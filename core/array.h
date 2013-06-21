@@ -122,8 +122,8 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
 }
 
 /// Returns an array of the application of a function to every elements of a reference
-template<class O, class T, class F, class... Args> array<O> apply(const ref<T>& a, F function, Args... args) {
-    array<O> r; for(const T& e: a) r << function(e, args...); return r;
+template<class Iterable, class Function, class... Args> auto apply(const Iterable& a, Function function, Args... args) -> array<decltype(function(*a.begin(), args...))> {
+    array<decltype(function(*a.begin(), args...))> r; for(const auto& e: a) r << function(e, args...); return r;
 }
 
 /// Converts arrays to references

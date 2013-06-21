@@ -112,8 +112,8 @@ struct range {
         iterator& operator++() { i++; return *this; }
         bool operator !=(const iterator& o) const{ return i<o.i; }
     };
-    iterator begin(){ return {start}; }
-    iterator end(){ return {stop}; }
+    iterator begin() const { return {start}; }
+    iterator end() const { return {stop}; }
     uint start, stop;
 };
 

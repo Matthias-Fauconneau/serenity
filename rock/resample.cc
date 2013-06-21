@@ -31,7 +31,6 @@ void downsample(Volume16& target, const Volume16& source) {
         }
     }
 }
-defineVolumePass(Downsample, uint16, downsample);
 
 /// Copies a volume
 void copy(Volume& target, const Volume& source) {

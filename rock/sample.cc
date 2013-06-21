@@ -24,7 +24,7 @@ template<Type X, Type Y> NonUniformSample<X,Y> scaleVariable(float scalar, NonUn
 /// Scales the variable of a distribution
 class(ScaleVariable, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", inputs[0]->metadata, inputs[0]->name);
+        assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
         outputs[0]->metadata = copy(inputs[0]->metadata);
         outputs[0]->data = toASCII(scaleVariable(TextData(inputs[1]->data).decimal(), parseNonUniformSample<double,double>(inputs[0]->data)));

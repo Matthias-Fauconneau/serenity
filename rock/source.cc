@@ -3,6 +3,7 @@
 #include "tiff.h"
 //#include "bmp.h"
 #include "sample.h"
+#include "crop.h"
 
 /// Parses physical resolution from source path
 class(PhysicalResolution, Operation) {
@@ -19,83 +20,41 @@ class(PhysicalResolution, Operation) {
 
 /// Concatenates image slice files in a volume
 class(Source, Operation), virtual VolumeOperation {
-    int3 min, max, sampleCount;
+    CropVolume crop;
 
     string parameters() const override { static auto p="path cylinder box downsample"_; return p; }
     uint outputSampleSize(uint) override { return 2; }
     size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint) override {
-        int3 sourceSize;
+        int3 size;
         assert_(args.contains("path"_), args);
         string path = args.at("path"_);
         if(!existsFolder(path, currentWorkingDirectory())) {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume volume;
             if(!parseVolumeFormat(volume, metadata)) error("Unknown format");
-            sourceSize=volume.sampleCount;
+            size=volume.sampleCount;
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
             assert_(slices, path);
-            sourceSize.z=slices.size;
+            size.z=slices.size;
             Map file (slices.first(), folder);
-            if(isTiff(file)) { const Tiff16 image (file); sourceSize.x=image.width,  sourceSize.y=image.height; }
-            else { Image image = decodeImage(file); assert_(image, path, slices.first());  sourceSize.x=image.width, sourceSize.y=image.height; }
+            if(isTiff(file)) { const Tiff16 image (file); size.x=image.width,  size.y=image.height; }
+            else { Image image = decodeImage(file); assert_(image, path, slices.first());  size.x=image.width, size.y=image.height; }
         }
-        min=0, max=sourceSize;
-        if(args.contains("cylinder"_)) {
-            if(args.at("cylinder"_)!=""_) {
-                if(args.at("cylinder"_).contains(',')) { // x, y, r, zMin, zMax
-                    Vector<int> coordinates = parseVector<int>(args.at("cylinder"_));
-                    int x=coordinates[0], y=coordinates[1], r=coordinates[2]; min.z=coordinates[3], max.z=coordinates[4];
-                    min.x=x-r, min.y=y-r, max.x=x+r, max.y=y+r;
-                } else { // Crops centered cylinder
-                    int r = toInteger(args.at("cylinder"_));
-                    min.x=max.x/2-r, min.y=max.y/2-r, min.z=max.z/2-r;
-                    max.x=max.x/2+r, max.y=max.y/2+r, max.z=max.z/2+r;
-                }
-            }
-            int margin = int(max.x-min.x) - int(max.y-min.y);
-            if(margin > 0) min.x+=margin/2, max.x-=margin/2;
-            if(margin < 0) min.y+=(-margin)/2, max.y-=(-margin)/2;
-        }
-        string box;
-        if(inputs) box = inputs[0]->data; // input argument (from automatic crop)
-        if(args.contains("box"_) && args.at("box"_)!="auto"_) box = args.at("box"_); // "box" argument overrides input
-        if(box) {
-            if(box.contains(',')) {
-                Vector<int> coordinates = parseVector<int>(box);
-                if(coordinates.size == 6) min=int3(coordinates[0], coordinates[1], coordinates[2]), max=int3(coordinates[3],coordinates[4],coordinates[5]); // Generic box
-                else if(coordinates.size == 3) { int3 size (coordinates[0],coordinates[1],coordinates[2]); min=max/2-size/2, max=max/2+size/2; } // Crops centered box
-            } else { int size = TextData(box).integer(); min=max/2-int3(size/2), max=max/2+int3(size/2); } // Crops centered cube
-        }
-        if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
-        if((max.x-min.x)%2) { if(max.x%2) max.x--; else assert(min.x%2), min.x++; }
-        if((max.y-min.y)%2) { if(max.y%2) max.y--; else assert(min.y%2), min.y++; }
-        if((max.z-min.z)%2) { if(max.z%2) max.z--; else assert(min.z%2), min.z++; }
-        // Asserts valid volume
-        assert_(min<max && max<=sourceSize, min, max, sourceSize);
-        assert_( (max.x-min.x)%2 == 0 && (max.y-min.y)%2 == 0 && (max.z-min.z)%2 == 0); // Margins are currently always symmetric
-        if(args.contains("cylinder"_)) assert_(max.x-min.x == max.y-min.y, min.x, min.y, max.x, max.y);
-        sampleCount = int3(nextPowerOfTwo(max.x-min.x), nextPowerOfTwo(max.y-min.y), nextPowerOfTwo(max.z-min.z));
-        while(sampleCount.x < ::min(sampleCount.y, sampleCount.z)/2) sampleCount.x*=2;
-        while(sampleCount.y < ::min(sampleCount.z, sampleCount.x)/2) sampleCount.y*=2;
-        while(sampleCount.z < ::min(sampleCount.x, sampleCount.y)/2) sampleCount.z*=2;
-        return (uint64)sampleCount.x*sampleCount.y*sampleCount.z*outputSampleSize(0);
+        crop = parseCrop(args, int3(0), size, inputs?inputs[0]->data:""_); // input argument (from automatic crop (CommonSampleSize))
+        return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
     }
-
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) override {
+        int3 min=crop.min, size=crop.size;
         string path = args.at("path"_);
-
         Volume16& target = outputs.first();
-        target.sampleCount = sampleCount;
-        int3 size = max-min;
-        target.margin = (target.sampleCount - size)/2;
-        assert( size+2*target.margin == target.sampleCount );
+        target.sampleCount = crop.sampleCount;
+        target.margin = crop.margin;
         uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z;
         uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
-
         if(!existsFolder(path, currentWorkingDirectory())) {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume source;
@@ -157,7 +116,7 @@ class(CommonSampleSize, Operation), virtual Pass {
             if(args.contains("path"_)) args.remove("path"_); //Removes sweep argument
             args.insert(String("path"_), copy(input.key));
             Source source; source.outputSize(args, {}, 0);
-            physicalSampleSizes << float(input.value)*vec3(source.max);
+            physicalSampleSizes << float(input.value)*vec3(source.crop.size);
         }
         vec3 min = ::min(physicalSampleSizes);
         size.metadata = String("vector"_);

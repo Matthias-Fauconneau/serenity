@@ -12,15 +12,20 @@ class(RelativeError, Operation), virtual Pass {
             NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
             double correct = sample.values.last();
             buffer<double> relativeError ( sample.size()-1 );
-            for(uint i: range(sample.values.size)) relativeError[i] = abs((sample.values[i]/correct)-1);
+            if(1) {
+                for(uint i: range(relativeError.size)) relativeError[i] = abs((sample.values[i]/correct)-1);
+            } else {
+                for(uint i: range(relativeError.size)) relativeError[i] = abs(sample.values[i] - correct);
+                double first=relativeError[0]; for(uint i: range(relativeError.size)) relativeError[i] /= first; // Normalizes with first error
+            }
             target.metadata = copy(source.metadata);
-            target.data = toASCII( NonUniformSample<double,double>(sample.keys.slice(0, sample.size()-1), relativeError) );
+            target.data = toASCII( NonUniformSample<double,double>(sample.keys.slice(0, relativeError.size), relativeError) );
         }
         if(source.elements) { // Sample
             assert_(!source.data && source.elements.size()>1);
             string reference = source.elements.keys.last();
             NonUniformSample<double,double> correct = parseNonUniformSample<double,double>(source.elements.values.last());
-            NonUniformSample<double,double> errors;
+            NonUniformSample<double,double> relativeError;
             for(auto element: source.elements) {
                 if(element.key == reference) continue;
                 NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(element.value);
@@ -28,9 +33,10 @@ class(RelativeError, Operation), virtual Pass {
                 UniformSample<double> error ( correct.size() );
                 const auto& f = sample.values;
                 for(uint i: range(error.size)) error[i] = abs((i<f.size?f[i]:0)-correct.values[i]);
-                errors.insert(toDecimal(element.key), error.sum() / correct.sum() );
+                relativeError.insert(toDecimal(element.key), error.sum() / correct.sum() );
             }
-            target.data = toASCII( errors );
+            //float first=relativeError.values[0]; for(uint i: range(relativeError.size())) relativeError.values[i] /= first; // Normalizes with first error
+            target.data = toASCII( relativeError );
         }
         target.metadata = copy(source.metadata);
     }

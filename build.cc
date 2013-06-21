@@ -102,7 +102,7 @@ struct Build {
                 else if(::find(build,"fast"_)) args << String("-g"_) << String("-Ofast"_);
                 else if(::find(build,"release"_)) args <<  String("-Ofast"_);
                 else error("Unknown build",build);
-                args << apply<String>(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
+                args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
                 pids << execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
             }
@@ -137,9 +137,9 @@ struct Build {
             String binary = tmp+build+"/"_+name;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime() || fileChanged) {
                 array<String> args; args<<String("-o"_)<<copy(binary);
-                args << apply<String>(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
+                args << apply(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
                 args << copy(files);
-                args << String("-L/ptmp/lib"_) << apply<String>(libraries, [this](const String& library){ return "-l"_+library; });
+                args << String("-L/ptmp/lib"_) << apply(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
                 if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) fail();
             }

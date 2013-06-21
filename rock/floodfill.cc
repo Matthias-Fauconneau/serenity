@@ -34,6 +34,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
 
+    assert_(source.margin>int3(1)); // Actually also needs the margin to be 0
     uint16* const targetData = target;
     clear(targetData, target.size());
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
@@ -49,7 +50,7 @@ void floodFill(Volume16& target, const Volume16& source) {
         buffer<byte> markBuffer(target.size()/8, target.size()/8, 0); // 1024³~128MiB
         byte* const mark = markBuffer.begin();
         uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-        uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+        uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
         {uint z=marginZ;
             for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
                 uint index = offsetX[x]+offsetY[y]+offsetZ[z];
@@ -105,5 +106,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     target.maximum = maximum; // Source maximum might be unconnected (with Z face method)
 }
 class(FloodFill, Operation), virtual VolumePass<uint16> {
-    void execute(const Dict&, VolumeT<uint16>& target, const Volume& source) override { floodFill(target, source); }
+    void execute(const Dict&, VolumeT<uint16>& target, const Volume& source) override {
+        floodFill(target, source);
+    }
 };

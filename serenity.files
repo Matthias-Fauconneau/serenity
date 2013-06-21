@@ -82,3 +82,5 @@ rock/median.cc
 rock/resample.cc
 rock/analysis.cc
 rock/sample.cc
+rock/crop.cc
+rock/crop.h

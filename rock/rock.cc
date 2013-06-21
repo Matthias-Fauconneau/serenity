@@ -96,9 +96,10 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 const string& path = targetPaths[index];
                 String name, data;
                 if(targetResults[index].size>1) output(targetsSweeps[index], targetResults[index], path);
-                else {
+                else { //FIXME: factorize with output
                     const shared<Result>& target = targetResults[index][0];
                     name = target->name+"."_+target->metadata;
+                    assert_(target->data);
                     data = unsafeReference(target->data);
                     if(existsFolder(path, cwd)) {
                         Time time;
@@ -117,11 +118,17 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
                 Folder(path,cwd,true);
             }
-            for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) if(target->data.size) {
+            for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) { //FIXME: factorize with output
                 Time time;
                 String fileName = target->name+"{"_+toASCII(target->relevantArguments)+"}."_+target->metadata;
-                writeFile(fileName, target->data, Folder(path, cwd));
-                log(fileName, "["_+strByteCount(target->data.size)+"]"_, time);
+                assert_(target->data || target->elements);
+                if(target->data) {
+                    writeFile(fileName, target->data, Folder(path, cwd));
+                    log(fileName, "["_+strByteCount(target->data.size)+"]"_, time);
+                } else {
+                    Folder folder(fileName, Folder(path, cwd), true);
+                    for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)target->elements) writeFile(element.key+"."_+target->metadata, element.value, folder);
+                }
             }
         } else assert(arguments.contains("view"_), "Expected target paths"_);
 
@@ -134,7 +141,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data)); } // Distribution
                     else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
                     else error(target->name, target->relevantArguments, target->metadata);
-                } else assert_(target->elements);
+                } else assert_(target->elements, target->name);
             }
         }
         if(current) {

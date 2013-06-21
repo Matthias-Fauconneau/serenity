@@ -78,7 +78,8 @@ if !sweep: minimalRadius = '0'
 if sweep: minimalRadius = {0..15}
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
-pruned-connected = FloodFill pruned-unconnected # Flood fills pruned pore space
+crop = Crop pruned-unconnected # Crops processed volume to remove boundary effects (before floodfill to avoid hidden connections)
+pruned-connected = FloodFill crop # Flood fills pruned pore space
 
 # Crops result to remove boundary bias
 #TODO
@@ -90,21 +91,22 @@ histogram-squaredRadius-connected = Histogram pruned-connected
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume (including rock)
-histogram-total = Histogram unconnected clip='0'
-volume-total = Sum histogram-total
+histogram-crop = Histogram crop clip='0'
+volume-crop = Sum histogram-crop
+volume-total = volume-crop #Backward compatibility
 # Computes porosity (= pore space volume / total volume )
-porosity-unconnected = Div volume-unconnected volume-total
-porosity-connected = Div volume-connected volume-total
+porosity-unconnected = Div volume-unconnected volume-crop
+porosity-connected = Div volume-connected volume-crop
 
 # Unconnected Volume( minimalSqRadius) sweep #FIXME: accumulate histogram-squaredRadius-unconnected
 volume-unconnected-minimalSqRadius = volume-unconnected minimalSqRadius
 volume-unconnected-minimalRadius = SquareRootVariable volume-unconnected-minimalSqRadius
-porosity-unconnected-minimalRadius = Div volume-unconnected-minimalRadius volume-total
+porosity-unconnected-minimalRadius = Div volume-unconnected-minimalRadius volume-crop
 
 # Connected Volume( minimalSqRadius) sweep
 volume-connected-minimalSqRadius = volume-connected minimalSqRadius
 volume-connected-minimalRadius = SquareRootVariable volume-connected-minimalSqRadius
-porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-total
+porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-crop
 
 # Returns the maximum pruning radius with volume > 0 (connectivity)
 maximum-minimalRadius = Optimize volume-connected-minimalRadius criteria='maximumArgument' constraint='>0'
@@ -116,8 +118,8 @@ histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connecte
 volume-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
 volume-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
 # Normalize probability density on total volume (including background (i.e not the same as density normalization))
-distribution-radius-unconnected = Div volume-distribution-radius-unconnected volume-total
-distribution-radius-connected = Div volume-distribution-radius-connected volume-total
+distribution-radius-unconnected = Div volume-distribution-radius-unconnected volume-crop
+distribution-radius-connected = Div volume-distribution-radius-connected volume-crop
 
 # Scales radius (e.g to original pixel or physical resolution)
  histogram-radius-unconnected-scaled = ScaleVariable histogram-radius-unconnected resampled-resolution
@@ -128,24 +130,24 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resampled-resolution
 
 # Representative elementary volume estimation
- # Sweeps cylinderRadius computing connected size distributions and porosity
-  distribution-radius-connected-cylinderRadius = distribution-radius-connected cylinder
-  porosity-connected-cylinderRadius = porosity-connected cylinder
-  porosity-connected-cylinderRadius-scaled = ScaleVariable porosity-connected-cylinderRadius resampled-resolution
+ # Sweeps cropRadius computing connected size distributions and porosity
+  distribution-radius-connected-cropRadius = distribution-radius-connected crop.cylinder
+  distribution-radius-connected-cropRadius-scaled = ScaleVariable distribution-radius-connected-cropRadius[] resampled-resolution
+  porosity-connected-cropRadius = porosity-connected crop.cylinder
+  porosity-connected-cropRadius-scaled = ScaleVariable porosity-connected-cropRadius resampled-resolution
 
  # Pore size distribution error
-  distribution-radius-error = RelativeError distribution-radius-connected-cylinderRadius
-  distribution-radius-error-scaled = ScaleVariable distribution-radius-error resampled-resolution
-  # Returns the minimum cylinderRadius with distribution error < 5%
-  minimum-cylinderRadius-distribution = Optimize distribution-radius-error criteria='minimumArgument' constraint='<0.5'
+  distribution-radius-error-cropRadius = RelativeError distribution-radius-connected-cropRadius
+  distribution-radius-error-cropRadius-scaled = ScaleVariable distribution-radius-error-cropRadius resampled-resolution
+  # Returns the minimum cropRadius with distribution error < 10%
+  minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.1'
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)
-  porosity-error = RelativeError porosity-connected-cylinderRadius-scaled
-  # Smoothes relative errors
-  porosity-error-smooth = RunningAverage porosity-error
-  # Returns the minimum cylinderRadius with porosity error < 5%
-  minimum-cylinderRadius-porosity = Optimize porosity-error-smooth criteria='minimumArgument' constraint='<0.05'
+  porosity-error-cropRadius = RelativeError porosity-connected-cropRadius
+  porosity-error-cropRadius-scaled = ScaleVariable porosity-error-cropRadius resampled-resolution
+  # Returns the minimum cropRadius with porosity error < 10%
+  minimum-cropRadius-porosity = Optimize porosity-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.1'
 
 # Square roots squared distance
  sqrt-unconnected = SquareRoot pruned-unconnected
