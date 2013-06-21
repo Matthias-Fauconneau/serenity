@@ -11,6 +11,6 @@ struct Script { Script() {
         log("1/2:",Date(start + 1*total/2), "2/3:",Date(start + 2*total/3), "3/4:",Date(start + 3*total/4));
 #endif
 #if 1
-        log(apply(range(4*log2(512)-15,4*log2(512)+1), [](double i){ return dec(round(pow(2,i/4.)),3); } ),',');
+        const int steps=8; log(apply(range(steps*log2(512)-45,steps*log2(512)), [](double i){ return dec(round(pow(2,(double)i/steps)),3); } )<<dec(506),',');
 #endif
 } } script;

@@ -245,6 +245,17 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         if(scopeArgumentsAndSweeps.contains(arg.key)) {}
         else scopeArgumentsAndSweeps.insert(copy(arg.key), sweepStr(arg.value));
     }
+    for(auto arg: rule.argumentExps) { // Evaluates local arguments
+        //if(args.contains(arg.key)) continue;
+        if(scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.remove(arg.key);
+        //assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule); //FIXME: local arguments are also forwarded to inputs
+        if(arg.value.type == Rule::Expression::Value) { // Local value argument
+            assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
+            scopeArgumentsAndSweeps.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
+        } else if(local) { // Local literal argument (only needed for Operation execution)
+            scopeArgumentsAndSweeps.insert(copy(arg.key), copy((const Variant&)arg.value));
+        }
+    }
 
     // Recursively evaluates to invalid cache on argument changes
     for(const string& input: rule.inputs) {
@@ -295,16 +306,6 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         assert_(arg.value, arg.key);
         if(args.contains(arg.key)) args.remove(arg.key); // Sweep overrides local argument
         args.insert(copy(arg.key), sweepStr(arg.value));
-    }
-    for(auto arg: rule.argumentExps) { // Evaluates local arguments
-        if(args.contains(arg.key)) continue;
-        assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule);
-        if(arg.value.type == Rule::Expression::Value) { // Local value argument
-            assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
-            args.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
-        } else if(local) { // Local literal argument (only needed for Operation execution)
-            args.insert(copy(arg.key), copy((const Variant&)arg.value));
-        }
     }
     //log(scope+"/"_+target, scopeArgumentsAndSweeps, "->"_, args);
     cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), local, sweep, move(args));
@@ -439,11 +440,17 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
-shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments, const string& scope) {
+shared<Result> PersistentProcess::getResult(const string& target, const Dict& scopeArguments, const string& scope) {
     const Rule& rule = ruleForOutput(target);
     if(!&rule && arguments.contains(target)) // Conversion from argument to result
         return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_);
     assert_(&rule, target);
+
+    Dict arguments = copy(scopeArguments);
+    for(auto arg: rule.argumentExps) if(arg.value.type == Rule::Expression::Literal) {
+        if(arguments.contains(arg.key)) arguments.remove(arg.key); // Local arguments overrides global arguments
+        arguments.insert(copy(arg.key), copy((const Variant&)arg.value)); // Appends local arguments
+    }
 
     const shared<Result>& result = find(target, arguments);
     if(&result && sameSince(target, result->timestamp, arguments)) return share(result); // Returns a cached result if still valid

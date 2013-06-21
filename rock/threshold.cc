@@ -87,9 +87,8 @@ UniformSample sample(const Lorentz& lorentz, uint size) {
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == "histogram.tsv"_);
+        assert_(inputs[0]->metadata == "kde.tsv"_);
         UniformHistogram density = parseUniformSample( inputs[0]->data );
-        density[0]=density[density.size-1]=0; // Zeroes extreme values (clipping artifacts)
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
         const UniformSample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
         Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
@@ -121,8 +120,9 @@ class(MaximumMeanGradient, Operation) {
         for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
             const uint16* const voxel = &source[z*X*Y+y*X+x];
             uint gradient = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) /*+ abs(voxel[0] - voxel[X*Y])*/; //[sic] Anistropic for backward compatibility
-            const uint binCount = 255; assert(binCount<=source.maximum); // Quantizes to 8bit as this method fails if voxels are not grouped in large enough sets
-            uint bin = uint(voxel[0])*binCount/source.maximum*source.maximum/binCount;
+            /*const uint binCount = 255; assert(binCount<=source.maximum); // Quantizes to 8bit as this method fails if voxels are not grouped in large enough sets
+            uint bin = uint(voxel[0])*binCount/source.maximum*source.maximum/binCount;*/
+            uint bin = uint(voxel[0]);
             gradientSum[bin] += gradient, histogram[bin]++;
             //gradientSum[voxel[1]] += gradient, histogram[voxel[1]]++; //[sic] Asymetric for backward compatibility
             //gradientSum[voxel[X]] += gradient, histogram[voxel[X]]++; //[sic] Asymetric for backward compatibility

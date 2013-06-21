@@ -82,9 +82,11 @@ pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 # Crops before floodfill to avoid hidden connections
 if !REV: cropInput = pruned-unconnected
 if !REV: floodInput = crop
+if !REV: crop-flood = pruned-connected
 # Floodfill once and explicitly crop each REV volume (FIXME: only crop histogram evaluation)
 if REV: floodInput = pruned-unconnected
 if REV: cropInput = pruned-connected
+if REV: crop-flood = crop
 
 # Crops processed volume to remove boundary bias effects
 if crop.cylinder: crop = Crop cropInput
@@ -93,7 +95,7 @@ pruned-connected = FloodFill floodInput # Flood fills pruned pore space
 
 # Computes histogram of maximum squared radii
 histogram-squaredRadius-unconnected = Histogram pruned-unconnected
-histogram-squaredRadius-connected = Histogram pruned-connected
+histogram-squaredRadius-connected = Histogram crop-flood
 # Computes pore space volume
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
@@ -144,21 +146,21 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
   porosity-connected-cropRadius-scaled = ScaleVariable porosity-connected-cropRadius resampled-resolution
 
  # Pore size distribution error
-  distribution-radius-error-cropRadius = RelativeError distribution-radius-connected-cropRadius
+  distribution-radius-error-cropRadius = DistributionError distribution-radius-connected-cropRadius
   distribution-radius-error-cropRadius-scaled = ScaleVariable distribution-radius-error-cropRadius resampled-resolution
   # Returns the minimum cropRadius with distribution error < 10%
-  minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.05'
+  minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)
-  porosity-error-cropRadius = RelativeError porosity-connected-cropRadius
+  porosity-error-cropRadius = ScalarError porosity-connected-cropRadius
   porosity-error-cropRadius-scaled = ScaleVariable porosity-error-cropRadius resampled-resolution
   # Returns the minimum cropRadius with porosity error < 10%
   minimum-cropRadius-porosity = Optimize porosity-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.05'
 
 # Square roots squared distance
  sqrt-unconnected = SquareRoot pruned-unconnected
- sqrt-connected = SquareRoot pruned-connected
+ sqrt-connected = SquareRoot crop-flood
 
 # Scale volume values
  sqrt-unconnected-scaled = ScaleValues sqrt-unconnected resampled-resolution

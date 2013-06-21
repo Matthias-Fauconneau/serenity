@@ -125,6 +125,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                 String fileName = target->name+"{"_+toASCII(target->relevantArguments)+"}."_+target->metadata;
                 //assert(target->data || target->elements, fileName);
                 if(target->data) {
+                    assert(!existsFolder(fileName), fileName);
                     writeFile(fileName, target->data, Folder(path, cwd));
                     log(fileName, "["_+strByteCount(target->data.size)+"]"_, time);
                 } else {

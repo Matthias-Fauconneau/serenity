@@ -56,6 +56,7 @@ class(Source, Operation), virtual VolumeOperation {
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
         if(!existsFolder(path, currentWorkingDirectory())) {
+            assert_(args.value("downsample"_,"0"_)=="0"_);
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume source;
             if(!parseVolumeFormat(source, metadata)) error("Unknown format");

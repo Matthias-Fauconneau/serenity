@@ -66,7 +66,7 @@ void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 
 // File
-File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),at.name()+"/"_+path+"'"_, (int)flags)){ assert_(path.size<0x100); }
+File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666),at.name()+"/"_+path+"'"_, (int)flags, path.size)){ assert_(path.size<0x100); }
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 File::size() const { return stat().st_size; }
 int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }

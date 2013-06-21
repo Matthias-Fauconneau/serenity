@@ -4,24 +4,26 @@
 #include "math.h"
 
 /// Computes relative errors (assuming last value is correct)
-class(RelativeError, Operation), virtual Pass {
-    string parameters() const override { return "slice"_; }
-    virtual void execute(const Dict& args, Result& target, const Result& source) override {
+class(ScalarError, Operation), virtual Pass {
+    virtual void execute(const Dict&, Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_));
         if(source.data) { // Scalar
             assert_(!source.elements);
             NonUniformSample sample = parseNonUniformSample(source.data);
             double correct = sample.values.last();
             buffer<double> relativeError ( sample.size()-1 );
-            if(1) {
-                for(uint i: range(relativeError.size)) relativeError[i] = abs((sample.values[i]/correct)-1);
-            } else {
-                for(uint i: range(relativeError.size)) relativeError[i] = abs(sample.values[i] - correct);
-                double first=relativeError[0]; for(uint i: range(relativeError.size)) relativeError[i] /= first; // Normalizes with first error
-            }
+            for(uint i: range(relativeError.size)) relativeError[i] = abs((sample.values[i]/correct)-1);
             target.metadata = copy(source.metadata);
             target.data = toASCII( NonUniformSample(sample.keys.slice(0, relativeError.size), relativeError) );
         }
+        target.metadata = copy(source.metadata);
+    }
+};
+
+class(DistributionError, Operation), virtual Pass {
+    string parameters() const override { return "slice"_; }
+    virtual void execute(const Dict& args, Result& target, const Result& source) override {
+        assert_(endsWith(source.metadata,".tsv"_));
         if(source.elements) { // Sample
             assert_(!source.data && source.elements.size()>1);
             string reference = source.elements.keys.last();
@@ -38,14 +40,12 @@ class(RelativeError, Operation), virtual Pass {
                 double differenceArea = 0, correctArea = 0;
                 for(uint i: range(round(sliceMin*sampleCount), round(sliceMax*sampleCount))) { // Computes area between curves (with 0th order numerical integration)
                     double x = i*delta;
-                    log(x, sample.interpolate(x), correct.interpolate(x));
                     differenceArea += abs(sample.interpolate(x)-correct.interpolate(x));
                     correctArea += correct.interpolate(x);
                 }
                 assert_(differenceArea && correctArea);
                 relativeError.insert(toDecimal(element.key), differenceArea / correctArea );
             }
-            //float first=relativeError.values[0]; for(uint i: range(relativeError.size())) relativeError.values[i] /= first; // Normalizes with first error
             target.data = toASCII( relativeError );
         }
         target.metadata = copy(source.metadata);
