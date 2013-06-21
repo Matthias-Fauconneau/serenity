@@ -78,12 +78,18 @@ if !sweep: minimalRadius = '0'
 if sweep: minimalRadius = {0..15}
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
-if crop.cylinder: crop = Crop pruned-unconnected # Crops processed volume to remove boundary effects (before floodfill to avoid hidden connections)
-if !crop.cylinder: crop = pruned-unconnected
-pruned-connected = FloodFill crop # Flood fills pruned pore space
 
-# Crops result to remove boundary bias
-#TODO
+# Crops before floodfill to avoid hidden connections
+if !REV: cropInput = pruned-unconnected
+if !REV: floodInput = crop
+# Floodfill once and explicitly crop each REV volume (FIXME: only crop histogram evaluation)
+if REV: floodInput = pruned-unconnected
+if REV: cropInput = pruned-connected
+
+# Crops processed volume to remove boundary bias effects
+if crop.cylinder: crop = Crop cropInput
+if !crop.cylinder: crop = cropInput
+pruned-connected = FloodFill floodInput # Flood fills pruned pore space
 
 # Computes histogram of maximum squared radii
 histogram-squaredRadius-unconnected = Histogram pruned-unconnected

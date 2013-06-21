@@ -117,11 +117,13 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             if(!existsFolder(path,cwd)) {
                 assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
                 Folder(path,cwd,true);
-            }
+            } else if(Folder(path,cwd).list(Files).size<=12) {
+                for(const String& file: Folder(path,cwd).list(Files)) ::remove(file, Folder(path,cwd)); // Cleanups previous results
+            } else log("Skipped cleaning (Too many previous results)");
             for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) { //FIXME: factorize with output
                 Time time;
                 String fileName = target->name+"{"_+toASCII(target->relevantArguments)+"}."_+target->metadata;
-                assert_(target->data || target->elements);
+                //assert(target->data || target->elements, fileName);
                 if(target->data) {
                     writeFile(fileName, target->data, Folder(path, cwd));
                     log(fileName, "["_+strByteCount(target->data.size)+"]"_, time);
@@ -137,11 +139,12 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
             for(const array<shared<Result>>& results: targetResults) for(const shared<Result>& target: results) {
                 if(target->data) {
                     if(target->metadata=="scalar"_) log_(str(target->name, "=", target->data));
-                    else if(endsWith(target->metadata,"map"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data));  } // Map of scalars
-                    else if(endsWith(target->metadata,".tsv"_)) { if(count(target->data,'\n')<32) log_(str(target->name, ":\n"_+target->data)); } // Distribution
+                    else if(endsWith(target->metadata,"map"_) || endsWith(target->metadata,".tsv"_)) { // Distribution or scalar map
+                        if(count(target->data,'\n')<16) log_(str(target->name, "["_+str(count(target->data,'\n'))+"]"_,":\n"_+target->data));
+                    }
                     else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
                     else error(target->name, target->relevantArguments, target->metadata);
-                } else assert_(target->elements, target->name);
+                } else assert(target->elements, target->name);
             }
         }
         if(current) {

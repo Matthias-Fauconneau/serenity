@@ -4,7 +4,7 @@
 #include "math.h"
 
 struct Script { Script() {
-#if 0
+#if 1
         Date start(10,April,2013), now = currentTime(), end(21,August,2013);
         uint since = now - start, until = end - now, total = since+until;
         log("Elapsed:",since/60/60/24,"days", "["_+str(100.0*since/total)+"%]"_, "\tRemaining:",until/60/60/24,"days", "["_+str(100.0*until/total)+"%]"_,"\tTotal:",total/60/60/24,"days");

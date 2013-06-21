@@ -106,7 +106,7 @@ bool isDecimal(const string& number) {
 
 inline double exp10(double x) { return __builtin_exp10(x); }
 inline double log10(double x) { return __builtin_log10(x); }
-double toDecimal(const string& number) {
+double toDecimal(const string& number) { //FIXME: fromDecimal
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
     double sign=1, eSign=1;

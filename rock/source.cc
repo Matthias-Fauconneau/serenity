@@ -63,7 +63,7 @@ class(Source, Operation), virtual VolumeOperation {
 
             Map file(path, currentWorkingDirectory()); // Copy from disk mapped to process managed memory
             for(uint z: range(size.z)) {
-                assert(min.z+z<sZ);
+                if(report/1000>=5) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                 uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
                 uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
                 for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
@@ -120,6 +120,6 @@ class(CommonSampleSize, Operation), virtual Pass {
         }
         vec3 min = ::min(physicalSampleSizes);
         size.metadata = String("vector"_);
-        size.data = toASCII( Vector<float>(ref<float>{min.x, min.y, min.z}) );
+        size.data = toASCII( Vector(ref<double>{min.x, min.y, min.z}) );
     }
 };

@@ -280,7 +280,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
             bool match=false;
             for(const string& output: rule.outputs) if(startsWith(output, scope)) match = true;
             if(match) {
-                assert_(parameters.contains(parameter));
+                //assert_(parameters.contains(parameter), "Irrelevant scope parameter", scope, parameter, rule); might fail on first configure pass
                 if(local) {
                     if(args.contains(parameter)) args.remove(parameter);
                     args.insert(String(parameter), copy(arg.value));

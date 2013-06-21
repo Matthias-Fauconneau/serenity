@@ -5,11 +5,12 @@
 
 /// Computes relative errors (assuming last value is correct)
 class(RelativeError, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
+    string parameters() const override { return "slice"_; }
+    virtual void execute(const Dict& args, Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_));
         if(source.data) { // Scalar
             assert_(!source.elements);
-            NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
+            NonUniformSample sample = parseNonUniformSample(source.data);
             double correct = sample.values.last();
             buffer<double> relativeError ( sample.size()-1 );
             if(1) {
@@ -19,65 +20,35 @@ class(RelativeError, Operation), virtual Pass {
                 double first=relativeError[0]; for(uint i: range(relativeError.size)) relativeError[i] /= first; // Normalizes with first error
             }
             target.metadata = copy(source.metadata);
-            target.data = toASCII( NonUniformSample<double,double>(sample.keys.slice(0, relativeError.size), relativeError) );
+            target.data = toASCII( NonUniformSample(sample.keys.slice(0, relativeError.size), relativeError) );
         }
         if(source.elements) { // Sample
             assert_(!source.data && source.elements.size()>1);
             string reference = source.elements.keys.last();
-            NonUniformSample<double,double> correct = parseNonUniformSample<double,double>(source.elements.values.last());
-            NonUniformSample<double,double> relativeError;
+            NonUniformSample correct = parseNonUniformSample(source.elements.values.last());
+            NonUniformSample relativeError;
             for(auto element: source.elements) {
                 if(element.key == reference) continue;
-                NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(element.value);
-                assert_(sample.size()<=correct.size(), sample.size(), correct.size(), source.elements.keys);
-                UniformSample<double> error ( correct.size() );
-                const auto& f = sample.values;
-                for(uint i: range(error.size)) error[i] = abs((i<f.size?f[i]:0)-correct.values[i]);
-                relativeError.insert(toDecimal(element.key), error.sum() / correct.sum() );
+                NonUniformSample sample = parseNonUniformSample(element.value);
+                double delta = min(correct.delta(), sample.delta()), maximum=max(max(correct.keys), max(sample.keys));
+                uint sampleCount = maximum/delta;
+                string slice = args.value("slice"_,"0-1"_);
+                assert_(slice.contains('-'));
+                double sliceMin = toDecimal(section(slice,'-',0,1)), sliceMax = toDecimal(section(slice,'-',1,2));
+                double differenceArea = 0, correctArea = 0;
+                for(uint i: range(round(sliceMin*sampleCount), round(sliceMax*sampleCount))) { // Computes area between curves (with 0th order numerical integration)
+                    double x = i*delta;
+                    log(x, sample.interpolate(x), correct.interpolate(x));
+                    differenceArea += abs(sample.interpolate(x)-correct.interpolate(x));
+                    correctArea += correct.interpolate(x);
+                }
+                assert_(differenceArea && correctArea);
+                relativeError.insert(toDecimal(element.key), differenceArea / correctArea );
             }
             //float first=relativeError.values[0]; for(uint i: range(relativeError.size())) relativeError.values[i] /= first; // Normalizes with first error
             target.data = toASCII( relativeError );
         }
         target.metadata = copy(source.metadata);
-    }
-};
-
-/*class(Error, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        assert_(endsWith(source.metadata,".tsv"_));
-        if(source.elements) { // Sample
-            assert_(!source.data && source.elements.size()>1);
-            string reference = source.elements.keys.last();
-            NonUniformSample<double,double> correct = parseNonUniformSample<double,double>(source.elements.values.last());
-            for(auto element: source.elements) {
-                if(element.key == reference) continue;
-                NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(element.value);
-                assert_(sample.size()<=correct.size(), sample.size(), correct.size(), source.elements.keys);
-                buffer<double> error ( correct.size() );
-                const auto& f = sample.values;
-                for(uint i: range(error.size)) error[i] = abs((i<f.size?f[i]:0)-correct.values[i]);
-                target.elements.insert(copy(element.key), toASCII( NonUniformSample<double,double>(correct.keys, error) ));
-            }
-        }
-        target.metadata = copy(source.metadata);
-    }
-};*/
-
-/// Computes running average (i.e convolution with a box kernel)
-class(RunningAverage, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        assert_(endsWith(source.metadata,".tsv"_));
-        NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
-        const int window = 1; // Half window size
-        buffer<double> average ( sample.size()-2*window );
-        const auto& f = sample.values;
-        for(uint i: range(window,f.size-window)) {
-            double sum = 0; for(uint j: range(i-window,i+window+1)) sum += f[j];
-            const uint sampleCount = window+1+window;
-            average[i-window] = sum/sampleCount;
-        }
-        target.metadata = copy(source.metadata);
-        target.data = toASCII( NonUniformSample<double,double>(sample.keys.slice(window,average.size), average) );
     }
 };
 
@@ -88,7 +59,7 @@ class(Optimize, Operation), virtual Pass {
         TextData s(args.at("constraint"_));
         string op = s.whileAny("><"_);
         double value = s.decimal();
-        const NonUniformSample<double,double> sample = parseNonUniformSample<double,double>(source.data);
+        const NonUniformSample sample = parseNonUniformSample(source.data);
         target.metadata = String("scalar"_);
         assert_(!target.data);
         double best = nan;

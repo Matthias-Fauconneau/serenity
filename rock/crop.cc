@@ -9,7 +9,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
     if(cylinder) {
         if(args.at("cylinder"_)!=""_) {
             if(args.at("cylinder"_).contains(',')) { // x, y, r, zMin, zMax
-                Vector<int> coordinates = parseVector<int>(args.at("cylinder"_));
+                Vector coordinates = parseVector(args.at("cylinder"_), true);
                 int x=coordinates[0], y=coordinates[1], r=coordinates[2]; min.z=coordinates[3], max.z=coordinates[4];
                 min.x=x-r, min.y=y-r, max.x=x+r, max.y=y+r;
             } else { // Crops centered cylinder
@@ -24,7 +24,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
     if(args.contains("box"_) && args.at("box"_)!="auto"_) box = args.at("box"_); // "box" argument overrides input
     if(box) {
         if(box.contains(',')) {
-            Vector<int> coordinates = parseVector<int>(box);
+            Vector coordinates = parseVector(box, true);
             if(coordinates.size == 6) min=int3(coordinates[0], coordinates[1], coordinates[2]), max=int3(coordinates[3],coordinates[4],coordinates[5]); // Generic box
             else if(coordinates.size == 3) { int3 size (coordinates[0],coordinates[1],coordinates[2]); min=max/2-size/2, max=max/2+size/2; } // Crops centered box
         } else { int size = TextData(box).integer(); min=center-int3(size/2), max=center+int3(size/2); } // Crops centered cube

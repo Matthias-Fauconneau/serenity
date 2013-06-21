@@ -84,3 +84,4 @@ rock/analysis.cc
 rock/sample.cc
 rock/crop.cc
 rock/crop.h
+rock/sample-operation.cc

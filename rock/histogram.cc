@@ -48,7 +48,7 @@ class(Histogram, Operation) {
 class(Normalize, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
-        auto sample = parseUniformSample<double>(source.data);
+        auto sample = parseUniformSample(source.data);
         //NonUniformSample sample = parseNonUniformSample(source.data);
         float sum = sample.sum();
         assert_(sum);
