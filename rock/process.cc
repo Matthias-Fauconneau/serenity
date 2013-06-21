@@ -36,7 +36,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 string op;
                 string right;
                 if(s.match('!')) op="=="_, right="0"_;
-                string parameter = s.word("_-"_);
+                string parameter = s.word("_-."_);
                 parameters += parameter;
                 String left ("0"_);
                 if(sweeps.contains(parameter)) left = sweepStr(sweeps.at(parameter));
@@ -158,7 +158,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                         if(rule.operation) rule.inputs << key; // Argument value
                         else if(sweeps.contains(key)) rule.sweeps.insert(String(key), copy(sweeps.at(key))); // Sweep value
                         else if(arguments.contains(key)) rule.sweeps.insert(String(key), move(array<Variant>()<<copy(arguments.at(key)))); // Single sweep value
-                        else if(pass>=1) error("Undefined argument", key, arguments, sweeps);
+                        //else if(pass>=1) error("Undefined argument", key, arguments, sweeps);
                     }
                 }
                 for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
@@ -247,20 +247,17 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     }
 
     // Recursively evaluates to invalid cache on argument changes
-    if(!local) for(const string& input: rule.inputs) {
-        for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
-            if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
-            else args.insert(copy(arg.key), copy(arg.value));
-        }
-    }
-    // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
     for(const string& input: rule.inputs) {
+        if(!local) for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
+            if(args.contains(arg.key)) args.remove(arg.key); //assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
+            args.insert(copy(arg.key), copy(arg.value));
+        }
+        // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
         if(!sweep) {
             const Rule& rule = ruleForOutput(input);
             if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter);
         }
     }
-
     /// Relevant rule parameters (from operation and argument expressions)
     array<string> parameters;
     if(rule.operation) {

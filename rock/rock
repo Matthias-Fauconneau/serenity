@@ -78,7 +78,8 @@ if !sweep: minimalRadius = '0'
 if sweep: minimalRadius = {0..15}
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
-crop = Crop pruned-unconnected # Crops processed volume to remove boundary effects (before floodfill to avoid hidden connections)
+if crop.cylinder: crop = Crop pruned-unconnected # Crops processed volume to remove boundary effects (before floodfill to avoid hidden connections)
+if !crop.cylinder: crop = pruned-unconnected
 pruned-connected = FloodFill crop # Flood fills pruned pore space
 
 # Crops result to remove boundary bias
@@ -140,14 +141,14 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
   distribution-radius-error-cropRadius = RelativeError distribution-radius-connected-cropRadius
   distribution-radius-error-cropRadius-scaled = ScaleVariable distribution-radius-error-cropRadius resampled-resolution
   # Returns the minimum cropRadius with distribution error < 10%
-  minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.1'
+  minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.05'
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)
   porosity-error-cropRadius = RelativeError porosity-connected-cropRadius
   porosity-error-cropRadius-scaled = ScaleVariable porosity-error-cropRadius resampled-resolution
   # Returns the minimum cropRadius with porosity error < 10%
-  minimum-cropRadius-porosity = Optimize porosity-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.1'
+  minimum-cropRadius-porosity = Optimize porosity-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.05'
 
 # Square roots squared distance
  sqrt-unconnected = SquareRoot pruned-unconnected
