@@ -3,7 +3,7 @@
 # Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Parse physical resolutions (i.e inverse sample rate)
-resolution = '1'
+resolution = '1' #Input resolution
 if resolution == 'auto': resolution = PhysicalResolution # Parses resolution from input folder name as "name-resolution"
 resolutions = resolution path # Parses all resolutions (using sweep generator)
 
@@ -27,12 +27,12 @@ if denoise == 'average': denoised = average
 if denoise == 'median': denoised = median
  median = Median source
 
-# Resamples all volumes to coarsest resolution
-common-resolution = Maximum resolutions
-if resample: resampled mipmap = Resample denoised resolution common-resolution # Resamples from input resolution to common-resolution
-if resample: resampled-resolution = common-resolution # Forwards common resolution
+# Resamples
+if !resample: process-resolution = resolution # Forwards original resolution
 if !resample: resampled = denoised # Forwards original volume
-if !resample: resampled-resolution = resolution # Forwards original resolution
+#FIXME: if resample and !process-resolution: process-resolution = Maximum resolutions # Resamples all volumes to coarsest resolution
+if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
+
 # Density distribution
 if !box: cylinder = '' #Clips histograms to the inscribed cylinder
 if !thresholdFromSource: histogram-density = Histogram resampled
@@ -131,30 +131,30 @@ distribution-radius-unconnected = Div volume-distribution-radius-unconnected vol
 distribution-radius-connected = Div volume-distribution-radius-connected volume-crop
 
 # Scales radius (e.g to original pixel or physical resolution)
- histogram-radius-unconnected-scaled = ScaleVariable histogram-radius-unconnected resampled-resolution
- histogram-radius-connected-scaled = ScaleVariable histogram-radius-connected resampled-resolution
- distribution-radius-unconnected-scaled = ScaleVariable distribution-radius-unconnected resampled-resolution
- distribution-radius-connected-scaled = ScaleVariable distribution-radius-connected resampled-resolution
- porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius resampled-resolution
- porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius resampled-resolution
+ histogram-radius-unconnected-scaled = ScaleVariable histogram-radius-unconnected process-resolution
+ histogram-radius-connected-scaled = ScaleVariable histogram-radius-connected process-resolution
+ distribution-radius-unconnected-scaled = ScaleDistribution distribution-radius-unconnected process-resolution
+ distribution-radius-connected-scaled = ScaleDistribution distribution-radius-connected process-resolution
+ porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius process-resolution
+ porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius process-resolution
 
 # Representative elementary volume estimation
  # Sweeps cropRadius computing connected size distributions and porosity
   distribution-radius-connected-cropRadius = distribution-radius-connected crop.cylinder
-  distribution-radius-connected-cropRadius-scaled = ScaleVariable distribution-radius-connected-cropRadius[] resampled-resolution
+  distribution-radius-connected-cropRadius-scaled = ScaleDistribution distribution-radius-connected-cropRadius[] process-resolution
   porosity-connected-cropRadius = porosity-connected crop.cylinder
-  porosity-connected-cropRadius-scaled = ScaleVariable porosity-connected-cropRadius resampled-resolution
+  porosity-connected-cropRadius-scaled = ScaleVariable porosity-connected-cropRadius process-resolution
 
  # Pore size distribution error
   distribution-radius-error-cropRadius = DistributionError distribution-radius-connected-cropRadius
-  distribution-radius-error-cropRadius-scaled = ScaleVariable distribution-radius-error-cropRadius resampled-resolution
+  distribution-radius-error-cropRadius-scaled = ScaleVariable distribution-radius-error-cropRadius process-resolution
   # Returns the minimum cropRadius with distribution error < 10%
   minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)
   porosity-error-cropRadius = ScalarError porosity-connected-cropRadius
-  porosity-error-cropRadius-scaled = ScaleVariable porosity-error-cropRadius resampled-resolution
+  porosity-error-cropRadius-scaled = ScaleVariable porosity-error-cropRadius process-resolution
   # Returns the minimum cropRadius with porosity error < 10%
   minimum-cropRadius-porosity = Optimize porosity-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.05'
 
@@ -163,8 +163,8 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  sqrt-connected = SquareRoot crop-flood
 
 # Scale volume values
- sqrt-unconnected-scaled = ScaleValues sqrt-unconnected resampled-resolution
- sqrt-connected-scaled = ScaleValues sqrt-connected resampled-resolution
+ sqrt-unconnected-scaled = ScaleValues sqrt-unconnected process-resolution
+ sqrt-connected-scaled = ScaleValues sqrt-connected process-resolution
 
 # Exports to CDL
  cdl-unconnected = ToCDL sqrt-unconnected-scaled

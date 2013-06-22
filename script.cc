@@ -12,5 +12,6 @@ struct Script { Script() {
 #endif
 #if 1
         const int steps=8; log(apply(range(steps*log2(512)-45,steps*log2(512)), [](double i){ return dec(round(pow(2,(double)i/steps)),3); } )<<dec(506),',');
+        log(apply(range(8), [](double i){ return ftoa(0.74*pow(2,8-1-i),2); } ),',');
 #endif
 } } script;

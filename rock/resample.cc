@@ -6,7 +6,7 @@ void downsample(Volume16& target, const Volume16& source) {
     int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
     assert_(X%2==0 && Y%2==0 && Z%2==0);
     target.sampleCount = source.sampleCount/2;
-    target.data.size /= 8;
+    target.data.size = source.data.size/8;
     assert(source.margin.x%2==0 && source.margin.y%2==0 && source.margin.z%2==0);
     target.margin = source.margin/2;
     target.maximum=source.maximum;
@@ -40,7 +40,7 @@ void copy(Volume& target, const Volume& source) {
 
 /// Resamples a volume using nearest neighbour (FIXME: linear, cubic)
 void resample(Volume16& target, const Volume16& source, int sourceResolution, int targetResolution) {
-    assert_(targetResolution > sourceResolution && targetResolution < sourceResolution*2);
+    assert_(targetResolution > sourceResolution && targetResolution < sourceResolution*2, sourceResolution, targetResolution);
     assert_(!source.tiled());
     int X = source.sampleCount.x, Y = source.sampleCount.y, XY = X*Y;
     int3 targetSize = (source.sampleCount-source.margin) * sourceResolution / targetResolution;
@@ -77,13 +77,18 @@ class(Resample, Operation), virtual VolumeOperation {
         int times = log2(targetResolution/sourceResolution);
         Volume* mipmap[2] = {&outputs[0], &outputs[1]};
         if(times%2) swap(mipmap[0], mipmap[1]);
+        if(targetResolution==(sourceResolution<<times)) swap(mipmap[0], mipmap[1]);
         for(int unused pass: range(times)) {
             downsample(*mipmap[0], *source);
             sourceResolution *= 2;
             swap(mipmap[0], mipmap[1]);
             source = mipmap[1];
         }
-        assert_(mipmap[1]==&outputs[1]);
-        resample(outputs[0], *source, sourceResolution, targetResolution);
+        if(sourceResolution == targetResolution) assert_(mipmap[1]==&outputs[0]);
+        else {
+            assert_(mipmap[1]==&outputs[1]);
+            resample(outputs[0], *source, sourceResolution, targetResolution);
+        }
+        assert_(outputs[0].data.size == outputs[0].size() * outputs[0].sampleSize, outputs[0].size(), outputs[0].sampleSize, outputs[0].sampleCount, outputs[0].data.size, outputs[0].size() * outputs[0].sampleSize);
     }
 };

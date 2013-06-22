@@ -16,7 +16,7 @@ struct Rule {
     bool arrayOperation = false; // Run operation on each element of an input array
 };
 template<> inline String str(const Rule::Expression& e) { return str<Variant>(e); }
-template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs)+(rule.arrayOperation?"[]"_:""_); }
+template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs/*,rule.argumentExps,rule.sweeps*/)+(rule.arrayOperation?"[]"_:""_); }
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process {

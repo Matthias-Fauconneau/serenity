@@ -14,6 +14,7 @@
 //include "resample.h"
 //#include "average.h"
 //#include "median.h"
+//#include "resample.h"
 //#include "histogram.h"
 //#include "threshold.h"
 //#include "distance.h"
@@ -128,7 +129,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                     assert(!existsFolder(fileName), fileName);
                     writeFile(fileName, target->data, Folder(path, cwd));
                     log(fileName, "["_+strByteCount(target->data.size)+"]"_, time);
-                } else {
+                } else if(target->elements) {
                     Folder folder(fileName, Folder(path, cwd), true);
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)target->elements) writeFile(element.key+"."_+target->metadata, element.value, folder);
                 }

@@ -1,7 +1,7 @@
 TODO
 build.cc
 build.sh
-test.cc
+script.cc
 test.sh
 
 core/array.h

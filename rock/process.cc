@@ -156,9 +156,11 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                         if(s.match("[]"_)) { assert_(outputs.size==1); assert_(rule.inputs.size==1); assert_(!rule.arrayOperation); rule.arrayOperation = true; }
                     } else {
                         if(rule.operation) rule.inputs << key; // Argument value
-                        else if(sweeps.contains(key)) rule.sweeps.insert(String(key), copy(sweeps.at(key))); // Sweep value
-                        else if(arguments.contains(key)) rule.sweeps.insert(String(key), move(array<Variant>()<<copy(arguments.at(key)))); // Single sweep value
-                        //else if(pass>=1) error("Undefined argument", key, arguments, sweeps);
+                        else /*if(s.match("{}"_))*/ {
+                            if(sweeps.contains(key)) rule.sweeps.insert(String(key), copy(sweeps.at(key))); // Sweep value
+                            else if(arguments.contains(key)) rule.sweeps.insert(String(key), move(array<Variant>()<<copy(arguments.at(key)))); // Single sweep value
+                            //else if(pass>=1) error("Undefined argument", key, arguments, sweeps);
+                        }
                     }
                 }
                 for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
@@ -173,7 +175,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             if(s.match('=')) { // Explicit argument
                 string scope, parameter = key;
                 if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
-                assert_(parameters.contains(parameter),"Invalid parameter", parameter);
+                //assert_(parameters.contains(parameter),"Invalid parameter", parameter);
                 string value = s.untilEnd();
                 assert_(value);
                 if(arguments.contains(key)) { sweeps.insert(String(key), move(array<Variant>()<<String(arguments.take(key))<<String(value))); }
@@ -203,14 +205,15 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 assert_(sweep.value.size>1, targets[i], sweeps);
                 if(args.contains(sweep.key)) {
                     if(!defaultArguments.contains(sweep.key)) assert_(!arguments.contains(sweep.key), "Sweep overrides argument", sweep.key, defaultArguments);
-                    args.at(sweep.key) = sweepStr(sweep.value);
+                    args.remove(sweep.key);
                 }
-                else args.insert(copy(sweep.key), sweepStr(sweep.value));
+                args.insert(copy(sweep.key), sweepStr(sweep.value));
             }
             for(auto sweep: sweeps) { // Discards irrelevant sweeps
                 bool relevant = false;
                 if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
                 if(relevant) targetSweeps.insert(copy(sweep.key), copy(sweep.value));
+                else if(pass) error("Irrelevant sweep", sweep.key, "for", targets[i], args, "->"_, evaluateArguments(targets[i],args), "\n"_,rules,'\n');
             }
             targetsSweeps << move(targetSweeps);
         }
@@ -228,7 +231,7 @@ bool Process::isDefined(const string& parameter) {
 Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
 const Dict& Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, bool sweep, const string& scope) {
-    for(const Evaluation& e: cache) if(e.target==target && e.input==scopeArguments && e.local==local && e.sweep==sweep) return e.output;
+    //for(const Evaluation& e: cache) if(e.target==target && e.input==scopeArguments && e.local==local && e.sweep==sweep) return e.output; //FIXME: invalidate on rule changes
     const Rule& rule = ruleForOutput(target);
     Dict args;
     if(!&rule && scopeArguments.contains(target)) { // Conversion from argument to result
@@ -242,8 +245,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     Dict scopeArgumentsAndSweeps = copy(scopeArguments);
     for(auto arg: rule.sweeps) {
         assert_(arg.value, arg.key);
-        if(scopeArgumentsAndSweeps.contains(arg.key)) {}
-        else scopeArgumentsAndSweeps.insert(copy(arg.key), sweepStr(arg.value));
+        if(!scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.insert(copy(arg.key), sweepStr(arg.value));
     }
     for(auto arg: rule.argumentExps) { // Evaluates local arguments
         //if(args.contains(arg.key)) continue;
@@ -252,14 +254,14 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         if(arg.value.type == Rule::Expression::Value) { // Local value argument
             assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
             scopeArgumentsAndSweeps.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
-        } else if(local) { // Local literal argument (only needed for Operation execution)
+        } else /*if(local)*/ { // Local literal argument (only needed for Operation execution)
             scopeArgumentsAndSweeps.insert(copy(arg.key), copy((const Variant&)arg.value));
         }
     }
 
     // Recursively evaluates to invalid cache on argument changes
     for(const string& input: rule.inputs) {
-        if(!local) for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
+        /*if(!local)*/ for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
             if(args.contains(arg.key)) args.remove(arg.key); //assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
             args.insert(copy(arg.key), copy(arg.value));
         }
@@ -307,7 +309,6 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         if(args.contains(arg.key)) args.remove(arg.key); // Sweep overrides local argument
         args.insert(copy(arg.key), sweepStr(arg.value));
     }
-    //log(scope+"/"_+target, scopeArgumentsAndSweeps, "->"_, args);
     cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), local, sweep, move(args));
     return cache.last()->output;
 }
@@ -522,11 +523,9 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
     const Dict* relevantArguments;
     if(operation) {
         relevantArguments = &evaluateArguments(target, arguments);
-        //log(scope+"/"_+target);
         if(rule.arrayOperation) { // Operation with elements inputs are run on each element
             assert_(inputs.size>=1 && inputs[0]->name && inputs[0]->metadata && inputs[0]->elements && !inputs[0]->data && outputs.size==1 && !outputs[0]->data);
             for(const const_pair<String,buffer<byte>>& e: inputs[0]->elements) {
-                log("'"_+inputs[0]->name+"'"_, "'"_+inputs[0]->metadata+"'"_);
                 Result input(inputs[0]->name, inputs[0]->timestamp, copy(inputs[0]->relevantArguments), copy(inputs[0]->metadata), copy(e.value));
                 assert_(input.name && input.metadata, input.name, input.metadata, inputs[0]->name, inputs[0]->metadata);
                 Result output(outputs[0]->name, 0, {}, {}, {});
@@ -573,7 +572,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
            outputs[0]->metadata = move(metadata);
            outputs[0]->data = move(data);
     }
-    /*if((uint64)time>100)*/ log(rule, relevantArguments, time);
+    if((uint64)time>0) log(rule, relevantArguments, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
