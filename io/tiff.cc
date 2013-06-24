@@ -29,6 +29,7 @@ Image decodeTIFF(const ref<byte>& file) {
 }
 
 Tiff16::Tiff16(const ref<byte>& file) : s(file) {
+    TIFFSetWarningHandler(0);
     tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
     assert(tiff, file.size, hex(file.slice(0, 4)));
     if(!tiff) return;

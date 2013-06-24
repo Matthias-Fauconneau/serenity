@@ -42,9 +42,9 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
     int3 sampleCount = int3(nextPowerOfTwo(size.x), nextPowerOfTwo(size.y), nextPowerOfTwo(size.z));
     int3 margin = ::max(minimalMargin, (sampleCount - size)/2);
     sampleCount = int3(nextPowerOfTwo(size.x+2*margin.x), nextPowerOfTwo(size.y+2*margin.y), nextPowerOfTwo(size.z+2*margin.z));
-    while(sampleCount.x < ::min(sampleCount.y, sampleCount.z)/2) sampleCount.x*=2;
-    while(sampleCount.y < ::min(sampleCount.z, sampleCount.x)/2) sampleCount.y*=2;
     while(sampleCount.z < ::min(sampleCount.x, sampleCount.y)/2) sampleCount.z*=2;
+    while(sampleCount.y <= ::min(sampleCount.z, sampleCount.x)/2) sampleCount.y*=2;
+    while(sampleCount.x <= ::min(sampleCount.y, sampleCount.z)/2) sampleCount.x*=2;
     margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
     assert_( margin >= minimalMargin );

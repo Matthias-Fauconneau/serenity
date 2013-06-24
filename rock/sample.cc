@@ -50,7 +50,7 @@ real NonUniformSample::delta() const {
     }
     return delta;
 }
-real NonUniformSample::interpolate(real x) {
+real NonUniformSample::interpolate(real x) const {
     real nearest=__DBL_MAX__, value=nan;
     for(auto e: *this) { real d=abs(e.key-x); if(d < nearest) nearest=d, value=e.value; }
     return value;
@@ -81,4 +81,9 @@ ScalarMap parseMap(const string& file) {
         dict.insert(String(key), toDecimal(value));
     }
     return dict;
+}
+String toASCII(const ScalarMap& A) {
+    String s;
+    for(auto sample: A) s << sample.key << '\t' << ftoa(sample.value, 4, 0, true) << '\n';
+    return s;
 }

@@ -71,8 +71,8 @@ class(Maximum, Operation), virtual Pass {
     }
 };
 
-/*/// Computes absolute difference
-class(AbsoluteDifference, Operation) {
+/// Computes mean
+class(Mean, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(inputs[0]->metadata == inputs[1]->metadata);
         outputs[0]->metadata = copy(inputs[0]->metadata);
@@ -80,5 +80,5 @@ class(AbsoluteDifference, Operation) {
         assert_(A.keys == B.keys);
         outputs[0]->data = toASCII( ScalarMap(A.keys, abs( A.values - B.values ) ) );
     }
-};*/
+};
 

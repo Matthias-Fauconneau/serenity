@@ -213,7 +213,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 bool relevant = false;
                 if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
                 if(relevant) targetSweeps.insert(copy(sweep.key), copy(sweep.value));
-                else if(pass) error("Irrelevant sweep", sweep.key, "for", targets[i], args, "->"_, evaluateArguments(targets[i],args), "\n"_,rules,'\n');
+                //else if(pass) error("Irrelevant sweep", sweep.key, "for", targets[i], args, "->"_, evaluateArguments(targets[i],args), "\n"_,rules,'\n');
             }
             targetsSweeps << move(targetSweeps);
         }
@@ -241,37 +241,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     }
     assert_(&rule, "No rule generating '"_+target+"'"_, scope, scopeArguments);
 
-    // Explicits sweep as arguments (for argument validation)
-    Dict scopeArgumentsAndSweeps = copy(scopeArguments);
-    for(auto arg: rule.sweeps) {
-        assert_(arg.value, arg.key);
-        if(!scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.insert(copy(arg.key), sweepStr(arg.value));
-    }
-    for(auto arg: rule.argumentExps) { // Evaluates local arguments
-        //if(args.contains(arg.key)) continue;
-        if(scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.remove(arg.key);
-        //assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule); //FIXME: local arguments are also forwarded to inputs
-        if(arg.value.type == Rule::Expression::Value) { // Local value argument
-            assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
-            scopeArgumentsAndSweeps.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
-        } else /*if(local)*/ { // Local literal argument (only needed for Operation execution)
-            scopeArgumentsAndSweeps.insert(copy(arg.key), copy((const Variant&)arg.value));
-        }
-    }
-
-    // Recursively evaluates to invalid cache on argument changes
-    for(const string& input: rule.inputs) {
-        /*if(!local)*/ for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
-            if(args.contains(arg.key)) args.remove(arg.key); //assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
-            args.insert(copy(arg.key), copy(arg.value));
-        }
-        // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
-        if(!sweep) {
-            const Rule& rule = ruleForOutput(input);
-            if(&rule) for(const string& parameter: rule.sweeps.keys) args.remove(parameter);
-        }
-    }
-    /// Relevant rule parameters (from operation and argument expressions)
+    // Relevant rule parameters (from operation and argument expressions)
     array<string> parameters;
     if(rule.operation) {
         unique<Operation> operation = Interface<Operation>::instance(rule.operation);
@@ -279,6 +249,33 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         parameters += split(operation->parameters());
     }
     for(auto arg: rule.argumentExps) if(arg.value.type==Rule::Expression::Value) parameters += arg.value;
+
+    // Explicits sweep as arguments (for argument validation)
+    Dict scopeArgumentsAndSweeps = copy(scopeArguments);
+    if(sweep) for(auto arg: rule.sweeps) {
+        assert_(arg.value, arg.key);
+        if(!scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.insert(copy(arg.key), sweepStr(arg.value));
+    }
+    for(auto arg: rule.argumentExps) if(!parameters.contains(arg.key)) { // Evaluates local scope arguments
+        log(rule, arg.key, arg.value);
+        //if(args.contains(arg.key)) continue;
+        if(scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.remove(arg.key);
+        //assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule); //FIXME: local arguments are also forwarded to inputs
+        if(arg.value.type == Rule::Expression::Value) { // Local value argument
+            assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
+            scopeArgumentsAndSweeps.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
+        } else if(local) { // Local literal argument (only needed for Operation execution)
+            scopeArgumentsAndSweeps.insert(copy(arg.key), copy((const Variant&)arg.value));
+        }
+    }
+
+    // Recursively evaluates to invalid cache on argument changes
+    for(const string& input: rule.inputs) {
+        if(!local) for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
+            if(args.contains(arg.key)) args.remove(arg.key); //assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
+            args.insert(copy(arg.key), copy(arg.value));
+        }
+    }
 
     for(auto arg: scopeArgumentsAndSweeps) {
         if(parameters.contains(arg.key)) {
@@ -304,10 +301,27 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
             }
         }
     }
+    for(const string& input: rule.inputs) { // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
+        if(!sweep) {
+            const Rule& rule = ruleForOutput(input);
+            if(&rule) for(const string& parameter: rule.sweeps.keys) if(args.contains(parameter)) args.remove(parameter);
+        }
+    }
     for(auto arg: rule.sweeps) { // Explicits sweep as arguments (for cache validation)
         assert_(arg.value, arg.key);
         if(args.contains(arg.key)) args.remove(arg.key); // Sweep overrides local argument
-        args.insert(copy(arg.key), sweepStr(arg.value));
+        if(sweep) args.insert(copy(arg.key), sweepStr(arg.value));
+    }
+    if(local) for(auto arg: rule.argumentExps) if(parameters.contains(arg.key)) { // Evaluates local arguments
+        //if(args.contains(arg.key)) continue;
+        if(args.contains(arg.key)) args.remove(arg.key);
+        //assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule); //FIXME: local arguments are also forwarded to inputs
+        if(arg.value.type == Rule::Expression::Value) { // Local value argument
+            assert_(args.contains(arg.value), rule, ": Undefined", arg.value);
+            args.insert(copy(arg.key), copy(args.at(arg.value)));
+        } else { // Local literal argument (only needed for Operation execution)
+            args.insert(copy(arg.key), copy((const Variant&)arg.value));
+        }
     }
     cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), local, sweep, move(args));
     return cache.last()->output;
@@ -367,6 +381,7 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
         array<Variant> sweep = remaining.take(parameter);
 
         if(!evaluateArguments(target,args,false,false).contains(parameter)) return execute(target, remaining, args);
+        log("Global sweep", parameter, target, args, "->"_, evaluateArguments(target,args,false,false));
         for(Variant& value: sweep) {
             args.at(parameter) = move(value);
             array<shared<Result>> result = execute(target, remaining, args);

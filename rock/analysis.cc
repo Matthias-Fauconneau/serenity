@@ -21,30 +21,44 @@ class(ScalarError, Operation), virtual Pass {
 };
 
 class(DistributionError, Operation), virtual Pass {
-    string parameters() const override { return "slice"_; }
+    string parameters() const override { return "reference slice"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         assert_(endsWith(source.metadata,".tsv"_));
         if(source.elements) { // Sample
             assert_(!source.data && source.elements.size()>1);
-            string reference = source.elements.keys.last();
-            NonUniformSample correct = parseNonUniformSample(source.elements.values.last());
-            NonUniformSample relativeError;
-            for(auto element: source.elements) {
-                if(element.key == reference) continue;
-                NonUniformSample sample = parseNonUniformSample(element.value);
-                double delta = min(correct.delta(), sample.delta()), maximum=max(max(correct.keys), max(sample.keys));
-                uint sampleCount = maximum/delta;
-                string slice = args.value("slice"_,"0-1"_);
-                assert_(slice.contains('-'));
-                double sliceMin = toDecimal(section(slice,'-',0,1)), sliceMax = toDecimal(section(slice,'-',1,2));
-                double differenceArea = 0, correctArea = 0;
+            array<NonUniformSample> samples; for(auto element: source.elements) samples << parseNonUniformSample(element.value);
+            double delta = __DBL_MAX__, maximum=0;
+            for(const NonUniformSample& sample: samples) delta=::min(delta, sample.delta()), maximum=max(maximum, max(sample.keys));
+            uint sampleCount = maximum/delta;
+
+            NonUniformSample reference;
+            if(args.at("reference"_)=="last"_) reference = samples.pop();
+            else if(args.at("reference"_)=="mean"_) {
+                for(uint i: range(0, sampleCount)) { // Computes mean distribution (uniform sampliong, 0th order interpolation)
+                    double x = i*delta;
+                    double sum=0;
+                    for(const NonUniformSample& sample: samples) sum += sample.interpolate(x);
+                    double mean = sum/samples.size;
+                    reference.insert(x, mean);
+                }
+            } else error("Unknown reference", args.at("reference"_));
+
+            string slice = args.value("slice"_,"0-1"_);
+            assert_(slice.contains('-'));
+            double sliceMin = toDecimal(section(slice,'-',0,1)), sliceMax = toDecimal(section(slice,'-',1,2));
+
+            ScalarMap relativeError;
+            for(uint i: range(samples.size)) {
+                const NonUniformSample& sample = samples[i];
+
+                double differenceArea = 0, referenceArea = 0;
                 for(uint i: range(round(sliceMin*sampleCount), round(sliceMax*sampleCount))) { // Computes area between curves (with 0th order numerical integration)
                     double x = i*delta;
-                    differenceArea += abs(sample.interpolate(x)-correct.interpolate(x));
-                    correctArea += correct.interpolate(x);
+                    differenceArea += abs(sample.interpolate(x)-reference.interpolate(x));
+                    referenceArea += reference.interpolate(x);
                 }
-                assert_(differenceArea && correctArea);
-                relativeError.insert(toDecimal(element.key), differenceArea / correctArea );
+                assert_(differenceArea && referenceArea);
+                relativeError.insert(copy(source.elements.keys[i]), differenceArea / referenceArea );
             }
             target.data = toASCII( relativeError );
         }

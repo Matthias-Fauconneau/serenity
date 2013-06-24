@@ -74,8 +74,7 @@ if !transpose: unconnected = rasterized
 connected = FloodFill unconnected
 
 # Discards small and unconnected pores
-if !sweep: minimalRadius = '0'
-if sweep: minimalRadius = {0..15}
+minimalRadius = '0'
 minimalSqRadius = $minimalRadius^2
 pruned-unconnected = ThresholdClip unconnected minimalSqRadius
 
@@ -100,7 +99,7 @@ histogram-squaredRadius-connected = Histogram crop-flood
 volume-unconnected = Sum histogram-squaredRadius-unconnected
 volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume (including rock)
-histogram-crop = Histogram crop clip='0'
+histogram-crop = Histogram crop-flood clip='0'
 volume-crop = Sum histogram-crop
 volume-total = volume-crop #Backward compatibility
 # Computes porosity (= pore space volume / total volume )
@@ -123,6 +122,9 @@ maximum-minimalRadius = Optimize volume-connected-minimalRadius criteria='maximu
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
 histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected
+# Normalize histograms
+histogram-radius-unconnected-normalized = Div histogram-radius-unconnected volume-crop
+histogram-radius-connected-normalized = Div histogram-radius-connected volume-crop
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 volume-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
 volume-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
@@ -131,25 +133,31 @@ distribution-radius-unconnected = Div volume-distribution-radius-unconnected vol
 distribution-radius-connected = Div volume-distribution-radius-connected volume-crop
 
 # Scales radius (e.g to original pixel or physical resolution)
- histogram-radius-unconnected-scaled = ScaleVariable histogram-radius-unconnected process-resolution
- histogram-radius-connected-scaled = ScaleVariable histogram-radius-connected process-resolution
+ histogram-radius-unconnected-scaled = ScaleDistribution histogram-radius-unconnected process-resolution
+ histogram-radius-connected-scaled = ScaleDistribution histogram-radius-connected process-resolution
+ histogram-radius-unconnected-normalized-scaled = ScaleDistribution histogram-radius-unconnected-normalized process-resolution
+ histogram-radius-connected-normalized-scaled = ScaleDistribution histogram-radius-connected-normalized process-resolution
  distribution-radius-unconnected-scaled = ScaleDistribution distribution-radius-unconnected process-resolution
  distribution-radius-connected-scaled = ScaleDistribution distribution-radius-connected process-resolution
  porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius process-resolution
  porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius process-resolution
 
-# Representative elementary volume estimation
- # Sweeps cropRadius computing connected size distributions and porosity
-  distribution-radius-connected-cropRadius = distribution-radius-connected crop.cylinder
-  distribution-radius-connected-cropRadius-scaled = ScaleDistribution distribution-radius-connected-cropRadius[] process-resolution
-  porosity-connected-cropRadius = porosity-connected crop.cylinder
-  porosity-connected-cropRadius-scaled = ScaleVariable porosity-connected-cropRadius process-resolution
+# Representative elementary volume (REV) estimation
+ # Sweeps crop.cylinder computing connected size distributions and porosity
+  distribution-radius-connected-crop = distribution-radius-connected crop.cylinder
+  distribution-radius-connected-crop-scaled = ScaleDistribution distribution-radius-connected-crop[] process-resolution
+  porosity-connected-crop = porosity-connected crop.cylinder
+  porosity-connected-crop-scaled = ScaleVariable porosity-connected-crop process-resolution
 
- # Pore size distribution error
-  distribution-radius-error-cropRadius = DistributionError distribution-radius-connected-cropRadius
-  distribution-radius-error-cropRadius-scaled = ScaleVariable distribution-radius-error-cropRadius process-resolution
+ # Pore size distribution error to last (for REV with increasingly large volumes)
+  distribution-radius-crop-error-last = DistributionError distribution-radius-connected-crop reference='last'
+  distribution-radius-crop-error-last-scaled = ScaleVariable distribution-radius-crop-error-last process-resolution
   # Returns the minimum cropRadius with distribution error < 10%
-  minimum-cropRadius-distribution = Optimize distribution-radius-error-cropRadius-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
+  minimum-cropRadius-distribution = Optimize distribution-radius-crop-error-last-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
+
+ # Pore size distribution deviation (TODO: automatically compute 8 sample crop parameters from sweep size)
+  distribution-radius-crop-deviations = DistributionError distribution-radius-connected-crop reference='mean'
+  distribution-radius-crop-deviation-mean = Mean distribution-radius-crop-deviation
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)

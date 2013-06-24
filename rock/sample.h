@@ -70,13 +70,13 @@ struct NonUniformSample : map<real, real> {
     /// Returns the minimal interval between samples
     real delta() const;
     /// Interpolates a value from the sample point (using nearest sample (0th order))
-    real interpolate(real x);
+    real interpolate(real x) const;
 };
 /// Multiplies sample by a scalar
 NonUniformSample operator*(float scalar, NonUniformSample&& A);
-/// Parses a uniformly sampled distribution from tab-separated values
+/// Parses a non-uniformly sampled distribution from tab-separated values
 NonUniformSample parseNonUniformSample(const string& file);
-/// Converts a uniformly sampled distribution to tab-separated values
+/// Converts a non-uniformly sampled distribution to tab-separated values
 String toASCII(const NonUniformSample& A);
 
 struct NonUniformHistogram : NonUniformSample {
@@ -96,3 +96,5 @@ struct NonUniformHistogram : NonUniformSample {
 typedef map<String, real> ScalarMap;
 
 ScalarMap parseMap(const string& file);
+/// Converts a scalar map to tab-separated values
+String toASCII(const ScalarMap& A);

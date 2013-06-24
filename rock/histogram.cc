@@ -18,7 +18,7 @@ UniformHistogram histogram(const Volume16& source, bool cylinder) {
             for(uint x=marginX; x<X-marginX; x++) {
                 if(uint(sq(x-X/2)+sq(y-Y/2)) <= radiusSq) {
                     uint sample = sourceData[ tiled ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*X*Y+y*X+x) ];
-                    assert(sample <= source.maximum);
+                    assert_(sample <= source.maximum, source.margin, x,y,z, source.sampleCount-source.margin, source.sampleCount, sample, source.maximum);
                     histograms[id][sample]++;
                 }
             }
