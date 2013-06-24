@@ -98,6 +98,7 @@ Image slice(const Volume& source, float normalizedZ, bool cylinder) {
 }
 
 Image slice(const Volume& source, int z, bool cylinder) {
+    assert_(source.maximum);
     int X=source.sampleCount.x, Y=source.sampleCount.y;
     int marginX=source.margin.x, marginY=source.margin.y;
     Image target(X,Y);

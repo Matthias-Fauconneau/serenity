@@ -97,12 +97,13 @@ class(Source, Operation), virtual VolumeOperation {
                     } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
                         Image image = decodeImage(file);
                         assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
-                        for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).a;
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
                     }
                 }
             }
         }
         target.maximum = maximum(target); // Some sources don't use the full range
+        assert_(target.maximum, target.sampleCount, target.margin);
     }
 };
 
