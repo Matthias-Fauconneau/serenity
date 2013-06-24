@@ -28,8 +28,7 @@ UniformHistogram histogram(const Volume16& source, bool cylinder) {
     for(uint value: range(source.maximum+1)) { // Merges histograms (and converts to float)
         histogram[value] = 0;
         for(uint id: range(coreCount)) histogram[value] += histograms[id][value];
-    }
-    return histogram;
+    } return histogram;
 }
 
 /// Computes histogram using uniform integer bins
