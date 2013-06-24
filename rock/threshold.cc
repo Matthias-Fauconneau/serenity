@@ -64,7 +64,7 @@ struct Lorentz {
     real position, height, scale;
     real operator()(float x) const { return height/(1+sq((x-position)/scale)); }
 };
-template<> inline String str(const Lorentz& o) { return "x₀ "_+str(o.position)+", I"_+str(o.height)+", γ "_+str(o.scale); }
+template<> inline String str(const Lorentz& o) { return "x₀:"_+str(o.position)+", I:"_+str(o.height)+", γ:"_+str(o.scale); }
 
 /// Estimates parameters for a Lorentz distribution fitting the maximum peak
 Lorentz estimateLorentz(const UniformSample& sample) {
@@ -99,7 +99,7 @@ class(LorentzianMixtureModel, Operation) {
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
-        output(outputs, 1, "lorentz"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore); });
+        output(outputs, 1, "lorentz.map"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore)+"\n"_; });
         output(outputs, 2, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
         output(outputs, 3, "density.tsv"_, [&]{ return toASCII(notrock); });
         output(outputs, 4, "lorentz.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });

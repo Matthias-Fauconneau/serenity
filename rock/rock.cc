@@ -145,7 +145,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
                         if(count(target->data,'\n')<16) log_(str(target->name, "["_+str(count(target->data,'\n'))+"]"_,":\n"_+target->data));
                     }
                     else if(inRange(1u,toVolume(target).sampleSize,4u)) { if(!current) current = share(target); } // Displays first displayable volume
-                    else error(target->name, target->relevantArguments, target->metadata);
+                    else warn("Unknown format",target->metadata, target->name, target->relevantArguments);
                 } else assert(target->elements, target->name);
             }
         }
