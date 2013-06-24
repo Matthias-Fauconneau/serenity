@@ -119,7 +119,7 @@ class(MaximumMeanGradient, Operation) {
         UniformHistogram histogram (source.maximum+1, source.maximum+1, 0); // Count samples belonging to each class to compute mean
         for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
             const uint16* const voxel = &source[z*X*Y+y*X+x];
-            uint gradient = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) /*+ abs(voxel[0] - voxel[X*Y])*/; //[sic] Anistropic for backward compatibility
+            uint gradient = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) /*+ abs(voxel[0] - voxel[X*Y])*/; //[sic] Anisotropic for backward compatibility
             /*const uint binCount = 255; assert(binCount<=source.maximum); // Quantizes to 8bit as this method fails if voxels are not grouped in large enough sets
             uint bin = uint(voxel[0])*binCount/source.maximum*source.maximum/binCount;*/
             uint bin = uint(voxel[0]);
@@ -132,12 +132,13 @@ class(MaximumMeanGradient, Operation) {
         UniformSample density = parseUniformSample( inputs[1]->data );
         uint pore=0, rock=0; real poreMaximum=0, rockMaximum=0;
         for(uint i: range(1,density.size-1)) {
-            if(density[i-1]<density[i] && density[i]<density[i+1] && density[i]>poreMaximum) {
+            if(density[i-1]<density[i] && density[i]>density[i+1] && density[i]>poreMaximum) {
                 pore=i; poreMaximum = density[i];
                 if(poreMaximum > rockMaximum) swap(pore, rock), swap(poreMaximum, rockMaximum);
             }
         }
-        log((real)pore/histogram.size, (real)rock/histogram.size);
+        assert_(pore != rock, pore, rock);
+        log((real)pore/histogram.size, (real)rock/histogram.size, pore, rock);
         assert(rock > pore); assert(rockMaximum>poreMaximum); assert(rock < histogram.size);
         uint threshold=0; real maximum=0;
         UniformSample gradientMean (source.maximum+1);
