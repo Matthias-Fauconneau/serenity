@@ -182,7 +182,7 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  ascii-unconnected = ToASCII sqrt-unconnected-scaled
  ascii-connected = ToASCII sqrt-connected-scaled
 
-# Exports to PNG
+# Exports to compressed PNG
  png-source = ToPNG source
  png-denoised = ToPNG denoised
  png-colorize = ToPNG colorize
@@ -190,3 +190,12 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
  png-skeleton = ToPNG skeleton
  png-unconnected = ToPNG unconnected
  png-connected = ToPNG connected
+
+# Exports to BMP (when writing to disk, it is faster to write PNGs and pipe to BMP-only tools (e.g using ImageMagick convert))
+  bmp-source = ToBMP source
+  bmp-denoised = ToBMP denoised
+  bmp-colorize = ToBMP colorize
+  bmp-distance = ToBMP distance
+  bmp-skeleton = ToBMP skeleton
+  bmp-unconnected = ToBMP unconnected
+  bmp-connected = ToBMP connected

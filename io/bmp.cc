@@ -1,11 +1,11 @@
-/// \file bmp.cc Decodes Windows Device independent bitmap (DIB) files
+/// \file bmp.cc Decodes Windows device independent bitmap (DIB) headers
 #include "image.h"
 #include "data.h"
 
 generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
 typedef vector<rgb,uint8,3> rgb3;
 
-/// Decodes Windows Device independent bitmap (DIB) files
+/// Decodes Windows device independent bitmap (DIB) headers
 Image decodeBMP(const ref<byte>& file) {
     BinaryData s(file);
     struct BitmapFileHeader { uint16 type; uint32 size, reserved, offset; } packed;
@@ -31,4 +31,17 @@ Image decodeBMP(const ref<byte>& file) {
     else if(header.depth==24) for(uint i: range(w*h)) dst[i] = ((rgb3*)src)[i];
     else error("header.depth", header.depth);
     return image;
+}
+
+buffer<byte> encodeBMP(const Image& image) {
+    buffer<byte4> palette (256); for(uint i: range(256)) palette[i]=byte4(i);
+    assert_(image.buffer.size == image.width*image.height);
+    buffer<byte> data (image.buffer.size); for(uint i: range(data.size)) data[i]=image.data[i].b;
+    struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; } packed header
+                  = {sizeof(Header), image.width, image.height, 1, 8, 0, image.width*image.height, 0, 0, 0, 0};
+    struct FileHeader { uint16 type; uint32 size, reserved, offset; } packed fileHeader
+                      = {'B'|('M'<<8), uint32(sizeof(FileHeader)+sizeof(Header)+palette.size*4+data.size), 0, uint32(sizeof(FileHeader)+sizeof(Header)+palette.size*4) };
+    buffer<byte> file = raw(fileHeader)+raw(header)+cast<byte>(palette)+data;
+    assert_(file.size == sizeof(FileHeader)+sizeof(Header)+palette.size*4+data.size);
+    return file;
 }
