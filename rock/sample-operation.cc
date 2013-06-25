@@ -71,14 +71,13 @@ class(Maximum, Operation), virtual Pass {
     }
 };
 
-/// Computes mean
-class(Mean, Operation) {
+/// Computes deviation from differences (i.e deviation of samples with zero mean)
+class(Deviation, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == inputs[1]->metadata);
         outputs[0]->metadata = copy(inputs[0]->metadata);
-        auto A = parseMap(inputs[0]->data), B = parseMap(inputs[1]->data);
-        assert_(A.keys == B.keys);
-        outputs[0]->data = toASCII( ScalarMap(A.keys, abs( A.values - B.values ) ) );
+        UniformSample sample(parseMap(inputs[0]->data).values);
+        real ssd=0; for(uint i: range(sample.size)) ssd += sq(sample[i]);
+        outputs[0]->data = toASCII( sqrt(ssd/(sample.size-1)) );
     }
 };
 

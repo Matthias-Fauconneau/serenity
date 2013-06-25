@@ -35,7 +35,7 @@ struct UniformSample : Vector {
     /// Returns the variance of the samples
     real variance() const;
 
-    float scale=1; // Scales from integer sample indices to floating-point sample positions
+    real scale=1; // Scales from integer sample indices to floating-point sample positions
 };
 /// Multiplies sample by a scalar
 inline UniformSample operator*(real scalar, const UniformSample& A) { return scalar*(const Vector&)A; }
@@ -73,7 +73,7 @@ struct NonUniformSample : map<real, real> {
     real interpolate(real x) const;
 };
 /// Multiplies sample by a scalar
-NonUniformSample operator*(float scalar, NonUniformSample&& A);
+NonUniformSample operator*(real scalar, NonUniformSample&& A);
 /// Parses a non-uniformly sampled distribution from tab-separated values
 NonUniformSample parseNonUniformSample(const string& file);
 /// Converts a non-uniformly sampled distribution to tab-separated values

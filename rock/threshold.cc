@@ -137,9 +137,6 @@ class(MaximumMeanGradient, Operation) {
                 if(poreMaximum > rockMaximum) swap(pore, rock), swap(poreMaximum, rockMaximum);
             }
         }
-        assert_(pore != rock, pore, rock);
-        log((real)pore/histogram.size, (real)rock/histogram.size, pore, rock);
-        assert(rock > pore); assert(rockMaximum>poreMaximum); assert(rock < histogram.size);
         uint threshold=0; real maximum=0;
         UniformSample gradientMean (source.maximum+1);
         for(uint i: range(pore, rock)) {
@@ -148,8 +145,9 @@ class(MaximumMeanGradient, Operation) {
             if(mean>maximum) maximum = mean, threshold = i;
             gradientMean[i] = mean;
         }
+        threshold = (rock+pore)/2;
         real densityThreshold = (real)threshold/histogram.size;
-        log("Maximum mean gradient estimates threshold at", densityThreshold, "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels");
+        log("Maximum mean gradient estimates threshold at", ftoa(densityThreshold,3), "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels (without gradient would be",ftoa((rock+pore)/(2.*histogram.size),3));
         outputs[0]->metadata = String("scalar"_);
         outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
         output(outputs, 1, "gradient-mean.tsv"_, [&]{ return toASCII(gradientMean); } );

@@ -157,7 +157,7 @@ distribution-radius-connected = Div volume-distribution-radius-connected volume-
 
  # Pore size distribution deviation (TODO: automatically compute 8 sample crop parameters from sweep size)
   distribution-radius-crop-deviations = DistributionError distribution-radius-connected-crop reference='mean'
-  distribution-radius-crop-deviation-mean = Mean distribution-radius-crop-deviation
+  distribution-radius-crop-deviation-mean = Deviation distribution-radius-crop-deviations
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)

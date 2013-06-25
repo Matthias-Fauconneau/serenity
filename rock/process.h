@@ -35,8 +35,15 @@ struct Process {
     /// Returns the Rule to evaluate in order to produce \a target
     Rule& ruleForOutput(const string& target);
 
+    enum ArgFlags {
+        None,
+        Recursive=1<<0, // Includes recursively relevant arguments
+        Sweep=1<<1, // Includes arguments handled by sweep generator rules
+        Local=1<<2, // Includes arguments only used locally by the rule
+        Cache=Recursive|Sweep|Local // Includes recursive relevance (in case input is not available), sweeps and locals
+    };
     /// Recursively evaluates relevant arguments for a rule
-    const Dict& evaluateArguments(const string& target, const Dict& arguments, bool local=false, bool sweep=true, const string& scope=""_);
+    const Dict& evaluateArguments(const string& target, const Dict& arguments, ArgFlags flags=None, const string& scope=""_);
 
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
     int indexOf(const string& target, const Dict& arguments);
@@ -62,9 +69,8 @@ struct Process {
     array<string> resultNames; // Valid result names defined by process
     array<shared<Result>> results; // Generated intermediate (and target) data
     struct Evaluation {
-        String target; Dict input; bool local, sweep; Dict output;
-        Evaluation(const string& target, Dict&& input, bool local, bool sweep, Dict&& output) :
-            target(String(target)),input(move(input)),local(local),sweep(sweep), output(move(output)){}
+        String target; Dict input; ArgFlags flags; Dict output;
+        Evaluation(const string& target, Dict&& input, ArgFlags flags, Dict&& output) : target(String(target)), input(move(input)), flags(flags), output(move(output)){}
     };
     array<unique<Evaluation>> cache; // Caches argument evaluation
 };
@@ -98,5 +104,5 @@ struct PersistentProcess : virtual Process {
     /// Gets result from cache or computes if necessary
     shared<Result> getResult(const string& target, const Dict& arguments, const string& scope=""_) override;
 
-    Folder storageFolder; // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data
+    Folder storageFolder; // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data (TODO: rename to -> temporaryFolder ?)
 };

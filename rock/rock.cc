@@ -33,18 +33,26 @@ String strByteCount(size_t byteCount) {
 }
 
 struct GraphProcess : virtual Process {
-    String dot(array<const Rule*>& once, const string& output) {
-        const Rule& rule = ruleForOutput(output);
+    String dot(array<const Rule*>& once, const Dict& scopeArguments, const string& output) {
         String s;
+        const Rule& rule = ruleForOutput(output);
         if(!once.contains(&rule)) {
             once << &rule;
-            s <<'"'<<hex(ptr(&rule))<<'"'<< "[shape=record, label=\""_<<rule.operation;
-            for(string output: rule.outputs) s<<"|<"_<<output<<"> "_<<output;
-            s<<"\"];\n"_;
-            for(string input: rule.inputs) {
-                s<<'"'<<hex(ptr(&ruleForOutput(input)))<<"\":\""_<<input<<"\" -> \""_<<hex(ptr(&rule))<<"\"\n"_;
-                s<<dot(once, input);
-            };
+            if(&rule) {
+                Dict arguments = copy(scopeArguments);
+                for(auto arg: rule.argumentExps) if(arg.value.type == Rule::Expression::Literal) {
+                    if(arguments.contains(arg.key)) arguments.remove(arg.key); // Local arguments overrides global arguments
+                    arguments.insert(copy(arg.key), copy((const Variant&)arg.value)); // Appends local arguments
+                }
+                const Dict& relevant = evaluateArguments(output, arguments, Local);
+                s <<'"'<<hex(ptr(&rule))<<'"'<< "[shape=record, label=\""_<<rule.operation<<(relevant?" "_+str(relevant).slice(1,-1):String());
+                for(string output: rule.outputs) s<<"|<"_<<output<<"> "_<<output;
+                s<<"\"];\n"_;
+                for(string input: rule.inputs) {
+                    s<<'"'<<hex(ptr(&ruleForOutput(input)))<<"\":\""_<<input<<"\" -> \""_<<hex(ptr(&rule))<<"\"\n"_;
+                    s<<dot(once, arguments, input);
+                };
+            }
         }
         return s;
     }
@@ -52,7 +60,7 @@ struct GraphProcess : virtual Process {
     void generateSVG(const ref<string>& targets, const string& name, const string& folder){
         array<const Rule*> once;
         String s ("digraph \""_+name+"\" {\n"_);
-        for(const string& target: targets) s << dot(once, target);
+        for(const string& target: targets) s << dot(once, arguments, target);
         s << "}"_;
         String path = "/dev/shm/"_+name+".dot"_;
         writeFile(path, s);
@@ -70,7 +78,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         array<string> targets = configure(args, process? : rock());
         if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                                                   "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
-        if(targets.size>targetPaths.size && arguments.value("view"_,"1"_)=="0"_) error("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
+        if(targets.size>targetPaths.size && arguments.value("view"_,"0"_)=="0"_) warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
 #ifndef BUILD
 #define BUILD "undefined"
 #endif

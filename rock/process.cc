@@ -198,6 +198,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 if(&rule) stack << rule.inputs;
             }
         }
+        this->parseSpecialArguments(specialArguments);
         for(uint i: range(targets.size)) {
             Sweeps targetSweeps;
             Dict args = copy(arguments);
@@ -211,13 +212,11 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
             for(auto sweep: sweeps) { // Discards irrelevant sweeps
                 bool relevant = false;
-                if(evaluateArguments(targets[i],args).contains(sweep.key)) relevant=true;
+                if(evaluateArguments(targets[i], args, Recursive).contains(sweep.key)) relevant=true;
                 if(relevant) targetSweeps.insert(copy(sweep.key), copy(sweep.value));
-                //else if(pass) error("Irrelevant sweep", sweep.key, "for", targets[i], args, "->"_, evaluateArguments(targets[i],args), "\n"_,rules,'\n');
             }
             targetsSweeps << move(targetSweeps);
         }
-        this->parseSpecialArguments(specialArguments);
     }
     return targets;
 }
@@ -230,13 +229,14 @@ bool Process::isDefined(const string& parameter) {
 
 Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
-const Dict& Process::evaluateArguments(const string& target, const Dict& scopeArguments, bool local, bool sweep, const string& scope) {
+const Dict& Process::evaluateArguments(const string& target, const Dict& scopeArguments, ArgFlags flags, const string& scope) {
     //for(const Evaluation& e: cache) if(e.target==target && e.input==scopeArguments && e.local==local && e.sweep==sweep) return e.output; //FIXME: invalidate on rule changes
     const Rule& rule = ruleForOutput(target);
     Dict args;
     if(!&rule && scopeArguments.contains(target)) { // Conversion from argument to result
         args.insert(String(target), copy(scopeArguments.at(target)));
-        cache << unique<Evaluation>(String(target), copy(scopeArguments), local, sweep, move(args));
+        assert_(args);
+        cache << unique<Evaluation>(String(target), copy(scopeArguments), flags, move(args));
         return cache.last()->output;
     }
     assert_(&rule, "No rule generating '"_+target+"'"_, scope, scopeArguments);
@@ -252,7 +252,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
 
     // Explicits sweep as arguments (for argument validation)
     Dict scopeArgumentsAndSweeps = copy(scopeArguments);
-    if(sweep) for(auto arg: rule.sweeps) {
+    if(flags&Sweep) for(auto arg: rule.sweeps) {
         assert_(arg.value, arg.key);
         if(!scopeArgumentsAndSweeps.contains(arg.key)) scopeArgumentsAndSweeps.insert(copy(arg.key), sweepStr(arg.value));
     }
@@ -264,14 +264,14 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         if(arg.value.type == Rule::Expression::Value) { // Local value argument
             assert_(scopeArgumentsAndSweeps.contains(arg.value), rule, ": Undefined", arg.value);
             scopeArgumentsAndSweeps.insert(copy(arg.key), copy(scopeArgumentsAndSweeps.at(arg.value)));
-        } else if(local) { // Local literal argument (only needed for Operation execution)
+        } else if(flags&Local) { // Local literal argument (only needed for Operation execution)
             scopeArgumentsAndSweeps.insert(copy(arg.key), copy((const Variant&)arg.value));
         }
     }
 
     // Recursively evaluates to invalid cache on argument changes
-    for(const string& input: rule.inputs) {
-        if(!local) for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, false, sweep, scope+"/"_+target)) {
+    if(flags&Recursive) for(const string& input: rule.inputs) {
+        for(auto arg: evaluateArguments(input, scopeArgumentsAndSweeps, flags, scope+"/"_+target)) {
             if(args.contains(arg.key)) args.remove(arg.key); //assert_(args.at(arg.key)==arg.value, "'"_+arg.key+"'"_, "'"_+arg.value+"'"_, args, scope+"/"_+target+"/"_+input);
             args.insert(copy(arg.key), copy(arg.value));
         }
@@ -291,7 +291,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
             for(const string& output: rule.outputs) if(startsWith(output, scope)) match = true;
             if(match) {
                 //assert_(parameters.contains(parameter), "Irrelevant scope parameter", scope, parameter, rule); might fail on first configure pass
-                if(local) {
+                if(flags&Local) {
                     if(args.contains(parameter)) args.remove(parameter);
                     args.insert(String(parameter), copy(arg.value));
                 } else {
@@ -302,7 +302,7 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         }
     }
     for(const string& input: rule.inputs) { // Removes sweep handled by inputs sweep generator (Prevents duplicate sweep by process sweeper)
-        if(!sweep) {
+        if(!(flags&Sweep)) {
             const Rule& rule = ruleForOutput(input);
             if(&rule) for(const string& parameter: rule.sweeps.keys) if(args.contains(parameter)) args.remove(parameter);
         }
@@ -310,9 +310,9 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
     for(auto arg: rule.sweeps) { // Explicits sweep as arguments (for cache validation)
         assert_(arg.value, arg.key);
         if(args.contains(arg.key)) args.remove(arg.key); // Sweep overrides local argument
-        if(sweep) args.insert(copy(arg.key), sweepStr(arg.value));
+        if(flags&Sweep) args.insert(copy(arg.key), sweepStr(arg.value));
     }
-    if(local) for(auto arg: rule.argumentExps) if(parameters.contains(arg.key)) { // Evaluates local arguments
+    if(flags&Local) for(auto arg: rule.argumentExps) if(parameters.contains(arg.key)) { // Evaluates local arguments
         //if(args.contains(arg.key)) continue;
         if(args.contains(arg.key)) args.remove(arg.key);
         //assert_(parameters.contains(arg.key), "Irrelevant argument", arg.key, "for", rule); //FIXME: local arguments are also forwarded to inputs
@@ -323,26 +323,33 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
             args.insert(copy(arg.key), copy((const Variant&)arg.value));
         }
     }
-    cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), local, sweep, move(args));
+    if(flags&Recursive) assert_(args, rule, scopeArgumentsAndSweeps, (int)flags);
+    cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), flags, move(args));
     return cache.last()->output;
 }
 
 int Process::indexOf(const string& target, const Dict& arguments) {
-    const Dict& relevantArguments = Process::evaluateArguments(target, arguments);
+    const Dict& relevantArguments = Process::evaluateArguments(target, arguments, Cache);
     for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i;
     return -1;
 }
 const shared<Result>& Process::find(const string& target, const Dict& arguments) { int i = indexOf(target, arguments); return i>=0 ? results[i] : *(shared<Result>*)0; }
 
 /// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
-bool Process::sameSince(const string& target, int64 queryTime, const Dict& arguments) {
+bool Process::sameSince(const string& target, int64 queryTime, const Dict& scopeArguments) {
+    const Rule& rule = ruleForOutput(target);
+    Dict arguments = copy(scopeArguments);
+    if(!&rule && arguments.contains(target)) return true; // Conversion from argument to result
+    assert_(&rule, target, arguments);
+    for(auto arg: rule.argumentExps) if(arg.value.type == Rule::Expression::Literal) {
+        if(arguments.contains(arg.key)) arguments.remove(arg.key); // Local arguments overrides global arguments
+        arguments.insert(copy(arg.key), copy((const Variant&)arg.value)); // Appends local arguments
+    }
     const shared<Result>& result = find(target, arguments);
     if(&result) {
         if(result->timestamp <= queryTime) queryTime = result->timestamp; // Result is still valid if inputs didn't change since it was generated
         else return false; // Result changed since query
     }
-    const Rule& rule = ruleForOutput(target);
-    if(!&rule && arguments.contains(target)) return true; // Conversion from argument to result
     for(const string& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
         if(rule.sweeps) { // Check all sweeped results
             assert_(rule.sweeps.size()==1);
@@ -380,8 +387,8 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
         string parameter = sweeps.keys.first(); // Removes first parameter and loop over it
         array<Variant> sweep = remaining.take(parameter);
 
-        if(!evaluateArguments(target,args,false,false).contains(parameter)) return execute(target, remaining, args);
-        log("Global sweep", parameter, target, args, "->"_, evaluateArguments(target,args,false,false));
+        if(!evaluateArguments(target,args, Recursive).contains(parameter)) return execute(target, remaining, args);
+        log("Global sweep", parameter, target, args, "->"_, evaluateArguments(target,args, Recursive));
         for(Variant& value: sweep) {
             args.at(parameter) = move(value);
             array<shared<Result>> result = execute(target, remaining, args);
@@ -391,7 +398,7 @@ array<shared<Result> > Process::execute(const string& target, const Sweeps& swee
             }
         }
     } else { // Actually generates targets when sweeps have been explicited
-        log(">>", target, evaluateArguments(target, arguments, false, false));
+        log(">>", target, evaluateArguments(target, arguments, Cache));
         Time time;
         results << getResult(target, arguments);
         if((uint64)time > 100) log("<<", target, time);
@@ -468,8 +475,31 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
         arguments.insert(copy(arg.key), copy((const Variant&)arg.value)); // Appends local arguments
     }
 
-    const shared<Result>& result = find(target, arguments);
-    if(&result && sameSince(target, result->timestamp, arguments)) return share(result); // Returns a cached result if still valid
+    // Simple forwarding rule
+    if(!rule.operation && !rule.sweeps && !rule.argumentExps) {
+        assert_(rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
+        return getResult(rule.inputs.first(), arguments, scope+"/"_+target);
+    }
+
+    const Dict* relevantArguments;
+    if(rule.operation) {
+        relevantArguments = &evaluateArguments(target, arguments, Cache);
+    } else { // Sweep generator
+        assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
+        assert_(rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single target sweeps can be generated");
+
+        Dict args = copy(arguments);
+        string parameter = rule.sweeps.keys.first(); // Removes first parameter and loop over it
+        assert_(rule.sweeps.at(parameter), "Single value sweep", parameter, rule.sweeps.at(parameter));
+        if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
+        args.insert(String(parameter), sweepStr(rule.sweeps.at(parameter)));
+        relevantArguments = &evaluateArguments(target, args, Cache);
+        assert_(relevantArguments->contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
+    }
+    assert_(*relevantArguments, target, arguments);
+
+    const shared<Result>& result = find(target, *relevantArguments);
+    if(&result && sameSince(target, result->timestamp, *relevantArguments)) return share(result); // Returns a cached result if still valid
     // Otherwise regenerates target using new inputs, arguments and/or implementations
 
     array<shared<Result>> inputs;
@@ -477,11 +507,6 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
     for(const shared<Result>& input: inputs) {
         ResultFile& result = *(ResultFile*)input.pointer;
         if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
-    }
-
-    if(!rule.operation && !rule.sweeps && !rule.argumentExps) { // Simple forwarding rule
-        assert_(inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
-        return move(inputs.first());
     }
 
     unique<Operation> operation = rule.operation ? Interface<Operation>::instance(rule.operation) : nullptr;
@@ -535,9 +560,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
     assert_(outputs);
 
     Time time;
-    const Dict* relevantArguments;
     if(operation) {
-        relevantArguments = &evaluateArguments(target, arguments);
         if(rule.arrayOperation) { // Operation with elements inputs are run on each element
             assert_(inputs.size>=1 && inputs[0]->name && inputs[0]->metadata && inputs[0]->elements && !inputs[0]->data && outputs.size==1 && !outputs[0]->data);
             for(const const_pair<String,buffer<byte>>& e: inputs[0]->elements) {
@@ -545,7 +568,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
                 assert_(input.name && input.metadata, input.name, input.metadata, inputs[0]->name, inputs[0]->metadata);
                 Result output(outputs[0]->name, 0, {}, {}, {});
                 array<Result*> elementInput (cast<Result*>(inputs)); elementInput[0] = &input;
-                operation->execute(evaluateArguments(target, arguments, true), {&output}, elementInput);
+                operation->execute(evaluateArguments(target, arguments, Local), {&output}, elementInput);
                 if(!outputs[0]->metadata) outputs[0]->metadata = copy(output.metadata);
                 assert_(outputs[0]->metadata == output.metadata);
                 assert_(output.data, target, rule.operation);
@@ -553,7 +576,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
             }
             assert_(outputs[0]->elements);
         } else {
-            operation->execute(evaluateArguments(target, arguments, true), cast<Result*>(outputs), cast<Result*>(inputs));
+            operation->execute(evaluateArguments(target, arguments, Local), cast<Result*>(outputs), cast<Result*>(inputs));
         }
     } else { // Sweep generator
            assert_(rule.sweeps.size()==1, "FIXME: Only single sweeps can be generated");
@@ -564,8 +587,6 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& sc
            assert_(rule.sweeps.at(parameter), "Single value sweep", parameter, rule.sweeps.at(parameter));
            if(args.contains(parameter)) args.remove(parameter); // Sweep overrides (default) argument
            args.insert(String(parameter), sweepStr(rule.sweeps.at(parameter)));
-           relevantArguments = &evaluateArguments(target, arguments);
-           assert_(relevantArguments->contains(parameter), "Irrelevant sweep parameter", parameter, "for", rule.inputs.first(), relevantArguments);
 
            String metadata, data;
            for(const Variant& value: rule.sweeps.at(parameter)) {

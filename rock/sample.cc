@@ -22,7 +22,7 @@ String toASCII(const Vector& a) { String s; for(uint i: range(a.size)) { s<<str(
 // UniformSample
 real UniformSample::sum() const { real sum=0; for(uint i: range(size)) sum += at(i); return sum; }
 real UniformSample::mean() const { return sum()/size; }
-real UniformSample::variance() const { float mean=UniformSample::mean(), ssd=0; for(uint i: range(size)) ssd += sq(at(i)-mean); return ssd/size; }
+real UniformSample::variance() const { real mean=UniformSample::mean(), ssd=0; for(uint i: range(size)) ssd += sq(at(i)-mean); return ssd/(size-1); }
 UniformSample parseUniformSample(const string& file) {
     TextData s (file);
     UniformSample sample(count(file,'\n'));
@@ -37,7 +37,7 @@ String toASCII(const UniformSample& A) {
 
 // UniformHistogram
 real UniformHistogram::sum() const { real sum=0; for(uint i: range(size)) sum += i*at(i); return sum; }
-real UniformHistogram::variance() const { float sampleMean=mean(), ssd=0; for(uint i: range(size)) ssd += at(i)*sq(i-sampleMean); return ssd/(sampleCount()-1); }
+real UniformHistogram::variance() const { real sampleMean=mean(), ssd=0; for(uint i: range(size)) ssd += at(i)*sq(i-sampleMean); return ssd/(sampleCount()-1); }
 
 // NonUniformSample
 real NonUniformSample::sum() const { real sum=0; for(uint i: range(values.size)) sum += values[i]; return sum; }
@@ -55,7 +55,7 @@ real NonUniformSample::interpolate(real x) const {
     for(auto e: *this) { real d=abs(e.key-x); if(d < nearest) nearest=d, value=e.value; }
     return value;
 }
-NonUniformSample operator*(float scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
+NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
 NonUniformSample parseNonUniformSample(const string& file) {
     TextData s (file);
     NonUniformSample sample;

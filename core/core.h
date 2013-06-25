@@ -141,7 +141,7 @@ generic struct ref {
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos,size); }
+    ref<T> slice(size_t pos, int64 size) const { assert(pos+size>=0 || pos+size<=this->size); return ref<T>(data+pos, size>=0?size:this->size-pos+size); }
     /// Slices a reference to elements from to the end of the reference
     ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 

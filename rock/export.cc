@@ -138,7 +138,6 @@ String toCDL(const Volume& source) {
         else if(!s) break;
         else error("Unknown substitution",s.until(';'));
     }
-    assert(toUTF32(data)); // Asserts output is valid UTF-8
     return data;
 }
 class(ToCDL, Operation), virtual VolumeOperation {
