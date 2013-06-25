@@ -66,7 +66,7 @@ rock/process.h
 rock/rasterize.cc
 rock/render.cc
 rock/render.h
-rock/rock
+rock/process
 rock/rock.cc
 rock/sample.h
 rock/skeleton.cc
@@ -85,3 +85,6 @@ rock/crop.cc
 rock/crop.h
 rock/sample-operation.cc
 io/bmp.h
+rock/sweep
+rock/sweep.h
+rock/sweep.cc

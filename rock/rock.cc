@@ -88,12 +88,12 @@ struct GraphProcess : virtual Process {
 
 /// From an X-ray tomography volume, segments rocks pore space and computes histogram of pore sizes
 struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
-    FILE(rock) // Rock process definition (embedded in binary)i
+    FILE(process) // Rock process definition (embedded in binary)
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
         specialParameters += "dump"_; specialParameters += "graph"_; specialParameters += "view"_; specialParameters += "cylinder"_; specialParameters += "storageFolder"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
-        array<string> targets = configure(args, process? : rock());
+        array<string> targets = configure(args, process? : this->process());
         if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                                                   "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
         if(targets.size>targetPaths.size && arguments.value("view"_,"0"_)=="0"_) warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));

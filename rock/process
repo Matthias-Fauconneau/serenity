@@ -1,20 +1,10 @@
 # Rock process definition
-# Usage: Specify the path to this process file in order to override the internal definition embedded in the binary
-# Syntax: output1 output2 ... = Operator input1 input2 arg1=value arg2 ...
 
 # Parse physical resolutions (i.e inverse sample rate)
 resolution = '1' #Input resolution
 if resolution == 'auto': resolution = PhysicalResolution # Parses resolution from input folder name as "name-resolution"
-resolutions = resolution path # Parses all resolutions (using sweep generator)
 
-# Use largest possible box fitting all inputs (box=auto)
-if box == 'auto': integer-box = Round input-box # Rounds input-box to nearest integer for Source
- input-box = Div common-box resolution # Converts physical common box to pixels (using current input resolution)
- common-box = CommonSampleSize resolutions # Returns largest possible box fitting all inputs
-
-# Imports volume data from image slices
-if box == 'auto': source = Source integer-box
-if box != 'auto': source = Source
+source = Source
 
 # Denoises
 denoise = 'median'
@@ -30,7 +20,6 @@ if denoise == 'median': denoised = median
 # Resamples
 if !resample: process-resolution = resolution # Forwards original resolution
 if !resample: resampled = denoised # Forwards original volume
-#FIXME: if resample and !process-resolution: process-resolution = Maximum resolutions # Resamples all volumes to coarsest resolution
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
 # Density distribution
@@ -72,9 +61,8 @@ volume-crop = Sum full-histogram
 volume-total = volume-crop #Backward compatibility
 
 # Discards small and unconnected pores
-minimalRadius = '0'
-minimalSqRadius = $minimalRadius^2
-pruned = ThresholdClip unconnected minimalSqRadius
+if minimalSqRadius: pruned = ThresholdClip unconnected minimalSqRadius
+if !minimalSqRadius: pruned = unconnected
 
 # Crops before floodfill to avoid hidden connections
 if !REV: cropInput = pruned
@@ -100,70 +88,37 @@ floodfill = '1'
 if !floodfill: connected = transposed # Forwards unconnected pore space
 if floodfill: connected = FloodFill transposed # Flood fills pore space
 
-histogram-squaredRadius = Histogram cropped-connected clip='1' # Computes histogram of maximum squared radii
-volume = Sum histogram-squaredRadius # Computes pore space volume
-porosity = Div volume volume-crop # Computes porosity (= pore space volume / total volume )
-
-# Connected Volume(minimalSqRadius) sweep
-volume-minimalSqRadius = volume minimalSqRadius
-volume-minimalRadius = SquareRootVariable volume-minimalSqRadius
-porosity-minimalRadius = Div volume-minimalRadius volume-crop
-
-# Returns the maximum pruning radius with volume > 0 (connectivity)
-maximum-minimalRadius = Optimize volume-minimalRadius criteria='maximumArgument' constraint='>0'
-
+# Computes histogram of maximum squared radii
+histogram-squaredRadius = Histogram cropped-connected clip='1'
+# Computes pore space volume
+volume = Sum histogram-squaredRadius
+# Computes porosity (= pore space volume / total volume )
+porosity = Div volume volume-crop
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius
-# Normalize histograms
+# Normalize histogram
 histogram-radius-normalized = Div histogram-radius volume-crop
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth='0.5'
-# Normalize probability density on total volume (including background (i.e not the same as density normalization))
+# Normalizes probability density on total volume (including background (i.e not the same as probability density normalization))
 distribution-radius = Div volume-distribution-radius volume-crop
-
 # Scales radius (e.g to original pixel or physical resolution)
  histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
  histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
- porosity-minimalRadius-scaled = ScaleVariable porosity-minimalRadius process-resolution
-
-# Representative elementary volume (REV) estimation
- # Sweeps crop.cylinder computing pore size distributions and porosity
-  volume-distribution-radius-crop = volume-distribution-radius crop.cylinder
-  distribution-radius-crop = distribution-radius crop.cylinder
-  distribution-radius-crop-scaled = ScaleDistribution distribution-radius-crop[] process-resolution
-  porosity-crop = porosity crop.cylinder
-  porosity-crop-scaled = ScaleVariable porosity-crop process-resolution
-
- # Pore size distribution error to last (for REV with increasingly large volumes)
-  distribution-radius-crop-error-last = DistributionError volume-distribution-radius-crop reference='last'
-  distribution-radius-crop-error-last-scaled = ScaleVariable distribution-radius-crop-error-last process-resolution
-  # Returns the minimum crop radius with distribution error < 10%
-  minimum-crop-distribution = Optimize distribution-radius-crop-error-last-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
-
- # Pore size distribution deviation (TODO: automatically compute 8 sample crop parameters from sweep size)
-  distribution-radius-crop-deviations = DistributionError distribution-radius-crop reference='mean'
-  distribution-radius-crop-deviation-mean = Deviation distribution-radius-crop-deviations
-
- # Porosity error
-  # Computes relative errors (assuming last value is correct)
-  porosity-error-crop = ScalarError porosity-crop
-  porosity-error-crop-scaled = ScaleVariable porosity-error-crop process-resolution
-  # Returns the minimum cropRadius with porosity error < 10%
-  minimum-crop-porosity = Optimize porosity-error-crop-scaled criteria='minimumArgument' constraint='<0.05'
 
 # Export
  sqrt = SquareRoot cropped-connected # Square roots squared distance
  sqrt-scaled = ScaleValues sqrt process-resolution # Scale volume values
  cdl = ToCDL sqrt-scaled # Exports to CDL
  ascii = ToASCII sqrt-scaled # Exports to ASCII
-# Exports to compressed PNG
- png-source = ToPNG source
- png-denoised = ToPNG denoised
- png-colorize = ToPNG colorize
- png-distance = ToPNG distance
- png-skeleton = ToPNG skeleton
- png-connected = ToPNG connected
+ # Exports to compressed PNG
+  png-source = ToPNG source
+  png-denoised = ToPNG denoised
+  png-colorize = ToPNG colorize
+  png-distance = ToPNG distance
+  png-skeleton = ToPNG skeleton
+  png-connected = ToPNG connected
 # Exports to BMP (when writing to disk, it is faster to write PNGs and pipe to BMP-only tools (e.g using ImageMagick convert))
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised

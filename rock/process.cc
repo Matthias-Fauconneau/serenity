@@ -15,7 +15,6 @@ array<string> Process::parameters() {
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
     array<string> targets;
     array<array<string>> results; // Intermediate result names for each target
-    //array<array<string>> sweepOverrides; // Sweep overrides for each target (Converts user specified sweeps to rule sweeps)
     Dict defaultArguments; // Process-specified default arguments
     Sweeps sweeps, defaultSweeps; // Process-specified default sweeps
     // Parses definitions and arguments twice to solve cyclic dependencies
@@ -25,7 +24,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
     // 4) Arguments are parsed again using the customized process definition
     for(uint pass unused: range(2)) {
         array<string> parameters = this->parameters();
-        rules.clear(); cache.clear(); resultNames.clear(); /*sweepOverrides.clear(); sweepOverrides.grow(targets.size);*/ defaultArguments.clear(); defaultSweeps.clear();
+        rules.clear(); cache.clear(); resultNames.clear(); defaultArguments.clear(); defaultSweeps.clear();
 
         for(TextData s(definition); s;) { //FIXME: factorize (arguments, sweeps, expressions ...), use parser
             s.skip();
@@ -320,7 +319,6 @@ const Dict& Process::evaluateArguments(const string& target, const Dict& scopeAr
         for(const string& parameter: rule.sweeps.keys) { if(args.contains(parameter)) args.remove(parameter); }
     }
     if(flags&Recursive) assert_(args, rule, scopeArgumentsAndSweeps, (int)flags);
-    log(target, (int)flags, scopeArgumentsAndSweeps, "->", args);
     cache << unique<Evaluation>(target, move(scopeArgumentsAndSweeps), flags, move(args));
     return cache.last()->output;
 }
