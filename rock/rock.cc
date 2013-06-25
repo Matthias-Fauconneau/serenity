@@ -121,21 +121,26 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
             for(uint index: range(min(targetResults.size,targetPaths.size))) {
                 const string& path = targetPaths[index];
-                String name, data;
                 if(targetResults[index].size>1) output(targetsSweeps[index], targetResults[index], path);
                 else { //FIXME: factorize with output
                     const shared<Result>& target = targetResults[index][0];
-                    name = target->name+"."_+target->metadata;
-                    assert_(target->data);
-                    data = unsafeReference(target->data);
-                    if(existsFolder(path, cwd)) {
-                        Time time;
-                        writeFile(name, data, Folder(path, cwd));
-                        log(path+"/"_+name, "["_+strByteCount(data.size)+"]"_, time);
+                    String fileName = target->name+"."_+target->metadata;
+                    if(target->elements) {
+                        assert_(existsFolder(path, cwd), path);
+                        Folder folder(fileName, Folder(path, cwd), true);
+                        for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)target->elements) writeFile(element.key+"."_+target->metadata, element.value, folder);
                     } else {
-                        Time time;
-                        writeFile(path, data, cwd);
-                        log(name,"->",path, "["_+strByteCount(data.size)+"]"_, time);
+                        assert_(target->data, fileName, target->elements);
+                        String data = unsafeReference(target->data);
+                        if(existsFolder(path, cwd)) {
+                            Time time;
+                            writeFile(fileName, data, Folder(path, cwd));
+                            log(path+"/"_+fileName, "["_+strByteCount(data.size)+"]"_, time);
+                        } else {
+                            Time time;
+                            writeFile(path, data, cwd);
+                            log(fileName,"->",path, "["_+strByteCount(data.size)+"]"_, time);
+                        }
                     }
                 }
             }
@@ -236,7 +241,7 @@ struct Rock : virtual PersistentProcess, virtual GraphProcess, Widget {
          targetPaths.clear();
         for(const string& argument: specialArguments) {
             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
-            else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) { remove(Folder(argument,cwd)); targetPaths << argument; } // Removes any empty target folder
+            else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) { removeFolder(argument,cwd); targetPaths << argument; } // Removes any empty target folder
             else if(!isDefined("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
                 if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) {
                     assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments, targetsSweeps);

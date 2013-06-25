@@ -42,6 +42,7 @@ struct Process {
         Recursive=1<<0, // Includes recursively relevant arguments
         Sweep=1<<1, // Includes arguments handled by sweep generator rules
         Local=1<<2, // Includes arguments only used locally by the rule
+        LocalSweep=1<<3, // Includes arguments handled by top sweep generator rule
         Cache=Recursive|Sweep|Local // Includes recursive relevance (in case input is not available), sweeps and locals
     };
     /// Recursively evaluates relevant arguments for a rule

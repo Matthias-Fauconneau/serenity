@@ -44,18 +44,6 @@ class(Histogram, Operation) {
     }
 };
 
-/// Zeroes first clip values
-class(Zero, Operation), virtual Pass {
-    virtual string parameters() const { return "clip"_; }
-    virtual void execute(const Dict& args, Result& output, const Result& source) override {
-        UniformSample sample = parseUniformSample(source.data);
-        uint clip = args.value("clip"_,1);
-        for(uint i: range(clip)) sample[i] = 0; // Zeroes values until clip (discards clipping artifacts or background)
-        output.metadata = copy(source.metadata);
-        output.data = toASCII(sample);
-    }
-};
-
 class(Normalize, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);

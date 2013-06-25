@@ -47,155 +47,127 @@ otsu-interclass-deviation-normalized = Normalize otsu-interclass-deviation
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-density # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
+# Segments
 pore = Binary resampled threshold # Also clips to cylinder
-if !downsample: colorize = Colorize pore source
-if downsample: colorize = Colorize pore resampled
+colorize = Colorize pore resampled # For visualization
 
 # Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
 distancey positionyx positionyy = DistanceY distancex positionxx
 distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
 
+# Computes skeleton (medial axis)
 skeleton = Skeleton positionx positiony positionz
 skeleton-tiled = ZOrder skeleton
 
-# Rasterizes clipped skeleton
+# Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin skeleton-tiled
-rasterized = Rasterize sphere-bins
+unconnected = Rasterize sphere-bins
 
-# Transposes to use an alternate connectivity axis (FloodFill always use Z)
-transposed = Transpose rasterized
-if transpose=='X': unconnected = transposed
-if transpose=='Y': unconnected = Transpose transposed
-if transpose=='Z': unconnected = rasterized
-if !transpose: unconnected = rasterized
-
-# Flood fills pore space (same as pruned-unconnected{minimalRadius=0}
-connected = FloodFill unconnected
+# Computes crop volume (including rock) before transpose or minimalRadius dependency (prevents double sweep)
+if crop.cylinder: crop-unconnected = Crop unconnected
+if !crop.cylinder: crop-unconnected = unconnected
+full-histogram = Histogram crop-unconnected clip='0' # including rock
+volume-crop = Sum full-histogram
+volume-total = volume-crop #Backward compatibility
 
 # Discards small and unconnected pores
 minimalRadius = '0'
 minimalSqRadius = $minimalRadius^2
-pruned-unconnected = ThresholdClip unconnected minimalSqRadius
+pruned = ThresholdClip unconnected minimalSqRadius
 
 # Crops before floodfill to avoid hidden connections
-if !REV: cropInput = pruned-unconnected
-if !REV: floodInput = crop
-if !REV: crop-flood = pruned-connected
-# Floodfill once and explicitly crop each REV volume (FIXME: only crop histogram evaluation)
-if REV: floodInput = pruned-unconnected
-if REV: cropInput = pruned-connected
-if REV: crop-flood = crop
+if !REV: cropInput = pruned
+if !REV: transposeInput = cropped
+if !REV: cropped-connected = connected
+# Floodfills once and explicitly crop each REV volume (FIXME: only crop histogram evaluation)
+if REV: transposeInput = pruned
+if REV: cropInput = connected
+if REV: cropped-connected = cropped
 
 # Crops processed volume to remove boundary bias effects
-if crop.cylinder: crop = Crop cropInput
-if !crop.cylinder: crop = cropInput
-pruned-connected = FloodFill floodInput # Flood fills pruned pore space
+if crop.cylinder: cropped = Crop cropInput
+if !crop.cylinder: cropped = cropInput
 
-# Computes total volume (including rock)
-histogram-crop = Histogram crop-flood clip='0'
-volume-crop = Sum histogram-crop
-volume-total = volume-crop #Backward compatibility
-# Computes histogram of maximum squared radii
-histogram-squaredRadius-unconnected = Histogram pruned-unconnected
-histogram-squaredRadius-connected = Zero histogram-crop clip='1'
-# Computes pore space volume
-volume-unconnected = Sum histogram-squaredRadius-unconnected
-volume-connected = Sum histogram-squaredRadius-connected
-# Computes porosity (= pore space volume / total volume )
-porosity-unconnected = Div volume-unconnected volume-crop
-porosity-connected = Div volume-connected volume-crop
+# Transposes to use an alternate connectivity axis (FloodFill always use Z)
+transpose = Transpose transposeInput
+if transpose=='X': transposed = transpose
+if transpose=='Y': transposed = Transpose transpose
+if transpose=='Z': transposed = pruned
+if !transpose: transposed = pruned
 
-# Unconnected Volume( minimalSqRadius) sweep #FIXME: accumulate histogram-squaredRadius-unconnected
-volume-unconnected-minimalSqRadius = volume-unconnected minimalSqRadius
-volume-unconnected-minimalRadius = SquareRootVariable volume-unconnected-minimalSqRadius
-porosity-unconnected-minimalRadius = Div volume-unconnected-minimalRadius volume-crop
+floodfill = '1'
+if !floodfill: connected = transposed # Forwards unconnected pore space
+if floodfill: connected = FloodFill transposed # Flood fills pore space
 
-# Connected Volume( minimalSqRadius) sweep
-volume-connected-minimalSqRadius = volume-connected minimalSqRadius
-volume-connected-minimalRadius = SquareRootVariable volume-connected-minimalSqRadius
-porosity-connected-minimalRadius = Div volume-connected-minimalRadius volume-crop
+histogram-squaredRadius = Histogram cropped-connected clip='1' # Computes histogram of maximum squared radii
+volume = Sum histogram-squaredRadius # Computes pore space volume
+porosity = Div volume volume-crop # Computes porosity (= pore space volume / total volume )
+
+# Connected Volume(minimalSqRadius) sweep
+volume-minimalSqRadius = volume minimalSqRadius
+volume-minimalRadius = SquareRootVariable volume-minimalSqRadius
+porosity-minimalRadius = Div volume-minimalRadius volume-crop
 
 # Returns the maximum pruning radius with volume > 0 (connectivity)
-maximum-minimalRadius = Optimize volume-connected-minimalRadius criteria='maximumArgument' constraint='>0'
+maximum-minimalRadius = Optimize volume-minimalRadius criteria='maximumArgument' constraint='>0'
 
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
-histogram-radius-unconnected = SquareRootVariable histogram-squaredRadius-unconnected
-histogram-radius-connected = SquareRootVariable histogram-squaredRadius-connected
+histogram-radius = SquareRootVariable histogram-squaredRadius
 # Normalize histograms
-histogram-radius-unconnected-normalized = Div histogram-radius-unconnected volume-crop
-histogram-radius-connected-normalized = Div histogram-radius-connected volume-crop
+histogram-radius-normalized = Div histogram-radius volume-crop
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
-volume-distribution-radius-unconnected = KernelDensityEstimation histogram-radius-unconnected bandwidth='0.5'
-volume-distribution-radius-connected = KernelDensityEstimation histogram-radius-connected bandwidth='0.5'
+volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth='0.5'
 # Normalize probability density on total volume (including background (i.e not the same as density normalization))
-distribution-radius-unconnected = Div volume-distribution-radius-unconnected volume-crop
-distribution-radius-connected = Div volume-distribution-radius-connected volume-crop
+distribution-radius = Div volume-distribution-radius volume-crop
 
 # Scales radius (e.g to original pixel or physical resolution)
- histogram-radius-unconnected-scaled = ScaleDistribution histogram-radius-unconnected process-resolution
- histogram-radius-connected-scaled = ScaleDistribution histogram-radius-connected process-resolution
- histogram-radius-unconnected-normalized-scaled = ScaleDistribution histogram-radius-unconnected-normalized process-resolution
- histogram-radius-connected-normalized-scaled = ScaleDistribution histogram-radius-connected-normalized process-resolution
- distribution-radius-unconnected-scaled = ScaleDistribution distribution-radius-unconnected process-resolution
- distribution-radius-connected-scaled = ScaleDistribution distribution-radius-connected process-resolution
- porosity-unconnected-minimalRadius-scaled = ScaleVariable porosity-unconnected-minimalRadius process-resolution
- porosity-connected-minimalRadius-scaled = ScaleVariable porosity-connected-minimalRadius process-resolution
+ histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
+ histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
+ distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
+ porosity-minimalRadius-scaled = ScaleVariable porosity-minimalRadius process-resolution
 
 # Representative elementary volume (REV) estimation
- # Sweeps crop.cylinder computing connected size distributions and porosity
-  distribution-radius-connected-crop = distribution-radius-connected crop.cylinder
-  distribution-radius-connected-crop-scaled = ScaleDistribution distribution-radius-connected-crop[] process-resolution
-  porosity-connected-crop = porosity-connected crop.cylinder
-  porosity-connected-crop-scaled = ScaleVariable porosity-connected-crop process-resolution
+ # Sweeps crop.cylinder computing pore size distributions and porosity
+  volume-distribution-radius-crop = volume-distribution-radius crop.cylinder
+  distribution-radius-crop = distribution-radius crop.cylinder
+  distribution-radius-crop-scaled = ScaleDistribution distribution-radius-crop[] process-resolution
+  porosity-crop = porosity crop.cylinder
+  porosity-crop-scaled = ScaleVariable porosity-crop process-resolution
 
  # Pore size distribution error to last (for REV with increasingly large volumes)
-  distribution-radius-crop-error-last = DistributionError distribution-radius-connected-crop reference='last'
+  distribution-radius-crop-error-last = DistributionError volume-distribution-radius-crop reference='last'
   distribution-radius-crop-error-last-scaled = ScaleVariable distribution-radius-crop-error-last process-resolution
-  # Returns the minimum cropRadius with distribution error < 10%
-  minimum-cropRadius-distribution = Optimize distribution-radius-crop-error-last-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
+  # Returns the minimum crop radius with distribution error < 10%
+  minimum-crop-distribution = Optimize distribution-radius-crop-error-last-scaled slice='0-1' criteria='minimumArgument' constraint='<0.20'
 
  # Pore size distribution deviation (TODO: automatically compute 8 sample crop parameters from sweep size)
-  distribution-radius-crop-deviations = DistributionError distribution-radius-connected-crop reference='mean'
+  distribution-radius-crop-deviations = DistributionError distribution-radius-crop reference='mean'
   distribution-radius-crop-deviation-mean = Deviation distribution-radius-crop-deviations
 
  # Porosity error
   # Computes relative errors (assuming last value is correct)
-  porosity-error-cropRadius = ScalarError porosity-connected-cropRadius
-  porosity-error-cropRadius-scaled = ScaleVariable porosity-error-cropRadius process-resolution
+  porosity-error-crop = ScalarError porosity-crop
+  porosity-error-crop-scaled = ScaleVariable porosity-error-crop process-resolution
   # Returns the minimum cropRadius with porosity error < 10%
-  minimum-cropRadius-porosity = Optimize porosity-error-cropRadius-scaled criteria='minimumArgument' constraint='<0.05'
+  minimum-crop-porosity = Optimize porosity-error-crop-scaled criteria='minimumArgument' constraint='<0.05'
 
-# Square roots squared distance
- sqrt-unconnected = SquareRoot pruned-unconnected
- sqrt-connected = SquareRoot crop-flood
-
-# Scale volume values
- sqrt-unconnected-scaled = ScaleValues sqrt-unconnected process-resolution
- sqrt-connected-scaled = ScaleValues sqrt-connected process-resolution
-
-# Exports to CDL
- cdl-unconnected = ToCDL sqrt-unconnected-scaled
- cdl-connected = ToCDL sqrt-connected-scaled
-
-# Exports to ASCII
- ascii-unconnected = ToASCII sqrt-unconnected-scaled
- ascii-connected = ToASCII sqrt-connected-scaled
-
+# Export
+ sqrt = SquareRoot cropped-connected # Square roots squared distance
+ sqrt-scaled = ScaleValues sqrt process-resolution # Scale volume values
+ cdl = ToCDL sqrt-scaled # Exports to CDL
+ ascii = ToASCII sqrt-scaled # Exports to ASCII
 # Exports to compressed PNG
  png-source = ToPNG source
  png-denoised = ToPNG denoised
  png-colorize = ToPNG colorize
  png-distance = ToPNG distance
  png-skeleton = ToPNG skeleton
- png-unconnected = ToPNG unconnected
  png-connected = ToPNG connected
-
 # Exports to BMP (when writing to disk, it is faster to write PNGs and pipe to BMP-only tools (e.g using ImageMagick convert))
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised
   bmp-colorize = ToBMP colorize
   bmp-distance = ToBMP distance
   bmp-skeleton = ToBMP skeleton
-  bmp-unconnected = ToBMP unconnected
   bmp-connected = ToBMP connected
