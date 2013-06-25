@@ -58,7 +58,7 @@ rock/export.cc
 rock/CDL
 rock/floodfill.cc
 rock/histogram.cc
-rock/interface.cc
+ui/interface.cc
 rock/layout.cc
 rock/operation.h
 rock/process.cc
@@ -88,3 +88,4 @@ io/bmp.h
 rock/sweep
 rock/sweep.h
 rock/sweep.cc
+rock/graph.h
