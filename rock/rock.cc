@@ -33,23 +33,41 @@ String strByteCount(size_t byteCount) {
 }
 
 struct GraphProcess : virtual Process {
-    String dot(array<const Rule*>& once, const Dict& scopeArguments, const string& output) {
+    String id(const string& target, const Dict& scopeArguments) {
+        const Dict& relevant = evaluateArguments(target, scopeArguments, Cache);
+        return hex(ptr(&ruleForOutput(target)))+(relevant?" "_+str(relevant).slice(1,-1):String());
+    }
+    String label(const string& target, const Dict& scopeArguments) {
+        const Dict& relevant = evaluateArguments(target, scopeArguments, Cache);
+        return ruleForOutput(target).operation+(relevant?" "_+str(relevant).slice(1,-1):String());
+    }
+    String dot(array<String>& once, const Dict& scopeArguments, const string& target) {
         String s;
-        const Rule& rule = ruleForOutput(output);
-        if(!once.contains(&rule)) {
-            once << &rule;
+        const Rule& rule = ruleForOutput(target);
+        String targetResult = id(target, scopeArguments);
+        if(!once.contains(targetResult)) {
+            once << copy(targetResult);
             if(&rule) {
-                Dict arguments = copy(scopeArguments);
-                for(auto arg: rule.argumentExps) if(arg.value.type == Rule::Expression::Literal) {
-                    if(arguments.contains(arg.key)) arguments.remove(arg.key); // Local arguments overrides global arguments
-                    arguments.insert(copy(arg.key), copy((const Variant&)arg.value)); // Appends local arguments
+                const Dict& arguments = evaluateArguments(target, scopeArguments, Recursive);
+                s <<'"'<<targetResult<<'"'<< "[shape=record, label=\""_<<label(target, scopeArguments);
+                for(string output: rule.outputs) {
+                    if(!rule.sweeps) s<<"|<"_<<output<<"> "_<<output;
+                    else for(auto sweep: rule.sweeps) for(const Variant& value: sweep.value) {
+                        String port = str(output,sweep.key+"="_+value);
+                        s<<"|<"_<<port<<"> "_<<port;
+                    }
                 }
-                const Dict& relevant = evaluateArguments(output, arguments, Local);
-                s <<'"'<<hex(ptr(&rule))<<'"'<< "[shape=record, label=\""_<<rule.operation<<(relevant?" "_+str(relevant).slice(1,-1):String());
-                for(string output: rule.outputs) s<<"|<"_<<output<<"> "_<<output;
                 s<<"\"];\n"_;
                 for(string input: rule.inputs) {
-                    s<<'"'<<hex(ptr(&ruleForOutput(input)))<<"\":\""_<<input<<"\" -> \""_<<hex(ptr(&rule))<<"\"\n"_;
+                    String inputResult = id(input, arguments);
+                    if(!rule.arrayOperation) s<<'"'<<inputResult<<"\":\""_<<input<<"\" -> \""_<<targetResult<<"\"\n"_;
+                    else { // Connects all input elements
+                        const Rule& inputRule = ruleForOutput(target); // Assumes array defined by a sweep
+                        for(auto sweep: inputRule.sweeps) for(const Variant& value: sweep.value) {
+                            String port = str(target,sweep.key+"="_+value);
+                            s<<'"'<<inputResult<<"\":\""_<<label(input, arguments)<<"\" -> \""_<<targetResult<<"\" [ label=\"test\"];\n"_;
+                        }
+                    }
                     s<<dot(once, arguments, input);
                 };
             }
@@ -58,7 +76,7 @@ struct GraphProcess : virtual Process {
     }
 
     void generateSVG(const ref<string>& targets, const string& name, const string& folder){
-        array<const Rule*> once;
+        array<String> once;
         String s ("digraph \""_+name+"\" {\n"_);
         for(const string& target: targets) s << dot(once, arguments, target);
         s << "}"_;

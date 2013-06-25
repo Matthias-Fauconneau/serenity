@@ -33,7 +33,7 @@ UniformHistogram histogram(const Volume16& source, bool cylinder) {
 
 /// Computes histogram using uniform integer bins
 class(Histogram, Operation) {
-    virtual string parameters() const { return "cylinder clip"_; } //zero: Whether to include 0 (clipping or background) in the histogram (Defaults to no)
+    virtual string parameters() const { return "cylinder clip"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         UniformHistogram histogram = ::histogram(source, args.contains("cylinder"_));
@@ -41,6 +41,18 @@ class(Histogram, Operation) {
         for(uint i: range(clip)) histogram[i] = 0; // Zeroes values until clip (discards clipping artifacts or background)
         outputs[0]->metadata = String("histogram.tsv"_);
         outputs[0]->data = clip == histogram.size ? String() : toASCII(histogram);
+    }
+};
+
+/// Zeroes first clip values
+class(Zero, Operation), virtual Pass {
+    virtual string parameters() const { return "clip"_; }
+    virtual void execute(const Dict& args, Result& output, const Result& source) override {
+        UniformSample sample = parseUniformSample(source.data);
+        uint clip = args.value("clip"_,1);
+        for(uint i: range(clip)) sample[i] = 0; // Zeroes values until clip (discards clipping artifacts or background)
+        output.metadata = copy(source.metadata);
+        output.data = toASCII(sample);
     }
 };
 

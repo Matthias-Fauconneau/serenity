@@ -92,16 +92,16 @@ if crop.cylinder: crop = Crop cropInput
 if !crop.cylinder: crop = cropInput
 pruned-connected = FloodFill floodInput # Flood fills pruned pore space
 
-# Computes histogram of maximum squared radii
-histogram-squaredRadius-unconnected = Histogram pruned-unconnected
-histogram-squaredRadius-connected = Histogram crop-flood
-# Computes pore space volume
-volume-unconnected = Sum histogram-squaredRadius-unconnected
-volume-connected = Sum histogram-squaredRadius-connected
 # Computes total volume (including rock)
 histogram-crop = Histogram crop-flood clip='0'
 volume-crop = Sum histogram-crop
 volume-total = volume-crop #Backward compatibility
+# Computes histogram of maximum squared radii
+histogram-squaredRadius-unconnected = Histogram pruned-unconnected
+histogram-squaredRadius-connected = Zero histogram-crop clip='1'
+# Computes pore space volume
+volume-unconnected = Sum histogram-squaredRadius-unconnected
+volume-connected = Sum histogram-squaredRadius-connected
 # Computes porosity (= pore space volume / total volume )
 porosity-unconnected = Div volume-unconnected volume-crop
 porosity-connected = Div volume-connected volume-crop
