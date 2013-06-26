@@ -1,9 +1,9 @@
 # Rock process definition
 
-# Parse physical resolutions (i.e inverse sample rate)
-resolution = '1' #Input resolution
-if resolution == 'auto': resolution = PhysicalResolution # Parses resolution from input folder name as "name-resolution"
+# Parses resolution from input folder name as "name-resolution"
+if !resolution: resolution = PhysicalResolution
 
+# Concatenates image slice files in a volume
 source = Source
 
 # Denoises
@@ -51,31 +51,31 @@ skeleton-tiled = ZOrder skeleton
 
 # Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin skeleton-tiled
-unconnected = Rasterize sphere-bins
+maximum = Rasterize sphere-bins
 
-# Computes crop volume (including rock) before transpose or minimalRadius dependency (prevents double sweep)
-if crop.cylinder: crop-unconnected = Crop unconnected
-if !crop.cylinder: crop-unconnected = unconnected
-full-histogram = Histogram crop-unconnected clip='0' # including rock
+# Computes crop volume (including rock) before transpose or minimalRadius dependency
+if crop.cylinder: crop-maximum = Crop maximum
+if !crop.cylinder: crop-maximum = maximum
+full-histogram = Histogram crop-maximum clip='0' # including rock
 volume-crop = Sum full-histogram
 volume-total = volume-crop #Backward compatibility
 
-# Discards small and unconnected pores
-if minimalSqRadius: pruned = ThresholdClip unconnected minimalSqRadius
-if !minimalSqRadius: pruned = unconnected
+# Discards small pores
+if minimalSqRadius: pruned = ThresholdClip maximum minimalSqRadius
+if !minimalSqRadius: pruned = maximum
 
 # Crops before floodfill to avoid hidden connections
 if !REV: cropInput = pruned
-if !REV: transposeInput = cropped
-if !REV: cropped-connected = connected
+if !REV: transposeInput = crop
+if !REV: crop-connected = connected
 # Floodfills once and explicitly crop each REV volume (FIXME: only crop histogram evaluation)
 if REV: transposeInput = pruned
 if REV: cropInput = connected
-if REV: cropped-connected = cropped
+if REV: crop-connected = crop
 
 # Crops processed volume to remove boundary bias effects
-if crop.cylinder: cropped = Crop cropInput
-if !crop.cylinder: cropped = cropInput
+if crop.cylinder: crop = Crop cropInput
+if !crop.cylinder: crop = cropInput
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
 transpose = Transpose transposeInput
@@ -89,7 +89,7 @@ if !floodfill: connected = transposed # Forwards unconnected pore space
 if floodfill: connected = FloodFill transposed # Flood fills pore space
 
 # Computes histogram of maximum squared radii
-histogram-squaredRadius = Histogram cropped-connected clip='1'
+histogram-squaredRadius = Histogram crop-connected clip='1'
 # Computes pore space volume
 volume = Sum histogram-squaredRadius
 # Computes porosity (= pore space volume / total volume )
@@ -108,7 +108,7 @@ distribution-radius = Div volume-distribution-radius volume-crop
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
 
 # Export
- sqrt = SquareRoot cropped-connected # Square roots squared distance
+ sqrt = SquareRoot crop-connected # Square roots squared distance
  sqrt-scaled = ScaleValues sqrt process-resolution # Scale volume values
  cdl = ToCDL sqrt-scaled # Exports to CDL
  ascii = ToASCII sqrt-scaled # Exports to ASCII

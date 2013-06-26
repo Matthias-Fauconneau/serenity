@@ -1,7 +1,6 @@
 TODO
 build.cc
 build.sh
-script.cc
 test.sh
 
 core/array.h
@@ -66,7 +65,7 @@ rock/process.h
 rock/rasterize.cc
 rock/render.cc
 rock/render.h
-rock/process
+rock/rock
 rock/rock.cc
 rock/sample.h
 rock/skeleton.cc
@@ -85,7 +84,8 @@ rock/crop.cc
 rock/crop.h
 rock/sample-operation.cc
 io/bmp.h
-rock/sweep
-rock/sweep.h
-rock/sweep.cc
-rock/graph.h
+rock/view.cc
+rock/tool.h
+rock/REV.cc
+rock/PSD.cc
+rock/analysis.h

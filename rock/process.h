@@ -48,9 +48,10 @@ struct Process {
     Dict arguments; // User-specified arguments
     array<Rule> rules; // Production rules
     array<string> resultNames; // Valid result names defined by process
-    array<shared<Result>> results; // Generated intermediate (and target) data
     struct Evaluation { String target; Dict input; Dict output; Evaluation(String&& target, Dict&& input, Dict&& output) : target(move(target)), input(move(input)), output(move(output)){}};
     array<unique<Evaluation>> cache; // Caches argument evaluation
+    array<shared<Result>> results; // Generated intermediate (and target) data
+    array<shared<Result>> targetResults; // Generated datas for each target
 };
 
 /// Mirrors results on a filesystem
@@ -74,7 +75,7 @@ struct ResultFile : Result {
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : virtual Process {
-     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) {}
+     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) { specialParameters += "storageFolder"_; }
     ~PersistentProcess();
 
     array<string> configure(const ref<string>& allArguments, const string& definition) override;

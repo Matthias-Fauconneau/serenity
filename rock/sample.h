@@ -15,6 +15,8 @@ Vector operator*(real scalar, const Vector& A);
 Vector round(const Vector& A);
 /// Computes absolute values
 Vector abs(const Vector& A);
+/// Adds two vectors
+Vector operator+(const Vector& A, const Vector& B);
 /// Substracts two vectors
 Vector operator-(const Vector& A, const Vector& B);
 
@@ -39,7 +41,9 @@ struct UniformSample : Vector {
 };
 /// Multiplies sample by a scalar
 inline UniformSample operator*(real scalar, const UniformSample& A) { return scalar*(const Vector&)A; }
-/// Substracts two vectors
+/// Adds two sample
+inline UniformSample operator+(const UniformSample& A, const UniformSample& B) { return (const Vector&)A + (const Vector&)B; }
+/// Substracts two sample
 inline UniformSample operator-(const UniformSample& A, const UniformSample& B) { return (const Vector&)A - (const Vector&)B; }
 /// Parses a uniformly sampled distribution from tab-separated values
 UniformSample parseUniformSample(const string& file);

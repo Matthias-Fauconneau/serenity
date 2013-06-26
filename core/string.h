@@ -99,16 +99,19 @@ String ftoa(double number, int precision=2, int pad=0, bool exponent=false, bool
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 
+/// Formats value using best binary prefix
+String binaryPrefix(size_t value, string unit="B"_);
+
 /// Converts arrays
-generic String str(const ref<T>& a) { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<' ';} return s; }
-generic String str(const mref<T>& a) { return str((const ref<T>&)a); }
-generic String str(const buffer<T>& a) { return str((const ref<T>&)a); }
+generic String str(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
+generic String str(const mref<T>& a, char separator=' ') { return str((const ref<T>&)a, separator); }
+generic String str(const buffer<T>& a, char separator=' ') { return str((const ref<T>&)a, separator); }
 generic String str(const array<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
 generic String dec(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
 generic String hex(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s; }
 
 /// Converts static arrays
-template<Type T, size_t N> String str(const T (&a)[N]) { return str(ref<T>(a,N)); }
+template<Type T, size_t N> String str(const T (&a)[N], char separator=' ') { return str(ref<T>(a,N), separator); }
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces

@@ -10,6 +10,7 @@ typedef buffer<real> Vector;
 Vector operator*(real scalar, const Vector& A) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
 Vector round(const Vector& A) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=round(A[i]); return R; }
 Vector abs(const Vector& A) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=abs(A[i]); return R; }
+Vector operator+(const Vector& A, const Vector& B) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=A[i]+B[i]; return R; }
 Vector operator-(const Vector& A, const Vector& B) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=A[i]-B[i]; return R; }
 Vector parseVector(const string& file, bool integer)  {
     TextData s (file);

@@ -160,6 +160,17 @@ const Dict& Process::relevantArguments(const string& target, const Dict& argumen
         assert_(args.value(arg.key,arg.value)==arg.value);
         if(parameters.contains(arg.key)) if(!args.contains(arg.key)) args.insert(copy(arg.key), copy(arg.value));
     }
+    for(auto arg: arguments) { // Appends matching scoped arguments
+        string scope, parameter = arg.key;
+        if(arg.key.contains('.')) scope=section(arg.key, '.', 0, 1), parameter=section(arg.key, '.', 1, 2);
+        if(!scope) continue;
+        for(const string& output: rule.outputs) if(output==scope) goto match;
+        /*else*/ continue;
+match:
+        assert_(parameters.contains(parameter), "Irrelevant parameter", scope+"."_+parameter, "for"_, rule);
+        if(args.contains(parameter)) args.remove(parameter);
+        args.insert(copy(arg.key), copy(arg.value));
+    }
     cache << unique<Evaluation>(String(target), copy(arguments), move(args));
     return cache.last()->output;
 }
@@ -178,10 +189,10 @@ Dict Process::localArguments(const string& target, const Dict& arguments) {
         string scope, parameter = arg.key;
         if(arg.key.contains('.')) scope=section(arg.key, '.', 0, 1), parameter=section(arg.key, '.', 1, 2);
         if(!scope) continue;
-        for(const string& output: rule.outputs) if(startsWith(output, scope)) goto match;
+        for(const string& output: rule.outputs) if(output==scope) goto match;
         /*else*/ continue;
 match:
-        assert_(parameters.contains(parameter), "Irrelevant scope parameter", scope, parameter, rule);
+        assert_(parameters.contains(parameter), "Irrelevant parameter", scope+"."_+parameter, "for"_, rule);
         if(args.contains(parameter)) args.remove(parameter);
         args.insert(String(parameter), copy(arg.value));
     }

@@ -106,22 +106,3 @@ class(Source, Operation), virtual VolumeOperation {
         assert_(target.maximum, target.sampleCount, target.margin);
     }
 };
-
-/// Returns largest possible box fitting all inputs
-class(CommonSampleSize, Operation), virtual Pass {
-    virtual void execute(const Dict& arguments, Result& size, const Result& resolutions) override {
-        assert_(endsWith(resolutions.metadata,"tsv"_), resolutions.metadata, resolutions.data);
-        ScalarMap inputs = parseMap(resolutions.data);
-        array<vec3> physicalSampleSizes;
-        for(auto input: inputs) {
-            Dict args = copy(arguments);
-            if(args.contains("path"_)) args.remove("path"_); //Removes sweep argument
-            args.insert(String("path"_), copy(input.key));
-            Source source; source.outputSize(args, {}, 0);
-            physicalSampleSizes << float(input.value)*vec3(source.crop.size);
-        }
-        vec3 min = ::min(physicalSampleSizes);
-        size.metadata = String("vector"_);
-        size.data = toASCII( Vector(ref<double>{min.x, min.y, min.z}) );
-    }
-};

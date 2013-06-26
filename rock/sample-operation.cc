@@ -52,32 +52,3 @@ class(Div, Operation) {
         else error(inputs[0]->metadata);
     }
 };
-
-/// Rounds vectors
-class(Round, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-        if(source.metadata=="vector"_) target.data = toASCII( round( parseVector(source.data) ) );
-        else error(source.metadata);
-    }
-};
-
-/// Returns maximum value
-class(Maximum, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = String("scalar"_);
-        if(endsWith(source.metadata,".tsv"_)) target.data = toASCII( max( parseMap(source.data).values ) );
-        else error(source.metadata);
-    }
-};
-
-/// Computes deviation from differences (i.e deviation of samples with zero mean)
-class(Deviation, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        outputs[0]->metadata = copy(inputs[0]->metadata);
-        UniformSample sample(parseMap(inputs[0]->data).values);
-        real ssd=0; for(uint i: range(sample.size)) ssd += sq(sample[i]);
-        outputs[0]->data = toASCII( sqrt(ssd/(sample.size-1)) );
-    }
-};
-
