@@ -57,9 +57,9 @@ struct Process {
 /// Mirrors results on a filesystem
 struct ResultFile : Result {
     ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, String&& data, const string& path, const Folder& folder)
-        : Result(name,timestamp,move(arguments),move(metadata), move(data)), fileName(String(path)), folder(folder) {}
+        : Result(name,timestamp,move(arguments),move(metadata), move(data)), fileName(String(path)), folder(""_,folder) {}
     ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, Map&& map, const string& path, const Folder& folder)
-        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(String(path)), folder(folder) { if(map) maps<<move(map); }
+        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(String(path)), folder(""_,folder) { if(map) maps<<move(map); }
     void rename() {
         if(!fileName) return;
         String newName = name+"{"_+toASCII(localArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata;
@@ -70,7 +70,7 @@ struct ResultFile : Result {
 
     array<Map> maps;
     String fileName;
-    const Folder& folder;
+    Folder folder;
 };
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes

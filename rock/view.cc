@@ -9,7 +9,7 @@
 
 /// Displays all target results
 class(View, Tool), Widget {
-    void execute(Process& process) override {
+    buffer<byte> execute(Process& process) override {
         this->process = &process;
         for(const shared<Result>& result: process.targetResults) {
             if(result->data) {
@@ -28,8 +28,8 @@ class(View, Tool), Widget {
             updateView();
             window->show();
         }
+        return buffer<byte>();
     }
-
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
             int volumeCount=0, volumeIndex=0;
@@ -66,7 +66,6 @@ class(View, Tool), Widget {
         else window->render();
         window->setTitle(str(current));
     }
-
     void render(int2 position, int2 size) {
         assert(current);
         Volume volume = toVolume(current);
@@ -94,7 +93,6 @@ class(View, Tool), Widget {
             blit(position, image);
         }
     }
-
     const Process* process = 0;
     shared<Result> current;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice

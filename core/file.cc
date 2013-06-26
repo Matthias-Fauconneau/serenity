@@ -74,7 +74,7 @@ int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.
 void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
-bool existsFile(const string& path, const Folder& at) { return Handle( openat(at.fd, strz(path), O_RDONLY, 0) ).fd > 0; }
+bool existsFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_RDONLY, 0); if(fd>0) close(fd); return fd>0; }
 buffer<byte> readFile(const string& path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 void writeFile(const string& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
 
@@ -90,11 +90,8 @@ void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system
 void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
-    assert_(oldName != newName);
-    assert_(existsFile(oldName,oldAt), oldName, newName, existsFile(newName,newAt));
-    assert_(!existsFile(newName,newAt), oldName, newName);
-    assert_(isUTF8(newName) && isASCII(newName), newName);
-    check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)), oldName, newName);
+    assert(existsFile(oldName,oldAt) && !existsFile(newName,newAt), oldName, newName);
+    check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)));
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }

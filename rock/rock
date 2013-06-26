@@ -22,8 +22,12 @@ if !resample: process-resolution = resolution # Forwards original resolution
 if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
+#Clips histograms to the inscribed cylinder
+if !box: histogram-density.cylinder = ''
+if !box: histogram-crop.cylinder = ''
+if !box: histogram-squaredRadius.cylinder = ''
+
 # Density distribution
-if !box: cylinder = '' #Clips histograms to the inscribed cylinder
 if !thresholdFromSource: histogram-density = Histogram resampled
 if thresholdFromSource: histogram-density = Histogram source
 histogram-density-normalized = Normalize histogram-density
@@ -56,8 +60,8 @@ maximum = Rasterize sphere-bins
 # Computes crop volume (including rock) before transpose or minimalRadius dependency
 if crop.cylinder: crop-maximum = Crop maximum
 if !crop.cylinder: crop-maximum = maximum
-full-histogram = Histogram crop-maximum clip='0' # including rock
-volume-crop = Sum full-histogram
+histogram-crop = Histogram crop-maximum clip='0' # including rock
+volume-crop = Sum histogram-crop
 volume-total = volume-crop #Backward compatibility
 
 # Discards small pores

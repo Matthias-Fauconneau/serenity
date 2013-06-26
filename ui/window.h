@@ -23,7 +23,7 @@ struct Window : Socket, Poll {
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size, const string& name,  const Image& icon, Renderer renderer) :
         Window(widget, size, name, icon, "_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread, renderer){}
-    ~Window() { destroy(); }
+    virtual ~Window() { destroy(); }
 
     /// Creates window.
     void create();

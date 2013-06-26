@@ -61,7 +61,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
             array<string> outputs;
             for(;!s.match('='); s.whileAny(" \t\r"_)) {
-                string output = s.word("_-"_);
+                string output = s.word("_-."_);
                 assert_(output, s.until('\n'));
                 outputs << output;
             }
@@ -305,8 +305,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
         if(&find(output, arguments)) { // Reuses same result file
             shared<ResultFile> result = results.take(indexOf(output, arguments));
-            String fileName = move(result->fileName); assert(!result->fileName.size);
-            rename(fileName, output, storageFolder);
+            rename(move(result->fileName), output, storageFolder);
         }
 
         Map map;

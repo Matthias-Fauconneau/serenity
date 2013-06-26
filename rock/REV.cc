@@ -3,7 +3,7 @@
 #include "analysis.h"
 
 class(REV, Tool) {
-    void execute(Process& process) {
+    buffer<byte> execute(Process& process) {
         const Dict& arguments = process.arguments;
         Volume input = toVolume(process.getResult("crop-connected"_, arguments));
         int margin = max(max(input.margin.x, input.margin.y), input.margin.z), size=min(min(input.sampleCount.x, input.sampleCount.y), input.sampleCount.z);
@@ -22,6 +22,6 @@ class(REV, Tool) {
             log(radius, ftoa(relativeDeviation,2,0,true));
             relativeDeviations.insert(r, relativeDeviation);
         }
-        writeFile("REV.tsv", toASCII(relativeDeviations), "/ptmp/results"_);
+        return toASCII(relativeDeviations);
     }
 };

@@ -105,7 +105,12 @@ struct Rock : virtual PersistentProcess {
             }
         } else assert(arguments.contains("view"_), "Expected target paths"_);
 
-        for(string key: Interface<Tool>::factories.keys) if(arguments.contains(key) || arguments.contains(toLower(key))) Interface<Tool>::instance(key)->execute(*this);
+        for(string key: Interface<Tool>::factories.keys) if(arguments.contains(key) || arguments.contains(toLower(key))) {
+            unique<Tool> tool = Interface<Tool>::instance(key);
+            tool->execute(*this);
+            tools << move(tool);
+        }
+        //TODO: writeFile("REV.tsv",, "/ptmp/results"_);
     }
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {
@@ -124,4 +129,5 @@ struct Rock : virtual PersistentProcess {
 
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
     array<string> targetPaths; // Path to file (or folders) where targets are copied
+    array<unique<Tool>> tools;
 } app ( arguments() );

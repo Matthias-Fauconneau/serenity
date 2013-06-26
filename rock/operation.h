@@ -94,6 +94,8 @@ struct Operation {
     virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) abstract;
+    /// Virtual destructor
+    virtual ~Operation() {}
 };
 
 /// Convenient helper method to implement outputs
