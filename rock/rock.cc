@@ -27,17 +27,18 @@
 struct Rock : virtual PersistentProcess {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "view"_;
+        specialParameters += "dump"_; specialParameters += "view"_; specialTargets += "REV"_; specialParameters += "ViewREV"_; //FIXME
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
         if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                                                   "\nHint: An unknown (mistyped?) target might be interpreted as target path"); //TODO: hint nearest (levenstein distance) target
-        if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && arguments.value("view"_,"0"_)=="0"_) warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
+        if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
+            warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
 #ifndef BUILD
 #define BUILD "undefined"
 #endif
-        if(arguments.contains("dump"_)) {
+        if(specialArguments.contains("dump"_)) {
             log("Binary built on " __DATE__ " " __TIME__ " (" BUILD ")");
             log("Tools:",Interface<Tool>::factories.keys);
             log("Operations:",Interface<Operation>::factories.keys);
@@ -47,16 +48,12 @@ struct Rock : virtual PersistentProcess {
             log("Arguments:",arguments);
             log("Target paths:",targetPaths);
         }
-        if(!targets) {
-            for(string key: Interface<Tool>::factories.keys) if(arguments.contains(key) || arguments.contains(toLower(key))) goto break_;
-            /*else*/ {
-                assert_(targets, "Expected target");
-                if(arguments) log("Arguments:",arguments);
-                if(targetPaths) log("Target paths:",targetPaths);
-            }
-            break_:;
+        if(!targets && !specialArguments) {
+            if(arguments) log("Arguments:",arguments);
+            if(targetPaths) log("Target paths:",targetPaths);
+            assert_(targets, "Expected target");
         }
-        for(uint i: range(targets.size)) targetResults << getResult(targets[i], arguments);
+        for(string target: targets) targetResults << (specialTargets.contains(target) ? Interface<Tool>::instance(target)->execute(*this) : getResult(target, arguments));
         assert_(targetResults.size == targets.size, targets, targetResults);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
@@ -92,7 +89,7 @@ struct Rock : virtual PersistentProcess {
             } else log("Skipped cleaning (Too many previous results)");
             for(const shared<Result>& result: targetResults) {
                 Time time;
-                String fileName = result->name+"{"_+toASCII(result->localArguments)+"}."_+result->metadata;
+                String fileName = result->name+(result->relevantArguments?"{"_+toASCII(result->relevantArguments)+"}"_:""_)+"."_+result->metadata;
                 //assert(result->data || result->elements, fileName);
                 if(result->data) {
                     assert(!existsFolder(fileName), fileName);
@@ -103,14 +100,13 @@ struct Rock : virtual PersistentProcess {
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
                 }
             }
-        } else assert(arguments.contains("view"_), "Expected target paths"_);
+        } else assert(specialArguments.contains("view"_), "Expected target paths"_);
 
-        for(string key: Interface<Tool>::factories.keys) if(arguments.contains(key) || arguments.contains(toLower(key))) {
+        for(string key: Interface<Tool>::factories.keys) if(specialArguments.contains(key) || specialArguments.contains(toLower(key))) {
             unique<Tool> tool = Interface<Tool>::instance(key);
             tool->execute(*this);
             tools << move(tool);
         }
-        //TODO: writeFile("REV.tsv",, "/ptmp/results"_);
     }
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {

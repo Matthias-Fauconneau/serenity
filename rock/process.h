@@ -8,6 +8,7 @@ struct Rule {
     array<string> inputs;
     array<string> outputs;
     map<String, Variant> arguments;
+    array<string> processParameters;
     array<string> parameters() const;
 };
 template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs); }
@@ -45,7 +46,9 @@ struct Process {
     virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;
 
     array<string> specialParameters; // Valid parameters accepted for derived class special behavior
+    array<string> specialTargets; // Valid targets accepted for derived class special behavior
     Dict arguments; // User-specified arguments
+    Dict specialArguments; // User-specified special arguments
     array<Rule> rules; // Production rules
     array<string> resultNames; // Valid result names defined by process
     struct Evaluation { String target; Dict input; Dict output; Evaluation(String&& target, Dict&& input, Dict&& output) : target(move(target)), input(move(input)), output(move(output)){}};
@@ -62,7 +65,7 @@ struct ResultFile : Result {
         : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(String(path)), folder(""_,folder) { if(map) maps<<move(map); }
     void rename() {
         if(!fileName) return;
-        String newName = name+"{"_+toASCII(localArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata;
+        String newName = name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata;
         if(fileName!=newName) { ::rename(fileName, newName, folder); fileName=move(newName); }
     }
     void addUser() override { ++userCount; rename(); }

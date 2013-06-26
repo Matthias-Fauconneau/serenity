@@ -25,8 +25,7 @@ void fill(Rect rect, vec4 color) {
 void blit(int2 target, const Image& source, vec4 unused color) {
     Rect rect = (target+Rect(source.size())) & currentClip;
     if(source.alpha) {
-        error("");
-        /*int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
+        int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
         if(color==white) {
             for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
                 byte4 s = source(x-target.x,y-target.y); int a=s.a;
@@ -40,7 +39,7 @@ void blit(int2 target, const Image& source, vec4 unused color) {
                 byte4 t = byte4((int4(d)*(0xFF-a) + color8*int4(s)/0xFF*a)/0xFF); t.a=min(0xFF,d.a+a);
                 d = t;
             }
-        }*/
+        }
     } else {
         for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
             framebuffer(x,y) = source(x-target.x,y-target.y);

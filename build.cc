@@ -95,7 +95,7 @@ struct Build {
         if(compile) {
             String object = tmp+build+"/"_+target+".o"_;
             if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
-                static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -march=native -o"_);
+                static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -I/usr/include/freetype2 -march=native -o"_);
                 array<String> args;
                 args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
                 if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DNO_INLINE"_) << String("-DASSERT"_);

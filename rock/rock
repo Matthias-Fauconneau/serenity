@@ -23,9 +23,9 @@ if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
 #Clips histograms to the inscribed cylinder
-if !box: histogram-density.cylinder = ''
-if !box: histogram-crop.cylinder = ''
-if !box: histogram-squaredRadius.cylinder = ''
+if source.box: histogram-density.cylinder = '0'
+if source.box: histogram-crop.cylinder = '0'
+if source.box: histogram-squaredRadius.cylinder = '0'
 
 # Density distribution
 if !thresholdFromSource: histogram-density = Histogram resampled
@@ -57,43 +57,34 @@ skeleton-tiled = ZOrder skeleton
 sphere-bins = Bin skeleton-tiled
 maximum = Rasterize sphere-bins
 
-# Computes crop volume (including rock) before transpose or minimalRadius dependency
-if crop.cylinder: crop-maximum = Crop maximum
+# Computes crop volume (including rock) before minimalRadius, transpose or floodfill dependency
+if crop.cylinder: crop-maximum = Crop maximum source.crop
 if !crop.cylinder: crop-maximum = maximum
 histogram-crop = Histogram crop-maximum clip='0' # including rock
 volume-crop = Sum histogram-crop
-volume-total = volume-crop #Backward compatibility
+volume-total = volume-crop # for backward compatibility [deprecated]
 
 # Discards small pores
 if minimalSqRadius: pruned = ThresholdClip maximum minimalSqRadius
 if !minimalSqRadius: pruned = maximum
 
-# Crops before floodfill to avoid hidden connections
-if !REV: cropInput = pruned
-if !REV: transposeInput = crop
-if !REV: crop-connected = connected
-# Floodfills once and explicitly crop each REV volume (FIXME: only crop histogram evaluation)
-if REV: transposeInput = pruned
-if REV: cropInput = connected
-if REV: crop-connected = crop
-
-# Crops processed volume to remove boundary bias effects
-if crop.cylinder: crop = Crop cropInput
-if !crop.cylinder: crop = cropInput
+# Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
+if crop.cylinder: crop = Crop pruned source.crop
+if !crop.cylinder: crop = pruned
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
-transpose = Transpose transposeInput
+transpose = Transpose crop
 if transpose=='X': transposed = transpose
 if transpose=='Y': transposed = Transpose transpose
-if transpose=='Z': transposed = pruned
-if !transpose: transposed = pruned
+if transpose=='Z': transposed = crop
+if !transpose: transposed = crop
 
 floodfill = '1'
 if !floodfill: connected = transposed # Forwards unconnected pore space
 if floodfill: connected = FloodFill transposed # Flood fills pore space
 
 # Computes histogram of maximum squared radii
-histogram-squaredRadius = Histogram crop-connected clip='1'
+histogram-squaredRadius = Histogram connected clip='1'
 # Computes pore space volume
 volume = Sum histogram-squaredRadius
 # Computes porosity (= pore space volume / total volume )
@@ -107,15 +98,16 @@ volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=
 # Normalizes probability density on total volume (including background (i.e not the same as probability density normalization))
 distribution-radius = Div volume-distribution-radius volume-crop
 # Scales radius (e.g to original pixel or physical resolution)
+ volume-distribution-radius-scaled = ScaleDistribution volume-distribution-radius process-resolution
  histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
  histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
 
 # Export
- sqrt = SquareRoot crop-connected # Square roots squared distance
- sqrt-scaled = ScaleValues sqrt process-resolution # Scale volume values
- cdl = ToCDL sqrt-scaled # Exports to CDL
- ascii = ToASCII sqrt-scaled # Exports to ASCII
+ sqrt = SquareRoot crop
+ sqrt-scaled = ScaleValues sqrt process-resolution
+ cdl = ToCDL sqrt-scaled
+ ascii = ToASCII sqrt-scaled
  # Exports to compressed PNG
   png-source = ToPNG source
   png-denoised = ToPNG denoised

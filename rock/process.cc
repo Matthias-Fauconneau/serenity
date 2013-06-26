@@ -5,7 +5,7 @@
 
 /// Relevant operation parameters
 array<string> Rule::parameters() const {
-    array<string> parameters;
+    array<string> parameters = copy(processParameters);
     if(operation) {
         unique<Operation> operation = Interface<Operation>::instance(this->operation);
         assert_(operation, "Operation", this->operation, "not found in", Interface<Operation>::factories.keys);
@@ -15,7 +15,7 @@ array<string> Rule::parameters() const {
 }
 
 array<string> Process::parameters() {
-    array<string> parameters = copy(specialParameters);
+    array<string> parameters;
     for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
     return parameters;
 }
@@ -36,6 +36,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         for(TextData s(definition); s;) { //FIXME: use parser generator
             s.skip();
             if(s.match('#')) { s.until('\n'); continue; }
+            array<string> processParameters;
             if(s.match("if"_)) {
                 s.whileAny(" \t\r"_);
                 bool enable;
@@ -44,6 +45,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 if(s.match('!')) op="=="_, right="0"_;
                 string parameter = s.word("_-."_);
                 parameters += parameter;
+                processParameters += parameter;
                 String left ("0"_);
                 if(arguments.contains(parameter)) left = copy(arguments.at(parameter));
                 if(!left) left=String("1"_);
@@ -98,24 +100,26 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 }
                 for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
                 rule.outputs = move(outputs);
+                rule.processParameters = move(processParameters);
                 rules << move(rule);
             }
         }
 
-        arguments.clear(); targets.clear(); results.clear(); array<string> specialArguments;
+        arguments.clear(); specialArguments.clear(); targets.clear(); results.clear(); array<string> specialArguments;
         for(const string& argument: allArguments) { // Parses generic arguments (may affect process definition)
             TextData s (argument); string key = s.word("-_."_);
+            string scope, parameter = key;
+            if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
             if(s.match('=')) { // Explicit argument
-                string scope, parameter = key;
-                if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
-                //assert_(parameters.contains(parameter),"Invalid parameter", parameter);
+                assert_(parameters.contains(parameter),"Invalid parameter", parameter);
                 string value = s.untilEnd();
                 assert_(value);
                 assert_(!arguments.contains(key), key);
                 arguments.insert(String(key), String(value));
             }
-            else if(resultNames.contains(argument)) targets << argument;
-            else if(parameters.contains(argument)) arguments.insert(String(argument), String());
+            else if(resultNames.contains(argument) || specialTargets.contains(argument)) targets << argument;
+            else if(parameters.contains(parameter)) arguments.insert(String(argument), String());
+            else if(specialParameters.contains(argument)) this->specialArguments.insert(String(argument), String());
             else specialArguments << argument;
         }
         for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(copy(arg.key), copy(arg.value));
@@ -136,6 +140,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
 
 Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
 
+/// Returns recursively relevant global and scoped arguments
 const Dict& Process::relevantArguments(const string& target, const Dict& arguments) {
     for(const Evaluation& e: cache) if(e.target==target && e.input==arguments) return e.output;
     const Rule& rule = ruleForOutput(target);
@@ -175,7 +180,7 @@ match:
     return cache.last()->output;
 }
 
-/// Returns relevant global arguments and matching scoped arguments
+/// Returns recursively relevant global, local and explicits scoped arguments
 Dict Process::localArguments(const string& target, const Dict& arguments) {
     Dict args = copy(relevantArguments(target, arguments));
     const Rule& rule = ruleForOutput(target);
@@ -194,14 +199,15 @@ Dict Process::localArguments(const string& target, const Dict& arguments) {
 match:
         assert_(parameters.contains(parameter), "Irrelevant parameter", scope+"."_+parameter, "for"_, rule);
         if(args.contains(parameter)) args.remove(parameter);
+        if(args.contains(arg.key)) args.remove(arg.key); // Cleanup scoped parameter (local only)
         args.insert(String(parameter), copy(arg.value));
     }
     return args;
 }
 
 int Process::indexOf(const string& target, const Dict& arguments) {
-    const Dict& localArguments = Process::localArguments(target, arguments);
-    for(uint i: range(results.size)) if(results[i]->name==target && results[i]->localArguments==localArguments) return i;
+    const Dict& relevantArguments = Process::localArguments(target, arguments);
+    for(uint i: range(results.size)) if(results[i]->name==target && results[i]->relevantArguments==relevantArguments) return i;
     return -1;
 }
 const shared<Result>& Process::find(const string& target, const Dict& arguments) { int i = indexOf(target, arguments); return i>=0 ? results[i] : *(shared<Result>*)0; }
@@ -297,7 +303,9 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     }
 
     unique<Operation> operation = Interface<Operation>::instance(rule.operation);
-    const Dict& localArguments = this->localArguments(target, arguments);
+    Dict relevantArguments = this->localArguments(target, arguments);
+    Dict localArguments; array<string> parameters = rule.parameters();
+    for(auto arg: relevantArguments) if(parameters.contains(arg.key)) localArguments.insert(copy(arg.key), copy(arg.value)); // Filters locally relevant arguments
 
     array<shared<Result>> outputs;
     for(uint index: range(rule.outputs.size)) {
@@ -320,8 +328,8 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
                 if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
-                TextData s (oldest); string name = s.whileNot('{'); Dict localArguments = parseDict(s);
-                for(uint i: range(results.size)) if(results[i]->name==name && results[i]->localArguments==localArguments) {
+                TextData s (oldest); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
+                for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
                     break;
                 }
@@ -348,12 +356,12 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     Time time;
     operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    if((uint64)time>0) log(rule, localArguments, time);
+    if((uint64)time>100) log(rule, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);
         result->timestamp = realTime();
-        result->localArguments = copy(localArguments);
+        result->relevantArguments = copy(relevantArguments);
         if(result->elements) { // Copies each elements data from anonymous memory to files in a folder
             assert_(!result->maps && !result->data);
             assert_(result->elements.size() > 1);

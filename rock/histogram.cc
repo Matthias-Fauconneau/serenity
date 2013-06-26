@@ -25,11 +25,10 @@ UniformHistogram histogram(const Volume16& source, CropVolume crop) {
         }
     });
     UniformHistogram histogram (source.maximum+1);
-    for(uint value: range(source.maximum+1)) { // Merges histograms (and converts to float)
+    for(uint value: range(source.maximum+1)) { // Merges histograms (and converts to floating point)
         histogram[value] = 0;
         for(uint id: range(coreCount)) histogram[value] += histograms[id][value];
     }
-    assert_(histogram.sum());
     return histogram;
 }
 

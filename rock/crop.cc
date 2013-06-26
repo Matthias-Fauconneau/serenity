@@ -5,9 +5,9 @@
 /// Parses volume to crop from user arguments
 CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string box, int3 minimalMargin) {
     int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
-    bool cylinder = args.contains("cylinder"_);
+    bool cylinder = args.value("cylinder"_,"1"_)!="0"_;
     if(cylinder) {
-        if(args.at("cylinder"_)!=""_) {
+        if(args.value("cylinder"_,""_)!=""_) {
             if(args.at("cylinder"_).contains(',')) { // x, y, r, zMin, zMax
                 Vector coordinates = parseVector(args.at("cylinder"_), true);
                 int x=coordinates[0], y=coordinates[1], r=coordinates[2]; min.z=coordinates[3], max.z=coordinates[4];
@@ -80,7 +80,17 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     }
     for(uint z=Z-marginZ; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
 }
-class(Crop,Operation), virtual VolumePass<uint16> {
+class(Crop,Operation), virtual VolumeOperation {
     string parameters() const override { static auto p="cylinder box"_; return p; }
-    void execute(const Dict& args, Volume16& target, const Volume& source) override { crop(target, source, parseCrop(args, source.margin, source.sampleCount-source.margin, ""_, 1)); }
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        const Volume& source = inputs[0];
+        if(!otherInputs) crop(outputs[0], source, parseCrop(args, source.margin, source.sampleCount-source.margin, ""_, 1));
+        else { // Converts to input coordinates
+            Dict inputCropCylinder; inputCropCylinder.insert(String("cylinder"_), String(otherInputs[0]->data));
+            CropVolume inputCrop = parseCrop(inputCropCylinder, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Unsafe (no bound checking)
+            CropVolume globalCrop = parseCrop(args, int3(0,0,0), int3(1<<16,1<<16,1<<16), ""_, 1); // Unsafe (no bound checking)
+            CropVolume localCrop = {globalCrop.min-inputCrop.min, globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
+            crop(outputs[0], source, localCrop);
+        }
+    }
 };

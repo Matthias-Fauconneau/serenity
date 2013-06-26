@@ -1,6 +1,7 @@
 #include "text.h"
 #include "display.h"
 #include "font.h"
+#include "utf8.h"
 
 map<int,Font> defaultSans;
 map<int,Font> defaultBold;
@@ -243,7 +244,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
 }
 
 bool TextInput::keyPress(Key key, Modifiers modifiers) {
-    cursor.line=min(cursor.line,textLines.size-1);
+    cursor.line=min<uint>(cursor.line,textLines.size-1);
     const TextLine& textLine = textLines[cursor.line];
 
     if(modifiers&Control && key=='v') {
@@ -260,7 +261,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
     } else if(key==DownArrow) {
          if(cursor.line<textLines.size-1) cursor.line++;
     } else {
-        cursor.column=min(cursor.column,textLine.size);
+        cursor.column=min<uint>(cursor.column,textLine.size);
 
         /**/  if(key==LeftArrow) {
             if(cursor.column>0) cursor.column--;
