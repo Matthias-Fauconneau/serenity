@@ -5,6 +5,7 @@
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
 struct Rule {
+    struct { string op, parameter, value; } condition;
     string operation;
     array<string> inputs;
     array<string> outputs;

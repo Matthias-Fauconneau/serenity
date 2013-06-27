@@ -66,8 +66,8 @@ volume-crop = Sum histogram-crop
 volume-total = volume-crop # for backward compatibility [deprecated]
 
 # Discards small pores
-minimalSqRadius = '0'
-pruned = ThresholdClip maximum minimalSqRadius
+if minimalSqRadius: pruned = ThresholdClip maximum minimalSqRadius
+if !minimalSqRadius: pruned = maximum
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
 if crop.cylinder: crop = Crop pruned source.crop
@@ -125,5 +125,5 @@ distribution-radius = Div volume-distribution-radius volume-crop
   bmp-connected = ToBMP connected
 
 # Tools
-REV = REV
-prune = Prune
+ε(r) = REV
+unconnected(λ) connected(λ) = Prune

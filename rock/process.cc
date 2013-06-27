@@ -29,7 +29,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
     // 2) Arguments are parsed using default definition
     // 3) Process definition is parsed with conditionnals taken according to user arguments
     // 4) Arguments are parsed again using the customized process definition
-    for(uint pass unused: range(2)) {
+    //for(uint pass unused: range(2)) {
         array<string> parameters = this->parameters();
         rules.clear(); resultNames.clear(); defaultArguments.clear();
 
@@ -37,33 +37,32 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             s.skip();
             if(s.match('#')) { s.until('\n'); continue; }
             array<string> processParameters;
+            Rule rule;
             if(s.match("if"_)) {
                 s.whileAny(" \t\r"_);
-                bool enable;
                 string op;
-                string right;
-                if(s.match('!')) op="=="_, right="0"_;
+                string value;
+                if(s.match('!')) op="=="_, value="0"_;
                 string parameter = s.word("_-."_);
                 parameters += parameter;
                 processParameters += parameter;
-                String left ("0"_);
-                if(arguments.contains(parameter)) left = copy(arguments.at(parameter));
-                if(!left) left=String("1"_);
                 s.whileAny(" \t\r"_);
                 if(!op) op = s.whileAny("!="_);
-                if(!op) op = "!="_, right = "0"_;
-                if(!right) { s.whileAny(" \t\r"_); s.skip("'"_); right = s.until('\''); }
-                assert_(left && right);
+                if(!op) op = "!="_, value = "0"_;
+                if(!value) { s.whileAny(" \t\r"_); s.skip("'"_); value = s.until('\''); }
+                s.skip(":"_);
+                assert_(parameter && value);
+                /*bool enable;
                 if(op=="=="_) enable = (left == right);
                 else if(op=="!="_) enable = (left != right);
                 else error("Unknown operator", op);
-                s.skip(":"_);
-                if(!enable) { s.until('\n'); continue; }
+                if(!enable) { s.until('\n'); continue; }*/
+                rule.condition={op, parameter, value};
                 s.whileAny(" \t\r"_);
             }
             array<string> outputs;
             for(;!s.match('='); s.whileAny(" \t\r"_)) {
-                string output = s.word("_-."_);
+                string output = s.whileNo(" \t\r=");
                 assert_(output, s.until('\n'));
                 outputs << output;
             }
@@ -86,7 +85,6 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     }
                 } else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
             } else {
-                Rule rule;
                 string word = s.word("_-"_);
                 assert_(word, "Expected operator or input for", outputs);
                 if(!Interface<Operation>::factories.contains(word) && !Interface<Tool>::factories.contains(word)) rule.inputs << word; // Forwarding rule
@@ -104,7 +102,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     else if(resultNames.contains(key)) rule.inputs << key; // Result input
                     else if(rule.operation) rule.inputs << key; // Argument value
                 }
-                for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
+                resultNames += outputs; //for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
                 rule.outputs = move(outputs);
                 rule.processParameters = move(processParameters);
                 rules << move(rule);
@@ -140,11 +138,25 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
         }
         this->parseSpecialArguments(specialArguments);
-    }
+    //}
     return targets;
 }
 
-Rule& Process::ruleForOutput(const string& target) { for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) return rule; return *(Rule*)0; }
+Rule& Process::ruleForOutput(const string& target) {
+    array<Rule*> match;
+    for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) {
+        bool enable = false;
+        string op=rule.condition.op, parameter=rule.condition.parameter, value=rule.condition.value;
+        string argument = arguments.contains(parameter) ? (arguments.at(parameter) ? : "1"_) : "0"_;
+        if(!op) enable = true;
+        else if(op=="=="_) enable = (argument == value);
+        else if(op=="!="_) enable = (argument != value);
+        else error("Unknown operator", "'"_+op+"'"_);
+        if(enable) match << &rule;
+    }
+    assert_(match.size<=1);
+    return match ? *match.first() : *(Rule*)0;
+}
 
 /// Returns recursively relevant global and scoped arguments
 const Dict& Process::relevantArguments(const string& target, const Dict& arguments) {
