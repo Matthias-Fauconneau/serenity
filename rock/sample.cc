@@ -60,7 +60,7 @@ NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.v
 NonUniformSample parseNonUniformSample(const string& file) {
     TextData s (file);
     NonUniformSample sample;
-    while(s) { real x=s.decimal(); s.skip("\t"_); sample.insert(x, s.decimal()); s.skip("\n"_); }
+    while(s) { if(s.match('#')) s.until('\n'); else { real x=s.decimal(); s.skip("\t"_); sample.insert(x, s.decimal()); s.skip("\n"_); } }
     return sample;
 }
 String toASCII(const NonUniformSample& A) {

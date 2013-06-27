@@ -1,4 +1,5 @@
 #include "string.h"
+#include "math.h"
 
 /// string
 
@@ -104,8 +105,6 @@ bool isDecimal(const string& number) {
     return true;
 }
 
-inline double exp10(double x) { return __builtin_exp10(x); }
-inline double log10(double x) { return __builtin_log10(x); }
 double toDecimal(const string& number) { //FIXME: fromDecimal
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
@@ -219,13 +218,12 @@ template<uint base> String itoa(int64 number, int pad) {
 }
 template String itoa<10>(int64,int);
 
-inline double round(double x) { return __builtin_round(x); }
 String ftoa(double n, int precision, int pad, bool exponent, bool inf) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return String("NaN"_);
     if(n==__builtin_inff()) { assert_(inf); return String("∞"_); }
     if(n==-__builtin_inff()) { assert_(inf); return String("-∞"_); }
-    int e=0; if(n && (exponent /*|| int(n*exp10(precision))==0*/) && (n<1 || log10(n)>=precision+4)) e=round(log10(n)), n /= exp10(e);
+    int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=round(log10(n)), n /= exp10(e);
     String s;
     if(sign) s<<'-';
     if(precision && n!=round(n)) {

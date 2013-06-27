@@ -33,4 +33,7 @@ inline real atan(real y, real x) { return __builtin_atan2(y, x); }
 
 const real PI = 3.14159265358979323846;
 inline real rad(real t) { return t/180*PI; }
+
 inline real deg(real t) { return t/PI*180; }
+inline real exp10(real x) { return __builtin_exp10(x); }
+inline real log10(real x) { return __builtin_log10(x); }

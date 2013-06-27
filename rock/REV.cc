@@ -23,7 +23,7 @@ class(REV, Tool) {
             log(radius, ftoa(relativeDeviation,2,0,true));
             relativeDeviations.insert(r, relativeDeviation);
         }
-        outputs[0]->metadata = String("tsv"_);
-        outputs[0]->data = toASCII(relativeDeviations);
+        outputs[0]->metadata = String("ε(r).tsv"_);
+        outputs[0]->data = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_ + toASCII(relativeDeviations);
     }
 };
