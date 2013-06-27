@@ -104,12 +104,12 @@ struct Rock : virtual PersistentProcess {
         if(specialArguments.value("view"_,"0"_)!="0"_) {
             for(const shared<Result>& result: targetResults) {
                 if(result->data) view(result->metadata, result->name, result->data);
-                for(auto data: result->elements) view(result->metadata, data.key, data.value);
+                for(auto data: result->elements) if(!view(result->metadata, data.key, data.value)) break;
             }
         }
     }
 
-    void view(string metadata, string name, const buffer<byte>& data) {
+    bool view(string metadata, string name, const buffer<byte>& data) {
         if(metadata=="scalar"_) log_(str(name, "=", data));
         else if((endsWith(metadata,"tsv"_) || endsWith(metadata,"map"_)) && count(data,'\n')<16) {
             log_(str(name, "["_+str(count(data,'\n'))+"]"_,":\n"_+data));
@@ -118,9 +118,10 @@ struct Rock : virtual PersistentProcess {
             /*else*/ for(auto viewer: Interface<View>::factories.values) {
                 unique<View> view  = viewer->constructNewInstance();
                 if( view->view(metadata, name, data) ) { views << move(view); goto break_; }
-            } /*else*/ warn("Unknown format",metadata, name);
+            } /*else*/ warn("Unknown format",metadata, name); return false;
 break_:;
         }
+        return true;
     }
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {

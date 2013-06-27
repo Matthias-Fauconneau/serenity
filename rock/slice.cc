@@ -42,7 +42,7 @@ class(SliceView, View), Widget {
     }
     void render(int2 position, int2 size) {
         const Volume& volume = volumes[currentIndex];
-        Image image = slice(volume, sliceZ/*, result->relevantArguments.contains("cylinder"_)*/);
+        Image image = slice(volume, sliceZ, true, true);
         while(2*image.size()<=size) image=upsample(image);
         blit(position, image);
     }

@@ -90,21 +90,23 @@ uint maximum(const Volume32& source) {
     return maximum;
 }
 
-Image slice(const Volume& source, float normalizedZ, bool cylinder) {
+Image slice(const Volume& source, float normalizedZ, bool normalize, bool gamma/*, bool cylinder*/) {
     //int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
     //assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
     int z = normalizedZ*(source.sampleCount.z-1);
-    return slice(source, z, cylinder);
+    return slice(source, z, normalize, gamma/*, cylinder*/);
 }
 
-Image slice(const Volume& source, int z, bool cylinder) {
+Image slice(const Volume& source, int z, bool normalize, bool gamma/*, bool cylinder*/) {
     assert_(source.maximum);
     int X=source.sampleCount.x, Y=source.sampleCount.y;
     int marginX=source.margin.x, marginY=source.margin.y;
     Image target(X,Y);
-    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
+    //uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
+    uint maximum = normalize ? (source.squared? round(sqrt(float(maximum))) : source.maximum) : 0xFF;
+    assert_(maximum<=0xFF, maximum, "overflows 8bit");
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
-        if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq || x<marginX || y<marginY || x>=X-marginX || y>=Y-marginY) { target(x,y) = byte4(0,0,0,0); continue; }
+        if(/*uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq ||*/ x<marginX || y<marginY || x>=X-marginX || y>=Y-marginY) { target(x,y) = byte4(0,0,0,0); continue; }
         uint value = 0;
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
@@ -112,9 +114,9 @@ Image slice(const Volume& source, int z, bool cylinder) {
         else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
         else error("source.sampleSize"_,source.sampleSize);
-        uint linear8 = source.squared ? round(sqrt(float(value))) * 0xFF / round(sqrt(float(source.maximum))) : value * 0xFF / source.maximum;
+        uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / maximum;
         extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
-        uint sRGB8 = sRGB_lookup[linear8];
+        uint sRGB8 = gamma ? sRGB_lookup[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values
         target(x,y) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;

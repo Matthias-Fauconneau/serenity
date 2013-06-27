@@ -30,30 +30,28 @@ class(ScaleValues, Operation), virtual VolumeOperation {
 
 /// Exports volume to normalized 8bit PNGs for visualization
 class(ToPNG, Operation), virtual VolumeOperation {
-    string parameters() const { return "cylinder"_; }
-    void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("png"_);
         uint marginZ = volume.margin.z;
         Time time; Time report;
         for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
             if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
-            outputs[0]->elements.insert(dec(z,4), encodePNG(slice(volume,z,args.contains("cylinder"_))));
+            outputs[0]->elements.insert(dec(z,4), encodePNG(slice(volume,z,true, true)));
         }
     }
 };
 
 /// Exports volume to normalized 8bit BMPs for visualization
 class(ToBMP, Operation), virtual VolumeOperation {
-    string parameters() const { return "cylinder"_; }
-    void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("bmp"_);
         uint marginZ = volume.margin.z;
         Time time; Time report;
         for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
             if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
-            outputs[0]->elements.insert(dec(z,4), encodeBMP(slice(volume,z,args.contains("cylinder"_))));
+            outputs[0]->elements.insert(dec(z,4), encodeBMP(slice(volume,z,false, false)));
         }
     }
 };

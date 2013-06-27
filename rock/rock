@@ -103,14 +103,14 @@ distribution-radius = Div volume-distribution-radius volume-crop
  sqrt-scaled = ScaleValues sqrt process-resolution
  cdl = ToCDL sqrt-scaled
  ascii = ToASCII sqrt-scaled
- # Exports to compressed PNG
+ # Exports to PNG (Normalized and gamma-compressed for visualization)
   png-source = ToPNG source
   png-denoised = ToPNG denoised
   png-colorize = ToPNG colorize
   png-distance = ToPNG distance
   png-skeleton = ToPNG skeleton
   png-connected = ToPNG connected
-# Exports to BMP (when writing to disk, it is faster to write PNGs and pipe to BMP-only tools (e.g using ImageMagick convert))
+# Exports to BMP (Stores original (Unnormalized and linear) values for interoperation)
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised
   bmp-colorize = ToBMP colorize
