@@ -22,7 +22,6 @@ array<string> Process::parameters() {
 
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
     array<string> targets;
-    array<array<string>> results; // Intermediate result names for each target
     Dict defaultArguments; // Process-specified default arguments
     // Parses definitions and arguments twice to solve cyclic dependencies
     // 1) Process definition defines valid parameters and targets
@@ -109,7 +108,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
         }
 
-        arguments.clear(); specialArguments.clear(); targets.clear(); results.clear(); array<string> specialArguments;
+        arguments.clear(); specialArguments.clear(); targets.clear(); array<string> specialArguments;
         for(const string& argument: allArguments) { // Parses generic arguments (may affect process definition)
             TextData s (argument); string key = s.word("-_."_);
             string scope, parameter = key;
@@ -127,27 +126,17 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             else specialArguments << argument;
         }
         for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(copy(arg.key), copy(arg.value));
-        results.grow(targets.size);
-        for(uint i: range(targets.size)) {
-            array<string> stack; stack << targets[i];
-            while(stack) { // Traverse dependency to get all intermediate result names
-                string result = stack.pop();
-                results[i] += result;
-                const Rule& rule = ruleForOutput(result);
-                if(&rule) stack << rule.inputs;
-            }
-        }
         this->parseSpecialArguments(specialArguments);
     //}
     return targets;
 }
 
-Rule& Process::ruleForOutput(const string& target) {
+Rule& Process::ruleForOutput(const string& target, const Dict& arguments) {
     array<Rule*> match;
     for(Rule& rule: rules) for(const string& output: rule.outputs) if(output==target) {
         bool enable = false;
         string op=rule.condition.op, parameter=rule.condition.parameter, value=rule.condition.value;
-        string argument = arguments.contains(parameter) ? (arguments.at(parameter) ? : "1"_) : "0"_;
+        string argument = arguments.value(parameter,"0"_); if(!argument) argument="1"_;
         if(!op) enable = true;
         else if(op=="=="_) enable = (argument == value);
         else if(op=="!="_) enable = (argument != value);
@@ -161,7 +150,7 @@ Rule& Process::ruleForOutput(const string& target) {
 /// Returns recursively relevant global and scoped arguments
 const Dict& Process::relevantArguments(const string& target, const Dict& arguments) {
     for(const Evaluation& e: cache) if(e.target==target && e.input==arguments) return e.output;
-    const Rule& rule = ruleForOutput(target);
+    const Rule& rule = ruleForOutput(target, arguments);
     Dict args;
     if(!&rule && arguments.contains(target)) { // Conversion from argument to result
         args.insert(String(target), copy(arguments.at(target)));
@@ -201,7 +190,7 @@ match:
 /// Returns recursively relevant global, local and explicits scoped arguments
 Dict Process::localArguments(const string& target, const Dict& arguments) {
     Dict args = copy(relevantArguments(target, arguments));
-    const Rule& rule = ruleForOutput(target);
+    const Rule& rule = ruleForOutput(target, arguments);
     array<string> parameters = rule.parameters();
     for(auto arg: rule.arguments) { // Appends local arguments
         assert_(parameters.contains(arg.key));
@@ -232,7 +221,7 @@ const shared<Result>& Process::find(const string& target, const Dict& arguments)
 
 /// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
 bool Process::sameSince(const string& target, int64 queryTime, const Dict& arguments) {
-    const Rule& rule = ruleForOutput(target);
+    const Rule& rule = ruleForOutput(target, arguments);
     if(!&rule && arguments.contains(target)) return true; // Conversion from argument to result
     assert_(&rule, target);
     const shared<Result>& result = find(target, arguments);
@@ -257,7 +246,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
     // Maps intermediate results from file system
     for(const String& path: storageFolder.list(Files|Folders)) {
         TextData s (path); string name = s.whileNot('{');
-        if(path==name || !&ruleForOutput(name)) { // Removes invalid data
+        if(path==name || !&ruleForOutput(name, arguments)) { // Removes invalid data
             if(existsFolder(path,storageFolder)) {
                 for(const string& file: Folder(path,storageFolder).list(Files)) ::remove(file,Folder(path,storageFolder));
                 ::removeFolder(path, storageFolder);
@@ -301,10 +290,10 @@ PersistentProcess::~PersistentProcess() {
 }
 
 shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments) {
-    const Rule& rule = ruleForOutput(target);
+    const Rule& rule = ruleForOutput(target, arguments);
     if(!&rule && arguments.contains(target)) // Conversion from argument to result
         return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_);
-    assert_(&rule, "Unknown rule", target, "(or failed argument or sweep conversion");
+    assert_(&rule, "Unknown rule", target);
 
     // Simple forwarding rule
     if(!rule.operation) {

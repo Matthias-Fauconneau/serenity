@@ -27,7 +27,7 @@ struct Process : ResultManager {
     virtual void parseSpecialArguments(const ref<string>& arguments) { assert_(!arguments); }
 
     /// Returns the Rule to evaluate in order to produce \a target
-    Rule& ruleForOutput(const string& target);
+    Rule& ruleForOutput(const string& target, const Dict& arguments);
 
     /// Recursively evaluates relevant arguments for a rule
     const Dict& relevantArguments(const string& target, const Dict& arguments);

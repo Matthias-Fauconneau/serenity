@@ -13,7 +13,7 @@ class(Prune, Tool) {
         //for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
         for(int r: range(maximumRadius)) { int r2=sq(r); // DEBUG
             Dict args = copy(arguments);
-            args.at("minimalSqRadius"_) = r2;
+            args.insert(String("minimalSqRadius"_), r2);
             {args.at("floodfill"_) = 0;
                 shared<Result> result = results.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;

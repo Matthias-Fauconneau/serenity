@@ -45,7 +45,7 @@ struct Variant : String {
     default_move(Variant);
     Variant(String&& s) : String(move(s)) {}
     Variant(int integer) : String(dec(integer)){}
-    explicit operator bool() { return size; }
+    explicit operator bool() const { return size; }
     operator int() const { return *this ? toInteger(*this) : 0; }
     operator uint() const { return *this ? toInteger(*this) : 0; }
     operator float() const { return toDecimal(*this); }
