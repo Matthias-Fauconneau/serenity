@@ -69,7 +69,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
             assert_(outputs, s.until('\n'));
             s.whileAny(" \t\r"_);
-            if(outputs.size==1 && (s.peek()=='\'' || s.peek()=='{' || s.peek()=='$')) { // Default argument
+            if(outputs.size==1 && (s.peek()=='\'' || s.peek()=='$')) { // Default argument
                 string key = outputs[0];
                 parameters += key; // May not be defined yet
                 if(s.match('\'')) {
@@ -77,8 +77,14 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
                     defaultArguments.insert(String(key), String(value));
                     if(!arguments.contains(key)) arguments.insert(String(key), String(value));
-                }
-                else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
+                } else if(s.match('$')) {
+                    string value = s.word("_-."_); // Value
+                    assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
+                    if(arguments.contains(value)) {
+                        defaultArguments.insert(String(key), copy(arguments.at(value)));
+                        if(!arguments.contains(key)) arguments.insert(String(key), copy(arguments.at(value)));
+                    }
+                } else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
             } else {
                 Rule rule;
                 string word = s.word("_-"_);

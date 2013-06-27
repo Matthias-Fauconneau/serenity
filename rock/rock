@@ -41,7 +41,7 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
 # Segments
-pore.cylinder = source.cylinder # Also clips to cylinder before distance field evaluation
+pore.cylinder = $source.cylinder # Also clips to cylinder before distance field evaluation
 pore = Binary resampled threshold
 colorize = Colorize pore resampled # For visualization
 

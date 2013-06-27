@@ -36,7 +36,7 @@ class(SliceView, View), Widget {
         Volume volume = toVolume(result);
         if(volume.sampleSize==20) { exit(); return; } // Don't try to display ASCII
         if(volume.sampleSize>4) error(result->name, volume.sampleSize);
-        Image image = slice(volume, sliceZ);
+        Image image = slice(volume, sliceZ/*, result->relevantArguments.contains("cylinder"_)*/);
         while(2*image.size()<=size) image=upsample(image);
         blit(position, image);
     }
