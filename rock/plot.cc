@@ -75,14 +75,17 @@ struct Plot : Widget {
 class(PlotView, View), Widget {
     array<Plot> plots;
 
+    PlotView() {
+        window.localShortcut(Escape).connect([]{exit();});
+        window.backgroundColor = 1;
+    }
+
     bool view(shared<Result>&& result) {
         if(!endsWith(result->metadata,"tsv"_)) return false;
         string x,y; { TextData s(result->metadata); y = s.until('('); x = s.until(')'); }
         string title = result->name; { TextData s(result->data); if(s.match('#')) title=s.until('\n'); }
         plots << Plot(parseNonUniformSample(result->data), title, x, y); //TODO: axis label from annotations
-        window.localShortcut(Escape).connect(&window, &Window::destroy);
-        window.backgroundColor = 1;
-        window.setTitle(result->name);
+        array<String> plotTitles; for(const Plot& plot: plots) plotTitles << copy(plot.title); window.setTitle(join(plotTitles,", "_));
         window.show();
         return true;
     }

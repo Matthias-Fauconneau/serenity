@@ -109,7 +109,8 @@ struct Rock : virtual PersistentProcess {
                     else if((endsWith(result->metadata,"tsv"_) || endsWith(result->metadata,"map"_)) && count(result->data,'\n')<16) {
                         log_(str(result->name, "["_+str(count(result->data,'\n'))+"]"_,":\n"_+result->data));
                     } else {
-                        for(auto viewer: Interface<View>::factories.values) {
+                        for(unique<View>& view: views) if( view->view( share(result) ) ) goto break_; // Tries to append to existing view first
+                        /*else*/ for(auto viewer: Interface<View>::factories.values) {
                             unique<View> view  = viewer->constructNewInstance();
                             if( view->view( share(result) ) ) { views << move(view); goto break_; }
                         } /*else*/ warn("Unknown format",result->metadata, result->name, result->relevantArguments);

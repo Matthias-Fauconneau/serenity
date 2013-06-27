@@ -11,7 +11,7 @@ class(Prune, Tool) {
         real totalVolume = parseScalar(results.getResult("volume-total"_, arguments)->data);
         NonUniformSample unconnectedVolume, connectedVolume;
         //for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
-        for(int r: range(maximumRadius)) { int r2=sq(r); // DEBUG
+        for(int r: range(maximumRadius)) { int r2=sq(r); // Faster testing
             Dict args = copy(arguments);
             args.insert(String("minimalSqRadius"_), r2);
             {args.at("floodfill"_) = 0;

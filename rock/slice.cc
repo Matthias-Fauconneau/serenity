@@ -6,17 +6,24 @@
 #include "display.h"
 
 class(SliceView, View), Widget {
-    bool view(shared<Result>&& result) override {
-        if(!inRange(1u,toVolume(result).sampleSize,4u)) return false;
-        this->result = move(result);
-        window.setTitle(str(this->result));
+    SliceView() {
         window.localShortcut(Escape).connect([]{exit();});
         window.clearBackground = false;
+    }
+    bool view(shared<Result>&& result) override {
+        if(!inRange(1u,toVolume(result).sampleSize,4u)) return false;
+        results << result;
         updateView();
         window.show();
         return true;
     }
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
+        if(button==WheelDown||button==WheelUp) {
+            int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),results.size-1);
+            if(nextIndex == currentIndex) return true;
+            updateView();
+            return true;
+        }
         if(!button) return false;
         float z = clip(0.f, float(cursor.x)/(size.x-1), 1.f);
         if(sliceZ != z) { sliceZ = z; updateView(); }
@@ -24,23 +31,22 @@ class(SliceView, View), Widget {
         return true;
     }
     void updateView() {
-        assert(result);
-        Volume volume = toVolume(result);
+        Volume volume = toVolume(results[currentIndex]);
         int2 size = volume.sampleCount.xy();
         while(2*size<displaySize) size *= 2;
         if(window.size != size) window.setSize(size);
         else window.render();
+        window.setTitle(str(results[currentIndex]));
     }
     void render(int2 position, int2 size) {
         assert(result);
-        Volume volume = toVolume(result);
-        if(volume.sampleSize==20) { exit(); return; } // Don't try to display ASCII
-        if(volume.sampleSize>4) error(result->name, volume.sampleSize);
+        Volume volume = toVolume(results[currentIndex]);
         Image image = slice(volume, sliceZ/*, result->relevantArguments.contains("cylinder"_)*/);
         while(2*image.size()<=size) image=upsample(image);
         blit(position, image);
     }
-    shared<Result> result;
+    array<shared<Result>> results;
+    int currentIndex=0;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window{this, int2(-1,-1), "SliceView"_};
 
