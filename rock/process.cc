@@ -6,7 +6,7 @@
 /// Relevant operation parameters
 array<string> Rule::parameters() const {
     array<string> parameters = copy(processParameters);
-    if(operation) {
+    if(operation && Interface<Operation>::factories.contains(this->operation)) {
         unique<Operation> operation = Interface<Operation>::instance(this->operation);
         assert_(operation, "Operation", this->operation, "not found in", Interface<Operation>::factories.keys);
         parameters += split(operation->parameters());
@@ -83,7 +83,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 Rule rule;
                 string word = s.word("_-"_);
                 assert_(word, "Expected operator or input for", outputs);
-                if(!Interface<Operation>::factories.contains(word)) rule.inputs << word; // Forwarding rule
+                if(!Interface<Operation>::factories.contains(word) && !Interface<Tool>::factories.contains(word)) rule.inputs << word; // Forwarding rule
                 else rule.operation = word; // Generating rule
                 s.whileAny(" \t\r"_);
                 for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
@@ -117,7 +117,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 assert_(!arguments.contains(key), key);
                 arguments.insert(String(key), String(value));
             }
-            else if(resultNames.contains(argument) || specialTargets.contains(argument)) targets << argument;
+            else if(resultNames.contains(argument)) targets << argument;
             else if(parameters.contains(parameter)) arguments.insert(String(argument), String());
             else if(specialParameters.contains(argument)) this->specialArguments.insert(String(argument), String());
             else specialArguments << argument;
@@ -225,7 +225,10 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
     for(const string& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
         if(!sameSince(input, queryTime, arguments)) return false;
     }
-    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
+    if(rule.operation) { // Implementation changed since query
+        if(Interface<Operation>::factories.contains(rule.operation) && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false;
+        if(Interface<Tool>::factories.contains(rule.operation) && parse(Interface<Tool>::version(rule.operation))*1000000000l > queryTime) return false;
+    }
     return true;
 }
 
@@ -302,7 +305,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
     }
 
-    unique<Operation> operation = Interface<Operation>::instance(rule.operation);
+    unique<Operation> operation = Interface<Operation>::factories.contains(rule.operation) ? Interface<Operation>::instance(rule.operation) : nullptr;
     Dict relevantArguments = this->localArguments(target, arguments);
     Dict localArguments; array<string> parameters = rule.parameters();
     for(auto arg: relevantArguments) if(parameters.contains(arg.key)) localArguments.insert(copy(arg.key), copy(arg.value)); // Filters locally relevant arguments
@@ -317,7 +320,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         }
 
         Map map;
-        int64 outputSize = operation->outputSize(localArguments, cast<Result*>(inputs), index);
+        int64 outputSize = operation ? operation->outputSize(localArguments, cast<Result*>(inputs), index) : 0;
         if(outputSize) { // Creates (or resizes) and maps an output result file
             while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
@@ -355,7 +358,8 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     assert_(outputs);
 
     Time time;
-    operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
+    if(operation) operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
+    else Interface<Tool>::instance(rule.operation)->execute(arguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
     if((uint64)time>100) log(rule, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) {

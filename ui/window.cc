@@ -107,12 +107,14 @@ void Window::create() {
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     created = true;
+    registerPoll();
 }
 void Window::destroy() {
     if(!created) return;
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
     created = false;
+    unregisterPoll();
 }
 
 // Render

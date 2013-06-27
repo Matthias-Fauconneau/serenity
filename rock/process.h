@@ -1,5 +1,6 @@
 #pragma once
 #include "operation.h"
+#include "tool.h"
 #include "file.h"
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
@@ -14,7 +15,7 @@ struct Rule {
 template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs); }
 
 /// Manages a process defined a direct acyclic graph of production rules
-struct Process {
+struct Process : ResultManager {
     /// Returns all valid parameters (accepted by operations compiled in this binary, used in process definition or for derived class special behavior)
     array<string> parameters();
 
@@ -42,11 +43,7 @@ struct Process {
     /// Converts matching scoped arguments to local arguments for execution
     Dict localArguments(const string& target, const Dict& scopeArguments);
 
-    /// Returns a valid cached Result for \a target with \a arguments or generates it if necessary
-    virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;
-
     array<string> specialParameters; // Valid parameters accepted for derived class special behavior
-    array<string> specialTargets; // Valid targets accepted for derived class special behavior
     Dict arguments; // User-specified arguments
     Dict specialArguments; // User-specified special arguments
     array<Rule> rules; // Production rules
@@ -54,7 +51,6 @@ struct Process {
     struct Evaluation { String target; Dict input; Dict output; Evaluation(String&& target, Dict&& input, Dict&& output) : target(move(target)), input(move(input)), output(move(output)){}};
     array<unique<Evaluation>> cache; // Caches argument evaluation
     array<shared<Result>> results; // Generated intermediate (and target) data
-    array<shared<Result>> targetResults; // Generated datas for each target
 };
 
 /// Mirrors results on a filesystem

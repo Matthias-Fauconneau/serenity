@@ -2,9 +2,9 @@
 #include "thread.h"
 #include "time.h"
 #include "process.h"
-#include "tool.h"
+#include "view.h"
 
-// Includes all operators used by rock process script
+// Includes all operators and tools used by rock process script
 //#include "source.h"
 //include "resample.h"
 //#include "average.h"
@@ -18,16 +18,15 @@
 //#include "rasterize.h"
 //#include "kernel-density-estimation.h"
 //#include "export.h"
-
-// Includes all available tools
-//#include "view.h"
 //#include "REV.h"
+//#include "slice.h"
+//#include "plot.h"
 
 /// Command-line interface for rock volume data processing
 struct Rock : virtual PersistentProcess {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "view"_; specialTargets += "REV"_; specialParameters += "ViewREV"_; //FIXME
+        specialParameters += "dump"_; specialParameters += "view"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
@@ -53,7 +52,7 @@ struct Rock : virtual PersistentProcess {
             if(targetPaths) log("Target paths:",targetPaths);
             assert_(targets, "Expected target");
         }
-        for(string target: targets) targetResults << (specialTargets.contains(target) ? Interface<Tool>::instance(target)->execute(*this) : getResult(target, arguments));
+        for(string target: targets) targetResults << getResult(target, arguments);
         assert_(targetResults.size == targets.size, targets, targetResults);
 
         if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
@@ -100,12 +99,23 @@ struct Rock : virtual PersistentProcess {
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
                 }
             }
-        } else assert(specialArguments.contains("view"_), "Expected target paths"_);
+        } else assert(specialArguments.value("view"_,"0"_)!="0"_, "Expected target paths"_);
 
-        for(string key: Interface<Tool>::factories.keys) if(specialArguments.contains(key) || specialArguments.contains(toLower(key))) {
-            unique<Tool> tool = Interface<Tool>::instance(key);
-            tool->execute(*this);
-            tools << move(tool);
+        if(specialArguments.value("view"_,"0"_)!="0"_) {
+            for(const shared<Result>& result: targetResults) {
+                if(result->data) {
+                    if(result->metadata=="scalar"_) log_(str(result->name, "=", result->data));
+                    else if((endsWith(result->metadata,"tsv"_) || endsWith(result->metadata,"map"_)) && count(result->data,'\n')<16) {
+                        log_(str(result->name, "["_+str(count(result->data,'\n'))+"]"_,":\n"_+result->data));
+                    } else {
+                        for(auto viewer: Interface<View>::factories.values) {
+                            unique<View> view  = viewer->constructNewInstance();
+                            if( view->view( share(result) ) ) { views << move(view); goto break_; }
+                        } /*else*/ warn("Unknown format",result->metadata, result->name, result->relevantArguments);
+                        break_:;
+                    }
+                } else assert(result->elements, result->name);
+            }
         }
     }
 
@@ -125,5 +135,6 @@ struct Rock : virtual PersistentProcess {
 
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
     array<string> targetPaths; // Path to file (or folders) where targets are copied
-    array<unique<Tool>> tools;
+    array<shared<Result>> targetResults; // Generated datas for each target
+    array<unique<View>> views;
 } app ( arguments() );

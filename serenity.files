@@ -84,8 +84,11 @@ rock/crop.cc
 rock/crop.h
 rock/sample-operation.cc
 io/bmp.h
-rock/view.cc
-rock/tool.h
+rock/slice.cc
 rock/REV.cc
 rock/PSD.cc
 rock/analysis.h
+rock/tool.h
+rock/result.h
+rock/view.h
+rock/plot.cc

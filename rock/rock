@@ -41,7 +41,8 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
 # Segments
-pore = Binary resampled threshold # Also clips to cylinder
+pore.cylinder = source.cylinder # Also clips to cylinder before distance field evaluation
+pore = Binary resampled threshold
 colorize = Colorize pore resampled # For visualization
 
 # Computes squared distance to / position of nearest background voxel
@@ -102,6 +103,9 @@ distribution-radius = Div volume-distribution-radius volume-crop
  histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
  histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
+
+# REV tool
+REV = REV
 
 # Export
  sqrt = SquareRoot crop
