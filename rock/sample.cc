@@ -3,6 +3,7 @@
 #include "data.h"
 
 // Scalar
+real parseScalar(const string& data) { return TextData(data).decimal(); }
 String toASCII(real scalar) { return ftoa(scalar, 5)+"\n"_; }
 
 // Vector

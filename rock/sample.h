@@ -5,6 +5,7 @@
 #include "math.h"
 
 // Scalar
+real parseScalar(const string& data);
 String toASCII(real scalar);
 
 // Vector

@@ -4,7 +4,7 @@
 #include "process.h"
 #include "view.h"
 
-// Includes all operators and tools used by rock process script
+// Includes all operators, tools and views
 //#include "source.h"
 //include "resample.h"
 //#include "average.h"
@@ -18,9 +18,10 @@
 //#include "rasterize.h"
 //#include "kernel-density-estimation.h"
 //#include "export.h"
-//#include "REV.h"
 //#include "slice.h"
 //#include "plot.h"
+//#include "prune.h"
+//#include "REV.h"
 
 /// Command-line interface for rock volume data processing
 struct Rock : virtual PersistentProcess {

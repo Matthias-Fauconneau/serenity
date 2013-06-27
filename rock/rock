@@ -66,8 +66,8 @@ volume-crop = Sum histogram-crop
 volume-total = volume-crop # for backward compatibility [deprecated]
 
 # Discards small pores
-if minimalSqRadius: pruned = ThresholdClip maximum minimalSqRadius
-if !minimalSqRadius: pruned = maximum
+minimalSqRadius = '0'
+pruned = ThresholdClip maximum minimalSqRadius
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
 if crop.cylinder: crop = Crop pruned source.crop
@@ -104,9 +104,6 @@ distribution-radius = Div volume-distribution-radius volume-crop
  histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
 
-# REV tool
-REV = REV
-
 # Export
  sqrt = SquareRoot crop
  sqrt-scaled = ScaleValues sqrt process-resolution
@@ -126,3 +123,7 @@ REV = REV
   bmp-distance = ToBMP distance
   bmp-skeleton = ToBMP skeleton
   bmp-connected = ToBMP connected
+
+# Tools
+REV = REV
+prune = Prune

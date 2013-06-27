@@ -86,7 +86,7 @@ rock/sample-operation.cc
 io/bmp.h
 rock/slice.cc
 rock/REV.cc
-rock/PSD.cc
+rock/prune.cc
 rock/analysis.h
 rock/tool.h
 rock/result.h

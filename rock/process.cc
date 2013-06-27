@@ -322,7 +322,8 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
         if(&find(output, arguments)) { // Reuses same result file
             shared<ResultFile> result = results.take(indexOf(output, arguments));
-            rename(move(result->fileName), output, storageFolder);
+            String fileName = move(result->fileName); assert_(!result->fileName);
+            rename(fileName, output, storageFolder);
         }
 
         Map map;
@@ -403,6 +404,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
             }
         }
         result->rename();
+        assert_(existsFile(result->fileName,storageFolder), result->fileName);
         results << move(result);
     }
     return share(find(target, arguments));
