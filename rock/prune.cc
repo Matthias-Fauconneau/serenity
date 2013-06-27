@@ -1,6 +1,6 @@
 #include "process.h"
 #include "volume-operation.h"
-#include "analysis.h"
+#include "sample.h"
 
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
 class(Prune, Tool) {
@@ -10,8 +10,8 @@ class(Prune, Tool) {
         int3 size=input.sampleCount-input.margin; int maximumRadius=min(min(size.x, size.y), size.z)/2;
         real totalVolume = parseScalar(results.getResult("volume-total"_, arguments)->data);
         NonUniformSample unconnectedVolume, connectedVolume;
-        //for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
-        for(int r: range(maximumRadius)) { int r2=sq(r); // Faster testing
+        for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
+        //for(int r: range(maximumRadius)) { int r2=sq(r); // Faster testing
             Dict args = copy(arguments);
             args.insert(String("minimalSqRadius"_), r2);
             {args.at("floodfill"_) = 0;
@@ -29,8 +29,8 @@ class(Prune, Tool) {
             }
         }
         outputs[0]->metadata = String("V(λ).tsv"_);
-        outputs[0]->data = "#Unconnected pore space volume versus pruning radius\n"_ + toASCII(unconnectedVolume);
+        outputs[0]->data = "#Pore space volume versus pruning radius\n"_ + toASCII(unconnectedVolume);
         outputs[1]->metadata = String("V(λ).tsv"_);
-        outputs[1]->data = "#Connected pore space volume versus pruning radius\n"_ + toASCII(connectedVolume);
+        outputs[1]->data = "#Pore space volume versus pruning radius\n"_ + toASCII(connectedVolume);
     }
 };

@@ -10,16 +10,18 @@ class(SliceView, View), Widget {
         window.localShortcut(Escape).connect([]{exit();});
         window.clearBackground = false;
     }
-    bool view(shared<Result>&& result) override {
-        if(!inRange(1u,toVolume(result).sampleSize,4u)) return false;
-        results << result;
+    bool view(string metadata, string name, const buffer<byte>& data) override {
+        Volume volume = toVolume(metadata, data);
+        if(!inRange(1u,volume.sampleSize,4u)) return false;
+        names << String(name);
+        volumes << move(volume);
         updateView();
         window.show();
         return true;
     }
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
-            int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),results.size-1);
+            int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),volumes.size-1);
             if(nextIndex == currentIndex) return true;
             updateView();
             return true;
@@ -31,21 +33,21 @@ class(SliceView, View), Widget {
         return true;
     }
     void updateView() {
-        Volume volume = toVolume(results[currentIndex]);
+        const Volume& volume = volumes[currentIndex];
         int2 size = volume.sampleCount.xy();
         while(2*size<displaySize) size *= 2;
         if(window.size != size) window.setSize(size);
         else window.render();
-        window.setTitle(str(results[currentIndex]));
+        window.setTitle(names[currentIndex]);
     }
     void render(int2 position, int2 size) {
-        assert(result);
-        Volume volume = toVolume(results[currentIndex]);
+        const Volume& volume = volumes[currentIndex];
         Image image = slice(volume, sliceZ/*, result->relevantArguments.contains("cylinder"_)*/);
         while(2*image.size()<=size) image=upsample(image);
         blit(position, image);
     }
-    array<shared<Result>> results;
+    array<String> names;
+    array<Volume> volumes;
     int currentIndex=0;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
     Window window{this, int2(-1,-1), "SliceView"_};

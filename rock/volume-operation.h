@@ -3,14 +3,15 @@
 #include "volume.h"
 
 // Converts an abstract operation Result to a volume
-inline Volume toVolume(const Result& result) {
+inline Volume toVolume(const string& metadata, const buffer<byte>& data) {
     Volume volume;
-    if( !parseVolumeFormat(volume, result.metadata) ) return Volume();
-    volume.data = buffer<byte>(ref<byte>(result.data));
+    if( !parseVolumeFormat(volume, metadata) ) return Volume();
+    volume.data = buffer<byte>(ref<byte>(data));
     volume.sampleSize = volume.data.size / volume.size();
     assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8, volume.sampleSize, volume.data.size); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
     return volume;
 }
+inline Volume toVolume(const Result& result) { return toVolume(result.metadata, result.data); }
 
 /// Convenience class to help define volume operations
 struct VolumeOperation : virtual Operation {

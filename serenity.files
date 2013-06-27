@@ -78,7 +78,6 @@ rock/volume-operation.h
 rock/kernel-density-estimation.cc
 rock/median.cc
 rock/resample.cc
-rock/analysis.cc
 rock/sample.cc
 rock/crop.cc
 rock/crop.h
@@ -87,7 +86,6 @@ io/bmp.h
 rock/slice.cc
 rock/REV.cc
 rock/prune.cc
-rock/analysis.h
 rock/tool.h
 rock/result.h
 rock/view.h

@@ -10,6 +10,7 @@ struct Rule {
     array<string> inputs;
     array<string> outputs;
     map<String, Variant> arguments;
+    map<String, String> argumentValues;
     array<string> processParameters;
     array<string> parameters() const;
 };

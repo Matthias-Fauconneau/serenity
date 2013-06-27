@@ -56,13 +56,12 @@ struct Rock : virtual PersistentProcess {
         for(string target: targets) targetResults << getResult(target, arguments);
         assert_(targetResults.size == targets.size, targets, targetResults);
 
-        if(targetPaths.size>1 || (targetPaths.size==1 && !existsFolder(targetPaths[0],cwd))) { // Copies results to individually named files
+        if(targetPaths.size>1 || (targetPaths.size==1 && (!existsFolder(targetPaths[0],cwd) || targetResults[0]->elements))) { // Copies results to individually named files
             for(uint index: range(min(targetResults.size,targetPaths.size))) {
                 const string& path = targetPaths[index];
                 const shared<Result>& result = targetResults[index];
                 String fileName = result->name+"."_+result->metadata;
                 if(result->elements) {
-                    assert_(existsFolder(path, cwd), path);
                     Folder folder(fileName, Folder(path, cwd), true);
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
                 } else {
@@ -104,20 +103,23 @@ struct Rock : virtual PersistentProcess {
 
         if(specialArguments.value("view"_,"0"_)!="0"_) {
             for(const shared<Result>& result: targetResults) {
-                if(result->data) {
-                    if(result->metadata=="scalar"_) log_(str(result->name, "=", result->data));
-                    else if((endsWith(result->metadata,"tsv"_) || endsWith(result->metadata,"map"_)) && count(result->data,'\n')<16) {
-                        log_(str(result->name, "["_+str(count(result->data,'\n'))+"]"_,":\n"_+result->data));
-                    } else {
-                        for(unique<View>& view: views) if( view->view( share(result) ) ) goto break_; // Tries to append to existing view first
-                        /*else*/ for(auto viewer: Interface<View>::factories.values) {
-                            unique<View> view  = viewer->constructNewInstance();
-                            if( view->view( share(result) ) ) { views << move(view); goto break_; }
-                        } /*else*/ warn("Unknown format",result->metadata, result->name, result->relevantArguments);
-                        break_:;
-                    }
-                } else assert(result->elements, result->name);
+                if(result->data) view(result->metadata, result->name, result->data);
+                for(auto data: result->elements) view(result->metadata, data.key, data.value);
             }
+        }
+    }
+
+    void view(string metadata, string name, const buffer<byte>& data) {
+        if(metadata=="scalar"_) log_(str(name, "=", data));
+        else if((endsWith(metadata,"tsv"_) || endsWith(metadata,"map"_)) && count(data,'\n')<16) {
+            log_(str(name, "["_+str(count(data,'\n'))+"]"_,":\n"_+data));
+        } else {
+            for(unique<View>& view: views) if( view->view(metadata, name, data) ) goto break_; // Tries to append to existing view first
+            /*else*/ for(auto viewer: Interface<View>::factories.values) {
+                unique<View> view  = viewer->constructNewInstance();
+                if( view->view(metadata, name, data) ) { views << move(view); goto break_; }
+            } /*else*/ warn("Unknown format",metadata, name);
+break_:;
         }
     }
 

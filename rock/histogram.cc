@@ -37,9 +37,9 @@ class(Histogram, Operation) {
     virtual string parameters() const { return "cylinder clip"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
-        UniformHistogram histogram = ::histogram(source, parseCrop(args, source.margin, source.sampleCount-source.margin, ""_, 1));
-        uint clip = args.value("clip"_,1);
-        for(uint i: range(clip)) histogram[i] = 0; // Zeroes values until clip (discards clipping artifacts or background)
+        UniformHistogram histogram = ::histogram(source, parseCrop(args.contains("crop"_)?args:(const Dict&)Dict(), source.margin, source.sampleCount-source.margin, ""_, 1));
+        uint clip = args.value("clip"_,0);
+        for(uint i: range(clip)) histogram[i] = 0; // Zeroes values until clip (discards background)
         outputs[0]->metadata = String("histogram.tsv"_);
         outputs[0]->data = clip == histogram.size ? String() : toASCII(histogram);
     }

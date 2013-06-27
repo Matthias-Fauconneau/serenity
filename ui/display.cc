@@ -65,6 +65,7 @@ inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
     float x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
+    assert_(vec4(0) <= color && color <= vec4(1));
     int4 invert = int4(0xFF*(1-color.z),0xFF*(1-color.y),0xFF*(1-color.x),0xFF*color.w);
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;

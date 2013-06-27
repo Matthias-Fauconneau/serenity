@@ -10,12 +10,16 @@ String toASCII(real scalar);
 
 // Vector
 typedef buffer<real> Vector;
+/// Returns the sum of the coordinates
+real sum(const Vector& A);
 /// Multiplies vector by a scalar
 Vector operator*(real scalar, const Vector& A);
 /// Rounds to integer
 Vector round(const Vector& A);
 /// Computes absolute values
 Vector abs(const Vector& A);
+/// Computes square values
+Vector sq(const Vector& A);
 /// Adds two vectors
 Vector operator+(const Vector& A, const Vector& B);
 /// Substracts two vectors
@@ -32,7 +36,7 @@ struct UniformSample : Vector {
     using Vector::Vector;
     UniformSample(Vector&& A):Vector(move(A)){}
     /// Returns the sum of the samples
-    real sum() const;
+    real sum() const { return ::sum(*this); }
     /// Returns the mean of the samples
     real mean() const;
     /// Returns the variance of the samples
@@ -42,6 +46,8 @@ struct UniformSample : Vector {
 };
 /// Multiplies sample by a scalar
 inline UniformSample operator*(real scalar, const UniformSample& A) { return scalar*(const Vector&)A; }
+/// Computes square values
+inline UniformSample sq(const UniformSample& A) { return sq((const Vector&)A); }
 /// Adds two sample
 inline UniformSample operator+(const UniformSample& A, const UniformSample& B) { return (const Vector&)A + (const Vector&)B; }
 /// Substracts two sample
@@ -50,6 +56,11 @@ inline UniformSample operator-(const UniformSample& A, const UniformSample& B) {
 UniformSample parseUniformSample(const string& file);
 /// Converts a uniformly sampled distribution to tab-separated values
 String toASCII(const UniformSample& A);
+UniformSample slice(const UniformSample& sample, real sliceBegin, real sliceEnd);
+
+// UniformSample[]
+/// Estimates mean distribution from distribution samples
+UniformSample mean(const ref<UniformSample>& samples);
 
 /// Represents a sample distribution by its histogram
 struct UniformHistogram : UniformSample {
@@ -83,6 +94,9 @@ NonUniformSample operator*(real scalar, NonUniformSample&& A);
 NonUniformSample parseNonUniformSample(const string& file);
 /// Converts a non-uniformly sampled distribution to tab-separated values
 String toASCII(const NonUniformSample& A);
+
+/// Resamples non uniform distributions to a common (discarding original variable scale)
+array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples);
 
 struct NonUniformHistogram : NonUniformSample {
     using NonUniformSample::NonUniformSample;

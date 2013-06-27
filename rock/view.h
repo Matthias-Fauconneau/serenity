@@ -3,6 +3,6 @@
 #include "result.h"
 
 struct View {
-    virtual bool view(shared<Result>&& result) abstract;
+    virtual bool view(string metadata, string name, const buffer<byte>& data) abstract;
     virtual ~View() {}
 };

@@ -191,7 +191,7 @@ void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint1
 
 /// Segments between either rock or pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
-    string parameters() const override { return "threshold cylinder"_; }
+    string parameters() const override { return "cylinder threshold"_; }
     uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         uint16 binaryThreshold;
@@ -204,7 +204,7 @@ class(Binary, Operation), virtual VolumeOperation {
             Result* threshold = otherInputs[0];
             binaryThreshold = round( TextData(threshold->data).decimal() * inputs[0].maximum );
         }
-        threshold(outputs[0], /*outputs[1],*/ inputs[0], binaryThreshold, args.value("cylinder"_,"0"_)!="0"_);
+        threshold(outputs[0], inputs[0], binaryThreshold, args.value("cylinder"_,"0"_)!="0"_);
     }
 };
 

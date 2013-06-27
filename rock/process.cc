@@ -23,111 +23,92 @@ array<string> Process::parameters() {
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
     array<string> targets;
     Dict defaultArguments; // Process-specified default arguments
-    // Parses definitions and arguments twice to solve cyclic dependencies
-    // 1) Process definition defines valid parameters and targets
-    // 2) Arguments are parsed using default definition
-    // 3) Process definition is parsed with conditionnals taken according to user arguments
-    // 4) Arguments are parsed again using the customized process definition
-    //for(uint pass unused: range(2)) {
-        array<string> parameters = this->parameters();
-        rules.clear(); resultNames.clear(); defaultArguments.clear();
 
-        for(TextData s(definition); s;) { //FIXME: use parser generator
-            s.skip();
-            if(s.match('#')) { s.until('\n'); continue; }
-            array<string> processParameters;
-            Rule rule;
-            if(s.match("if"_)) {
-                s.whileAny(" \t\r"_);
-                string op;
-                string value;
-                if(s.match('!')) op="=="_, value="0"_;
-                string parameter = s.word("_-."_);
-                parameters += parameter;
-                processParameters += parameter;
-                s.whileAny(" \t\r"_);
-                if(!op) op = s.whileAny("!="_);
-                if(!op) op = "!="_, value = "0"_;
-                if(!value) { s.whileAny(" \t\r"_); s.skip("'"_); value = s.until('\''); }
-                s.skip(":"_);
-                assert_(parameter && value);
-                /*bool enable;
-                if(op=="=="_) enable = (left == right);
-                else if(op=="!="_) enable = (left != right);
-                else error("Unknown operator", op);
-                if(!enable) { s.until('\n'); continue; }*/
-                rule.condition={op, parameter, value};
-                s.whileAny(" \t\r"_);
-            }
-            array<string> outputs;
-            for(;!s.match('='); s.whileAny(" \t\r"_)) {
-                string output = s.whileNo(" \t\r=");
-                assert_(output, s.until('\n'));
-                outputs << output;
-            }
-            assert_(outputs, s.until('\n'));
-            s.whileAny(" \t\r"_);
-            if(outputs.size==1 && (s.peek()=='\'' || s.peek()=='$')) { // Default argument
-                string key = outputs[0];
-                parameters += key; // May not be defined yet
-                if(s.match('\'')) {
-                    string value = s.until('\''); // Literal
-                    assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
-                    defaultArguments.insert(String(key), String(value));
-                    if(!arguments.contains(key)) arguments.insert(String(key), String(value));
-                } else if(s.match('$')) {
-                    string value = s.word("_-."_); // Value
-                    assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
-                    if(arguments.contains(value)) {
-                        defaultArguments.insert(String(key), copy(arguments.at(value)));
-                        if(!arguments.contains(key)) arguments.insert(String(key), copy(arguments.at(value)));
-                    }
-                } else error("Unquoted literal", key, s.whileNo(" \t\r\n"_));
-            } else {
-                string word = s.word("_-"_);
-                assert_(word, "Expected operator or input for", outputs);
-                if(!Interface<Operation>::factories.contains(word) && !Interface<Tool>::factories.contains(word)) rule.inputs << word; // Forwarding rule
-                else rule.operation = word; // Generating rule
-                s.whileAny(" \t\r"_);
-                for(;!s.match('\n'); s.whileAny(" \t\r"_)) {
-                    if(s.match('#')) { s.whileNot('\n'); continue; }
-                    string key = s.word("_-."_); s.whileAny(" \t\r"_);
-                    assert_(key, s.until('\n'), word);
-                    if(s.match('=')) { // Local argument
-                        s.whileAny(" \t\r"_);
-                        s.skip("'"_);
-                        rule.arguments.insert(String(key), String(s.until('\'')));
-                    }
-                    else if(resultNames.contains(key)) rule.inputs << key; // Result input
-                    else if(rule.operation) rule.inputs << key; // Argument value
+    array<string> parameters = this->parameters();
+
+    for(TextData s(definition); s;) { //FIXME: use parser generator
+        s.skip();
+        if(s.match('#')) { s.until('\n'); continue; }
+        array<string> processParameters;
+        Rule rule;
+        if(s.match("if"_)) {
+            s.whileAny(" \t"_);
+            string op;
+            string value;
+            if(s.match('!')) op="=="_, value="0"_;
+            string parameter = s.word("_-."_);
+            parameters += parameter;
+            processParameters += parameter;
+            s.whileAny(" \t"_);
+            if(!op) op = s.whileAny("!="_);
+            if(!op) op = "!="_, value = "0"_;
+            if(!value) { s.whileAny(" \t"_); s.skip("'"_); value=s.until('\''); }
+            s.skip(":"_);
+            assert_(parameter && value);
+            rule.condition={op, parameter, value};
+            s.whileAny(" \t"_);
+        }
+        array<string> outputs;
+        for(;!s.match('='); s.whileAny(" \t"_)) {
+            string output = s.whileNo(" \t=");
+            assert_(output, s.until('\n'));
+            outputs << output;
+        }
+        assert_(outputs, s.until('\n'));
+        s.whileAny(" \t"_);
+        if(outputs.size==1 && s.peek()=='\'') { // Default argument
+            assert_(!rule.condition.op, "Conditionnal default argument would induce cyclic dependency between process definition and user arguments"_);
+            string key = outputs[0];
+            parameters += key; // May not be defined yet
+            if(!s.match('\'')) error("Unquoted literal", key, s.whileNo(" \t\n"_));
+            string value = s.until('\''); // Literal
+            assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
+            defaultArguments.insert(String(key), String(value));
+            if(!arguments.contains(key)) arguments.insert(String(key), String(value));
+        } else {
+            string word = s.word("_-"_);
+            assert_(word, "Expected operator or input for", outputs);
+            if(!Interface<Operation>::factories.contains(word) && !Interface<Tool>::factories.contains(word)) rule.inputs << word; // Forwarding rule
+            else rule.operation = word; // Generating rule
+            s.whileAny(" \t"_);
+            for(;!s.match('\n'); s.whileAny(" \t"_)) {
+                if(s.match('#')) { s.whileNot('\n'); continue; }
+                string key = s.word("_-."_); s.whileAny(" \t"_);
+                assert_(key, s.until('\n'), word);
+                if(s.match('=')) { // Local argument
+                    s.whileAny(" \t"_);
+                    //s.skip("'"_);
+                    rule.arguments.insert(String(key), String(/*s.until('\'')*/ s.whileNo(" \t\n")));
                 }
-                resultNames += outputs; //for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
-                rule.outputs = move(outputs);
-                rule.processParameters = move(processParameters);
-                rules << move(rule);
+                else if(resultNames.contains(key)) rule.inputs << key; // Result input
+                else if(rule.operation) rule.inputs << key; // Argument value
             }
+            resultNames += outputs; //for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
+            rule.outputs = move(outputs);
+            rule.processParameters = move(processParameters);
+            rules << move(rule);
         }
+    }
 
-        arguments.clear(); specialArguments.clear(); targets.clear(); array<string> specialArguments;
-        for(const string& argument: allArguments) { // Parses generic arguments (may affect process definition)
-            TextData s (argument); string key = s.word("-_."_);
-            string scope, parameter = key;
-            if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
-            if(s.match('=')) { // Explicit argument
-                assert_(parameters.contains(parameter),"Invalid parameter", parameter);
-                string value = s.untilEnd();
-                assert_(value);
-                assert_(!arguments.contains(key), key);
-                arguments.insert(String(key), String(value));
-            }
-            else if(resultNames.contains(argument)) targets << argument;
-            else if(parameters.contains(parameter)) arguments.insert(String(argument), String());
-            else if(specialParameters.contains(argument)) this->specialArguments.insert(String(argument), String());
-            else specialArguments << argument;
+    array<string> specialArguments;
+    for(const string& argument: allArguments) { // Parses process arguments
+        TextData s (argument); string key = s.word("-_."_);
+        string scope, parameter = key;
+        if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
+        if(s.match('=')) { // Explicit argument
+            assert_(parameters.contains(parameter),"Invalid parameter", parameter);
+            string value = s.untilEnd();
+            assert_(value);
+            assert_(!arguments.contains(key), key);
+            arguments.insert(String(key), String(value));
         }
-        for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(copy(arg.key), copy(arg.value));
-        this->parseSpecialArguments(specialArguments);
-    //}
+        else if(resultNames.contains(argument)) targets << argument;
+        else if(parameters.contains(parameter)) arguments.insert(String(argument), String());
+        else if(specialParameters.contains(argument)) this->specialArguments.insert(String(argument), String());
+        else specialArguments << argument;
+    }
+    for(auto arg: defaultArguments) if(!arguments.contains(arg.key)) arguments.insert(copy(arg.key), copy(arg.value));
+    this->parseSpecialArguments(specialArguments);
     return targets;
 }
 
@@ -193,9 +174,10 @@ Dict Process::localArguments(const string& target, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target, arguments);
     array<string> parameters = rule.parameters();
     for(auto arg: rule.arguments) { // Appends local arguments
-        assert_(parameters.contains(arg.key));
+        assert_(parameters.contains(arg.key),target,arg.key);
         if(args.contains(arg.key)) args.remove(arg.key); // Local arguments overrides scope arguments
-        args.insert(copy(arg.key), copy(arg.value));
+        if(arguments.contains(arg.value)) args.insert(copy(arg.key), copy(arguments.at(arg.value))); // Argument value
+        else args.insert(copy(arg.key), copy(arg.value)); // Argument literal
     }
     for(auto arg: arguments) { // Appends matching scoped arguments
         string scope, parameter = arg.key;

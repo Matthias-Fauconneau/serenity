@@ -13,7 +13,7 @@ if denoise == 'average': denoised = average
  shift = ShiftRight source
  averagex = Average shift
  averagexy = Average averagex
- average = Average averagexy shift='0'
+ average = Average averagexy shift=0
 if denoise == 'median': denoised = median
  median = Median source
 
@@ -22,13 +22,8 @@ if !resample: process-resolution = resolution # Forwards original resolution
 if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
-#Clips histograms to the inscribed cylinder
-if source.box: histogram-density.cylinder = '0'
-if source.box: histogram-crop.cylinder = '0'
-if source.box: histogram-squaredRadius.cylinder = '0'
-
 # Density distribution
-if !thresholdFromSource: histogram-density = Histogram resampled
+if !thresholdFromSource: histogram-density = Histogram resampled cylinder=source.cylinder
 if thresholdFromSource: histogram-density = Histogram source
 histogram-density-normalized = Normalize histogram-density
 distribution-density = KernelDensityEstimation histogram-density
@@ -41,8 +36,7 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-density # Explicit model
 
 # Segments
-pore.cylinder = $source.cylinder # Also clips to cylinder before distance field evaluation
-pore = Binary resampled threshold
+pore = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
 colorize = Colorize pore resampled # For visualization
 
 # Computes squared distance to / position of nearest background voxel
@@ -59,9 +53,9 @@ sphere-bins = Bin skeleton-tiled
 maximum = Rasterize sphere-bins
 
 # Computes crop volume (including rock) before minimalRadius, transpose or floodfill dependency
-if crop.cylinder: crop-maximum = Crop maximum source.crop
+if crop.cylinder: crop-maximum = Crop maximum inputCylinder=source.cylinder inputBox=source.box inputDownsample=source.downsample
 if !crop.cylinder: crop-maximum = maximum
-histogram-crop = Histogram crop-maximum clip='0' # including rock
+histogram-crop = Histogram crop-maximum cylinder=source.cylinder # including rock
 volume-crop = Sum histogram-crop
 volume-total = volume-crop # for backward compatibility [deprecated]
 
@@ -85,7 +79,7 @@ if !floodfill: connected = transposed # Forwards unconnected pore space
 if floodfill: connected = FloodFill transposed # Flood fills pore space
 
 # Computes histogram of maximum squared radii
-histogram-squaredRadius = Histogram connected clip='1'
+histogram-squaredRadius = Histogram connected cylinder=source.cylinder clip=1 # Not including rock
 # Computes pore space volume
 volume = Sum histogram-squaredRadius
 # Computes porosity (= pore space volume / total volume )
@@ -95,7 +89,7 @@ histogram-radius = SquareRootVariable histogram-squaredRadius
 # Normalize histogram
 histogram-radius-normalized = Div histogram-radius volume-crop
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
-volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth='0.5'
+volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=0.5
 # Normalizes probability density on total volume (including background (i.e not the same as probability density normalization))
 distribution-radius = Div volume-distribution-radius volume-crop
 # Scales radius (e.g to original pixel or physical resolution)
@@ -105,7 +99,7 @@ distribution-radius = Div volume-distribution-radius volume-crop
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
 
 # Export
- sqrt = SquareRoot crop
+ sqrt = SquareRoot connected
  sqrt-scaled = ScaleValues sqrt process-resolution
  cdl = ToCDL sqrt-scaled
  ascii = ToASCII sqrt-scaled
@@ -125,5 +119,5 @@ distribution-radius = Div volume-distribution-radius volume-crop
   bmp-connected = ToBMP connected
 
 # Tools
-ε(r) = REV
+ε(R) ε(R|r<median) ε(R|r>median) PSD(R) = REV
 unconnected(λ) connected(λ) = Prune

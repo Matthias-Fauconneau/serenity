@@ -80,17 +80,20 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     }
     for(uint z=Z-marginZ; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
 }
-class(Crop,Operation), virtual VolumeOperation {
-    string parameters() const override { static auto p="cylinder box"_; return p; }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        const Volume& source = inputs[0];
-        if(!otherInputs) crop(outputs[0], source, parseCrop(args, source.margin, source.sampleCount-source.margin, ""_, 1));
-        else { // Converts to input coordinates
-            Dict inputCropCylinder; inputCropCylinder.insert(String("cylinder"_), String(otherInputs[0]->data));
-            CropVolume inputCrop = parseCrop(inputCropCylinder, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Unsafe (no bound checking)
+class(Crop,Operation), virtual VolumePass<uint16> {
+    string parameters() const override { static auto p="cylinder box downsample inputCylinder inputBox inputDownsample"_; return p; }
+    void execute(const Dict& args, Volume16& target, const Volume& source) override {
+        if(!args.contains("inputCylinder"_) && !args.contains("inputBox"_) && !args.contains("inputDownsample"_)) { // Using input coordinates
+            crop(target, source, parseCrop(args, source.margin, source.sampleCount-source.margin, ""_, 1));
+        } else { // Converts to input coordinates
+            Dict inputArgs;
+            if(args.contains("inputCylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
+            if(args.contains("inputBox"_)) inputArgs.insert(String("box"_), copy(args.at("inputBox"_)));
+            if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
+            CropVolume inputCrop = parseCrop(inputArgs, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Unsafe (no bound checking)
             CropVolume globalCrop = parseCrop(args, int3(0,0,0), int3(1<<16,1<<16,1<<16), ""_, 1); // Unsafe (no bound checking)
             CropVolume localCrop = {globalCrop.min-inputCrop.min, globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
-            crop(outputs[0], source, localCrop);
+            crop(target, source, localCrop);
         }
     }
 };
