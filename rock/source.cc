@@ -2,7 +2,6 @@
 #include "time.h"
 #include "tiff.h"
 //#include "bmp.h"
-#include "sample.h"
 #include "crop.h"
 
 /// Parses physical resolution from source path

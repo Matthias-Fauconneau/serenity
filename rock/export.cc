@@ -24,7 +24,20 @@ void scaleValues(VolumeFloat& target, const VolumeFloat& source, const float sca
 class(ScaleValues, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(float); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        scaleValues(outputs[0], inputs[0], TextData(otherInputs[0]->data).decimal());
+        scaleValues(outputs[0], inputs[0], parseScalar(otherInputs[0]->data));
+    }
+};
+
+/// Sets masked voxels to masked value
+void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 maskedValue) {
+    assert_(source.size()==mask.size() && target.size() == source.size());
+    for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
+        target(x,y,z) = mask(x,y,z) ? source(x,y,z) : maskedValue;
+}
+class(Mask, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        mask(outputs[0], inputs[0], inputs[1], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
     }
 };
 

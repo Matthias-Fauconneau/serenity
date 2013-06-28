@@ -64,7 +64,6 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             string value = s.until('\''); // Literal
             assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
             defaultArguments.insert(String(key), String(value));
-            if(!arguments.contains(key)) arguments.insert(String(key), String(value));
         } else {
             string word = s.word("_-"_);
             assert_(word, "Expected operator or input for", outputs);

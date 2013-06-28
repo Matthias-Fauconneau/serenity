@@ -27,7 +27,7 @@ class(ScaleVariable, Operation) {
         assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
         outputs[0]->metadata = copy(inputs[0]->metadata);
-        outputs[0]->data = toASCII(scaleVariable(TextData(inputs[1]->data).decimal(), parseNonUniformSample(inputs[0]->data)));
+        outputs[0]->data = toASCII(scaleVariable(parseScalar(inputs[1]->data), parseNonUniformSample(inputs[0]->data)));
     }
 };
 
@@ -38,7 +38,7 @@ class(ScaleDistribution, Operation) {
         assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
         outputs[0]->metadata = copy(inputs[0]->metadata);
-        outputs[0]->data = toASCII(scaleDistribution(TextData(inputs[1]->data).decimal(), parseNonUniformSample(inputs[0]->data)));
+        outputs[0]->data = toASCII(scaleDistribution(parseScalar(inputs[1]->data), parseNonUniformSample(inputs[0]->data)));
     }
 };
 
@@ -46,9 +46,9 @@ class(ScaleDistribution, Operation) {
 class(Div, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         outputs[0]->metadata = copy(inputs[0]->metadata);
-        if(inputs[0]->metadata=="scalar"_) outputs[0]->data = toASCII(TextData(inputs[0]->data).decimal()/TextData(inputs[1]->data).decimal());
-        else if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseVector(inputs[0]->data) );
-        else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./TextData(inputs[1]->data).decimal()) * parseNonUniformSample(inputs[0]->data) );
+        if(inputs[0]->metadata=="scalar"_) outputs[0]->data = toASCII(parseScalar(inputs[0]->data)/parseScalar(inputs[1]->data));
+        else if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( (1./parseScalar(inputs[1]->data)) * parseVector(inputs[0]->data) );
+        else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./parseScalar(inputs[1]->data)) * parseNonUniformSample(inputs[0]->data) );
         else error(inputs[0]->metadata);
     }
 };
