@@ -24,6 +24,14 @@ Vector parseVector(const string& file, bool integer)  {
 String toASCII(const Vector& a) { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<", "_;} s<<"\n"_; return s; }
 
 // UniformSample
+UniformSample operator*(real scalar, const UniformSample& A) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
+/// Computes square values
+UniformSample sq(const UniformSample& A) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=sq(A[i]); return R; }
+/// Adds two sample
+//UniformSample operator+(const UniformSample& A, const UniformSample& B) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=A[i]+B[i]; return R; }
+/// Substracts two sample
+UniformSample operator-(const UniformSample& A, const UniformSample& B) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=A[i]-B[i]; return R; }
+
 real UniformSample::mean() const { return sum()/size; }
 real UniformSample::variance() const { real mean=UniformSample::mean(), ssd=0; for(uint i: range(size)) ssd += sq(at(i)-mean); return ssd/(size-1); }
 UniformSample parseUniformSample(const string& file) {

@@ -45,13 +45,13 @@ struct UniformSample : Vector {
     real scale=1; // Scales from integer sample indices to floating-point sample positions
 };
 /// Multiplies sample by a scalar
-inline UniformSample operator*(real scalar, const UniformSample& A) { return scalar*(const Vector&)A; }
+UniformSample operator*(real scalar, const UniformSample& A);
 /// Computes square values
-inline UniformSample sq(const UniformSample& A) { return sq((const Vector&)A); }
+UniformSample sq(const UniformSample& A);
 /// Adds two sample
-inline UniformSample operator+(const UniformSample& A, const UniformSample& B) { return (const Vector&)A + (const Vector&)B; }
+UniformSample operator+(const UniformSample& A, const UniformSample& B);
 /// Substracts two sample
-inline UniformSample operator-(const UniformSample& A, const UniformSample& B) { return (const Vector&)A - (const Vector&)B; }
+UniformSample operator-(const UniformSample& A, const UniformSample& B);
 /// Parses a uniformly sampled distribution from tab-separated values
 UniformSample parseUniformSample(const string& file);
 /// Converts a uniformly sampled distribution to tab-separated values

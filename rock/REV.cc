@@ -26,7 +26,6 @@ class(REV, Tool) {
             UniformHistogram mean = ::mean(samples);
             if(radius==52) PSD_octant.insert(String("mean"_), "#Pore size distribution versus octants (R=50)\n"_+toASCII(mean));
             uint median = mean.median();
-            log(radius, median, size);
             for(uint i: range(3)) { /// Computes deviation of a sample of distributions
                 uint begin = (uint[]){0,0,median}[i], end = (uint[]){(uint)mean.size,median,(uint)mean.size}[i]; // 0-size, 0-median, median-size
                 assert_(begin<end);
@@ -34,10 +33,10 @@ class(REV, Tool) {
                 UniformSample mean = ::mean(slices);
                 real sumOfSquareDifferences = 0; for(const UniformSample& slice: slices) sumOfSquareDifferences += sum(sq(slice-mean));
                 real unbiasedVarianceEstimator = sumOfSquareDifferences / (slices.size-1);  //assuming samples are uncorrelated
-                real relativeDeviation = sqrt(unbiasedVarianceEstimator) / mean.sum();
+                real relativeDeviation = sqrt( unbiasedVarianceEstimator ) / sqrt( sq(mean).sum() );
                 relativeDeviations[i].insert(radius, relativeDeviation);
             }
-            PSD_R.insert("R="_+dec(radius,3), ("#Pore size distribution versus cylinder radius (mean of 8 volume samples)\n"_ + toASCII((1/mean.sum())*mean)));
+            PSD_R.insert("R="_+dec(radius,3), ("#Pore size distribution versus cylinder radius (mean of 8 volume samples)\n"_ + toASCII((1./mean.sampleCount())*mean)));
         }
         //TODO: scale R vx -> μm
         assert_(outputs[0]->name == "ε(R)"_);
