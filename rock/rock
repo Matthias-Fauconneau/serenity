@@ -120,5 +120,5 @@ distribution-radius = Div volume-distribution-radius volume-crop
   bmp-denoised-connected = ToBMP denoised-connected
 
 # Tools
-ε(R) ε(R|r<median) ε(R|r>median) PSD(R) = REV
+ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant) = REV
 unconnected(λ) connected(λ) = Prune

@@ -4,6 +4,7 @@
 #include "text.h"
 #include "sample.h"
 #include "math.h"
+#include "png.h"
 
 struct Plot : Widget {
     Plot(const string& title, const string& xlabel, const string& ylabel, const string& legend, NonUniformSample&& data)
@@ -22,7 +23,7 @@ struct Plot : Widget {
         int tickCount[2]={};
         for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
             real subExponent = log10(max[axis]) - floor(log10(max[axis]));
-            for(auto a: (real[][2]){{1,5}, {1.2,6}, {2.5,5}, {5,5}, {6,6}, {10,5}})
+            for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.5,6}, {1.6,8}, {2,10}, {2.5,5}, {5,5}, {6,6}, {10,5}})
                 if(log10(a[0]) >= subExponent) { max[axis] = a[0]*exp10(floor(log10(max[axis]))); tickCount[axis] = a[1]; break; }
         }
 
@@ -47,28 +48,28 @@ struct Plot : Widget {
         }
 
         // Transforms data positions to render positions
-        auto point = [&](vec2 p)->int2{ p = (p-min)/(max-min); return position+int2(left+p.x*(size.x-left-right),top+(1-p.y)*(size.y-top-bottom)); };
+        auto point = [&](vec2 p)->vec2{ p = (p-min)/(max-min); return vec2(position.x+left+p.x*(size.x-left-right),position.y+top+(1-p.y)*(size.y-top-bottom)); };
 
         // Draws axis and ticks
         {vec2 end = vec2(max.x, min.y); // X
             line(point(min), point(end));
             for(uint i: range(tickCount[0]+1)) {
-                int2 p = point(min+(i/float(tickCount[0]))*(end-min));
+                int2 p (point(min+(i/float(tickCount[0]))*(end-min)));
                 line(p, p+int2(0,-4));
                 Text& tick = ticks[0][i];
                 tick.render(p + int2(-tick.textSize.x/2, 0) );
             }
-            {Text text(format(Bold)+xlabel); text.render(point(end)+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
+            {Text text(format(Bold)+xlabel); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
         }
         {vec2 end = vec2(min.x, max.y); // Y (FIXME: factor)
             line(point(min), point(end));
             for(uint i: range(tickCount[1]+1)) {
-                int2 p = point(min+(i/float(tickCount[1]))*(end-min));
+                int2 p (point(min+(i/float(tickCount[1]))*(end-min)));
                 line(p, p+int2(4,0));
                 Text& tick = ticks[1][i];
                 tick.render(p + int2(-tick.textSize.x, -tick.textSize.y/2) );
             }
-            {Text text(format(Bold)+ylabel); text.render(point(end)+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y));}
+            {Text text(format(Bold)+ylabel); text.render(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y));}
         }
 
         // Plots data points
@@ -76,7 +77,7 @@ struct Plot : Widget {
         for(uint i: range(dataSets.size)) {
             vec4 color = colors[i];
             const auto& data = dataSets[i];
-            int2 points[data.size()];
+            vec2 points[data.size()];
             for(uint i: range(data.size())) points[i] = point( vec2(data.keys[i],data.values[i]) );
             for(uint i: range(data.size()-1)) line(points[i], points[i+1], color);
         }
@@ -88,10 +89,20 @@ struct Plot : Widget {
 };
 
 class(PlotView, View), Widget {
+    String title;
     array<Plot> plots;
 
     PlotView() {
         window.localShortcut(Escape).connect([]{exit();});
+        window.localShortcut(PrintScreen).connect([this]{
+            assert_(!framebuffer && !clipStack);
+            framebuffer = Image(1920,1080);
+            currentClip = Rect(framebuffer.size());
+            fill(Rect(framebuffer.size()),1);
+            render(0,framebuffer.size());
+            writeFile(title+".png"_, encodePNG(framebuffer), home());
+            framebuffer = Image();
+        });
         window.backgroundColor = 1;
     }
 
@@ -102,14 +113,14 @@ class(PlotView, View), Widget {
         auto sample = parseNonUniformSample(data);
         for(Plot& plot: plots) { // Tries to merge with an existing plot
             if(plot.title==title) {
-                assert_(plot.xlabel == x && plot.ylabel == y && plot.dataSets.first().keys == sample.keys);
+                assert_(plot.xlabel == x && plot.ylabel == y);
                 plot.dataSets << move(sample);
                 plot.legends << String(name);
                 goto break_;
             }
         } /*else*/ plots << Plot(title, x, y, name, move(sample)); // New plot
         break_:;
-        array<String> plotTitles; for(const Plot& plot: plots) plotTitles << copy(plot.title); window.setTitle(join(plotTitles,", "_));
+        array<String> plotTitles; for(const Plot& plot: plots) plotTitles << copy(plot.title); this->title = join(plotTitles,", "_); window.setTitle(this->title);
         window.show();
         return true;
     }

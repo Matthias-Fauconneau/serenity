@@ -43,9 +43,12 @@ UniformSample slice(const UniformSample& sample, real sliceBegin, real sliceEnd)
     return UniformSample(sample.slice(begin,end-begin));
 }
 
-// UniformSample[]/// Estimates mean distribution from distribution samples
+// UniformSample[]
+/// Estimates mean distribution from distribution samples
 UniformSample mean(const ref<UniformSample>& samples) {
     UniformSample mean (samples[0].size);
+    mean.scale = samples[0].scale;
+    for(const UniformSample& sample: samples) assert_(sample.scale == mean.scale);
     for(uint i: range(mean.size)) {
         real sum = 0;
         for(const UniformSample& sample: samples) sum += sample[i];
@@ -75,6 +78,7 @@ real NonUniformSample::interpolate(real x) const {
     return value;
 }
 NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
+
 array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
     real delta = __DBL_MAX__, maximum=0;
     for(const NonUniformSample& sample: nonUniformSamples) delta=::min(delta, sample.delta()), maximum=max(maximum, max(sample.keys));
@@ -83,11 +87,13 @@ array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
     array<UniformSample> samples;
     for(const NonUniformSample& sample: nonUniformSamples) {
         UniformSample uniform ( sampleCount );
+        uniform.scale = delta;
         for(uint i: range(0, sampleCount)) uniform[i] = sample.interpolate( delta*i );
         samples << move(uniform);
     }
     return samples;
 }
+
 NonUniformSample parseNonUniformSample(const string& file) {
     TextData s (file);
     NonUniformSample sample;
