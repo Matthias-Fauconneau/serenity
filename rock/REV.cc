@@ -14,7 +14,7 @@ class(REV, Tool) {
             int radius = int(round(r));
             array<NonUniformSample> nonUniformSamples;
             for(int3 octant: (int3[]){int3{-1,-1,-1},int3{1,-1,-1},int3{-1,1,-1},int3{1,1,-1},int3{-1,-1,1},int3{1,-1,1},int3{-1,1,1},int3{1,1,1}}) {
-                int3 center = int3(size/2) + radius * octant;
+                int3 center = int3(size/2) + (size/4) * octant;
                 Dict args = copy(arguments);
                 args.insert("histogram-squaredRadius.crop"_);
                 args.insert(String("histogram-squaredRadius.cylinder"_), str((int[]){center.x, center.y, radius, center.z-radius, center.z+radius},','));

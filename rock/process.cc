@@ -238,13 +238,13 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
         if(!existsFolder(path, storageFolder)) {
             File file = File(path, storageFolder, ReadWrite);
             if(file.size()<pageSize) { // Small file (<4K)
-                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), path, storageFolder);
+                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), path, storageFolder.name());
             } else { // Memory-mapped file
-                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), path, storageFolder);
+                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), path, storageFolder.name());
             }
         } else { // Folder
             Folder folder (path, storageFolder);
-            shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), String(metadata), String(), path, storageFolder);
+            shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), String(metadata), String(), path, storageFolder.name());
             for(const String& path: folder.list(Files|Sorted)) {
                 string key = section(path,'.',0,1), metadata=section(path,'.',1,-1);
                 assert_(metadata == result->metadata);
@@ -315,7 +315,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
-                    if(File(path, storageFolder).size() < 64*1024) continue; // Keeps small result files
+                    if(File(path, storageFolder).size() < 64*1024) continue; // Small files won't release much capacity
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
@@ -342,7 +342,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
             file.resize(outputSize);
             if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
         }
-        outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder);
+        outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }
     assert_(outputs);
 
