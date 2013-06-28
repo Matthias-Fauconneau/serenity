@@ -8,7 +8,7 @@ class(REV, Tool) {
         Volume input = toVolume(results.getResult("connected"_, arguments));
         int margin = max(max(input.margin.x, input.margin.y), input.margin.z), size=min(min(input.sampleCount.x, input.sampleCount.y), input.sampleCount.z);
         map<String, buffer<byte>> PSD_R, PSD_octant;
-        NonUniformSample relativeDeviations;
+        NonUniformSample relativeDeviations[3];
         const real ratio = (real)(margin+2)/(margin+1);
         for(double r=margin+1; round(r)<(size-margin)/4; r*=ratio) {
             int radius = int(round(r));
@@ -23,21 +23,32 @@ class(REV, Tool) {
                 nonUniformSamples << parseNonUniformSample( result->data );
             }
             array<UniformSample> samples = resample(nonUniformSamples);
-            UniformSample mean = ::mean(samples);
+            UniformHistogram mean = ::mean(samples);
             if(radius==52) PSD_octant.insert(String("mean"_), "#Pore size distribution versus octants (R=50)\n"_+toASCII(mean));
-            /// Computes deviation of a sample of distributions
-            real sumOfSquareDifferences = 0; for(const UniformSample& sample: samples) sumOfSquareDifferences += sum(sq(sample-mean));
-            real unbiasedVarianceEstimator = sumOfSquareDifferences / (samples.size-1);  //assuming samples are uncorrelated
-            real relativeDeviation = sqrt(unbiasedVarianceEstimator) / mean.sum();
-            log(radius, ftoa(relativeDeviation,2,0,true));
-            relativeDeviations.insert(radius, relativeDeviation);
+            uint median = mean.median();
+            log(radius, median, size);
+            for(uint i: range(3)) { /// Computes deviation of a sample of distributions
+                uint begin = (uint[]){0,0,median}[i], end = (uint[]){(uint)mean.size,median,(uint)mean.size}[i]; // 0-size, 0-median, median-size
+                assert_(begin<end);
+                array<UniformSample> slices = apply(samples, [&](const UniformSample& sample){ return UniformSample(sample.slice(begin,end-begin)); } );
+                UniformSample mean = ::mean(slices);
+                real sumOfSquareDifferences = 0; for(const UniformSample& slice: slices) sumOfSquareDifferences += sum(sq(slice-mean));
+                real unbiasedVarianceEstimator = sumOfSquareDifferences / (slices.size-1);  //assuming samples are uncorrelated
+                real relativeDeviation = sqrt(unbiasedVarianceEstimator) / mean.sum();
+                relativeDeviations[i].insert(radius, relativeDeviation);
+            }
             PSD_R.insert("R="_+dec(radius,3), ("#Pore size distribution versus cylinder radius (mean of 8 volume samples)\n"_ + toASCII((1/mean.sum())*mean)));
         }
+        //TODO: scale R vx -> μm
         assert_(outputs[0]->name == "ε(R)"_);
         outputs[0]->metadata = String("ε(R).tsv"_);
-        outputs[0]->data = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_ + toASCII(relativeDeviations);
-        //TODO: ε(R|r<median)
-        //TODO: ε(R|r>median)
+        outputs[0]->data = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_ + toASCII(relativeDeviations[0]);
+        assert_(outputs[1]->name == "ε(R|r<median)"_);
+        outputs[1]->metadata = String("ε(R).tsv"_);
+        outputs[1]->data = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_ + toASCII(relativeDeviations[1]);
+        assert_(outputs[2]->name == "ε(R|r>median)"_);
+        outputs[2]->metadata = String("ε(R).tsv"_);
+        outputs[2]->data = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_ + toASCII(relativeDeviations[2]);
         assert_(outputs[3]->name == "PSD(R)"_);
         outputs[3]->metadata = String("V(r).tsv"_);
         outputs[3]->elements = move(PSD_R);

@@ -56,7 +56,6 @@ inline UniformSample operator-(const UniformSample& A, const UniformSample& B) {
 UniformSample parseUniformSample(const string& file);
 /// Converts a uniformly sampled distribution to tab-separated values
 String toASCII(const UniformSample& A);
-UniformSample slice(const UniformSample& sample, real sliceBegin, real sliceEnd);
 
 // UniformSample[]
 /// Estimates mean distribution from distribution samples
@@ -74,6 +73,8 @@ struct UniformHistogram : UniformSample {
     real mean() const { return sum()/sampleCount(); }
     /// Returns the variance of the samples represented by the histogram
     real variance() const;
+    /// Returns the median of the samples represented by the histogram
+    uint median() const;
 };
 
 // NonUniformSample

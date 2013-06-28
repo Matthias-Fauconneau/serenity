@@ -53,11 +53,11 @@ void blit(int2 target, const Image& source, int2 size) {
     bilinear(region, source);
 }
 
-inline void plot(int x, int y, float c, bool transpose, int4 invert) {
+inline void plot(int x, int y, float alpha, bool transpose, int4 color) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
         byte4& d = framebuffer(x,y);
-        d=byte4(max<int>(0,d.b-c*invert.b),max<int>(0,d.g-c*invert.g),max<int>(0,d.r-c*invert.r),0xFF/*min<int>(0xFF,d.a+c*invert.a)*/);
+        d=byte4((1-alpha)*d.b+alpha*color.b,(1-alpha)*d.g+alpha*color.g,(1-alpha)*d.r+alpha*color.r,0xFF);
     }
 }
 
@@ -66,7 +66,7 @@ inline float rfpart(float x) { return 1 - fpart(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
     float x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
     assert_(vec4(0) <= color && color <= vec4(1));
-    int4 invert = int4(0xFF*(1-color.z),0xFF*(1-color.y),0xFF*(1-color.x),0xFF*color.w);
+    int4 color8 = int4(0xFF*color.z,0xFF*color.y,0xFF*color.x,0xFF*color.w);
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
     if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
@@ -76,21 +76,21 @@ void line(vec2 p1, vec2 p2, vec4 color) {
     {
         float xend = round(x1), yend = y1 + gradient * (xend - x1);
         float xgap = rfpart(x1 + 0.5);
-        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, invert);
-        plot(int(xend), int(yend)+1, fpart(yend) * xgap, transpose, invert);
+        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, color8);
+        plot(int(xend), int(yend)+1, fpart(yend) * xgap, transpose, color8);
         i1 = int(xend);
         intery = yend + gradient;
     }
     {
         float xend = round(x2), yend = y2 + gradient * (xend - x2);
         float xgap = fpart(x2 + 0.5);
-        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, invert);
-        plot(int(xend), int(yend) + 1, fpart(yend) * xgap, transpose, invert);
+        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, color8);
+        plot(int(xend), int(yend) + 1, fpart(yend) * xgap, transpose, color8);
         i2 = int(xend);
     }
     for(int x=i1+1;x<i2;x++) {
-        plot(x, int(intery), rfpart(intery), transpose, invert);
-        plot(x, int(intery)+1, fpart(intery), transpose, invert);
+        plot(x, int(intery), rfpart(intery), transpose, color8);
+        plot(x, int(intery)+1, fpart(intery), transpose, color8);
         intery += gradient;
     }
 }

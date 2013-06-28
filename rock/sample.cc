@@ -37,11 +37,6 @@ String toASCII(const UniformSample& A) {
     for(uint i=0; i<A.size; i++) s << ftoa(A.scale*i,4,0,true) << '\t' << ftoa(A[i],4,0,true) << '\n';
     return s;
 }
-/// Returns a slice (by reference) a range of values from a uniformly sampled distribution (discards original variable)
-UniformSample slice(const UniformSample& sample, real sliceBegin, real sliceEnd) {
-    int begin = round(sliceBegin*sample.size), end = round(sliceEnd*sample.size);
-    return UniformSample(sample.slice(begin,end-begin));
-}
 
 // UniformSample[]
 /// Estimates mean distribution from distribution samples
@@ -60,7 +55,7 @@ UniformSample mean(const ref<UniformSample>& samples) {
 // UniformHistogram
 real UniformHistogram::sum() const { real sum=0; for(uint i: range(size)) sum += i*at(i); return sum; }
 real UniformHistogram::variance() const { real sampleMean=mean(), ssd=0; for(uint i: range(size)) ssd += at(i)*sq(i-sampleMean); return ssd/(sampleCount()-1); }
-
+uint UniformHistogram::median() const { uint N=sampleCount(), n=0; for(uint i: range(size)) { n+=at(i); if(n>N/2) return i; } return size; }
 // NonUniformSample
 real NonUniformSample::sum() const { real sum=0; for(uint i: range(values.size)) sum += values[i]; return sum; }
 real NonUniformSample::delta() const {

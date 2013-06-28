@@ -23,7 +23,7 @@ struct Plot : Widget {
         int tickCount[2]={};
         for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
             real subExponent = log10(max[axis]) - floor(log10(max[axis]));
-            for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.5,6}, {1.6,8}, {2,10}, {2.5,5}, {5,5}, {6,6}, {10,5}})
+            for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.5,6}, {1.6,8}, {2,10}, {2.5,5}, {5,5}, {6,6}, {8,8}, {10,5}})
                 if(log10(a[0]) >= subExponent) { max[axis] = a[0]*exp10(floor(log10(max[axis]))); tickCount[axis] = a[1]; break; }
         }
 
