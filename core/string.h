@@ -60,10 +60,12 @@ String replace(const string& s, const string& before, const string& after);
 String toLower(const string& s);
 /// Removes duplicate whitespace
 String simplify(String&& s);
-/// Repeats a String
+/// Repeats a string
 String repeat(const string& s, uint times);
+/// Pads a string
+String pad(const string& s, uint length, const string& pad=" "_);
 
-/// Forwards String
+/// Forwards string
 inline const String& str(const String& s) { return s; }
 
 struct stringz : String { operator const char*(){ return data; }};
@@ -76,7 +78,6 @@ array<string> split(const string& str, byte separator=' ');
 /// Converts integers
 template<uint base=10> String utoa(uint64 number, int pad=0);
 template<uint base=10> String itoa(int64 number, int pad=0);
-inline String bin(uint64 n, int pad=0) { return utoa<2>(n,pad); }
 inline String dec(int64 n, int pad=0) { return itoa<10>(n,pad); }
 inline String str(const uint8& n) { return dec(n); }
 inline String str(const int8& n) { return dec(n); }

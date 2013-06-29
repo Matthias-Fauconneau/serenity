@@ -160,8 +160,9 @@ const Dict& Process::relevantArguments(const string& target, const Dict& argumen
         /*else*/ continue;
 match:
         assert_(parameters.contains(parameter), "Irrelevant parameter", scope+"."_+parameter, "for"_, rule);
-        if(args.contains(parameter)) args.remove(parameter);
-        args.insert(copy(arg.key), copy(arg.value));
+        //if(args.contains(parameter)) args.remove(parameter);
+        if(args.contains(arg.key)) assert_(args.at(arg.key)==arg.value);
+        else args.insert(copy(arg.key), copy(arg.value));
     }
     cache << unique<Evaluation>(String(target), copy(arguments), move(args));
     return cache.last()->output;
@@ -175,7 +176,8 @@ Dict Process::localArguments(const string& target, const Dict& arguments) {
     for(auto arg: rule.arguments) { // Appends local arguments
         assert_(parameters.contains(arg.key),target,arg.key);
         if(args.contains(arg.key)) args.remove(arg.key); // Local arguments overrides scope arguments
-        if(arguments.contains(arg.value)) args.insert(copy(arg.key), copy(arguments.at(arg.value))); // Argument value
+        TextData s(arg.value); string scope=s.until('.');
+        if(&ruleForOutput(scope, arguments)) { if(arguments.contains(arg.value)) args.insert(copy(arg.key), copy(arguments.at(arg.value))); } // Argument value
         else args.insert(copy(arg.key), copy(arg.value)); // Argument literal
     }
     for(auto arg: arguments) { // Appends matching scoped arguments
@@ -359,6 +361,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
             assert_(!result->maps && !result->data);
             assert_(result->elements.size() > 1);
             Folder folder(result->fileName, result->folder, true);
+            for(string file: folder.list(Files)) remove(file,folder);
             for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
             touchFile(result->fileName, result->folder, true);
         } else { // Synchronizes file mappings with results

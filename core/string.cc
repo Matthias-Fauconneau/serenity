@@ -169,6 +169,8 @@ String repeat(const string& s, uint times) {
     String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
 }
 
+String pad(const string& s, uint length, const string& pad) { return repeat(pad, max(0ul,length-s.size/pad.size))+s; }
+
 stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
 
 /// array<string>
@@ -201,7 +203,6 @@ template<uint base> String utoa(uint64 n, int pad) {
     while(64-i<pad) buf[--i] = '0';
     return String(string(buf+i,64-i));
 }
-template String utoa<2>(uint64,int);
 template String utoa<16>(uint64,int);
 
 template<uint base> String itoa(int64 number, int pad) {

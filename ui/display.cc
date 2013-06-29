@@ -57,7 +57,7 @@ inline void plot(int x, int y, float alpha, bool transpose, int4 color) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
         byte4& d = framebuffer(x,y);
-        d=byte4((1-alpha)*d.b+alpha*color.b,(1-alpha)*d.g+alpha*color.g,(1-alpha)*d.r+alpha*color.r,0xFF);
+        d=byte4(round((1-alpha)*d.b+alpha*color.b),round((1-alpha)*d.g+alpha*color.g),round((1-alpha)*d.r+alpha*color.r),0xFF);
     }
 }
 

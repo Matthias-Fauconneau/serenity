@@ -65,7 +65,6 @@ struct Rock : virtual PersistentProcess {
                     Folder folder(fileName, Folder(path, cwd), true);
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
                 } else {
-                    assert_(result->data, fileName, result->elements);
                     String data = unsafeReference(result->data);
                     if(existsFolder(path, cwd)) {
                         Time time;

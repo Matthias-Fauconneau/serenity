@@ -38,7 +38,8 @@ struct Plot : Widget {
                 tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
             }
         }
-        int margin = ::max(tickLabelSize.x, tickLabelSize.y), left=margin, right=margin, top=margin, bottom=margin;
+        int margin = ::max(tickLabelSize.x, tickLabelSize.y), left=margin, top=margin, bottom=margin;
+        int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
 
         {Text text(format(Bold)+title); text.render(position+int2((size.x-text.sizeHint().x)/2,top));} // Title
         // Legend
@@ -90,6 +91,7 @@ struct Plot : Widget {
 
 class(PlotView, View), Widget {
     String title;
+    Text text;
     array<Plot> plots;
 
     PlotView() {
@@ -107,6 +109,7 @@ class(PlotView, View), Widget {
     }
 
     bool view(string metadata, string name, const buffer<byte>& data) {
+        if(endsWith(metadata,"text"_)) { assert_(!text.text); text.setText(data); return true; }
         if(!endsWith(metadata,"tsv"_)) return false;
         string x,y; { TextData s(metadata); y = s.until('('); x = s.until(')'); }
         string legend = name; string title=legend; { TextData s(data); if(s.match('#')) title=s.until('\n'); }
@@ -126,12 +129,14 @@ class(PlotView, View), Widget {
     }
 
     void render(int2 position, int2 size) override {
-        const uint w = 1, h = plots.size;
-        for(uint i : range(plots.size)) {
-            int2 plotSize = int2(size.x/w,size.y/h);
-            int2 plotPosition = position+int2(i%w,i/w)*plotSize;
-            plots[i].render(plotPosition, plotSize);
-        }
+        array<Widget*> widgets;
+        if(text.text) widgets << &text;
+        for(Plot& plot: plots) widgets << &plot;
+
+        uint w=0,h=0; while(w*h<widgets.size) if(w<=h) w++; else h++;
+        int2 elementSize = int2(size.x/w,size.y/h); text.wrap = min(elementSize.x,600); text.textSize=0;
+        int2 margin = (size - int2(w,h)*elementSize) / 2;
+        for(uint i : range(widgets.size)) widgets[i]->render(position+margin+int2(i%w,i/w)*elementSize, elementSize);
     }
 
     Window window {this,int2(1920/2,1080/2),"PlotView"_};

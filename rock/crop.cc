@@ -2,6 +2,8 @@
 #include "volume-operation.h"
 #include "sample.h"
 
+String str(const CropVolume& crop) { return "("_+str(crop.min, crop.max)+")"_; }
+
 /// Parses volume to crop from user arguments
 CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string box, int3 minimalMargin) {
     int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
@@ -35,16 +37,18 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
     if((max.z-min.z)%2) { if(max.z%2) max.z--; else assert(min.z%2), min.z++; }
     int3 size = max-min;
     // Asserts valid volume
-    assert_(min>=sourceMin && min<max && max<=sourceMax, sourceMin, min, max, sourceMax);
+    assert_(min>=sourceMin && min<max && max<=sourceMax, sourceMin, min, max, sourceMax, args);
     assert_( size.x%2 == 0 && size.y%2 == 0 && size.z%2 == 0); // Margins are currently always symmetric (i.e even volume size)
     if(cylinder) assert_(size.x == size.y);
     // Align sampleCount for correct tiled indexing
     int3 sampleCount = int3(nextPowerOfTwo(size.x), nextPowerOfTwo(size.y), nextPowerOfTwo(size.z));
     int3 margin = ::max(minimalMargin, (sampleCount - size)/2);
     sampleCount = int3(nextPowerOfTwo(size.x+2*margin.x), nextPowerOfTwo(size.y+2*margin.y), nextPowerOfTwo(size.z+2*margin.z));
-    while(sampleCount.z < ::min(sampleCount.x, sampleCount.y)/2) sampleCount.z*=2;
-    while(sampleCount.y <= ::min(sampleCount.z, sampleCount.x)/2) sampleCount.y*=2;
-    while(sampleCount.x <= ::min(sampleCount.y, sampleCount.z)/2) sampleCount.x*=2;
+    while(sampleCount.y < sampleCount.z   ) sampleCount.y*=2; // Z-order: [Z Y] X z y x
+    while(sampleCount.x < sampleCount.y   ) sampleCount.x*=2; // Z-order: Z [Y X] z y x
+    while(sampleCount.z < sampleCount.x   ) sampleCount.z*=2; // Z-order: Z Y [X z] y x
+    while(sampleCount.y < sampleCount.z/2) sampleCount.y*=2; // Z-order: Z Y X [z y] x
+    while(sampleCount.x < sampleCount.y/2) sampleCount.x*=2; // Z-order: Z Y X z [y x]
     margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
     assert_( margin >= minimalMargin );
@@ -55,7 +59,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
 void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     assert_(source.tiled() && target.tiled());
     target.sampleCount = crop.sampleCount;
-    assert_(crop.min>=source.margin && crop.max<=source.sampleCount-source.margin, crop.min, crop.max, source.margin, source.sampleCount);
+    assert_(crop.min>=source.margin && crop.max<=source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     target.margin = crop.margin;
     assert_(target.data.size >= target.size()*target.sampleSize);
     target.data.size = target.size()*target.sampleSize;
@@ -90,9 +94,9 @@ class(Crop,Operation), virtual VolumePass<uint16> {
             if(args.contains("inputCylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
             if(args.contains("inputBox"_)) inputArgs.insert(String("box"_), copy(args.at("inputBox"_)));
             if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
-            CropVolume inputCrop = parseCrop(inputArgs, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Unsafe (no bound checking)
-            CropVolume globalCrop = parseCrop(args, int3(0,0,0), int3(1<<16,1<<16,1<<16), ""_, 1); // Unsafe (no bound checking)
-            CropVolume localCrop = {globalCrop.min-inputCrop.min, globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
+            CropVolume inputCrop = parseCrop(inputArgs, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Already bound checked
+            CropVolume globalCrop = parseCrop(args, inputCrop.min, inputCrop.max, ""_, /*inputCrop.margin*/1); // Margins will be wrong
+            CropVolume localCrop = {inputCrop.margin+globalCrop.min-inputCrop.min, inputCrop.margin+globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
             crop(target, source, localCrop);
         }
     }

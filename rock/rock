@@ -42,7 +42,7 @@ colorize = Colorize pore resampled # For visualization
 # Computes squared distance to / position of nearest background voxel
 distancex positionxx = DistanceX pore
 distancey positionyx positionyy = DistanceY distancex positionxx
-distance positionx positiony positionz = DistanceZ distancey positionyx positionyy
+positionx positiony positionz = DistanceZ distancey positionyx positionyy
 
 # Computes skeleton (medial axis)
 skeleton = Skeleton positionx positiony positionz
@@ -52,38 +52,32 @@ skeleton-tiled = ZOrder skeleton
 sphere-bins = Bin skeleton-tiled
 maximum = Rasterize sphere-bins
 
-# Computes crop volume (including rock) before minimalRadius, transpose or floodfill dependency
-if crop.cylinder: crop-maximum = Crop maximum inputCylinder=source.cylinder inputBox=source.box inputDownsample=source.downsample
-if !crop.cylinder: crop-maximum = maximum
-histogram-crop = Histogram crop-maximum cylinder=source.cylinder # including rock
-volume-crop = Sum histogram-crop
-volume-total = volume-crop # for backward compatibility [deprecated]
+# Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
+if crop.cylinder: crop = Crop maximum inputCylinder=source.cylinder inputBox=source.box inputDownsample=source.downsample
+if !crop.cylinder: crop = maximum
 
 # Discards small pores
-if minimalSqRadius: pruned = ThresholdClip maximum minimalSqRadius
-if !minimalSqRadius: pruned = maximum
-
-# Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-if crop.cylinder: crop = Crop pruned source.crop
-if !crop.cylinder: crop = pruned
+if minimalSqRadius: pruned = ThresholdClip crop minimalSqRadius
+if !minimalSqRadius: pruned = crop
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
-transpose = Transpose crop
+transpose = Transpose pruned
 if transpose=='X': transposed = transpose
 if transpose=='Y': transposed = Transpose transpose
-if transpose=='Z': transposed = crop
-if !transpose: transposed = crop
+if transpose=='Z': transposed = pruned
+if !transpose: transposed = pruned
 
 floodfill = '1'
 if !floodfill: connected = transposed # Forwards unconnected pore space
 if floodfill: connected = FloodFill transposed # Flood fills pore space
 
 # Computes histogram of maximum squared radii
-histogram-squaredRadius = Histogram connected cylinder=source.cylinder clip=1 # Not including rock
-# Computes pore space volume
+histogram = Histogram connected cylinder=source.cylinder # Including rock
+histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
+# Computes pore space, total, relative volumes
 volume = Sum histogram-squaredRadius
-# Computes porosity (= pore space volume / total volume )
-porosity = Div volume volume-crop
+volume-total = Sum histogram-crop
+porosity = Div volume volume-crop # Computes porosity (= pore space volume / total volume )
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius
 # Normalize histogram
@@ -120,5 +114,5 @@ distribution-radius = Div volume-distribution-radius volume-crop
   bmp-denoised-connected = ToBMP denoised-connected
 
 # Tools
-ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant) = REV
+ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:50) REV = REV
 unconnected(λ) connected(λ) = Prune

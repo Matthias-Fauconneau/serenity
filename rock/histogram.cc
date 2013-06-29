@@ -34,14 +34,12 @@ UniformHistogram histogram(const Volume16& source, CropVolume crop) {
 
 /// Computes histogram using uniform integer bins
 class(Histogram, Operation) {
-    virtual string parameters() const { return "crop cylinder clip"_; }
+    virtual string parameters() const { return "crop cylinder"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         UniformHistogram histogram = ::histogram(source, parseCrop(args.contains("crop"_)?args:(const Dict&)Dict(), source.margin, source.sampleCount-source.margin, ""_, 1));
-        uint clip = args.value("clip"_,0);
-        for(uint i: range(clip)) histogram[i] = 0; // Zeroes values until clip (discards background)
         outputs[0]->metadata = String("histogram.tsv"_);
-        outputs[0]->data = clip == histogram.size ? String() : toASCII(histogram);
+        outputs[0]->data = toASCII(histogram);
     }
 };
 

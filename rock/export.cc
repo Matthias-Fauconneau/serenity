@@ -28,11 +28,11 @@ class(ScaleValues, Operation), virtual VolumeOperation {
     }
 };
 
-/// Sets masked voxels to masked value
+/// Sets masked voxels where source is under masked value to masked value
 void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 maskedValue) {
     assert_(source.size()==mask.size() && target.size() == source.size());
     for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
-        target(x,y,z) = mask(x,y,z) ? source(x,y,z) : maskedValue;
+        target(x,y,z) = mask(x,y,z) || source(x,y,z)>maskedValue ? source(x,y,z) : maskedValue;
 }
 class(Mask, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }

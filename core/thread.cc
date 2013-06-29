@@ -139,7 +139,6 @@ void __attribute((constructor(102))) setup_signals() {
 }
 
 template<> void __attribute((noreturn)) error(const string& message) {
-    log(message);
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;

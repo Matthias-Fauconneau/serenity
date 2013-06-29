@@ -2,6 +2,15 @@
 #include "sample.h"
 #include "operation.h"
 
+/// Slices sample
+class(Slice, Operation), virtual Pass {
+    virtual string parameters() const { return "begin"_; }
+    virtual void execute(const Dict& args, Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        target.data = toASCII(UniformSample(parseUniformSample(source.data).slice(toInteger(args.at("begin"_)))));
+    }
+};
+
 class(Sum, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = String("scalar"_);
