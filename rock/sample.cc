@@ -1,6 +1,7 @@
 /// \file sample.cc Methods for (non-)uniformly sampled distribution
 #include "sample.h"
 #include "data.h"
+#include "vector.h"
 
 // Scalar
 real parseScalar(const string& data) { return TextData(data).decimal(); }
@@ -81,6 +82,23 @@ real NonUniformSample::interpolate(real x) const {
     return value;
 }
 NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
+NonUniformSample abs(const NonUniformSample& A) { return NonUniformSample(A.keys, abs((const Vector&)A.values)); }
+NonUniformSample differentiate(const NonUniformSample& A) {
+    NonUniformSample R;
+    for(uint i: range(1,A.keys.size-1)) {
+        assert_(A.keys[i+1] != A.keys[i-1]);
+        R.insert(A.keys[i], (A.values[i+1]-A.values[i-1])/(A.keys[i+1]-A.keys[i-1]));
+    }
+    return R;
+}
+NonUniformSample laplacian(const NonUniformSample& A) {
+    NonUniformSample R;
+    for(uint i: range(1,A.keys.size-1)) {
+        assert_(A.keys[i+1] != A.keys[i-1]);
+        R.insert(A.keys[i], (A.values[i-1]-A.values[i])/(A.keys[i-1]-A.keys[i]) + (A.values[i+1]-A.values[i])/(A.keys[i+1]-A.keys[i]));
+    }
+    return R;
+}
 
 array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
     real delta = __DBL_MAX__, maximum=0;

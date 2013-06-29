@@ -18,13 +18,13 @@ struct Plot : Widget {
             min=::min(min,p);
             max=::max(max,p);
         }
-        if(!logx) min.x = 0;
-        if(!logy) min.y = 0;
+        if(!logx && min.x>0) min.x = 0;
+        if(min.y<0) { assert(!logy); min.y=-(max.y=::max(-min.y,max.y)); } else if(!logy) min.y = 0;
 
         int tickCount[2]={};
         for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
             real subExponent = log10(max[axis]) - floor(log10(max[axis]));
-            for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.5,6}, {1.6,8}, {2,10}, {2.5,5}, {5,5}, {6,6}, {8,8}, {10,5}})
+            for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.5,6}, {1.6,8}, {2,10}, {2.5,5}, {5,5}, {6,6}, {8,8}, {10,5}})
                 if(log10(a[0]) >= subExponent) { max[axis] = a[0]*exp10(floor(log10(max[axis]))); tickCount[axis] = a[1]; break; }
         }
 
@@ -33,7 +33,7 @@ struct Plot : Widget {
         for(uint axis: range(2)) {
             int precision = ::max(0., ceil(-log10(max[axis]/tickCount[axis])));
             for(uint i: range(tickCount[axis]+1)) {
-                String label = ftoa(max[axis]*i/tickCount[axis], precision);
+                String label = ftoa(min[axis]+(max[axis]-min[axis])*i/tickCount[axis], precision);
                 assert_(label);
                 ticks[axis] << Text(label);
                 tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
@@ -58,20 +58,20 @@ struct Plot : Widget {
         };
 
         // Draws axis and ticks
-        {vec2 end = vec2(max.x, min.y); // X
-            line(point(min), point(end));
+        {vec2 O=vec2(min.x, 0), end = vec2(max.x, 0); // X
+            line(point(O), point(end));
             for(uint i: range(tickCount[0]+1)) {
-                int2 p (point(min+(i/float(tickCount[0]))*(end-min)));
+                int2 p (point(O+(i/float(tickCount[0]))*(end-O)));
                 line(p, p+int2(0,-4));
                 Text& tick = ticks[0][i];
                 tick.render(p + int2(-tick.textSize.x/2, 0) );
             }
             {Text text(format(Bold)+xlabel); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
         }
-        {vec2 end = vec2(min.x, max.y); // Y (FIXME: factor)
-            line(point(min), point(end));
+        {vec2 O=vec2(0, min.y), end = vec2(0, max.y); // Y (FIXME: factor)
+            line(point(O), point(end));
             for(uint i: range(tickCount[1]+1)) {
-                int2 p (point(min+(i/float(tickCount[1]))*(end-min)));
+                int2 p (point(O+(i/float(tickCount[1]))*(end-O)));
                 line(p, p+int2(4,0));
                 Text& tick = ticks[1][i];
                 tick.render(p + int2(-tick.textSize.x, -tick.textSize.y/2) );

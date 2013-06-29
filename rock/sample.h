@@ -91,6 +91,12 @@ struct NonUniformSample : map<real, real> {
 };
 /// Multiplies sample by a scalar
 NonUniformSample operator*(real scalar, NonUniformSample&& A);
+/// Computes absolute values
+NonUniformSample abs(const NonUniformSample& A);
+/// Differentiates using finite differences
+NonUniformSample differentiate(const NonUniformSample& A);
+/// Applies discrete laplace operator (2nd order derivative)
+NonUniformSample laplacian(const NonUniformSample& A);
 /// Parses a non-uniformly sampled distribution from tab-separated values
 NonUniformSample parseNonUniformSample(const string& file);
 /// Converts a non-uniformly sampled distribution to tab-separated values
