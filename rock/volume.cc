@@ -101,24 +101,23 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma) {
     assert_(source.maximum);
     int X=source.sampleCount.x, Y=source.sampleCount.y;
     int marginX=source.margin.x, marginY=source.margin.y;
-    Image target(X,Y);
+    Image target(X-2*marginX,Y-2*marginY);
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;
     if(!normalize && maximum==0xFFFF) { normalizeFactor=0xFF00; warn("16bit volume truncated to 8bit image slices"); }
     assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit");
-    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) {
-        if(x<marginX || y<marginY || x>=X-marginX || y>=Y-marginY) { target(x,y) = byte4(0,0,0,0); continue; }
+    for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
         uint value = 0;
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-        else if(source.sampleSize==3) { target(x,y) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
+        else if(source.sampleSize==3) { target(x-marginX,y-marginY) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
         else error("source.sampleSize"_,source.sampleSize);
         uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
         extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
         uint sRGB8 = gamma ? sRGB_lookup[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values
-        target(x,y) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
+        target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
 }

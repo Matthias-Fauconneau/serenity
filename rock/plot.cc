@@ -7,8 +7,8 @@
 #include "png.h"
 
 struct Plot : Widget {
-    Plot(const string& title, const string& xlabel, const string& ylabel, const string& legend, NonUniformSample&& data)
-        : title(String(title)), xlabel(String(xlabel)),ylabel(String(ylabel)) { legends<<String(legend); dataSets << move(data); }
+    Plot(const string& title, const string& xlabel, const string& ylabel, bool logx, bool logy, const string& legend, NonUniformSample&& data)
+        : title(String(title)), xlabel(String(xlabel)),ylabel(String(ylabel)),logx(logx),logy(logy) { legends<<String(legend); dataSets << move(data); }
 
     void render(int2 position, int2 size) override {
         // Computes axis scales
@@ -18,7 +18,8 @@ struct Plot : Widget {
             min=::min(min,p);
             max=::max(max,p);
         }
-        min = 0;
+        if(!logx) min.x = 0;
+        if(!logy) min.y = 0;
 
         int tickCount[2]={};
         for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
@@ -49,7 +50,12 @@ struct Plot : Widget {
         }
 
         // Transforms data positions to render positions
-        auto point = [&](vec2 p)->vec2{ p = (p-min)/(max-min); return vec2(position.x+left+p.x*(size.x-left-right),position.y+top+(1-p.y)*(size.y-top-bottom)); };
+        auto point = [&](vec2 p)->vec2{
+            p = (p-min)/(max-min);
+            if(logx) p.x = ln(1+(e-1)*p.x);
+            if(logy) p.y = ln(1+(e-1)*p.y);
+            return vec2(position.x+left+p.x*(size.x-left-right),position.y+top+(1-p.y)*(size.y-top-bottom));
+        };
 
         // Draws axis and ticks
         {vec2 end = vec2(max.x, min.y); // X
@@ -85,6 +91,7 @@ struct Plot : Widget {
     }
 
     String title, xlabel, ylabel;
+    bool logx, logy;
     array<String> legends;
     array<NonUniformSample> dataSets;
 };
@@ -112,16 +119,17 @@ class(PlotView, View), Widget {
         if(endsWith(metadata,"text"_)) { assert_(!text.text); text.setText(data); return true; }
         if(!endsWith(metadata,"tsv"_)) return false;
         string x,y; { TextData s(metadata); y = s.until('('); x = s.until(')'); }
-        string legend = name; string title=legend; { TextData s(data); if(s.match('#')) title=s.until('\n'); }
+        string legend = name; string title=legend; bool logx=false,logy=false;
+        {TextData s(data); if(s.match('#')) title=s.until('\n'); if(s.match("#logx\n"_)) logx=true; if(s.match("#logy\n"_)) logy=true; }
         auto sample = parseNonUniformSample(data);
         for(Plot& plot: plots) { // Tries to merge with an existing plot
             if(plot.title==title) {
-                assert_(plot.xlabel == x && plot.ylabel == y);
+                assert_(plot.xlabel == x && plot.ylabel == y && plot.logx==logx && plot.logy==logy);
                 plot.dataSets << move(sample);
                 plot.legends << String(name);
                 goto break_;
             }
-        } /*else*/ plots << Plot(title, x, y, name, move(sample)); // New plot
+        } /*else*/ plots << Plot(title, x, y, logx, logy, name, move(sample)); // New plot
         break_:;
         array<String> plotTitles; for(const Plot& plot: plots) plotTitles << copy(plot.title); this->title = join(plotTitles,", "_); window.setTitle(this->title);
         window.show();
@@ -134,10 +142,10 @@ class(PlotView, View), Widget {
         for(Plot& plot: plots) widgets << &plot;
 
         uint w=0,h=0; while(w*h<widgets.size) if(w<=h) w++; else h++;
-        int2 elementSize = int2(size.x/w,size.y/h); text.wrap = min(elementSize.x,600); text.textSize=0;
+        int2 elementSize = int2(size.x/w,size.y/h); text.wrap = min(elementSize.x,640); text.textSize=0;
         int2 margin = (size - int2(w,h)*elementSize) / 2;
         for(uint i : range(widgets.size)) widgets[i]->render(position+margin+int2(i%w,i/w)*elementSize, elementSize);
     }
 
-    Window window {this,int2(1920/2,1080/2),"PlotView"_};
+    Window window {this,int2(0,0),"PlotView"_};
 };

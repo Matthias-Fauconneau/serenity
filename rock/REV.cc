@@ -10,8 +10,8 @@ class(REV, Tool) {
         int margin = max(max(input.margin.x, input.margin.y), input.margin.z), size=min(min(input.sampleCount.x, input.sampleCount.y), input.sampleCount.z);
         map<String, buffer<byte>> PSD_R, PSD_octant;
         NonUniformSample relativeDeviations[3];
-        const real ratio = (real)(margin+2)/(margin+1);
-        for(double r=margin+1; round(r)<(size-margin)/4; r*=ratio) {
+        const real start=margin+2, ratio = (start+1)/start;
+        for(double r=start; round(r)<(size-margin)/4; r*=ratio) {
             int radius = int(round(r));
             array<NonUniformSample> nonUniformSamples;
             int3 octants[] = {int3{-1,-1,-1},int3{1,-1,-1},int3{-1,1,-1},int3{1,1,-1},int3{-1,-1,1},int3{1,-1,1},int3{-1,1,1},int3{1,1,1}};
@@ -26,11 +26,11 @@ class(REV, Tool) {
             array<UniformSample> samples = resample(nonUniformSamples);
             for(UniformSample& sample: samples) sample.scale *= resolution;
             UniformHistogram mean = ::mean(samples);
-            const int inflection = 52;
+            const int inflection = 52; //FIXME: compute
             if(radius==inflection) {
                 const String title = "#Pore size distribution versus octants (R="_+dec(resolution*inflection)+"μm)\n"_;
-                for(uint i: range(8)) PSD_octant.insert(str(octants[i]), title+toASCII(samples[i]));
-                PSD_octant.insert(String("mean"_), title+toASCII(mean));
+                for(uint i: range(8)) PSD_octant.insert(str(octants[i]), title+toASCII((1./mean.sampleCount())*samples[i]));
+                PSD_octant.insert(String("mean"_), title+toASCII((1./mean.sampleCount())*mean));
             }
             uint median = mean.median();
             for(uint i: range(3)) { /// Computes deviation of a sample of distributions
@@ -47,7 +47,7 @@ class(REV, Tool) {
         }
         assert_(outputs[0]->name == "ε(R)"_);
         outputs[0]->metadata = String("ε(R [μm]).tsv"_);
-        const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_;
+        const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_; //#logx\n#logy\n
         outputs[0]->data = title + toASCII(relativeDeviations[0]);
         assert_(outputs[1]->name == "ε(R|r<median)"_);
         outputs[1]->metadata = String("ε(R [μm]).tsv"_);
@@ -71,16 +71,16 @@ The unbiased sample variance estimator is defined as the sum of squared differen
 Relative standard error is the deviation divided by the mean.
 The squared difference between two distributions is the integral of the squared difference of their values
 The deviation is also computed separately for small and big pores in order to compare their convergence rate.
-Small pores converges with smaller volumes while correctly estimating the distribution of large pores requires bigger volumes.
+1) Small pores converges with smaller volumes while correctly estimating the distribution of large pores requires bigger volumes.
+2) The mean pore size distribution estimation smoothes as it converges.
+3) At the inflection point (R=405μm), all pore size distributions are similar to each other.
 
 for each cylinder radius : R
  pore size distribution of each 8 samples : PSD[i]
  Mean distribution : μ = Σ[i] PSD[i] / 8
- Sum of squared differences = Σ[octants] Σ[radius] ( PSD(radius) - μ(radius) )²
+ Sum of squared differences : SSD = Σ[octants] Σ[radius] ( PSD(radius) - μ(radius) )²
  Unbiased variance estimator: σ² = SSD / (sample count - 1)
  Relative deviation: ε = σ / |μ|
-
-
-          )"_);
+                               )"_);
     }
 };

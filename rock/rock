@@ -76,16 +76,16 @@ histogram = Histogram connected cylinder=source.cylinder # Including rock
 histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
 # Computes pore space, total, relative volumes
 volume = Sum histogram-squaredRadius
-volume-total = Sum histogram-crop
-porosity = Div volume volume-crop # Computes porosity (= pore space volume / total volume )
+volume-total = Sum histogram
+porosity = Div volume volume-total # Computes porosity (= pore space volume / total volume )
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius
 # Normalize histogram
-histogram-radius-normalized = Div histogram-radius volume-crop
+histogram-radius-normalized = Div histogram-radius volume-total
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=0.5
 # Normalizes probability density on total volume (including background (i.e not the same as probability density normalization))
-distribution-radius = Div volume-distribution-radius volume-crop
+distribution-radius = Div volume-distribution-radius volume-total
 # Scales radius (e.g to original pixel or physical resolution)
  volume-distribution-radius-scaled = ScaleDistribution volume-distribution-radius process-resolution
  histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution

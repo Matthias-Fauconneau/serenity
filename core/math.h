@@ -19,6 +19,7 @@ inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline real sqrt(real f) { return __builtin_sqrt(f); }
 inline real pow(real x, real y) { return __builtin_pow(x,y); }
 
+const real e = 2.71828;
 const real expUnderflow = -7.45133219101941108420e+02;
 const real expOverflow = 7.09782712893383973096e+02;
 inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }

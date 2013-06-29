@@ -62,7 +62,7 @@ struct Rock : virtual PersistentProcess {
                 const shared<Result>& result = targetResults[index];
                 String fileName = result->name+"."_+result->metadata;
                 if(result->elements) {
-                    Folder folder(fileName, Folder(path, cwd), true);
+                    Folder folder(path, cwd, true);
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
                 } else {
                     String data = unsafeReference(result->data);
