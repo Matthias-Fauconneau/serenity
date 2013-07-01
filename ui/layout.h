@@ -107,6 +107,8 @@ struct Grid : virtual Layout {
     int2 sizeHint();
     array<Rect> layout(int2 position, int2 size) override;
 };
+/// Grid of heterogenous widgets. \sa Widgets
+struct WidgetGrid : Grid, Widgets {};
 template<class T> struct UniformGrid : Grid,  Array<T> {
     UniformGrid(int width=0, int height=0, int margin=0):Grid(width,height,margin){}
 };

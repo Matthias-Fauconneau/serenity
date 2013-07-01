@@ -1,10 +1,8 @@
 # Rock process definition
 
-# Parses resolution from input folder name as "name-resolution"
-if !resolution: resolution = PhysicalResolution
-
 # Concatenates image slice files in a volume
-source = Source
+# \note Parses resolution from input folder name as "name-resolution"
+source name resolution voxelSize physicalSize = Source
 
 # Denoises
 denoise = 'median'

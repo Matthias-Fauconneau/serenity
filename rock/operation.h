@@ -15,12 +15,14 @@ struct Operation {
 };
 
 /// Convenient helper method to implement outputs
-template<Type F> bool output(const ref<Result*>& outputs, uint index, const string& metadata, F data) {
-    if(outputs.size>index) {
-        outputs[index]->metadata = String(metadata);
-        outputs[index]->data = data();
+template<Type F> bool output(const ref<Result*>& outputs, const string& name, const string& metadata, F data) {
+    for(Result* output: outputs) if(output->name == name) {
+        assert_(!output->metadata);
+        output->metadata = String(metadata);
+        assert_(!output->data);
+        output->data = data();
         return true;
-    } else assert_(index>0);
+    }
     return false;
 }
 

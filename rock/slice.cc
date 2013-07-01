@@ -5,18 +5,14 @@
 #include "window.h"
 #include "display.h"
 
-class(SliceView, View), Widget {
-    SliceView() {
-        window.localShortcut(Escape).connect([]{exit();});
-        window.clearBackground = false;
-    }
-    bool view(string metadata, string name, const buffer<byte>& data) override {
+/// Displays volume as slices
+class(SliceView, View), virtual Widget {
+    bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
         Volume volume = toVolume(metadata, data);
         if(!inRange(1u,volume.sampleSize,4u)) return false;
         names << String(name);
         volumes << move(volume);
         updateView();
-        window.show();
         return true;
     }
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {

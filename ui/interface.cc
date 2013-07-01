@@ -102,9 +102,9 @@ void TabSelection::render(int2 position, int2 size) {
     for(uint i: range(count()))  at(i).render(widgets[i]);
 }
 
-// ImageView
-int2 ImageView::sizeHint() { return image.size(); }
-void ImageView::render(int2 position, int2 size) {
+// ImageWidget
+int2 ImageWidget::sizeHint() { return image.size(); }
+void ImageWidget::render(int2 position, int2 size) {
     if(!image) return;
     int2 pos = position+(size-image.size())/2;
     blit(pos, image);

@@ -61,9 +61,9 @@ bool isASCII(const string& s) {
 bool isUTF8(const string& s) {
     for(uint i=0; i<s.size;i++) {
         /**/  if((s[i]&0b10000000)==0b00000000) {}
-        else if((s[i]&0b11100000)==0b11000000) for(uint j unused: range(1)) if(s[++i]>>6 != 0b10) return false;
-        else if((s[i]&0b11110000)==0b11100000) for(uint j unused: range(2)) if(s[++i]>>6 != 0b10) return false;
-        else if((s[i]&0b11111000)==0b11110000) for(uint j unused: range(3)) if(s[++i]>>6 != 0b10) return false;
+        else if((s[i]&0b11100000)==0b11000000) for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false;
+        else if((s[i]&0b11110000)==0b11100000) for(uint j unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false;
+        else if((s[i]&0b11111000)==0b11110000) for(uint j unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false;
         else return false;
     }
     return true;

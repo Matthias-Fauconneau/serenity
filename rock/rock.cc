@@ -3,6 +3,9 @@
 #include "time.h"
 #include "process.h"
 #include "view.h"
+#include "window.h"
+#include "interface.h"
+#include "png.h"
 
 // Includes all operators, tools and views
 //#include "source.h"
@@ -20,8 +23,9 @@
 //#include "export.h"
 //#include "slice.h"
 //#include "plot.h"
-//#include "prune.h"
 //#include "REV.h"
+//#include "prune.h"
+//include "summary.h
 
 /// Command-line interface for rock volume data processing
 struct Rock : virtual PersistentProcess {
@@ -72,6 +76,7 @@ struct Rock : virtual PersistentProcess {
                         log(path+"/"_+fileName, "["_+binaryPrefix(data.size)+"]"_, time);
                     } else {
                         Time time;
+                        assert_(!(existsFile(path, cwd) && File(path, cwd).size() >= 1<<30 && data.size <= 1<<20), "Would override large existing result, need to be removed manually", path);
                         writeFile(path, data, cwd);
                         log(fileName,"->",path, "["_+binaryPrefix(data.size)+"]"_, time);
                     }
@@ -103,24 +108,42 @@ struct Rock : virtual PersistentProcess {
         if(specialArguments.value("view"_,"0"_)!="0"_) {
             for(const shared<Result>& result: targetResults) {
                 if(result->data) view(result->metadata, result->name, result->data);
-                for(auto data: result->elements) if(!view(result->metadata, data.key, data.value)) break;
+                for(auto data: result->elements) view(result->metadata, data.key, data.value);
             }
+        }
+
+        if(viewers) {
+            title = String("Rock"_); //join(apply(targetResults,[](const shared<Result>& r){return copy(r->name);}),", "_);
+            window = unique<Window>(&grids, int2(0,0), title);
+            window->localShortcut(Escape).connect([]{exit();});
+            window->localShortcut(PrintScreen).connect([this]{
+                assert_(!framebuffer && !clipStack);
+                framebuffer = Image(1920,1080); //Image(724,1024);
+                currentClip = Rect(framebuffer.size());
+                fill(Rect(framebuffer.size()),1);
+                grids.render(0,framebuffer.size());
+                writeFile(title+".png"_, encodePNG(framebuffer), home());
+                framebuffer = Image();
+            });
+            window->backgroundColor = 1;
+
+            for(array<unique<View>>& views : viewers.values) {
+                WidgetGrid grid;
+                for(unique<View>& view: views) grid << view.pointer;
+                grids << move(grid);
+            }
+            window->show();
         }
     }
 
-    bool view(string metadata, string name, const buffer<byte>& data) {
-        if(metadata=="scalar"_) log_(str(name, "=", data));
-        else if((endsWith(metadata,"tsv"_) || endsWith(metadata,"map"_)) && count(data,'\n')<16) {
-            log_(str(name, "["_+str(count(data,'\n'))+"]"_,":\n"_+data));
-        } else {
-            for(unique<View>& view: views) if( view->view(metadata, name, data) ) goto break_; // Tries to append to existing view first
-            /*else*/ for(auto viewer: Interface<View>::factories.values) {
-                unique<View> view  = viewer->constructNewInstance();
-                if( view->view(metadata, name, data) ) { views << move(view); goto break_; }
-            } /*else*/ warn("Unknown format",metadata, name); return false;
-break_:;
+    bool view(const string& metadata, const string& name, const buffer<byte>& data) {
+        for(array<unique<View>>& views: viewers.values) for(unique<View>& view: views) if( view->view(metadata, name, data) ) return true; // Tries to append to existing view first
+        for(auto viewer: Interface<View>::factories) {
+            unique<View> view  = viewer.value->constructNewInstance();
+            if( view->view(metadata, name, data) ) { viewers[viewer.key] << move(view); return true; }
         }
-        return true;
+        warn("Unknown format",metadata, name);
+        return false;
     }
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {
@@ -130,6 +153,7 @@ break_:;
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) targetPaths << argument;
             else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
                 if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments);
+                else assert_(File(argument,cwd).size()>=1<<20);
                 arguments.insert(String("path"_), String(argument));
             }
             else if(!argument.contains('=')) targetPaths << argument;
@@ -140,5 +164,9 @@ break_:;
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
     array<string> targetPaths; // Path to file (or folders) where targets are copied
     array<shared<Result>> targetResults; // Generated datas for each target
-    array<unique<View>> views;
+
+    map<string, array<unique<View>>> viewers;
+    String title;
+    unique<Window> window = nullptr;
+    VList<WidgetGrid> grids;
 } app ( arguments() );

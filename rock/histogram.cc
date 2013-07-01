@@ -14,12 +14,31 @@ UniformHistogram histogram(const Volume16& source, CropVolume crop) {
     buffer<uint> histograms[coreCount];
     for(uint id: range(coreCount)) histograms[id] = buffer<uint>(source.maximum+1, source.maximum+1, 0);
     parallel(crop.min.z, crop.max.z, [&](uint id, uint z) {
-        for(int y=crop.min.y; y<crop.max.y; y++) {
-            for(int x=crop.min.x; x<crop.max.x; x++) {
-                if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
-                    uint sample = sourceData[ tiled ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*X*Y+y*X+x) ];
-                    assert_(sample <= source.maximum, source.margin, x,y,z, source.sampleCount-source.margin, source.sampleCount, sample, source.maximum);
-                    histograms[id][sample]++;
+        uint* const histogram = histograms[id].begin();
+        if(tiled) {
+            const uint16* sourceZ = sourceData + offsetZ[z];
+            for(int y=crop.min.y; y<crop.max.y; y++) {
+                const uint16* sourceZY = sourceZ + offsetY[y];
+                for(int x=crop.min.x; x<crop.max.x; x++) {
+                    const uint16* sourceZYX = sourceZY + offsetX[x];
+                    if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
+                        uint sample = sourceZYX[0];
+                        assert(sample <= source.maximum);
+                        histogram[sample]++;
+                    }
+                }
+            }
+        } else {
+            const uint16* sourceZ = sourceData + z*X*Y;
+            for(int y=crop.min.y; y<crop.max.y; y++) {
+                const uint16* sourceZY = sourceZ + y*X;
+                for(int x=crop.min.x; x<crop.max.x; x++) {
+                    const uint16* sourceZYX = sourceZY + x;
+                    if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
+                        uint sample = sourceZYX[0];
+                        assert(sample <= source.maximum);
+                        histogram[sample]++;
+                    }
                 }
             }
         }

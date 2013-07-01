@@ -4,26 +4,15 @@
 //#include "bmp.h"
 #include "crop.h"
 
-/// Parses physical resolution from source path
-class(PhysicalResolution, Operation) {
-    string parameters() const override { return "path downsample"_; }
-    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>&) override {
-        assert_(args.contains("path"_), args);
-        string resolutionMetadata = section(args.at("path"_),'-',1,2);
-        double resolution = resolutionMetadata ? TextData(resolutionMetadata).decimal()/1000.0 : 1;
-        {string times = args.value("downsample"_,"0"_); resolution *= pow(2, toInteger(times?:"1"_));}
-        outputs[0]->metadata = String("scalar"_);
-        outputs[0]->data = str(resolution)+"\n"_;
-    }
-};
-
 /// Concatenates image slice files in a volume
+/// \note Parses physical resolution from source path
 class(Source, Operation), virtual VolumeOperation {
     CropVolume crop;
 
     string parameters() const override { static auto p="path cylinder box downsample"_; return p; }
-    uint outputSampleSize(uint) override { return 2; }
-    size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint) override {
+    uint outputSampleSize(uint index) override { return index ? 0 : 2; }
+    size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
+        if(index) return 0;
         int3 size;
         assert_(args.contains("path"_), args);
         string path = args.at("path"_);
@@ -44,7 +33,7 @@ class(Source, Operation), virtual VolumeOperation {
         crop = parseCrop(args, int3(0), size, inputs?inputs[0]->data:""_); // input argument (from automatic crop (CommonSampleSize))
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
     }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
         int3 min=crop.min, size=crop.size;
         string path = args.at("path"_);
         Volume16& target = outputs.first();
@@ -103,5 +92,15 @@ class(Source, Operation), virtual VolumeOperation {
         }
         target.maximum = maximum(target); // Some sources don't use the full range
         assert_(target.maximum, target.sampleCount, target.margin);
+        {TextData s (args.at("path"_));
+            string name = s.until('-');
+            output(otherOutputs, "name"_, "label"_, [&]{return name+"\n"_;});
+            float resolution = s ? s.decimal()/1000.0 : 1; if(args.contains("downsample"_)) resolution *= 2;
+            output(otherOutputs, "resolution"_, "scalar"_, [&]{return str(resolution)+" μm\n"_;});
+            int3 voxelSize = target.sampleCount-2*target.margin;
+            output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(voxelSize.x)+"x"_+str(voxelSize.y)+"x"_+str(voxelSize.z) + " voxels"_;});
+            int3 physicalSize = int3(round(resolution*vec3(voxelSize)));
+            output(otherOutputs, "physicalSize"_, "size"_, [&]{return str(physicalSize.x)+"x"_+str(physicalSize.y)+"x"_+str(physicalSize.z)+" μm³"_;});
+        }
     }
 };

@@ -39,23 +39,23 @@ template<class T> struct Scroll : ScrollArea, T {
 };
 
 /// Displays an image
-struct ImageView : Widget {
+struct ImageWidget : virtual Widget {
     /// Displayed image
     Image image;
 
-    ImageView(){}
+    ImageWidget(){}
     /// Creates a widget displaying \a image
-    ImageView(Image&& image):image(move(image)){}
+    ImageWidget(Image&& image):image(move(image)){}
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
 };
 /// \typedef ImageView Icon
 /// Displays an icon
-typedef ImageView Icon;
+typedef ImageWidget Icon;
 
 /// Clickable image
-struct ImageLink : ImageView {
+struct ImageLink : ImageWidget {
     /// Argument given to triggered
     String link;
     /// User clicked on the image

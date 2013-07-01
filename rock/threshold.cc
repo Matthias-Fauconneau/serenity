@@ -39,9 +39,8 @@ class(Otsu, Operation) {
         }
         float densityThreshold = float(threshold) / float(density.size-1);
         //log("Otsu's method estimates threshold at", densityThreshold);
-        outputs[0]->metadata = String("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 6)+"\n"_;
-        output(outputs, 1, "map"_, [&]{
+        output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(densityThreshold);});
+        output(outputs, "otsu-parameters"_, "map"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
                     "threshold16 "_+dec(threshold)+"\n"_
                     "maximum "_+dec(density.size-1)+"\n"_
@@ -50,7 +49,7 @@ class(Otsu, Operation) {
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount)))+"\n"_; } );
-        output(outputs, 2, "deviation.tsv"_, [&]{ return toASCII((1./(totalCount-1))*squareRoot(interclassVariance)); } );
+        output(outputs, "otsu-interclass-deviation"_, "deviation.tsv"_, [&]{ return toASCII((1./(totalCount-1))*squareRoot(interclassVariance)); } );
     }
 };
 
@@ -97,13 +96,12 @@ class(LorentzianMixtureModel, Operation) {
         uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore(i) <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
         float densityThreshold = float(threshold) / float(density.size);
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
-        outputs[0]->metadata = String("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
-        output(outputs, 1, "lorentz.map"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore)+"\n"_; });
-        output(outputs, 2, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
-        output(outputs, 3, "density.tsv"_, [&]{ return toASCII(notrock); });
-        output(outputs, 4, "lorentz.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
-        output(outputs, 5, "density.tsv"_, [&]{ return toASCII(notpore); });
+        output(outputs, "threshold"_, "scalar"_, [&]{return ftoa(densityThreshold, 5)+"\n"_;});
+        output(outputs, "lorentz-parameters"_, "lorentz.map"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore)+"\n"_; });
+        output(outputs, "lorentz-rock"_, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
+        output(outputs, "lorentz-notrock"_, "density.tsv"_, [&]{ return toASCII(notrock); });
+        output(outputs, "lorentz-pore"_, "lorentz.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
+        output(outputs, "lorentz-notpore"_, "density.tsv"_, [&]{ return toASCII(notpore); });
     }
 };
 #endif
@@ -148,9 +146,8 @@ class(MaximumMeanGradient, Operation) {
         threshold = (rock+pore)/2;
         real densityThreshold = (real)threshold/histogram.size;
         log("Maximum mean gradient estimates threshold at", ftoa(densityThreshold,3), "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels (without gradient would be",ftoa((rock+pore)/(2.*histogram.size),3));
-        outputs[0]->metadata = String("scalar"_);
-        outputs[0]->data = ftoa(densityThreshold, 5)+"\n"_;
-        output(outputs, 1, "gradient-mean.tsv"_, [&]{ return toASCII(gradientMean); } );
+        output(outputs, "threshold"_, "scalar"_, [&]{ return toASCII(densityThreshold); } );
+        output(outputs, "gradient-mean"_, "tsv"_, [&]{ return toASCII(gradientMean); } );
     }
 };
 #endif
