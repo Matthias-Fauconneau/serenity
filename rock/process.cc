@@ -50,7 +50,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         }
         array<string> outputs;
         for(;!s.match('='); s.whileAny(" \t"_)) {
-            string output = s.whileNo(" \t=");
+            string output = s.match('\'') ? s.until('\'') : s.whileNo(" \t=");
             assert_(output, s.until('\n'));
             outputs << output;
         }
@@ -313,7 +313,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         Map map;
         int64 outputSize = operation ? operation->outputSize(localArguments, cast<Result*>(inputs), index) : 0;
         if(outputSize) { // Creates (or resizes) and maps an output result file
-            while(outputSize > (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
+            while(outputSize >= (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
@@ -342,7 +342,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
             File file(output, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
-            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>=1l<<32?0:Map::Populate)));
+            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
         }
         outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }

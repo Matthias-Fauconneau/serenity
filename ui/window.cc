@@ -77,7 +77,6 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     setTitle(title);
     setIcon(icon);
     setType(type);
-    registerPoll();
 }
 
 void Window::create() {

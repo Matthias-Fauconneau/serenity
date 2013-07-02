@@ -45,31 +45,21 @@ class(REV, Tool) {
             PSD_octants.insert(resolution*radius, move(PSD_octant));}
         }
         const auto& e=relativeDeviations[0]; real radius=0; for(uint i: range(e.size()-1)) if(e.values[i+1] > e.values[i]) { radius=e.keys[i]; break; } // Deviation within estimation error
-        assert_(outputs[0]->name == "ε(R)"_);
-        outputs[0]->metadata = String("ε(R [μm]).tsv"_);
         const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_; //#logx\n#logy\n
-        outputs[0]->data = title + toASCII(relativeDeviations[0]);
-        assert_(outputs[1]->name == "ε(R|r<median)"_);
-        outputs[1]->metadata = String("ε(R [μm]).tsv"_);
-        outputs[1]->data = title + toASCII(relativeDeviations[1]);
-        assert_(outputs[2]->name == "ε(R|r>median)"_);
-        outputs[2]->metadata = String("ε(R [μm]).tsv"_);
-        outputs[2]->data = title + toASCII(relativeDeviations[2]);
-        assert_(outputs[3]->name == "PSD(R)"_);
-        outputs[3]->metadata = String("V(r [μm]).tsv"_);
-        outputs[3]->elements = move(PSD_R);
-        assert_(outputs[4]->name == "R"_);
-        outputs[4]->metadata = String("scalar"_);
-        outputs[4]->data = toASCII(radius);
-        assert_(outputs[5]->name == "PSD(octant|R:inflection)"_);
-        outputs[5]->metadata = String("V(r [μm]).tsv"_);
-        {const array<UniformSample>& PSD_octant = PSD_octants.at(radius);
-        const String title = "#Pore size distribution versus octants (R="_+dec(radius)+"μm)\n"_;
-        for(uint i: range(8)) outputs[5]->elements.insert(str(octants[i]), title+toASCII(PSD_octant[i]));
-        outputs[5]->elements.insert(String("mean"_), title+toASCII(PSD_octant.last()));}
-        assert_(outputs[6]->name == "REV"_);
-        outputs[6]->metadata = String("text"_);
-        outputs[6]->data = String(R"(
+        output(outputs, "ε(R)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[0]);});
+        output(outputs, "ε(R|r<median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[1]);});
+        output(outputs, "ε(R|r>median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[2]);});
+        outputElements(outputs, "PSD(R)"_, "V(r [μm]).tsv"_, [&]{return move(PSD_R);});
+        output(outputs, "R"_, "scalar"_, [&]{return toASCII(radius);});
+        outputElements(outputs, "PSD(octant|R:inflection)"_, "V(r [μm]).tsv"_, [&]{
+            const array<UniformSample>& PSD_octant = PSD_octants.at(radius);
+            const String title = "#Pore size distribution versus octants (R="_+dec(radius)+"μm)\n"_;
+            map<String, buffer<byte>> elements;
+            for(uint i: range(8)) elements.insert(str(octants[i]), title+toASCII(PSD_octant[i]));
+            elements.insert(String("mean"_), title+toASCII(PSD_octant.last()));
+            return elements;
+        });
+        output(outputs, "REV Explanation"_, "text"_, [&]{return String(R"(
 This tool computes the minimal representative elementary volume (REV).
 The deviation of the pore size distribution is computed for many volume sizes.
 The pore size distribution is computed on cylinders as high as large, centered on each octant of the original volume.
@@ -87,6 +77,6 @@ for each cylinder radius : R
  Sum of squared differences : SSD = Σ[octants] Σ[radius] ( PSD(radius) - μ(radius) )²
  Unbiased variance estimator: σ² = SSD / (sample count - 1)
  Relative deviation: ε = σ / |μ|
-                               )"_);
+                               )"_);});
     }
 };

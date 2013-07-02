@@ -4,6 +4,7 @@
 #include "widget.h"
 
 struct View : virtual Widget {
-    virtual bool view(const string& metadata, const string& name, const buffer<byte>& data) abstract;
     virtual ~View() {}
+    virtual bool view(const string& metadata, const string& name, const buffer<byte>& data) abstract;
+    virtual string name() abstract;
 };

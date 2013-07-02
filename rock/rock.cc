@@ -27,33 +27,37 @@
 //#include "prune.h"
 //include "summary.h
 
+Image renderToImage(Widget* widget, int2 size, int imageResolution=resolution) {
+    Image framebuffer = move(::framebuffer);
+    array<Rect> clipStack = move(::clipStack);
+    Rect currentClip = move(::currentClip);
+    int resolution = ::resolution;
+    ::framebuffer = Image(size.x, size.y);
+    ::currentClip = Rect(::framebuffer.size());
+    ::resolution = imageResolution;
+    fill(Rect(::framebuffer.size()),1);
+    assert_(widget);
+    widget->render(0,::framebuffer.size());
+    Image image = move(::framebuffer);
+    ::framebuffer = move(framebuffer);
+    ::clipStack = move(clipStack);
+    ::currentClip = move(currentClip);
+    ::resolution = resolution;
+    return image;
+}
+
 /// A4 page proxy
 struct Page : Widget {
     Page(Widget* content) : content(content) {}
-    const int h=1024, w=round(1024/sqrt(2.)), ratio=4;
-    int2 sizeHint() { return int2(w,h); }
+    const int ratio = 384/96;
+    int2 sizeHint() { return int2(round(1024/sqrt(2.)), 1024); }
     void render(int2 position, int2 size) {
-        Image framebuffer = move(::framebuffer);
-        array<Rect> clipStack = move(::clipStack);
-        Rect currentClip = move(::currentClip);
-        int resolution = ::resolution;
-        {
-            ::framebuffer = Image(ratio*w,ratio*h);
-            ::currentClip = Rect(::framebuffer.size());
-            ::resolution = ratio*resolution;
-            fill(Rect(::framebuffer.size()),1);
-            assert_(content);
-            content->render(0,::framebuffer.size());
-            image = move(::framebuffer);
-        }
-        ::framebuffer = move(framebuffer);
-        ::clipStack = move(clipStack);
-        ::currentClip = move(currentClip);
-        ::resolution = resolution;
+        image = renderToImage(content, ratio*size, ratio*resolution);
         assert_(size==sizeHint(), size, sizeHint());
-        blit(position, resize(image, w, h));
+        blit(position, resize(image, size));
     }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { return content->mouseEvent(ratio*cursor, ratio*size, event, button); }
+    //.localShortcut(PrintScreen).connect([this]{ writeFile("page.png"_, encodePNG(page.image), home()); }
     Widget* content;
     Image image;
 };
@@ -62,12 +66,13 @@ struct Page : Widget {
 struct Rock : virtual PersistentProcess {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "view"_; specialParameters += "page"_;
+        specialParameters += "dump"_; specialParameters += "view"_; specialParameters += "page"_; specialParameters += "slides"_; specialParameters += "png"_; specialParameters += "pdf"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
-        if(targetPaths.size>targets.size) error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
-                                                "\nHint: An unknown (mistyped?) target might be interpreted as target path", rules,'\n'); //TODO: hint nearest (levenstein distance) target
+        if(targetPaths.size>targets.size)
+            error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
+                  "\nHint: An unknown (mistyped?) target might be interpreted as target path", rules,'\n');
         if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
             warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
 #ifndef BUILD
@@ -144,19 +149,38 @@ struct Rock : virtual PersistentProcess {
         }
 
         if(viewers) {
-            title = String("Rock"_); //join(apply(targetResults,[](const shared<Result>& r){return copy(r->name);}),", "_);
+            bool slides = specialArguments.contains("slides"_);
             bool pagePreview = specialArguments.contains("page"_);
-            window = unique<Window>(pagePreview?(Widget*)&page:(Widget*)&grids, int2(pagePreview?-1:0), title);
-            window->localShortcut(Escape).connect([]{exit();});
-            window->localShortcut(PrintScreen).connect([this]{ writeFile(title+".png"_, encodePNG(page.image), home()); });
-            window->backgroundColor = 1;
-
-            for(array<unique<View>>& views : viewers.values) {
-                WidgetGrid grid;
-                for(unique<View>& view: views) grid << view.pointer;
-                grids << move(grid);
+            if(slides) for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) newWindow(view.pointer, 0, view->name()); // one slide per view element
+            else {
+                for(array<unique<View>>& views : viewers.values) {
+                    WidgetGrid grid;
+                    for(unique<View>& view: views) grid << view.pointer;
+                    grids << move(grid);
+                }
+                if(slides) for(WidgetGrid& widget: grids) newWindow(&widget, 0, "Slide"_); // one slide per viewer type
+                else if(pagePreview) newWindow(&page, -1, "Page"_);
+                else newWindow(&grids, 0, "Rock"_);
             }
+            if(specialArguments.contains("pdf"_)) {
+                String pdf = join(titles,"; "_)+".pdf"_;
+                log(pdf);
+                assert_( !execute("/ptmp/bin/convert"_,toRefs(images)<<pdf, true, home()) );
+            }
+        }
+    }
+
+    void newWindow(Widget* widget, int2 sizeHint, string title) {
+        if(specialArguments.contains("png"_)) {
+            writeFile(title+".png"_, encodePNG(renderToImage(widget, int2(1920,1080))), home());
+            titles << String(title);
+            images << title+".png"_;
+        } else {
+            unique<Window> window(widget, sizeHint, title);
+            window->localShortcut(Escape).connect([]{exit();});
+            window->backgroundColor = 1;
             window->show();
+            windows << move(window);
         }
     }
 
@@ -190,8 +214,9 @@ struct Rock : virtual PersistentProcess {
     array<shared<Result>> targetResults; // Generated datas for each target
 
     map<string, array<unique<View>>> viewers;
-    String title;
-    unique<Window> window = nullptr;
     VList<WidgetGrid> grids {Linear::Share, Linear::Expand};
     Page page {&grids};
+    array<unique<Window>> windows;
+    array<String> titles;
+    array<String> images;
 } app ( arguments() );

@@ -9,7 +9,7 @@
 class(Source, Operation), virtual VolumeOperation {
     CropVolume crop;
 
-    string parameters() const override { static auto p="path cylinder box downsample"_; return p; }
+    string parameters() const override { static auto p="path resolution cylinder box downsample"_; return p; }
     uint outputSampleSize(uint index) override { return index ? 0 : 2; }
     size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
         if(index) return 0;

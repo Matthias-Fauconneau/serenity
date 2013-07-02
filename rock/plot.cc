@@ -92,11 +92,12 @@ class(PlotView, View), virtual Plot {
         string legend=name; string title=legend; bool logx=false,logy=false;
         {TextData s(data); if(s.match('#')) title=s.until('\n'); if(s.match("#logx\n"_)) logx=true; if(s.match("#logy\n"_)) logy=true; }
         auto dataSet = parseNonUniformSample(data);
-        if(!this->title) this->title=String(name), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->logx=logx, this->logy=logy;
+        if(!this->title) this->title=String(title), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->logx=logx, this->logy=logy;
         if(this->title && this->title!=title) return false;
         assert_(this->xlabel == xlabel && this->ylabel == ylabel && this->logx==logx && this->logy==logy);
         dataSets << move(dataSet);
         legends << String(legend);
         return true;
     }
+    string name() override { return title; }
 };

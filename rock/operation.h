@@ -25,7 +25,17 @@ template<Type F> bool output(const ref<Result*>& outputs, const string& name, co
     }
     return false;
 }
-
+/// Convenient helper method to implement outputs
+template<Type F> bool outputElements(const ref<Result*>& outputs, const string& name, const string& metadata, F data) {
+    for(Result* output: outputs) if(output->name == name) {
+        assert_(!output->metadata);
+        output->metadata = String(metadata);
+        assert_(!output->data);
+        output->elements = data();
+        return true;
+    }
+    return false;
+}
 /// Convenience class to define a single input, single output operation
 struct Pass : virtual Operation {
     virtual void execute(const Dict& args, Result& output, const Result& source) abstract;

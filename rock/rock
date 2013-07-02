@@ -1,9 +1,8 @@
 # Rock process definition
 
 # Concatenates image slice files in a volume
-if !resolution: source name voxelSize physicalSize = Source
 # \note Parses resolution from input folder name as "name-resolution"
-if resolution: source name resolution voxelSize physicalSize = Source
+source name resolution voxelSize physicalSize = Source
 
 # Denoises
 denoise = 'median'
@@ -114,5 +113,5 @@ distribution-radius = Div volume-distribution-radius volume-total
   bmp-denoised-connected = ToBMP denoised-connected
 
 # Tools
-ε(R) ε(R|r<median) ε(R|r>median) PSD(R) R PSD(octant|R:inflection) REV = REV
+ε(R) ε(R|r<median) ε(R|r>median) PSD(R) R PSD(octant|R:inflection) 'REV Explanation' = REV
 unconnected(λ) connected(λ) = Prune

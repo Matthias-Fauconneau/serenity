@@ -14,7 +14,6 @@ UniformSample squareRoot(const UniformSample& A) {
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == "histogram.tsv"_);
         UniformHistogram density = parseUniformSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
@@ -49,7 +48,7 @@ class(Otsu, Operation) {
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount)))+"\n"_; } );
-        output(outputs, "otsu-interclass-deviation"_, "deviation.tsv"_, [&]{ return toASCII((1./(totalCount-1))*squareRoot(interclassVariance)); } );
+        output(outputs, "otsu-interclass-deviation"_, "σ(μ).tsv"_, [&]{ return toASCII((1./(totalCount-1)*1./(density.size-1))*squareRoot(interclassVariance)); } );
     }
 };
 

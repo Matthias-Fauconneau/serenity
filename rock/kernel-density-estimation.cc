@@ -44,7 +44,7 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, doub
 class(KernelDensityEstimation, Operation), virtual Pass {
     virtual string parameters() const { return "bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        target.metadata = String("kde.tsv"_);
+        target.metadata = copy(source.metadata);
         NonUniformHistogram H = parseNonUniformSample(source.data);
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }

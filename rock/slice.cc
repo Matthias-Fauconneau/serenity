@@ -15,6 +15,7 @@ class(SliceView, View), virtual Widget {
         volumes << move(volume);
         return true;
     }
+    string name() override { return names[currentIndex]; }
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
         if(button==WheelDown||button==WheelUp) {
             int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),volumes.size-1);
