@@ -15,7 +15,7 @@
 //#include "resample.h"
 //#include "histogram.h"
 //#include "threshold.h"
-//#include "distance.h"
+//#include "position.h"
 //#include "skeleton.h"
 //#include "floodfill.h"
 //#include "rasterize.h"
@@ -27,11 +27,42 @@
 //#include "prune.h"
 //include "summary.h
 
+/// A4 page proxy
+struct Page : Widget {
+    Page(Widget* content) : content(content) {}
+    const int h=1024, w=round(1024/sqrt(2.)), ratio=4;
+    int2 sizeHint() { return int2(w,h); }
+    void render(int2 position, int2 size) {
+        Image framebuffer = move(::framebuffer);
+        array<Rect> clipStack = move(::clipStack);
+        Rect currentClip = move(::currentClip);
+        int resolution = ::resolution;
+        {
+            ::framebuffer = Image(ratio*w,ratio*h);
+            ::currentClip = Rect(::framebuffer.size());
+            ::resolution = ratio*resolution;
+            fill(Rect(::framebuffer.size()),1);
+            assert_(content);
+            content->render(0,::framebuffer.size());
+            image = move(::framebuffer);
+        }
+        ::framebuffer = move(framebuffer);
+        ::clipStack = move(clipStack);
+        ::currentClip = move(currentClip);
+        ::resolution = resolution;
+        assert_(size==sizeHint(), size, sizeHint());
+        blit(position, resize(image, w, h));
+    }
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { return content->mouseEvent(ratio*cursor, ratio*size, event, button); }
+    Widget* content;
+    Image image;
+};
+
 /// Command-line interface for rock volume data processing
 struct Rock : virtual PersistentProcess {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "view"_;
+        specialParameters += "dump"_; specialParameters += "view"_; specialParameters += "page"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
@@ -114,17 +145,10 @@ struct Rock : virtual PersistentProcess {
 
         if(viewers) {
             title = String("Rock"_); //join(apply(targetResults,[](const shared<Result>& r){return copy(r->name);}),", "_);
-            window = unique<Window>(&grids, int2(0,0), title);
+            bool pagePreview = specialArguments.contains("page"_);
+            window = unique<Window>(pagePreview?(Widget*)&page:(Widget*)&grids, int2(pagePreview?-1:0), title);
             window->localShortcut(Escape).connect([]{exit();});
-            window->localShortcut(PrintScreen).connect([this]{
-                assert_(!framebuffer && !clipStack);
-                framebuffer = Image(1920,1080); //Image(724,1024);
-                currentClip = Rect(framebuffer.size());
-                fill(Rect(framebuffer.size()),1);
-                grids.render(0,framebuffer.size());
-                writeFile(title+".png"_, encodePNG(framebuffer), home());
-                framebuffer = Image();
-            });
+            window->localShortcut(PrintScreen).connect([this]{ writeFile(title+".png"_, encodePNG(page.image), home()); });
             window->backgroundColor = 1;
 
             for(array<unique<View>>& views : viewers.values) {
@@ -134,16 +158,6 @@ struct Rock : virtual PersistentProcess {
             }
             window->show();
         }
-    }
-
-    bool view(const string& metadata, const string& name, const buffer<byte>& data) {
-        for(array<unique<View>>& views: viewers.values) for(unique<View>& view: views) if( view->view(metadata, name, data) ) return true; // Tries to append to existing view first
-        for(auto viewer: Interface<View>::factories) {
-            unique<View> view  = viewer.value->constructNewInstance();
-            if( view->view(metadata, name, data) ) { viewers[viewer.key] << move(view); return true; }
-        }
-        warn("Unknown format",metadata, name);
-        return false;
     }
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {
@@ -161,6 +175,16 @@ struct Rock : virtual PersistentProcess {
         }
     }
 
+     bool view(const string& metadata, const string& name, const buffer<byte>& data) {
+         for(array<unique<View>>& views: viewers.values) for(unique<View>& view: views) if( view->view(metadata, name, data) ) return true; // Tries to append to existing view first
+         for(auto viewer: Interface<View>::factories) {
+             unique<View> view  = viewer.value->constructNewInstance();
+             if( view->view(metadata, name, data) ) { viewers[viewer.key] << move(view); return true; }
+         }
+         warn("Unknown format",metadata, name);
+         return false;
+     }
+
     const Folder& cwd = currentWorkingDirectory(); // Reference for relative paths
     array<string> targetPaths; // Path to file (or folders) where targets are copied
     array<shared<Result>> targetResults; // Generated datas for each target
@@ -168,5 +192,6 @@ struct Rock : virtual PersistentProcess {
     map<string, array<unique<View>>> viewers;
     String title;
     unique<Window> window = nullptr;
-    VList<WidgetGrid> grids;
+    VList<WidgetGrid> grids {Linear::Share, Linear::Expand};
+    Page page {&grids};
 } app ( arguments() );

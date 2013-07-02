@@ -42,17 +42,17 @@ array<Rect> Linear::layout(int2 position, int2 size) {
 
     for(uint i: range(count)) { Widget& child=at(i); assert(*(void**)&child);
         int2 sizeHint = xy(child.sizeHint());
-        width -= abs(widths[i]=sizeHint.x); //commits minimum width for all widgets
-        if(sizeHint.x<0) expanding++; //counts expanding widgets
-        height=max(height, heights[i]=(sizeHint.y<0 ? size.y : min(size.y,sizeHint.y))); //necessary height
+        width -= abs(widths[i]=sizeHint.x); // Commits minimum width for all widgets
+        if(sizeHint.x<0) expanding++; // Counts expanding widgets
+        height=max(height, heights[i]=(sizeHint.y<0 ? size.y : min(size.y,sizeHint.y))); // Necessary height
     }
 
     int sharing = expanding ?: (main==Share? count : 0);
-    if(sharing && width >= sharing) { //shares extra space evenly between sharing widgets
+    if(sharing && width >= sharing) { // Shares extra space evenly between sharing widgets
         int extra = width/sharing;
         for(uint i: range(count)) {
-            if(!expanding || widths[i]<0) { //if all widgets are sharing or this widget is expanding
-                widths[i] = abs(widths[i])+extra, width -= extra; //commits extra space
+            if(!expanding || widths[i]<0) { // If all widgets are sharing or this widget is expanding
+                widths[i] = abs(widths[i])+extra, width -= extra; // Commits extra space
             }
         }
         //width%sharing space remains as extra is rounded down
@@ -68,11 +68,11 @@ array<Rect> Linear::layout(int2 position, int2 size) {
         }
     }
 
-    int margin = (main==Spread && count>1) ? width/(count-1) : 0; //spreads any margin between all widgets
-    width -= margin*(count-1); //width%(count-1) space remains as margin is rounded down
+    int margin = (main==Spread && count>1) ? width/(count-1) : 0; // Spreads any margin between all widgets
+    width -= margin*(count-1); // width%(count-1) space remains as margin is rounded down
 
     if(main==Even) {
-        for(uint i: range(count)) widths[i]=size.x/count; //converts all expanding widgets to fixed
+        for(uint i: range(count)) widths[i]=size.x/count; // Converts all expanding widgets to fixed
         width = size.x-count*size.x/count;
     }
 
@@ -102,9 +102,10 @@ array<Rect> Linear::layout(int2 position, int2 size) {
 // Grid
 int2 Grid::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-    int2 max(0,0);
-    for(uint i: range(count())) max = ::max(max,at(i).sizeHint());
-    return int2(w,h)*(max+margin);
+    int2 max(0,0); int2 expanding(1,1);
+    for(uint i: range(count())) { int2 hint=at(i).sizeHint(); max = ::max(max,hint); if(hint.x<0) expanding.x=-1; if(hint.y<0) expanding.y=-1; }
+    int2 size = int2(w,h)*(max+margin);
+    return int2(expanding.x < 0 ? -::max(1,size.x) : size.x, expanding.y < 0 ? -::max(1,size.y) : size.y);
 }
 
 array<Rect> Grid::layout(int2 position, int2 size) {

@@ -64,6 +64,6 @@ uint maximum(const Volume32& source);
 void interleavedLookup(Volume& target);
 
 /// Returns an image of a volume slice
-Image slice(const Volume& volume, float z, bool normalize, bool gamma/*, bool cylinder=false*/);
-Image slice(const Volume& volume, int z, bool normalize, bool gamma/*, bool cylinder=false*/);
+Image slice(const Volume& volume, float z, bool normalize, bool gamma, bool cylinder=false);
+Image slice(const Volume& volume, int z, bool normalize, bool gamma, bool cylinder=false);
 

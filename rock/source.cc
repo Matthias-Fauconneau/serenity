@@ -95,7 +95,7 @@ class(Source, Operation), virtual VolumeOperation {
         {TextData s (args.at("path"_));
             string name = s.until('-');
             output(otherOutputs, "name"_, "label"_, [&]{return name+"\n"_;});
-            float resolution = s ? s.decimal()/1000.0 : 1; if(args.contains("downsample"_)) resolution *= 2;
+            float resolution = s ? s.decimal()/1000.0 : args.contains("resolution"_) ? toDecimal(args.at("resolution"_)) : 1; if(args.contains("downsample"_)) resolution *= 2;
             output(otherOutputs, "resolution"_, "scalar"_, [&]{return str(resolution)+" μm\n"_;});
             int3 voxelSize = target.sampleCount-2*target.margin;
             output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(voxelSize.x)+"x"_+str(voxelSize.y)+"x"_+str(voxelSize.z) + " voxels"_;});

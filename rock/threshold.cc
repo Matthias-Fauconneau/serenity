@@ -97,7 +97,12 @@ class(LorentzianMixtureModel, Operation) {
         float densityThreshold = float(threshold) / float(density.size);
         log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
         output(outputs, "threshold"_, "scalar"_, [&]{return ftoa(densityThreshold, 5)+"\n"_;});
-        output(outputs, "lorentz-parameters"_, "lorentz.map"_, [&]{ return str("rock",rock)+"\n"_+str("pore",pore)+"\n"_; });
+        output(outputs, "lorentz-parameters"_, "map"_, [&]{
+            return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
+                    "threshold16 "_+dec(threshold)+"\n"_
+                    "maximum "_+dec(density.size-1)+"\n"_
+                    "rock "+str(rock)+"\n"_
+                    "pore "+str(pore)+"\n"_; } );
         output(outputs, "lorentz-rock"_, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
         output(outputs, "lorentz-notrock"_, "density.tsv"_, [&]{ return toASCII(notrock); });
         output(outputs, "lorentz-pore"_, "lorentz.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });

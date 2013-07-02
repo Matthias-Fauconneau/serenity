@@ -1,7 +1,7 @@
 #include "display.h"
 #include "math.h"
 
-bool softwareRendering = true;
+int resolution = 96;
 Image framebuffer;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);

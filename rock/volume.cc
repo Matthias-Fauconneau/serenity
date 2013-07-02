@@ -90,23 +90,25 @@ uint maximum(const Volume32& source) {
     return maximum;
 }
 
-Image slice(const Volume& source, float normalizedZ, bool normalize, bool gamma) {
+Image slice(const Volume& source, float normalizedZ, bool normalize, bool gamma, bool cylinder) {
     //int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
     //assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
     int z = normalizedZ*(source.sampleCount.z-1);
-    return slice(source, z, normalize, gamma);
+    return slice(source, z, normalize, gamma, cylinder);
 }
 
-Image slice(const Volume& source, int z, bool normalize, bool gamma) {
+Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylinder) {
     assert_(source.maximum);
     int X=source.sampleCount.x, Y=source.sampleCount.y;
     int marginX=source.margin.x, marginY=source.margin.y;
-    Image target(X-2*marginX,Y-2*marginY);
+    Image target(X-2*marginX,Y-2*marginY, true);
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;
     if(!normalize && maximum==0xFFFF) { normalizeFactor=0xFF00; warn("16bit volume truncated to 8bit image slices"); }
     assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit");
+    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
+         if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = byte4(0,0,0,0); continue; }
         uint value = 0;
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];

@@ -48,7 +48,7 @@ struct Linear: virtual Layout {
         Center, /// Aligns tightly packed widgets
         Even, /// shares space evenly
         Spread, /// allocates minimum sizes and spreads any extra space between widgets
-        Share,  /// allocates minimum sizes and shares any extra space
+        Share,  /// allocates minimum sizes and shares any extra space between expanding widgets
         AlignLeft,AlignTop=AlignLeft, /// For side axis, sets all widgets side size to maximum needed and aligns left/top
         AlignRight,AlignBottom=AlignRight, /// For side axis, sets all widgets side size to maximum needed and aligns right/bottom
         AlignCenter, /// For side axis, sets all widgets side size to largest hint (or total available if any widget is expanding) and centers
@@ -86,13 +86,13 @@ struct VBox : Vertical, Widgets {
 };
 /// Horizontal layout of homogenous items. \sa Array
 template<class T> struct HList : Horizontal, Array<T> {
-    HList(){}
     HList(array<T>&& widgets):Array<T>(move(widgets)){}
+    HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of homogenous items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
-    VList(){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
+    VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
 /// Layouts items on an uniform #width x #height grid

@@ -20,8 +20,8 @@ void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, const string& type, Thread& thread, Renderer renderer)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
+Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, const string& type, Thread& thread)
+    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
@@ -77,24 +77,7 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     setTitle(title);
     setIcon(icon);
     setType(type);
-    //if(widget) show(); //asynchronous window are shown by default to avoid race conditions ??
     registerPoll();
-
-    if(renderer == OpenGL) {
-#if GL
-        if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
-        if(!glContext) {
-            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, 0};
-            int fbCount=0; void** fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
-            const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION, 3, GLX_CONTEXT_MINOR_VERSION, 0, 0};
-            glContext = ((glXCreateContextAttribsARB)glXGetProcAddress("glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
-            assert(glContext);
-        }
-        glXMakeCurrent(glDisplay, id, glContext);
-#else
-        error("OpenGL unsupported");
-#endif
-    }
 }
 
 void Window::create() {
@@ -129,68 +112,50 @@ void Window::event() {
         currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
-        if(renderer == Raster) {
-            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-                if(shm) {
-                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                    shmdt(buffer.data);
-                    shmctl(shm, IPC_RMID, 0);
-                }
-                buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
-                shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-                buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-                {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
+            if(shm) {
+                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                shmdt(buffer.data);
+                shmctl(shm, IPC_RMID, 0);
             }
-            framebuffer=share(buffer);
-            currentClip=Rect(size);
-
-            if(clearBackground) {
-                if(backgroundCenter==backgroundColor) {
-                    fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                } else { // Oxygen-like radial gradient background
-                    const int radius=256;
-                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                            a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                    uint* dst=(uint*)framebuffer.data;
-                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
-                    }
-                }
-            }
-#if GL
-            ::softwareRendering=true;
-        } else {
-            glXMakeCurrent(glDisplay, id, glContext);
-            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
-            ::softwareRendering=false;
+            buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
+            shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
-#else
-        } else error("Unsupported");
-#endif
+        framebuffer=share(buffer);
+        currentClip=Rect(size);
 
+        if(clearBackground) {
+            if(backgroundCenter==backgroundColor) {
+                fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+            } else { // Oxygen-like radial gradient background
+                const int radius=256;
+                int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                        a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
+                if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                uint* dst=(uint*)framebuffer.data;
+                for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                    int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
+                    dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                }
+            }
+        }
         widget->render(0,size);
         assert(!clipStack);
 
-        if(renderer == Raster) {
-            if(featherBorder) { //feather borders
-                const bool corner = 1;
-                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-                if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-                if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-            }
-            Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-            r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
-            r.srcW=size.x; r.srcH=size.y; send(raw(r));
-            state=Server;
-            framebuffer=Image();
-        } else {
-#if GL
-            glFinish();
-#endif
+        if(featherBorder) { //feather borders
+            const bool corner = 1;
+            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+            if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+            if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
         }
+        Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+        r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
+        r.srcW=size.x; r.srcH=size.y; send(raw(r));
+        state=Server;
+        framebuffer=Image();
         frameReady();
     } else for(;;) {
         readLock.lock();

@@ -3,13 +3,9 @@
 #include "vector.h"
 #include "image.h"
 
-#define GL 0
-#if GL
-extern bool softwareRendering;
-#endif
-
 /// Framebuffer of the window being rendered (X11 shared memory to be used only under Window::render)
 extern Image framebuffer;
+extern int resolution; /// Device resolution in dots per inch (dpi)
 
 // Clip
 extern array<Rect> clipStack;

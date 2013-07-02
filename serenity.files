@@ -52,7 +52,7 @@ ui/window.cc
 ui/window.h
 ui/x.h
 
-rock/distance.cc
+rock/position.cc
 rock/export.cc
 rock/CDL
 rock/floodfill.cc

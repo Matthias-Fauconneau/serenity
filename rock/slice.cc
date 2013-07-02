@@ -8,11 +8,11 @@
 /// Displays volume as slices
 class(SliceView, View), virtual Widget {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
+        if(volumes) return false;
         Volume volume = toVolume(metadata, data);
         if(!inRange(1u,volume.sampleSize,4u)) return false;
         names << String(name);
         volumes << move(volume);
-        updateView();
         return true;
     }
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
@@ -25,28 +25,25 @@ class(SliceView, View), virtual Widget {
         if(!button) return false;
         float z = clip(0.f, float(cursor.x)/(size.x-1), 1.f);
         if(sliceZ != z) { sliceZ = z; updateView(); }
-        updateView();
         return true;
     }
-    void updateView() {
+    int2 sizeHint() {
+        assert_(volumes);
         const Volume& volume = volumes[currentIndex];
-        int2 size = volume.sampleCount.xy();
-        while(2*size<displaySize) size *= 2;
-        if(window.size != size) window.setSize(size);
-        else window.render();
-        window.setTitle(names[currentIndex]);
+        return (volume.sampleCount-2*volume.margin).xy();
     }
     void render(int2 position, int2 size) {
         const Volume& volume = volumes[currentIndex];
-        Image image = slice(volume, sliceZ, true, true);
-        while(2*image.size()<=size) image=upsample(image);
-        blit(position, image);
+        Image image = slice(volume, sliceZ, true, true, true);
+        //while(2*image.size()<=size) image=upsample(image);
+        int2 centered = position+(size-image.size())/2;
+        blit(centered, image);
     }
     array<String> names;
     array<Volume> volumes;
     int currentIndex=0;
     float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
-    Window window{this, int2(-1,-1), "SliceView"_};
+    signal<> updateView;
 
     bool renderVolume = false;
     int2 lastPos;

@@ -342,7 +342,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
             File file(output, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
-            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
+            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>=1l<<32?0:Map::Populate)));
         }
         outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }

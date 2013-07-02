@@ -1,8 +1,9 @@
 # Rock process definition
 
 # Concatenates image slice files in a volume
+if !resolution: source name voxelSize physicalSize = Source
 # \note Parses resolution from input folder name as "name-resolution"
-source name resolution voxelSize physicalSize = Source
+if resolution: source name resolution voxelSize physicalSize = Source
 
 # Denoises
 denoise = 'median'
@@ -37,10 +38,11 @@ if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-not
 pore = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
 colorize = Colorize pore resampled # For visualization
 
-# Computes squared distance to / position of nearest background voxel
-distancex positionxx = DistanceX pore
-distancey positionyx positionyy = DistanceY distancex positionxx
-positionx positiony positionz = DistanceZ distancey positionyx positionyy
+# Computes position of nearest background voxel
+distancex positionxx = PositionX pore
+distancey positionyx positionyy = PositionY distancex positionxx
+positionx positiony positionz = PositionZ distancey positionyx positionyy
+distance = Distance positionx positiony positionz
 
 # Computes skeleton (medial axis)
 skeleton = Skeleton positionx positiony positionz

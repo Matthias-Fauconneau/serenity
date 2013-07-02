@@ -161,7 +161,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 }
 
 // Z
-void perpendicularBisectorEuclideanDistanceTransform(/*Volume32& target,*/ Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY) {
+void perpendicularBisectorEuclideanDistanceTransform(Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY) {
     //setBorders(target);
     const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
     const int tX=sY, tY=sZ;
@@ -169,7 +169,6 @@ void perpendicularBisectorEuclideanDistanceTransform(/*Volume32& target,*/ Volum
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     const uint16* const ySourceData = sourceY;
-    //uint32* const targetData = target;
     uint16* const xPositionData = positionX;
     uint16* const yPositionData = positionY;
     uint16* const zPositionData = positionZ;
@@ -177,7 +176,6 @@ void perpendicularBisectorEuclideanDistanceTransform(/*Volume32& target,*/ Volum
         const uint32* const sourceZ = sourceData+z*sX*sY;
         const uint16* const xSourceZ = xSourceData+z*sX*sY;
         const uint16* const ySourceZ = ySourceData+z*sX*sY;
-        //uint32* const targetZ = targetData+z*tX;
         uint16* const xPositionZ = xPositionData+z*tX;
         uint16* const yPositionZ = yPositionData+z*tX;
         uint16* const zPositionZ = zPositionData+z*tX;
@@ -207,12 +205,10 @@ void perpendicularBisectorEuclideanDistanceTransform(/*Volume32& target,*/ Volum
             }
             const uint16* const xSourceZY = xSourceZ+y*sX;
             const uint16* const ySourceZY = ySourceZ+y*sX;
-            //uint32* const targetZY = targetZ+y;
             uint16* const xPositionZY = xPositionZ+y;
             uint16* const yPositionZY = yPositionZ+y;
             uint16* const zPositionZY = zPositionZ+y;
             for(int x=sX-1-marginX; x>=marginX; x--) {
-                //uint32* const targetZYX = targetZY+x*tX*tY;
                 uint16* const xPositionZYX = xPositionZY+x*tX*tY;
                 uint16* const yPositionZYX = yPositionZY+x*tX*tY;
                 uint16* const zPositionZYX = zPositionZY+x*tX*tY;
@@ -222,8 +218,6 @@ void perpendicularBisectorEuclideanDistanceTransform(/*Volume32& target,*/ Volum
                     if(x==stack[i].cx) i--;
                     assert_(i>=0);
                     int sx = stack[i].x;
-                    //int sqRadius = x * (x - 2*sx) + stack[i].sd;
-                    //targetZYX[dy] = sqRadius;
                     xPositionZYX[dy] = xSourceZY[dy*sX + sx];
                     yPositionZYX[dy] = ySourceZY[dy*sX + sx];
                     zPositionZYX[dy] = sx;
@@ -231,24 +225,13 @@ void perpendicularBisectorEuclideanDistanceTransform(/*Volume32& target,*/ Volum
             }
         }
     });
-    //target.squared=true;
     positionX.squared=false, positionX.maximum=sourceX.maximum;
     positionY.squared=false, positionY.maximum=sourceY.maximum;
     positionZ.squared=false, positionZ.maximum=sX-1;
 }
 
-/*/// Converts a 32bit volume to 16bit
-void pack(Volume16& target, const Volume32& source) {
-    const uint32* const sourceData = source;
-    target.data.size = source.data.size / 2;
-    uint16* const targetData = target;
-    size_t size = source.size();
-    for(uint i=0; i<size; i+=8) storea(targetData+i, packus(loada(sourceData+i),loada(sourceData+i+4)));
-    target.maximum=source.maximum;
-}*/
-
-/// Computes distance field to nearest background (X pass)
-class(DistanceX, Operation), virtual VolumeOperation {
+/// Computes position of nearest background (X pass)
+class(PositionX, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2}; return sizes[index]; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
@@ -256,8 +239,8 @@ class(DistanceX, Operation), virtual VolumeOperation {
     }
 };
 
-/// Computes distance field to nearest background (Y pass)
-class(DistanceY, Operation), virtual VolumeOperation {
+/// Computes position of nearest background (Y pass)
+class(PositionY, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2}; return sizes[index]; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
@@ -265,18 +248,36 @@ class(DistanceY, Operation), virtual VolumeOperation {
     }
 };
 
-/// Computes distance field to nearest background (Y pass)
-class(DistanceZ, Operation), virtual VolumeOperation {
-    uint outputSampleSize(uint index) override { int sizes[]={/*4,*/ 2, 2, 2}; return sizes[index]; }
+/// Computes position of nearest background (Y pass)
+class(PositionZ, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint index) override { int sizes[]={2, 2, 2}; return sizes[index]; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],/*outputs[3],*/inputs[0],inputs[1],inputs[2]);
-        /*Volume& target = outputs[0];
-        target.maximum=maximum((const Volume32&)target);
-        if(target.maximum < (1ul<<(8*(target.sampleSize/2)))) { // Packs outputs if needed
-            const Volume32& target32 = target;
-            target.sampleSize = target.sampleSize / 2;
-            pack(target, target32);
-        }*/
+    }
+};
+
+/// Computes distance field from feature transform (for visualization)
+class(Distance, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint index) override { int sizes[]={2}; return sizes[index]; }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        const Volume16& pX = inputs[0];
+        const Volume16& pY = inputs[1];
+        const Volume16& pZ = inputs[2];
+        Volume16& target = outputs[0];
+        uint maximum=0;
+        for(int z: range(target.margin.z, target.sampleCount.z-target.margin.z)) {
+            for(int y: range(target.margin.y, target.sampleCount.y-target.margin.y)) {
+                for(int x: range(target.margin.x, target.sampleCount.x-target.margin.x)) {
+                    int dx = x-pX(x,y,z), dy = y-pY(x,y,z), dz = z-pZ(x,y,z);
+                    uint d = dx*dx + dy*dy + dz*dz;
+                    target(x,y,z) = d;
+                    maximum = max(maximum, d);
+                }
+            }
+        }
+        assert(maximum<(1<<(8*target.sampleSize)));
+        target.maximum=maximum;
+        target.squared = true;
     }
 };
