@@ -118,7 +118,7 @@ Image doResize(const Image& image, uint width, uint height) {
     if(!image) return Image();
     assert(width!=image.width || height!=image.height);
     Image target(width, height, image.alpha);
-    if(image.width/width==image.height/height && image.width%width==0 && image.height%height==0) { //integer box downsample
+    if(image.width/width==image.height/height && image.width%width<=4 && image.height%height<=4) { //integer box downsample
         byte4* dst = target.data;
         const byte4* src = image.data;
         int scale = image.width/width;
@@ -139,11 +139,12 @@ Image doResize(const Image& image, uint width, uint height) {
             src += scale*image.stride;
         }
     } else {
-        Image mipmap;
+        error(image.size(), int2(width,height), int2(image.width%width,image.height%height));
+        /*Image mipmap;
         bool needMipmap = image.width>2*width || image.height>2*height;
-        if(needMipmap) mipmap = resize(image, image.width/max(1u,(image.width/width)), image.height/max(1u,image.height/height));
+        if(needMipmap) mipmap = doResize(image, image.width/max(1u,(image.width/width)), image.height/max(1u,image.height/height));
         const Image& source = needMipmap?mipmap:image;
-        bilinear(target, source);
+        bilinear(target, source);*/
     }
     return target;
 }

@@ -92,3 +92,5 @@ rock/view.h
 rock/view.cc
 rock/plot.cc
 rock/plot.h
+rock/summary.cc
+rock/slice.h

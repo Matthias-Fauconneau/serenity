@@ -13,6 +13,25 @@ namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 int2 displaySize;
 
+Image renderToImage(Widget* widget, int2 size, int imageResolution) {
+    Image framebuffer = move(::framebuffer);
+    array<Rect> clipStack = move(::clipStack);
+    Rect currentClip = move(::currentClip);
+    int resolution = ::resolution;
+    ::framebuffer = Image(size.x, size.y);
+    ::currentClip = Rect(::framebuffer.size());
+    ::resolution = imageResolution;
+    fill(Rect(::framebuffer.size()),1);
+    assert_(widget);
+    widget->render(0,::framebuffer.size());
+    Image image = move(::framebuffer);
+    ::framebuffer = move(framebuffer);
+    ::clipStack = move(clipStack);
+    ::currentClip = move(currentClip);
+    ::resolution = resolution;
+    return image;
+}
+
 static __thread Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
 bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }

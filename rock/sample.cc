@@ -43,7 +43,7 @@ UniformSample parseUniformSample(const string& file) {
 }
 String toASCII(const UniformSample& A) {
     String s;
-    for(uint i=0; i<A.size; i++) s << ftoa(A.scale*i,4,0,true) << '\t' << ftoa(A[i],4,0,true) << '\n';
+    for(uint i=0; i<A.size; i++) s << ftoa(A.scale*i,5,0,true) << '\t' << ftoa(A[i],5,0,true) << '\n';
     return s;
 }
 
@@ -83,22 +83,7 @@ real NonUniformSample::interpolate(real x) const {
 }
 NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
 NonUniformSample abs(const NonUniformSample& A) { return NonUniformSample(A.keys, abs((const Vector&)A.values)); }
-NonUniformSample differentiate(const NonUniformSample& A) {
-    NonUniformSample R;
-    for(uint i: range(1,A.keys.size-1)) {
-        assert_(A.keys[i+1] != A.keys[i-1]);
-        R.insert(A.keys[i], (A.values[i+1]-A.values[i-1])/(A.keys[i+1]-A.keys[i-1]));
-    }
-    return R;
-}
-NonUniformSample laplacian(const NonUniformSample& A) {
-    NonUniformSample R;
-    for(uint i: range(1,A.keys.size-1)) {
-        assert_(A.keys[i+1] != A.keys[i-1]);
-        R.insert(A.keys[i], (A.values[i-1]-A.values[i])/(A.keys[i-1]-A.keys[i]) + (A.values[i+1]-A.values[i])/(A.keys[i+1]-A.keys[i]));
-    }
-    return R;
-}
+NonUniformSample scaleDistribution(float scalar, NonUniformSample&& A) { for(real& x: A.keys) x *= scalar; for(real& y: A.values) y /= scalar; return move(A); }
 
 array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
     real delta = __DBL_MAX__, maximum=0;
@@ -123,7 +108,7 @@ NonUniformSample parseNonUniformSample(const string& file) {
 }
 String toASCII(const NonUniformSample& A) {
     String s;
-    for(auto sample: A) s << ftoa(sample.key, 4) << '\t' << ftoa(sample.value, 4, 0, true) << '\n';
+    for(auto sample: A) s << ftoa(sample.key, 5) << '\t' << ftoa(sample.value, 5, 0, true) << '\n';
     return s;
 }
 

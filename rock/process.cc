@@ -95,7 +95,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         string scope, parameter = key;
         if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
         if(s.match('=')) { // Explicit argument
-            assert_(parameters.contains(parameter),"Invalid parameter", parameter);
+            assert_(parameters.contains(parameter) || specialParameters.contains(parameter),"Invalid parameter", parameter);
             string value = s.untilEnd();
             assert_(value);
             assert_(!arguments.contains(key), key);

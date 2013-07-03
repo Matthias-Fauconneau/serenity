@@ -6,10 +6,13 @@
 
 /// Square roots samples
 UniformSample squareRoot(const UniformSample& A) {
-    uint N=A.size; UniformSample R(N);
+    uint N=A.size; UniformSample R(N); R.scale=A.scale;
     for(uint i: range(N)) { R[i]=sqrt(A[i]); assert(!__builtin_isnanf(R[i]) && R[i]!=__builtin_inff()); }
     return R;
 }
+
+/// Normalizes distribution
+UniformSample normalize(const UniformSample& A) { return (1./(A.scale*A.sum()))*A; }
 
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
@@ -20,7 +23,9 @@ class(Otsu, Operation) {
         uint64 totalCount=0, totalSum=0;
         for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        UniformSample interclassVariance(density.size); real parameters[4];
+        UniformSample interclassVariance(density.size);
+        interclassVariance.scale = 1./(density.size-1);
+        real parameters[4];
         for(uint64 t: range(density.size)) {
             backgroundCount += density[t];
             if(backgroundCount == 0) continue;
@@ -48,7 +53,7 @@ class(Otsu, Operation) {
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount)))+"\n"_; } );
-        output(outputs, "otsu-interclass-deviation"_, "σ(μ).tsv"_, [&]{ return toASCII((1./(totalCount-1)*1./(density.size-1))*squareRoot(interclassVariance)); } );
+        output(outputs, "otsu-interclass-deviation"_, "σ(μ).tsv"_, [&]{ return toASCII(normalize(squareRoot(interclassVariance))); } );
     }
 };
 

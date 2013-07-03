@@ -41,7 +41,6 @@ class(ScaleVariable, Operation) {
 };
 
 /// Scales both the variable and the values of a distribution to keep the same area
-NonUniformSample scaleDistribution(float scalar, NonUniformSample&& A) { for(real& x: A.keys) x *= scalar; for(real& y: A.values) y /= scalar; return move(A); }
 class(ScaleDistribution, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);

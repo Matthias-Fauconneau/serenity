@@ -65,7 +65,7 @@ class(ToBMP, Operation), virtual VolumeOperation {
         Time time; Time report;
         for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
             if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
-            outputs[0]->elements.insert(dec(z,4), encodeBMP(slice(volume,z,false, false)));
+            outputs[0]->elements.insert(dec(z-marginZ,4), encodeBMP(slice(volume,z,false, false)));
         }
     }
 };

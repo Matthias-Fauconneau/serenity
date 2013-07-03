@@ -1,6 +1,7 @@
 #include "view.h"
 #include "text.h"
 #include "interface.h"
+#include "window.h"
 
 class(TextView, View), virtual Text {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
@@ -22,6 +23,7 @@ class(ImageView, View), virtual ImageWidget {
         title = String(name);
         return image ? true : false;
     }
+    int2 sizeHint() override { while(!(image.size()<displaySize)) image=resize(image,image.size()/2); return ImageWidget::sizeHint(); }
     string name() override { return title; }
     String title;
 };

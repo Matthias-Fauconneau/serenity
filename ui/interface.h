@@ -115,12 +115,16 @@ struct Slider : Progress {
 };
 
 /// ::Icon with \ref Text "text"
-struct Item : Horizontal {
-    Icon icon; Text text;
+struct Item : Linear {
     Item(){}
-    Item(Image&& icon, String&& text, int size=16):icon(move(icon)),text(move(text),size){}
+    Item(Image&& icon, const string& text, int size=16, bool under=false):icon(move(icon)),text(text,size),under(under){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
+    int2 xy(int2 xy) override { return under ? int2(xy.y,xy.x) : xy /*right*/; }
+
+    Icon icon;
+    Text text;
+    bool under=false; // Displays text label under icon (instead of inline)
 };
 
 /// Clickable Item

@@ -5,7 +5,7 @@
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
 class(Prune, Tool) {
     void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
-        shared<Result> inputResult = results.getResult("maximum"_, arguments); // Keep this reference to prevent this input to be evicted from cache
+        shared<Result> inputResult = results.getResult("crop"_, arguments); // Keep this reference to prevent this input to be evicted from cache
         Volume input = toVolume(inputResult);
         int3 size=input.sampleCount-input.margin; int maximumRadius=min(min(size.x, size.y), size.z)/2;
         real totalVolume = parseScalar(results.getResult("volume-total"_, arguments)->data);

@@ -90,7 +90,7 @@ uint maximum(const Volume32& source) {
     return maximum;
 }
 
-Image slice(const Volume& source, float normalizedZ, bool normalize, bool gamma, bool cylinder) {
+Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, bool cylinder) {
     //int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
     //assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
     int z = normalizedZ*(source.sampleCount.z-1);

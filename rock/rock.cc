@@ -8,6 +8,7 @@
 #include "png.h"
 
 // Includes all operators, tools and views
+//#include "volume.h"
 //#include "source.h"
 //include "resample.h"
 //#include "average.h"
@@ -25,48 +26,13 @@
 //#include "plot.h"
 //#include "REV.h"
 //#include "prune.h"
-//include "summary.h
-
-Image renderToImage(Widget* widget, int2 size, int imageResolution=resolution) {
-    Image framebuffer = move(::framebuffer);
-    array<Rect> clipStack = move(::clipStack);
-    Rect currentClip = move(::currentClip);
-    int resolution = ::resolution;
-    ::framebuffer = Image(size.x, size.y);
-    ::currentClip = Rect(::framebuffer.size());
-    ::resolution = imageResolution;
-    fill(Rect(::framebuffer.size()),1);
-    assert_(widget);
-    widget->render(0,::framebuffer.size());
-    Image image = move(::framebuffer);
-    ::framebuffer = move(framebuffer);
-    ::clipStack = move(clipStack);
-    ::currentClip = move(currentClip);
-    ::resolution = resolution;
-    return image;
-}
-
-/// A4 page proxy
-struct Page : Widget {
-    Page(Widget* content) : content(content) {}
-    const int ratio = 384/96;
-    int2 sizeHint() { return int2(round(1024/sqrt(2.)), 1024); }
-    void render(int2 position, int2 size) {
-        image = renderToImage(content, ratio*size, ratio*resolution);
-        assert_(size==sizeHint(), size, sizeHint());
-        blit(position, resize(image, size));
-    }
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { return content->mouseEvent(ratio*cursor, ratio*size, event, button); }
-    //.localShortcut(PrintScreen).connect([this]{ writeFile("page.png"_, encodePNG(page.image), home()); }
-    Widget* content;
-    Image image;
-};
+//#include "summary.h
 
 /// Command-line interface for rock volume data processing
 struct Rock : virtual PersistentProcess {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "view"_; specialParameters += "page"_; specialParameters += "slides"_; specialParameters += "png"_; specialParameters += "pdf"_;
+        specialParameters += "dump"_; specialParameters += "view"_; specialParameters += "slides"_; specialParameters += "png"_; specialParameters += "pdf"_;
         String process;
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
@@ -150,17 +116,21 @@ struct Rock : virtual PersistentProcess {
 
         if(viewers) {
             bool slides = specialArguments.contains("slides"_);
-            bool pagePreview = specialArguments.contains("page"_);
-            if(slides) for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) newWindow(view.pointer, 0, view->name()); // one slide per view element
-            else {
+            if(slides) {
+                for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) { // one slide per view element
+                    titles << String(view->name());
+                    newWindow(view.pointer, 0, view->name());
+                }
+            } else {
                 for(array<unique<View>>& views : viewers.values) {
                     WidgetGrid grid;
-                    for(unique<View>& view: views) grid << view.pointer;
+                    for(unique<View>& view: views) {
+                        grid << view.pointer;
+                        titles << String(view->name());
+                    }
                     grids << move(grid);
                 }
-                if(slides) for(WidgetGrid& widget: grids) newWindow(&widget, 0, "Slide"_); // one slide per viewer type
-                else if(pagePreview) newWindow(&page, -1, "Page"_);
-                else newWindow(&grids, 0, "Rock"_);
+                newWindow(&grids, -1, join(titles,"; "_));
             }
             if(specialArguments.contains("pdf"_)) {
                 String pdf = join(titles,"; "_)+".pdf"_;
@@ -173,7 +143,6 @@ struct Rock : virtual PersistentProcess {
     void newWindow(Widget* widget, int2 sizeHint, string title) {
         if(specialArguments.contains("png"_)) {
             writeFile(title+".png"_, encodePNG(renderToImage(widget, int2(1920,1080))), home());
-            titles << String(title);
             images << title+".png"_;
         } else {
             unique<Window> window(widget, sizeHint, title);
@@ -215,7 +184,6 @@ struct Rock : virtual PersistentProcess {
 
     map<string, array<unique<View>>> viewers;
     VList<WidgetGrid> grids {Linear::Share, Linear::Expand};
-    Page page {&grids};
     array<unique<Window>> windows;
     array<String> titles;
     array<String> images;

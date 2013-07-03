@@ -1,5 +1,4 @@
 #include "plot.h"
-#include "view.h"
 #include "window.h"
 #include "display.h"
 #include "text.h"
@@ -37,11 +36,15 @@ void Plot::render(int2 position, int2 size) {
     int margin = ::max(tickLabelSize.x, tickLabelSize.y), left=margin, top=margin, bottom=margin;
     int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
 
-    {Text text(format(Bold)+title); text.render(position+int2((size.x-text.sizeHint().x)/2,top));} // Title
+    int2 pen=position;
+    {Text text(format(Bold)+title); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
     // Legend
-    buffer<vec4> colors(legends.size); for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(2*PI*i/colors.size,1,1),1.f); //FIXME: constant intensity
+    buffer<vec4> colors(legends.size);
+    if(colors.size==1) colors[0] = black;
+    else if(colors.size==2) colors[0] = red, colors[1] = blue;
+    else for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(2*PI*i/colors.size,1,1),1.f); //FIXME: constant intensity
     if(legends.size>1) {
-        int2 pen=position; for(uint i: range(legends.size)) {Text text(legends[i], 16, colors[i]); text.render(pen+int2(size.x-right-text.sizeHint().x,top)); pen.y+=text.sizeHint().y; }
+        for(uint i: range(legends.size)) {Text text(legends[i], 16, colors[i]); text.render(pen+int2(size.x-right-text.sizeHint().x,top)); pen.y+=text.sizeHint().y; }
     }
 
     // Transforms data positions to render positions
@@ -71,11 +74,11 @@ void Plot::render(int2 position, int2 size) {
             Text& tick = ticks[1][i];
             tick.render(p + int2(-tick.textSize.x, -tick.textSize.y/2) );
         }
-        {Text text(format(Bold)+ylabel); text.render(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y));}
+        {Text text(format(Bold)+ylabel); text.render(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y/2));}
     }
 
     // Plots data points
-    assert_(dataSets.size == legends.size && dataSets.size == colors.size);
+    assert_(dataSets.size == legends.size && dataSets.size <= colors.size);
     for(uint i: range(dataSets.size)) {
         vec4 color = colors[i];
         const auto& data = dataSets[i];
@@ -85,19 +88,18 @@ void Plot::render(int2 position, int2 size) {
     }
 }
 
-class(PlotView, View), virtual Plot {
-    bool view(const string& metadata, const string& name, const buffer<byte>& data) {
-        if(!endsWith(metadata,"tsv"_)) return false;
-        string xlabel,ylabel; { TextData s(metadata); ylabel = s.until('('); xlabel = s.until(')'); }
-        string legend=name; string title=legend; bool logx=false,logy=false;
-        {TextData s(data); if(s.match('#')) title=s.until('\n'); if(s.match("#logx\n"_)) logx=true; if(s.match("#logy\n"_)) logy=true; }
-        auto dataSet = parseNonUniformSample(data);
-        if(!this->title) this->title=String(title), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->logx=logx, this->logy=logy;
-        if(this->title && this->title!=title) return false;
-        assert_(this->xlabel == xlabel && this->ylabel == ylabel && this->logx==logx && this->logy==logy);
-        dataSets << move(dataSet);
-        legends << String(legend);
-        return true;
-    }
-    string name() override { return title; }
-};
+bool PlotView::view(const string& metadata, const string& name, const buffer<byte>& data) {
+    if(!endsWith(metadata,"tsv"_)) return false;
+    string xlabel,ylabel; { TextData s(metadata); ylabel = s.until('('); xlabel = s.until(')'); }
+    string legend=name; string title=legend; bool logx=false,logy=false;
+    {TextData s(data); if(s.match('#')) title=s.until('\n'); if(s.match("#logx\n"_)) logx=true; if(s.match("#logy\n"_)) logy=true; }
+    auto dataSet = parseNonUniformSample(data);
+    if(!this->title) this->title=String(title), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->logx=logx, this->logy=logy;
+    if(this->title && this->title!=title) return false;
+    assert_(this->xlabel == xlabel && this->ylabel == ylabel && this->logx==logx && this->logy==logy);
+    dataSets << move(dataSet);
+    legends << String(legend);
+    return true;
+}
+
+string PlotView::name() { return title; }
