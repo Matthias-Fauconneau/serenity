@@ -351,7 +351,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     Time time;
     if(operation) operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
     else Interface<Tool>::instance(rule.operation)->execute(arguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
-    if((uint64)time>100) log(rule, localArguments ? str(localArguments) : ""_, time);
+    if((uint64)time>200) log(rule, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) {
         shared<ResultFile> result = move(output);

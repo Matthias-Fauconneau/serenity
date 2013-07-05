@@ -44,39 +44,24 @@ class(REV, Tool) {
             PSD_octant << (1./mean.sampleCount())*mean;
             PSD_octants.insert(resolution*radius, move(PSD_octant));}
         }
-        const auto& e=relativeDeviations[0]; real radius=0; for(uint i: range(e.size()-1)) if(e.values[i+1] > e.values[i]) { radius=e.keys[i]; break; } // Deviation within estimation error
+        const auto& e=relativeDeviations[0]; real inflectionRadius=0; for(uint i: range(e.size()-1)) if(e.values[i+1] > e.values[i]) { inflectionRadius=e.keys[i]; break; } // Deviation within estimation error
         const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_; //#logx\n#logy\n
         output(outputs, "ε(R)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[0]);});
         output(outputs, "ε(R|r<median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[1]);});
         output(outputs, "ε(R|r>median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[2]);});
         outputElements(outputs, "PSD(R)"_, "V(r [μm]).tsv"_, [&]{return move(PSD_R);});
-        output(outputs, "R"_, "scalar"_, [&]{return toASCII(radius);});
-        outputElements(outputs, "PSD(octant|R:inflection)"_, "V(r [μm]).tsv"_, [&]{
-            const array<UniformSample>& PSD_octant = PSD_octants.at(radius);
-            const String title = "#Pore size distribution versus octants (R="_+dec(radius)+"μm)\n"_;
-            map<String, buffer<byte>> elements;
-            for(uint i: range(8)) elements.insert(str(octants[i]), title+toASCII(PSD_octant[i]));
-            elements.insert(String("mean"_), title+toASCII(PSD_octant.last()));
-            return elements;
-        });
-        output(outputs, "REV Explanation"_, "text"_, [&]{return String(R"(
-This tool computes the minimal representative elementary volume (REV).
-The deviation of the pore size distribution is computed for many volume sizes.
-The pore size distribution is computed on cylinders as high as large, centered on each octant of the original volume.
-The unbiased sample variance estimator is defined as the sum of squared differences to the sample mean divided by the number of samples minus one.
-Relative standard error is the deviation divided by the mean.
-The squared difference between two distributions is the integral of the squared difference of their values
-The deviation is also computed separately for small and big pores in order to compare their convergence rate.
-1) Small pores converges with smaller volumes while correctly estimating the distribution of large pores requires bigger volumes.
-2) The mean pore size distribution estimation smoothes as it converges.
-3) At the inflection point (R=)"_+dec(radius)+R"(μm), all pore size distributions are similar to each other.
-
-for each cylinder radius : R
- pore size distribution of each 8 samples : PSD[i]
- Mean distribution : μ = Σ[i] PSD[i] / 8
- Sum of squared differences : SSD = Σ[octants] Σ[radius] ( PSD(radius) - μ(radius) )²
- Unbiased variance estimator: σ² = SSD / (sample count - 1)
- Relative deviation: ε = σ / |μ|
-                               )"_);});
+        output(outputs, "R"_, "scalar"_, [&]{return toASCII(inflectionRadius);});
+        for(uint i: range(2)) {
+            real radius = i==0 ? inflectionRadius : PSD_octants.keys.last();
+            string name = i==0 ? "inflection"_ : "last"_;
+            outputElements(outputs, "PSD(octant|R:"_+name+")"_, "V(r [μm]).tsv"_, [&]{
+                const array<UniformSample>& PSD_octant = PSD_octants.at(radius);
+                const String title = "#Pore size distribution versus octants (R="_+dec(radius)+"μm)\n"_;
+                map<String, buffer<byte>> elements;
+                for(uint i: range(8)) elements.insert(str(octants[i]), title+toASCII(PSD_octant[i]));
+                elements.insert(String("mean"_), title+toASCII(PSD_octant.last()));
+                return elements;
+            });
+        }
     }
 };

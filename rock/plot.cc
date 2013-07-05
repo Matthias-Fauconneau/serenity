@@ -4,7 +4,9 @@
 #include "text.h"
 #include "math.h"
 
+int2 Plot::sizeHint() { return int2(1920/2, 1080/2); }
 void Plot::render(int2 position, int2 size) {
+    int resolution = ::resolution; ::resolution *= 2; // Scales the size of all text labels
     // Computes axis scales
     vec2 min=0, max=0;
     for(const auto& data: dataSets) for(auto point: data) {
@@ -27,13 +29,14 @@ void Plot::render(int2 position, int2 size) {
     for(uint axis: range(2)) {
         int precision = ::max(0., ceil(-log10(max[axis]/tickCount[axis])));
         for(uint i: range(tickCount[axis]+1)) {
-            String label = ftoa(min[axis]+(max[axis]-min[axis])*i/tickCount[axis], precision);
+            real value = min[axis]+(max[axis]-min[axis])*i/tickCount[axis];
+            String label = ftoa(value, value>=10e5 ? 1 : precision, 0, value>=10e5 ? 3 : 0);
             assert_(label);
             ticks[axis] << Text(label);
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
     }
-    int margin = ::max(tickLabelSize.x, tickLabelSize.y), left=margin, top=margin, bottom=margin;
+    int left=tickLabelSize.x, top=2*tickLabelSize.y, bottom=tickLabelSize.y;
     int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
 
     int2 pen=position;
@@ -86,6 +89,7 @@ void Plot::render(int2 position, int2 size) {
         for(uint i: range(data.size())) points[i] = point( vec2(data.keys[i],data.values[i]) );
         for(uint i: range(data.size()-1)) line(points[i], points[i+1], color);
     }
+    ::resolution = resolution;
 }
 
 bool PlotView::view(const string& metadata, const string& name, const buffer<byte>& data) {
@@ -93,7 +97,7 @@ bool PlotView::view(const string& metadata, const string& name, const buffer<byt
     string xlabel,ylabel; { TextData s(metadata); ylabel = s.until('('); xlabel = s.until(')'); }
     string legend=name; string title=legend; bool logx=false,logy=false;
     {TextData s(data); if(s.match('#')) title=s.until('\n'); if(s.match("#logx\n"_)) logx=true; if(s.match("#logy\n"_)) logy=true; }
-    auto dataSet = parseNonUniformSample(data);
+    NonUniformSample dataSet = parseNonUniformSample(data);
     if(!this->title) this->title=String(title), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->logx=logx, this->logy=logy;
     if(this->title && this->title!=title) return false;
     assert_(this->xlabel == xlabel && this->ylabel == ylabel && this->logx==logx && this->logy==logy);

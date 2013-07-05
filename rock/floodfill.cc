@@ -27,6 +27,7 @@ class(ThresholdClip, Operation), virtual VolumeOperation {
         if(args.contains("clipThreshold"_) && isInteger(args.at("clipThreshold"_))) clipThreshold = toInteger(args.at("clipThreshold"_));
         else clipThreshold = TextData(otherInputs[0]->data).integer();
         thresholdClip(outputs[0], inputs[0], clipThreshold);
+        outputs[0].margin += ceil(sqrt((real)clipThreshold)); //HACK: pruned skeleton cannot reach boundaries (needed for floodfill connectivity)
     }
 };
 
@@ -43,7 +44,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     short3* const stack = stackBuffer.begin();
     int stackSize=0;
     // Seeds from top/bottom Z faces
-    buffer<byte> markBuffer(target.size()/8 /*, target.size()/8, 0*/); // 1024³~128MiB
+    buffer<byte> markBuffer(target.size()/8, target.size()/8, 0); // 1024³~128MiB
     byte* const mark = markBuffer.begin();
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
@@ -53,17 +54,15 @@ void floodFill(Volume16& target, const Volume16& source) {
             if(sourceData[index]) stack[stackSize++] = short3(x,y,z); // Pushes initial seeds (from bottom Z face)
         }
     }
-    {
-        while(stackSize) {
-            short3& p = stack[--stackSize];
-            uint x=p.x, y=p.y, z=p.z;
-            for(auto d: (int[][3]){{0,0,-1},{0,-1,0},{-1,0,0},{1,0,0},{0,1,0},{0,0,1}}) { // Visits first 6 neighbours
-                uint nx=x+d[0], ny=y+d[1], nz=z+d[2];
-                uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
-                if(sourceData[index] && !(mark[index/8]&(1<<(index%8)))) {
-                    mark[index/8] |= (1<<(index%8)); // Marks previously unvisited skeleton voxel
-                    stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
-                }
+    while(stackSize) {
+        short3& p = stack[--stackSize];
+        uint x=p.x, y=p.y, z=p.z;
+        for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
+            uint nx=x+dx, ny=y+dy, nz=z+dz;
+            uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
+            if(sourceData[index] && !(mark[index/8]&(1<<(index%8)))) {
+                mark[index/8] |= (1<<(index%8)); // Marks previously unvisited skeleton voxel
+                stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
             }
         }
     }
@@ -78,8 +77,8 @@ void floodFill(Volume16& target, const Volume16& source) {
     while(stackSize) {
         const short3& p = stack[--stackSize];
         uint x=p.x, y=p.y, z=p.z;
-        for(auto d: (int[][3]){{0,0,-1},{0,-1,0},{-1,0,0},{1,0,0},{0,1,0},{0,0,1}}) { // Visits first 6 neighbours
-            uint nx=x+d[0], ny=y+d[1], nz=z+d[2];
+        for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
+            uint nx=x+dx, ny=y+dy, nz=z+dz;
             uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
             if(sourceData[index] && !targetData[index]) {
                 targetData[index] = sourceData[index]; // Marks previously unvisited skeleton voxel

@@ -3,6 +3,8 @@
 #include "volume-operation.h"
 #include "display.h"
 
+float SliceView::sliceZ = 1./2;
+
 bool SliceView::view(const string& metadata, const string& name, const buffer<byte>& data) {
     if(volumes) return false;
     Volume volume = toVolume(metadata, data);

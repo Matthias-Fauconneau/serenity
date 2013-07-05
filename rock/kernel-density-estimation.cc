@@ -26,7 +26,7 @@ UniformSample kernelDensityEstimation(const UniformHistogram& histogram, real h=
 UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real h=nan, bool normalize=false) {
     const real N = histogram.sampleCount();
     if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
-    real max = ::max(histogram.keys);
+    real max = ::max(histogram.keys) + 4*h;
     real delta = histogram.delta();
     uint sampleCount = align(coreCount, max/delta);
     delta = max/sampleCount;
@@ -50,7 +50,7 @@ class(KernelDensityEstimation, Operation), virtual Pass {
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
         target.data = uniform ?
-                    toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"1"_)!="0"_)) :
-                    toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"1"_)!="0"_)); // Non uniform KDE
+                    toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)) :
+                    toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"0"_)!="0"_)); // Non uniform KDE
     }
 };

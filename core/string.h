@@ -53,6 +53,7 @@ inline string str(const char& c) { return string((byte*)&c,1); }
 inline const buffer<byte>& str(const buffer<byte>& s) { return s; }
 
 /// Joins \a list into a single String with each element separated by \a separator
+String join(const ref<string>& list, const string& separator);
 String join(const ref<String>& list, const string& separator);
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string& s, const string& before, const string& after);
@@ -96,7 +97,7 @@ generic String str(const unique<T>& t) { return str(*t.pointer); }
 generic String str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-String ftoa(double number, int precision=2, int pad=0, bool exponent=false, bool inf=false);
+String ftoa(double number, int precision=2, int pad=0, int exponent=0, bool inf=false);
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 

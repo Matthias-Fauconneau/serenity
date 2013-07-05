@@ -7,7 +7,7 @@ class(TextView, View), virtual Text {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
         if(text) return false;
         if(endsWith(metadata, "scalar"_)) { setText(name+": "_+data); title = String(name); return true; }
-        else if(endsWith(metadata,"text"_)||endsWith(metadata,"label"_)||endsWith(metadata,("size"_))) {
+        else if(endsWith(metadata,"text"_)||endsWith(metadata,"label"_)||endsWith(metadata,("size"_))||endsWith(metadata,("map"_))) {
             assert_(data && isUTF8(data), name, metadata); setText(data); title = String(name); return true;
         }
         return false;

@@ -14,7 +14,7 @@ class(SliceView, View), virtual Widget {
     array<String> names;
     array<Volume> volumes;
     int currentIndex=0;
-    float sliceZ = 1./2; // Normalized z coordinate of the currently shown slice
+    static float sliceZ; // Normalized z coordinate of the currently shown slice (static: synchronize Z coordinates across all slice views)
     signal<> updateView;
 
     bool renderVolume = false;

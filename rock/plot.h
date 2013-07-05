@@ -4,6 +4,7 @@
 #include "view.h"
 
 struct Plot : virtual Widget {
+    int2 sizeHint() override;
     void render(int2 position, int2 size) override;
 
     String title, xlabel, ylabel;

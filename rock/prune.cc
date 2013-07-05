@@ -17,20 +17,20 @@ class(Prune, Tool) {
             {args.at("floodfill"_) = 0;
                 shared<Result> result = results.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;
-                log("unconnected\t", r, ftoa(relativeVolume,3));
+                log("unconnected\t", r, ftoa(relativeVolume,4));
                 unconnectedVolume.insert(r, relativeVolume);
             }
             {args.at("floodfill"_) = 1;
                 shared<Result> result = results.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;
-                log("connected\t",r, ftoa(relativeVolume,3));
+                log("connected\t",r, ftoa(relativeVolume,4));
                 connectedVolume.insert(r, relativeVolume);
                 if(!relativeVolume) break;
             }
         }
-        outputs[0]->metadata = String("V(λ).tsv"_);
+        outputs[0]->metadata = String("V(λ [vx]).tsv"_);
         outputs[0]->data = "#Pore space volume versus pruning radius\n"_ + toASCII(unconnectedVolume);
-        outputs[1]->metadata = String("V(λ).tsv"_);
+        outputs[1]->metadata = String("V(λ [vx]).tsv"_);
         outputs[1]->data = "#Pore space volume versus pruning radius\n"_ + toASCII(connectedVolume);
     }
 };

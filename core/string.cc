@@ -132,11 +132,12 @@ double toDecimal(const string& number) { //FIXME: fromDecimal
 
 /// String
 
-String join(const ref<String>& list, const string& separator) {
+String join(const ref<string>& list, const string& separator) {
     String str;
     for(uint i: range(list.size)) { str<< list[i]; if(i<list.size-1) str<<separator; }
     return str;
 }
+String join(const ref<String>& list, const string& separator) { return join(toRefs(list),separator); }
 
 String replace(const string& s, const string& before, const string& after) {
     String r(s.size);
@@ -219,12 +220,12 @@ template<uint base> String itoa(int64 number, int pad) {
 }
 template String itoa<10>(int64,int);
 
-String ftoa(double n, int precision, int pad, bool exponent, bool inf) {
+String ftoa(double n, int precision, int pad, int exponent, bool inf) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return String("NaN"_);
     if(n==__builtin_inff()) { assert_(inf); return String("∞"_); }
     if(n==-__builtin_inff()) { assert_(inf); return String("-∞"_); }
-    int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=round(log10(n)), n /= exp10(e);
+    int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=round(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';
     if(precision && n!=round(n)) {
@@ -233,7 +234,10 @@ String ftoa(double n, int precision, int pad, bool exponent, bool inf) {
         if(decimal==(uint)exp10(precision)) integer++, decimal=0; // Rounds to ceiling integer
         s<<utoa(integer,pad)<<'.'<< utoa<10>(decimal,precision);
     } else s<<utoa(round(n));
-    if(e) s<<'e'<<itoa<10>(e);
+    if(exponent==3 && e==3) s<<'K';
+    else if(exponent==3 && e==6) s<<'M';
+    else if(exponent==3 && e==9) s<<'G';
+    else if(e) s<<'e'<<itoa<10>(e);
     return move(s);
 }
 

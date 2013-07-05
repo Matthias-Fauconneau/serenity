@@ -16,7 +16,8 @@ UniformSample normalize(const UniformSample& A) { return (1./(A.scale*A.sum()))*
 
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    string parameters() const override { return "normalize"_; }
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
         density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
@@ -24,7 +25,7 @@ class(Otsu, Operation) {
         for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
         UniformSample interclassVariance(density.size);
-        interclassVariance.scale = 1./(density.size-1);
+        if(args.value("normalize"_,"0"_)!="0"_) interclassVariance.scale = 1./(density.size-1);
         real parameters[4];
         for(uint64 t: range(density.size)) {
             backgroundCount += density[t];
@@ -90,7 +91,6 @@ UniformSample sample(const Lorentz& lorentz, uint size) {
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 class(LorentzianMixtureModel, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(inputs[0]->metadata == "kde.tsv"_);
         UniformHistogram density = parseUniformSample( inputs[0]->data );
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
         const UniformSample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -204,8 +204,7 @@ class(Binary, Operation), virtual VolumeOperation {
         if(args.contains("threshold"_) && isDecimal(args.at("threshold"_))) {
             float threshold = toDecimal(args.at("threshold"_));
             if(threshold < 1) binaryThreshold = round( threshold*inputs[0].maximum ); // Normalized (/maximum)
-            else if(threshold < 256) binaryThreshold = round(threshold*(1<<8)); // 8bit -> 16bit
-            else binaryThreshold = round(threshold); // 16bit
+            else binaryThreshold = round(threshold);
         } else {
             Result* threshold = otherInputs[0];
             binaryThreshold = round( TextData(threshold->data).decimal() * inputs[0].maximum );

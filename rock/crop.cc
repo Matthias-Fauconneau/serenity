@@ -95,7 +95,7 @@ class(Crop,Operation), virtual VolumePass<uint16> {
             if(args.contains("inputBox"_)) inputArgs.insert(String("box"_), copy(args.at("inputBox"_)));
             if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
             CropVolume inputCrop = parseCrop(inputArgs, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Already bound checked
-            CropVolume globalCrop = parseCrop(args, inputCrop.min, inputCrop.max, ""_, /*inputCrop.margin*/1); // Margins will be wrong
+            CropVolume globalCrop = parseCrop(args, inputCrop.min, inputCrop.max); // Margins will be wrong
             CropVolume localCrop = {inputCrop.margin+globalCrop.min-inputCrop.min, inputCrop.margin+globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
             crop(target, source, localCrop);
         }

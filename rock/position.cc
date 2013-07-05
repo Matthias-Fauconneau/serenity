@@ -276,7 +276,7 @@ class(Distance, Operation), virtual VolumeOperation {
                 }
             }
         }
-        assert(maximum<(1<<(8*target.sampleSize)));
+        assert_(maximum<(1u<<(8*target.sampleSize)));
         target.maximum=maximum;
         target.squared = true;
     }

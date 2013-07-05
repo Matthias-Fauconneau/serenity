@@ -130,7 +130,9 @@ struct Rock : virtual PersistentProcess {
                     }
                     grids << move(grid);
                 }
-                newWindow(&grids, -1, join(titles,"; "_));
+                String title = join(titles,"; "_);
+                if(title.size > 256) title = join(targets, "; "_);
+                newWindow(&grids, -1, title);
             }
             if(specialArguments.contains("pdf"_)) {
                 String pdf = join(titles,"; "_)+".pdf"_;
@@ -147,6 +149,8 @@ struct Rock : virtual PersistentProcess {
         } else {
             unique<Window> window(widget, sizeHint, title);
             window->localShortcut(Escape).connect([]{exit();});
+            String* name = new String(title+".png"_);
+            window->localShortcut(PrintScreen).connect([=]{writeFile(*name, encodePNG(renderToImage(widget, int2(1920,1080))), home());});
             window->backgroundColor = 1;
             window->show();
             windows << move(window);

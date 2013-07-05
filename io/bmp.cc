@@ -36,7 +36,8 @@ Image decodeBMP(const ref<byte>& file) {
 buffer<byte> encodeBMP(const Image& image) {
     buffer<byte4> palette (256); for(uint i: range(256)) palette[i]=byte4(i);
     assert_(image.buffer.size == image.width*image.height);
-    buffer<byte> data (image.buffer.size); for(uint i: range(data.size)) data[i]=image.data[i].b;
+    int stride = align(4, image.width);
+    buffer<byte> data (image.height*stride); for(uint x: range(image.width)) for(uint y: range(image.height)) data[y*stride+x]=image(x,y).b;
     struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; } packed header
                   = {sizeof(Header), image.width, image.height, 1, 8, 0, image.width*image.height, 0, 0, 0, 0};
     struct FileHeader { uint16 type; uint32 size, reserved, offset; } packed fileHeader

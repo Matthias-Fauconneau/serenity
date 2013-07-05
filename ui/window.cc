@@ -221,7 +221,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
-            else if(anchor==Float) {
+            /*else if(anchor==Float) {
                 if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; }
                 bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
                 bool left = dragStart.x<dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-1;
@@ -244,7 +244,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                     else if(top || bottom) cursor=Cursor::Vertical;
                     else if(left || right) cursor=Cursor::Horizontal;
                 }
-            }
+            }*/
             if(cursor!=lastCursor) setCursor(cursor);
         }
         else if(type==ButtonPress) {
