@@ -5,33 +5,28 @@
 String str(const CropVolume& crop) { return "("_+str(crop.min, crop.max)+")"_; }
 
 /// Parses volume to crop from user arguments
-CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string box, int3 minimalMargin) {
-    int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
-    bool cylinder = args.value("cylinder"_,"1"_)!="0"_;
+CropVolume parseCrop(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 sourceMax, int3 extra, int3 minimalMargin) {
+    int3 min=sourceMin-sourceMargin, max=sourceMax-sourceMargin, center=(min+max)/2;
+    string cylinder = args.value("cylinder"_,""_);
     if(cylinder) {
-        if(args.value("cylinder"_,""_)!=""_) {
-            if(args.at("cylinder"_).contains(',')) { // x, y, r, zMin, zMax
-                Vector coordinates = parseVector(args.at("cylinder"_), true);
+        if(cylinder!=""_) {
+            if(cylinder.contains(',')) { // x, y, r, zMin, zMax
+                Vector coordinates = parseVector(cylinder, true);
                 int x=coordinates[0], y=coordinates[1], r=coordinates[2]; min.z=coordinates[3], max.z=coordinates[4];
                 min.x=x-r, min.y=y-r, max.x=x+r, max.y=y+r;
             } else { // Crops centered cylinder
-                int r = toInteger(args.at("cylinder"_));
+                int r = toInteger(cylinder);
                 min=center-int3(r), max=center+int3(r);
             }
+            min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
         }
-        int margin = int(max.x-min.x) - int(max.y-min.y);
+        assert_(int(max.x-min.x) == int(max.y-min.y), min, max, args);
+        /*int margin = int(max.x-min.x) - int(max.y-min.y);
         if(margin > 0) min.x+=margin/2, max.x-=margin/2;
-        if(margin < 0) min.y+=(-margin)/2, max.y-=(-margin)/2;
-    }
-    if(args.contains("box"_) && args.at("box"_)!="auto"_) box = args.at("box"_); // "box" argument overrides input
-    if(box) {
-        if(box.contains(',')) {
-            Vector coordinates = parseVector(box, true);
-            if(coordinates.size == 6) min=int3(coordinates[0], coordinates[1], coordinates[2]), max=int3(coordinates[3],coordinates[4],coordinates[5]); // Generic box
-            else if(coordinates.size == 3) { int3 size (coordinates[0],coordinates[1],coordinates[2]); min=max/2-size/2, max=max/2+size/2; } // Crops centered box
-        } else { int size = TextData(box).integer(); min=center-int3(size/2), max=center+int3(size/2); } // Crops centered cube
+        if(margin < 0) min.y+=(-margin)/2, max.y-=(-margin)/2;*/
     }
     if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
+    min += sourceMargin, max += sourceMargin;
     if((max.x-min.x)%2) { if(max.x%2) max.x--; else assert(min.x%2), min.x++; }
     if((max.y-min.y)%2) { if(max.y%2) max.y--; else assert(min.y%2), min.y++; }
     if((max.z-min.z)%2) { if(max.z%2) max.z--; else assert(min.z%2), min.z++; }
@@ -39,7 +34,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
     // Asserts valid volume
     assert_(min>=sourceMin && min<max && max<=sourceMax, sourceMin, min, max, sourceMax, args);
     assert_( size.x%2 == 0 && size.y%2 == 0 && size.z%2 == 0); // Margins are currently always symmetric (i.e even volume size)
-    if(cylinder) assert_(size.x == size.y);
+    /*if(cylinder!="0"_ || args.contains("inputCylinder"_))*/ assert_(size.x == size.y);
     // Align sampleCount for correct tiled indexing
     int3 sampleCount = int3(nextPowerOfTwo(size.x), nextPowerOfTwo(size.y), nextPowerOfTwo(size.z));
     int3 margin = ::max(minimalMargin, (sampleCount - size)/2);
@@ -52,7 +47,21 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, string bo
     margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
     assert_( margin >= minimalMargin );
-    return {min, max, size, sampleCount, margin, cylinder};
+    return {min, max, size, sampleCount, margin, /*cylinder!="0"_*/true};
+}
+CropVolume parseGlobalCropAndTransformToInput(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 sourceMax) {
+    if(!args.contains("inputCylinder"_) && !args.contains("inputDownsample"_)) { // Using input coordinates
+        return parseCrop(args, sourceMargin, sourceMin, sourceMax, 0, 1);
+    } else { // Converts to input coordinates
+        Dict inputArgs;
+        if(args.contains("inputCylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
+        if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
+        CropVolume inputCrop = parseCrop(inputArgs, 0, 0, 1<<16); // Already bound checked
+        inputCrop.min += sourceMargin, inputCrop.max += sourceMargin;
+        CropVolume globalCrop = parseCrop(args, sourceMargin, inputCrop.min, inputCrop.max, 0, 1); // Margins will be wrong
+        CropVolume localCrop = {globalCrop.min-inputCrop.min, globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
+        return localCrop;
+    }
 }
 
 /// Crops a volume to remove boundary effects
@@ -85,19 +94,8 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     for(uint z=Z-marginZ; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
 }
 class(Crop,Operation), virtual VolumePass<uint16> {
-    string parameters() const override { static auto p="cylinder box downsample inputCylinder inputBox inputDownsample"_; return p; }
+    string parameters() const override { return "cylinder downsample inputCylinder inputDownsample"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        if(!args.contains("inputCylinder"_) && !args.contains("inputBox"_) && !args.contains("inputDownsample"_)) { // Using input coordinates
-            crop(target, source, parseCrop(args, source.margin, source.sampleCount-source.margin, ""_, 1));
-        } else { // Converts to input coordinates
-            Dict inputArgs;
-            if(args.contains("inputCylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
-            if(args.contains("inputBox"_)) inputArgs.insert(String("box"_), copy(args.at("inputBox"_)));
-            if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
-            CropVolume inputCrop = parseCrop(inputArgs, int3(0,0,0), int3(1<<16,1<<16,1<<16)); // Already bound checked
-            CropVolume globalCrop = parseCrop(args, inputCrop.min, inputCrop.max); // Margins will be wrong
-            CropVolume localCrop = {inputCrop.margin+globalCrop.min-inputCrop.min, inputCrop.margin+globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
-            crop(target, source, localCrop);
-        }
+        crop(target, source, parseGlobalCropAndTransformToInput(args, source.margin, source.margin, source.sampleCount-source.margin));
     }
 };

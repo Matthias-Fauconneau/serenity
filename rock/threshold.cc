@@ -164,7 +164,7 @@ class(MaximumMeanGradient, Operation) {
 /// Segments by setting values under a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
 void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint16 threshold, bool cylinder=false) {
     // Ensures threshold volume is closed to avoid null/full rows in aligned distance search
-    int marginX=align(4,source.margin.x)+1, marginY=align(4,source.margin.y)+1, marginZ=align(4,source.margin.z)+1;
+    int marginX=align(4,source.margin.x-1)+1, marginY=align(4,source.margin.y-1)+1, marginZ=align(4,source.margin.z-1)+1;
     v4si threshold4 = set1(threshold);
     int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     assert_(X%8==0 && (!cylinder || (X%2==0 && Y%2==0 && X-2*marginX==Y-2*marginY)));
@@ -195,21 +195,15 @@ void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint1
 #endif
 }
 
-/// Segments between either rock or pore space by comparing density against a uniform threshold
+/// Segments pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
     string parameters() const override { return "cylinder threshold"_; }
     uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        uint16 binaryThreshold;
-        if(args.contains("threshold"_) && isDecimal(args.at("threshold"_))) {
-            float threshold = toDecimal(args.at("threshold"_));
-            if(threshold < 1) binaryThreshold = round( threshold*inputs[0].maximum ); // Normalized (/maximum)
-            else binaryThreshold = round(threshold);
-        } else {
-            Result* threshold = otherInputs[0];
-            binaryThreshold = round( TextData(threshold->data).decimal() * inputs[0].maximum );
-        }
-        threshold(outputs[0], inputs[0], binaryThreshold, args.value("cylinder"_,"0"_)!="0"_);
+        real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
+        uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
+        log("Segmentation using threshold", threshold, threshold<1?str("->"_,integerThreshold):""_);
+        ::threshold(outputs[0], inputs[0], integerThreshold, args.value("cylinder"_,""_)!="0"_);
     }
 };
 

@@ -42,7 +42,7 @@ if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-not
 # Segments
 pore = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
 colorize = Colorize pore resampled # For visualization
-thresholded = Threshold resampled threshold
+thresholded = Threshold resampled threshold # For visualization
 
 # Computes position of nearest background voxel
 distancex positionxx = PositionX pore
@@ -54,39 +54,40 @@ distance = Distance positionx positiony positionz
 skeleton = Skeleton positionx positiony positionz
 skeleton-tiled = ZOrder skeleton
 
-if !floodfillAfterRasterization: cropInput = skeleton-tiled
-if !floodfillAfterRasterization: rasterizeInput = connected
-if !floodfillAfterRasterization: maximum = rasterized
-if floodfillAfterRasterization: rasterizeInput = skeleton-tiled
-if floodfillAfterRasterization: cropInput = rasterized
-if floodfillAfterRasterization: maximum = connected
-
-# Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-if crop.cylinder: crop = Crop cropInput inputCylinder=source.cylinder inputBox=source.box inputDownsample=source.downsample
-if !crop.cylinder: crop = cropInput
-
 # Discards small pores
 minimalSqRadius = '0'
-if minimalSqRadius: pruned = ThresholdClip crop minimalSqRadius
-if !minimalSqRadius: pruned = crop
+if minimalSqRadius: pruned = ThresholdClip skeleton-tiled minimalSqRadius
+if !minimalSqRadius: pruned = skeleton-tiled
+
+# Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
+if crop.cylinder: crop = Crop pruned inputCylinder=source.cylinder inputDownsample=source.downsample
+if !crop.cylinder: crop = pruned
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
-transpose = Transpose pruned
+transpose = Transpose floodInput
 if transpose=='X': transposed = transpose
 if transpose=='Y': transposed = Transpose transpose
-if transpose=='Z': transposed = pruned
-if !transpose: transposed = pruned
+if transpose=='Z': transposed = floodInput
+if !transpose: transposed = floodInput
 
 floodfill = ''
 if !floodfill: connected = transposed # Forwards unconnected skeleton
 if floodfill: connected = FloodFill transposed minimalSqRadius # Flood fills skeleton
+
+if !floodfillAfterRasterization: floodInput = crop
+if !floodfillAfterRasterization: rasterizeInput = connected
+if !floodfillAfterRasterization: maximum = rasterized
+
+if floodfillAfterRasterization: rasterizeInput = crop
+if floodfillAfterRasterization: floodInput = rasterized
+if floodfillAfterRasterization: maximum = connected
 
 # Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin rasterizeInput
 rasterized = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
-histogram = Histogram maximum cylinder=source.cylinder # Including rock
+histogram = Histogram maximum inputCylinder=source.cylinder inputDownsample=source.downsample # Including rock
 histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
 # Computes pore space, total, relative volumes
 volume = Sum histogram-squaredRadius
@@ -124,7 +125,7 @@ distribution-radius = Div volume-distribution-radius volume-total
   bmp-distance = ToBMP distance
   bmp-skeleton = ToBMP skeleton
   bmp-maximum = ToBMP maximum
-  denoised-connected = Mask denoised maximum threshold
+  denoised-connected = Mask denoised maximum
   bmp-denoised-connected = ToBMP denoised-connected
 
 # Tools

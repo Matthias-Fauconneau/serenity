@@ -91,9 +91,7 @@ struct Rock : virtual PersistentProcess {
             if(!existsFolder(path,cwd)) {
                 assert_(!existsFile(path,cwd), "New folder would overwrite existing file", path);
                 Folder(path,cwd,true);
-            } else if(Folder(path,cwd).list(Files).size<=12) {
-                for(const String& file: Folder(path,cwd).list(Files)) ::remove(file, Folder(path,cwd)); // Cleanups previous results
-            } else log("Skipped cleaning (Too many previous results)");
+            }
             for(const shared<Result>& result: targetResults) {
                 Time time;
                 String fileName = result->name+(result->relevantArguments?"{"_+toASCII(result->relevantArguments)+"}"_:""_)+"."_+result->metadata;
@@ -122,7 +120,6 @@ struct Rock : virtual PersistentProcess {
                 for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) { // one slide per view element
                     titles << String(view->name());
                     newWindow(view.pointer, int2(1080*4/3,1080), view->name());
-                    view->contentChanged.connect(windows.last().pointer, &Window::render);
                 }
             } else {
                 for(array<unique<View>>& views : viewers.values) {
@@ -136,7 +133,6 @@ struct Rock : virtual PersistentProcess {
                 String title = join(titles,"; "_);
                 if(title.size > 256) title = join(targets, "; "_);
                 newWindow(&grids, -1, title);
-                for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) view->contentChanged.connect(windows.last().pointer, &Window::render);
             }
             if(specialArguments.contains("pdf"_)) {
                 String pdf = join(titles,"; "_)+".pdf"_;

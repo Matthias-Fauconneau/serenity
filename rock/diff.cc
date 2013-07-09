@@ -19,15 +19,15 @@ class(Diff, Operation), virtual VolumeOperation {
 
 /// Compares results of enabling a given parameter when generating a given target
 class(Compare, Tool) {
-    string parameters() const override { return "target parameter hold"_; }
+    string parameters() const override { return "target parameter A B hold"_; }
     void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, Process& process) override {
         shared<Result> hold;
         if(arguments.contains("hold"_)) hold = process.getResult(arguments.at("hold"_), arguments); // Prevents last common ancestor from being recycled (FIXME: automatic?)
         string target = arguments.at("target"_), parameter = arguments.at("parameter"_);
         Dict args = copy(arguments);
-        args[parameter]=0;
+        args[parameter]=arguments.value("A"_,0);
         shared<Result> A = process.getResult(target, args);
-        args[parameter]=1;
+        args[parameter]=arguments.value("B"_,1);
         shared<Result> B = process.getResult(target, args);
 
         Dict relevantArguments = copy(process.relevantArguments(target, arguments));

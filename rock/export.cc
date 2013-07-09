@@ -41,16 +41,20 @@ class(Threshold, Operation), virtual VolumeOperation {
 };
 
 /// Sets masked voxels where source is under masked value to masked value
-static void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 maskedValue) {
+static void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 value) {
     assert_(source.size()==mask.size() && target.size() == source.size());
     target.margin = mask.margin;
     for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
-        target(x,y,z) = mask(x,y,z) || source(x,y,z)>maskedValue ? source(x,y,z) : maskedValue;
+        target(x,y,z) = mask(x,y,z) || source(x,y,z)>value ? source(x,y,z) : value;
 }
 class(Mask, Operation), virtual VolumeOperation {
+    virtual string parameters() const { return "value"_; }
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        mask(outputs[0], inputs[0], inputs[1], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        float value = toDecimal(args.at("value"_));
+        uint16 integerValue = value < 1 ? round( value*inputs[0].maximum ) : round(value);
+        log("Mask using value", value, value<1?str("->"_,integerValue):""_);
+        mask(outputs[0], inputs[0], inputs[1], integerValue);
     }
 };
 

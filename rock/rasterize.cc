@@ -141,13 +141,17 @@ void rasterize(Volume16& target, const Volume& source) {
 #endif
         }
         // Writes out fully interleaved target for compatibility (metadata tiled flags currently only define untiled or fully tiled (Z-order) volumes)
-        uint16* const target = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
+        uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
         for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
             int blockX = dx*blockSide, blockY = dy*blockSide, blockZ = dz*blockSide;
             const uint16* const block = tile + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
-            uint16* const targetBlock = target + offsetX[blockX] + offsetY[blockY] + offsetZ[blockZ];
+            uint16* const targetBlock = targetTile + offsetX[blockX] + offsetY[blockY] + offsetZ[blockZ];
             for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
                 targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]] = block[dz*blockSide*blockSide + dy*blockSide + dx];
+#if 1 // Only for floodfill after rasterization test
+                int3 X = int3(tileX,tileY,tileZ)+int3(blockX,blockY,blockZ)+int3(dx,dy,dz);
+                if(!(X>=int3(target.margin) && X<int3(target.sampleCount-target.margin))) targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]]=0;
+#endif
             }
         }
     } );
