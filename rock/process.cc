@@ -2,34 +2,27 @@
 #include "data.h"
 #include "time.h"
 #include "math.h"
+#include <sys/stat.h>
 
 /// Relevant operation parameters
 array<string> Rule::parameters() const {
-    array<string> parameters = copy(processParameters);
-    if(operation && Interface<Operation>::factories.contains(this->operation)) {
-        unique<Operation> operation = Interface<Operation>::instance(this->operation);
-        assert_(operation, "Operation", this->operation, "not found in", Interface<Operation>::factories.keys);
-        parameters += split(operation->parameters());
-    }
-    return parameters;
-}
-
-array<string> Process::parameters() {
     array<string> parameters;
-    for(auto factory: Interface<Operation>::factories.values) parameters += split(factory->constructNewInstance()->parameters());
+    if(condition.parameter) parameters << condition.parameter;
+    if(operation && Interface<Operation>::factories.contains(this->operation))
+        parameters += split(Interface<Operation>::instance(this->operation)->parameters());
+    if(operation && Interface<Tool>::factories.contains(this->operation))
+        parameters += split(Interface<Tool>::instance(this->operation)->parameters());
     return parameters;
 }
 
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
     array<string> targets;
     Dict defaultArguments; // Process-specified default arguments
-
-    array<string> parameters = this->parameters();
+    array<string> parameters; /// All valid parameters accepted by defined rules (used by conditions or operations)
 
     for(TextData s(definition); s;) { //FIXME: use parser generator
         s.skip();
         if(s.match('#')) { s.until('\n'); continue; }
-        array<string> processParameters;
         Rule rule;
         if(s.match("if"_)) {
             s.whileAny(" \t"_);
@@ -38,7 +31,6 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             if(s.match('!')) op="=="_, value="0"_;
             string parameter = s.word("_-."_);
             parameters += parameter;
-            processParameters += parameter;
             s.whileAny(" \t"_);
             if(!op) op = s.whileAny("!="_);
             if(!op) op = "!="_, value = "0"_;
@@ -59,7 +51,6 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         if(outputs.size==1 && s.peek()=='\'') { // Default argument
             assert_(!rule.condition.op, "Conditionnal default argument would induce cyclic dependency between process definition and user arguments"_);
             string key = outputs[0];
-            parameters += key; // May not be defined yet
             if(!s.match('\'')) error("Unquoted literal", key, s.whileNo(" \t\n"_));
             string value = s.until('\''); // Literal
             assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
@@ -84,7 +75,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             }
             resultNames += outputs; //for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
             rule.outputs = move(outputs);
-            rule.processParameters = move(processParameters);
+            parameters += rule.parameters();
             rules << move(rule);
         }
     }
@@ -226,7 +217,6 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
     assert_(!results);
     array<string> targets = Process::configure(allArguments, definition);
     if(arguments.contains("storageFolder"_)) storageFolder = Folder(arguments.at("storageFolder"_),currentWorkingDirectory());
-    // Maps intermediate results from file system
     for(const String& path: storageFolder.list(Files|Folders)) {
         TextData s (path); string name = s.whileNot('{');
         if(path==name || !&ruleForOutput(name, arguments)) { // Removes invalid data
@@ -290,19 +280,28 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     array<shared<Result>> inputs;
     for(const string& input: rule.inputs) inputs << getResult(input, arguments);
-    for(const shared<Result>& input: inputs) {
+
+    Dict relevantArguments = Process::localArguments(target, arguments);
+    Dict localArguments; array<string> parameters = rule.parameters();
+    for(auto arg: relevantArguments) if(parameters.contains(arg.key) && rule.condition.parameter!=arg.key) localArguments.insert(copy(arg.key), copy(arg.value)); // Filters locally relevant arguments
+
+    compute(rule.operation, inputs, rule.outputs, arguments, relevantArguments, localArguments);
+    assert_(&find(target, arguments), target, arguments);
+    return share(find(target, arguments));
+}
+
+void PersistentProcess::compute(const string& operationName, const ref<shared<Result>>& inputs, const ref<string>& outputNames,
+                                const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) {
+    for(const shared<Result>& input: inputs) { // Updates last access time for correct LRU cache behavior
         ResultFile& result = *(ResultFile*)input.pointer;
-        if(result.fileName) touchFile(result.fileName, result.folder, false); // Updates last access time for correct LRU cache behavior
+        if(result.fileName) touchFile(result.fileName, result.folder, false);
     }
 
-    unique<Operation> operation = Interface<Operation>::factories.contains(rule.operation) ? Interface<Operation>::instance(rule.operation) : nullptr;
-    Dict relevantArguments = this->localArguments(target, arguments);
-    Dict localArguments; array<string> parameters = rule.parameters();
-    for(auto arg: relevantArguments) if(parameters.contains(arg.key)) localArguments.insert(copy(arg.key), copy(arg.value)); // Filters locally relevant arguments
+    unique<Operation> operation = Interface<Operation>::factories.contains(operationName) ? Interface<Operation>::instance(operationName) : nullptr;
 
     array<shared<Result>> outputs;
-    for(uint index: range(rule.outputs.size)) {
-        const string& output = rule.outputs[index];
+    for(uint index: range(outputNames.size)) {
+        const string& output = outputNames[index];
 
         if(&find(output, arguments)) { // Reuses same result file
             shared<ResultFile> result = results.take(indexOf(output, arguments));
@@ -318,6 +317,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
                     if(File(path, storageFolder).size() < 64*1024) continue; // Small files won't release much capacity
+                    if(!(File(path, storageFolder).stat().st_mode&S_IWUSR)) continue; // Locked file
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
@@ -350,10 +350,10 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     Time time;
     if(operation) operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    else Interface<Tool>::instance(rule.operation)->execute(arguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
-    if((uint64)time>200) log(rule, localArguments ? str(localArguments) : ""_, time);
+    else Interface<Tool>::instance(operationName)->execute(arguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
+    if((uint64)time>200) log(operationName, localArguments ? str(localArguments) : ""_, time);
 
-    for(shared<Result>& output : outputs) {
+    for(shared<Result>& output : outputs) if(output->name) { // Tool may remove already stored outputs (by an explicit Process::compute use)
         shared<ResultFile> result = move(output);
         result->timestamp = realTime();
         result->relevantArguments = copy(relevantArguments);
@@ -392,5 +392,4 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
         assert_(existsFile(result->fileName,storageFolder), result->fileName);
         results << move(result);
     }
-    return share(find(target, arguments));
 }

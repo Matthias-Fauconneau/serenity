@@ -4,9 +4,9 @@
 
 /// Returns relative deviation versus cylinder radius of 8 volume samples
 class(REV, Tool) {
-    void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
-        real resolution = parseScalar(results.getResult("resolution"_, arguments)->data);
-        Volume input = toVolume(results.getResult("connected"_, arguments));
+    void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, Process& process) override {
+        real resolution = parseScalar(process.getResult("resolution"_, arguments)->data);
+        Volume input = toVolume(process.getResult("connected"_, arguments));
         int margin = max(max(input.margin.x, input.margin.y), input.margin.z), size=min(min(input.sampleCount.x, input.sampleCount.y), input.sampleCount.z);
         map<String, buffer<byte>> PSD_R;
         map<real, array<UniformSample>> PSD_octants;
@@ -21,7 +21,7 @@ class(REV, Tool) {
                 Dict args = copy(arguments);
                 args.insert("histogram.crop"_);
                 args.insert(String("histogram.cylinder"_), str((int[]){center.x, center.y, radius, center.z-radius, center.z+radius},','));
-                shared<Result> result = results.getResult("volume-distribution-radius"_, args); // Pore size distribution (values are volume in voxels)
+                shared<Result> result = process.getResult("volume-distribution-radius"_, args); // Pore size distribution (values are volume in voxels)
                 nonUniformSamples << parseNonUniformSample( result->data );
             }
             array<UniformSample> samples = resample(nonUniformSamples);
@@ -51,9 +51,9 @@ class(REV, Tool) {
         output(outputs, "ε(R|r>median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[2]);});
         outputElements(outputs, "PSD(R)"_, "V(r [μm]).tsv"_, [&]{return move(PSD_R);});
         output(outputs, "R"_, "scalar"_, [&]{return toASCII(inflectionRadius);});
-        for(uint i: range(2)) {
-            real radius = i==0 ? inflectionRadius : PSD_octants.keys.last();
-            string name = i==0 ? "inflection"_ : "last"_;
+        for(uint i: range(3)) {
+            real radius = i==0 ? PSD_octants.keys[3] : i==1 ? inflectionRadius : PSD_octants.keys.last();
+            string name = i==0 ? "first"_ : i==1 ? "inflection"_ : "last"_;
             outputElements(outputs, "PSD(octant|R:"_+name+")"_, "V(r [μm]).tsv"_, [&]{
                 const array<UniformSample>& PSD_octant = PSD_octants.at(radius);
                 const String title = "#Pore size distribution versus octants (R="_+dec(radius)+"μm)\n"_;

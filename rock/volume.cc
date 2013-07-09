@@ -30,6 +30,7 @@ String volumeFormat(const Volume& volume) {
     if(volume.tiled()) s << "-tiled"_;
     if(volume.squared) s << "-squared"_;
     if(volume.floatingPoint) s << "-float"_;
+    if(volume.field) s << "-"_ << volume.field;
     return s;
 }
 
@@ -48,6 +49,7 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
     if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint>(), volume.offsetY=buffer<uint>(), volume.offsetZ=buffer<uint>(); }
     if(s.match("-squared"_)) volume.squared=true;
     if(s.match("-float"_)) volume.floatingPoint=true;
+    if(s.match("-"_)) volume.field = String(s.untilEnd());
     if(s) return false;
     return true;
 }

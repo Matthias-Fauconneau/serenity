@@ -20,18 +20,14 @@ void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
     });
 }
 class(ThresholdClip, Operation), virtual VolumeOperation {
-    string parameters() const override { return "clipThreshold"_; }
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        uint clipThreshold;
-        if(args.contains("clipThreshold"_) && isInteger(args.at("clipThreshold"_))) clipThreshold = toInteger(args.at("clipThreshold"_));
-        else clipThreshold = TextData(otherInputs[0]->data).integer();
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        uint clipThreshold = TextData(otherInputs[0]->data).integer();
         thresholdClip(outputs[0], inputs[0], clipThreshold);
-        outputs[0].margin += ceil(sqrt((real)clipThreshold)); //HACK: pruned skeleton cannot reach boundaries (needed for floodfill connectivity)
     }
 };
 
-void floodFill(Volume16& target, const Volume16& source) {
+void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMargin) {
     assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
 
@@ -48,7 +44,7 @@ void floodFill(Volume16& target, const Volume16& source) {
     byte* const mark = markBuffer.begin();
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
-    {uint z=marginZ;
+    {uint z=marginZ+connectivitySeedMargin;
         for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
             uint index = offsetX[x]+offsetY[y]+offsetZ[z];
             if(sourceData[index]) stack[stackSize++] = short3(x,y,z); // Pushes initial seeds (from bottom Z face)
@@ -66,7 +62,7 @@ void floodFill(Volume16& target, const Volume16& source) {
             }
         }
     }
-    {uint z=Z-1-marginZ;
+    {uint z=Z-1-marginZ-connectivitySeedMargin;
         for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
             uint index = offsetX[x]+offsetY[y]+offsetZ[z];
             if(mark[index/8]&(1<<(index%8))) {
@@ -87,8 +83,11 @@ void floodFill(Volume16& target, const Volume16& source) {
         }
     }
 }
-class(FloodFill, Operation), virtual VolumePass<uint16> {
-    void execute(const Dict&, VolumeT<uint16>& target, const Volume& source) override {
-        floodFill(target, source);
+class(FloodFill, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        uint connectivitySeedMarginSq = TextData(otherInputs[0]->data).integer();
+        uint connectivitySeedMargin = ceil(sqrt(real(connectivitySeedMarginSq))); //FIXME: use minimalRadius = SquareRoot minimalSqRadius
+        floodFill(outputs[0], inputs[0], connectivitySeedMargin);
     }
 };

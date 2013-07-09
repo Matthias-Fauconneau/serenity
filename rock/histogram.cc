@@ -57,7 +57,7 @@ class(Histogram, Operation) {
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         UniformHistogram histogram = ::histogram(source, parseCrop(args.contains("crop"_)?args:(const Dict&)Dict(), source.margin, source.sampleCount-source.margin, ""_, 1));
-        outputs[0]->metadata = String("V(μ).tsv"_);
+        outputs[0]->metadata = String("V("_+source.field+").tsv"_);
         outputs[0]->data = toASCII(histogram);
     }
 };
@@ -66,9 +66,19 @@ class(Normalize, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         auto sample = parseUniformSample(source.data);
-        //sample.scale = 1./(sample.size-1); //FIXME
+        //sample.scale = 1./(sample.size-1); Only normalize Y axis
         float sum = sample.sum();
         assert_(sum);
-        target.data = toASCII((1./sum)*sample);
+        target.data = toASCII((1./(sample.scale*sum))*sample);
+    }
+};
+
+class(NormalizeY, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        auto sample = parseUniformSample(source.data);
+        float sum = sample.sum();
+        assert_(sum);
+        target.data = toASCII((1./(sample.scale*sum))*sample);
     }
 };

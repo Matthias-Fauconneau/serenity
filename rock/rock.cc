@@ -22,11 +22,14 @@
 //#include "rasterize.h"
 //#include "kernel-density-estimation.h"
 //#include "export.h"
+
 //#include "slice.h"
 //#include "plot.h"
+
 //#include "REV.h"
 //#include "prune.h"
 //#include "summary.h
+//#include "diff.h
 
 /// Command-line interface for rock volume data processing
 struct Rock : virtual PersistentProcess {
@@ -38,7 +41,7 @@ struct Rock : virtual PersistentProcess {
         array<string> targets = configure(args, process? : rock());
         if(targetPaths.size>targets.size)
             error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
-                  "\nHint: An unknown (mistyped?) target might be interpreted as target path", rules,'\n');
+                  "\nHint: An unknown (mistyped?) target might be interpreted as target path");
         if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
             warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
 #ifndef BUILD
@@ -48,7 +51,6 @@ struct Rock : virtual PersistentProcess {
             log("Binary built on " __DATE__ " " __TIME__ " (" BUILD ")");
             log("Tools:",Interface<Tool>::factories.keys);
             log("Operations:",Interface<Operation>::factories.keys);
-            log("Parameters:",parameters());
             log("Results:",resultNames);
             log("Targets:",targets);
             log("Arguments:",arguments);
@@ -119,7 +121,8 @@ struct Rock : virtual PersistentProcess {
             if(slides) {
                 for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) { // one slide per view element
                     titles << String(view->name());
-                    newWindow(view.pointer, 0, view->name());
+                    newWindow(view.pointer, int2(1080*4/3,1080), view->name());
+                    view->contentChanged.connect(windows.last().pointer, &Window::render);
                 }
             } else {
                 for(array<unique<View>>& views : viewers.values) {
@@ -133,6 +136,7 @@ struct Rock : virtual PersistentProcess {
                 String title = join(titles,"; "_);
                 if(title.size > 256) title = join(targets, "; "_);
                 newWindow(&grids, -1, title);
+                for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) view->contentChanged.connect(windows.last().pointer, &Window::render);
             }
             if(specialArguments.contains("pdf"_)) {
                 String pdf = join(titles,"; "_)+".pdf"_;
@@ -144,7 +148,7 @@ struct Rock : virtual PersistentProcess {
 
     void newWindow(Widget* widget, int2 sizeHint, string title) {
         if(specialArguments.contains("png"_)) {
-            writeFile(title+".png"_, encodePNG(renderToImage(widget, int2(1920,1080))), home());
+            writeFile(title+".png"_, encodePNG(renderToImage(widget, sizeHint)), home());
             images << title+".png"_;
         } else {
             unique<Window> window(widget, sizeHint, title);

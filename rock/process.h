@@ -1,6 +1,5 @@
 #pragma once
 #include "operation.h"
-#include "tool.h"
 #include "file.h"
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
@@ -10,16 +9,13 @@ struct Rule {
     array<string> inputs;
     array<string> outputs;
     map<String, Variant> arguments;
-    map<String, String> argumentValues;
     array<string> processParameters;
     array<string> parameters() const;
 };
 template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs); }
 
 /// Manages a process defined a direct acyclic graph of production rules
-struct Process : ResultManager {
-    /// Returns all valid parameters (accepted by operations compiled in this binary, used in process definition or for derived class special behavior)
-    array<string> parameters();
+struct Process {
 
     /// Configures process using given arguments and definition (which can depends on the arguments)
     virtual array<string> configure(const ref<string>& allArguments, const string& definition);
@@ -45,6 +41,12 @@ struct Process : ResultManager {
     /// Converts matching scoped arguments to local arguments for execution
     Dict localArguments(const string& target, const Dict& scopeArguments);
 
+    /// Gets result from cache or computes if necessary
+    virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;
+
+    /// Computes result of an operation
+    virtual void compute(const string& operation, const ref<shared<Result>>& inputs, const ref<string>& outputNames, const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) abstract;
+
     array<string> specialParameters; // Valid parameters accepted for derived class special behavior
     Dict arguments; // User-specified arguments
     Dict specialArguments; // User-specified special arguments
@@ -55,6 +57,17 @@ struct Process : ResultManager {
     array<shared<Result>> results; // Generated intermediate (and target) data
 };
 
+/// High level operation with direct access to query new results from process
+/// \note as inputs are unknown, results are not regenerated on input changes
+struct Tool {
+    /// Returns which parameters affects this operation output
+    virtual string parameters() const { return ""_; }
+    /// Executes the tool computing data results using process
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs, Process& results) abstract;
+    /// Virtual destructor
+    virtual ~Tool() {}
+};
+
 /// Mirrors results on a filesystem
 struct ResultFile : Result {
     ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, String&& data, const string& path, const string& folder)
@@ -62,7 +75,7 @@ struct ResultFile : Result {
     ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, Map&& map, const string& path, const string& folder)
         : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(String(path)), folder(String(folder)) { if(map) maps<<move(map); }
     void rename() {
-        if(!fileName) return;
+        if(!fileName || !name) return;
         String newName = name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata;
         if(fileName!=newName) { ::rename(fileName, newName, Folder(folder)); fileName=move(newName); }
     }
@@ -79,10 +92,14 @@ struct PersistentProcess : virtual Process {
      PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) { specialParameters += "storageFolder"_; }
     ~PersistentProcess();
 
+     /// Maps intermediate results from file system
     array<string> configure(const ref<string>& allArguments, const string& definition) override;
 
     /// Gets result from cache or computes if necessary
     shared<Result> getResult(const string& target, const Dict& arguments) override;
+
+    /// Computes result of an operation
+    void compute(const string& operation, const ref<shared<Result>>& inputs, const ref<string>& outputNames, const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) override;
 
     Folder storageFolder; // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data (TODO: rename to -> temporaryFolder ?)
 };

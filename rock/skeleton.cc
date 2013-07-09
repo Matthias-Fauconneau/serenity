@@ -57,6 +57,7 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
     });
     target.margin.x = marginX, target.margin.y = marginY, target.margin.z = marginZ;
     target.maximum = maximum(target), target.squared=true;
+    target.field = String("r"_); // Radius
 }
 
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)

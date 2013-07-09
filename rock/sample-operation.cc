@@ -22,7 +22,7 @@ NonUniformSample squareRootVariable(NonUniformSample&& A) { for(real& x: A.keys)
 /// Square roots the variable of a distribution
 class(SquareRootVariable, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
-        assert_(endsWith(source.metadata,".tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
+        assert_(endsWith(source.metadata,"tsv"_), "Expected a distribution, not a", source.metadata, source.name, target.name);
         target.metadata = copy(source.metadata);
         target.data = toASCII(squareRootVariable(parseNonUniformSample(source.data)));
     }
@@ -33,7 +33,7 @@ NonUniformSample scaleVariable(float scalar, NonUniformSample&& A) { for(real& x
 /// Scales the variable of a distribution
 class(ScaleVariable, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
+        assert_(endsWith(inputs[0]->metadata,"tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
         outputs[0]->metadata = copy(inputs[0]->metadata);
         outputs[0]->data = toASCII(scaleVariable(parseScalar(inputs[1]->data), parseNonUniformSample(inputs[0]->data)));
@@ -43,9 +43,10 @@ class(ScaleVariable, Operation) {
 /// Scales both the variable and the values of a distribution to keep the same area
 class(ScaleDistribution, Operation) {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        assert_(endsWith(inputs[0]->metadata,".tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
+        assert_(endsWith(inputs[0]->metadata,"tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
-        outputs[0]->metadata = copy(inputs[0]->metadata);
+        string xlabel,ylabel; { TextData s(inputs[0]->metadata); ylabel = s.until('('); xlabel = s.until(')'); }
+        outputs[0]->metadata = ylabel+"("_+xlabel+" [μm]).tsv"_; //FIXME: get unit from scalar input
         outputs[0]->data = toASCII(scaleDistribution(parseScalar(inputs[1]->data), parseNonUniformSample(inputs[0]->data)));
     }
 };
@@ -56,7 +57,7 @@ class(Div, Operation) {
         outputs[0]->metadata = copy(inputs[0]->metadata);
         if(inputs[0]->metadata=="scalar"_) outputs[0]->data = toASCII(parseScalar(inputs[0]->data)/parseScalar(inputs[1]->data));
         else if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( (1./parseScalar(inputs[1]->data)) * parseVector(inputs[0]->data) );
-        else if(endsWith(inputs[0]->metadata,".tsv"_)) outputs[0]->data = toASCII( (1./parseScalar(inputs[1]->data)) * parseNonUniformSample(inputs[0]->data) );
+        else if(endsWith(inputs[0]->metadata,"tsv"_)) outputs[0]->data = toASCII( (1./parseScalar(inputs[1]->data)) * parseNonUniformSample(inputs[0]->data) );
         else error(inputs[0]->metadata);
     }
 };

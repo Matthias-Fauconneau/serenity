@@ -4,9 +4,9 @@
 #include "text.h"
 #include "math.h"
 
-int2 Plot::sizeHint() { return int2(1920/2, 1080/2); }
+int2 Plot::sizeHint() { return int2(1080*4/3, 1080); }
 void Plot::render(int2 position, int2 size) {
-    int resolution = ::resolution; ::resolution *= 2; // Scales the size of all text labels
+    int resolution = ::resolution; ::resolution = 1.5*96; // Scales the size of all text labels
     // Computes axis scales
     vec2 min=0, max=0;
     for(const auto& data: dataSets) for(auto point: data) {
@@ -20,7 +20,7 @@ void Plot::render(int2 position, int2 size) {
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
         real subExponent = log10(max[axis]) - floor(log10(max[axis]));
-        for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.5,6}, {1.6,8}, {2,10}, {2.5,5}, {5,5}, {6,6}, {8,8}, {10,5}})
+        for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, /*{1.5,6},*/ {1.6,8}, {2,10}, {2.5,5}, {4,8}, {5,5}, {6,6}, {8,8}, {10,5}})
             if(log10(a[0]) >= subExponent) { max[axis] = a[0]*exp10(floor(log10(max[axis]))); tickCount[axis] = a[1]; break; }
     }
 
@@ -36,26 +36,25 @@ void Plot::render(int2 position, int2 size) {
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
     }
-    int left=tickLabelSize.x, top=2*tickLabelSize.y, bottom=tickLabelSize.y;
+    int left=tickLabelSize.x, top=tickLabelSize.y, bottom=tickLabelSize.y;
     int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
 
-    int2 pen=position;
-    {Text text(format(Bold)+title); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
-    // Legend
+    // Colors
     buffer<vec4> colors(legends.size);
     if(colors.size==1) colors[0] = black;
     else if(colors.size==2) colors[0] = red, colors[1] = blue;
     else for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(2*PI*i/colors.size,1,1),1.f); //FIXME: constant intensity
-    if(legends.size>1) {
-        for(uint i: range(legends.size)) {Text text(legends[i], 16, colors[i]); text.render(pen+int2(size.x-right-text.sizeHint().x,top)); pen.y+=text.sizeHint().y; }
-    }
+
+    int2 pen=position;
+    {Text text(format(Bold)+title); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
+    for(uint i: range(legends.size)) {Text text(legends[i], 16, colors[i]); text.render(pen+int2(size.x-right-text.sizeHint().x,top)); pen.y+=text.sizeHint().y; } // Legend
 
     // Transforms data positions to render positions
     auto point = [&](vec2 p)->vec2{
         p = (p-min)/(max-min);
         if(logx) p.x = ln(1+(e-1)*p.x);
         if(logy) p.y = ln(1+(e-1)*p.y);
-        return vec2(position.x+left+p.x*(size.x-left-right),position.y+top+(1-p.y)*(size.y-top-bottom));
+        return vec2(position.x+left+p.x*(size.x-left-right),position.y+2*top+(1-p.y)*(size.y-2*top-bottom));
     };
 
     // Draws axis and ticks

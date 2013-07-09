@@ -15,7 +15,7 @@ void squareRoot(VolumeFloat& target, const Volume16& source) {
 defineVolumePass(SquareRoot, float, squareRoot);
 
 /// Scales all values
-void scaleValues(VolumeFloat& target, const VolumeFloat& source, const float scale) {
+static void scaleValues(VolumeFloat& target, const VolumeFloat& source, const float scale) {
     assert_(source.floatingPoint);
     target.maximum = ceil(scale*source.maximum), target.squared=false;
     const float* const sourceData = source; float* const targetData = target;
@@ -28,8 +28,20 @@ class(ScaleValues, Operation), virtual VolumeOperation {
     }
 };
 
+/// Sets voxels above threshold to maximum
+static void threshold(Volume16& target, const Volume16& source, uint16 threshold) {
+    for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
+        target(x,y,z) = source(x,y,z)>threshold ? target.maximum : source(x,y,z);
+}
+class(Threshold, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        threshold(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+    }
+};
+
 /// Sets masked voxels where source is under masked value to masked value
-void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 maskedValue) {
+static void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 maskedValue) {
     assert_(source.size()==mask.size() && target.size() == source.size());
     target.margin = mask.margin;
     for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
@@ -80,7 +92,7 @@ template<uint pad> inline void itoa(byte*& target, uint n) {
 }
 
 /// Exports volume to ASCII, one sample per line formatted as "x, y, z, f(x,y,z)"
-buffer<byte> toASCII(const Volume& source) {
+static buffer<byte> toASCII(const Volume& source) {
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
@@ -113,7 +125,7 @@ class(ToASCII, Operation), virtual VolumeOperation {
 
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
-String toCDL(const Volume& source) {
+static String toCDL(const Volume& source) {
     uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;

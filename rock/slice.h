@@ -2,7 +2,6 @@
 #include "view.h"
 #include "volume.h"
 #include "widget.h"
-#include "function.h"
 
 /// Displays volume as slices
 class(SliceView, View), virtual Widget {
@@ -15,9 +14,8 @@ class(SliceView, View), virtual Widget {
     array<Volume> volumes;
     int currentIndex=0;
     static float sliceZ; // Normalized z coordinate of the currently shown slice (static: synchronize Z coordinates across all slice views)
-    signal<> updateView;
 
     bool renderVolume = false;
-    int2 lastPos;
+    int2 lastPos; float lastZ;
     vec2 rotation = vec2(PI/3,-PI/3); // Current view angles (yaw,pitch)
 };

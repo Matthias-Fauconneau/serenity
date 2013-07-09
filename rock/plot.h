@@ -8,7 +8,7 @@ struct Plot : virtual Widget {
     void render(int2 position, int2 size) override;
 
     String title, xlabel, ylabel;
-    bool logx, logy;
+    bool logx=false, logy=false;
     array<String> legends;
     array<NonUniformSample> dataSets;
 };

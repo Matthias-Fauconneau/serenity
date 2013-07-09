@@ -23,23 +23,26 @@ if resample: resampled mipmap = Resample denoised resolution process-resolution 
 # Density distribution
 if !thresholdFromSource: histogram-radiodensity = Histogram resampled cylinder=source.cylinder
 if thresholdFromSource: histogram-radiodensity = Histogram source
-histogram-radiodensity-normalized = Normalize histogram-radiodensity
+histogram-radiodensity-normalizeY = NormalizeY histogram-radiodensity
 distribution-radiodensity = KernelDensityEstimation histogram-radiodensity
+distribution-radiodensity-normalized = KernelDensityEstimation histogram-radiodensity normalize=1
 
 # Deprecated (Backward compatibility)
 histogram-density = histogram-radiodensity
-histogram-density-normalized = histogram-radiodensity-normalized
+histogram-density-normalized = histogram-radiodensity-normalizeY
 distribution-density = distribution-radiodensity
 
 # Threshold determination
 threshold = 'otsu'
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-radiodensity # Recommended robust statistic method
+otsu-interclass-deviation-normalized = Normalize otsu-interclass-deviation
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-radiodensity # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity # Explicit model
 
 # Segments
 pore = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
 colorize = Colorize pore resampled # For visualization
+thresholded = Threshold resampled threshold
 
 # Computes position of nearest background voxel
 distancex positionxx = PositionX pore
@@ -51,19 +54,19 @@ distance = Distance positionx positiony positionz
 skeleton = Skeleton positionx positiony positionz
 skeleton-tiled = ZOrder skeleton
 
-pruneSkeleton = '1'
-if pruneSkeleton: cropInput = skeleton-tiled
-if pruneSkeleton: rasterizeInput = connected
-if pruneSkeleton: maximum = rasterized
-if !pruneSkeleton: rasterizeInput = skeleton-tiled
-if !pruneSkeleton: cropInput = rasterized
-if !pruneSkeleton: maximum = connected
+if !floodfillAfterRasterization: cropInput = skeleton-tiled
+if !floodfillAfterRasterization: rasterizeInput = connected
+if !floodfillAfterRasterization: maximum = rasterized
+if floodfillAfterRasterization: rasterizeInput = skeleton-tiled
+if floodfillAfterRasterization: cropInput = rasterized
+if floodfillAfterRasterization: maximum = connected
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
 if crop.cylinder: crop = Crop cropInput inputCylinder=source.cylinder inputBox=source.box inputDownsample=source.downsample
 if !crop.cylinder: crop = cropInput
 
 # Discards small pores
+minimalSqRadius = '0'
 if minimalSqRadius: pruned = ThresholdClip crop minimalSqRadius
 if !minimalSqRadius: pruned = crop
 
@@ -74,9 +77,9 @@ if transpose=='Y': transposed = Transpose transpose
 if transpose=='Z': transposed = pruned
 if !transpose: transposed = pruned
 
-floodfill = '1'
+floodfill = ''
 if !floodfill: connected = transposed # Forwards unconnected skeleton
-if floodfill: connected = FloodFill transposed # Flood fills skeleton
+if floodfill: connected = FloodFill transposed minimalSqRadius # Flood fills skeleton
 
 # Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin rasterizeInput
@@ -125,6 +128,7 @@ distribution-radius = Div volume-distribution-radius volume-total
   bmp-denoised-connected = ToBMP denoised-connected
 
 # Tools
-ε(R) ε(R|r<median) ε(R|r>median) PSD(R) R PSD(octant|R:inflection) PSD(octant|R:last) = REV
+ε(R) ε(R|r<median) ε(R|r>median) PSD(R) R PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) = REV
 unconnected(λ) connected(λ) = Prune
 summary = Summary
+compare = Compare

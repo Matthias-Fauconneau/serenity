@@ -6,7 +6,7 @@
 float SliceView::sliceZ = 1./2;
 
 bool SliceView::view(const string& metadata, const string& name, const buffer<byte>& data) {
-    if(volumes) return false;
+    //if(volumes) return false;
     Volume volume = toVolume(metadata, data);
     if(!inRange(1u,volume.sampleSize,4u)) return false;
     names << String(name);
@@ -16,16 +16,17 @@ bool SliceView::view(const string& metadata, const string& name, const buffer<by
 
 string SliceView::name() { return names[currentIndex]; }
 
-bool SliceView::mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
+bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     if(button==WheelDown||button==WheelUp) {
         int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),volumes.size-1);
-        if(nextIndex == currentIndex) return true;
-        updateView();
+        if(nextIndex == currentIndex) return false;
+        currentIndex = nextIndex; //contentChanged();
         return true;
     }
+    if(event==Press) lastPos=cursor, lastZ = sliceZ;
     if(!button) return false;
-    float z = clip(0.f, float(cursor.x)/(size.x-1), 1.f);
-    if(sliceZ != z) { sliceZ = z; updateView(); }
+    float z = clip(0.f, lastZ+float(cursor.x-lastPos.x)/(size.x-1), 1.f);
+    if(sliceZ != z) { sliceZ = z; /*contentChanged();*/ }
     return true;
 }
 

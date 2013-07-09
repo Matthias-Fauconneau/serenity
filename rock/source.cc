@@ -39,6 +39,7 @@ class(Source, Operation), virtual VolumeOperation {
         Volume16& target = outputs.first();
         target.sampleCount = crop.sampleCount;
         target.margin = crop.margin;
+        target.field = String("μ"_); // Radiodensity
         uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z;
         uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;

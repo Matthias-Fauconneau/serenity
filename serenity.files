@@ -86,7 +86,6 @@ io/bmp.h
 rock/slice.cc
 rock/REV.cc
 rock/prune.cc
-rock/tool.h
 rock/result.h
 rock/view.h
 rock/view.cc
@@ -94,3 +93,4 @@ rock/plot.cc
 rock/plot.h
 rock/summary.cc
 rock/slice.h
+rock/diff.cc
