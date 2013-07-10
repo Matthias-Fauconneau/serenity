@@ -27,7 +27,7 @@ histogram-radiodensity-normalizeY = NormalizeY histogram-radiodensity
 distribution-radiodensity = KernelDensityEstimation histogram-radiodensity
 distribution-radiodensity-normalized = KernelDensityEstimation histogram-radiodensity normalize=1
 
-# Deprecated (Backward compatibility)
+# Deprecated (Backward compatibility) (Using "radiodensity" as "density" is too easily confused with probability density)
 histogram-density = histogram-radiodensity
 histogram-density-normalized = histogram-radiodensity-normalizeY
 distribution-density = distribution-radiodensity
@@ -89,22 +89,26 @@ rasterized = Rasterize sphere-bins
 # Computes histogram of maximum squared radii
 histogram = Histogram maximum inputCylinder=source.cylinder inputDownsample=source.downsample # Including rock
 histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
-# Computes pore space, total, relative volumes
+# Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
+histogram-radius = SquareRootVariable histogram-squaredRadius
+
+# Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
 volume = Sum histogram-squaredRadius
 volume-total = Sum histogram
 porosity = Div volume volume-total # Computes porosity (= pore space volume / total volume )
-# Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
-histogram-radius = SquareRootVariable histogram-squaredRadius
-# Normalize histogram
-histogram-radius-normalized = Div histogram-radius volume-total
+histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
+mean-radius = HistogramMean histogram-radius-scaled
+
+# Should be removed (kept for backward compatibility)
+ histogram-radius-normalized = Div histogram-radius volume-total # Normalizes histogram (for comparison with distribution-radius, compare histogram-radius with volume-distribution-radius instead)
+ histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
+
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=0.5 normalize=0
 # Normalizes probability density on total volume (including background (i.e not the same as probability density normalization))
 distribution-radius = Div volume-distribution-radius volume-total
 # Scales radius (e.g to original pixel or physical resolution)
  volume-distribution-radius-scaled = ScaleDistribution volume-distribution-radius process-resolution
- histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
- histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
 
 # Export

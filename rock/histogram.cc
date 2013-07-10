@@ -61,24 +61,3 @@ class(Histogram, Operation) {
         outputs[0]->data = toASCII(histogram);
     }
 };
-
-class(Normalize, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-        auto sample = parseUniformSample(source.data);
-        //sample.scale = 1./(sample.size-1); Only normalize Y axis
-        float sum = sample.sum();
-        assert_(sum);
-        target.data = toASCII((1./(sample.scale*sum))*sample);
-    }
-};
-
-class(NormalizeY, Operation), virtual Pass {
-    virtual void execute(const Dict& , Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
-        auto sample = parseUniformSample(source.data);
-        float sum = sample.sum();
-        assert_(sum);
-        target.data = toASCII((1./(sample.scale*sum))*sample);
-    }
-};
