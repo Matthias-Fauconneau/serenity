@@ -162,7 +162,7 @@ class(MaximumMeanGradient, Operation) {
 #endif
 
 /// Segments by setting values under a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
-void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint16 threshold, bool cylinder=false) {
+void threshold(Volume32& pore, const Volume16& source, uint16 threshold, bool cylinder=false, bool greaterThanOrEqual=false) {
     // Ensures threshold volume is closed to avoid null/full rows in aligned distance search
     int marginX=align(4,source.margin.x-1)+1, marginY=align(4,source.margin.y-1)+1, marginZ=align(4,source.margin.z-1)+1;
     v4si threshold4 = set1(threshold);
@@ -181,9 +181,16 @@ void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint1
             const uint16* const sourceY = sourceZ + y*X;
             uint32* const poreZY = poreZ + y*X;
             uint32* const maskY = mask + y*X;
-            for(int x=0; x<X; x+=8) {
-                storea(poreZY+x, loada(sqr+x) | ((threshold4 > unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
-                storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 > unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
+            if(greaterThanOrEqual) {
+                for(int x=0; x<X; x+=8) {
+                    storea(poreZY+x, loada(sqr+x) | ((threshold4 <= unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
+                    storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 <= unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
+                }
+            } else {
+                for(int x=0; x<X; x+=8) {
+                    storea(poreZY+x, loada(sqr+x) | ((threshold4 > unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
+                    storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 > unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
+                }
             }
         }
     });
@@ -197,13 +204,13 @@ void threshold(Volume32& pore, /*Volume32& rock,*/ const Volume16& source, uint1
 
 /// Segments pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
-    string parameters() const override { return "cylinder threshold"_; }
+    string parameters() const override { return "cylinder threshold gte"_; }
     uint outputSampleSize(uint) override { return sizeof(uint); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        log("Segmentation using threshold", threshold, threshold<1?str("->"_,integerThreshold):""_);
-        ::threshold(outputs[0], inputs[0], integerThreshold, args.value("cylinder"_,""_)!="0"_);
+        log("Segmentation using threshold", threshold, threshold<1?"("_+str(integerThreshold)+")"_:""_);
+        ::threshold(outputs[0], inputs[0], integerThreshold, args.value("cylinder"_,""_)!="0"_, args.value("gte"_,"0"_)!="0"_);
     }
 };
 

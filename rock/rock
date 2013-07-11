@@ -133,7 +133,7 @@ distribution-radius = Div volume-distribution-radius volume-total
   bmp-denoised-connected = ToBMP denoised-connected
 
 # Tools
-ε(R) ε(R|r<median) ε(R|r>median) PSD(R) R PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) = REV
-unconnected(λ) connected(λ) = Prune
-summary = Summary
+ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV
+critical-radius unconnected(λ) connected(λ) = Prune
+slices plots summary = Summary
 compare = Compare

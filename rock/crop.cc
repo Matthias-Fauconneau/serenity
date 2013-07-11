@@ -50,18 +50,19 @@ CropVolume parseCrop(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 s
     return {min, max, size, sampleCount, margin, /*cylinder!="0"_*/true};
 }
 CropVolume parseGlobalCropAndTransformToInput(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 sourceMax) {
-    if(!args.contains("inputCylinder"_) && !args.contains("inputDownsample"_)) { // Using input coordinates
-        return parseCrop(args, sourceMargin, sourceMin, sourceMax, 0, 1);
-    } else { // Converts to input coordinates
-        Dict inputArgs;
-        if(args.contains("inputCylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
-        if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
-        CropVolume inputCrop = parseCrop(inputArgs, 0, 0, 1<<16); // Already bound checked
+    Dict inputArgs;
+    if(args.contains("inputDownsample"_)) inputArgs.insert(String("downsample"_), copy(args.at("inputDownsample"_)));
+    if(args.value("inputCylinder"_,""_)!=""_) { // Converts to input coordinates
+        inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
+        CropVolume inputCrop = parseCrop(inputArgs, sourceMargin, 0, 1<<16); // Already bound checked
         inputCrop.min += sourceMargin, inputCrop.max += sourceMargin;
         CropVolume globalCrop = parseCrop(args, sourceMargin, inputCrop.min, inputCrop.max, 0, 1); // Margins will be wrong
         CropVolume localCrop = {globalCrop.min-inputCrop.min, globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
         return localCrop;
     }
+    //assert_(!args.contains("cylinder"_), "Expected source.cylinder"_);
+    if(args.contains("cylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("cylinder"_)));
+    return parseCrop(inputArgs, sourceMargin, sourceMin, sourceMax, 0, 1); // Using input coordinates
 }
 
 /// Crops a volume to remove boundary effects

@@ -148,7 +148,7 @@ void rasterize(Volume16& target, const Volume& source) {
             uint16* const targetBlock = targetTile + offsetX[blockX] + offsetY[blockY] + offsetZ[blockZ];
             for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
                 targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]] = block[dz*blockSide*blockSide + dy*blockSide + dx];
-#if 1 // Only for floodfill after rasterization test
+#if 0 // Only for floodfill after rasterization test
                 int3 X = int3(tileX,tileY,tileZ)+int3(blockX,blockY,blockZ)+int3(dx,dy,dz);
                 if(!(X>=int3(target.margin) && X<int3(target.sampleCount-target.margin))) targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]]=0;
 #endif

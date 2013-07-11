@@ -5,6 +5,7 @@
 #include "crop.h"
 
 UniformHistogram histogram(const Volume16& source, CropVolume crop) {
+    assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     uint X=source.sampleCount.x, Y=source.sampleCount.y;
     uint radiusSq = crop.cylinder ? sq(crop.size.x/2) : -1;
     int2 center = ((crop.min+crop.max)/2).xy();

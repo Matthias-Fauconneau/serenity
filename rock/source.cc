@@ -9,7 +9,7 @@
 class(Source, Operation), virtual VolumeOperation {
     CropVolume crop;
 
-    string parameters() const override { return "path resolution cylinder downsample"_; }
+    string parameters() const override { return "path resolution cylinder downsample extra"_; }
     uint outputSampleSize(uint index) override { return index ? 0 : 2; }
     size_t outputSize(const Dict& args, const ref<Result*>&, uint index) override {
         if(index) return 0;
@@ -30,7 +30,7 @@ class(Source, Operation), virtual VolumeOperation {
             if(isTiff(file)) { const Tiff16 image (file); size.x=image.width,  size.y=image.height; }
             else { Image image = decodeImage(file); assert_(image, path, slices.first());  size.x=image.width, size.y=image.height; }
         }
-        crop = parseCrop(args, 0, 0, size, 5 /*HACK: reverse dependency on process*/);
+        crop = parseCrop(args, 0, 0, size, args.contains("extra"_)?5:0 /*HACK: reverse dependency on process*/);
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {

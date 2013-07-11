@@ -4,6 +4,7 @@
 
 /// Returns relative deviation versus cylinder radius of 8 volume samples
 class(REV, Tool) {
+    string parameters() const override { return "path"_; }
     void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, Process& process) override {
         real resolution = parseScalar(process.getResult("resolution"_, arguments)->data);
         Volume input = toVolume(process.getResult("connected"_, arguments));
@@ -19,7 +20,6 @@ class(REV, Tool) {
             for(int3 octant: octants) {
                 int3 center = int3(size/2) + (size/4) * octant;
                 Dict args = copy(arguments);
-                args.insert("histogram.crop"_);
                 args.insert(String("histogram.cylinder"_), str((int[]){center.x, center.y, radius, center.z-radius, center.z+radius},','));
                 shared<Result> result = process.getResult("volume-distribution-radius"_, args); // Pore size distribution (values are volume in voxels)
                 nonUniformSamples << parseNonUniformSample( result->data );
@@ -44,13 +44,13 @@ class(REV, Tool) {
             PSD_octant << (1./mean.sampleCount())*mean;
             PSD_octants.insert(resolution*radius, move(PSD_octant));}
         }
-        const auto& e=relativeDeviations[0]; real inflectionRadius=0; for(uint i: range(e.size()-1)) if(e.values[i+1] > e.values[i]) { inflectionRadius=e.keys[i]; break; } // Deviation within estimation error
+        const auto& e=relativeDeviations[0]; real inflectionRadius=0; for(uint i: range(e.size()-1)) { inflectionRadius=e.keys[i]; if(e.values[i] < 1 && e.values[i+1] > e.values[i]) break; } // Deviation within estimation error
         const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_; //#logx\n#logy\n
         output(outputs, "ε(R)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[0]);});
         output(outputs, "ε(R|r<median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[1]);});
         output(outputs, "ε(R|r>median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[2]);});
         outputElements(outputs, "PSD(R)"_, "V(r [μm]).tsv"_, [&]{return move(PSD_R);});
-        output(outputs, "R"_, "scalar"_, [&]{return toASCII(inflectionRadius);});
+        output(outputs, "representative-radius"_, "scalar"_, [&]{return toASCII(inflectionRadius);});
         for(uint i: range(3)) {
             real radius = i==0 ? PSD_octants.keys[3] : i==1 ? inflectionRadius : PSD_octants.keys.last();
             string name = i==0 ? "first"_ : i==1 ? "inflection"_ : "last"_;

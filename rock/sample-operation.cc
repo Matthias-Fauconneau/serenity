@@ -66,10 +66,10 @@ class(Normalize, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         auto sample = parseUniformSample(source.data);
-        //sample.scale = 1./(sample.size-1); Only normalize Y axis
+        sample.scale = 1./(sample.size-1); // Also normalize X axis
         float sum = sample.sum();
         assert_(sum);
-        target.data = toASCII((1./(sample.scale*sum))*sample);
+        target.data = toASCII((1./(sample.scale*sum))*sample); // Normalize Y axis by integral
     }
 };
 
@@ -79,7 +79,7 @@ class(NormalizeY, Operation), virtual Pass {
         auto sample = parseUniformSample(source.data);
         float sum = sample.sum();
         assert_(sum);
-        target.data = toASCII((1./(sample.scale*sum))*sample);
+        target.data = toASCII((1./(sample.scale*sum))*sample); // Normalize Y axis by integral
     }
 };
 
