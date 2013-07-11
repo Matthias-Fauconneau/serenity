@@ -38,7 +38,8 @@ array<String> Folder::list(uint flags) const {
             if(!(flags&Hidden) && name[0]=='.') continue;
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
-            if((type==DT_DIR && flags&Folders) || (type==DT_REG && flags&Files)) { if(flags&Sorted) list.insertSorted(String(name)); else list << String(name); }
+            //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
+            if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==0/*HACK!*/) && flags&Files)) { if(flags&Sorted) list.insertSorted(String(name)); else list << String(name); }
             if(type==DT_DIR && flags&Recursive) for(const String& file: Folder(name,*this).list(flags)) { if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file; }
         }
     }
@@ -105,7 +106,7 @@ void symlink(const string& from,const string& to, const Folder& at) {
 }
 void touchFile(const string& path, const Folder& at, bool setModified) { timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; check_(utimensat(at.fd, strz(path), times, 0)); }
 void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
-    File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate));
+    File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate)); //FIXME: preserve executable flag
     for(size_t offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
     assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
 }

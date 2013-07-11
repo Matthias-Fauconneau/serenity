@@ -21,23 +21,24 @@ if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
 # Density distribution
-if !thresholdFromSource: histogram-radiodensity = Histogram resampled cylinder=source.cylinder
+if !thresholdFromSource: histogram-radiodensity = Histogram resampled
 if thresholdFromSource: histogram-radiodensity = Histogram source
-histogram-radiodensity-normalizeY = NormalizeY histogram-radiodensity
 distribution-radiodensity = KernelDensityEstimation histogram-radiodensity
-distribution-radiodensity-normalized = KernelDensityEstimation histogram-radiodensity normalize=1
 
-# Deprecated (Backward compatibility) (Using "radiodensity" as "density" is too easily confused with probability density)
+# Debug
+histogram-radiodensity-normalizeY = NormalizeY histogram-radiodensity
+distribution-radiodensity-unnormalized = KernelDensityEstimation histogram-radiodensity normalize=0
+# Compatibility
 histogram-density = histogram-radiodensity
 histogram-density-normalized = histogram-radiodensity-normalizeY
-distribution-density = distribution-radiodensity
+distribution-density = distribution-radiodensity-unnormalized
 
 # Threshold determination
 threshold = 'otsu'
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-radiodensity # Recommended robust statistic method
 otsu-interclass-deviation-normalized = Normalize otsu-interclass-deviation
-if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-radiodensity # Use this method for backward compatibility only
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity # Explicit model
+if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-radiodensity-unnormalized # Use this method for backward compatibility only
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
 # Segments
 pore = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
