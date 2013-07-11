@@ -6,7 +6,8 @@ String str(const CropVolume& crop) { return "("_+str(crop.min, crop.max)+")"_; }
 
 /// Parses volume to crop from user arguments
 CropVolume parseCrop(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 sourceMax, int3 extra, int3 minimalMargin) {
-    int3 min=sourceMin-sourceMargin, max=sourceMax-sourceMargin, center=(min+max)/2;
+    bool downsample = args.value("downsample"_,"0"_)!="0"_;
+    int3 min=sourceMin-(downsample?2:1)*sourceMargin, max=sourceMax-(downsample?2:1)*sourceMargin, center=(min+max)/2;
     string cylinder = args.value("cylinder"_,""_);
     if(cylinder) {
         if(cylinder!=""_) {
@@ -25,14 +26,14 @@ CropVolume parseCrop(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 s
         if(margin > 0) min.x+=margin/2, max.x-=margin/2;
         if(margin < 0) min.y+=(-margin)/2, max.y-=(-margin)/2;*/
     }
-    if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
+    if(downsample) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
     min += sourceMargin, max += sourceMargin;
     if((max.x-min.x)%2) { if(max.x%2) max.x--; else assert(min.x%2), min.x++; }
     if((max.y-min.y)%2) { if(max.y%2) max.y--; else assert(min.y%2), min.y++; }
     if((max.z-min.z)%2) { if(max.z%2) max.z--; else assert(min.z%2), min.z++; }
     int3 size = max-min;
     // Asserts valid volume
-    assert_(min>=sourceMin && min<max && max<=sourceMax, sourceMin, min, max, sourceMax, args);
+    assert_(min>=sourceMin && min<max && max<=sourceMax, sourceMargin, sourceMin, min, max, sourceMax, args);
     assert_( size.x%2 == 0 && size.y%2 == 0 && size.z%2 == 0); // Margins are currently always symmetric (i.e even volume size)
     /*if(cylinder!="0"_ || args.contains("inputCylinder"_))*/ assert_(size.x == size.y);
     // Align sampleCount for correct tiled indexing
@@ -55,14 +56,18 @@ CropVolume parseGlobalCropAndTransformToInput(const Dict& args, int3 sourceMargi
     if(args.value("inputCylinder"_,""_)!=""_) { // Converts to input coordinates
         inputArgs.insert(String("cylinder"_), copy(args.at("inputCylinder"_)));
         CropVolume inputCrop = parseCrop(inputArgs, sourceMargin, 0, 1<<16); // Already bound checked
-        inputCrop.min += sourceMargin, inputCrop.max += sourceMargin;
+        inputCrop.min += sourceMargin;
         CropVolume globalCrop = parseCrop(args, sourceMargin, inputCrop.min, inputCrop.max, 0, 1); // Margins will be wrong
+        inputCrop.min -= sourceMargin;
         CropVolume localCrop = {globalCrop.min-inputCrop.min, globalCrop.max-inputCrop.min, globalCrop.size, globalCrop.sampleCount, globalCrop.margin, globalCrop.cylinder};
+        assert_(localCrop.min>=sourceMin && localCrop.max <= sourceMax, sourceMin, localCrop.min, localCrop.max, sourceMax, globalCrop.margin, sourceMargin);
         return localCrop;
     }
     //assert_(!args.contains("cylinder"_), "Expected source.cylinder"_);
     if(args.contains("cylinder"_)) inputArgs.insert(String("cylinder"_), copy(args.at("cylinder"_)));
-    return parseCrop(inputArgs, sourceMargin, sourceMin, sourceMax, 0, 1); // Using input coordinates
+    CropVolume crop = parseCrop(inputArgs, sourceMargin, sourceMin, sourceMax, 0, 1); // Using input coordinates
+    assert_(crop.min>=sourceMin && crop.max <= sourceMax, sourceMin, crop.min, crop.max, sourceMax);
+    return crop;
 }
 
 /// Crops a volume to remove boundary effects
