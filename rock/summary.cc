@@ -47,7 +47,7 @@ class(Summary, Tool) {
             otsu.legends << String("Interclass deviation (Otsu)"_); otsu.dataSets << parseNonUniformSample(process.getResult("otsu-interclass-deviation-normalized"_, args)->data);
             plots << move(otsu);}
         {Plot plot; plot.title = String("Pore size distribution"_), plot.xlabel=String("r [μm]"_), plot.ylabel=String("V"_);
-            plot.legends << String("Probability density estimation"); plot.dataSets << parseNonUniformSample(process.getResult("distribution-radius"_, args)->data);
+            plot.legends << String("Probability density estimation"); plot.dataSets << parseNonUniformSample(process.getResult("distribution-radius-scaled"_, args)->data);
             plots << move(plot);}
         {Plot plot; plot.title = String("Representative elementary volume"_), plot.xlabel=String("R [μm]"_), plot.ylabel=String("ε"_);
             plot.legends << String("Pore size distribution deviation"); plot.dataSets << parseNonUniformSample(process.getResult("ε(R)"_, args)->data);

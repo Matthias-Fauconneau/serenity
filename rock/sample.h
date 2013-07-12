@@ -111,7 +111,7 @@ struct NonUniformHistogram : NonUniformSample {
     /// Returns the sum of the samples represented by the histogram
     real sum() const;
     /// Returns the mean of the samples represented by the histogram
-    real mean() const { return sum()/NonUniformSample::sum(); }
+    real mean() const { return sum()/sampleCount(); }
     /// Returns the variance of the samples represented by the histogram
     real variance() const;
 };

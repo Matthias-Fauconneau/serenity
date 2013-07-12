@@ -87,7 +87,7 @@ class(HistogramMean, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = String("scalar"_);
         NonUniformHistogram histogram = parseNonUniformSample(source.data);
-        float mean = histogram.mean();
+        real mean = histogram.mean();
         assert_(mean);
         target.data = toASCII(mean);
     }
