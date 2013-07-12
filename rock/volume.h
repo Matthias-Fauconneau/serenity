@@ -26,7 +26,7 @@ struct Volume {
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
     size_t index(uint x, uint y, uint z) const {
         assert(x<uint(sampleCount.x) && y<uint(sampleCount.y) && y<uint(sampleCount.y));
-        return tiled() ? (offsetX[x]+offsetY[y]+offsetZ[z]) : (z*sampleCount.x*sampleCount.y+y*sampleCount.x+x);
+        return tiled() ? offsetX[x]+offsetY[y]+offsetZ[z] : uint64(z)*uint64(sampleCount.x*sampleCount.y)+y*sampleCount.x+x;
     }
     size_t index(int3 position) const { return index(position.x, position.y, position.z); }
 
@@ -34,7 +34,7 @@ struct Volume {
     generic operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
-    buffer<uint> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
+    buffer<uint64> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
     int3 sampleCount = 0; // Sample counts (along each dimensions)
     int3 margin = 0; // Margins to ignore when processing volume (for each dimensions)
     uint maximum=0; // Maximum value (to compute normalized values)

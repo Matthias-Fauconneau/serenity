@@ -97,9 +97,9 @@ template<uint pad> inline void itoa(byte*& target, uint n) {
 
 /// Exports volume to ASCII, one sample per line formatted as "x, y, z, f(x,y,z)"
 static buffer<byte> toASCII(const Volume& source) {
-    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     buffer<byte> target (X*Y*Z*(3*5+6)); assert_(X<=1e4 && Y<=1e4 && Z<=1e4 && source.maximum < 1e5);
     byte *targetPtr = target.begin();
     for(uint z=marginZ; z<Z-marginZ; z++) {
@@ -130,9 +130,9 @@ class(ToASCII, Operation), virtual VolumeOperation {
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
 static String toCDL(const Volume& source) {
-    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     constexpr uint positionSize="8191"_.size; buffer<byte> positions (X*Y*Z*3*(positionSize+1)); assert_(X<=1e4 && Y<=1e4 && Z<=1e4);
     constexpr uint valueSize="65535"_.size; buffer<byte> values (X*Y*Z*(valueSize+1)); assert_(source.maximum < 1e5);
     byte *positionIndex = positions.begin(), *valueIndex = values.begin();

@@ -9,7 +9,7 @@ UniformSample kernelDensityEstimation(const UniformHistogram& histogram, real h=
     const real N = histogram.sampleCount();
     if(h==0 || isNaN(h)) h = pow(4./(3*N),1./5) * sqrt(histogram.variance());
     const uint clip = 8192;
-    const real scale = real(histogram.size)/( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
+    const real scale = (normalize ? real(histogram.size) : 1) / ( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
     real K[clip]; for(int i: range(clip)) { real x=-1./2*sq(i/h); K[i] = x>expUnderflow ? scale * exp(x) : 0; } // Precomputes gaussian kernel
     UniformSample pdf (histogram.size);
     if(normalize) pdf.scale = 1./histogram.size;

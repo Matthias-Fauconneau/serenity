@@ -5,7 +5,7 @@
 /// Denoises a volume using a 3x3x3 median filter
 void median(Volume16& target, const Volume16& source) {
     assert_(!source.tiled());
-    const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int marginX=source.margin.x+1, marginY=source.margin.y+1, marginZ=source.margin.z+1;
     target.margin = int3(marginX, marginY, marginZ);
     const uint16* const sourceData = source;

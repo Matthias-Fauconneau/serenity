@@ -225,7 +225,7 @@ String ftoa(double n, int precision, int pad, int exponent, bool inf) {
     if(__builtin_isnan(n)) return String("NaN"_);
     if(n==__builtin_inff()) { assert_(inf); return String("∞"_); }
     if(n==-__builtin_inff()) { assert_(inf); return String("-∞"_); }
-    int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=round(log10(n) / exponent) * exponent, n /= exp10(e);
+    int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';
     if(precision && n!=round(n)) {

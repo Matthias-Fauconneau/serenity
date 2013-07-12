@@ -16,7 +16,10 @@ Targets and arguments:
     Downsamples the volume by two.
     \note Unlike "resample", the full resolution is never stored in memory as downsampling is done as the slices are loaded.
   - cylinder = x,y,r,z0,z1 | r
-    Crops the volume to the cylinder of radius r centered at (x,y) including all slices of index z with z0<=z<z1 (i.e excluding z1 slice for a total z1-z0 slices)
+    Crops the volume to the cylinder of radius r centered at (x,y) including all slices of coordinate z with z0<=z<z1 (i.e excluding z1 slice for a total z1-z0 slices)
+    \note Voxel coordinates starts from zero
+  - extra
+    Adds 5 voxels to the cylinder to compensate for margins lost to processing
   \note It can be useful to store the cropped/downsampled source volume on the filesystem when extracting/downsampling from a large original dataset takes a long time.
 - name
   The name of the data set (i.e everything before any dash in the "path" folder name)

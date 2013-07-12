@@ -5,11 +5,11 @@
 #include "data.h"
 
 /// Interleaves bits
-static uint interleave(uint bits, uint offset, uint stride=3) { uint interleavedBits=0; for(uint b=0; bits!=0; bits>>=1, b++) interleavedBits |= (bits&1) << (b*stride+offset); return interleavedBits; }
+static uint64 interleave(uint64 bits, uint64 offset, uint stride=3) { uint64 interleavedBits=0; for(uint b=0; bits!=0; bits>>=1, b++) interleavedBits |= (bits&1) << (b*stride+offset); return interleavedBits; }
 /// Interleaves 3 coordinates
 uint zOrder(int3 coordinates) { return interleave(coordinates.x, 0)|interleave(coordinates.y, 1)|interleave(coordinates.z, 2); }
 /// Generates lookup tables of interleaved bits
-static buffer<uint> interleavedLookup(uint size, uint offset, uint stride=3) { buffer<uint> lookup(size); for(uint i=0; i<size; i++) { lookup[i]=interleave(i,offset,stride); } return lookup; }
+static buffer<uint64> interleavedLookup(uint size, uint offset, uint stride=3) { buffer<uint64> lookup(size); for(uint i=0; i<size; i++) { lookup[i]=interleave(i,offset,stride); } return lookup; }
 
 /// Pack interleaved bits
 static uint pack(uint bits, uint offset, uint stride=3) { uint packedBits=0; bits>>=offset; for(uint b=0; bits!=0; bits>>=stride, b++) packedBits |= (bits&1) << b; return packedBits; }
@@ -46,7 +46,7 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
     }
     if(!s.match("-"_)) return false;
     volume.maximum = s.hexadecimal();
-    if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint>(), volume.offsetY=buffer<uint>(), volume.offsetZ=buffer<uint>(); }
+    if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint64>(), volume.offsetY=buffer<uint64>(), volume.offsetZ=buffer<uint64>(); }
     if(s.match("-squared"_)) volume.squared=true;
     if(s.match("-float"_)) volume.floatingPoint=true;
     if(s.match("-"_)) volume.field = String(s.untilEnd());
@@ -56,8 +56,8 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
 
 uint maximum(const Volume16& source) {
     const uint16* const sourceData = source;
-    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     v8hi maximum8 = {0,0,0,0,0,0,0,0};
     uint16 maximum=0;
     for(uint z : range(marginZ, Z-marginZ)) {
@@ -75,8 +75,8 @@ uint maximum(const Volume16& source) {
 
 uint maximum(const Volume32& source) {
     const uint32* const sourceData = source;
-    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     v4si maximum4 = {0,0,0,0};
     uint32 maximum=0;
     for(uint z=marginZ; z<Z-marginZ; z++) {
@@ -101,8 +101,8 @@ Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, 
 
 Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylinder) {
     assert_(source.maximum);
-    int X=source.sampleCount.x, Y=source.sampleCount.y;
-    int marginX=source.margin.x, marginY=source.margin.y;
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
+    const int marginX=source.margin.x, marginY=source.margin.y;
     Image target(X-2*marginX,Y-2*marginY, true);
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;

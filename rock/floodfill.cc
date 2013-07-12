@@ -34,7 +34,7 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
     assert_(source.margin>int3(1)); // Actually also needs the margin to be 0
     uint16* const targetData = target;
     clear(targetData, target.size());
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
 
     buffer<short3> stackBuffer(1<<27); // 1024³~128MiB
     short3* const stack = stackBuffer.begin();
@@ -42,8 +42,8 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
     // Seeds from top/bottom Z faces
     buffer<byte> markBuffer(target.size()/8, target.size()/8, 0); // 1024³~128MiB
     byte* const mark = markBuffer.begin();
-    uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
     {uint z=marginZ+connectivitySeedMargin;
         for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
             uint index = offsetX[x]+offsetY[y]+offsetZ[z];

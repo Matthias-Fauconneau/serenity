@@ -19,7 +19,7 @@ void tiffUnmap(thandle_t, tdata_t , toff_t) {}
 Image decodeTIFF(const ref<byte>& file) {
     BinaryData s (file);
     TIFF *const tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
-    assert(tiff);
+    assert_(tiff);
     uint32 width=0; TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     uint32 height=0; TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
     Image image(width, height);
@@ -31,21 +31,20 @@ Image decodeTIFF(const ref<byte>& file) {
 Tiff16::Tiff16(const ref<byte>& file) : s(file) {
     TIFFSetWarningHandler(0);
     tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
-    assert(tiff, file.size, hex(file.slice(0, 4)));
+    assert_(tiff, file.size, hex(file.slice(0, 4)));
     if(!tiff) return;
     TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
     uint rowsPerStrip=0; TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);
-    uint compression=0; TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &compression);
-    randomAccess = rowsPerStrip == 1 && compression == 1;
-    uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample); assert(bitPerSample==16);
+    randomAccess = rowsPerStrip == 1;
+    uint16 bitPerSample=1; TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitPerSample); assert_(bitPerSample==16);
 }
 void Tiff16::read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride) {
-    assert(x0+w<=width && y0+h<=height, x0, y0, w, h, width, height);
-    if(!randomAccess) for(uint y: range(y0)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y, 0); } // Reads first lines to avoid "Compression algorithm does not support random access" errors.
-    if(w==width) for(uint y: range(h)) TIFFReadScanline(tiff, target+y*stride, y0+y, 0);
+    assert_(x0+w<=width && y0+h<=height, x0, y0, w, h, width, height);
+    if(!randomAccess) for(uint y: range(y0)) { uint16 buffer[width]; assert_( TIFFReadScanline(tiff, buffer, y, 0) == 1 ); } // Reads first lines to avoid "Compression algorithm does not support random access" errors.
+    if(w==width) for(uint y: range(h)) assert_( TIFFReadScanline(tiff, target+y*stride, y0+y, 0) == 1 );
     else {
-        for(uint y: range(h)) { uint16 buffer[width]; TIFFReadScanline(tiff, buffer, y0+y, 0); rawCopy(target+y*stride, buffer+x0, w); }
+        for(uint y: range(h)) { uint16 buffer[width]; assert_( TIFFReadScanline(tiff, buffer, y0+y, 0)  == 1 ); rawCopy(target+y*stride, buffer+x0, w); }
     }
 }
 Tiff16::~Tiff16() { TIFFClose(tiff); }

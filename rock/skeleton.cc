@@ -30,8 +30,8 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
     const uint16* const zPositionData = positionZ;
     uint16* const targetData = target;
     clear(targetData, target.size());
-    const uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
-    uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
+    const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
+    const uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
         const uint16* const xPositionZ = xPositionData+z*XY;
         const uint16* const yPositionZ = yPositionData+z*XY;

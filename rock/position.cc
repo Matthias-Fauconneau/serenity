@@ -3,8 +3,8 @@
 #include "simd.h"
 
 void setBorders(Volume32& target) {
-    const uint X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
-    uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
+    const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY=X*Y;
+    const uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
     typedef uint32 T;
     T* const targetData = target;
     assert(!target.tiled());
@@ -38,7 +38,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
     setBorders(target);
     const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
     const int tX=sY, tY=sZ;
-    int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
+    const int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
     const uint32* const sourceData = source;
     uint32* const targetData = target;
     uint16* const xPositionData = positionX;
@@ -97,7 +97,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
     setBorders(target);
     const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
     const int tX=sY, tY=sZ;
-    int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
+    const int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     uint32* const targetData = target;
@@ -165,7 +165,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume16& positionX, Volume
     //setBorders(target);
     const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
     const int tX=sY, tY=sZ;
-    int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
+    const int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
     const uint16* const ySourceData = sourceY;

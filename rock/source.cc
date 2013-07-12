@@ -1,8 +1,8 @@
 #include "volume-operation.h"
 #include "time.h"
 #include "tiff.h"
-//#include "bmp.h"
 #include "crop.h"
+//#include "bmp.h"
 
 /// Concatenates image slice files in a volume
 /// \note Parses physical resolution from source path
@@ -40,8 +40,8 @@ class(Source, Operation), virtual VolumeOperation {
         target.sampleCount = crop.sampleCount;
         target.margin = crop.margin;
         target.field = String("μ"_); // Radiodensity
-        uint X = target.sampleCount.x, Y = target.sampleCount.y, Z = target.sampleCount.z;
-        uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
+        const uint64 X= target.sampleCount.x, Y= target.sampleCount.y;
+        const uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
         if(!existsFolder(path, currentWorkingDirectory())) {
@@ -51,19 +51,19 @@ class(Source, Operation), virtual VolumeOperation {
             if(!parseVolumeFormat(source, metadata)) error("Unknown format");
             uint sX = source.sampleCount.x, sY = source.sampleCount.y, unused sZ = source.sampleCount.z;
 
-            Map file(path, currentWorkingDirectory()); // Copy from disk mapped to process managed memory
+            Map file(path, currentWorkingDirectory()); // Copy from disk to process managed memory
             for(uint z: range(size.z)) {
-                if(report/1000>=5) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                 uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
-                uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
+                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                 for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
             }
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
             for(uint z: range(size.z)) {
-                if(report/1000>=5) { log(z,"/",Z, (z*X*Y*2/1024/1024)/(time/1000), "MB/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                uint16* const targetSlice = targetData + (uint64)(marginZ+z)*X*Y + marginY*X + marginX;
+                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                 if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample for larger than RAM volumes
                     const uint sliceStride = Y*2*X*2;
                     buffer<uint16> sliceBuffer(2*sliceStride);
@@ -78,7 +78,7 @@ class(Source, Operation), virtual VolumeOperation {
                                 source[sliceStride+0] + source[sliceStride+1] + source[sliceStride+X*2] + source[sliceStride+X*2+1])/8;
                     }
                 } else {
-                    Map file(slices[min.z+z],folder);
+                    Map file(slices[min.z+z], folder);
                     if(isTiff(file)) { // Directly decodes slice images into the volume
                         Tiff16 tiff(file);
                         assert_(tiff, path, slices[min.z+z]);

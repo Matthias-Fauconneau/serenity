@@ -5,11 +5,11 @@
 /// Tiles a volume recursively into bricks (using 3D Z ordering)
 void zOrder(Volume16& target, const Volume16& source) {
     assert_(!source.tiled());
-    const uint X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     interleavedLookup(target);
-    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
         assert(offsetZ[z]+offsetY[y]+offsetX[x] < target.size());
         targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
@@ -35,11 +35,11 @@ inline uint dmin(int size, int vx, int vy, int vz) {
 /// Bins each skeleton voxel as a ball to tiles of 16³ voxels
 void bin(Volume& target, const Volume16& source) {
     const uint16* const sourceData = source;
-    const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
-    int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     assert(source.tiled());
-    const uint* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
 
     Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
     assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
@@ -82,12 +82,12 @@ class(Bin, Operation), virtual VolumeOperation {
 /// Rasterizes each skeleton voxel as a ball (with maximum blending)
 void rasterize(Volume16& target, const Volume& source) {
     const Tile* const sourceData = (Tile*)source.data.data;
-    const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     uint tileCount = X/tileSide*Y/tileSide*Z/tileSide;
 
     uint16* const targetData = target;
     assert_(target.tiled());
-    const uint* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
     Time time; Time report;
     parallel(tileCount, [&](uint id, uint i) {
