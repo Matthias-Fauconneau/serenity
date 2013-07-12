@@ -321,7 +321,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
-                if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"); else break; /*Virtual*/ }
+                if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"_); else break; /*Virtual*/ }
                 TextData s (oldest); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename

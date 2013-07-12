@@ -70,11 +70,11 @@ Targets and arguments:
 - transposed (internal)
  Transposed volume (to use an alternate connectivity axis when floodfilling)
  - transpose = X|Y|[Z]
-  Input axis to map to the output Z axis
+  Input axis to map to the output Z axis.
 - connected (internal)
- Skeleton without unconnected pores
+ Skeleton without unconnected pores.
  floodfill = 0|[1]
-  Selects whether to discard unconnected pores
+  Selects whether to discard unconnected pores.
 - histogram-radius[-scaled]
  Histogram of the pore radii (voxels versus radius)
  \note This histogram is the square root of the histogram of squared distance (which is integer as voxel coordinates are integer).
@@ -93,7 +93,7 @@ Targets and arguments:
 - porosity
   Relative volume of the pore space (i.e pore space volume over total volume)
 - mean-radius
-  Mean radius of the pores
+  Mean radius of the pores (in voxels)
 - cdl
   Volume of the rounded maximum radii exported in CDL format (to be converted to a netCDF file using ncgen)
 - ascii
@@ -117,13 +117,13 @@ Tools:
  - ε(R) ε(R|r<median) ε(R|r>median)
   Deviation between the octants for each R estimated on the full distribution, the lower half or the higher half.
  - representative-radius
-  Cylinder radius at the inflection point assumed to be large enough to estimate properties of the full rock.
+  Cylinder radius at the inflection point assumed to be large enough to estimate properties of the full rock (in voxels).
 - Largest bottleneck radius:
  Computes the largest pruning radius which allows at least one connection
  - unconnected(λ) connected(λ)
   Volume of the [un]connected pore space versus pruning radius λ
  - critical-radius
-  Critical pruning radius which allows at least one connection
+  Critical pruning radius which allows at least one connection (in voxels)
 - Analysis summary:
  Presents all important informations extracted from a data set by this tool
  - slices

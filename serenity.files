@@ -1,3 +1,5 @@
+README
+TODO
 build.cc
 build.sh
 test.sh
@@ -35,6 +37,7 @@ io/png.h
 io/tiff.cc
 io/tiff.h
 io/bmp.cc
+io/bmp.h
 
 ui/display.cc
 ui/display.h
@@ -81,7 +84,7 @@ rock/sample.cc
 rock/crop.cc
 rock/crop.h
 rock/sample-operation.cc
-io/bmp.h
+
 rock/slice.cc
 rock/REV.cc
 rock/prune.cc

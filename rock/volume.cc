@@ -92,14 +92,14 @@ uint maximum(const Volume32& source) {
     return maximum;
 }
 
-Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, bool cylinder) {
+Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, bool cylinder, bool invert, bool binary) {
     int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
-    assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z);
+    assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z, normalizedZ, source.margin, source.sampleCount, z);
     //int z = normalizedZ*(source.sampleCount.z-1);
-    return slice(source, z, normalize, gamma, cylinder);
+    return slice(source, z, normalize, gamma, cylinder, invert, binary);
 }
 
-Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylinder) {
+Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylinder, bool invert, bool binary) {
     assert_(source.maximum);
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
     const int marginX=source.margin.x, marginY=source.margin.y;
@@ -118,6 +118,8 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
         else if(source.sampleSize==3) { target(x-marginX,y-marginY) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
         else error("source.sampleSize"_,source.sampleSize);
+        if(binary) value = value ? source.maximum : 0;
+        if(invert) value = source.maximum-value;
         uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
         extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
         uint sRGB8 = gamma ? sRGB_lookup[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values

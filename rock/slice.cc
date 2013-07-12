@@ -40,7 +40,7 @@ int2 SliceView::sizeHint() {
 void SliceView::render(int2 position, int2 size) {
     const Volume& volume = volumes[currentIndex];
     Image image = slice(volume, sliceZ, true, true, true);
-    //while(2*image.size()<=size) image=upsample(image);
+    while(2*image.size()<=size) image=upsample(image);
     int2 centered = position+(size-image.size())/2;
     blit(centered, image);
 }

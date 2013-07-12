@@ -61,7 +61,7 @@ if minimalSqRadius: pruned = ThresholdClip skeleton-tiled minimalSqRadius
 if !minimalSqRadius: pruned = skeleton-tiled
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-if crop.cylinder: crop = Crop pruned inputCylinder=source.cylinder inputDownsample=source.downsample
+if crop.cylinder: crop = Crop pruned inputCylinder=source.cylinder
 if !crop.cylinder: crop = pruned
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
@@ -88,17 +88,17 @@ sphere-bins = Bin rasterizeInput
 rasterized = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
-histogram = Histogram maximum inputCylinder=source.cylinder inputDownsample=source.downsample # Including rock
+histogram = Histogram maximum inputCylinder=source.cylinder # Including rock
 histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius
+histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
 
 # Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
 volume = Sum histogram-squaredRadius
 volume-total = Sum histogram
 porosity = Div volume volume-total # Computes porosity (= pore space volume / total volume )
-histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
-mean-radius = HistogramMean histogram-radius-scaled
+mean-radius = HistogramMean histogram-radius
 
 # Should be removed (kept for backward compatibility)
  histogram-radius-normalized = Div histogram-radius volume-total # Normalizes histogram (for comparison with distribution-radius, compare histogram-radius with volume-distribution-radius instead)
@@ -121,9 +121,10 @@ distribution-radius = Div volume-distribution-radius volume-total
   png-source = ToPNG source
   png-denoised = ToPNG denoised
   png-colorize = ToPNG colorize
-  png-distance = ToPNG distance
-  png-skeleton = ToPNG skeleton
-  png-maximum = ToPNG maximum
+  png-thresholded = ToPNG thresholded
+  png-distance = ToPNG distance invert=1
+  png-skeleton = ToPNG skeleton invert=1 binary=1
+  png-maximum = ToPNG maximum invert=1
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation)
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised

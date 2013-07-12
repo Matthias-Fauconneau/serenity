@@ -7,7 +7,7 @@
 UniformHistogram histogram(const Volume16& source, CropVolume crop) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y;
-    uint radiusSq = /*crop.cylinder ?*/ sq(crop.size.x/2) /*: -1*/;
+    uint radiusSq = sq(crop.size.x/2);
     int2 center = ((crop.min+crop.max)/2).xy();
     bool tiled=source.tiled();
     const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;

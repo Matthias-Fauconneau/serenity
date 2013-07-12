@@ -107,10 +107,10 @@ class(LorentzianMixtureModel, Operation) {
                     "maximum "_+dec(density.size-1)+"\n"_
                     "rock "+str(rock)+"\n"_
                     "pore "+str(pore)+"\n"_; } );
-        output(outputs, "lorentz-rock"_, "lorentz.tsv"_, [&]{ return toASCII(sample(rock,density.size)); });
-        output(outputs, "lorentz-notrock"_, "density.tsv"_, [&]{ return toASCII(notrock); });
-        output(outputs, "lorentz-pore"_, "lorentz.tsv"_, [&]{ return toASCII(sample(pore,density.size)); });
-        output(outputs, "lorentz-notpore"_, "density.tsv"_, [&]{ return toASCII(notpore); });
+        output(outputs, "lorentz-rock"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(sample(rock,density.size)); });
+        output(outputs, "lorentz-notrock"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(notrock); });
+        output(outputs, "lorentz-pore"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(sample(pore,density.size)); });
+        output(outputs, "lorentz-notpore"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(notpore); });
     }
 };
 #endif
@@ -162,13 +162,13 @@ class(MaximumMeanGradient, Operation) {
 #endif
 
 /// Segments by setting values under a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
-void threshold(Volume32& pore, const Volume16& source, uint16 threshold, bool cylinder=false, bool greaterThanOrEqual=false) {
+void threshold(Volume32& pore, const Volume16& source, uint16 threshold, bool greaterThanOrEqual=false) {
     // Ensures threshold volume is closed to avoid null/full rows in aligned distance search
     const int marginX=align(4,source.margin.x-1)+1, marginY=align(4,source.margin.y-1)+1, marginZ=align(4,source.margin.z-1)+1;
     v4si threshold4 = set1(threshold);
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    assert_(X%8==0 && (!cylinder || (X%2==0 && Y%2==0 && X-2*marginX==Y-2*marginY)));
-    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
+    assert_(X%8==0 && X%2==0 && Y%2==0 && X-2*marginX==Y-2*marginY);
+    uint radiusSq = (X/2-marginX)*(Y/2-marginY);
     uint32 sqr[X]; for(int x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
     uint32 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 0xFFFFFFFF;
@@ -210,7 +210,7 @@ class(Binary, Operation), virtual VolumeOperation {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
         log("Segmentation using threshold", threshold, threshold<1?"("_+str(integerThreshold)+")"_:""_);
-        ::threshold(outputs[0], inputs[0], integerThreshold, args.value("cylinder"_,""_)!="0"_, args.value("gte"_,"0"_)!="0"_);
+        ::threshold(outputs[0], inputs[0], integerThreshold, args.value("gte"_,"0"_)!="0"_);
     }
 };
 

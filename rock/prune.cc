@@ -9,12 +9,12 @@ class(Prune, Tool) {
         real resolution = parseScalar(process.getResult("resolution"_, arguments)->data);
         shared<Result> inputResult = process.getResult("crop"_, arguments); // Keep this reference to prevent this input to be evicted from cache
         Volume input = toVolume(inputResult);
-        int3 size=input.sampleCount-input.margin; int maximumRadius=min(min(size.x, size.y), size.z)/2;
+        int3 size=input.sampleCount-input.margin; int maximumRadius=min(16, min(min(size.x, size.y), size.z)/2);
         real totalVolume = parseScalar(process.getResult("volume-total"_, arguments)->data);
         NonUniformSample unconnectedVolume, connectedVolume;
         real criticalRadius = 0;
-        //for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
-        for(int r: range(maximumRadius)) { int r2=sq(r); // Faster testing
+        for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
+        //for(int r: range(maximumRadius)) { int r2=sq(r); // Faster testing (only integer radius)
             Dict args = copy(arguments);
             args["minimalSqRadius"_]=r2;
             {args.at("floodfill"_) = 0;
@@ -34,6 +34,6 @@ class(Prune, Tool) {
         }
         output(outputs, "unconnected(λ)"_, "V(λ [μm]).tsv"_, [&]{return "#Pore space volume versus pruning radius\n"_ + toASCII(unconnectedVolume);});
         output(outputs, "connected(λ)"_, "V(λ [μm]).tsv"_, [&]{return "#Pore space volume versus pruning radius\n"_ + toASCII(connectedVolume);});
-        output(outputs, "critical-radius"_, "scalar"_, [&]{return toASCII(resolution*criticalRadius);});
+        output(outputs, "critical-radius"_, "scalar"_, [&]{return toASCII(criticalRadius);});
     }
 };

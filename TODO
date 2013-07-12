@@ -1,0 +1,5 @@
+TODO:
+- Check otsu vs lorentz on P2PA1_01
+- Fix crop
+- regenerate P2PA1_01 1024³ (3.9μm), P2PA1_02 934³ (2x2μm)
+- Assert no unconnected grain (from all faces)
