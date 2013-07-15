@@ -43,7 +43,6 @@ class(Otsu, Operation) {
             interclassVariance[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size-1);
-        //log("Otsu's method estimates threshold at", densityThreshold);
         output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(densityThreshold);});
         output(outputs, "otsu-parameters"_, "map"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
@@ -209,7 +208,6 @@ class(Binary, Operation), virtual VolumeOperation {
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        log("Segmentation using threshold", threshold, threshold<1?"("_+str(integerThreshold)+")"_:""_);
         ::threshold(outputs[0], inputs[0], integerThreshold, args.value("gte"_,"0"_)!="0"_);
     }
 };

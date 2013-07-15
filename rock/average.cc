@@ -59,7 +59,7 @@ class(Average, Operation), virtual VolumePass<uint16> {
         const int averageWindow = 1, sampleCount = 2*averageWindow+1, shift = args.value("shift"_,log2(sampleCount));
         target.margin.y += align(4, averageWindow);
         target.maximum *= sampleCount; target.maximum >>= shift;
-        target.sampleCount=rotate(target.sampleCount); target.margin=rotate(target.margin);
+        target.sampleCount=rotate(target.sampleCount); target.margin=rotate(target.margin); target.origin=rotate(target.origin);
         average(target, source, averageWindow, shift);
     }
 };

@@ -25,12 +25,13 @@ void interleavedLookup(Volume& target) {
 
 String volumeFormat(const Volume& volume) {
     String s; s << str(volume.sampleCount.x) << 'x' << str(volume.sampleCount.y) << 'x' << str(volume.sampleCount.z);
-    if(volume.margin) s << '+' << str(volume.margin.x) << '+' << str(volume.margin.y) << '+' << str(volume.margin.z);
+    s << '+' << str(volume.margin.x) << '+' << str(volume.margin.y) << '+' << str(volume.margin.z);
     s << '-' << hex(volume.maximum);
     if(volume.tiled()) s << "-tiled"_;
     if(volume.squared) s << "-squared"_;
     if(volume.floatingPoint) s << "-float"_;
     if(volume.field) s << "-"_ << volume.field;
+    if(volume.origin) s << '+' << str(volume.origin.x) << '+' << str(volume.origin.y) << '+' << str(volume.origin.z);
     return s;
 }
 
@@ -39,17 +40,21 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
     volume.sampleCount.x = s.mayInteger(); if(!s.match("x"_)) return false;
     volume.sampleCount.y = s.mayInteger(); if(!s.match("x"_)) return false;
     volume.sampleCount.z = s.mayInteger();
-    if(s.match('+')) {
-        volume.margin.x = s.mayInteger(); if(!s.match("+"_)) return false;
-        volume.margin.y = s.mayInteger(); if(!s.match("+"_)) return false;
-        volume.margin.z = s.mayInteger();
-    }
-    if(!s.match("-"_)) return false;
+    if(!s.match('+')) return false;
+    volume.margin.x = s.mayInteger(); if(!s.match("+"_)) return false;
+    volume.margin.y = s.mayInteger(); if(!s.match("+"_)) return false;
+    volume.margin.z = s.mayInteger();
+    if(!s.match('-')) return false;
     volume.maximum = s.hexadecimal();
     if(s.match("-tiled"_)) interleavedLookup(volume); else { volume.offsetX=buffer<uint64>(), volume.offsetY=buffer<uint64>(), volume.offsetZ=buffer<uint64>(); }
     if(s.match("-squared"_)) volume.squared=true;
     if(s.match("-float"_)) volume.floatingPoint=true;
-    if(s.match("-"_)) volume.field = String(s.untilEnd());
+    if(s.match('-')) volume.field = String(s.whileNot('+'));
+    if(s.match('+')) {
+        volume.origin.x = s.mayInteger(); if(!s.match('+')) return false;
+        volume.origin.y = s.mayInteger(); if(!s.match('+')) return false;
+        volume.origin.z = s.mayInteger();
+    }
     if(s) return false;
     return true;
 }
@@ -110,7 +115,7 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
     assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit");
     uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
-         if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = byte4(0,0,0,0); continue; }
+         if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0); continue; }
         uint value = 0;
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
@@ -118,9 +123,9 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
         else if(source.sampleSize==3) { target(x-marginX,y-marginY) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
         else error("source.sampleSize"_,source.sampleSize);
-        if(binary) value = value ? source.maximum : 0;
-        if(invert) value = source.maximum-value;
         uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
+        if(binary) linear8 = linear8 ? 0xFF : 0;
+        if(invert) linear8 = 0xFF-linear8;
         extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
         uint sRGB8 = gamma ? sRGB_lookup[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values
         target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);

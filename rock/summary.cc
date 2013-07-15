@@ -22,13 +22,11 @@ class(Summary, Tool) {
         UniformGrid<Item> slices;
         int scale=0;
         args.insert(String("z"_),0.5);
-        for(auto target: map<string, string>({"png-source"_, "png-denoised"_, "png-thresholded"_, "png-distance"_, "png-skeleton"_, "png-maximum"_},
-                                                                   {"Source"_,"Denoised"_,"Thresholded"_,"Distance"_,"Skeleton"_,"Maximum"_})) {
-            if(target.key=="denoised"_  && args.value("denoise"_)=="0"_) continue;
+        for(auto target: map<string, string>({"png-denoised"_, "png-thresholded"_, "png-skeleton"_, "png-maximum"_},{"Density"_,"Pore"_,"Skeleton"_,"Maximum"_})) {
             shared<Result> result = process.getResult(target.key, args);
             Image slice = decodeImage(result->data);
-            if(!scale) scale = max(1.,floor(real(slice.size().x)/(pageSize.x/3)));
-            assert_(scale>0 && scale<=4, scale);
+            assert_(slice);
+            if(!scale) scale = max(2.,ceil(real(slice.size().x)/(2*pageSize.x/2)));
             slices << Item(resize(slice,slice.size()/scale), target.value, 16, true);
         }
         args.remove("z"_);

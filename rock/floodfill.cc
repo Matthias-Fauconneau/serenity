@@ -1,5 +1,6 @@
 #include "volume-operation.h"
 #include "thread.h"
+#include "time.h"
 
 /// Transposes a volume permuting its coordinates
 void transpose(Volume16& target, const Volume16& source) {
@@ -44,6 +45,7 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
     byte* const mark = markBuffer.begin();
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
+    Time time;
     {uint z=marginZ+connectivitySeedMargin;
         for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
             uint index = offsetX[x]+offsetY[y]+offsetZ[z];
@@ -62,6 +64,7 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
             }
         }
     }
+    log("1 / 2", time.reset());
     {uint z=Z-1-marginZ-connectivitySeedMargin;
         for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
             uint index = offsetX[x]+offsetY[y]+offsetZ[z];
@@ -82,6 +85,7 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
             }
         }
     }
+    log("2 / 2", time.reset());
 }
 class(FloodFill, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }

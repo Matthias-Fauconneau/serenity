@@ -18,21 +18,20 @@ Cylinder parseCylinder(string cylinder, int3 center, int3 extra) {
     return {min, max};
 }
 
-CropVolume alignCrop(int3 min, int3 max, int3 sourceMargin, int3 sourceMin, int3 sourceMax, int3 minimalMargin) {
+CropVolume alignCrop(int3 min, int3 max, int3 minimalMargin) {
     assert_(int(max.x-min.x) == int(max.y-min.y), min, max);
-    min += sourceMargin, max += sourceMargin;
     if((max.x-min.x)%2) { if(max.x%2) max.x--; else assert(min.x%2), min.x++; }
     if((max.y-min.y)%2) { if(max.y%2) max.y--; else assert(min.y%2), min.y++; }
     if((max.z-min.z)%2) { if(max.z%2) max.z--; else assert(min.z%2), min.z++; }
     int3 size = max-min;
     // Asserts valid volume
-    assert_(min>=sourceMin && min<max && max<=sourceMax, sourceMin, min, max, sourceMax);
     assert_( size.x%2 == 0 && size.y%2 == 0 && size.z%2 == 0); // Margins are currently always symmetric (i.e even volume size)
     assert_(size.x == size.y);
     // Align sampleCount for correct tiled indexing
     int3 sampleCount = int3(nextPowerOfTwo(size.x), nextPowerOfTwo(size.y), nextPowerOfTwo(size.z));
     int3 margin = ::max(minimalMargin, (sampleCount - size)/2);
     sampleCount = int3(nextPowerOfTwo(size.x+2*margin.x), nextPowerOfTwo(size.y+2*margin.y), nextPowerOfTwo(size.z+2*margin.z));
+    assert_(sampleCount>int3(1), sampleCount);
     while(sampleCount.y < sampleCount.z   ) sampleCount.y*=2; // Z-order: [Z Y] X z y x
     while(sampleCount.x < sampleCount.y   ) sampleCount.x*=2; // Z-order: Z [Y X] z y x
     while(sampleCount.z < sampleCount.x   ) sampleCount.z*=2; // Z-order: Z Y [X z] y x
@@ -45,27 +44,15 @@ CropVolume alignCrop(int3 min, int3 max, int3 sourceMargin, int3 sourceMin, int3
 }
 
 /// Parses volume to crop from user arguments
-CropVolume parseCrop(const Dict& args, int3 sourceMargin, int3 sourceMin, int3 sourceMax, int3 extra, int3 minimalMargin) {
-    bool downsample = args.value("downsample"_,"0"_)!="0"_;
-    int3 min=sourceMin-(downsample?2:1)*sourceMargin, max=sourceMax-(downsample?2:1)*sourceMargin;
+CropVolume parseCrop(const Dict& args, int3 min, int3 max, int3 extra, int3 minimalMargin) {
     if(args.contains("cylinder"_)) {
         Cylinder cylinder = parseCylinder(args.at("cylinder"_), (min+max)/2, extra);
         min = cylinder.min, max=cylinder.max;
     }
-    if(downsample) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
-    return alignCrop(min, max, sourceMargin, sourceMin, sourceMax, minimalMargin);
-}
-
-/// Parses volume to crop from user arguments (transforms global cooordinates to input coordinates using crop specifications of input volume)
-CropVolume parseGlobalCropAndTransformToInput(const Dict& args, int3 margin, int3 min, int3 max) {
-    if(args.contains("inputCylinder"_) && args.contains("cylinder"_)) { // Converts to input coordinates
-        Cylinder input = parseCylinder(args.at("inputCylinder"_), (min+max)/2); // Parses input cylinder in global coordinates
-        Cylinder global = parseCylinder(args.at("cylinder"_), (min+max)/2); // Parses crop cylinder in global coordinates
-        log(input.min, input.max, args.at("inputCylinder"_), global.min, global.max, args.at("cylinder"_));
-        return alignCrop(global.min-input.min, global.max-input.min, margin, min, max); // Transforms from global coordinates to input coordinates and aligns
-    } else { // Local crop (using input coordinates)
-        return parseCrop(args, margin, min, max); // Using input coordinates
-    }
+    if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
+    CropVolume crop = alignCrop(min, max, minimalMargin);
+    assert_(int3(0)<=min && min<=crop.min && crop.min<crop.max && crop.max<=max, min, crop.min, crop.max, max);
+    return crop;
 }
 
 /// Crops a volume to remove boundary effects
@@ -98,8 +85,11 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     for(uint z=Z-marginZ; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
 }
 class(Crop,Operation), virtual VolumePass<uint16> {
-    string parameters() const override { return "cylinder downsample inputCylinder inputDownsample"_; }
+    string parameters() const override { return "cylinder downsample"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        crop(target, source, parseGlobalCropAndTransformToInput(args, source.margin, source.margin, source.sampleCount-source.margin));
+        CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin, 0, 1);
+        crop.min -= source.origin, crop.max -= source.origin;
+        ::crop(target, source, crop);
+        target.origin = crop.min;
     }
 };

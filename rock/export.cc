@@ -53,7 +53,6 @@ class(Mask, Operation), virtual VolumeOperation {
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         float value = toDecimal(args.at("value"_));
         uint16 integerValue = value < 1 ? round( value*inputs[0].maximum ) : round(value);
-        log("Mask using value", value, value<1?str("->"_,integerValue):""_);
         mask(outputs[0], inputs[0], inputs[1], integerValue);
     }
 };

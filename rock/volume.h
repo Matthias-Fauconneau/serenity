@@ -21,7 +21,9 @@ struct Volume {
     explicit operator bool() const { return (bool)data; }
     size_t size() const { return (size_t)sampleCount.x*sampleCount.y*sampleCount.z; }
     bool tiled() const { if(offsetX || offsetY || offsetZ) { assert(offsetX && offsetY && offsetZ); return true; } else return false; }
-    void copyMetadata(const Volume& source) { margin=source.margin; maximum=source.maximum; squared=source.squared; floatingPoint=source.floatingPoint; field=copy(source.field); }
+    void copyMetadata(const Volume& source) {
+        margin=source.margin; maximum=source.maximum; squared=source.squared; floatingPoint=source.floatingPoint; field=copy(source.field); origin=source.origin;
+    }
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
     size_t index(uint x, uint y, uint z) const {
@@ -36,12 +38,13 @@ struct Volume {
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     buffer<uint64> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes
     int3 sampleCount = 0; // Sample counts (along each dimensions)
-    int3 margin = 0; // Margins to ignore when processing volume (for each dimensions)
+    int3 margin=0; // Margins to ignore when processing volume (for each dimensions)
     uint maximum=0; // Maximum value (to compute normalized values)
     uint sampleSize=0; // Sample integer size (in bytes)
     bool squared=false; // Whether the sample are a squared magnitude
     bool floatingPoint=false;  // Whether the sample are stored as floats
     String field; // Symbol of the sampled field
+    int3 origin=0; // Coordinates of the origin in some reference coordinates
 };
 
 generic struct VolumeT : Volume {

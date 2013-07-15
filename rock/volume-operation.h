@@ -8,7 +8,8 @@ inline Volume toVolume(const string& metadata, const buffer<byte>& data) {
     if( !parseVolumeFormat(volume, metadata) ) return Volume();
     volume.data = buffer<byte>(ref<byte>(data));
     volume.sampleSize = volume.data.size / volume.size();
-    assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8, volume.sampleSize, volume.data.size); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+    assert(volume.sampleSize >= align(8, nextPowerOfTwo(log2(nextPowerOfTwo((volume.maximum+1))))) / 8); // Minimum sample size to encode maximum value (in 2ⁿ bytes)
+    assert_(volume.sampleCount>2*volume.margin, "Empty volume"_, volume.sampleCount-2*volume.margin);
     return volume;
 }
 inline Volume toVolume(const Result& result) { return toVolume(result.metadata, result.data); }
@@ -52,7 +53,7 @@ struct VolumeOperation : virtual Operation {
                 if(inputVolumes) { // Inherits initial metadata from previous operation
                     const Volume& source = inputVolumes.first();
                     volume.sampleCount=source.sampleCount; volume.copyMetadata(source);
-                    assert(volume.sampleSize * volume.size() == volume.data.size, volume.sampleSize, volume.size(), volume.data.size, index, outputs);
+                    assert(volume.sampleSize * volume.size() == volume.data.size);
                     if(source.tiled()) interleavedLookup(volume);
                 }
                 outputVolumes << move( volume );
@@ -67,6 +68,7 @@ struct VolumeOperation : virtual Operation {
                 Volume& output = outputVolumes[outputVolumesIndex++];
                 //if(output.sampleSize==2) assert(maximum((const Volume16&)output)==output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);
                 //if(output.sampleSize==4) assert(maximum((const Volume32&)output)==output.maximum, outputs[index]->name, output, maximum((const Volume32&)output), output.maximum);
+                assert_(output.sampleCount>2*output.margin, "Empty output volume"_, output.sampleCount-2*output.margin);
                 outputs[index]->metadata = volumeFormat(output);
                 outputs[index]->data.size = output.data.size;
             }

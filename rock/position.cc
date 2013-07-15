@@ -234,7 +234,7 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume16& positionX, Volume
 class(PositionX, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2}; return sizes[index]; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
+        for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); volume.origin=rotate(volume.origin); }
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],inputs[0]);
     }
 };
@@ -243,7 +243,7 @@ class(PositionX, Operation), virtual VolumeOperation {
 class(PositionY, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={4, 2, 2}; return sizes[index]; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
+        for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); volume.origin=rotate(volume.origin); }
         perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],inputs[0],inputs[1]);
     }
 };
@@ -252,8 +252,8 @@ class(PositionY, Operation), virtual VolumeOperation {
 class(PositionZ, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint index) override { int sizes[]={2, 2, 2}; return sizes[index]; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); }
-        perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],/*outputs[3],*/inputs[0],inputs[1],inputs[2]);
+        for(Volume& volume: outputs) { volume.sampleCount=rotate(volume.sampleCount); volume.margin=rotate(volume.margin); volume.origin=rotate(volume.origin); }
+        perpendicularBisectorEuclideanDistanceTransform(outputs[0],outputs[1],outputs[2],inputs[0],inputs[1],inputs[2]);
     }
 };
 

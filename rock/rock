@@ -61,7 +61,7 @@ if minimalSqRadius: pruned = ThresholdClip skeleton-tiled minimalSqRadius
 if !minimalSqRadius: pruned = skeleton-tiled
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-if crop.cylinder: crop = Crop pruned inputCylinder=source.cylinder
+if crop.cylinder: crop = Crop pruned
 if !crop.cylinder: crop = pruned
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
@@ -88,7 +88,7 @@ sphere-bins = Bin rasterizeInput
 rasterized = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
-histogram = Histogram maximum inputCylinder=source.cylinder # Including rock
+histogram = Histogram maximum # Including rock
 histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius

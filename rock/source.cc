@@ -20,7 +20,7 @@ class(Source, Operation), virtual VolumeOperation {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume volume;
             if(!parseVolumeFormat(volume, metadata)) error("Unknown format");
-            crop = parseCrop(args, volume.margin, volume.margin, volume.sampleCount-volume.margin);
+            crop = parseCrop(args, volume.margin, volume.sampleCount-volume.margin);
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
@@ -29,7 +29,7 @@ class(Source, Operation), virtual VolumeOperation {
             Map file (slices.first(), folder);
             if(isTiff(file)) { const Tiff16 image (file); size.x=image.width,  size.y=image.height; }
             else { Image image = decodeImage(file); assert_(image, path, slices.first());  size.x=image.width, size.y=image.height; }
-            crop = parseCrop(args, 0, 0, size, args.contains("extra"_)?5:0 /*HACK: reverse dependency on process*/);
+            crop = parseCrop(args, 0, size, args.contains("extra"_)?5:0 /*HACK: reverse dependency on process*/);
         }
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
     }
@@ -40,6 +40,7 @@ class(Source, Operation), virtual VolumeOperation {
         target.sampleCount = crop.sampleCount;
         target.margin = crop.margin;
         target.field = String("μ"_); // Radiodensity
+        target.origin = crop.min-target.margin;
         const uint64 X= target.sampleCount.x, Y= target.sampleCount.y;
         const uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;
@@ -61,12 +62,12 @@ class(Source, Operation), virtual VolumeOperation {
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
-            for(uint z: range(size.z)) {
-                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample for larger than RAM volumes
-                    const uint sliceStride = Y*2*X*2;
-                    buffer<uint16> sliceBuffer(2*sliceStride);
+            if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample for larger than RAM volumes
+                const uint sliceStride = Y*2*X*2;
+                buffer<uint16> sliceBuffer(2*sliceStride);
+                for(uint z: range(size.z)) {
+                    if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                    uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                     for(uint i: range(2)) {
                         Map file(slices[(min.z+z)*2+i],folder);
                         Tiff16 tiff(file); assert_(tiff);
@@ -77,17 +78,20 @@ class(Source, Operation), virtual VolumeOperation {
                         targetSlice[y*X+x] = (source[0] + source[1] + source[X*2] + source[X*2+1] +
                                 source[sliceStride+0] + source[sliceStride+1] + source[sliceStride+X*2] + source[sliceStride+X*2+1])/8;
                     }
-                } else {
-                    Map file(slices[min.z+z], folder);
-                    if(isTiff(file)) { // Directly decodes slice images into the volume
-                        Tiff16 tiff(file);
-                        assert_(tiff, path, slices[min.z+z]);
-                        tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
-                    } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
-                        Image image = decodeImage(file);
-                        assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
-                        for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
-                    }
+                }
+            }
+            for(uint z: range(size.z)) {
+                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                Map file(slices[min.z+z], folder);
+                if(isTiff(file)) { // Directly decodes slice images into the volume
+                    Tiff16 tiff(file);
+                    assert_(tiff, path, slices[min.z+z]);
+                    tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
+                } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
+                    Image image = decodeImage(file);
+                    assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
+                    for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
                 }
             }
         }

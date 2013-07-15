@@ -316,7 +316,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
-                    if(File(path, storageFolder).size() < 64*1024) continue; // Small files won't release much capacity
+                    if(File(path, storageFolder).size() < 2<<20) continue; // Small files won't release much capacity
                     if(!(File(path, storageFolder).stat().st_mode&S_IWUSR)) continue; // Locked file
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);

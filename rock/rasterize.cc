@@ -90,6 +90,7 @@ void rasterize(Volume16& target, const Volume& source) {
     const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
     Time time; Time report;
+    tsc profile[8][8];
     parallel(tileCount, [&](uint id, uint i) {
         if(id==0 && report/1000>=7) log(i,"/", tileCount, (i*tileSize/1024./1024.)/(time/1000.), "MS/s"), report.reset();
         int z = (i/(X/tileSide*Y/tileSide))%(Z/tileSide), y=(i/(X/tileSide))%(Y/tileSide), x=i%(X/tileSide); // Extracts tile coordinates back from index
@@ -97,6 +98,7 @@ void rasterize(Volume16& target, const Volume& source) {
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         struct Block { uint16 min=0, max=0; } blocks[blockCount*blockCount*blockCount]; // min/max values for each block (for hierarchical culling) (ala Hi-Z) [256B]
         uint16 tile[tileSize] = {}; // Half-tiled target buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
+        profile[0][id].start();
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];
             int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
@@ -140,6 +142,8 @@ void rasterize(Volume16& target, const Volume& source) {
             }
 #endif
         }
+        profile[0][id].stop();
+        profile[1][id].start();
         // Writes out fully interleaved target for compatibility (metadata tiled flags currently only define untiled or fully tiled (Z-order) volumes)
         uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
         for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
@@ -148,13 +152,11 @@ void rasterize(Volume16& target, const Volume& source) {
             uint16* const targetBlock = targetTile + offsetX[blockX] + offsetY[blockY] + offsetZ[blockZ];
             for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
                 targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]] = block[dz*blockSide*blockSide + dy*blockSide + dx];
-#if 0 // Only for floodfill after rasterization test
-                int3 X = int3(tileX,tileY,tileZ)+int3(blockX,blockY,blockZ)+int3(dx,dy,dz);
-                if(!(X>=int3(target.margin) && X<int3(target.sampleCount-target.margin))) targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]]=0;
-#endif
             }
         }
+        profile[1][id].stop();
     } );
+    for(uint i: range(2)) { uint64 total=0; for(uint id: range(8)) total+=profile[i][id]; log(i, total); }
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }

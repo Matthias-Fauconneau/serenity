@@ -12,13 +12,13 @@ class(REV, Tool) {
         map<String, buffer<byte>> PSD_R;
         map<real, array<UniformSample>> PSD_octants;
         NonUniformSample relativeDeviations[3];
-        const real start=1, ratio = (start+1)/start;
+        const real start=6, ratio = (start+1)/start;
         const int3 octants[] = {int3{-1,-1,-1},int3{1,-1,-1},int3{-1,1,-1},int3{1,1,-1},int3{-1,-1,1},int3{1,-1,1},int3{-1,1,1},int3{1,1,1}};
         int i=0; for(real r=start; round(r)<size/4; r*=ratio, i++) {
             int radius = int(round(r));
             array<NonUniformSample> nonUniformSamples;
             for(int3 octant: octants) {
-                int3 center = int3(size/2) + (size/4) * octant;
+                int3 center = input.sampleCount/2 + (size/4) * octant;
                 Dict args = copy(arguments);
                 args.insert(String("histogram.cylinder"_), str((int[]){center.x, center.y, radius, center.z-radius, center.z+radius},','));
                 shared<Result> result = process.getResult("volume-distribution-radius"_, args); // Pore size distribution (values are volume in voxels)
@@ -30,7 +30,7 @@ class(REV, Tool) {
             uint median = mean.median();
             for(uint i: range(3)) { /// Computes deviation of a sample of distributions
                 uint begin = (uint[]){0,0,median}[i], end = (uint[]){(uint)mean.size,median,(uint)mean.size}[i]; // 0-size, 0-median, median-size
-                assert_(begin<end);
+                assert_(begin<end, r, i, begin, end, mean.size, median);
                 array<UniformSample> slices = apply(samples, [&](const UniformSample& sample){ return UniformSample(sample.slice(begin,end-begin)); } );
                 UniformSample mean = ::mean(slices);
                 real sumOfSquareDifferences = 0; for(const UniformSample& slice: slices) sumOfSquareDifferences += sum(sq(slice-mean));
@@ -44,7 +44,7 @@ class(REV, Tool) {
             PSD_octant << (1./mean.sampleCount())*mean;
             PSD_octants.insert(resolution*radius, move(PSD_octant));}
         }
-        const auto& e=relativeDeviations[0]; real inflectionRadius=0; for(uint i: range(e.size()-1)) { inflectionRadius=e.keys[i]; if(e.values[i] < 1 && e.values[i+1] > e.values[i]) break; } // Deviation within estimation error
+        const auto& e=relativeDeviations[0]; real inflectionRadius=0; for(uint i: range(e.size()-1)) { inflectionRadius=e.keys[i]; if(e.values[i] < 0.5 && e.values[i+1] > e.values[i]) break; } // Deviation within estimation error
         const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_; //#logx\n#logy\n
         output(outputs, "ε(R)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[0]);});
         output(outputs, "ε(R|r<median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[1]);});

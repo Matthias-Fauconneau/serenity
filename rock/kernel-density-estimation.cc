@@ -15,7 +15,7 @@ UniformSample kernelDensityEstimation(const UniformHistogram& histogram, real h=
     if(normalize) pdf.scale = 1./histogram.size;
     parallel(pdf.size, [&](uint, uint x0) {
         real sum = 0;
-        for(int i: range(min(clip,x0))) sum += histogram[x0-1-i]*K[i];
+        for(int i: range(1,min(clip,x0))) sum += histogram[x0-i]*K[i];
         for(int i: range(min(clip,uint(histogram.size)-x0))) sum += histogram[x0+i]*K[i];
         pdf[x0] = sum;
     });

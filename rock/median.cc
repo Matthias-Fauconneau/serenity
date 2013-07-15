@@ -4,6 +4,7 @@
 
 /// Denoises a volume using a 3x3x3 median filter
 void median(Volume16& target, const Volume16& source) {
+    assert_(source.sampleCount-2*source.margin>int3(3), "Input too small for 3³ median filter", source.sampleCount-2*source.margin);
     assert_(!source.tiled());
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int marginX=source.margin.x+1, marginY=source.margin.y+1, marginZ=source.margin.z+1;

@@ -7,14 +7,14 @@ class(Prune, Tool) {
     string parameters() const override { return "path"_; }
     void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, Process& process) override {
         real resolution = parseScalar(process.getResult("resolution"_, arguments)->data);
-        shared<Result> inputResult = process.getResult("crop"_, arguments); // Keep this reference to prevent this input to be evicted from cache
+        shared<Result> inputResult = process.getResult("skeleton-tiled"_, arguments); // Keep this reference to prevent this input to be evicted from cache
         Volume input = toVolume(inputResult);
         int3 size=input.sampleCount-input.margin; int maximumRadius=min(16, min(min(size.x, size.y), size.z)/2);
         real totalVolume = parseScalar(process.getResult("volume-total"_, arguments)->data);
         NonUniformSample unconnectedVolume, connectedVolume;
         real criticalRadius = 0;
         for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
-        //for(int r: range(maximumRadius)) { int r2=sq(r); // Faster testing (only integer radius)
+        //const real precision = 2; int last=-1; for(int i: range(maximumRadius)) { int r2=round(sq(i/precision)); if(r2==last) continue; last=r2; real r=sqrt(real(r2));
             Dict args = copy(arguments);
             args["minimalSqRadius"_]=r2;
             {args.at("floodfill"_) = 0;
