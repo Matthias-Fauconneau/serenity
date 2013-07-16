@@ -51,9 +51,9 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
     if(s.match("-float"_)) volume.floatingPoint=true;
     if(s.match('-')) volume.field = String(s.whileNot('+'));
     if(s.match('+')) {
-        volume.origin.x = s.mayInteger(); if(!s.match('+')) return false;
-        volume.origin.y = s.mayInteger(); if(!s.match('+')) return false;
-        volume.origin.z = s.mayInteger();
+        volume.origin.x = s.mayInteger(true); if(!s.match('+')) return false;
+        volume.origin.y = s.mayInteger(true); if(!s.match('+')) return false;
+        volume.origin.z = s.mayInteger(true);
     }
     if(s) return false;
     return true;
@@ -111,8 +111,8 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
     Image target(X-2*marginX,Y-2*marginY, true);
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;
-    if(!normalize && maximum==0xFFFF) { normalizeFactor=0xFF00; warn("16bit volume truncated to 8bit image slices"); }
-    assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit");
+    if(!normalize && maximum>0x8000) { normalizeFactor=0xFF00; warn("16bit volume truncated to 8bit image slices"); }
+    assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum<0x8000");
     uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
          if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0); continue; }
@@ -129,6 +129,22 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
         extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
         uint sRGB8 = gamma ? sRGB_lookup[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values
         target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
+    }
+    return target;
+}
+
+Image16 slice(const Volume& source, int z) {
+    assert_(source.maximum);
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
+    const int marginX=source.margin.x, marginY=source.margin.y;
+    Image16 target(X-2*marginX,Y-2*marginY);
+    for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
+        uint value = 0;
+        size_t index = source.index(x,y,z);
+        if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
+        else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
+        else error("source.sampleSize"_,source.sampleSize);
+        target(x-marginX,y-marginY) = value;
     }
     return target;
 }

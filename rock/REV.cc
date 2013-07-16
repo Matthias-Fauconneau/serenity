@@ -44,15 +44,15 @@ class(REV, Tool) {
             PSD_octant << (1./mean.sampleCount())*mean;
             PSD_octants.insert(resolution*radius, move(PSD_octant));}
         }
-        const auto& e=relativeDeviations[0]; real inflectionRadius=0; for(uint i: range(e.size()-1)) { inflectionRadius=e.keys[i]; if(e.values[i] < 0.5 && e.values[i+1] > e.values[i]) break; } // Deviation within estimation error
+        const auto& e=relativeDeviations[0]; real representativeRadius=0; for(uint i: range(e.size())) { representativeRadius=e.keys[i]; if(e.values[i] < 0.25) break; } // Deviation < 0.25
         const string title = "#Relative deviation of pore size distribution versus cylinder radius of 8 volume samples\n"_; //#logx\n#logy\n
         output(outputs, "ε(R)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[0]);});
         output(outputs, "ε(R|r<median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[1]);});
         output(outputs, "ε(R|r>median)"_, "ε(R [μm]).tsv"_, [&]{return title + toASCII(relativeDeviations[2]);});
         outputElements(outputs, "PSD(R)"_, "V(r [μm]).tsv"_, [&]{return move(PSD_R);});
-        output(outputs, "representative-radius"_, "scalar"_, [&]{return toASCII(inflectionRadius/resolution);});
+        output(outputs, "representative-radius"_, "scalar"_, [&]{return toASCII(representativeRadius/resolution);});
         for(uint i: range(3)) {
-            real radius = i==0 ? PSD_octants.keys[3] : i==1 ? inflectionRadius : PSD_octants.keys.last();
+            real radius = i==0 ? PSD_octants.keys[3] : i==1 ? representativeRadius : PSD_octants.keys.last();
             string name = i==0 ? "first"_ : i==1 ? "inflection"_ : "last"_;
             outputElements(outputs, "PSD(octant|R:"_+name+")"_, "V(r [μm]).tsv"_, [&]{
                 const array<UniformSample>& PSD_octant = PSD_octants.at(radius);

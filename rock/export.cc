@@ -3,6 +3,7 @@
 #include "time.h"
 #include "png.h"
 #include "bmp.h"
+#include "tiff.h"
 
 /// Square roots all values
 void squareRoot(VolumeFloat& target, const Volume16& source) {
@@ -57,7 +58,7 @@ class(Mask, Operation), virtual VolumeOperation {
     }
 };
 
-/// Exports volume to normalized 8bit PNGs for visualization
+/// Exports volume to 8bit PNGs for visualization (normalized and gamma corrected)
 class(ToPNG, Operation), virtual VolumeOperation {
     virtual string parameters() const { return "z invert binary"_; }
     void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
@@ -76,7 +77,7 @@ class(ToPNG, Operation), virtual VolumeOperation {
     }
 };
 
-/// Exports volume to normalized 8bit BMPs for visualization
+/// Exports volume to 8bit BMPs for interoperation (deprecated: use ToTIFF instead)
 class(ToBMP, Operation), virtual VolumeOperation {
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
@@ -86,6 +87,21 @@ class(ToBMP, Operation), virtual VolumeOperation {
         for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
             if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
             outputs[0]->elements.insert(dec(z-marginZ,4), encodeBMP(slice(volume,z,false, false)));
+        }
+    }
+};
+
+/// Exports volume to 16bit TIFFs  for interoperation
+class(ToTIFF, Operation), virtual VolumeOperation {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+        const Volume& volume = inputs[0];
+        outputs[0]->metadata = String("tiff"_);
+        uint marginZ = volume.margin.z;
+        Time time; Time report;
+        for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
+            if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
+            assert_(!volume.tiled());
+            outputs[0]->elements.insert(dec(z-marginZ,4), encodeTIFF(slice(volume, z)));
         }
     }
 };

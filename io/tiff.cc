@@ -3,22 +3,20 @@
 #include "image.h"
 #include <tiffio.h> //tiff
 
-tsize_t tiffRead(BinaryData& s, byte* buffer, tsize_t size) { size=min(size,int(s.buffer.size-s.index)); copy(buffer, s.buffer.data+s.index, size); s.advance(size); return size; }
-tsize_t tiffWrite(BinaryData&, byte*, tsize_t) { error(""); }
-toff_t tiffSeek(BinaryData& s, toff_t off, int whence) {
+static toff_t tiffSize(BinaryData& fd) { return fd.buffer.size; }
+static tsize_t tiffRead(BinaryData& s, byte* buffer, tsize_t size) { size=min(size,int(s.buffer.size-s.index)); copy(buffer, s.buffer.data+s.index, size); s.advance(size); return size; }
+static toff_t tiffSeek(BinaryData& s, toff_t off, int whence) {
     if(whence==SEEK_SET) s.index=off;
     if(whence==SEEK_CUR) s.index+=off;
-    if(whence==SEEK_CUR) s.index=s.buffer.size+off;
+    if(whence==SEEK_END) s.index=s.buffer.size+off;
     return s.index;
 }
-int tiffClose(BinaryData&) { return 0; }
-toff_t tiffSize(BinaryData& fd) { return fd.buffer.size; }
-int tiffMap(thandle_t , tdata_t* , toff_t* ) { return 0; }
-void tiffUnmap(thandle_t, tdata_t , toff_t) {}
+static tsize_t tiffZero() {return 0; }
+static int tiffError() { error(""); return 0; }
 
 Image decodeTIFF(const ref<byte>& file) {
     BinaryData s (file);
-    TIFF *const tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
+    TIFF *const tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffError, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffZero, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffZero, (TIFFUnmapFileProc)tiffError);
     assert_(tiff);
     uint32 width=0; TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
     uint32 height=0; TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
@@ -30,7 +28,7 @@ Image decodeTIFF(const ref<byte>& file) {
 
 Tiff16::Tiff16(const ref<byte>& file) : s(file) {
     TIFFSetWarningHandler(0);
-    tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffClose, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffMap, (TIFFUnmapFileProc)tiffUnmap);
+    tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffError, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffZero, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffZero, (TIFFUnmapFileProc)tiffError);
     assert_(tiff, file.size, hex(file.slice(0, 4)));
     if(!tiff) return;
     TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
@@ -48,3 +46,17 @@ void Tiff16::read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride)
     }
 }
 Tiff16::~Tiff16() { TIFFClose(tiff); }
+
+static tsize_t tiffWrite(BinaryData& s, const byte* data, tsize_t size) { assert_(s.index+size<=s.buffer.capacity); copy(s.buffer.begin()+s.index, data, size); s.index+=size; if(s.index>s.buffer.size) s.buffer.size=s.index; return size; }
+buffer<byte> encodeTIFF(const Image16& image) {
+    BinaryData s ( buffer<byte>(4096+image.height*image.width*2, 0) );
+    TIFF* tiff = TIFFClientOpen("TIFF", "w", (thandle_t)&s, (TIFFReadWriteProc)tiffZero, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffZero, (TIFFSizeProc)tiffError, (TIFFMapFileProc)tiffError, (TIFFUnmapFileProc)tiffError);
+    TIFFSetField(tiff, TIFFTAG_IMAGEWIDTH, image.width);
+    TIFFSetField(tiff, TIFFTAG_IMAGELENGTH, image.height);
+    TIFFSetField(tiff, TIFFTAG_SAMPLESPERPIXEL, 1);
+    TIFFSetField(tiff, TIFFTAG_BITSPERSAMPLE, 16);
+    TIFFSetField(tiff, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+    for(uint y: range(image.height)) TIFFWriteScanline(tiff, (void*)(image.data+y*image.width), y, 0);
+    TIFFClose(tiff);
+    return move(s.buffer);
+}

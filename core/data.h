@@ -161,7 +161,7 @@ struct TextData : virtual Data {
     /// Reads an integer
     int integer(bool sign=false);
     /// Reads an unsigned integer, return -1 if fails
-    uint mayInteger();
+    uint mayInteger(bool sign=false);
     /// Matches [0-9a-fA-F]*
     string whileHexadecimal();
     /// Reads an hexadecimal integer

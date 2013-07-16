@@ -65,27 +65,20 @@ if crop.cylinder: crop = Crop pruned
 if !crop.cylinder: crop = pruned
 
 # Transposes to use an alternate connectivity axis (FloodFill always use Z)
-transpose = Transpose floodInput
+transpose = Transpose crop
 if transpose=='X': transposed = transpose
 if transpose=='Y': transposed = Transpose transpose
-if transpose=='Z': transposed = floodInput
-if !transpose: transposed = floodInput
+if transpose=='Z': transposed = crop
+if !transpose: transposed = crop
 
+# Discards unconnected pores
 floodfill = ''
 if !floodfill: connected = transposed # Forwards unconnected skeleton
 if floodfill: connected = FloodFill transposed minimalSqRadius # Flood fills skeleton
 
-if !floodfillAfterRasterization: floodInput = crop
-if !floodfillAfterRasterization: rasterizeInput = connected
-if !floodfillAfterRasterization: maximum = rasterized
-
-if floodfillAfterRasterization: rasterizeInput = crop
-if floodfillAfterRasterization: floodInput = rasterized
-if floodfillAfterRasterization: maximum = connected
-
 # Rasterizes skeleton voxel as maximum spheres
-sphere-bins = Bin rasterizeInput
-rasterized = Rasterize sphere-bins
+sphere-bins = Bin connected
+maximum = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
 histogram = Histogram maximum # Including rock
@@ -115,6 +108,7 @@ distribution-radius = Div volume-distribution-radius volume-total
 # Export
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
+ denoised-connected = Mask denoised maximum
  cdl = ToCDL sqrt-scaled
  ascii = ToASCII sqrt-scaled
  # Exports to PNG (normalized and gamma-compressed for visualization)
@@ -125,15 +119,16 @@ distribution-radius = Div volume-distribution-radius volume-total
   png-distance = ToPNG distance invert=1
   png-skeleton = ToPNG skeleton invert=1 binary=1
   png-maximum = ToPNG maximum invert=1
-# Exports to BMP (Stores original (unnormalized and linear) values for interoperation)
+# Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised
   bmp-distance = ToBMP distance
   bmp-skeleton = ToBMP skeleton
   bmp-maximum = ToBMP maximum
-  denoised-connected = Mask denoised maximum
   bmp-denoised-connected = ToBMP denoised-connected
-
+ # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
+  tiff-denoised = ToTIFF denoised
+  tiff-denoised-connected = ToTIFF denoised-connected
 # Tools
 ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV
 critical-radius unconnected(λ) connected(λ) = Prune
