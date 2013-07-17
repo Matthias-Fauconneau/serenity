@@ -8,16 +8,16 @@ void setBorders(Volume32& target) {
     typedef uint32 T;
     T* const targetData = target;
     assert(!target.tiled());
-    for(uint z=0; z<Z; z++) {
+    for(uint z=marginZ; z<Z-marginZ; z++) {
         T* const targetZ = targetData + z*XY;
         for(uint y=0; y<Y; y++) {
             T* const targetZY = targetZ + y*X;
-            for(uint x=0; x<=marginX; x++) targetZY[x] = x*x;
+            for(uint x=0; x<marginX; x++) targetZY[x] = x*x;
             for(uint x=X-marginX; x<X; x++) targetZY[x] = x*x;
         }
         for(uint x=0; x<X; x++) {
             T* const targetZX = targetZ + x;
-            for(uint y=0; y<=marginY; y++) targetZX[y*X] = x*x;
+            for(uint y=0; y<marginY; y++) targetZX[y*X] = x*x;
             for(uint y=Y-marginY; y<Y; y++) targetZX[y*X] = x*x;
         }
     }
@@ -25,7 +25,7 @@ void setBorders(Volume32& target) {
         T* const targetY = targetData + y*X;
         for(uint x=0; x<X; x++) {
             T* const targetYX = targetY + x;
-            for(uint z=0; z<=marginZ; z++) targetYX[z*XY] = x*x;
+            for(uint z=0; z<marginZ; z++) targetYX[z*XY] = x*x;
             for(uint z=Z-marginZ; z<Z; z++) targetYX[(Z-marginZ-1)*XY] = x*x;
         }
     }
@@ -36,8 +36,8 @@ void setBorders(Volume32& target) {
 // X
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, const Volume32& source) {
     setBorders(target);
-    const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
-    const int tX=sY, tY=sZ;
+    const int64 sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
+    const int64 tX=sY, tY=sZ;
     const int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
     const uint32* const sourceData = source;
     uint32* const targetData = target;
@@ -95,8 +95,8 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 // Y
 void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16& positionX, Volume16& positionY, const Volume32& source, const Volume16& sourceX) {
     setBorders(target);
-    const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
-    const int tX=sY, tY=sZ;
+    const int64 sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
+    const int64 tX=sY, tY=sZ;
     const int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;
@@ -163,8 +163,8 @@ void perpendicularBisectorEuclideanDistanceTransform(Volume32& target, Volume16&
 // Z
 void perpendicularBisectorEuclideanDistanceTransform(Volume16& positionX, Volume16& positionY, Volume16& positionZ, const Volume32& source, const Volume16& sourceX, const Volume16& sourceY) {
     //setBorders(target);
-    const int sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
-    const int tX=sY, tY=sZ;
+    const int64 sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
+    const int64 tX=sY, tY=sZ;
     const int marginX=source.margin.x-1, marginY=source.margin.y-1, marginZ=source.margin.z-1;
     const uint32* const sourceData = source;
     const uint16* const xSourceData = sourceX;

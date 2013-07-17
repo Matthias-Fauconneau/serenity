@@ -34,7 +34,7 @@ CropVolume alignCrop(int3 min, int3 max, int3 minimalMargin) {
     assert_(sampleCount>int3(1), sampleCount);
     while(sampleCount.y < sampleCount.z   ) sampleCount.y*=2; // Z-order: [Z Y] X z y x
     while(sampleCount.x < sampleCount.y   ) sampleCount.x*=2; // Z-order: Z [Y X] z y x
-    while(sampleCount.z < sampleCount.x   ) sampleCount.z*=2; // Z-order: Z Y [X z] y x
+    while(sampleCount.z < sampleCount.x/2) sampleCount.z*=2; // Z-order: Z Y [X z] y x
     while(sampleCount.y < sampleCount.z/2) sampleCount.y*=2; // Z-order: Z Y X [z y] x
     while(sampleCount.x < sampleCount.y/2) sampleCount.x*=2; // Z-order: Z Y X z [y x]
     margin = (sampleCount - size)/2;

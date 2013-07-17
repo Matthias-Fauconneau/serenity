@@ -172,7 +172,7 @@ void threshold(Volume32& pore, const Volume16& source, uint16 threshold, bool gr
     uint32 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 0xFFFFFFFF;
     uint32* const poreData = pore;
-    parallel(Z, [&](uint, int z) {
+    parallel(marginZ-1, Z-marginZ+1, [&](uint, int z) {
         const uint16* const sourceZ = source + z*XY;
         uint32* const poreZ = poreData + z*XY;
         if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=4) storea(poreZ+y*X+x, loada(sqr+x));
