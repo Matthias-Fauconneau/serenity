@@ -1,9 +1,9 @@
 #include "volume-operation.h"
 #include "thread.h"
 
-inline void compare(uint16* const skel, const uint16* const xf, const uint16* const yf, const uint16* const zf, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter) {
-    int xf0=xf[0], yf0=yf[0], zf0=zf[0]; // First feature point
-    int xfd=xf[da], yfd=yf[da], zfd=zf[da]; // Second feature point
+inline void compare(uint16* const skel, const short3* const pos, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter) {
+    int xf0=pos[0].x, yf0=pos[0].y, zf0=pos[0].z; // First feature point
+    int xfd=pos[da].x, yfd=pos[da].y, zfd=pos[da].z; // Second feature point
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
     int sqNorm = sq(x0d) + sq(y0d) + sq(z0d); // Squared distance between feature points
     int xd=x+dx, yd=y+dy, zd=z+dz; // Second origin point
@@ -23,34 +23,26 @@ inline void compare(uint16* const skel, const uint16* const xf, const uint16* co
 }
 
 /// Computes integer medial axis
-void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume16& positionY, const Volume16& positionZ, int minimalSqDiameter) {
+void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter) {
     assert_(minimalSqDiameter>=3);
-    const uint16* const xPositionData = positionX;
-    const uint16* const yPositionData = positionY;
-    const uint16* const zPositionData = positionZ;
+    const short3* const positionData = position;
     uint16* const targetData = target;
     clear(targetData, target.size());
-    const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
+    const int64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     const uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {
-        const uint16* const xPositionZ = xPositionData+z*XY;
-        const uint16* const yPositionZ = yPositionData+z*XY;
-        const uint16* const zPositionZ = zPositionData+z*XY;
+        const short3* const positionZ = positionData+z*XY;
         uint16* const targetZ = targetData+z*XY;
         for(uint y=marginY; y<Y-marginY; y++) {
-            const uint16* const xPositionZY = xPositionZ+y*X;
-            const uint16* const yPositionZY = yPositionZ+y*X;
-            const uint16* const zPositionZY = zPositionZ+y*X;
+            const short3* const positionZY = positionZ+y*X;
             uint16* const targetZY = targetZ+y*X;
             for(uint x=marginX; x<X-marginX; x++) {
-                const uint16* const xf = xPositionZY+x;
-                const uint16* const yf = yPositionZY+x;
-                const uint16* const zf = zPositionZY+x;
+                const short3* const pos = positionZY+x;
                 uint16* const skel = targetZY+x;
-                if(xf[0]<0xFFFF) {
-                    if(xf[-1]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, -1,0,0, -1, minimalSqDiameter);
-                    if(xf[-(int)X]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,-1,0, -X, minimalSqDiameter);
-                    if(xf[-(int)XY]<0xFFFF) compare(skel,xf,yf,zf,x,y,z, 0,0,-1, -XY, minimalSqDiameter);
+                if(pos[0]!=short3(x,y,z)) {
+                    if(pos[-1]!=short3(x-1,y,z)) compare(skel,pos,x,y,z, -1,0,0, -1, minimalSqDiameter);
+                    if(pos[-X]!=short3(x,y-1,z)) compare(skel,pos,x,y,z, 0,-1,0, -X, minimalSqDiameter);
+                    if(pos[-XY]!=short3(x,y,z-1)) compare(skel,pos,x,y,z, 0,0,-1, -XY, minimalSqDiameter);
                 }
             }
         }
@@ -63,5 +55,5 @@ void integerMedialAxis(Volume16& target, const Volume16& positionX, const Volume
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
 class(Skeleton, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { integerMedialAxis(outputs[0],inputs[0],inputs[1],inputs[2], 3); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { integerMedialAxis(outputs[0],inputs[0], 3); }
 };

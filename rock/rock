@@ -7,11 +7,6 @@ source name resolution voxelSize physicalSize = Source
 # Denoises
 denoise = 'median'
 if !denoise: denoised = source
-if denoise == 'average': denoised = average
- shift = ShiftRight source
- averagex = Average shift
- averagexy = Average averagex
- average = Average averagexy shift=0
 if denoise == 'median': denoised = median
  median = Median source
 
@@ -46,7 +41,9 @@ colorize = Colorize pore resampled # For visualization
 thresholded = Threshold resampled threshold # For visualization
 
 # Computes position of nearest background voxel
-position = Position pore
+positionx = PositionX pore
+positionxy = PositionY positionx
+position = PositionZ positionxy
 distance = Distance position
 
 # Computes skeleton (medial axis)

@@ -71,7 +71,6 @@ rock/rock
 rock/rock.cc
 rock/sample.h
 rock/skeleton.cc
-rock/average.cc
 rock/source.cc
 rock/threshold.cc
 rock/volume.cc

@@ -2,7 +2,6 @@
 #include "sample.h"
 #include "time.h"
 #include "thread.h"
-#include "simd.h"
 
 /// Square roots samples
 UniformSample squareRoot(const UniformSample& A) {
@@ -163,24 +162,22 @@ class(MaximumMeanGradient, Operation) {
 /// Segments by setting values over a fixed threshold
 void threshold(Volume16& pore, const Volume16& source, uint16 threshold, bool invert=false) {
     const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    v8hi threshold8 = short8(threshold);
-    const v8hi _1i = {1,1,1,1,1,1,1,1};
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     assert_(X%16==0 && X-2*marginX==Y-2*marginY);
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    uint16 mask[X*Y]; // Disk mask (TODO: bit)
+    uint16 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 1;
     uint16* const poreData = pore;
     parallel(marginZ-1, Z-marginZ+1, [&](uint, int z) {
         const uint16* const sourceZ = source + z*XY;
         uint16* const poreZ = poreData + z*XY;
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=8) storea(poreZ+y*X+x, _1i);
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint16* const poreZY = poreZ + y*X; for(int x=0; x<X; x++) poreZY[x]=1; }
         else for(int y=0; y<Y; y++) {
             const uint16* const sourceY = sourceZ + y*X;
             uint16* const poreZY = poreZ + y*X;
             uint16* const maskY = mask + y*X;
-            if(invert) for(int x=0; x<X; x+=8) storea(poreZY+x, (threshold8 < loada(sourceY+x)) & loada(maskY+x) );
-            else for(int x=0; x<X; x+=8) storea(poreZY+x, (threshold8 >= loada(sourceY+x)) & loada(maskY+x) );
+            if(invert) for(int x=0; x<X; x++) poreZY[x] = (sourceY[x] < threshold) & maskY[x];
+            else for(int x=0; x<X; x++) poreZY[x] = (sourceY[x] >= threshold) & maskY[x];
         }
     });
     pore.maximum=1;
