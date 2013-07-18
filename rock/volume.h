@@ -7,7 +7,6 @@ int3 zOrder(uint index);
 uint zOrder(int3 coordinates);
 
 generic struct VolumeT;
-//TODO: 1-bit Volume
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
 struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;

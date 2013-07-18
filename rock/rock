@@ -21,7 +21,7 @@ if thresholdFromSource: histogram-radiodensity = Histogram source
 distribution-radiodensity = KernelDensityEstimation histogram-radiodensity
 
 # Debug
-histogram-radiodensity-normalizeY = NormalizeY histogram-radiodensity
+histogram-radiodensity-normalizeY = NormalizeAreaY histogram-radiodensity
 distribution-radiodensity-unnormalized = KernelDensityEstimation histogram-radiodensity normalize=0
 # Compatibility
 histogram-density = histogram-radiodensity
@@ -31,7 +31,7 @@ distribution-density = distribution-radiodensity-unnormalized
 # Threshold determination
 threshold = 'otsu'
 if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-radiodensity # Recommended robust statistic method
-otsu-interclass-deviation-normalized = Normalize otsu-interclass-deviation
+otsu-interclass-deviation-normalized = NormalizeAreaXY otsu-interclass-deviation
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-radiodensity-unnormalized # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
@@ -124,8 +124,13 @@ distribution-radius = Div volume-distribution-radius volume-total
  # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected
+
 # Tools
-ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV
-critical-radius unconnected(λ) connected(λ) = Prune
-slices plots summary = Summary
-compare = Compare
+ ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV
+ critical-radius unconnected(λ) connected(λ) = Prune
+ slices plots summary = Summary
+ compare = Compare
+
+# Visualization
+ source-tiled = ZOrder source
+ density = Normalize8 source-tiled

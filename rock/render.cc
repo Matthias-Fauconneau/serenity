@@ -1,22 +1,30 @@
 #include "render.h"
 #include "thread.h"
 #include "simd.h"
+#include "volume-operation.h"
 
-void render(Image& target, const Volume8& empty, const Volume8& density, const Volume8& intensity, mat3 view) {
+/// Normalizes to 8bit
+void normalize8(Volume8& target, const Volume16& source) {
+    const uint16* const sourceData = source; uint8* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = sourceData[index]*0xFF/source.maximum;
+}
+defineVolumePass(Normalize8, uint8, normalize8);
+
+void render(Image& target, const Volume8& density, /*const Volume8& intensity, const Volume8& empty,*/ mat3 view) {
+    assert_(density.tiled() /*&& intensity.tiled() && empty.tiled()*/);
     // Volume
-    uint stride = empty.sampleCount.x; // Unclipped volume data size
-    uint size = stride-2*empty.margin.x; // Clipped volume size
+    uint stride = density.sampleCount.x; // Unclipped volume data size
+    uint size = stride-2*density.margin.x; // Clipped volume size
     const float radius = size/2, halfHeight = size/2; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const uint8* const densityData = density;
-    const uint8* const intensityData = intensity;
-    assert_(empty.tiled());
-    const uint8* const emptyData = empty;
-    const uint* const offsetX = empty.offsetX.data + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint* const offsetY = empty.offsetY.data + stride/2;
-    const uint* const offsetZ = empty.offsetZ.data + stride/2;
+    /*const uint8* const intensityData = intensity;
+    const uint8* const emptyData = empty;*/
+    const uint64* const offsetX = density.offsetX.data + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
+    const uint64* const offsetY = density.offsetY.data + stride/2;
+    const uint64* const offsetZ = density.offsetZ.data + stride/2;
 
     // Image
     int imageX = target.width, imageY = target.height; // Target image size
@@ -78,9 +86,9 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
                 const uint vx0 = offsetX[extracti(p0,0)];
                 const uint vy0 = offsetY[extracti(p0,1)];
                 const uint vz0 = offsetZ[extracti(p0,2)];
-                const uint r = emptyData[vx0 + vy0 + vz0];
+                /*const uint r = emptyData[vx0 + vy0 + vz0];
                 if(r) position = position + cvtdq2ps(set1(r)) * ray; // Step
-                else {
+                else*/ {
                     const v4si p1 = p0 +_1i;
                     const uint vx1 = offsetX[extracti(p1,0)];
                     const uint vy1 = offsetY[extracti(p1,1)];
@@ -88,8 +96,8 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
                     // Loads samples (FIXME: interleave density and intensity)
                     const v4si icx0_density = {densityData[vx0 + vy0 + vz0], densityData[vx0 + vy0 + vz1], densityData[vx0 + vy1 + vz0], densityData[vx0 + vy1 + vz1]};
                     const v4si icx1_density = {densityData[vx1 + vy0 + vz0], densityData[vx1 + vy0 + vz1], densityData[vx1 + vy1 + vz0], densityData[vx1 + vy1 + vz1]};
-                    const v4si icx0_intensity = {intensityData[vx0 + vy0 + vz0], intensityData[vx0 + vy0 + vz1], intensityData[vx0 + vy1 + vz0], intensityData[vx0 + vy1 + vz1]};
-                    const v4si icx1_intensity = {intensityData[vx1 + vy0 + vz0], intensityData[vx1 + vy0 + vz1], intensityData[vx1 + vy1 + vz0], intensityData[vx1 + vy1 + vz1]};
+                    /*const v4si icx0_intensity = {intensityData[vx0 + vy0 + vz0], intensityData[vx0 + vy0 + vz1], intensityData[vx0 + vy1 + vz0], intensityData[vx0 + vy1 + vz1]};
+                    const v4si icx1_intensity = {intensityData[vx1 + vy0 + vz0], intensityData[vx1 + vy0 + vz1], intensityData[vx1 + vy1 + vz0], intensityData[vx1 + vy1 + vz1]};*/
                     // Compute trilinear interpolation coefficients
                     const v4sf pc = position - cvtdq2ps(p0);
                     const v4sf _1mpc = _1f - pc;
@@ -108,12 +116,13 @@ void render(Image& target, const Volume8& empty, const Volume8& density, const V
                     const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));
                     const v4sf dz = x0011*y0101*(shuffle(cx0,cx1, 0,2,0,2)-shuffle(cx0,cx1, 1,3,1,3));
                     // Trilinearly interpolated intensity
-                    const v4sf sample = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_intensity) + x1111*cvtdq2ps(icx1_intensity));
+                    const v4sf intensity = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_density) + x1111*cvtdq2ps(icx1_density));
+                    //const v4sf intensity = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_intensity) + x1111*cvtdq2ps(icx1_intensity));
                     // Surface normal
                     const v4sf dp = transpose(dx, dy, dz, _0001f);
                     const v4sf n = dp * rsqrt(dot3(dp,dp));
-                    const v4sf alpha = min(sample, _0001f);
-                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(sample*sample* _halff*(n+_1110f), alpha); // Blend
+                    const v4sf alpha = min(intensity, _0001f);
+                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(intensity*intensity* _halff*(n+_1110f), alpha); // Blend
                     position = position + ray; // Step
                 }
                 if(mask(bitOr(accumulator > alphaTerm, position > texit))) break; // Check for exit intersection or saturation

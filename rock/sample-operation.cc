@@ -62,7 +62,7 @@ class(Div, Operation) {
     }
 };
 
-class(Normalize, Operation), virtual Pass {
+class(NormalizeAreaXY, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         UniformSample sample = parseUniformSample(source.data);
@@ -73,7 +73,7 @@ class(Normalize, Operation), virtual Pass {
     }
 };
 
-class(NormalizeY, Operation), virtual Pass {
+class(NormalizeAreaY, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         UniformSample sample = parseUniformSample(source.data);

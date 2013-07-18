@@ -56,7 +56,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             assert_(!defaultArguments.contains(key),"Multiple default argument definitions for",key);
             defaultArguments.insert(String(key), String(value));
         } else {
-            string word = s.word("_-"_);
+            string word = s.identifier("_-"_);
             assert_(word, "Expected operator or input for", outputs);
             if(!Interface<Operation>::factories.contains(word) && !Interface<Tool>::factories.contains(word)) rule.inputs << word; // Forwarding rule
             else rule.operation = word; // Generating rule
@@ -270,7 +270,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     // Simple forwarding rule
     if(!rule.operation) {
-        assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded");
+        assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded", rule);
         return getResult(rule.inputs.first(), arguments);
     }
 

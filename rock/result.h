@@ -25,7 +25,7 @@ template <class I> struct Interface {
     template <class C> struct Factory : AbstractFactory {
         string version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
-        Factory() { TextData s (str(typeid(C).name())); s.integer(); factories.insert(s.word(), this); }
+        Factory() { TextData s (str(typeid(C).name())); s.integer(); factories.insert(s.identifier(), this); }
         static Factory registerFactory;
     };
     static string version(const string& name) { return factories.at(name)->version(); }

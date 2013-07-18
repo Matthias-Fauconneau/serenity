@@ -15,7 +15,7 @@ class(SliceView, View), virtual Widget {
     int currentIndex=0;
     static float sliceZ; // Normalized z coordinate of the currently shown slice (static: synchronize Z coordinates across all slice views)
 
-    bool renderVolume = false;
+    bool renderVolume = true;
     int2 lastPos; float lastZ;
     vec2 rotation = vec2(PI/3,-PI/3); // Current view angles (yaw,pitch)
 };
