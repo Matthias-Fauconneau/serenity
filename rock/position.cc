@@ -49,12 +49,12 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
 #define g(i) sq(x-int(sourceXZ[dz*Y+i]))
 #define f(i,u) (sq((i)-(u))+g(u))
 #define Sep(i,u) ((sq(u) - sq(i) + g(u) - g(i)) / (2*((u)-(i))))
-            int Q[width]={}; uint16 S[width][Y], T[width][Y];
+            int Q[width]; uint16 S[width][Y], T[width][Y];
             for(uint dz: range(width)) {
                 int& q = Q[dz];
                 uint16* const s = S[dz];
                 uint16* const t = T[dz];
-                s[0]=0, t[0]=0;
+                q=0; s[0]=0, t[0]=0;
                 for(int u=marginY+1; u<Y-marginY; u++) { // Forward scan
                     while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
                     if(q<0) q=0, s[0]=u;
@@ -84,27 +84,38 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
     const short2* const sourceData = source;
     short3* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const int64 marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z-1;
-    assert(marginZ>=0);
+    const int64 marginX=floor(width/2,source.margin.x), marginY=source.margin.y, marginZ=source.margin.z-1;
+    assert_(marginX>=0 && marginX>=0 && (X-2*marginX)%width == 0);
     for(uint y: range(marginY,Y-marginY)) {
         const short2* const sourceY = sourceData + y*Z*X;
         short3* const targetY = targetData + y*X;
-        for(uint x: range(marginX,X-marginX)) {
-            const short2* const ftXY = sourceY + x*Z;
-            short3* const ftXYZ = targetY + x;
-            int q=0; uint16 s[Z], t[Z]; s[0]=0, t[0]=0;
-#define g(i) (sq(x-int(ftXY[i].x))+sq(y-int(ftXY[i].y)))
-            for(int u=marginZ+1; u<Z-marginZ; u++) { // Forward scan
-                while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
-                if(q<0) q=0, s[0]=u;
-                else {
-                    int w = 1 + Sep(int(s[q]),u);
-                    if(w<Z) q++, s[q]=u, t[q]=w;
+        for(uint x=marginX; x<X-marginX; x+=width) {
+            const short2* const sourceYX = sourceY + x*Z;
+            short3* const targetYX = targetY + x;
+            int Q[width]; uint16 S[width][Z], T[width][Z];
+            for(uint dx: range(width)) {
+                int& q = Q[dx];
+                uint16* const s = S[dx];
+                uint16* const t = T[dx];
+                q=0; s[0]=0, t[0]=0;
+#define g(i) (sq(x+dx-int(sourceYX[dx*Z+(i)].x))+sq(y-int(sourceYX[dx*Z+(i)].y)))
+                for(int u=marginZ+1; u<Z-marginZ; u++) { // Forward scan
+                    while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
+                    if(q<0) q=0, s[0]=u;
+                    else {
+                        int w = 1 + Sep(int(s[q]),u);
+                        if(w<Z) q++, s[q]=u, t[q]=w;
+                    }
                 }
             }
             for(int u=Z-marginZ-1; u>=marginZ; u--) { // Backward scan
-                ftXYZ[u*X*Y] = short3{ftXY[s[q]].x, ftXY[s[q]].y, s[q]};
-                if(u==t[q]) q--;
+                for(uint dx: range(width)) {
+                    int& q = Q[dx];
+                    uint16* const s = S[dx];
+                    uint16* const t = T[dx];
+                    targetYX[u*X*Y+dx] = short3(sourceYX[dx*Z+s[q]].x, sourceYX[dx*Z+s[q]].y, s[q]);
+                    if(u==t[q]) q--;
+                }
             }
         }
     }
