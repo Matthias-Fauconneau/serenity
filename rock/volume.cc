@@ -59,6 +59,25 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
     return true;
 }
 
+uint minimum(const Volume16& source) {
+    const uint16* const sourceData = source;
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    v8hi minimum8 = {~0,~0,~0,~0,~0,~0,~0,~0};
+    uint16 minimum = 0xFFFF;
+    for(uint z : range(marginZ, Z-marginZ)) {
+        const uint16* const sourceZ = sourceData + z*XY;
+        for(uint y=marginY; y<Y-marginY; y++) {
+            const uint16* const sourceZY = sourceZ + y*X;
+            for(uint x=marginX; x<align(8,marginX); x++) minimum = min(minimum, sourceZY[x]); // Processes from margin to next aligned position
+            for(uint x=align(8,marginX); x<floor(8,X-marginX); x+=8) minimum8 = min(minimum8, loada(sourceZY+x)); // Processes using SIMD (8x speedup)
+            for(uint x=floor(8,X-marginX); x<X-marginX; x++) minimum = min(minimum, sourceZY[x]); // Processes from last aligned position to margin
+        }
+    }
+    for(uint i: range(8)) minimum = min(minimum, ((uint16*)&minimum8)[i]);
+    return minimum;
+}
+
 uint maximum(const Volume16& source) {
     const uint16* const sourceData = source;
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;

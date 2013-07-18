@@ -3,35 +3,28 @@
 #include "simd.h"
 #include "volume-operation.h"
 
-/// Normalizes to 8bit
-void normalize8(Volume8& target, const Volume16& source) {
-    const uint16* const sourceData = source; uint8* const targetData = target;
-    for(uint index: range(source.size())) targetData[index] = sourceData[index]*0xFF/source.maximum;
-}
-defineVolumePass(Normalize8, uint8, normalize8);
-
 void render(Image& target, const Volume8& density, /*const Volume8& intensity, const Volume8& empty,*/ mat3 view) {
     assert_(density.tiled() /*&& intensity.tiled() && empty.tiled()*/);
     // Volume
-    uint stride = density.sampleCount.x; // Unclipped volume data size
-    uint size = stride-2*density.margin.x; // Clipped volume size
-    const float radius = size/2, halfHeight = size/2; // Cylinder parameters
+    int3 size = density.sampleCount-2*density.margin;
+    assert_(size.x == size.y);
+    const float radius = size.x/2-1, halfHeight = size.z/2-1; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const uint8* const densityData = density;
     /*const uint8* const intensityData = intensity;
     const uint8* const emptyData = empty;*/
-    const uint64* const offsetX = density.offsetX.data + stride/2; // + stride/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint64* const offsetY = density.offsetY.data + stride/2;
-    const uint64* const offsetZ = density.offsetZ.data + stride/2;
+    const uint64* const offsetX = density.offsetX.data + density.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
+    const uint64* const offsetY = density.offsetY.data + density.sampleCount.y/2;
+    const uint64* const offsetZ = density.offsetZ.data + density.sampleCount.z/2;
 
     // Image
     int imageX = target.width, imageY = target.height; // Target image size
     byte4* const imageData = target.data;
 
     // View
-    mat3 world = view.inverse().scale(size*sqrt(2.)); // Transform normalized view space to world space
+    mat3 world = view.inverse().scale(max(max(size.x,size.y),size.z)*sqrt(2.)); // Transform normalized view space to world space
     vec3 vViewStepX = world * vec3(1./imageX,0,0); v4sf viewStepX = vViewStepX;
     vec3 vViewStepY = world * vec3(0,1./imageY,0); v4sf viewStepY = vViewStepY;
     const v4sf worldOrigin = world * vec3(0,0,0) - float(imageX/2)*vViewStepX - float(imageY/2)*vViewStepY;
@@ -49,7 +42,7 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
     setExceptions(Denormal | Underflow);
 
     #define tileSize 8
-    assert(imageX%tileSize ==0 && imageY%tileSize ==0, imageX, imageY);
+    assert_(imageX%tileSize ==0 && imageY%tileSize ==0, imageX, imageY);
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageY/tileSize);
         byte4* const image = imageData+tileY*tileSize*imageX+tileX*tileSize;
@@ -73,7 +66,7 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
             const v4sf sideZ = abs(originZ + sideT * rayZ); // ? z+ ? z-
             const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); //world positions for top bottom +side -side
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
-            const v4sf tMask = radiusSqHeight > capSideP; //cmpgt(radiusSqHeight, capSideP);
+            const v4sf tMask = radiusSqHeight > capSideP;
             if(!mask(tMask)) { image[y*imageX+x] = byte4(0,0,0,0xFF); continue; }
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
             const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );

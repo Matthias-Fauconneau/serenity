@@ -40,7 +40,7 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event unused event, Button bu
 int2 SliceView::sizeHint() {
     assert_(volumes);
     const Volume& volume = volumes[currentIndex];
-    return (volume.sampleCount-2*volume.margin).xy();
+    return renderVolume ? 1024 : (volume.sampleCount-2*volume.margin).xy();
 }
 
 void SliceView::render(int2 position, int2 size) {

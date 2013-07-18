@@ -60,6 +60,8 @@ inline String str(const Volume& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
 bool parseVolumeFormat(Volume& volume, const string& format);
 
+/// Returns minimum of data
+uint minimum(const Volume16& source);
 /// Returns maximum of data
 uint maximum(const Volume16& source);
 

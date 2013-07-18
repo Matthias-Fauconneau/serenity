@@ -29,15 +29,38 @@ class(ScaleValues, Operation), virtual VolumeOperation {
     }
 };
 
-/// Sets voxels above threshold to maximum
-static void threshold(Volume16& target, const Volume16& source, uint16 threshold) {
-    for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
-        target(x,y,z) = source(x,y,z)>threshold ? target.maximum : source(x,y,z);
+/// Normalizes to 8bit
+void normalize8(Volume8& target, const Volume16& source) {
+    const uint16* const sourceData = source; uint8* const targetData = target;
+    uint minimum = ::minimum(source);
+    log(minimum, source.maximum);
+    assert_(source.maximum>minimum);
+    for(uint index: range(source.size())) targetData[index] = (sourceData[index]-minimum)*0xFF/(source.maximum-minimum);
 }
-class(Threshold, Operation), virtual VolumeOperation {
+defineVolumePass(Normalize8, uint8, normalize8);
+
+/// Clips voxels to maximum
+static void maximum(Volume16& target, const Volume16& source, uint16 maximum) {
+    const uint16* const sourceData = source; uint16* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = min(sourceData[index], maximum);
+    target.maximum = min<uint>(source.maximum, maximum);
+}
+class(Maximum, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        threshold(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+        maximum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+    }
+};
+
+/// Clips voxels to minimum
+static void minimum(Volume16& target, const Volume16& source, uint16 minimum) {
+    const uint16* const sourceData = source; uint16* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = max(sourceData[index], minimum);
+}
+class(Minimum, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        minimum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
     }
 };
 
@@ -59,23 +82,23 @@ class(Mask, Operation), virtual VolumeOperation {
 };
 
 /// Maps intensity to either red or green channel depending on binary classification
-void colorize(Volume24& target, const Volume16& binary, const Volume16& intensity) {
-    assert_(!binary.tiled() && !intensity.tiled() && binary.sampleCount == intensity.sampleCount);
-    const uint maximum = intensity.maximum;
-    chunk_parallel(binary.size(), [&](uint offset, uint size) {
-        const uint16* const binaryData = binary + offset;
-        const uint16* const intensityData = intensity + offset;
+void colorize(Volume24& target, const Volume16& source, uint16 threshold) {
+    const uint maximum = source.maximum;
+    chunk_parallel(source.size(), [&](uint offset, uint size) {
+        const uint16* const sourceData = source + offset;
         bgr* const targetData = target + offset;
         for(uint i : range(size)) {
-            uint8 c = 0xFF*intensityData[i]/maximum;
-            targetData[i] = binaryData[i] ? bgr{0,0,c} : bgr{0,c,0};
+            uint8 c = 0xFF*sourceData[i]/maximum;
+            targetData[i] = sourceData[i]<threshold ? bgr{0,c,0} : bgr{0,0,c};
         }
     });
     target.maximum=0xFF;
 }
 class(Colorize, Operation), virtual VolumeOperation {
-    uint outputSampleSize(uint) override { return 3; }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { colorize(outputs[0], inputs[0], inputs[1]); }
+    uint outputSampleSize(uint) override { return sizeof(bgr); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        colorize(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+    }
 };
 
 

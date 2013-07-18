@@ -36,12 +36,13 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
 # Segments
-pore = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
-colorize = Colorize pore resampled # For visualization
-thresholded = Threshold resampled threshold # For visualization
+binary = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
+colored = Colorize resampled threshold # For visualization
+background = Maximum resampled threshold # For visualization
+foreground = Minimum resampled threshold # For visualization
 
 # Computes position of nearest background voxel
-positionx = PositionX pore
+positionx = PositionX binary
 positionxy = PositionY positionx
 position = PositionZ positionxy
 distance = Distance position
@@ -108,9 +109,9 @@ distribution-radius = Div volume-distribution-radius volume-total
  ascii = ToASCII sqrt-scaled
  # Exports to PNG (normalized and gamma-compressed for visualization)
   png-source = ToPNG source
-  png-denoised = ToPNG denoised
-  png-colorize = ToPNG colorize
-  png-thresholded = ToPNG thresholded
+  png-density = ToPNG denoised
+  png-colored = ToPNG colorize
+  png-background = ToPNG background
   png-distance = ToPNG distance invert=1
   png-skeleton = ToPNG skeleton invert=1 binary=1
   png-maximum = ToPNG maximum invert=1
@@ -132,5 +133,5 @@ distribution-radius = Div volume-distribution-radius volume-total
  compare = Compare
 
 # Visualization
- source-tiled = ZOrder source
- density = Normalize8 source-tiled
+ foreground-tiled = ZOrder foreground
+ foreground-tiled-normalized = Normalize8 foreground-tiled
