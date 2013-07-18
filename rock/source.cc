@@ -42,7 +42,7 @@ class(Source, Operation), virtual VolumeOperation {
         target.field = String("μ"_); // Radiodensity
         target.origin = crop.min-target.margin;
         const uint64 X= target.sampleCount.x, Y= target.sampleCount.y;
-        const uint marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
+        const int64 marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
         if(!existsFolder(path, currentWorkingDirectory())) {
@@ -50,7 +50,7 @@ class(Source, Operation), virtual VolumeOperation {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume source;
             if(!parseVolumeFormat(source, metadata)) error("Unknown format");
-            uint sX = source.sampleCount.x, sY = source.sampleCount.y, unused sZ = source.sampleCount.z;
+            uint64 sX = source.sampleCount.x, sY = source.sampleCount.y, unused sZ = source.sampleCount.z;
 
             Map file(path, currentWorkingDirectory()); // Copy from disk to process managed memory
             for(uint z: range(size.z)) {
