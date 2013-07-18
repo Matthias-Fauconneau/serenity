@@ -9,7 +9,7 @@ void featureTransformX(Volume16& target, const Volume16& source) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int64 marginX=source.margin.x-1, marginY=floor(width/2,source.margin.y), marginZ=source.margin.z;
     assert_(marginX>=0 && marginY>=0 && (Y-2*marginY)%width == 0);
-    for(uint z: range(marginZ,Z-marginZ)) {
+    parallel(marginZ,Z-marginZ, [&](uint, uint z) {
         const uint16* const sourceZ = sourceData + z*X*Y;
         uint16* const targetZ = targetData + z*Y;
         for(uint y=marginY; y<Y-marginY; y+=width) {
@@ -29,7 +29,7 @@ void featureTransformX(Volume16& target, const Volume16& source) {
                 for(uint dy: range(width)) targetZY[x*Y*Z+dy] = previous[dy] = (x-previous[dy] <= int(G[dy][x])) ? previous[dy] : x+int(G[dy][x]);
             }
         }
-    }
+    });
     target.maximum = X-1;
 }
 defineVolumePass(PositionX, uint16, featureTransformX);
@@ -40,7 +40,7 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int64 marginX=source.margin.x, marginY=source.margin.y-1, marginZ=floor(width/2,source.margin.z);
     assert_(marginY>=0 && marginZ>=0 && (Z-2*marginZ)%width == 0);
-    for(uint x: range(marginX,X-marginX)) {
+    parallel(marginX,X-marginX, [&](uint, uint x) {
         const uint16* const sourceX = sourceData + x*Y*Z;
         short2* const targetX = targetData + x*Z;
         for(uint z=marginZ; z<Z-marginZ; z+=width) {
@@ -75,7 +75,7 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
             }
 #undef g
         }
-    }
+    });
     target.maximum = max(X-1,Y-1);
 }
 defineVolumePass(PositionY, short2, featureTransformY);
@@ -86,7 +86,7 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int64 marginX=floor(width/2,source.margin.x), marginY=source.margin.y, marginZ=source.margin.z-1;
     assert_(marginX>=0 && marginX>=0 && (X-2*marginX)%width == 0);
-    for(uint y: range(marginY,Y-marginY)) {
+    parallel(marginY,Y-marginY, [&](uint, uint y) {
         const short2* const sourceY = sourceData + y*Z*X;
         short3* const targetY = targetData + y*X;
         for(uint x=marginX; x<X-marginX; x+=width) {
@@ -118,7 +118,7 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
                 }
             }
         }
-    }
+    });
 }
 defineVolumePass(PositionZ, short3, featureTransformZ);
 
