@@ -14,19 +14,19 @@ void featureTransformX(Volume16& target, const Volume16& source) {
         uint16* const targetZ = targetData + z*Y;
         for(uint y=marginY; y<Y-marginY; y+=width) {
             const uint16* const sourceZY = sourceZ + y*X;
-            uint16 stack[width*X];
+            uint16 G[width][X];
             for(uint dy: range(width)) {
                 const uint16* const b = sourceZY + dy*X;
-                uint16* const g = stack + dy*X;
+                uint16* const g = G[dy];
                 if(b[X-1]) g[X-1] = 0;
                 else g[X-1] = 0xFFFF;
                 for(int x=X-marginX-2; x>=marginX; x--) g[x] = b[x] ? 0 : (1+g[x+1]); // Backward scan
             }
             uint16* const targetZY = targetZ + y;
             int previous[width];
-            for(uint dy: range(width)) targetZY[dy*X+0] = previous[dy] = stack[dy*X+0];
+            for(uint dy: range(width)) targetZY[dy*X+0] = previous[dy] = G[dy][0];
             for(int x=marginX+1; x<X-marginX; x++) { // Forward scan
-                for(uint dy: range(width)) targetZY[x*Y*Z+dy] = previous[dy] = (x-previous[dy] <= int(stack[dy*X+x])) ? previous[dy] : x+int(stack[dy*X+x]);
+                for(uint dy: range(width)) targetZY[x*Y*Z+dy] = previous[dy] = (x-previous[dy] <= int(G[dy][x])) ? previous[dy] : x+int(G[dy][x]);
             }
         }
     }
@@ -38,29 +38,40 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     short2* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const int64 marginX=source.margin.x, marginY=source.margin.y-1, marginZ=source.margin.z;
-    assert(marginY>=0);
+    const int64 marginX=source.margin.x, marginY=source.margin.y-1, marginZ=floor(width/2,source.margin.z);
+    assert_(marginY>=0 && marginZ>=0 && (Z-2*marginZ)%width == 0);
     for(uint x: range(marginX,X-marginX)) {
         const uint16* const sourceX = sourceData + x*Y*Z;
         short2* const targetX = targetData + x*Z;
-        for(uint z: range(marginZ,Z-marginZ)) {
-            const uint16* const ftX = sourceX + z*Y;
-            short2* const ftXY = targetX + z;
-#define g(i) sq(x-int(ftX[i]))
+        for(uint z=marginZ; z<Z-marginZ; z+=width) {
+            const uint16* const sourceXZ = sourceX + z*Y;
+            short2* const targetXZ = targetX + z;
+#define g(i) sq(x-int(sourceXZ[dz*Y+i]))
 #define f(i,u) (sq((i)-(u))+g(u))
 #define Sep(i,u) ((sq(u) - sq(i) + g(u) - g(i)) / (2*((u)-(i))))
-            int q=0; uint16 s[Y], t[Y]; s[0]=0, t[0]=0;
-            for(int u=marginY+1; u<Y-marginY; u++) { // Forward scan
-                while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
-                if(q<0) q=0, s[0]=u;
-                else {
-                    int w = 1 + Sep(int(s[q]),u);
-                    if(w<Y) { q++; s[q]=u; t[q]=w; }
+            int Q[width]={}; uint16 S[width][Y], T[width][Y];
+            for(uint dz: range(width)) {
+                int& q = Q[dz];
+                uint16* const s = S[dz];
+                uint16* const t = T[dz];
+                s[0]=0, t[0]=0;
+                for(int u=marginY+1; u<Y-marginY; u++) { // Forward scan
+                    while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
+                    if(q<0) q=0, s[0]=u;
+                    else {
+                        int w = 1 + Sep(int(s[q]),u);
+                        if(w<Y) { q++; s[q]=u; t[q]=w; }
+                    }
                 }
             }
             for(int u=Y-marginY-1; u>=marginY; u--) { // Backward scan
-                ftXY[u*Z*X] = short2{ftX[s[q]], s[q]};
-                if(u==t[q]) q--;
+                for(uint dz: range(width)) {
+                    int& q = Q[dz];
+                    uint16* const s = S[dz];
+                    uint16* const t = T[dz];
+                    targetXZ[u*Z*X+dz] = short2(sourceXZ[dz*Y+s[q]], s[q]);
+                    if(u==t[q]) q--;
+                }
             }
 #undef g
         }
