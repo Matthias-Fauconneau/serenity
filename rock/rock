@@ -48,7 +48,7 @@ position = PositionZ positionxy
 distance = Distance position
 
 # Computes skeleton (medial axis)
-skeleton = Skeleton positionx positiony positionz
+skeleton = Skeleton position
 skeleton-tiled = ZOrder skeleton
 
 # Discards small pores
@@ -134,9 +134,22 @@ distribution-radius = Div volume-distribution-radius volume-total
 
 # Visualization
  source-tiled = ZOrder resampled
- source-tiled-normalized = Normalize8 source-tiled
+ source8 = Normalize8 source-tiled
  binary-tiled = ZOrder8 binary
+ binary8 = Normalize8 binary-tiled
  foreground-tiled = ZOrder foreground
- foreground-tiled-normalized = Normalize8 foreground-tiled
+ foreground8 = Normalize8 foreground-tiled
  background-tiled = ZOrder background
- background-tiled-normalized = Normalize8 background-tiled
+ background8 = Normalize8 background-tiled
+ distance-tiled = ZOrder distance
+ distance8 = Normalize8 distance-tiled
+ maximum8 = Normalize8 maximum
+ binary-inverted = Binary maximum threshold threshold=1 cylinder=source.cylinder invert=1
+ binary-inverted-tiled = ZOrder8 binary-inverted
+ binary-inverted8 = Normalize8 binary-inverted-tiled
+ epositionx = PositionX binary-inverted
+ epositionxy = PositionY epositionx
+ eposition = PositionZ epositionxy
+ empty = Distance eposition
+ empty-tiled = ZOrder empty
+ empty8 = Normalize8 empty-tiled

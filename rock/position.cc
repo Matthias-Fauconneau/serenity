@@ -7,12 +7,12 @@ void featureTransformX(Volume16& target, const Volume8& source) {
     const uint8* const sourceData = source;
     uint16* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const int64 marginX=source.margin.x-1, marginY=floor(width/2,source.margin.y), marginZ=source.margin.z;
-    assert_(marginX>=0 && marginY>=0 && (Y-2*marginY)%width == 0);
-    parallel(marginZ,Z-marginZ, [&](uint, uint z) {
+    //const int64 marginX=source.margin.x-1, marginY=floor(width/2,source.margin.y), marginZ=source.margin.z;
+    assert_(source.margin.x>=1 /*&& (Y-2*marginY)%width == 0*/);
+    parallel(0,Z, [&](uint, uint z) {
         const uint8* const sourceZ = sourceData + z*X*Y;
         uint16* const targetZ = targetData + z*Y;
-        for(uint y=marginY; y<Y-marginY; y+=width) {
+        for(uint y=0; y<Y; y+=width) {
             const uint8* const sourceZY = sourceZ + y*X;
             uint16 G[width][X];
             for(uint dy: range(width)) {
@@ -20,12 +20,12 @@ void featureTransformX(Volume16& target, const Volume8& source) {
                 uint16* const g = G[dy];
                 if(b[X-1]) g[X-1] = 0;
                 else g[X-1] = 0xFFFF;
-                for(int x=X-marginX-2; x>=marginX; x--) g[x] = b[x] ? 0 : (1+g[x+1]); // Backward scan
+                for(int x=X-2; x>=0; x--) g[x] = b[x] ? 0 : (1+g[x+1]); // Backward scan
             }
             uint16* const targetZY = targetZ + y;
             int previous[width];
             for(uint dy: range(width)) targetZY[dy*X+0] = previous[dy] = G[dy][0];
-            for(int x=marginX+1; x<X-marginX; x++) { // Forward scan
+            for(int x=1; x<X; x++) { // Forward scan
                 for(uint dy: range(width)) targetZY[x*Y*Z+dy] = previous[dy] = (x-previous[dy] <= int(G[dy][x])) ? previous[dy] : x+int(G[dy][x]);
             }
         }
@@ -38,12 +38,12 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     short2* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const int64 marginX=source.margin.x, marginY=source.margin.y-1, marginZ=floor(width/2,source.margin.z);
-    assert_(marginY>=0 && marginZ>=0 && (Z-2*marginZ)%width == 0);
-    parallel(marginX,X-marginX, [&](uint, uint x) {
+    //const int64 marginX=source.margin.x, marginY=source.margin.y-1, marginZ=floor(width/2,source.margin.z);
+    assert_(source.margin.y>=1 /*&& (Z-2*marginZ)%width == 0*/);
+    parallel(0,X, [&](uint, uint x) {
         const uint16* const sourceX = sourceData + x*Y*Z;
         short2* const targetX = targetData + x*Z;
-        for(uint z=marginZ; z<Z-marginZ; z+=width) {
+        for(uint z=0; z<Z; z+=width) {
             const uint16* const sourceXZ = sourceX + z*Y;
             short2* const targetXZ = targetX + z;
 #define g(i) sq(x-int(sourceXZ[dz*Y+i]))
@@ -55,7 +55,7 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
                 uint16* const s = S[dz];
                 uint16* const t = T[dz];
                 q=0; s[0]=0, t[0]=0;
-                for(int u=marginY+1; u<Y-marginY; u++) { // Forward scan
+                for(int u=1; u<Y; u++) { // Forward scan
                     while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
                     if(q<0) q=0, s[0]=u;
                     else {
@@ -64,7 +64,7 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
                     }
                 }
             }
-            for(int u=Y-marginY-1; u>=marginY; u--) { // Backward scan
+            for(int u=Y-1; u>=0; u--) { // Backward scan
                 for(uint dz: range(width)) {
                     int& q = Q[dz];
                     uint16* const s = S[dz];
@@ -84,12 +84,12 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
     const short2* const sourceData = source;
     short3* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const int64 marginX=floor(width/2,source.margin.x), marginY=source.margin.y, marginZ=source.margin.z-1;
-    assert_(marginX>=0 && marginX>=0 && (X-2*marginX)%width == 0);
-    parallel(marginY,Y-marginY, [&](uint, uint y) {
+    //const int64 marginX=floor(width/2,source.margin.x), marginY=source.margin.y, marginZ=source.margin.z-1;
+    assert_(source.margin.z>=1 /*&& (X-2*marginX)%width == 0*/);
+    parallel(0,Y, [&](uint, uint y) {
         const short2* const sourceY = sourceData + y*Z*X;
         short3* const targetY = targetData + y*X;
-        for(uint x=marginX; x<X-marginX; x+=width) {
+        for(uint x=0; x<X; x+=width) {
             const short2* const sourceYX = sourceY + x*Z;
             short3* const targetYX = targetY + x;
             int Q[width]; uint16 S[width][Z], T[width][Z];
@@ -99,7 +99,7 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
                 uint16* const t = T[dx];
                 q=0; s[0]=0, t[0]=0;
 #define g(i) (sq(x+dx-int(sourceYX[dx*Z+(i)].x))+sq(y-int(sourceYX[dx*Z+(i)].y)))
-                for(int u=marginZ+1; u<Z-marginZ; u++) { // Forward scan
+                for(int u=1; u<Z; u++) { // Forward scan
                     while(q>=0 && f(int(t[q]),int(s[q]))>f(int(t[q]),u)) q--;
                     if(q<0) q=0, s[0]=u;
                     else {
@@ -108,7 +108,7 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
                     }
                 }
             }
-            for(int u=Z-marginZ-1; u>=marginZ; u--) { // Backward scan
+            for(int u=Z-1; u>=0; u--) { // Backward scan
                 for(uint dx: range(width)) {
                     int& q = Q[dx];
                     uint16* const s = S[dx];

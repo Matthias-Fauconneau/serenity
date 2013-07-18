@@ -30,12 +30,16 @@ class(ScaleValues, Operation), virtual VolumeOperation {
 };
 
 /// Normalizes to 8bit
-void normalize8(Volume8& target, const Volume16& source) {
-    const uint16* const sourceData = source; uint8* const targetData = target;
-    uint minimum = ::minimum(source);
+void normalize8(Volume8& target, const Volume& source) {
+    uint8* const targetData = target;
+    uint minimum = source.sampleSize==2 ? ::minimum(source) : 0;
     assert_(source.maximum>minimum);
     for(uint index: range(source.size())) {
-        int v = int(sourceData[index]-minimum)*0xFF/(source.maximum-minimum);
+        int value;
+        if(source.sampleSize==1) value = ((uint8*)source.data.data)[index];
+        else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
+        else error("");
+        int v = int(value-minimum)*0xFF/(source.maximum-minimum);
         assert_(v>=0 && v<=0xFF);
         targetData[index] = v;
     }

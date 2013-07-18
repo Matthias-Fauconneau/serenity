@@ -73,9 +73,9 @@ void bin(Volume& target, const Volume16& source) {
                             Tile* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
                             int tileX = dx*tileSide, tileY = dy*tileSide, tileZ = dz*tileSide;
                             if(dmin(tileSide,x-tileX,y-tileY,int(z)-tileZ) < sqRadius) { // Intersects tile
-                                float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sq((tileSide-1)/2.));
-                                assert_(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere
-                                assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), tile->ballCount, dmin(tileSide,x-tileX,y-tileY,z-tileZ), dx,dy,dz, sqRadius,ballRadius,  x-tileX,y-tileY,int(z)-tileZ, norm(vec3(0,y-tileY,int(z)-tileZ)), x,y,z, x+ballRadius,y+ballRadius,z+ballRadius);
+                                /*float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sq((tileSide-1)/2.));
+                                assert(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere
+                                assert(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), tile->ballCount);*/
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
                                 tile->balls[index] = {uint16(x),uint16(y),uint16(z),uint16(sqRadius)}; // Appends the ball to intersecting tiles
                             }

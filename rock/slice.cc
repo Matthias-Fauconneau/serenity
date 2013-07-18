@@ -11,6 +11,7 @@ bool SliceView::view(const string& metadata, const string& name, const buffer<by
     if(volume.sampleSize<1 || volume.sampleSize>6) return false;
     names << String(name);
     volumes << move(volume);
+    renderVolume = volumes.size==2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1;
     return true;
 }
 
@@ -46,7 +47,6 @@ int2 SliceView::sizeHint() {
 }
 
 void SliceView::render(int2 position, int2 size) {
-    const Volume& volume = volumes[currentIndex];
     if(renderVolume) {
         assert_(position==int2(0) && size == framebuffer.size());
         /*shared<Result> empty = getResult("empty"_, arguments);
@@ -58,7 +58,8 @@ void SliceView::render(int2 position, int2 size) {
 #if PROFILE
         Time time;
 #endif
-        ::render(framebuffer, volume, view);
+        assert_(volumes.size==2);
+        ::render(framebuffer, volumes[0], volumes[1], view);
         //::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
 #if PROFILE
         log((uint64)time,"ms");
@@ -66,7 +67,7 @@ void SliceView::render(int2 position, int2 size) {
         wait.reset();
 #endif
     } else {
-        Image image = slice(volume, sliceZ, true, true, true);
+        Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
         while(2*image.size()<=size) image=upsample(image);
         int2 centered = position+(size-image.size())/2;
         blit(centered, image);

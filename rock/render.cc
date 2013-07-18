@@ -3,8 +3,8 @@
 #include "simd.h"
 #include "volume-operation.h"
 
-void render(Image& target, const Volume8& density, /*const Volume8& intensity, const Volume8& empty,*/ mat3 view) {
-    assert_(density.tiled() /*&& intensity.tiled() && empty.tiled()*/);
+void render(Image& target, const Volume8& density, const Volume8& intensity, /*const Volume8& empty,*/ mat3 view) {
+    assert_(density.tiled() && intensity.tiled() /*&& empty.tiled()*/);
     // Volume
     int3 size = density.sampleCount-2*density.margin;
     assert_(size.x == size.y);
@@ -13,8 +13,8 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const uint8* const densityData = density;
-    /*const uint8* const intensityData = intensity;
-    const uint8* const emptyData = empty;*/
+    const uint8* const intensityData = intensity;
+    //const uint8* const emptyData = empty;
     const uint64* const offsetX = density.offsetX.data + density.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint64* const offsetY = density.offsetY.data + density.sampleCount.y/2;
     const uint64* const offsetZ = density.offsetZ.data + density.sampleCount.z/2;
@@ -89,8 +89,8 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
                     // Loads samples (FIXME: interleave density and intensity)
                     const v4si icx0_density = {densityData[vx0 + vy0 + vz0], densityData[vx0 + vy0 + vz1], densityData[vx0 + vy1 + vz0], densityData[vx0 + vy1 + vz1]};
                     const v4si icx1_density = {densityData[vx1 + vy0 + vz0], densityData[vx1 + vy0 + vz1], densityData[vx1 + vy1 + vz0], densityData[vx1 + vy1 + vz1]};
-                    /*const v4si icx0_intensity = {intensityData[vx0 + vy0 + vz0], intensityData[vx0 + vy0 + vz1], intensityData[vx0 + vy1 + vz0], intensityData[vx0 + vy1 + vz1]};
-                    const v4si icx1_intensity = {intensityData[vx1 + vy0 + vz0], intensityData[vx1 + vy0 + vz1], intensityData[vx1 + vy1 + vz0], intensityData[vx1 + vy1 + vz1]};*/
+                    const v4si icx0_intensity = {intensityData[vx0 + vy0 + vz0], intensityData[vx0 + vy0 + vz1], intensityData[vx0 + vy1 + vz0], intensityData[vx0 + vy1 + vz1]};
+                    const v4si icx1_intensity = {intensityData[vx1 + vy0 + vz0], intensityData[vx1 + vy0 + vz1], intensityData[vx1 + vy1 + vz0], intensityData[vx1 + vy1 + vz1]};
                     // Compute trilinear interpolation coefficients
                     const v4sf pc = position - cvtdq2ps(p0);
                     const v4sf _1mpc = _1f - pc;
@@ -109,13 +109,12 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
                     const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));
                     const v4sf dz = x0011*y0101*(shuffle(cx0,cx1, 0,2,0,2)-shuffle(cx0,cx1, 1,3,1,3));
                     // Trilinearly interpolated intensity
-                    const v4sf intensity = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_density) + x1111*cvtdq2ps(icx1_density));
-                    //const v4sf intensity = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_intensity) + x1111*cvtdq2ps(icx1_intensity));
+                    const v4sf intensity = scaleFrom8bit * dot4(sw_yz, x0000*cvtdq2ps(icx0_intensity) + x1111*cvtdq2ps(icx1_intensity)) / 4;
                     // Surface normal
                     const v4sf dp = transpose(dx, dy, dz, _0001f);
-                    const v4sf n = dp * rsqrt(dot3(dp,dp));
+                    const v4sf n = dot3(dp,dp)>_0f ? dp * rsqrt(dot3(dp,dp)) : _1f;
                     const v4sf alpha = min(intensity, _0001f);
-                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(intensity*intensity*_halff*(n+_1110f), alpha); // Blend
+                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(intensity*/*intensity**/_halff*(n+_1110f), alpha); // Blend
                     position = position + ray; // Step
                 }
                 if(mask(bitOr(accumulator > alphaTerm, position > texit))) break; // Check for exit intersection or saturation

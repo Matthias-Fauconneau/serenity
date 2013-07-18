@@ -160,36 +160,39 @@ class(MaximumMeanGradient, Operation) {
 #endif
 
 /// Segments by setting values over a fixed threshold
-void threshold(Volume8& binary, const Volume16& source, uint16 threshold, bool invert=false) {
-    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+void binary(Volume8& target, const Volume16& source, uint16 threshold, bool invert=false) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const int marginX=target.margin.x=max(1,source.margin.x), marginY=target.margin.y=max(1,source.margin.y), marginZ=target.margin.z=max(1,source.margin.z);
+    bool tiled = source.tiled();
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     assert_(X%16==0 && X-2*marginX==Y-2*marginY);
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
     uint8 mask[X*Y]; // Disk mask
-    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 1;
-    uint8* const binaryData = binary;
-    parallel(marginZ-1, Z-marginZ+1, [&](uint, int z) {
-        const uint16* const sourceZ = source + z*XY;
-        uint8* const binaryZ = binaryData + z*XY;
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const binaryZY = binaryZ + y*X; for(int x=0; x<X; x++) binaryZY[x]=1; }
+    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq;
+    uint8* const targetData = target;
+    parallel(0, Z, [&](uint, int z) {
+        const uint16* const sourceZ = source + (tiled ? offsetZ[z] : z*XY);
+        uint8* const targetZ = targetData + z*XY;
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const targetZY = targetZ + y*X; for(int x=0; x<X; x++) targetZY[x]=1; }
         else for(int y=0; y<Y; y++) {
-            const uint16* const sourceY = sourceZ + y*X;
-            uint8* const binaryZY = binaryZ + y*X;
+            const uint16* const sourceY = sourceZ + (tiled ? offsetY[y] : y*X);
+            uint8* const targetZY = targetZ + y*X;
             uint8* const maskY = mask + y*X;
-            if(invert) for(int x=0; x<X; x++) binaryZY[x] = (sourceY[x] < threshold) & maskY[x];
-            else for(int x=0; x<X; x++) binaryZY[x] = (sourceY[x] >= threshold) & maskY[x];
+            if(invert) for(int x=0; x<X; x++) targetZY[x] = (sourceY[tiled ? offsetX[x] : x] < threshold) || maskY[x];
+            else for(int x=0; x<X; x++) targetZY[x] = (sourceY[tiled ? offsetX[x] : x] >= threshold) || maskY[x];
         }
     });
-    binary.maximum=1;
+    target.offsetX=buffer<uint64>(), target.offsetY=buffer<uint64>(), target.offsetZ=buffer<uint64>();
+    target.maximum=1;
 }
 
 /// Segments pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
-    string parameters() const override { return "cylinder threshold gte"_; }
+    string parameters() const override { return "cylinder threshold invert"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        ::threshold(outputs[0], inputs[0], integerThreshold, args.value("gte"_,"0"_)!="0"_);
+        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_);
     }
 };
