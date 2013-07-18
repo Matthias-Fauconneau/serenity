@@ -118,7 +118,7 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
          if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0); continue; }
         uint value = 0;
         size_t index = source.index(x,y,z);
-        if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
+        if(source.sampleSize==1) value = ((uint8*)source.data.data)[index];
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
         else if(source.sampleSize==3) { target(x-marginX,y-marginY) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
         //else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];

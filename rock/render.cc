@@ -20,13 +20,15 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
     const uint64* const offsetZ = density.offsetZ.data + density.sampleCount.z/2;
 
     // Image
-    int imageX = target.width, imageY = target.height; // Target image size
+    #define tileSize 8
+    int imageX = floor(tileSize,target.width), imageY = floor(tileSize,target.height), imageStride=target.stride; // Target image size
+    assert_(imageX%tileSize ==0 && imageY%tileSize ==0);
     byte4* const imageData = target.data;
 
     // View
     mat3 world = view.inverse().scale(max(max(size.x,size.y),size.z)*sqrt(2.)); // Transform normalized view space to world space
-    vec3 vViewStepX = world * vec3(1./imageX,0,0); v4sf viewStepX = vViewStepX;
-    vec3 vViewStepY = world * vec3(0,1./imageY,0); v4sf viewStepY = vViewStepY;
+    vec3 vViewStepX = world * vec3(1./min(imageX,imageY),0,0); v4sf viewStepX = vViewStepX;
+    vec3 vViewStepY = world * vec3(0,1./min(imageX,imageY),0); v4sf viewStepY = vViewStepY;
     const v4sf worldOrigin = world * vec3(0,0,0) - float(imageX/2)*vViewStepX - float(imageY/2)*vViewStepY;
     vec3 worldRay = normalize( view.transpose() * vec3(0,0,1) );
     const v4sf ray = {worldRay.x, worldRay.y, worldRay.z, 1};
@@ -41,11 +43,9 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
     extern void setExceptions(int except);
     setExceptions(Denormal | Underflow);
 
-    #define tileSize 8
-    assert_(imageX%tileSize ==0 && imageY%tileSize ==0, imageX, imageY);
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
-        const int tileX = i%(imageX/tileSize), tileY = i/(imageY/tileSize);
-        byte4* const image = imageData+tileY*tileSize*imageX+tileX*tileSize;
+        const int tileX = i%(imageX/tileSize), tileY = i/(imageX/tileSize);
+        byte4* const image = imageData+tileY*tileSize*imageStride+tileX*tileSize;
         const v4sf tileOrigin = worldOrigin + float4(tileX * tileSize) * viewStepX + float4(tileY * tileSize) * viewStepY;
         for(uint y=0; y<tileSize; y++) for(uint x=0; x<tileSize; x++) {
             const v4sf origin = tileOrigin + float4(x) * viewStepX + float4(y) * viewStepY;
@@ -67,7 +67,7 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
             const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); //world positions for top bottom +side -side
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
             const v4sf tMask = radiusSqHeight > capSideP;
-            if(!mask(tMask)) { image[y*imageX+x] = byte4(0,0,0,0xFF); continue; }
+            if(!mask(tMask)) { image[y*imageStride+x] = byte4(0,0,0,0xFF); continue; }
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
             const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
             const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
@@ -115,7 +115,7 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
                     const v4sf dp = transpose(dx, dy, dz, _0001f);
                     const v4sf n = dp * rsqrt(dot3(dp,dp));
                     const v4sf alpha = min(intensity, _0001f);
-                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(intensity*intensity* _halff*(n+_1110f), alpha); // Blend
+                    accumulator = accumulator + alpha * (_1f - shuffle(accumulator, accumulator, 3,3,3,3)) + max(intensity*intensity*_halff*(n+_1110f), alpha); // Blend
                     position = position + ray; // Step
                 }
                 if(mask(bitOr(accumulator > alphaTerm, position > texit))) break; // Check for exit intersection or saturation
@@ -126,7 +126,7 @@ void render(Image& target, const Volume8& density, /*const Volume8& intensity, c
             uint bgra = extracti((v4si)bgra8, 0);
             const byte4& linear = (byte4&)bgra;
             extern uint8 sRGB_lookup[256];
-            image[y*imageX+x] = byte4(sRGB_lookup[linear.b], sRGB_lookup[linear.g], sRGB_lookup[linear.r], 0xFF);
+            image[y*imageStride+x] = byte4(sRGB_lookup[linear.b], sRGB_lookup[linear.g], sRGB_lookup[linear.r], 0xFF);
         }
     } );
 }

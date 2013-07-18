@@ -160,33 +160,33 @@ class(MaximumMeanGradient, Operation) {
 #endif
 
 /// Segments by setting values over a fixed threshold
-void threshold(Volume16& pore, const Volume16& source, uint16 threshold, bool invert=false) {
+void threshold(Volume8& binary, const Volume16& source, uint16 threshold, bool invert=false) {
     const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     assert_(X%16==0 && X-2*marginX==Y-2*marginY);
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    uint16 mask[X*Y]; // Disk mask
+    uint8 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 1;
-    uint16* const poreData = pore;
+    uint8* const binaryData = binary;
     parallel(marginZ-1, Z-marginZ+1, [&](uint, int z) {
         const uint16* const sourceZ = source + z*XY;
-        uint16* const poreZ = poreData + z*XY;
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint16* const poreZY = poreZ + y*X; for(int x=0; x<X; x++) poreZY[x]=1; }
+        uint8* const binaryZ = binaryData + z*XY;
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const binaryZY = binaryZ + y*X; for(int x=0; x<X; x++) binaryZY[x]=1; }
         else for(int y=0; y<Y; y++) {
             const uint16* const sourceY = sourceZ + y*X;
-            uint16* const poreZY = poreZ + y*X;
-            uint16* const maskY = mask + y*X;
-            if(invert) for(int x=0; x<X; x++) poreZY[x] = (sourceY[x] < threshold) & maskY[x];
-            else for(int x=0; x<X; x++) poreZY[x] = (sourceY[x] >= threshold) & maskY[x];
+            uint8* const binaryZY = binaryZ + y*X;
+            uint8* const maskY = mask + y*X;
+            if(invert) for(int x=0; x<X; x++) binaryZY[x] = (sourceY[x] < threshold) & maskY[x];
+            else for(int x=0; x<X; x++) binaryZY[x] = (sourceY[x] >= threshold) & maskY[x];
         }
     });
-    pore.maximum=1;
+    binary.maximum=1;
 }
 
 /// Segments pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
     string parameters() const override { return "cylinder threshold gte"_; }
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);

@@ -133,5 +133,10 @@ distribution-radius = Div volume-distribution-radius volume-total
  compare = Compare
 
 # Visualization
+ source-tiled = ZOrder resampled
+ source-tiled-normalized = Normalize8 source-tiled
+ binary-tiled = ZOrder8 binary
  foreground-tiled = ZOrder foreground
  foreground-tiled-normalized = Normalize8 foreground-tiled
+ background-tiled = ZOrder background
+ background-tiled-normalized = Normalize8 background-tiled

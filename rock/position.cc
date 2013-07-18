@@ -3,20 +3,20 @@
 
 constexpr uint width = 8;  // Processes 8 voxel wide stripes to write back 16 bytes at a time
 
-void featureTransformX(Volume16& target, const Volume16& source) {
-    const uint16* const sourceData = source;
+void featureTransformX(Volume16& target, const Volume8& source) {
+    const uint8* const sourceData = source;
     uint16* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int64 marginX=source.margin.x-1, marginY=floor(width/2,source.margin.y), marginZ=source.margin.z;
     assert_(marginX>=0 && marginY>=0 && (Y-2*marginY)%width == 0);
     parallel(marginZ,Z-marginZ, [&](uint, uint z) {
-        const uint16* const sourceZ = sourceData + z*X*Y;
+        const uint8* const sourceZ = sourceData + z*X*Y;
         uint16* const targetZ = targetData + z*Y;
         for(uint y=marginY; y<Y-marginY; y+=width) {
-            const uint16* const sourceZY = sourceZ + y*X;
+            const uint8* const sourceZY = sourceZ + y*X;
             uint16 G[width][X];
             for(uint dy: range(width)) {
-                const uint16* const b = sourceZY + dy*X;
+                const uint8* const b = sourceZY + dy*X;
                 uint16* const g = G[dy];
                 if(b[X-1]) g[X-1] = 0;
                 else g[X-1] = 0xFFFF;

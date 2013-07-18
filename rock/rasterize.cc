@@ -17,6 +17,21 @@ void zOrder(Volume16& target, const Volume16& source) {
 }
 defineVolumePass(ZOrder, uint16, zOrder);
 
+/// Tiles a volume recursively into bricks (using 3D Z ordering)
+void zOrder(Volume8& target, const Volume8& source) {
+    assert_(!source.tiled());
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const uint8* const sourceData = source;
+    uint8* const targetData = target;
+    interleavedLookup(target);
+    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
+        assert(offsetZ[z]+offsetY[y]+offsetX[x] < target.size());
+        targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
+    }
+}
+defineVolumePass(ZOrder8, uint8, zOrder);
+
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles)
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
 struct Ball { uint16 x,y,z,sqRadius; };

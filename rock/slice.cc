@@ -16,7 +16,7 @@ bool SliceView::view(const string& metadata, const string& name, const buffer<by
 
 string SliceView::name() { return names[currentIndex]; }
 
-bool SliceView::mouseEvent(int2 cursor, int2 size, Event unused event, Button button) {
+bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     if(button==WheelDown||button==WheelUp) {
         int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),volumes.size-1);
         if(nextIndex == currentIndex) return false;
@@ -24,10 +24,11 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event unused event, Button bu
         return true;
     }
     if(!button) return false;
+    if(event==Press && button==RightButton) renderVolume=!renderVolume;
     if(renderVolume) {
         int2 delta = cursor-lastPos;
         lastPos = cursor;
-        if(event != Motion) return false;
+        if(event != Motion && !(event==Press && button==RightButton)) return false;
         rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
         rotation.y= clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
     } else {
@@ -40,7 +41,8 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event unused event, Button bu
 int2 SliceView::sizeHint() {
     assert_(volumes);
     const Volume& volume = volumes[currentIndex];
-    return renderVolume ? 1024 : (volume.sampleCount-2*volume.margin).xy();
+    int2 size = (volume.sampleCount-2*volume.margin).xy();
+    return renderVolume ? 1024 : int2(align(4,size.x),align(4,size.y));
 }
 
 void SliceView::render(int2 position, int2 size) {

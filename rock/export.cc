@@ -33,9 +33,13 @@ class(ScaleValues, Operation), virtual VolumeOperation {
 void normalize8(Volume8& target, const Volume16& source) {
     const uint16* const sourceData = source; uint8* const targetData = target;
     uint minimum = ::minimum(source);
-    log(minimum, source.maximum);
     assert_(source.maximum>minimum);
-    for(uint index: range(source.size())) targetData[index] = (sourceData[index]-minimum)*0xFF/(source.maximum-minimum);
+    for(uint index: range(source.size())) {
+        int v = int(sourceData[index]-minimum)*0xFF/(source.maximum-minimum);
+        assert_(v>=0 && v<=0xFF);
+        targetData[index] = v;
+    }
+    target.maximum = 0xFF;
 }
 defineVolumePass(Normalize8, uint8, normalize8);
 
