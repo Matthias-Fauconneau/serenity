@@ -13,6 +13,8 @@ struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } }
 typedef VolumeT<bgr> Volume24;
 typedef VolumeT<uint32> Volume32;
 typedef VolumeT<float> VolumeFloat;
+typedef VolumeT<short2> Volume2x16;
+typedef VolumeT<short3> Volume3x16;
 typedef VolumeT<double> VolumeDouble;
 
 struct Volume {

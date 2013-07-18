@@ -121,7 +121,9 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool cylind
         if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
         else if(source.sampleSize==3) { target(x-marginX,y-marginY) = ((bgr*)source.data.data)[index]; continue; } //FIXME: sRGB
-        else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+        //else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
+        //else if(source.sampleSize==4) { short2 xyz=((short2*)source.data.data)[index]; target(x-marginX,y-marginY) = bgr{uint8(xyz.x/2),uint8(xyz.y/2),0}; continue; } //FIXME: sRGB
+        else if(source.sampleSize==6) { short3 xyz=((short3*)source.data.data)[index]; target(x-marginX,y-marginY) = bgr{uint8(xyz.x/2),uint8(xyz.y/2),uint8(xyz.z/2)}; continue; } //FIXME: sRGB
         else error("source.sampleSize"_,source.sampleSize);
         uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
         if(binary) linear8 = linear8 ? 0xFF : 0;

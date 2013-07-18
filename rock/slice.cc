@@ -8,7 +8,7 @@ float SliceView::sliceZ = 1./2;
 bool SliceView::view(const string& metadata, const string& name, const buffer<byte>& data) {
     //if(volumes) return false;
     Volume volume = toVolume(metadata, data);
-    if(!inRange(1u,volume.sampleSize,4u)) return false;
+    if(volume.sampleSize<1 || volume.sampleSize>6) return false;
     names << String(name);
     volumes << move(volume);
     return true;

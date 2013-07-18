@@ -90,7 +90,6 @@ void rasterize(Volume16& target, const Volume& source) {
     const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
 
     Time time; Time report;
-    tsc profile[8][8];
     parallel(tileCount, [&](uint id, uint i) {
         if(id==0 && report/1000>=7) log(i,"/", tileCount, (i*tileSize/1024./1024.)/(time/1000.), "MS/s"), report.reset();
         int z = (i/(X/tileSide*Y/tileSide))%(Z/tileSide), y=(i/(X/tileSide))%(Y/tileSide), x=i%(X/tileSide); // Extracts tile coordinates back from index
@@ -98,7 +97,6 @@ void rasterize(Volume16& target, const Volume& source) {
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         struct Block { uint16 min=0, max=0; } blocks[blockCount*blockCount*blockCount]; // min/max values for each block (for hierarchical culling) (ala Hi-Z) [256B]
         uint16 tile[tileSize] = {}; // Half-tiled target buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
-        profile[0][id].start();
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];
             int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
@@ -108,27 +106,28 @@ void rasterize(Volume16& target, const Volume& source) {
                 if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
             }
 #elif 0 // Clip 18s
-            int radius = ceil(sqrt(sqRadius));
+            int radius = ceil(sqrt((real)sqRadius));
             for(int dz=max(0,cz-radius); dz<min(tileSide,cz+radius); dz++)
                 for(int dy=max(0,cy-radius); dy<min(tileSide,cy+radius); dy++)
                     for(int dx=max(0,cx-radius); dx<min(tileSide,cx+radius); dx++) {
                         uint16* const voxel = target + offsetX[dx] + offsetY[dy] + offsetZ[dz];
                         if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
                     }
-#else // Recursive 15s (TODO: SIMD)
+#else // Recursive 12s (TODO: SIMD)
             for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
                 Block& HiZ = blocks[dz*blockCount*blockCount+dy*blockCount+dx];
-                if(sqRadius <= HiZ.min) continue; //Skips whole block if all voxels are already larger
+                if(sqRadius <= HiZ.min) continue; // Rejects whole block if all voxels are already larger
                 int blockX = dx*blockSide, blockY = dy*blockSide, blockZ = dz*blockSide;
                 int blockBallX=tileBallX-blockX, blockBallY=tileBallY-blockY, blockBallZ=tileBallZ-blockZ;
                 int dmin = ::dmin(blockSide, blockBallX, blockBallY, blockBallZ);
-                if(dmin >= sqRadius) continue; // Rejects whole block
+                if(dmin >= sqRadius)  continue; // Rejects whole block if fully outside
                 uint16* const block = tile + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
                 const int blockSqRadius = 3*(blockSide-1)*(blockSide-1);
                 if(sqRadius>=HiZ.max) {
                     if(dmin == 0 && sqRadius>blockSqRadius) { // Accepts whole block
                         for(uint i=0; i<blockSize; i++) block[i]=sqRadius;
                         HiZ.min = sqRadius, HiZ.max = sqRadius;
+                        continue;
                     }
                     HiZ.max = sqRadius;
                 }
@@ -142,8 +141,6 @@ void rasterize(Volume16& target, const Volume& source) {
             }
 #endif
         }
-        profile[0][id].stop();
-        profile[1][id].start();
         // Writes out fully interleaved target for compatibility (metadata tiled flags currently only define untiled or fully tiled (Z-order) volumes)
         uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
         for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
@@ -154,9 +151,7 @@ void rasterize(Volume16& target, const Volume& source) {
                 targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]] = block[dz*blockSide*blockSide + dy*blockSide + dx];
             }
         }
-        profile[1][id].stop();
     } );
-    for(uint i: range(2)) { uint64 total=0; for(uint id: range(8)) total+=profile[i][id]; log(i, total); }
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }
