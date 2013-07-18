@@ -58,6 +58,27 @@ class(Mask, Operation), virtual VolumeOperation {
     }
 };
 
+/// Maps intensity to either red or green channel depending on binary classification
+void colorize(Volume24& target, const Volume16& binary, const Volume16& intensity) {
+    assert_(!binary.tiled() && !intensity.tiled() && binary.sampleCount == intensity.sampleCount);
+    const uint maximum = intensity.maximum;
+    chunk_parallel(binary.size(), [&](uint offset, uint size) {
+        const uint16* const binaryData = binary + offset;
+        const uint16* const intensityData = intensity + offset;
+        bgr* const targetData = target + offset;
+        for(uint i : range(size)) {
+            uint8 c = 0xFF*intensityData[i]/maximum;
+            targetData[i] = binaryData[i] ? bgr{0,0,c} : bgr{0,c,0};
+        }
+    });
+    target.maximum=0xFF;
+}
+class(Colorize, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return 3; }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { colorize(outputs[0], inputs[0], inputs[1]); }
+};
+
+
 /// Exports volume to 8bit PNGs for visualization (normalized and gamma corrected)
 class(ToPNG, Operation), virtual VolumeOperation {
     virtual string parameters() const { return "z invert binary"_; }

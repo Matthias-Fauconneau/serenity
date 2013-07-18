@@ -87,6 +87,7 @@ inline void transpose8(uint16* out, uint stride, v8hi a, v8hi b, v8hi c, v8hi d,
 
 // v16qi
 
+inline v16qi set1(char i) { return (v16qi){i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i}; }
 inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
 
 // v4sf

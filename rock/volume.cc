@@ -78,25 +78,6 @@ uint maximum(const Volume16& source) {
     return maximum;
 }
 
-uint maximum(const Volume32& source) {
-    const uint32* const sourceData = source;
-    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    v4si maximum4 = {0,0,0,0};
-    uint32 maximum=0;
-    for(uint z=marginZ; z<Z-marginZ; z++) {
-        const uint32* const sourceZ = sourceData + z*XY;
-        for(uint y=marginY; y<Y-marginY; y++) {
-            const uint32* const sourceZY = sourceZ + y*X;
-            for(uint x=marginX; x<align(4,marginX); x++) maximum = max(maximum, sourceZY[x]); // Processes from margin to next aligned position
-            for(uint x=align(4,marginX); x<floor(4,X-marginX); x+=4) maximum4 = max(maximum4, loada(sourceZY+x)); // Processes using SIMD (4x speedup)
-            for(uint x=floor(4,X-marginX); x<X-marginX; x++) maximum = max(maximum, sourceZY[x]); // Processes from last aligned position to margin
-        }
-    }
-    for(uint i: range(4)) maximum = max(maximum, ((uint32*)&maximum4)[i]);
-    return maximum;
-}
-
 Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, bool cylinder, bool invert, bool binary) {
     int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
     assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z, normalizedZ, source.margin, source.sampleCount, z);

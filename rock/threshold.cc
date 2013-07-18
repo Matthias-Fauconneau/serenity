@@ -160,75 +160,39 @@ class(MaximumMeanGradient, Operation) {
 };
 #endif
 
-/// Segments by setting values under a fixed threshold to ∞ (2³²-1) and to x² otherwise (for distance X input)
-void threshold(Volume32& pore, const Volume16& source, uint16 threshold, bool greaterThanOrEqual=false) {
-    // Ensures threshold volume is closed to avoid null/full rows in aligned distance search
-    const int marginX=align(4,source.margin.x-1)+1, marginY=align(4,source.margin.y-1)+1, marginZ=align(4,source.margin.z-1)+1;
-    v4si threshold4 = set1(threshold);
+/// Segments by setting values over a fixed threshold
+void threshold(Volume16& pore, const Volume16& source, uint16 threshold, bool invert=false) {
+    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    v8hi threshold8 = short8(threshold);
+    const v8hi _1i = {1,1,1,1,1,1,1,1};
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    assert_(X%8==0 && X%2==0 && Y%2==0 && X-2*marginX==Y-2*marginY);
+    assert_(X%16==0 && X-2*marginX==Y-2*marginY);
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
-    uint32 sqr[X]; for(int x=0; x<X; x++) sqr[x]=x*x; // Lookup table of squares
-    uint32 mask[X*Y]; // Disk mask
-    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 0xFFFFFFFF;
-    uint32* const poreData = pore;
+    uint16 mask[X*Y]; // Disk mask (TODO: bit)
+    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= (y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq) ? 0 : 1;
+    uint16* const poreData = pore;
     parallel(marginZ-1, Z-marginZ+1, [&](uint, int z) {
         const uint16* const sourceZ = source + z*XY;
-        uint32* const poreZ = poreData + z*XY;
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=4) storea(poreZ+y*X+x, loada(sqr+x));
+        uint16* const poreZ = poreData + z*XY;
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) for(int x=0; x<X; x+=8) storea(poreZ+y*X+x, _1i);
         else for(int y=0; y<Y; y++) {
             const uint16* const sourceY = sourceZ + y*X;
-            uint32* const poreZY = poreZ + y*X;
-            uint32* const maskY = mask + y*X;
-            if(greaterThanOrEqual) {
-                for(int x=0; x<X; x+=8) {
-                    storea(poreZY+x, loada(sqr+x) | ((threshold4 <= unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
-                    storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 <= unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
-                }
-            } else {
-                for(int x=0; x<X; x+=8) {
-                    storea(poreZY+x, loada(sqr+x) | ((threshold4 > unpacklo(loada(sourceY+x), _0h)) & loada(maskY+x)) );
-                    storea(poreZY+x+4, loada(sqr+x+4) | ((threshold4 > unpackhi(loada(sourceY+x), _0h)) & loada(maskY+x+4)) );
-                }
-            }
+            uint16* const poreZY = poreZ + y*X;
+            uint16* const maskY = mask + y*X;
+            if(invert) for(int x=0; x<X; x+=8) storea(poreZY+x, (threshold8 < loada(sourceY+x)) & loada(maskY+x) );
+            else for(int x=0; x<X; x+=8) storea(poreZY+x, (threshold8 >= loada(sourceY+x)) & loada(maskY+x) );
         }
     });
-    pore.margin.x=marginX, pore.margin.y=marginY, pore.margin.z=marginZ;
-#if ASSERT
-    pore.maximum=0xFFFFFFFF; // for the assert
-#else
-    pore.maximum=(pore.sampleCount.x-1)*(pore.sampleCount.x-1); // for visualization
-#endif
+    pore.maximum=1;
 }
 
 /// Segments pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
     string parameters() const override { return "cylinder threshold gte"_; }
-    uint outputSampleSize(uint) override { return sizeof(uint); }
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
         ::threshold(outputs[0], inputs[0], integerThreshold, args.value("gte"_,"0"_)!="0"_);
     }
-};
-
-/// Maps intensity to either red or green channel depending on binary classification
-void colorize(Volume24& target, const Volume32& binary, const Volume16& intensity) {
-    assert_(!binary.tiled() && !intensity.tiled() && binary.sampleCount == intensity.sampleCount);
-    const uint maximum = intensity.maximum;
-    chunk_parallel(binary.size(), [&](uint offset, uint size) {
-        const uint32* const binaryData = binary + offset;
-        const uint16* const intensityData = intensity + offset;
-        bgr* const targetData = target + offset;
-        for(uint i : range(size)) {
-            uint8 c = 0xFF*intensityData[i]/maximum;
-            targetData[i] = binaryData[i]==0xFFFFFFFF ? bgr{0,c,0} : bgr{0,0,c};
-        }
-    });
-    target.maximum=0xFF;
-}
-
-class(Colorize, Operation), virtual VolumeOperation {
-    uint outputSampleSize(uint) override { return 3; }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { colorize(outputs[0], inputs[0], inputs[1]); }
 };

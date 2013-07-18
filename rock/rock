@@ -46,13 +46,7 @@ colorize = Colorize pore resampled # For visualization
 thresholded = Threshold resampled threshold # For visualization
 
 # Computes position of nearest background voxel
-#distancex positionxx = PositionX pore
-#distancey positionyx positionyy = PositionY distancex positionxx
-#positionx positiony positionz = PositionZ distancey positionyx positionyy
-#distance = Distance positionx positiony positionz
-positionx = PositionX pore
-positionxy = PositionY positionx
-position = PositionZ positionxy
+position = Position pore
 distance = Distance position
 
 # Computes skeleton (medial axis)

@@ -7,15 +7,13 @@ int3 zOrder(uint index);
 uint zOrder(int3 coordinates);
 
 generic struct VolumeT;
+//TODO: 1-bit Volume
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
 struct bgr { uint8 b,g,r; operator byte4() const { return byte4(b,g,r,0xFF); } } packed;
 typedef VolumeT<bgr> Volume24;
-typedef VolumeT<uint32> Volume32;
 typedef VolumeT<float> VolumeFloat;
-typedef VolumeT<short2> Volume2x16;
 typedef VolumeT<short3> Volume3x16;
-typedef VolumeT<double> VolumeDouble;
 
 struct Volume {
     Volume(){}
@@ -64,7 +62,6 @@ bool parseVolumeFormat(Volume& volume, const string& format);
 
 /// Returns maximum of data
 uint maximum(const Volume16& source);
-uint maximum(const Volume32& source);
 
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);
