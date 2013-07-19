@@ -36,13 +36,15 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
 # Segments
-binary = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
+rock = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
+rock-tiled = ZOrder8 rock
+rock-connected = FloodFill rock-tiled
 colored = Colorize resampled threshold # For visualization
 background = Maximum resampled threshold # For visualization
 foreground = Minimum resampled threshold # For visualization
 
 # Computes position of nearest background voxel
-positionx = PositionX binary
+positionx = PositionX rock-connected
 positionxy = PositionY positionx
 position = PositionZ positionxy
 distance = Distance position
@@ -70,7 +72,7 @@ if !transpose: transposed = crop
 # Discards unconnected pores
 floodfill = ''
 if !floodfill: connected = transposed # Forwards unconnected skeleton
-if floodfill: connected = FloodFill transposed minimalSqRadius # Flood fills skeleton
+if floodfill: connected = ConnectivityFloodFill transposed minimalSqRadius # Flood fills skeleton
 
 # Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin connected

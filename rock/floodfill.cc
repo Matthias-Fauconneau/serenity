@@ -28,7 +28,7 @@ class(ThresholdClip, Operation), virtual VolumeOperation {
     }
 };
 
-void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMargin) {
+void connectivityFloodFill(Volume16& target, const Volume16& source, uint connectivitySeedMargin) {
     assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
 
@@ -87,11 +87,48 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
     }
     if((uint64)time>1000) log("2 / 2", time.reset());
 }
-class(FloodFill, Operation), virtual VolumeOperation {
+class(ConnectivityFloodFill, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         uint connectivitySeedMarginSq = TextData(otherInputs[0]->data).integer();
         uint connectivitySeedMargin = ceil(sqrt(real(connectivitySeedMarginSq))); //FIXME: use minimalRadius = SquareRoot minimalSqRadius
-        floodFill(outputs[0], inputs[0], connectivitySeedMargin);
+        connectivityFloodFill(outputs[0], inputs[0], connectivitySeedMargin);
+    }
+};
+
+void floodFill(Volume8& target, const Volume8& source) {
+    assert_(source.tiled() && target.tiled());
+    const uint8* const sourceData = source;
+
+    uint8* const targetData = target;
+    clear(targetData, target.size());
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+
+    buffer<short3> stackBuffer(1<<27); // 1024³~128MiB
+    short3* const stack = stackBuffer.begin();
+    int stackSize=0;
+    for(uint z=marginZ;z<Z-marginZ;z++) for(uint x=marginX;x<X-marginX;x++) for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) { // Seeds all faces
+        if(x==marginX || x==X-marginX-1 || y==marginY || y==Y-marginY-1 || z==marginZ || z==Z-marginZ-1) stack[stackSize++] = short3(x,y,z);
+    }
+    while(stackSize) {
+        const short3& p = stack[--stackSize];
+        uint x=p.x, y=p.y, z=p.z;
+        for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
+            uint nx=x+dx, ny=y+dy, nz=z+dz;
+            if(nx>=X || ny>=Y || nz>=Z) continue;
+            uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
+            if(sourceData[index] && !targetData[index]) {
+                targetData[index] = sourceData[index]; // Marks previously unvisited skeleton voxel
+                stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
+            }
+        }
+    }
+}
+class(FloodFill, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint8); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        floodFill(outputs[0], inputs[0]);
     }
 };
