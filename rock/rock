@@ -144,10 +144,10 @@ distribution-radius = Div volume-distribution-radius volume-total
  distance-tiled = ZOrder distance
  distance8 = Normalize8 distance-tiled
  maximum8 = Normalize8 maximum
- binary-inverted = Binary maximum threshold threshold=1 cylinder=source.cylinder invert=1
- binary-inverted-tiled = ZOrder8 binary-inverted
- binary-inverted8 = Normalize8 binary-inverted-tiled
- epositionx = PositionX binary-inverted
+ maximum-invert = Binary maximum threshold threshold=1 cylinder=source.cylinder invert=1
+ maximum-invert-tiled = ZOrder8 maximum-invert
+ maximum-invert8 = Normalize8 maximum-invert-tiled
+ epositionx = PositionX maximum8
  epositionxy = PositionY epositionx
  eposition = PositionZ epositionxy
  empty = Distance eposition

@@ -33,16 +33,21 @@ class(ScaleValues, Operation), virtual VolumeOperation {
 void normalize8(Volume8& target, const Volume& source) {
     uint8* const targetData = target;
     uint minimum = source.sampleSize==2 ? ::minimum(source) : 0;
-    assert_(source.maximum>minimum);
+    uint maximum = source.maximum;
+    if(source.squared) minimum=round(sqrt(real(minimum))), maximum=round(sqrt(real(maximum)));
+    assert_(maximum>minimum);
     for(uint index: range(source.size())) {
         int value;
         if(source.sampleSize==1) value = ((uint8*)source.data.data)[index];
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
         else error("");
-        int v = int(value-minimum)*0xFF/(source.maximum-minimum);
-        assert_(v>=0 && v<=0xFF);
+        int v = source.squared ?
+                    min<int>(0xFF,round((sqrt(real(value))-minimum)*0xFF/(maximum-minimum))) :
+                    int(value-minimum)*0xFF/(maximum-minimum);
+        assert_(v>=0 && v<=0xFF, v);
         targetData[index] = v;
     }
+    target.squared=false;
     target.maximum = 0xFF;
 }
 defineVolumePass(Normalize8, uint8, normalize8);
@@ -97,15 +102,18 @@ void colorize(Volume24& target, const Volume16& source, uint16 threshold) {
         bgr* const targetData = target + offset;
         for(uint i : range(size)) {
             uint8 c = 0xFF*sourceData[i]/maximum;
-            targetData[i] = sourceData[i]<threshold ? bgr{0,c,0} : bgr{0,0,c};
+            targetData[i] = sourceData[i]<threshold ? bgr{0,c,0} : bgr{c,0,0};
         }
     });
     target.maximum=0xFF;
 }
 class(Colorize, Operation), virtual VolumeOperation {
+    string parameters() const override { return "threshold"_; }
     uint outputSampleSize(uint) override { return sizeof(bgr); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        colorize(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+        real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
+        uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
+        colorize(outputs[0], inputs[0], integerThreshold);
     }
 };
 

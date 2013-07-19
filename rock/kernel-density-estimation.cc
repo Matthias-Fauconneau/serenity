@@ -45,12 +45,14 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real
 class(KernelDensityEstimation, Operation), virtual Pass {
     virtual string parameters() const { return "bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        target.metadata = copy(source.metadata);
+        bool normalize = args.value("normalize"_,"1"_)!="0"_;
+        string xlabel,ylabel; { TextData s(source.metadata); ylabel = s.until('('); xlabel = s.until(')'); }
+        target.metadata = (normalize?"σ"_:ylabel)+"("_+xlabel+").tsv"_;
         NonUniformHistogram H = parseNonUniformSample(source.data);
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
         target.data = uniform ?
-                    toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"1"_)!="0"_)) :
-                    toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), args.value("normalize"_,"1"_)!="0"_)); // Non uniform KDE
+                    toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), normalize)) :
+                    toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), normalize)); // Non uniform KDE
     }
 };

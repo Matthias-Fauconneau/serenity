@@ -11,7 +11,7 @@ bool SliceView::view(const string& metadata, const string& name, const buffer<by
     if(volume.sampleSize<1 || volume.sampleSize>6) return false;
     names << String(name);
     volumes << move(volume);
-    renderVolume = volumes.size==2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1;
+    renderVolume = volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1;
     return true;
 }
 
@@ -22,6 +22,7 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
         int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),volumes.size-1);
         if(nextIndex == currentIndex) return false;
         currentIndex = nextIndex; //contentChanged();
+        if(currentIndex>=2) renderVolume=false;
         return true;
     }
     if(!button) return false;
@@ -58,7 +59,7 @@ void SliceView::render(int2 position, int2 size) {
 #if PROFILE
         Time time;
 #endif
-        assert_(volumes.size==2);
+        assert_(volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1);
         ::render(framebuffer, volumes[0], volumes[1], view);
         //::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
 #if PROFILE

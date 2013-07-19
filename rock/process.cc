@@ -63,7 +63,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             s.whileAny(" \t"_);
             for(;!s.match('\n'); s.whileAny(" \t"_)) {
                 if(s.match('#')) { s.whileNot('\n'); continue; }
-                string key = s.word("_-."_); s.whileAny(" \t"_);
+                string key = s.identifier("_-."_); s.whileAny(" \t"_);
                 assert_(key, s.until('\n'), word);
                 if(s.match('=')) { // Local argument
                     s.whileAny(" \t"_);

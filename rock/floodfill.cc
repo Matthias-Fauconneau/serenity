@@ -64,7 +64,7 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
             }
         }
     }
-    log("1 / 2", time.reset());
+    if((uint64)time>1000) log("1 / 2", time.reset());
     {uint z=Z-1-marginZ-connectivitySeedMargin;
         for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) {
             uint index = offsetX[x]+offsetY[y]+offsetZ[z];
@@ -85,7 +85,7 @@ void floodFill(Volume16& target, const Volume16& source, uint connectivitySeedMa
             }
         }
     }
-    log("2 / 2", time.reset());
+    if((uint64)time>1000) log("2 / 2", time.reset());
 }
 class(FloodFill, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }

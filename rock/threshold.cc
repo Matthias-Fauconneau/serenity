@@ -18,7 +18,6 @@ class(Otsu, Operation) {
     string parameters() const override { return "normalize"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
-        density[0]=density[density.size-1]=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
         for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
