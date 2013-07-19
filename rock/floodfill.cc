@@ -109,7 +109,7 @@ void floodFill(Volume8& target, const Volume8& source) {
     buffer<short3> stackBuffer(1<<27); // 1024³~128MiB
     short3* const stack = stackBuffer.begin();
     int stackSize=0;
-    for(uint z=marginZ;z<Z-marginZ;z++) for(uint x=marginX;x<X-marginX;x++) for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) { // Seeds all faces
+    for(uint z=marginZ;z<Z-marginZ;z++) for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) { // Seeds all faces
         if(x==marginX || x==X-marginX-1 || y==marginY || y==Y-marginY-1 || z==marginZ || z==Z-marginZ-1) stack[stackSize++] = short3(x,y,z);
     }
     while(stackSize) {

@@ -16,8 +16,8 @@ if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
 # Density distribution
-if !thresholdFromSource: histogram-radiodensity = Histogram resampled
-if thresholdFromSource: histogram-radiodensity = Histogram source
+if !threshold-from-source: histogram-radiodensity = Histogram resampled
+if threshold-from-source: histogram-radiodensity = Histogram source
 distribution-radiodensity = KernelDensityEstimation histogram-radiodensity
 
 # Debug
@@ -37,11 +37,14 @@ if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-not
 
 # Segments
 rock = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
-rock-tiled = ZOrder8 rock
-rock-connected = FloodFill rock-tiled
 colored = Colorize resampled threshold # For visualization
 background = Maximum resampled threshold # For visualization
 foreground = Minimum resampled threshold # For visualization
+
+# Discards unconnected rocks
+rock-tiled = ZOrder8 rock
+if !connect-rock: rock-connected = rock # Forwards unconnected skeleton
+if connect-rock: rock-connected = FloodFill rock-tiled # Flood fills rock
 
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
@@ -70,9 +73,9 @@ if transpose=='Z': transposed = crop
 if !transpose: transposed = crop
 
 # Discards unconnected pores
-floodfill = ''
-if !floodfill: connected = transposed # Forwards unconnected skeleton
-if floodfill: connected = ConnectivityFloodFill transposed minimalSqRadius # Flood fills skeleton
+connect-pore = ''
+if !connect-pore: connected = transposed # Forwards unconnected skeleton
+if connect-pore: connected = ConnectivityFloodFill transposed minimalSqRadius # Flood fills skeleton
 
 # Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin connected

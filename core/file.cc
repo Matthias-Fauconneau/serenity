@@ -93,6 +93,7 @@ void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
     assert_(existsFile(oldName,oldAt), oldName, newName);
     assert_(!existsFile(newName,newAt), oldName, newName);
+    assert_(newName.size<0x100, newName.size, newName);
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)));
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { rename(at, oldName, at, newName); }

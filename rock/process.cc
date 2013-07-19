@@ -321,7 +321,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                     long timestamp = File(path, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldest=move(path);
                 }
-                if(!oldest) { if(outputSize<=1l<<32) error("Not enough space available"_); else break; /*Virtual*/ }
+                if(!oldest) { if(outputSize<=6l<<30) error("Not enough space available"_); else break; /*Virtual*/ }
                 TextData s (oldest); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
@@ -342,7 +342,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
 
             File file(output, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
-            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>1l<<32?0:Map::Populate)));
+            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>6l<<30?0:Map::Populate)));
         }
         outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }
