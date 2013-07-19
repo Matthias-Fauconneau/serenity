@@ -104,17 +104,17 @@ template<> void error(const string& message) __attribute((noreturn));
 
 /// Numeric range
 struct range {
-    range(uint start, uint stop) : start(start), stop(stop){}
+    range(int start, int stop) : start(start), stop(stop){}
     range(uint size) : range(0, size){}
     struct iterator {
-        uint i;
-        uint operator*() { return i; }
+        int i;
+        int operator*() { return i; }
         iterator& operator++() { i++; return *this; }
         bool operator !=(const iterator& o) const{ return i<o.i; }
     };
     iterator begin() const { return {start}; }
     iterator end() const { return {stop}; }
-    uint start, stop;
+    int start, stop;
 };
 
 /// Unmanaged fixed-size const reference to an array of elements

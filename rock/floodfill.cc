@@ -117,7 +117,7 @@ void floodFill(Volume8& target, const Volume8& source) {
         uint x=p.x, y=p.y, z=p.z;
         for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
             uint nx=x+dx, ny=y+dy, nz=z+dz;
-            if(nx>=X || ny>=Y || nz>=Z) continue;
+            if(nx<marginX || nx>=X-marginX || ny<marginY || ny>=Y-marginY || n<marginZ || nz>=Z-marginZ) continue;
             uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
             if(sourceData[index] && !targetData[index]) {
                 targetData[index] = sourceData[index]; // Marks previously unvisited skeleton voxel

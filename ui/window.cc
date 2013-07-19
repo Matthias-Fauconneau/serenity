@@ -4,6 +4,7 @@
 #include "file.h"
 #include "data.h"
 #include "time.h"
+#include "image.h"
 #include "png.h"
 #include "linux.h"
 #include "x.h"

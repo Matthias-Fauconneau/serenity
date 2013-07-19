@@ -3,6 +3,7 @@ TODO
 build.cc
 build.sh
 test.sh
+test.cc
 
 core/array.h
 core/core.h
