@@ -29,7 +29,7 @@ class(Source, Operation), virtual VolumeOperation {
             Map file (slices.first(), folder);
             if(isTiff(file)) { const Tiff16 image (file); size.x=image.width,  size.y=image.height; }
             else { Image image = decodeImage(file); assert_(image, path, slices.first());  size.x=image.width, size.y=image.height; }
-            crop = parseCrop(args, 0, size, args.contains("extra"_)?5:0 /*HACK: reverse dependency on process*/);
+            crop = parseCrop(args, 0, size, args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
         }
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
     }

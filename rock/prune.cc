@@ -16,17 +16,18 @@ class(Prune, Tool) {
         for(int r2: range(sq(maximumRadius))) { real r = sqrt((real)r2);
         //const real precision = 2; int last=-1; for(int i: range(maximumRadius)) { int r2=round(sq(i/precision)); if(r2==last) continue; last=r2; real r=sqrt(real(r2));
             Dict args = copy(arguments);
-            args["minimalSqRadius"_]=r2;
-            {args.at("floodfill"_) = 0;
+            args.at("minimalSqRadius"_)=r2;
+            {args.at("connect-pore"_) = 0;
                 shared<Result> result = process.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;
-                log("unconnected\t", r, ftoa(relativeVolume,4));
+                log(args.at("connect-pore"_),"\t", r, ftoa(relativeVolume,4));
                 unconnectedVolume.insert(resolution*r, relativeVolume);
             }
-            {args.at("floodfill"_) = 1;
+            {args.at("connect-pore"_) = 1;
+                if(arguments.contains("connect-pore"_)) args.at("connect-pore"_) = copy(arguments.at("connect-pore"_));
                 shared<Result> result = process.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;
-                log("connected\t",r, ftoa(relativeVolume,4));
+                log(args.at("connect-pore"_),"\t",r, ftoa(relativeVolume,4));
                 connectedVolume.insert(resolution*r, relativeVolume);
                 if(!relativeVolume) break;
                 criticalRadius = r;

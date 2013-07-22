@@ -43,16 +43,17 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real
 }
 
 class(KernelDensityEstimation, Operation), virtual Pass {
-    virtual string parameters() const { return "bandwidth normalize"_; }
+    virtual string parameters() const { return "ignore-clip bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        bool normalize = args.value("normalize"_,"1"_)!="0"_;
-        string xlabel,ylabel; { TextData s(source.metadata); ylabel = s.until('('); xlabel = s.until(')'); }
-        target.metadata = (normalize?"σ"_:ylabel)+"("_+xlabel+").tsv"_;
         NonUniformHistogram H = parseNonUniformSample(source.data);
+        if(args.value("ignore-clip"_,"0"_)!="0"_) H.values.first()=H.values.last()=0; // Ignores clipped values
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
+        bool normalize = args.value("normalize"_,"1"_)!="0"_;
         target.data = uniform ?
                     toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), normalize)) :
                     toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), normalize)); // Non uniform KDE
+        string xlabel,ylabel; { TextData s(source.metadata); ylabel = s.until('('); xlabel = s.until(')'); }
+        target.metadata = (normalize?"σ"_:ylabel)+"("_+xlabel+").tsv"_;
     }
 };

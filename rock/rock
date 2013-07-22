@@ -42,7 +42,6 @@ background = Maximum resampled threshold # For visualization
 foreground = Minimum resampled threshold # For visualization
 
 # Discards unconnected rocks
-rock-tiled = ZOrder8 rock
 if !connect-rock: rock-connected = rock # Forwards unconnected skeleton
 if connect-rock: rock-connected = FloodFill rock-tiled # Flood fills rock
 
@@ -65,20 +64,22 @@ if !minimalSqRadius: pruned = skeleton-tiled
 if crop.cylinder: crop = Crop pruned
 if !crop.cylinder: crop = pruned
 
-# Transposes to use an alternate connectivity axis (FloodFill always use Z)
-transpose = Transpose crop
-if transpose=='X': transposed = transpose
-if transpose=='Y': transposed = Transpose transpose
-if transpose=='Z': transposed = crop
-if !transpose: transposed = crop
+# Floodfills skeleton
+unconnected = Binary crop threshold=1 mask=0
+connected-bottom = FloodFill unconnected minimalSqRadius seed=001000 # Keeps pore space connected to bottom face
+connected-top = FloodFill unconnected minimalSqRadius seed=000001 # Keeps pore space connected to top face
+connected-both = Intersect connected-bottom connected-top # Keeps pore space connected to both face
 
 # Discards unconnected pores
 connect-pore = ''
-if !connect-pore: connected = transposed # Forwards unconnected skeleton
-if connect-pore: connected = ConnectivityFloodFill transposed minimalSqRadius # Flood fills skeleton
+if !connect-pore: connected = unconnected # Forwards unconnected skeleton
+if connect-pore=='bottom': connected = connected-bottom
+if connect-pore=='top': connected = connected-top
+if connect-pore=='1': connected = connected-both
 
 # Rasterizes skeleton voxel as maximum spheres
-sphere-bins = Bin connected
+connected-skeleton = Mask skeleton-tiled connected invert=1 value=0
+sphere-bins = Bin connected-skeleton
 maximum = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
@@ -118,7 +119,7 @@ distribution-radius = Div volume-distribution-radius volume-total
   png-colored = ToPNG colorize
   png-background = ToPNG background
   png-distance = ToPNG distance invert=1
-  png-skeleton = ToPNG skeleton invert=1 binary=1
+  png-skeleton = ToPNG connected invert=1 binary=1
   png-maximum = ToPNG maximum invert=1
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
@@ -136,25 +137,4 @@ distribution-radius = Div volume-distribution-radius volume-total
  critical-radius unconnected(λ) connected(λ) = Prune
  slices plots summary = Summary
  compare = Compare
-
-# Visualization
- source-tiled = ZOrder resampled
- source8 = Normalize8 source-tiled
- binary-tiled = ZOrder8 binary
- binary8 = Normalize8 binary-tiled
- foreground-tiled = ZOrder foreground
- foreground8 = Normalize8 foreground-tiled
- background-tiled = ZOrder background
- background8 = Normalize8 background-tiled
- distance-tiled = ZOrder distance
- distance8 = Normalize8 distance-tiled
- maximum8 = Normalize8 maximum
- maximum-invert = Binary maximum threshold threshold=1 cylinder=source.cylinder invert=1
- maximum-invert-tiled = ZOrder8 maximum-invert
- maximum-invert8 = Normalize8 maximum-invert-tiled
- epositionx = PositionX maximum8
- epositionxy = PositionY epositionx
- eposition = PositionZ epositionxy
- empty = Distance eposition
- empty-tiled = ZOrder empty
- empty8 = Normalize8 empty-tiled
+ P(Sw) = Prune connect-pore=top

@@ -3,39 +3,29 @@
 #include "time.h"
 
 /// Tiles a volume recursively into bricks (using 3D Z ordering)
-void zOrder(Volume16& target, const Volume16& source) {
+template<Type T> void zOrder(VolumeT<T>& target, const VolumeT<T>& source) {
     assert_(!source.tiled());
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const uint16* const sourceData = source;
-    uint16* const targetData = target;
+    const T* const sourceData = source;
+    T* const targetData = target;
     interleavedLookup(target);
     const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
-        assert(offsetZ[z]+offsetY[y]+offsetX[x] < target.size());
-        targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
-    }
+    for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
 }
-defineVolumePass(ZOrder, uint16, zOrder);
-
-/// Tiles a volume recursively into bricks (using 3D Z ordering)
-void zOrder(Volume8& target, const Volume8& source) {
-    assert_(!source.tiled());
-    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const uint8* const sourceData = source;
-    uint8* const targetData = target;
-    interleavedLookup(target);
-    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) {
-        assert(offsetZ[z]+offsetY[y]+offsetX[x] < target.size());
-        targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
+class(ZOrder, Operation), virtual VolumeOperation {
+    uint outputSampleSize(const Dict&, const ref<Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        assert_(outputs);
+        /***/ if(inputs[0].sampleSize==1) zOrder<uint8>(outputs[0],inputs[0]);
+        else if(inputs[0].sampleSize==2) zOrder<uint16>(outputs[0],inputs[0]);
+        else error(inputs[0].sampleSize);
     }
-}
-defineVolumePass(ZOrder8, uint8, zOrder);
+};
 
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles)
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
 struct Ball { uint16 x,y,z,sqRadius; };
-const int overcommit = 32; // Allows more spheres intersections than voxels inside a tile (only virtual memory is reserved and committed only as needed when filling tile's sphere lists)
+const int overcommit = 8; // Allows more spheres intersections than voxels inside a tile (only virtual memory is reserved and committed only as needed when filling tile's sphere lists)
 struct Tile { uint64 ballCount=0; Ball balls[tileSize*overcommit-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
 
 /// Tests box-ball intersection
@@ -53,7 +43,7 @@ void bin(Volume& target, const Volume16& source) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    assert(source.tiled());
+    assert_(source.tiled());
     const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
 
     Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
@@ -67,15 +57,15 @@ void bin(Volume& target, const Volume16& source) {
                 if(!sqRadius) continue;
                 float ballRadius = sqrt(float(sqRadius));
                 int radius = ceil(ballRadius);
-                for(int dz=(int(z)-radius)/tileSide; dz<=(int(z)+radius)/tileSide; dz++) {
-                    for(int dy=(y-radius)/tileSide; dy<=(y+radius)/tileSide; dy++) {
-                        for(int dx=(x-radius)/tileSide; dx<=(x+radius)/tileSide; dx++) {
+                for(int dz=max(0,(int(z)-radius))/tileSide; dz<=min<int>(Z-1,(int(z)+radius))/tileSide; dz++) {
+                    for(int dy=max(0,(y-radius))/tileSide; dy<=min<int>(Y-1,(y+radius))/tileSide; dy++) {
+                        for(int dx=max(0,(x-radius))/tileSide; dx<=min<int>(X-1,(x+radius))/tileSide; dx++) {
                             Tile* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
                             int tileX = dx*tileSide, tileY = dy*tileSide, tileZ = dz*tileSide;
                             if(dmin(tileSide,x-tileX,y-tileY,int(z)-tileZ) < sqRadius) { // Intersects tile
                                 /*float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sq((tileSide-1)/2.));
-                                assert(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere
-                                assert(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), tile->ballCount);*/
+                                assert(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere*/
+                                assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), dx, X/tileSide, dy, Y/tileSide, dz, Z/tileSide,  tile->ballCount);
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
                                 tile->balls[index] = {uint16(x),uint16(y),uint16(z),uint16(sqRadius)}; // Appends the ball to intersecting tiles
                             }

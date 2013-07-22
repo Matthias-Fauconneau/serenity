@@ -77,20 +77,21 @@ class(Minimum, Operation), virtual VolumeOperation {
     }
 };
 
-/// Sets masked voxels where source is under masked value to masked value
-static void mask(Volume16& target, const Volume16& source, const Volume16& mask, uint16 value) {
+/// Sets masked voxels where source is under/over masked value to masked value
+static void mask(Volume16& target, const Volume16& source, const Volume8& mask, uint16 value, bool invert) {
     assert_(source.size()==mask.size() && target.size() == source.size());
     target.margin = mask.margin;
     for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
-        target(x,y,z) = mask(x,y,z) || source(x,y,z)>value ? source(x,y,z) : value;
+        target(x,y,z) = mask(x,y,z) || (invert ? source(x,y,z)<value : source(x,y,z)>value) ? source(x,y,z) : value;
 }
 class(Mask, Operation), virtual VolumeOperation {
-    virtual string parameters() const { return "value"_; }
+    virtual string parameters() const { return "value invert"_; }
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        float value = toDecimal(args.at("value"_));
-        uint16 integerValue = value < 1 ? round( value*inputs[0].maximum ) : round(value);
-        mask(outputs[0], inputs[0], inputs[1], integerValue);
+        assert_(args.contains("value"_),"Missing mandatory argument 'value' for mask");
+        float value = toDecimal(args.value("value"_,"0"_));
+        uint16 integerValue = value <= 1 ? round( value*inputs[0].maximum ) : round(value);
+        mask(outputs[0], inputs[0], inputs[1], integerValue, args.value("invert"_,"0"_)!="0"_);
     }
 };
 

@@ -104,7 +104,7 @@ Targets and arguments:
   Image slices of the volume exported in BMP format (unnormalized and linear for interoperation)
 - [bmp-]denoised-connected
   Denoised volume with all unconnected pores set to "value"
-  - value = <decimal>|<integer>
+  - value = <decimal>|<integer> [mandatory]
    Radiodensity value to set masked voxels
 
 Tools:

@@ -18,10 +18,11 @@ inline Volume toVolume(const Result& result) { return toVolume(result.metadata, 
 struct VolumeOperation : virtual Operation {
     /// Overriden by implementation to return required output sample size (or 0 for non-volume output)
     virtual uint outputSampleSize(uint index unused) { return 0; } // No volume output by default
-    size_t outputSize(const Dict&, const ref<Result*>& inputs, uint index) override {
+    virtual uint outputSampleSize(const Dict&, const ref<Result*>&, uint index) { return this->outputSampleSize(index); }
+    size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
         assert_(inputs);
         assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
-        return toVolume(*inputs[0]).size() * outputSampleSize(index);
+        return toVolume(*inputs[0]).size() * this->outputSampleSize(args,inputs,index);
     }
     /// Actual operation (overriden by implementation)
     virtual void execute(const Dict& args unused, const mref<Volume>& outputs unused, const ref<Volume>& inputs unused) { error("None of the execute methods were overriden by implementation"_); }
@@ -45,7 +46,7 @@ struct VolumeOperation : virtual Operation {
         }
         array<Volume> outputVolumes; array<Result*> otherOutputs;
         for(uint index: range(outputs.size)) {
-            uint sampleSize = this->outputSampleSize(index);
+            uint sampleSize = this->outputSampleSize(args, inputs, index);
             if(sampleSize) {
                 Volume volume;
                 volume.sampleSize = sampleSize;
@@ -63,7 +64,7 @@ struct VolumeOperation : virtual Operation {
         }
         execute(args, outputVolumes, inputVolumes, otherOutputs, otherInputs);
         uint outputVolumesIndex=0; for(uint index: range(outputs.size)) {
-            uint sampleSize = this->outputSampleSize(index);
+            uint sampleSize = this->outputSampleSize(args, inputs, index);
             if(sampleSize) {
                 Volume& output = outputVolumes[outputVolumesIndex++];
                 //if(output.sampleSize==2) assert(maximum((const Volume16&)output)==output.maximum, outputs[index]->name, output, maximum((const Volume16&)output), output.maximum);

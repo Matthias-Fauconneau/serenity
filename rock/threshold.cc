@@ -15,9 +15,10 @@ UniformSample normalize(const UniformSample& A) { return (1./(A.scale*A.sum()))*
 
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
-    string parameters() const override { return "normalize"_; }
+    string parameters() const override { return "ignore-clip normalize"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
+        if(args.value("ignore-clip"_,"0"_)!="0"_) density.first()=density.last()=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
         for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
@@ -159,39 +160,51 @@ class(MaximumMeanGradient, Operation) {
 #endif
 
 /// Segments by setting values over a fixed threshold
-void binary(Volume8& target, const Volume16& source, uint16 threshold, bool invert=false) {
+void binary(Volume8& target, const Volume16& source, uint16 threshold, bool invert=false, int maskValue=0) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const int marginX=target.margin.x=max(1,source.margin.x), marginY=target.margin.y=max(1,source.margin.y), marginZ=target.margin.z=max(1,source.margin.z);
     bool tiled = source.tiled();
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     assert_(X%16==0 && X-2*marginX==Y-2*marginY);
     uint radiusSq = (X/2-marginX)*(Y/2-marginY);
     uint8 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq;
     uint8* const targetData = target;
+    interleavedLookup(target);
+    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    uint64 count[2];
     parallel(0, Z, [&](uint, int z) {
         const uint16* const sourceZ = source + (tiled ? offsetZ[z] : z*XY);
-        uint8* const targetZ = targetData + z*XY;
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const targetZY = targetZ + y*X; for(int x=0; x<X; x++) targetZY[x]=1; }
+        uint8* const targetZ = targetData + offsetZ[z];
+        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const targetZY = targetZ + offsetY[y]; for(int x=0; x<X; x++) targetZY[x]=1; }
         else for(int y=0; y<Y; y++) {
             const uint16* const sourceY = sourceZ + (tiled ? offsetY[y] : y*X);
-            uint8* const targetZY = targetZ + y*X;
+            uint8* const targetZY = targetZ + offsetY[y];
             uint8* const maskY = mask + y*X;
-            if(invert) for(int x=0; x<X; x++) targetZY[x] = (sourceY[tiled ? offsetX[x] : x] < threshold) || maskY[x];
-            else for(int x=0; x<X; x++) targetZY[x] = (sourceY[tiled ? offsetX[x] : x] >= threshold) || maskY[x];
+            if(maskValue==1) { // Masked pixel are 1
+                if(invert) for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] < threshold || maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+                else for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] >= threshold || maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+            } else { // Masked pixel are 0
+                if(invert) for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] < threshold && !maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+                else for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] >= threshold && !maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+            }
         }
     });
-    target.offsetX=buffer<uint64>(), target.offsetY=buffer<uint64>(), target.offsetZ=buffer<uint64>();
+    assert_(count[0] && count[1], "Empty segmentation using threshold",threshold);
     target.maximum=1;
 }
 
 /// Segments pore space by comparing density against a uniform threshold
 class(Binary, Operation), virtual VolumeOperation {
-    string parameters() const override { return "cylinder threshold invert"_; }
+    string parameters() const override { return "cylinder threshold invert mask"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        real threshold = args.at("threshold"_);
+        uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
+        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"1"_)!="0"_);
+    }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_);
+        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"1"_)!="0"_);
     }
 };
