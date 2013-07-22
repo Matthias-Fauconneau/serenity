@@ -103,7 +103,7 @@ array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
 NonUniformSample parseNonUniformSample(const string& file) {
     TextData s (file);
     NonUniformSample sample;
-    while(s) { if(s.match('#')) s.until('\n'); else { real x=s.decimal(); s.skip("\t"_); sample.insert(x, s.decimal()); s.skip("\n"_); } }
+    while(s) { if(s.match('#')) s.until('\n'); else { real x=s.decimal(); s.skip("\t"_); sample.insertMulti(x, s.decimal()); s.skip("\n"_); } }
     return sample;
 }
 String toASCII(const NonUniformSample& A) {

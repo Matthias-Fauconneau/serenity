@@ -46,37 +46,49 @@ class(Source, Operation), virtual VolumeOperation {
         Time time; Time report;
         uint16* const targetData = (Volume16&)outputs.first();
         if(!existsFolder(path, currentWorkingDirectory())) {
-            assert_(args.value("downsample"_,"0"_)=="0"_);
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume source;
             if(!parseVolumeFormat(source, metadata)) error("Unknown format");
-            uint64 sX = source.sampleCount.x, sY = source.sampleCount.y, unused sZ = source.sampleCount.z;
+            const uint64 sX = source.sampleCount.x, sY = source.sampleCount.y;
 
             Map file(path, currentWorkingDirectory()); // Copy from disk to process managed memory
-            for(uint z: range(size.z)) {
-                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
-                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
+            if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
+                for(uint z: range(size.z)) {
+                    if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                    uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
+                    uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                    for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                        uint16* const source = sourceSlice + (min.y+y)*2*sX+(min.x+x)*2;
+                        targetSlice[y*X+x] = (source[0] + source[1] + source[sX*2] + source[sX+1] +
+                                source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                    }
+                }
+            } else { // Reads from disk into process managed cache
+                for(uint z: range(size.z)) {
+                    if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                    uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
+                    uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                    for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
+                }
             }
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
-            if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample for larger than RAM volumes
-                const uint sliceStride = Y*2*X*2;
-                buffer<uint16> sliceBuffer(2*sliceStride);
+            if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
+                const uint64 sX = X*2, sY = Y*2;
+                buffer<uint16> sliceBuffer(2*sX*sY);
                 for(uint z: range(size.z)) {
                     if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                     uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                     for(uint i: range(2)) {
                         Map file(slices[(min.z+z)*2+i],folder);
                         Tiff16 tiff(file); assert_(tiff);
-                        tiff.read(sliceBuffer.begin()+i*sliceStride, min.x*2, min.y*2, size.x*2, size.y*2, X*2);
+                        tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);
                     }
                     for(uint y: range(size.y)) for(uint x: range(size.x)) {
-                        uint16* const source = sliceBuffer.begin() + (y*2)*X*2+(x*2);
-                        targetSlice[y*X+x] = (source[0] + source[1] + source[X*2] + source[X*2+1] +
-                                source[sliceStride+0] + source[sliceStride+1] + source[sliceStride+X*2] + source[sliceStride+X*2+1])/8;
+                        uint16* const source = sliceBuffer.begin() + (y*2)*sX+(x*2);
+                        targetSlice[y*X+x] = (source[0] + source[1] + source[sX] + source[sX+1] +
+                                source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
                     }
                 }
             }

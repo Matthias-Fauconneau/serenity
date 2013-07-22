@@ -79,10 +79,11 @@ class(Minimum, Operation), virtual VolumeOperation {
 
 /// Sets masked voxels where source is under/over masked value to masked value
 static void mask(Volume16& target, const Volume16& source, const Volume8& mask, uint16 value, bool invert) {
-    assert_(source.size()==mask.size() && target.size() == source.size());
+    assert_(source.size()==mask.size() && target.size() == source.size() && target.tiled() && source.tiled() && mask.tiled());
     target.margin = mask.margin;
-    for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z))
-        target(x,y,z) = mask(x,y,z) || (invert ? source(x,y,z)<value : source(x,y,z)>value) ? source(x,y,z) : value;
+    const uint8* const maskData = mask; const uint16* const sourceData = source; uint16* const targetData = target;
+    if(invert) for(uint index: range(source.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s<value ? s: value; }
+    else for(uint index: range(source.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s>value ? s: value; }
 }
 class(Mask, Operation), virtual VolumeOperation {
     virtual string parameters() const { return "value invert"_; }

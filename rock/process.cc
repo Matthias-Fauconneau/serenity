@@ -4,6 +4,8 @@
 #include "math.h"
 #include <sys/stat.h>
 
+uint ResultFile::indirectID = 0;
+
 /// Relevant operation parameters
 array<string> Rule::parameters() const {
     array<string> parameters;
@@ -67,8 +69,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                 assert_(key, s.until('\n'), word);
                 if(s.match('=')) { // Local argument
                     s.whileAny(" \t"_);
-                    //s.skip("'"_);
-                    rule.arguments.insert(String(key), String(/*s.until('\'')*/ s.whileNo(" \t\n")));
+                    rule.arguments.insert(String(key), String(s.whileNo(" \t\n"_)));
                 }
                 else if(resultNames.contains(key)) rule.inputs << key; // Result input
                 else if(rule.operation) rule.inputs << key; // Argument value
@@ -165,7 +166,7 @@ Dict Process::localArguments(const string& target, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target, arguments);
     array<string> parameters = rule.parameters();
     for(auto arg: rule.arguments) { // Appends local arguments
-        assert_(parameters.contains(arg.key),target,arg.key);
+        assert_(parameters.contains(arg.key),"Irrelevant local argument",arg.key,"for",rule.operation,"generating",target);
         if(args.contains(arg.key)) args.remove(arg.key); // Local arguments overrides scope arguments
         TextData s(arg.value); string scope=s.until('.');
         if(&ruleForOutput(scope, arguments)) { if(arguments.contains(arg.value)) args.insert(copy(arg.key), copy(arguments.at(arg.value))); } // Argument value
@@ -216,31 +217,42 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
 array<string> PersistentProcess::configure(const ref<string>& allArguments, const string& definition) {
     assert_(!results);
     array<string> targets = Process::configure(allArguments, definition);
-    if(arguments.contains("storageFolder"_)) storageFolder = Folder(arguments.at("storageFolder"_),currentWorkingDirectory());
-    for(const String& path: storageFolder.list(Files|Folders)) {
-        TextData s (path); string name = s.whileNot('{');
-        if(path==name || !&ruleForOutput(name, arguments)) { // Removes invalid data
-            if(existsFolder(path,storageFolder)) {
-                for(const string& file: Folder(path,storageFolder).list(Files)) ::remove(file,Folder(path,storageFolder));
-                ::removeFolder(path, storageFolder);
-            } else ::remove(path, storageFolder);
+    if(specialArguments.contains("storageFolder"_)) storageFolder = Folder(specialArguments.at("storageFolder"_),currentWorkingDirectory());
+    if(specialArguments.contains("indirect"_)) { ResultFile::indirectID=1; log("Storing metadata in auxiliary files (instead of file names)"); }
+    for(const String& fileID: storageFolder.list(Files|Folders|Sorted)) {
+        String id; String dataFile;
+        if(ResultFile::indirectID) {
+            if(endsWith(fileID,"data"_)) {
+                if(!existsFile(fileID+".meta"_, storageFolder)) remove(fileID, storageFolder); //Missing metadata
+                continue; // Load from metadata
+            }
+            if(endsWith(fileID,"meta"_)) { remove(fileID, storageFolder); continue; } // Neither data nor metadata
+            if(!existsFile(fileID+".data"_, storageFolder)) { remove(fileID, storageFolder); continue; } // Missing data
+            id=readFile(fileID+".meta"_), dataFile=fileID+".data"_;
+        } else id=copy(fileID), dataFile=copy(fileID);
+        TextData s (id); string name = s.whileNot('{');
+        if(id==name || !&ruleForOutput(name, arguments)) { // Removes invalid data
+            if(existsFolder(dataFile,storageFolder)) {
+                for(const string& file: Folder(dataFile,storageFolder).list(Files)) ::remove(file,Folder(dataFile,storageFolder));
+                ::removeFolder(dataFile, storageFolder);
+            } else ::remove(dataFile, storageFolder);
             continue;
         }
         Dict arguments = parseDict(s); s.until("."_); string metadata = s.untilEnd();
-        if(!existsFolder(path, storageFolder)) {
-            File file = File(path, storageFolder, ReadWrite);
+        if(!existsFolder(dataFile, storageFolder)) {
+            File file = File(dataFile, storageFolder, ReadWrite);
             if(file.size()<pageSize) { // Small file (<4K)
-                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), path, storageFolder.name());
+                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), dataFile, storageFolder.name());
             } else { // Memory-mapped file
-                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), path, storageFolder.name());
+                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), dataFile, storageFolder.name());
             }
         } else { // Folder
-            Folder folder (path, storageFolder);
-            shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), String(metadata), String(), path, storageFolder.name());
-            for(const String& path: folder.list(Files|Sorted)) {
-                string key = section(path,'.',0,1), metadata=section(path,'.',1,-1);
+            Folder folder (dataFile, storageFolder);
+            shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), String(metadata), String(), dataFile, storageFolder.name());
+            for(const String& dataFile: folder.list(Files|Sorted)) {
+                string key = section(dataFile,'.',0,1), metadata=section(dataFile,'.',1,-1);
                 assert_(metadata == result->metadata);
-                File file = File(path, folder, ReadWrite);
+                File file = File(dataFile, folder, ReadWrite);
                 if(file.size()<pageSize) { // Small file (<4K)
                     result->elements.insert(String(key), file.read(file.size()));
                 } else { // Memory-mapped file
@@ -248,6 +260,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
                     result->elements.insert(String(key), buffer<byte>(result->maps.last()));
                 }
             }
+            if(ResultFile::indirectID) rename(fileID, str(result->fileID)+".meta"_, storageFolder);
             results << move(result);
         }
     }
@@ -294,7 +307,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                                 const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) {
     for(const shared<Result>& input: inputs) { // Updates last access time for correct LRU cache behavior
         ResultFile& result = *(ResultFile*)input.pointer;
-        if(result.fileName) touchFile(result.fileName, result.folder, false);
+        if(result.id) touchFile(result.dataFile(), result.folder, false);
     }
 
     unique<Operation> operation = Interface<Operation>::factories.contains(operationName) ? Interface<Operation>::instance(operationName) : nullptr;
@@ -303,16 +316,18 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
     for(uint index: range(outputNames.size)) {
         const string& output = outputNames[index];
 
+        String outputFileID = ResultFile::indirectID ? str(ResultFile::indirectID)+".data"_ : String(output); //FIXME: should be transparent
+
         if(&find(output, arguments)) { // Reuses same result file
             shared<ResultFile> result = results.take(indexOf(output, arguments));
-            String fileName = move(result->fileName); assert_(!result->fileName);
-            rename(fileName, output, storageFolder);
+            result->rename(outputFileID);
+            result->id.clear();
         }
 
         Map map;
         int64 outputSize = operation ? operation->outputSize(localArguments, cast<Result*>(inputs), index) : 0;
         if(outputSize) { // Creates (or resizes) and maps an output result file
-            while(outputSize >= (existsFile(output, storageFolder) ? File(output, storageFolder).size() : 0) + freeSpace(storageFolder)) {
+            while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
@@ -324,7 +339,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                 if(!oldest) { if(outputSize<=6l<<30) error("Not enough space available for",output," need"_,outputSize,"B, only",freeSpace(storageFolder),"B available on",storageFolder.name()); else break; /*Virtual*/ }
                 TextData s (oldest); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
-                    ((shared<ResultFile>)results.take(i))->fileName.clear(); // Prevents rename
+                    ((shared<ResultFile>)results.take(i))->id.clear(); // Prevents rename
                     break;
                 }
                 if(!existsFile(oldest, storageFolder) || outputSize > File(oldest,storageFolder).size() + freeSpace(storageFolder)) { // Removes if not a file or need to recycle more than one file
@@ -336,11 +351,11 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                     }
                     continue;
                 }
-                ::rename(storageFolder, oldest, storageFolder, output); // Renames last discarded file instead of removing (avoids page zeroing)
+                ::rename(storageFolder, oldest, storageFolder, outputFileID); // Renames last discarded file instead of removing (avoids page zeroing)
                 break;
             }
 
-            File file(output, storageFolder, Flags(ReadWrite|Create));
+            File file(outputFileID, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
             if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>6l<<30?0:Map::Populate)));
         }
@@ -350,7 +365,11 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
 
     Time time;
     if(operation) operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    else Interface<Tool>::instance(operationName)->execute(arguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
+    else {
+        Dict args = copy(arguments);
+        for(auto arg: relevantArguments) if(args.contains(arg.key)) args.at(arg.key)=copy(arg.value); else args.insert(copy(arg.key), copy(arg.value));
+        Interface<Tool>::instance(operationName)->execute(args, cast<Result*>(outputs), cast<Result*>(inputs), *this);
+    }
     if((uint64)time>200) log(operationName, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) if(output->name) { // Tool may remove already stored outputs (by an explicit Process::compute use)
@@ -360,10 +379,10 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
         if(result->elements) { // Copies each elements data from anonymous memory to files in a folder
             assert_(!result->maps && !result->data);
             assert_(result->elements.size() > 1);
-            Folder folder(result->fileName, result->folder, true);
+            Folder folder(result->dataFile(), result->folder, true);
             for(string file: folder.list(Files)) remove(file,folder);
             for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
-            touchFile(result->fileName, result->folder, true);
+            touchFile(result->dataFile(), result->folder, true);
         } else { // Synchronizes file mappings with results
             size_t mappedSize = 0;
             if(result->maps) {
@@ -375,11 +394,11 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
             }
             File file = 0;
             if(mappedSize && result->data.size <= mappedSize) { // Truncates file to result size
-                file = File(result->fileName, result->folder, ReadWrite);
+                file = File(result->dataFile(), result->folder, ReadWrite);
                 if(result->data.size < mappedSize) file.resize(result->data.size);
                 //else only open file to map read-only
             } else { // Copies data from anonymous memory to file
-                file = File(result->fileName, result->folder, Flags(ReadWrite|Truncate|Create));
+                file = File(result->dataFile(), result->folder, Flags(ReadWrite|Truncate|Create));
                 assert(result->data);
                 file.write(result->data);
             }
@@ -389,7 +408,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
             }
         }
         result->rename();
-        assert_(existsFile(result->fileName,storageFolder), result->fileName);
+        assert_(existsFile(result->dataFile(),storageFolder), result->dataFile());
         results << move(result);
     }
 }

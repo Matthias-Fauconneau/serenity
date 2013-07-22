@@ -48,9 +48,9 @@ struct Build {
     String find(const string& file) { for(String& path: sources) if(endsWith(path, file)) return String(path.contains('.')?section(path,'.',0,-2):path); return String(); }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
-    long parseHeader(const string& name) {
+    int64 parseHeader(const string& name) {
         File file (name+".h"_, folder);
-        long lastEdit = file.modifiedTime();
+        int64 lastEdit = file.modifiedTime();
         for(TextData s = file.read(file.size()); s; s.advance(1)) {
             if(s.match("#include \""_)) {
                 string name = s.until('.');
@@ -63,13 +63,13 @@ struct Build {
 
     /// Compiles a module and its dependencies as needed
     /// \return Timestamp of the last modified module implementation (deep)
-    long processModule(const string& target) {
+    int64 processModule(const string& target) {
         assert_(target);
         modules << unique<Node>(target);
         Node& parent = modules.last();
         File file (target+".cc"_, folder);
-        long lastCompileEdit = file.modifiedTime(); // including headers
-        long lastLinkEdit = lastCompileEdit; // including headers and their associated implementations (avoid getting all timestamps again before link)
+        int64 lastCompileEdit = file.modifiedTime(); // including headers
+        int64 lastLinkEdit = lastCompileEdit; // including headers and their associated implementations (avoid getting all timestamps again before link)
         for(TextData s = file.read(file.size()); s; s.advance(1)) {
             if(s.match("#include "_)) {
                 if(s.match('"')) { // module header
@@ -115,9 +115,8 @@ struct Build {
     Build() {
         Folder(tmp+build, root(), true);
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+build+"/"_+subfolder, root(), true);
-        long lastEdit = processModule( find(target+".cc"_) );
+        int64 lastEdit = processModule( find(target+".cc"_) );
         if(compile) {
-            bool fileChanged = false;
             if(files) {
                 Folder(tmp+"files"_, root(), true);
                 for(String& file: files) {
@@ -126,16 +125,17 @@ struct Build {
                     Folder subfolder = Folder(section(path,'/',0,-2), folder);
                     string name = section(path,'/',-2,-1);
                     String object = tmp+"files/"_+name+".o"_;
-                    if(!existsFile(object) || File(name, subfolder).modifiedTime() >= File(object).modifiedTime()) {
+                    int64 lastFileEdit = File(name, subfolder).modifiedTime();
+                    if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
                         if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
-                        fileChanged = true;
+                        lastEdit = max(lastEdit, lastFileEdit);
                     }
                     file = move(object);
                 }
             }
             String name = target+"."_+build;
             String binary = tmp+build+"/"_+name;
-            if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime() || fileChanged) {
+            if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime()) {
                 array<String> args; args<<String("-o"_)<<copy(binary);
                 args << apply(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
                 args << copy(files);

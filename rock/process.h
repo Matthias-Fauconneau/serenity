@@ -70,26 +70,35 @@ struct Tool {
 
 /// Mirrors results on a filesystem
 struct ResultFile : Result {
-    ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, String&& data, const string& path, const string& folder)
-        : Result(name,timestamp,move(arguments),move(metadata), move(data)), fileName(String(path)), folder(String(folder)) {}
-    ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, Map&& map, const string& path, const string& folder)
-        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), fileName(String(path)), folder(String(folder)) { if(map) maps<<move(map); }
+    ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, String&& data, const string& id, const string& folder)
+        : Result(name,timestamp,move(arguments),move(metadata), move(data)), id(String(id)), folder(String(folder)), fileID(indirectID ? indirectID++ : 0) {}
+    ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, Map&& map, const string& id, const string& folder)
+        : Result(name,timestamp,move(arguments),move(metadata), buffer<byte>(map)), id(String(id)), folder(String(folder)), fileID(indirectID ? indirectID++ : 0) { if(map) maps<<move(map); }
     void rename() {
-        if(!fileName || !name) return;
-        String newName = name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata;
-        if(fileName!=newName) { ::rename(fileName, newName, Folder(folder)); fileName=move(newName); }
+        if(!id || !name) return;
+        rename( name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata );
+    }
+    void rename(const string& newID) {
+        if(id!=newID) {
+            if(indirectID) writeFile(str(fileID)+".meta"_, newID, Folder(folder));
+            else ::rename(id, newID, Folder(folder));
+            id=String(newID);
+        }
     }
     void addUser() override { ++userCount; rename(); }
     uint removeUser() override { --userCount; rename(); return userCount; }
+    String dataFile() { return indirectID ? str(fileID)+".data"_ : copy(id); }
 
     array<Map> maps;
-    String fileName;
+    String id;
     String folder; // a Folder file descriptor would use up maximum file descriptor count (ulimit -n)
+    static uint indirectID;
+    uint fileID;
 };
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : virtual Process {
-     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) { specialParameters += "storageFolder"_; }
+     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("dev/shm"_),true) { specialParameters += "storageFolder"_; specialParameters += "indirect"_; }
     ~PersistentProcess();
 
      /// Maps intermediate results from file system

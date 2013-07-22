@@ -40,10 +40,10 @@ struct Rock : virtual PersistentProcess {
         for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(args, process? : rock());
         if(targetPaths.size>targets.size)
-            error("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
+            warn("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                   "\nHint: An unknown (mistyped?) target might be interpreted as target path");
         if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
-            warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size));
+            warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size), targetPaths?str("using", map<string,string>(targetPaths, targets.slice(0,targetPaths.size))):""_);
 #ifndef BUILD
 #define BUILD "undefined"
 #endif

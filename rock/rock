@@ -43,7 +43,7 @@ foreground = Minimum resampled threshold # For visualization
 
 # Discards unconnected rocks
 if !connect-rock: rock-connected = rock # Forwards unconnected skeleton
-if connect-rock: rock-connected = FloodFill rock-tiled # Flood fills rock
+if connect-rock: rock-connected = FloodFill rock # Flood fills rock
 
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
@@ -110,7 +110,8 @@ distribution-radius = Div volume-distribution-radius volume-total
 # Export
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
- denoised-connected = Mask denoised maximum
+ denoised-tiled = ZOrder denoised
+ denoised-connected = Mask denoised-tiled maximum
  cdl = ToCDL sqrt-scaled
  ascii = ToASCII sqrt-scaled
  # Exports to PNG (normalized and gamma-compressed for visualization)
