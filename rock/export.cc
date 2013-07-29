@@ -77,7 +77,7 @@ class(Minimum, Operation), virtual VolumeOperation {
     }
 };
 
-/// Sets masked voxels where source is under/over masked value to masked value
+/// Sets masked (mask=0) voxels where source is under/over masked value to masked value
 static void mask(Volume16& target, const Volume16& source, const Volume8& mask, uint16 value, bool invert) {
     assert_(source.size()==mask.size() && target.size() == source.size() && target.tiled() && source.tiled() && mask.tiled());
     target.margin = mask.margin;

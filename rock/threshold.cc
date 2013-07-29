@@ -200,11 +200,11 @@ class(Binary, Operation), virtual VolumeOperation {
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         real threshold = args.at("threshold"_);
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"1"_)!="0"_);
+        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_);
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"1"_)!="0"_);
+        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_);
     }
 };

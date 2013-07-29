@@ -36,7 +36,7 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
 # Segments
-rock = Binary resampled threshold cylinder=source.cylinder # Also clips to cylinder before distance field evaluation
+rock = Binary resampled threshold cylinder=source.cylinder mask=1 # Also clips to cylinder before distance field evaluation
 colored = Colorize resampled threshold # For visualization
 background = Maximum resampled threshold # For visualization
 foreground = Minimum resampled threshold # For visualization
@@ -111,7 +111,8 @@ distribution-radius = Div volume-distribution-radius volume-total
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
- denoised-connected = Mask denoised-tiled maximum
+ maximum-mask = Binary maximum threshold threshold=1 cylinder=source.cylinder mask=0
+ denoised-connected = Mask denoised-tiled maximum-mask
  cdl = ToCDL sqrt-scaled
  ascii = ToASCII sqrt-scaled
  # Exports to PNG (normalized and gamma-compressed for visualization)

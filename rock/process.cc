@@ -238,7 +238,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
             } else ::remove(dataFile, storageFolder);
             continue;
         }
-        Dict arguments = parseDict(s); s.until("."_); string metadata = s.untilEnd();
+        Dict arguments = parseDict(s); s.mayInteger(); s.skip("."_); string metadata = s.untilEnd();
         if(!existsFolder(dataFile, storageFolder)) {
             File file = File(dataFile, storageFolder, ReadWrite);
             if(file.size()<pageSize) { // Small file (<4K)
@@ -321,7 +321,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
         if(&find(output, arguments)) { // Reuses same result file
             shared<ResultFile> result = results.take(indexOf(output, arguments));
             result->rename(outputFileID);
-            result->id.clear();
+            result->id.clear(); // Reference count update would rewrite metadata
         }
 
         Map map;
@@ -330,7 +330,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
             while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
-                    TextData s (path); s.until('}'); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
+                    TextData s (path); s.whileNot('{'); parseDict(s); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
                     if(File(path, storageFolder).size() < 2<<20) continue; // Small files won't release much capacity
                     if(!(File(path, storageFolder).stat().st_mode&S_IWUSR)) continue; // Locked file
                     long timestamp = File(path, storageFolder).accessTime();

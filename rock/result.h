@@ -64,7 +64,7 @@ inline Dict parseDict(TextData& s) {
         if(s.match('}')) break;
         string key = s.whileNo(":|}"_);
         string value;
-        if(s.match(':')) value = s.whileNo("|}"_);
+        if(s.match(':')) value = s.whileNo("|"_,'{','}');
         dict.insert(String(key), replace(String(value),'\\','/'));
         if(s.match('|')) continue;
         else if(s.match('}')) break;

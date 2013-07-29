@@ -54,6 +54,9 @@ string TextData::whileAny(const string& any) {
 string TextData::whileNo(const string& any) {
     uint start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);
 }
+string TextData::whileNo(const string& any, char left, char right) {
+    uint start=index; int nest=0; while(available(1)) { if(match(left)) nest++; else if(peek()==right) { nest--; if(nest<0) break; else advance(1); } else if(!matchNo(any)) break; } return slice(start,index-start);
+}
 
 string TextData::until(char key) {
     uint start=index, end;

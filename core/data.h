@@ -133,10 +133,12 @@ struct TextData : virtual Data {
 
     /// Advances while input doesn't match \a key. \sa until
     string whileNot(char key);
-    /// Advances while input match any of \a key
-    string whileAny(const string& key);
-    /// Advances while input match none of \a key
-    string whileNo(const string& key);
+    /// Advances while input match any of \a any
+    string whileAny(const string& any);
+    /// Advances while input match none of \a any
+    string whileNo(const string& any);
+    /// Advances while input match none of \a any or \a right (which may be nested using \a left)
+    string whileNo(const string& any, char left, char right);
 
     /// Reads until input match \a key. \sa whileNot
     string until(char key);

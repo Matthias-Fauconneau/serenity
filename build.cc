@@ -100,7 +100,7 @@ struct Build {
                 args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
                 if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DNO_INLINE"_) << String("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << String("-g"_) << String("-Ofast"_);
-                else if(::find(build,"release"_)) args <<  String("-Ofast"_);
+                else if(::find(build,"release"_)) args << String("-Ofast"_);
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
