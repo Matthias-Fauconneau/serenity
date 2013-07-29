@@ -32,8 +32,8 @@ struct Volume {
     }
     size_t index(int3 position) const { return index(position.x, position.y, position.z); }
 
-    generic operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize); return *(const VolumeT<T>*)this; }
-    generic operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize); return *(VolumeT<T>*)this; }
+    generic operator const VolumeT<T>&() const { assert_(sampleSize==sizeof(T),sampleSize,sizeof(T)); return *(const VolumeT<T>*)this; }
+    generic operator VolumeT<T>&() { assert_(sampleSize==sizeof(T),sampleSize,sizeof(T)); return *(VolumeT<T>*)this; }
 
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
     buffer<uint64> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes

@@ -76,5 +76,9 @@ void intersect(Volume8& target, const Volume8& A, const Volume8& B) {
 }
 class(Intersect, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint8); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { intersect(outputs[0], inputs[0], inputs[1]); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        assert_(inputs[0].sampleSize, "Expected 8bit mask");
+        assert_(inputs[1].sampleSize, "Expected 8bit mask");
+        intersect(outputs[0], inputs[0], inputs[1]);
+    }
 };

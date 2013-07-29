@@ -96,7 +96,7 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
     assert_(newName.size<0x100, newName.size, newName);
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)));
 }
-void rename(const string& oldName,const string& newName, const Folder& at) { rename(at, oldName, at, newName); }
+void rename(const string& oldName,const string& newName, const Folder& at) { assert_(oldName!=newName); rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
 void removeFolder(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
 void remove(const Folder& folder) { int fd=check(openat(folder.fd, strz("."_), O_WRONLY|O_DIRECTORY, 0), folder.name()); check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); close(fd); }
@@ -105,7 +105,7 @@ void symlink(const string& from,const string& to, const Folder& at) {
     remove(from,at);
     check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
-void touchFile(const string& path, const Folder& at, bool setModified) { timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; check_(utimensat(at.fd, strz(path), times, 0)); }
+void touchFile(const string& path, const Folder& at, bool setModified) { timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; check_(utimensat(at.fd, strz(path), times, 0), path); }
 void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate)); //FIXME: preserve executable flag
     for(size_t offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);

@@ -20,7 +20,7 @@ class(Source, Operation), virtual VolumeOperation {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume volume;
             if(!parseVolumeFormat(volume, metadata)) error("Unknown format");
-            crop = parseCrop(args, volume.margin, volume.sampleCount-volume.margin);
+            crop = parseCrop(args, volume.margin, volume.sampleCount-volume.margin, args.contains("extra"_)?2:0);
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
@@ -31,9 +31,11 @@ class(Source, Operation), virtual VolumeOperation {
             else { Image image = decodeImage(file); assert_(image, path, slices.first());  size.x=image.width, size.y=image.height; }
             crop = parseCrop(args, 0, size, args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
         }
+        assert(crop.sampleCount);
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
+        assert_(crop.size);
         int3 min=crop.min, size=crop.size;
         string path = args.at("path"_);
         Volume16& target = outputs.first();

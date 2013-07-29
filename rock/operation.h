@@ -2,7 +2,7 @@
 /// \file operation.h Abstract interface for operations run by a process manager
 #include "result.h"
 
-/// Single method abstract class to allow high-level Operations to query arbitrary results
+/// Abstract class to allow high-level Operations to query arbitrary results
 struct ResultManager {
     /// Gets result from cache or computes if necessary
     virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;

@@ -44,14 +44,15 @@ CropVolume alignCrop(int3 min, int3 max, int3 minimalMargin) {
 }
 
 /// Parses volume to crop from user arguments
-CropVolume parseCrop(const Dict& args, int3 min, int3 max, int3 extra, int3 minimalMargin) {
+CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extra, int3 minimalMargin) {
+    int3 min=sourceMin, max=sourceMax;
     if(args.contains("cylinder"_)) {
         Cylinder cylinder = parseCylinder(args.at("cylinder"_), (min+max)/2, extra);
         min = cylinder.min, max=cylinder.max;
     }
     if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
     CropVolume crop = alignCrop(min, max, minimalMargin);
-    assert_(int3(0)<=min && min<=crop.min && crop.min<crop.max && crop.max<=max, min, crop.min, crop.max, max);
+    assert_(int3(0)<=sourceMin && sourceMin<=crop.min && crop.min<crop.max && crop.max<=sourceMax, min, crop.min, crop.max, sourceMax);
     return crop;
 }
 

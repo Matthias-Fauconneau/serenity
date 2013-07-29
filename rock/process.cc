@@ -215,18 +215,34 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
     assert_(!results);
     array<string> targets = Process::configure(allArguments, definition);
     if(specialArguments.contains("storageFolder"_)) storageFolder = Folder(specialArguments.at("storageFolder"_),currentWorkingDirectory());
-    if(specialArguments.contains("indirect"_)) { ResultFile::indirectID=1; log("Storing metadata in auxiliary files (instead of file names)"); }
-    for(const String& fileID: storageFolder.list(Files|Folders|Sorted)) {
+    if(specialArguments.contains("indirect"_)) {
+        log("Storing metadata in auxiliary files (instead of file names)");
+        ResultFile::indirectID=1;
+        for(const String& file: storageFolder.list(Files|Folders|Sorted)) { // Starts from the highest ID to avoid collisions with previous runs
+            TextData s(file); ResultFile::indirectID=max(ResultFile::indirectID,s.mayInteger()+1);
+        }
+    }
+    for(const String& file: storageFolder.list(Files|Folders|Sorted)) {
         String id; String dataFile;
         if(ResultFile::indirectID) {
-            if(endsWith(fileID,"data"_)) {
-                if(!existsFile(fileID+".meta"_, storageFolder)) remove(fileID, storageFolder); //Missing metadata
-                continue; // Load from metadata
+            if(!endsWith(file,".data"_) && !endsWith(file,".meta"_)) { warn("Neither data nor metadata", file);  remove(file, storageFolder); continue; }
+            string fileID = file.slice(0,file.size-".data"_.size);
+            dataFile=fileID+".data"_;
+            if(!existsFile(fileID+".meta"_, storageFolder)) {
+                warn("Missing metadata", fileID);
+                if(existsFolder(dataFile,storageFolder)) {
+                    for(const string& file: Folder(dataFile,storageFolder).list(Files)) ::remove(file,Folder(dataFile,storageFolder));
+                    ::removeFolder(dataFile, storageFolder);
+                } else ::remove(dataFile, storageFolder);
+                continue;
             }
-            if(endsWith(fileID,"meta"_)) { remove(fileID, storageFolder); continue; } // Neither data nor metadata
-            if(!existsFile(fileID+".data"_, storageFolder)) { remove(fileID, storageFolder); continue; } // Missing data
-            id=readFile(fileID+".meta"_), dataFile=fileID+".data"_;
-        } else id=copy(fileID), dataFile=copy(fileID);
+            if(!existsFile(fileID+".data"_, storageFolder)) { remove(file, storageFolder); continue; }
+            if(!endsWith(file,"meta"_)) continue; // Skips load when listing data file to load once listing the metadata file
+            id=readFile(fileID+".meta"_, storageFolder);
+        } else {
+            id=copy(file);
+            dataFile=copy(file);
+        }
         TextData s (id); string name = s.whileNot('{');
         if(id==name || !&ruleForOutput(name, arguments)) { // Removes invalid data
             if(existsFolder(dataFile,storageFolder)) {
@@ -236,16 +252,17 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
             continue;
         }
         Dict arguments = parseDict(s); s.mayInteger(); s.skip("."_); string metadata = s.untilEnd();
+        shared<ResultFile> result;
         if(!existsFolder(dataFile, storageFolder)) {
             File file = File(dataFile, storageFolder, ReadWrite);
             if(file.size()<pageSize) { // Small file (<4K)
-                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), dataFile, storageFolder.name());
+                result = shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), dataFile, storageFolder.name());
             } else { // Memory-mapped file
-                results << shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), dataFile, storageFolder.name());
+                result = shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), dataFile, storageFolder.name());
             }
         } else { // Folder
             Folder folder (dataFile, storageFolder);
-            shared<ResultFile> result(name, folder.modifiedTime(), move(arguments), String(metadata), String(), dataFile, storageFolder.name());
+            result = shared<ResultFile>(name, folder.modifiedTime(), move(arguments), String(metadata), String(), dataFile, storageFolder.name());
             for(const String& dataFile: folder.list(Files|Sorted)) {
                 string key = section(dataFile,'.',0,1), metadata=section(dataFile,'.',1,-1);
                 assert_(metadata == result->metadata);
@@ -257,9 +274,13 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
                     result->elements.insert(String(key), buffer<byte>(result->maps.last()));
                 }
             }
-            if(ResultFile::indirectID) rename(fileID, str(result->fileID)+".meta"_, storageFolder);
-            results << move(result);
         }
+        if(ResultFile::indirectID && file!=str(result->fileID)+".meta"_) { // Remap IDs for this run
+            rename(file, str(result->fileID)+".meta"_, storageFolder);
+            rename(dataFile, str(result->fileID)+".data"_, storageFolder);
+        }
+        assert_(existsFile(result->dataFile(),storageFolder));
+        results << move(result);
     }
     return move(targets);
 }
@@ -302,19 +323,24 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
 void PersistentProcess::compute(const string& operationName, const ref<shared<Result>>& inputs, const ref<string>& outputNames,
                                 const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) {
-    for(const shared<Result>& input: inputs) { // Updates last access time for correct LRU cache behavior
-        ResultFile& result = *(ResultFile*)input.pointer;
-        if(result.id) touchFile(result.dataFile(), result.folder, false);
-    }
-
     unique<Operation> operation = Interface<Operation>::instance(operationName);
 
+    // Updates inputs last access time for correct LRU cache behavior
+    for(const shared<Result>& input: inputs) {
+        ResultFile& result = *(ResultFile*)input.pointer;
+        if(result.id) {
+            assert_(existsFile(result.dataFile(),storageFolder), result.dataFile());
+            touchFile(result.dataFile(), result.folder, false);
+        }
+    }
+
+    // Allocates outputs
     array<shared<Result>> outputs;
     for(uint index: range(outputNames.size)) {
         const string& output = outputNames[index];
         int64 outputSize = operation->outputSize(localArguments, cast<Result*>(inputs), index);
         if(outputSize==-1) { // Prevents process from allocating any output Result (used for Operation using custom rules (own compute call), use outputs to pass output names
-            outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), String(), ""_/*No ID*/, ""_);
+            outputs << shared<ResultFile>(output, 0, Dict(), String(), String(), ""_, ""_);
             continue;
         }
 
@@ -364,13 +390,15 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
     }
     assert_(outputs);
 
+    // Executes operation
     Time time;
     Dict args = copy(arguments);
     for(auto arg: relevantArguments) if(args.contains(arg.key)) args.at(arg.key)=copy(arg.value); else args.insert(copy(arg.key), copy(arg.value));
-    Interface<Operation>::instance(operationName)->execute(args, localArguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
+    operation->execute(args, localArguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
     if((uint64)time>200) log(operationName, localArguments ? str(localArguments) : ""_, time);
 
-    for(shared<Result>& output : outputs) if(output->name) { // Tool may remove already stored outputs (by an explicit Process::compute use)
+    for(shared<Result>& output : outputs) {
+        if(!output->timestamp) continue; // outputSize==-1: output was computed indirectly using an explicit ResultManager::compute
         shared<ResultFile> result = move(output);
         result->timestamp = realTime();
         result->relevantArguments = copy(relevantArguments);

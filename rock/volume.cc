@@ -112,7 +112,7 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool/* cyli
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;
     if(!normalize && maximum>0x8000) { normalizeFactor=0xFF00; warn("16bit volume truncated to 8bit image slices"); }
-    assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum<0x8000");
+    assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum<=0x8000");
     //uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
          //if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0); continue; }
