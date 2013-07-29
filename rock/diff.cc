@@ -8,7 +8,6 @@ static void diff(Volume24& target, const Volume16& A, const Volume16& B) {
     for(uint z: range(target.sampleCount.z)) for(uint y: range(target.sampleCount.z)) for(uint x: range(target.sampleCount.z)) {
         uint a=A(x,y,z), b=B(x,y,z); uint8 c=a*0xFF/A.maximum;
         target(x,y,z) = a==b ? bgr{c,c,c} : a<b ? bgr{0xFF,0,0} : bgr{0,0,0xFF};
-        //target(x,y,z) = a==b ? bgr{c,0,0} : a<b ? bgr{0,0xFF,0} : bgr{c,c,c};
     }
 }
 class(Diff, Operation), virtual VolumeOperation {
