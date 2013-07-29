@@ -15,7 +15,7 @@ struct Rule {
 template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rule.operation,rule.inputs); }
 
 /// Manages a process defined a direct acyclic graph of production rules
-struct Process {
+struct Process : ResultManager {
 
     /// Configures process using given arguments and definition (which can depends on the arguments)
     virtual array<string> configure(const ref<string>& allArguments, const string& definition);
@@ -41,12 +41,6 @@ struct Process {
     /// Converts matching scoped arguments to local arguments for execution
     Dict localArguments(const string& target, const Dict& scopeArguments);
 
-    /// Gets result from cache or computes if necessary
-    virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;
-
-    /// Computes result of an operation
-    virtual void compute(const string& operation, const ref<shared<Result>>& inputs, const ref<string>& outputNames, const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) abstract;
-
     array<string> specialParameters; // Valid parameters accepted for derived class special behavior
     Dict arguments; // User-specified arguments
     Dict specialArguments; // User-specified special arguments
@@ -57,16 +51,21 @@ struct Process {
     array<shared<Result>> results; // Generated intermediate (and target) data
 };
 
-/// High level operation with direct access to query new results from process
+/*/// High level operation with direct access to query new results from process
 /// \note as inputs are unknown, results are not regenerated on input changes
 struct Tool {
     /// Returns which parameters affects this operation output
     virtual string parameters() const { return ""_; }
+    /// Returns the desired intermediate data size in bytes for each outputs
+    virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the tool computing data results using process
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs, Process& results) abstract;
+    /// Executes the tool computing data results using process
+    //FIXME: fix Compare and revert full Process access to a single getResult method
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs, Process& results) abstract;
     /// Virtual destructor
     virtual ~Tool() {}
-};
+};*/
 
 /// Mirrors results on a filesystem
 struct ResultFile : Result {

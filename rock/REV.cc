@@ -1,13 +1,12 @@
-#include "process.h"
 #include "volume-operation.h"
 #include "sample.h"
 
 /// Returns relative deviation versus cylinder radius of 8 volume samples
-class(REV, Tool) {
+class(REV, Operation) {
     string parameters() const override { return "path"_; }
-    void execute(const Dict& arguments, const ref<Result*>& outputs, const ref<Result*>&, Process& process) override {
-        real resolution = parseScalar(process.getResult("resolution"_, arguments)->data);
-        Volume input = toVolume(process.getResult("maximum"_, arguments));
+    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
+        real resolution = parseScalar(results.getResult("resolution"_, arguments)->data);
+        Volume input = toVolume(results.getResult("maximum"_, arguments));
         int margin = max(max(input.margin.x, input.margin.y), input.margin.z), size=min(min(input.sampleCount.x, input.sampleCount.y), input.sampleCount.z)-2*margin;
         map<String, buffer<byte>> PSD_R;
         map<real, array<UniformSample>> PSD_octants;
@@ -21,7 +20,7 @@ class(REV, Tool) {
                 int3 center = input.sampleCount/2 + (size/4) * octant;
                 Dict args = copy(arguments);
                 args.insert(String("histogram.cylinder"_), str((int[]){center.x, center.y, radius, center.z-radius, center.z+radius},','));
-                shared<Result> result = process.getResult("volume-distribution-radius"_, args); // Pore size distribution (values are volume in voxels)
+                shared<Result> result = results.getResult("volume-distribution-radius"_, args); // Pore size distribution (values are volume in voxels)
                 nonUniformSamples << parseNonUniformSample( result->data );
             }
             array<UniformSample> samples = resample(nonUniformSamples);

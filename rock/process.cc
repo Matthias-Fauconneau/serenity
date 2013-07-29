@@ -10,10 +10,7 @@ uint ResultFile::indirectID = 0;
 array<string> Rule::parameters() const {
     array<string> parameters;
     if(condition.parameter) parameters << condition.parameter;
-    if(operation && Interface<Operation>::factories.contains(this->operation))
-        parameters += split(Interface<Operation>::instance(this->operation)->parameters());
-    if(operation && Interface<Tool>::factories.contains(this->operation))
-        parameters += split(Interface<Tool>::instance(this->operation)->parameters());
+    if(operation) parameters += split(Interface<Operation>::instance(this->operation)->parameters());
     return parameters;
 }
 
@@ -60,7 +57,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         } else {
             string word = s.identifier("_-"_);
             assert_(word, "Expected operator or input for", outputs);
-            if(!Interface<Operation>::factories.contains(word) && !Interface<Tool>::factories.contains(word)) rule.inputs << word; // Forwarding rule
+            if(!Interface<Operation>::factories.contains(word)) rule.inputs << word; // Forwarding rule
             else rule.operation = word; // Generating rule
             s.whileAny(" \t"_);
             for(;!s.match('\n'); s.whileAny(" \t"_)) {
@@ -207,10 +204,10 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
     for(const string& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
         if(!sameSince(input, queryTime, arguments)) return false;
     }
-    if(rule.operation) { // Implementation changed since query
-        if(Interface<Operation>::factories.contains(rule.operation) && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false;
-        if(Interface<Tool>::factories.contains(rule.operation) && parse(Interface<Tool>::version(rule.operation))*1000000000l > queryTime) return false;
-    }
+    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
+    /*if(Interface<Tool>::factories.contains(rule.operation)) { // Let high level operations reports its custom input for correct cache behavior
+        for(Interface<Tool>::instance(rule.operation)->inputs()
+    }*/
     return true;
 }
 
@@ -310,11 +307,16 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
         if(result.id) touchFile(result.dataFile(), result.folder, false);
     }
 
-    unique<Operation> operation = Interface<Operation>::factories.contains(operationName) ? Interface<Operation>::instance(operationName) : nullptr;
+    unique<Operation> operation = Interface<Operation>::instance(operationName);
 
     array<shared<Result>> outputs;
     for(uint index: range(outputNames.size)) {
         const string& output = outputNames[index];
+        int64 outputSize = operation->outputSize(localArguments, cast<Result*>(inputs), index);
+        if(outputSize==-1) { // Prevents process from allocating any output Result (used for Operation using custom rules (own compute call), use outputs to pass output names
+            outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), String(), ""_/*No ID*/, ""_);
+            continue;
+        }
 
         String outputFileID = ResultFile::indirectID ? str(ResultFile::indirectID)+".data"_ : String(output); //FIXME: should be transparent
 
@@ -325,8 +327,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
         }
 
         Map map;
-        int64 outputSize = operation ? operation->outputSize(localArguments, cast<Result*>(inputs), index) : 0;
-        if(outputSize) { // Creates (or resizes) and maps an output result file
+        if(outputSize>0) { // Creates (or resizes) and maps an output result file
             while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + freeSpace(storageFolder)) {
                 long minimum=realTime(); String oldest;
                 for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
@@ -364,12 +365,9 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
     assert_(outputs);
 
     Time time;
-    if(operation) operation->execute(localArguments, cast<Result*>(outputs), cast<Result*>(inputs));
-    else {
-        Dict args = copy(arguments);
-        for(auto arg: relevantArguments) if(args.contains(arg.key)) args.at(arg.key)=copy(arg.value); else args.insert(copy(arg.key), copy(arg.value));
-        Interface<Tool>::instance(operationName)->execute(args, cast<Result*>(outputs), cast<Result*>(inputs), *this);
-    }
+    Dict args = copy(arguments);
+    for(auto arg: relevantArguments) if(args.contains(arg.key)) args.at(arg.key)=copy(arg.value); else args.insert(copy(arg.key), copy(arg.value));
+    Interface<Operation>::instance(operationName)->execute(args, localArguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
     if((uint64)time>200) log(operationName, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) if(output->name) { // Tool may remove already stored outputs (by an explicit Process::compute use)

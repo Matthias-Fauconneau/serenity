@@ -2,6 +2,14 @@
 /// \file operation.h Abstract interface for operations run by a process manager
 #include "result.h"
 
+/// Single method abstract class to allow high-level Operations to query arbitrary results
+struct ResultManager {
+    /// Gets result from cache or computes if necessary
+    virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;
+    /// Computes result of an operation
+    virtual void compute(const string& operation, const ref<shared<Result>>& inputs, const ref<string>& outputNames, const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) abstract;
+};
+
  /// Executes an operation using inputs to compute outputs (of given sample sizes)
 struct Operation {
     /// Returns which parameters affects this operation output
@@ -9,7 +17,9 @@ struct Operation {
     /// Returns the desired intermediate data size in bytes for each outputs
     virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) abstract;
+    virtual void execute(const Dict& args unused, const ref<Result*>& outputs unused, const ref<Result*>& inputs unused) { error("Neither execute methods implemented"); }
+    /// Executes the operation using inputs and or any results to compute outputs
+    virtual void execute(const Dict& args unused, const Dict& localArgs, const ref<Result*>& outputs, const ref<Result*>& inputs, ResultManager& results unused) { execute(localArgs,outputs,inputs); }
     /// Virtual destructor
     virtual ~Operation() {}
 };

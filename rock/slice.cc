@@ -44,6 +44,7 @@ int2 SliceView::sizeHint() {
     assert_(volumes);
     const Volume& volume = volumes[currentIndex];
     int2 size = (volume.sampleCount-2*volume.margin).xy();
+    while(size<int2(512)) size*=2;
     return renderVolume ? 1024 : int2(align(4,size.x),align(4,size.y));
 }
 

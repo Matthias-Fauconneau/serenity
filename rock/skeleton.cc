@@ -13,7 +13,7 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
     float norm = sqrt(float(sqDistance));
     // Prune using all methods (as rasterization is the bottleneck)
     if( sqNorm > minimalSqDiameter &&  // Constant pruning: feature point far enough apart (may filter small features)
-         sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 53° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
+         //sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 53° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
          sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
             ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
@@ -24,7 +24,7 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
 
 /// Computes integer medial axis
 void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter) {
-    assert_(minimalSqDiameter>=3);
+    //assert_(minimalSqDiameter>=3);
     const short3* const positionData = position;
     uint16* const targetData = target;
     clear(targetData, target.size());
@@ -55,5 +55,5 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
 class(Skeleton, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { integerMedialAxis(outputs[0],inputs[0], 3); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { integerMedialAxis(outputs[0],inputs[0], /*3*/1); }
 };

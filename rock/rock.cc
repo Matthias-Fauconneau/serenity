@@ -49,7 +49,6 @@ struct Rock : virtual PersistentProcess {
 #endif
         if(specialArguments.contains("dump"_)) {
             log("Binary built on " __DATE__ " " __TIME__ " (" BUILD ")");
-            log("Tools:",Interface<Tool>::factories.keys);
             log("Operations:",Interface<Operation>::factories.keys);
             log("Results:",resultNames);
             log("Targets:",targets);
