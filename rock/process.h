@@ -78,6 +78,7 @@ struct ResultFile : Result {
         rename( name+"{"_+toASCII(relevantArguments)+"}"_+(userCount?str(userCount):String())+"."_+metadata );
     }
     void rename(const string& newID) {
+        assert_(!endsWith(newID,"data"_));
         if(id!=newID) {
             if(indirectID) writeFile(str(fileID)+".meta"_, newID, Folder(folder));
             else ::rename(id, newID, Folder(folder));

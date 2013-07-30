@@ -225,7 +225,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
     for(const String& file: storageFolder.list(Files|Folders|Sorted)) {
         String id; String dataFile;
         if(ResultFile::indirectID) {
-            if(!endsWith(file,".data"_) && !endsWith(file,".meta"_)) { warn("Neither data nor metadata", file);  remove(file, storageFolder); continue; }
+            if(!endsWith(file,".data"_) && !endsWith(file,".meta"_)) { remove(file, storageFolder); continue; }
             string fileID = file.slice(0,file.size-".data"_.size);
             dataFile=fileID+".data"_;
             if(!existsFile(fileID+".meta"_, storageFolder)) {
@@ -348,37 +348,43 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
 
         if(&find(output, arguments)) { // Reuses same result file
             shared<ResultFile> result = results.take(indexOf(output, arguments));
-            result->rename(outputFileID);
+            result->rename(output);
             result->id.clear(); // Reference count update would rewrite metadata
         }
 
         Map map;
         if(outputSize>0) { // Creates (or resizes) and maps an output result file
-            while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + freeSpace(storageFolder)) {
-                long minimum=realTime(); String oldest;
-                for(String& path: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
-                    TextData s (path); s.whileNot('{'); parseDict(s); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
-                    if(File(path, storageFolder).size() < 2<<20) continue; // Small files won't release much capacity
-                    if(!(File(path, storageFolder).stat().st_mode&S_IWUSR)) continue; // Locked file
-                    long timestamp = File(path, storageFolder).accessTime();
-                    if(timestamp < minimum) minimum=timestamp, oldest=move(path);
+            //while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + max(int64(0), (2<<30)-(capacity(storageFolder)-available(storageFolder)))) {
+            while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + available(storageFolder)) {
+                long minimum=realTime(); String oldestMeta, oldestData;
+                for(String& file: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
+                    if(ResultFile::indirectID && !endsWith(file,".meta"_)) continue;
+                    string fileID = file.slice(0,file.size-".meta"_.size);
+                    String dataFile = ResultFile::indirectID ? fileID+".data"_ : copy(file);
+                    if(ResultFile::indirectID && !existsFile(dataFile,storageFolder)) { remove(file,storageFolder); continue; } // Data already removed (removes metadata file)
+                    String id = ResultFile::indirectID ? readFile(file, storageFolder) : copy(file);
+                    TextData s(id); s.whileNot('{'); if(!s) continue; parseDict(s); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
+                    if(File(dataFile, storageFolder).size() < 2<<20) continue; // Small files won't release much capacity
+                    if(!(File(dataFile, storageFolder).stat().st_mode&S_IWUSR)) continue; // Locked file
+                    long timestamp = File(dataFile, storageFolder).accessTime();
+                    if(timestamp < minimum) minimum=timestamp, oldestMeta=move(id), oldestData=move(dataFile);
                 }
-                if(!oldest) { if(outputSize<=6l<<30) error("Not enough space available for",output," need"_,outputSize,"B, only",freeSpace(storageFolder),"B available on",storageFolder.name()); else break; /*Virtual*/ }
-                TextData s (oldest); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
+                if(!oldestMeta) { if(outputSize<=6l<<30) error("Not enough space available for",output," need"_,outputSize,"B, only",available(storageFolder),"B available on",storageFolder.name()); else break; /*Virtual*/ }
+                TextData s (oldestMeta); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->id.clear(); // Prevents rename
                     break;
                 }
-                if(!existsFile(oldest, storageFolder) || outputSize > File(oldest,storageFolder).size() + freeSpace(storageFolder)) { // Removes if not a file or need to recycle more than one file
-                    if(existsFile(oldest, storageFolder)) ::remove(oldest, storageFolder);
+                if(!existsFile(oldestData, storageFolder) || outputSize > File(oldestData,storageFolder).size() + available(storageFolder)) { // Removes if not a file or need to recycle more than one file
+                    if(existsFile(oldestData, storageFolder)) ::remove(oldestData, storageFolder);
                     else { // Array output (folder)
-                        Folder folder(oldest, storageFolder);
-                        for(const String& path: folder.list(Files)) ::remove(path, folder);
+                        Folder folder(oldestData, storageFolder);
+                        for(const String& file: folder.list(Files)) ::remove(file, folder);
                         remove(folder);
                     }
                     continue;
                 }
-                ::rename(storageFolder, oldest, storageFolder, outputFileID); // Renames last discarded file instead of removing (avoids page zeroing)
+                ::rename(storageFolder, oldestData, storageFolder, outputFileID); // Renames last discarded file instead of removing (avoids page zeroing)
                 break;
             }
 

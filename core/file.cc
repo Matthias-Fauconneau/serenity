@@ -112,5 +112,8 @@ void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const
     assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
 }
 
-int64 freeSpace(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
-int64 freeSpace(const string& path, const Folder& at) { return freeSpace(File(path,at)); }
+int64 available(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
+int64 available(const string& path, const Folder& at) { return available(File(path,at)); }
+
+int64 capacity(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_blocks*statvfs.f_frsize; }
+int64 capacity(const string& path, const Folder& at) { return capacity(File(path,at)); }

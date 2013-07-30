@@ -46,7 +46,7 @@ class(KernelDensityEstimation, Operation), virtual Pass {
     virtual string parameters() const { return "ignore-clip bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         NonUniformHistogram H = parseNonUniformSample(source.data);
-        if(args.value("ignore-clip"_,"0"_)!="0"_) H.values.first()=H.values.last()=0; // Ignores clipped values
+        if(args.value("ignore-clip"_,"0"_)!="0"_) { log("clip"); H.values.first()=H.values.last()=0; } // Ignores clipped values
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
         bool normalize = args.value("normalize"_,"1"_)!="0"_;
