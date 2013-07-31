@@ -17,7 +17,7 @@ static uint pack(uint bits, uint offset, uint stride=3) { uint packedBits=0; bit
 int3 zOrder(uint index) { return int3(pack(index,0),pack(index,1),pack(index,2)); }
 
 void interleavedLookup(Volume& target) {
-    assert(!target.tiled());
+    if(target.tiled()) return;
     target.offsetX = interleavedLookup(target.sampleCount.x,0);
     target.offsetY = interleavedLookup(target.sampleCount.y,1);
     target.offsetZ = interleavedLookup(target.sampleCount.z,2);

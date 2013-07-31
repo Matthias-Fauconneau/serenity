@@ -103,7 +103,7 @@ array<Rect> Linear::layout(int2 position, int2 size) {
 int2 Grid::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 max(0,0); int2 expanding(1,1);
-    for(uint i: range(count())) { int2 hint=at(i).sizeHint(); max = ::max(max,hint); if(hint.x<0) expanding.x=-1; if(hint.y<0) expanding.y=-1; }
+    for(uint i: range(count())) { int2 hint=at(i).sizeHint(); max = ::max(max,abs(hint)); if(hint.x<0) expanding.x=-1; if(hint.y<0) expanding.y=-1; }
     int2 size = int2(w,h)*(max+margin);
     return int2(expanding.x < 0 ? -::max(1,size.x) : size.x, expanding.y < 0 ? -::max(1,size.y) : size.y);
 }

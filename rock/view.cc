@@ -2,6 +2,7 @@
 #include "text.h"
 #include "interface.h"
 #include "window.h"
+#include "plot.h"
 
 class(TextView, View), virtual Text {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
@@ -26,4 +27,21 @@ class(ImageView, View), virtual ImageWidget {
     int2 sizeHint() override { while(!(image.size()<displaySize)) image=resize(image,image.size()/2); return ImageWidget::sizeHint(); }
     string name() override { return title; }
     String title;
+};
+
+class(PlotView, View), virtual Plot {
+    bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
+        if(!endsWith(metadata,"tsv"_)) return false;
+        string xlabel,ylabel; { TextData s(metadata); ylabel = s.until('('); xlabel = s.until(')'); }
+        string legend=name; string title=legend; bool logx=false,logy=false;
+        {TextData s(data); if(s.match('#')) title=s.until('\n'); if(s.match("#logx\n"_)) logx=true; if(s.match("#logy\n"_)) logy=true; }
+        NonUniformSample dataSet = parseNonUniformSample(data);
+        if(!this->title) this->title=String(title), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->logx=logx, this->logy=logy;
+        if((this->title && this->title!=title) && !(this->xlabel == xlabel && this->ylabel == ylabel && this->logx==logx && this->logy==logy)) return false;
+        assert_(this->xlabel == xlabel && this->ylabel == ylabel && this->logx==logx && this->logy==logy);
+        dataSets << move(dataSet);
+        legends << String(legend);
+        return true;
+    }
+    string name() override { return title; }
 };

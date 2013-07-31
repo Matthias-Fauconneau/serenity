@@ -46,9 +46,9 @@ struct Linear: virtual Layout {
         Left,Top=Left, /// Aligns tightly packed widgets
         Right,Bottom=Right, /// Aligns tightly packed widgets
         Center, /// Aligns tightly packed widgets
-        Even, /// shares space evenly
-        Spread, /// allocates minimum sizes and spreads any extra space between widgets
-        Share,  /// allocates minimum sizes and shares any extra space between expanding widgets
+        Even, /// Shares space evenly
+        Spread, /// Allocates minimum sizes and spreads any extra space between widgets
+        Share, /// Allocates minimum sizes and shares any extra space between expanding widgets
         AlignLeft,AlignTop=AlignLeft, /// For side axis, sets all widgets side size to maximum needed and aligns left/top
         AlignRight,AlignBottom=AlignRight, /// For side axis, sets all widgets side size to maximum needed and aligns right/bottom
         AlignCenter, /// For side axis, sets all widgets side size to largest hint (or total available if any widget is expanding) and centers

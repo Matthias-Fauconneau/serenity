@@ -42,7 +42,7 @@ class(Otsu, Operation) {
             interclassVariance[t] = variance;
         }
         float densityThreshold = float(threshold) / float(density.size-1);
-        output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(densityThreshold);});
+        output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(threshold);});
         output(outputs, "otsu-parameters"_, "map"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
                     "threshold16 "_+dec(threshold)+"\n"_
