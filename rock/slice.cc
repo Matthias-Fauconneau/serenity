@@ -1,4 +1,4 @@
-/// \file slice.cc Displays volume as slices
+/// \file slice.cc Displays volume as slices (or 3D visualization)
 #include "slice.h"
 #include "volume-operation.h"
 #include "display.h"
@@ -11,7 +11,7 @@ bool SliceView::view(const string& metadata, const string& name, const buffer<by
     if(volume.sampleSize<1 || volume.sampleSize>6) return false;
     names << String(name);
     volumes << move(volume);
-    renderVolume = volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1;
+    //renderVolume = volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1;
     return true;
 }
 
@@ -21,7 +21,7 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     if(button==WheelDown||button==WheelUp) {
         int nextIndex = clip<int>(0,currentIndex+(button==WheelUp?1:-1),volumes.size-1);
         if(nextIndex == currentIndex) return false;
-        currentIndex = nextIndex; //contentChanged();
+        currentIndex = nextIndex;
         if(currentIndex>=2) renderVolume=false;
         return true;
     }
@@ -54,23 +54,11 @@ int2 SliceView::sizeHint() {
 void SliceView::render(int2 position, int2 size) {
     if(renderVolume) {
         assert_(position==int2(0) && size == framebuffer.size());
-        /*shared<Result> empty = getResult("empty"_, arguments);
-        shared<Result> density = getResult("density"_, arguments);
-        shared<Result> intensity = getResult("intensity"_, arguments);*/
         mat3 view;
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
-#if PROFILE
-        Time time;
-#endif
         assert_(volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1);
         ::render(framebuffer, volumes[0], volumes[1], view);
-        //::render(framebuffer, toVolume(empty), toVolume(density), toVolume(intensity), view);
-#if PROFILE
-        log((uint64)time,"ms");
-        window->render(); // Force continuous updates (even when nothing changed)
-        wait.reset();
-#endif
     } else {
         Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
         while(2*image.size()<=size) image=upsample(image);

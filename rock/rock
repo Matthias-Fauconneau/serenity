@@ -65,7 +65,7 @@ if crop.cylinder: crop = Crop pruned
 if !crop.cylinder: crop = pruned
 
 # Floodfills skeleton
-unconnected = Binary crop threshold=1 mask=0
+unconnected = Binary crop threshold=1
 connected-bottom = FloodFill unconnected minimalSqRadius seed=001000 # Keeps pore space connected to bottom face
 connected-top = FloodFill unconnected minimalSqRadius seed=000001 # Keeps pore space connected to top face
 connected-both = Intersect connected-bottom connected-top # Keeps pore space connected to both face
@@ -111,10 +111,10 @@ distribution-radius = Div volume-distribution-radius volume-total
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
- maximum-mask = Binary maximum threshold threshold=1 cylinder=source.cylinder mask=0
+ maximum-mask = Binary maximum threshold threshold=1
  denoised-connected = Mask denoised-tiled maximum-mask
- cdl = ToCDL sqrt-scaled
- ascii = ToASCII sqrt-scaled
+ pore = Not rock
+ flood = Add pore maximum-mask
  # Exports to PNG (normalized and gamma-compressed for visualization)
   png-source = ToPNG source
   png-density = ToPNG denoised
@@ -133,6 +133,14 @@ distribution-radius = Div volume-distribution-radius volume-total
  # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected
+ # Exports to CDL
+  cdl-flood = ToCDL flood
+  cdl-maximum = ToCDL sqrt-scaled
+  cdl = cdl-maximum
+ # Exports to ASCII
+  ascii-flood = ToASCII flood
+  ascii-maximum = ToASCII sqrt-scaled
+  ascii = ascii-maximum
 
 # Tools
  ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV

@@ -5,6 +5,27 @@
 #include "bmp.h"
 #include "tiff.h"
 
+/// Negates volume (when source = 0, target is 1; when source > 0, target = 0)
+static void negate(Volume8& target, const Volume8& source) {
+    const uint8* const sourceData = source; uint8* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = !sourceData[index];
+    target.maximum=1;
+}
+defineVolumePass(Not, uint8, negate);
+
+/// Adds two volumes
+static void add(Volume8& target, const Volume8& A, const Volume8& B) {
+    const uint8* const aData = A; const uint8* const bData = B; uint8* const targetData = target;
+    for(uint index: range(target.size())) targetData[index] = aData[index] + bData[index];
+    target.maximum= A.maximum + B.maximum;
+}
+class(Add, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint8); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        add(outputs[0], inputs[0], inputs[1]);
+    }
+};
+
 /// Square roots all values
 void squareRoot(VolumeFloat& target, const Volume16& source) {
     assert_(source.squared);
