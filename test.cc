@@ -22,7 +22,7 @@ struct Cell {
 };
 
 struct Test : Widget {
-    int2 gridSize{33,1};
+    int2 gridSize{33,33};
     Grid<Cell> source{gridSize};
     Grid<Cell> target{gridSize};
 
@@ -39,7 +39,7 @@ struct Test : Widget {
     const real eta = rho * nu; // Dynamic viscosity: η[water] [Pa·s=kg/(m·s)]
     const vec2 g = vec2(0,9.8); // Body Force: Earth gravity pull [m/s²]
 
-    const real v = 7e-5; // Channel peak speed: v [m/s]
+    const real v = 70e-6; // Channel peak speed: v [m/s]
     const real R = sqrt(2*v*eta/(rho*g.y)); // Channel diameter: D [m]
     const real dx = 2*R/(gridSize.x-1+2);
 
@@ -94,7 +94,6 @@ struct Test : Widget {
                     const real BGK = (1-alpha)*phi + alpha*phieq; //BGK relaxation
                     const vec2 k = rho * ( 1/sqrt(e) * (v-u) + dotvu/sqrt(cb(e)) * v );
                     const real body = dt/sqrt(e)*(1-dt/tau)*dot(k,g); // External body force
-                    assert(BGK + body >= 0, BGK, body);
                     target(x,y)(dx,dy) = BGK + body;
                 }
             }
@@ -138,13 +137,10 @@ struct Test : Widget {
                 }
                 numeric.insert(x*dx*1e6, u.y*1e6);
                 const real dxP = rho * g.y * dx / dx;
-                const real R = (gridSize.x-1+d) * dx / 2;
-                const real d = 0;
-                const real r = abs((gridSize.x-1+d)/2 - (x+d/2)) * dx;
+                const real R = (gridSize.x+0.5) / 2 * dx;
+                const real r = abs((gridSize.x+0.5)/2 - (x+1.5/2)) * dx;
                 const real v = 1/(2*eta) * dxP * (sq(R)-sq(r)); // v = -1/(Cη)·dxP·(R²-r²) (Poiseuille equation (channel: C=2, cylinder: C=4))
-                //const real v = 2/(3*eta) * dxP * (sq(R)-sq(r)); // FIXME: numeric fits with C~2/3 ?!
                 analytic.insert(x*dx*1e6, v*1e6);
-                if(x==(gridSize.x-1)/2) log(u.y/v, v/u.y);
             }
         }
         Plot plot;
