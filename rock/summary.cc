@@ -22,7 +22,7 @@ class(Summary, Operation) {
         UniformGrid<Item> slices;
         int scale=0;
         args.insert(String("z"_),0.5);
-        for(auto target: map<string, string>({"png-denoised"_, "png-pore"_, "png-skeleton"_, "png-maximum"_},{"Density"_,"Pore"_,"Skeleton"_,"Maximum"_})) {
+        for(auto target: map<string, string>({"png-denoised"_, "png-background"_, "png-skeleton"_, "png-maximum"_},{"Density"_,"Pore"_,"Skeleton"_,"Maximum"_})) {
             shared<Result> result = results.getResult(target.key, args);
             Image slice = decodeImage(result->data);
             assert_(slice);

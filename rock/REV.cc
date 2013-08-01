@@ -11,7 +11,7 @@ class(REV, Operation) {
         map<String, buffer<byte>> PSD_R;
         map<real, array<UniformSample>> PSD_octants;
         NonUniformSample relativeDeviations[3];
-        const real start=6, ratio = (start+1)/start;
+        const real start=8, ratio = (start+1)/start;
         const int3 octants[] = {int3{-1,-1,-1},int3{1,-1,-1},int3{-1,1,-1},int3{1,1,-1},int3{-1,-1,1},int3{1,-1,1},int3{-1,1,1},int3{1,1,1}};
         int i=0; for(real r=start; round(r)<size/4; r*=ratio, i++) {
             int radius = int(round(r));

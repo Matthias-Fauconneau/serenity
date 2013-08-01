@@ -225,18 +225,11 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
     for(const String& file: storageFolder.list(Files|Folders|Sorted)) {
         String id; String dataFile;
         if(ResultFile::indirectID) {
-            if(!endsWith(file,".data"_) && !endsWith(file,".meta"_)) { remove(file, storageFolder); continue; }
+            if(!endsWith(file,".data"_) && !endsWith(file,".meta"_)) { removeFileOrFolder(file, storageFolder); continue; }
             string fileID = file.slice(0,file.size-".data"_.size);
             dataFile=fileID+".data"_;
-            if(!existsFile(fileID+".meta"_, storageFolder)) {
-                warn("Missing metadata", fileID);
-                if(existsFolder(dataFile,storageFolder)) {
-                    for(const string& file: Folder(dataFile,storageFolder).list(Files)) ::remove(file,Folder(dataFile,storageFolder));
-                    ::removeFolder(dataFile, storageFolder);
-                } else ::remove(dataFile, storageFolder);
-                continue;
-            }
-            if(!existsFile(fileID+".data"_, storageFolder)) { remove(file, storageFolder); continue; }
+            if(!existsFile(fileID+".meta"_, storageFolder)) { warn("Missing metadata", fileID); removeFileOrFolder(dataFile,storageFolder); continue; }
+            if(!existsFile(fileID+".data"_, storageFolder)) { removeFileOrFolder(file,storageFolder); continue; }
             if(!endsWith(file,"meta"_)) continue; // Skips load when listing data file to load once listing the metadata file
             id=readFile(fileID+".meta"_, storageFolder);
         } else {
@@ -244,13 +237,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
             dataFile=copy(file);
         }
         TextData s (id); string name = s.whileNot('{');
-        if(id==name || !&ruleForOutput(name, arguments)) { // Removes invalid data
-            if(existsFolder(dataFile,storageFolder)) {
-                for(const string& file: Folder(dataFile,storageFolder).list(Files)) ::remove(file,Folder(dataFile,storageFolder));
-                ::removeFolder(dataFile, storageFolder);
-            } else ::remove(dataFile, storageFolder);
-            continue;
-        }
+        if(id==name || !&ruleForOutput(name, arguments)) { removeFileOrFolder(dataFile,storageFolder); continue; } // Removes invalid data
         Dict arguments = parseDict(s); s.mayInteger(); s.skip("."_); string metadata = s.untilEnd();
         shared<ResultFile> result;
         if(!existsFolder(dataFile, storageFolder)) {

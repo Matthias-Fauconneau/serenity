@@ -101,11 +101,14 @@ mean-radius = HistogramMean histogram-radius
 
 # Computes kernel density estimation from radii histogram (i.e. pore size distribution)
 volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=0.5 normalize=0
-# Normalizes probability density on total volume (including background (i.e not the same as probability density normalization))
+# Normalizes probability density on total volume (including background (i.e not the same as probability density normalization (area=porosity))
 distribution-radius = Div volume-distribution-radius volume-total
+# Normalizes probability density on pore volume (excluding background (i.e probability density normalization (area=1))
+distribution-radius-normalized = Div volume-distribution-radius volume
 # Scales radius (e.g to original pixel or physical resolution)
  volume-distribution-radius-scaled = ScaleDistribution volume-distribution-radius process-resolution
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
+ distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
 
 # Export
  sqrt = SquareRoot maximum
@@ -119,12 +122,14 @@ distribution-radius = Div volume-distribution-radius volume-total
  pore-not-flood = Intersect pore not-flood
  # Exports to PNG (normalized and gamma-compressed for visualization)
   png-source = ToPNG source
-  png-density = ToPNG denoised
-  png-colored = ToPNG colorize
+  png-denoised = ToPNG denoised
+  png-colored = ToPNG colored
   png-background = ToPNG background
   png-distance = ToPNG distance invert=1
   png-skeleton = ToPNG connected invert=1 binary=1
   png-maximum = ToPNG maximum invert=1
+  png-flood = ToPNG flood
+  png-denoised-connected = ToPNG denoised-connected
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised
@@ -132,7 +137,8 @@ distribution-radius = Div volume-distribution-radius volume-total
   bmp-skeleton = ToBMP skeleton
   bmp-maximum = ToBMP maximum
   bmp-denoised-connected = ToBMP denoised-connected
-  bmp-pore-not-flood = ToBMP pore-not-flood
+  pore-not-flood8 = Normalize8 pore-not-flood
+  bmp-pore-not-flood = ToBMP pore-not-flood8
  # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected
