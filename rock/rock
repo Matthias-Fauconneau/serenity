@@ -78,7 +78,7 @@ if connect-pore=='top': connected = connected-top
 if connect-pore=='1': connected = connected-both
 
 # Rasterizes skeleton voxel as maximum spheres
-connected-skeleton = Mask skeleton-tiled connected invert=1 value=0
+connected-skeleton = Mask crop connected invert=1 value=0
 sphere-bins = Bin connected-skeleton
 maximum = Rasterize sphere-bins
 
@@ -113,8 +113,10 @@ distribution-radius = Div volume-distribution-radius volume-total
  denoised-tiled = ZOrder denoised
  maximum-mask = Binary maximum threshold threshold=1
  denoised-connected = Mask denoised-tiled maximum-mask
- pore = Not rock
+ pore = Negate rock
  flood = Add pore maximum-mask
+ not-flood = Negate maximum-mask
+ pore-not-flood = Intersect pore not-flood
  # Exports to PNG (normalized and gamma-compressed for visualization)
   png-source = ToPNG source
   png-density = ToPNG denoised
@@ -130,6 +132,7 @@ distribution-radius = Div volume-distribution-radius volume-total
   bmp-skeleton = ToBMP skeleton
   bmp-maximum = ToBMP maximum
   bmp-denoised-connected = ToBMP denoised-connected
+  bmp-pore-not-flood = ToBMP pore-not-flood
  # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected
@@ -145,6 +148,7 @@ distribution-radius = Div volume-distribution-radius volume-total
 # Tools
  ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV
  critical-radius unconnected(λ) connected(λ) = Prune
+ P(Sw) = Prune connect-pore=top
  slices plots summary = Summary
  compare = Compare
- P(Sw) = Prune connect-pore=top
+ sweep = Sweep

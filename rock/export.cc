@@ -11,7 +11,7 @@ static void negate(Volume8& target, const Volume8& source) {
     for(uint index: range(source.size())) targetData[index] = !sourceData[index];
     target.maximum=1;
 }
-defineVolumePass(Not, uint8, negate);
+defineVolumePass(Negate, uint8, negate);
 
 /// Adds two volumes
 static void add(Volume8& target, const Volume8& A, const Volume8& B) {
@@ -100,7 +100,7 @@ class(Minimum, Operation), virtual VolumeOperation {
 
 /// Sets masked (mask=0) voxels where source is under/over masked value to masked value
 static void mask(Volume16& target, const Volume16& source, const Volume8& mask, uint16 value, bool invert) {
-    assert_(source.size()==mask.size() && target.size() == source.size() && target.tiled() && source.tiled() && mask.tiled());
+    assert_(source.size()==mask.size() && target.size() == source.size() && target.tiled() && source.tiled() && mask.tiled(), source, mask, target, source.sampleCount-2*source.margin, mask.sampleCount-2*mask.margin, target.sampleCount-2*target.margin);
     target.margin = mask.margin;
     const uint8* const maskData = mask; const uint16* const sourceData = source; uint16* const targetData = target;
     if(invert) for(uint index: range(source.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s<value ? s: value; }

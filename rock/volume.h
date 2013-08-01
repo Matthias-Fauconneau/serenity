@@ -57,6 +57,7 @@ generic struct VolumeT : Volume {
 /// Serializes volume format (size, margin, range, layout)
 String volumeFormat(const Volume& volume);
 inline String str(const Volume& volume) { return volumeFormat(volume); }
+generic String str(const VolumeT<T>& volume) { return volumeFormat(volume); }
 /// Parses volume format (i.e sample format)
 bool parseVolumeFormat(Volume& volume, const string& format);
 

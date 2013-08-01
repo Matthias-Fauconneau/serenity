@@ -16,13 +16,13 @@ template<Type T> struct Grid {
 };
 
 struct Cell {
-    real phi[3*3]={};
+    real phi[3*3]={}; // Mass density (kg/m³) for each lattice velocity
     real operator()(uint dx, uint dy) const { assert(dx<3 && dy<3,int(dx),int(dy)); return phi[dy*3+dx]; }
     real& operator()(uint dx, uint dy) { assert(dx<3 && dy<3,int(dx),int(dy)); return phi[dy*3+dx]; }
 };
 
 struct Test : Widget {
-    int2 gridSize{128,128};
+    int2 gridSize{33,1};
     Grid<Cell> source{gridSize};
     Grid<Cell> target{gridSize};
 
@@ -34,25 +34,25 @@ struct Test : Widget {
         window.localShortcut(Escape).connect([]{exit();});
     }
 
-    const real rho = 10e3; // Mass density: ρ[water] [kg/m³]
-    const real nu = 10e-4/*0e-6*/; // Kinematic viscosity: ν[water] [m²/s]
-#if 0
-    const real dt = 1./60; // Time step: display rate [s]
-    const real dx = sqrt(nu*dt); // Spatial step: δx² α νδt [m]
-#else
-    const real dx = (window.size.x/gridSize.x)/3700.; // Spatial step: cell size [px] / display resolution [px/m] [m]
+    const real rho = 1e3; // Mass density: ρ[water] [kg/m³]
+    const real nu = 1e-6; // Kinematic viscosity: ν[water] [m²/s]
+    const real eta = rho * nu; // Dynamic viscosity: η[water] [Pa·s=kg/(m·s)]
+    const vec2 g = vec2(0,9.8); // Body Force: Earth gravity pull [m/s²]
+
+    const real v = 7e-5; // Channel peak speed: v [m/s]
+    const real R = sqrt(2*v*eta/(rho*g.y)); // Channel diameter: D [m]
+    const real dx = 2*R/(gridSize.x-1+2);
+
     const real dt = sq(dx)/nu; // Time step: δx² α νδt [s]
-#endif
     const real c = dx/dt; // Lattice velocity δx/δt [m/s]
-    const real e = sq(c)/3; // Specific internal energy density c = √(3e) [m²/s²]
+    const real e = sq(c)/3; // Lattice internal energy density (e/c² = 1/3 optimize stability) [m²/s²]
     const real tau = nu / e; // Relaxation time: τ [s] = ν [m²/s] / e [m²/s²]
     const real alpha = dt/tau; // Relaxation coefficient: α = δt/τ [1]
-    const vec2 g = vec2(0,9.8); // Body Force: Earth gravity pull [m/s²]
 
     uint64 t = 0;
 
     void initialize() {
-        log("dx=",dx*1000,"mm", "dt=",dt*1000,"ms", "("_+str(1./dt),"Hz)");
+        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs");
         assert(alpha<1, alpha);
         for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
             Cell& cell = source(x,y);
@@ -66,9 +66,8 @@ struct Test : Widget {
     }
 
     void step() {
-        Time time;
+        //Time time;
         // Collision
-        //for(int y: range(gridSize.y)) {
         parallel(gridSize.y, [this](uint, uint y) {
             for(int x: range(gridSize.x)) {
                 const Cell& cell = source(x,y);
@@ -94,22 +93,21 @@ struct Test : Widget {
                     const real phieq = rho * ( 1 + dotvu/e + sq(dotvu)/(2*sq(e)) - sq(u)/(2*e)); // kg/m/s²
                     const real BGK = (1-alpha)*phi + alpha*phieq; //BGK relaxation
                     const vec2 k = rho * ( 1/sqrt(e) * (v-u) + dotvu/sqrt(cb(e)) * v );
-                    const real body = dt/sqrt(e)*dot(k,g); // External body force
+                    const real body = dt/sqrt(e)*(1-dt/tau)*dot(k,g); // External body force
                     assert(BGK + body >= 0, BGK, body);
                     target(x,y)(dx,dy) = BGK + body;
                 }
             }
         });
         // Streaming
-        //for(int y: range(gridSize.y))
         parallel(gridSize.y, [this](uint, uint y) {
             for(int x: range(gridSize.x)) {
                 for(int dy: range(3)) for(int dx: range(3)) {
                     int sx=x-(dx-1), sy=y-(dy-1);
-                    if(sy<0) sy=gridSize.y-1; // Periodic horizontal boundary
-                    if(sy>=gridSize.y) sy=0; // Periodic horizontal boundary
                     int tx=dx-1, ty=dy-1;
-                    if(sx<0 || sx>=gridSize.x) { sx=x, tx=-tx, ty=-ty; } // No slip vertical boundary
+                    if(sx<0 || sx>=gridSize.x) { sx=x, sy=y, tx=-tx, ty=-ty; } // No slip vertical boundary
+                    if(sy<0) sy=gridSize.y-1; // Periodic top horizontal boundary
+                    if(sy>=gridSize.y) sy=0; // Periodic bottom horizontal boundary
                     source(x,y)(dx,dy) = target(sx,sy)(tx+1,ty+1);
                 }
             }
@@ -138,17 +136,19 @@ struct Test : Widget {
                     const real phi = cell(dx,dy);
                     u += w * v * phi / rho;
                 }
-                numeric.insert(x*dx*100, u.y);
-                const real eta = rho * nu;
+                numeric.insert(x*dx*1e6, u.y*1e6);
                 const real dxP = rho * g.y * dx / dx;
-                const real R = gridSize.x * dx / 2;
-                const real r = abs(gridSize.x/2 - x) * dx;
-                const real v = 1/(4*eta) * dxP * (sq(R)-sq(r)); // v = -1/(4η)·dxP·(R²-r²) (Poiseuille equation)
-                analytic.insert(x*dx*100, v);
+                const real R = (gridSize.x-1+d) * dx / 2;
+                const real d = 0;
+                const real r = abs((gridSize.x-1+d)/2 - (x+d/2)) * dx;
+                const real v = 1/(2*eta) * dxP * (sq(R)-sq(r)); // v = -1/(Cη)·dxP·(R²-r²) (Poiseuille equation (channel: C=2, cylinder: C=4))
+                //const real v = 2/(3*eta) * dxP * (sq(R)-sq(r)); // FIXME: numeric fits with C~2/3 ?!
+                analytic.insert(x*dx*1e6, v*1e6);
+                if(x==(gridSize.x-1)/2) log(u.y/v, v/u.y);
             }
         }
         Plot plot;
-        plot.title = str(int(round(t*dt*1000)),"ms"), plot.xlabel=String("x [cm]"_), plot.ylabel=String("v [m/s]"_);
+        plot.title = str(int(round(t*dt*1e6)),"μs"), plot.xlabel=String("x [μm]"_), plot.ylabel=String("v [μm/s]"_);
         plot.legends << String("numeric"_); plot.dataSets << move(numeric);
         plot.legends << String("analytic"_); plot.dataSets << move(analytic);
         plot.render(position, size);

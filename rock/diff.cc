@@ -27,24 +27,31 @@ class(Compare, Operation) {
         string target = arguments.at("target"_), parameter = arguments.at("parameter"_);
         Dict args = copy(arguments);
         args[parameter]=arguments.value("A"_,0);
-        log(args);
         shared<Result> A = results.getResult(target, args);
         args[parameter]=arguments.value("B"_,1);
         shared<Result> B = results.getResult(target, args);
 
-        /*Dict relevantArguments = copy(results.relevantArguments(target, arguments));
-        relevantArguments.insert(String("target"_), String(target));
-        relevantArguments.insert(String("parameter"_), String(parameter));
-        String name = move(outputs[0]->name); // Removes already stored output from this tool's results (FIXME)
-        Result* output = 0;
-        for(const shared<Result>& result: results.results) if(result->name==name && result->relevantArguments==relevantArguments) { output=result.pointer; break; }
-        if(!output) {
-            results.compute("Diff"_, {move(A),move(B)}, {name}, arguments, relevantArguments, Dict());
-            for(const shared<Result>& result: results.results) if(result->name==name && result->relevantArguments==relevantArguments) { output=result.pointer; break; }
-        }
-        assert_(output);
-        output->relevantArguments = results.localArguments(name, arguments);*/
         results.compute("Diff"_, {move(A),move(B)}, {outputs[0]->name}, arguments, localArguments, Dict());
     }
 };
 
+/// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
+class(Sweep, Operation) {
+    string parameters() const override { return "target parameter hold"_; }
+    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& process) override {
+        shared<Result> hold;
+        if(arguments.contains("hold"_)) hold = process.getResult(arguments.at("hold"_), arguments); // Prevents last common ancestor from being recycled (FIXME: automatic?)
+        string target = arguments.at("target"_), parameter = arguments.at("parameter"_);
+        Dict args = copy(arguments);
+        map<String, shared<Result>> results;
+        for(string value: (string[]){"0"_,"1"_}) {
+            args[parameter] = String(value);
+            results.insert(String(value), process.getResult(target, args));
+        }
+        outputElements(outputs, "sweep"_, results.values[0]->metadata, [&]{
+            map<String, buffer<byte>> elements;
+            for(auto result: results) elements.insert(copy(result.key), copy(result.value->data));
+            return elements;
+        });
+    }
+};
