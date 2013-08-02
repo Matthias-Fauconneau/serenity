@@ -4,6 +4,7 @@
 #include "display.h"
 #include "text.h"
 #include "plot.h"
+#include "volume.h"
 
 typedef vector<xyz,double,3> vec3x64; // Double precision vector (FIXME: normalize units and use float)
 #define vec3 vec3x64
@@ -24,11 +25,12 @@ struct Cell {
 };
 
 struct Test : Widget {
-    int3 gridSize = int3(33,33,33);
+    const int3 gridSize = 252;
+    Grid<int> solid{gridSize};
     Grid<Cell> source{gridSize};
     Grid<Cell> target{gridSize};
 
-    Window window{this, int2(1024), "3D Cylinder"_};
+    Window window{this, 2*int2(gridSize.x, gridSize.z), "3D Cylinder"_};
     Test() {
         initialize();
         window.backgroundColor=window.backgroundCenter=1;
@@ -47,9 +49,7 @@ struct Test : Widget {
     const vec3 g = vec3(0,0,9.8); // Body Force: Earth gravity pull [m/s²]
 
     // Physical parameters
-    const real vmax = 70e-6; // Channel peak speed: v [m/s]
-    const real R = sqrt(4*vmax*eta/(rho*g.z)); // Channel diameter: D [m]
-    const real dx = 2*R/(gridSize.x+0.5);
+    const real dx = 2.96e-6; // Spatial resolution [m]
     const real dxP = (rho * g.z * dx) / dx;  // Pressure gradient (~ applied pressure difference / thickness of the medium) (Assumes constant rho (incompressible flow))
 
     // Lattice parameters
@@ -62,7 +62,14 @@ struct Test : Widget {
     uint64 t = 0;
 
     void initialize() {
-        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs");
+        Volume16 volume;
+        parseVolumeFormat(volume, "256x256x128+2+2+2-193-tiled-squared"_);
+        volume.data = readFile("/ptmp/Berea-2960-maximum.256x256x128+2+2+2-193-tiled-squared"_);
+        for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Mirror volume
+            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = /*x<2||y<2||z<2||x>=gridSize.x-2||y>=gridSize.y-2||z>=gridSize.z-2||*/volume(x+2,y+2,z+2)==0 ? 1 : 0;
+        }
+
+        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s");
         assert(alpha<1, alpha);
         for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) {
             w[dz*3*3+dy*3+dx] = W[dx]*W[dy]*W[dz];
@@ -70,7 +77,10 @@ struct Test : Widget {
         }
         for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
             Cell& cell = source(x,y,z);
-            for(int i: range(3*3*3)) cell[i] = rho / cb(3) / w[i];
+            /*if(solid(x,y,z)) for(int i: range(3*3*3)) cell[i] = 0;
+            for(int i: range(3*3*3)) cell[i] = rho / cb(3) / w[i];*/
+            for(int i: range(3*3*3)) cell[i] = 0;
+            cell(1,1,1) = rho; // Starts at rest
         }
         t = 0;
     }
@@ -81,6 +91,7 @@ struct Test : Widget {
         parallel(gridSize.z, [this](uint, uint z) {
             for(int y: range(gridSize.y)) {
                 for(int x: range(gridSize.x)) {
+                    if(solid(x,y,z)) continue;
                     const Cell& cell = source(x,y,z);
                     real rho = 0;
                     vec3 pu = 0;
@@ -105,16 +116,13 @@ struct Test : Widget {
         parallel(gridSize.z, [this](uint, uint z) {
             for(int y: range(gridSize.y)) {
                 for(int x: range(gridSize.x)) {
-                    for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { //TODO: lookup map
+                    if(solid(x,y,z)) continue;
+                    for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { //TODO: lookup map, tiled
                         int sx=x-(dx-1), sy=y-(dy-1), sz=z-(dz-1);
                         int tx=dx-1, ty=dy-1, tz=dz-1;
-                        const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
-                        const uint R2 = sq(min(cx,cy));
-                        const uint r2 = sq(sx-cx) + sq(sy-cy);
-                        if(r2>R2) { sx=x, sy=y, sz=z, tx=-tx, ty=-ty, tz=-tz; } // No slip vertical boundary
-                        assert(!(sx<0 || sx>=gridSize.x || sy<0 || sy>= gridSize.y), sx, sy, r2, R2, cx, cy, sx-cx, sy-cy);
                         if(sz<0) sz=gridSize.z-1; // Periodic top horizontal boundary
                         if(sz>=gridSize.z) sz=0; // Periodic bottom horizontal boundary
+                        if(sx<0 || sy<0 || sx>=gridSize.x || sy>=gridSize.y || solid(sx,sy,sz)) { sx=x, sy=y, sz=z, tx=-tx, ty=-ty, tz=-tz; }
                         source(x,y,z)(dx,dy,dz) = target(sx,sy,sz)(tx+1,ty+1,tz+1);
                     }
                 }
@@ -125,15 +133,15 @@ struct Test : Widget {
         window.render();
     }
 
+    float sliceZ = 0.5;
+    bool mouseEvent(int2 cursor, int2 size, Event, Button) { sliceZ = clip(0.f, float(cursor.x)/size.x, 1.f); return false; }
+
     void render(int2 position, int2 size) {
-        vec3 U[8] = 0; real N[8] = {};
+        vec3 U[8] = 0; real P[8] = {}; real N[8] = {};
         parallel(gridSize.z, [&](uint id, uint z) {
             for(int y: range(gridSize.y)) {
                 for(int x: range(gridSize.x)) {
-                    const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
-                    const uint R2 = sq(min(cx,cy));
-                    const uint r2 = sq(x-cx) + sq(y-cy);
-                    if(r2>R2) continue; // Solid
+                    if(solid(x,y,z)) continue;
 
                     const Cell& cell = source(x,y,z);
                     real rho = 0;
@@ -144,18 +152,24 @@ struct Test : Widget {
                         pu += wphi * v[i];
                     }
                     vec3 u = (dt/2)*g + pu/rho;
-                    U[id] += u;
                     N[id]++;
+                    P[id] += rho;
+                    U[id] += u;
                 }
             }
         });
-        vec3 u=0; real n=0; for(uint i: range(8)) u+=U[i], n+=N[i]; u/=n; // Mean speed (~superficial fluid flow rate (m³/s)/m²)
-        log(u.z*1e6, vmax/2*1e6);
+        real n=0; real p=0; vec3 u=0; for(uint i: range(8)) p+=P[i], u+=U[i], n+=N[i]; p/=n; u/=n; // Mean speed (~superficial fluid flow rate (m³/s)/m²)
         real k = u.z * eta / dxP; // Permeability [m²] (1D ~ µm²)
-        log(k*1e12, (vmax/2) * eta / dxP * 1e12);
+        log(p, ftoa(u.z / c,3),"c", u.z*1e6,"μm/s", k*1e15, "mD");
+        vec3 meanU = u;
 
-        NonUniformSample analytic, numeric;
-        {int z=gridSize.z/2, y=gridSize.y/2; for(int x: range(gridSize.x)) {
+        const int64 X=gridSize.x, Y=gridSize.y;
+        assert_(2*gridSize.xy()==size);
+        int z = sliceZ * (gridSize.z-1);
+        assert_(z>=0 && z<gridSize.z);
+        for(int y: range(Y)) for(int x: range(X)) {
+            vec3 u=0;
+            if(!solid(x,y,z)) {
                 const Cell& cell = source(x,y,z);
                 real rho = 0; vec3 pu = 0;
                 for(int i: range(3*3*3)) {
@@ -163,21 +177,13 @@ struct Test : Widget {
                     rho += wphi;
                     pu += wphi * v[i];
                 }
-                vec3 u = (dt/2)*g + pu/rho;
-                numeric.insert(x*dx*1e6, u.z*1e6);
-                const real d = 1./sqrt(2.);
-                const real R = (gridSize.x-1+d) / 2 * dx;
-                const real r = abs((gridSize.x-1+d)/2 - (x+d/2)) * dx;
-                const real v = 1/(4*eta) * dxP * (sq(R)-sq(r)); // v = -1/(4η)·dxP·(R²-r²) (Poiseuille equation)
-                analytic.insert(x*dx*1e6, v*1e6);
-                //if(x==0) log(v/u.z);
+                u = (dt/2)*g + pu/rho;
             }
+            uint linear = clip(0,(int)round(0xFF*u.z/meanU.z),0xFF);
+            extern uint8 sRGB_lookup[256];
+            uint sRGB = sRGB_lookup[linear];
+            for(int dy: range(2)) for(int dx: range(2)) framebuffer((position.x+x)*2+dx,(position.y+y)*2+dy) = byte4(sRGB,sRGB,sRGB,0xFF);
         }
-        Plot plot;
-        plot.title = str(int(round(t*dt*1e6)),"μs"), plot.xlabel=String("x [μm]"_), plot.ylabel=String("v [μm/s]"_);
-        plot.legends << String("numeric"_); plot.dataSets << move(numeric);
-        plot.legends << String("analytic"_); plot.dataSets << move(analytic);
-        plot.render(position, size);
         step();
     }
 } test;

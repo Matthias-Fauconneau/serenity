@@ -138,7 +138,8 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool/* cyli
 Image16 slice(const Volume& source, int z) {
     assert_(source.maximum);
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
-    const int marginX=source.margin.x, marginY=source.margin.y;
+    //const int marginX=source.margin.x, marginY=source.margin.y;
+    const int marginX=0, marginY=0;
     Image16 target(X-2*marginX,Y-2*marginY);
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
         uint value = 0;
