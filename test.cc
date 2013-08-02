@@ -24,7 +24,7 @@ struct Cell {
 };
 
 struct Test : Widget {
-    int3 gridSize = int3(65,65,1);
+    int3 gridSize = int3(33,33,33);
     Grid<Cell> source{gridSize};
     Grid<Cell> target{gridSize};
 
@@ -40,15 +40,19 @@ struct Test : Widget {
     real w[cb(3)]; // Explicit 3D Lattice weights
     vec3 v[cb(3)]; // Lattice velocities
 
+    // Physical constants
     const real rho = 1e3; // Mass density: ρ[water] [kg/m³]
     const real nu = 1e-6; // Kinematic viscosity: ν[water] [m²/s]
     const real eta = rho * nu; // Dynamic viscosity: η[water] [Pa·s=kg/(m·s)]
     const vec3 g = vec3(0,0,9.8); // Body Force: Earth gravity pull [m/s²]
 
+    // Physical parameters
     const real vmax = 70e-6; // Channel peak speed: v [m/s]
     const real R = sqrt(4*vmax*eta/(rho*g.z)); // Channel diameter: D [m]
     const real dx = 2*R/(gridSize.x+0.5);
+    const real dxP = (rho * g.z * dx) / dx;  // Pressure gradient (~ applied pressure difference / thickness of the medium) (Assumes constant rho (incompressible flow))
 
+    // Lattice parameters
     const real dt = sq(dx)/nu; // Time step: δx² α νδt [s]
     const real c = dx/dt; // Lattice velocity δx/δt [m/s]
     const real e = sq(c)/3; // Lattice internal energy density (e/c² = 1/3 optimize stability) [m²/s²]
@@ -104,7 +108,7 @@ struct Test : Widget {
                     for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { //TODO: lookup map
                         int sx=x-(dx-1), sy=y-(dy-1), sz=z-(dz-1);
                         int tx=dx-1, ty=dy-1, tz=dz-1;
-                        int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
+                        const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
                         const uint R2 = sq(min(cx,cy));
                         const uint r2 = sq(sx-cx) + sq(sy-cy);
                         if(r2>R2) { sx=x, sy=y, sz=z, tx=-tx, ty=-ty, tz=-tz; } // No slip vertical boundary
@@ -122,24 +126,45 @@ struct Test : Widget {
     }
 
     void render(int2 position, int2 size) {
+        vec3 U[8] = 0; real N[8] = {};
+        parallel(gridSize.z, [&](uint id, uint z) {
+            for(int y: range(gridSize.y)) {
+                for(int x: range(gridSize.x)) {
+                    const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
+                    const uint R2 = sq(min(cx,cy));
+                    const uint r2 = sq(x-cx) + sq(y-cy);
+                    if(r2>R2) continue; // Solid
+
+                    const Cell& cell = source(x,y,z);
+                    real rho = 0;
+                    vec3 pu = 0;
+                    for(int i: range(3*3*3)) {
+                        real wphi = w[i] * cell[i];
+                        rho += wphi;
+                        pu += wphi * v[i];
+                    }
+                    vec3 u = (dt/2)*g + pu/rho;
+                    U[id] += u;
+                    N[id]++;
+                }
+            }
+        });
+        vec3 u=0; real n=0; for(uint i: range(8)) u+=U[i], n+=N[i]; u/=n; // Mean speed (~superficial fluid flow rate (m³/s)/m²)
+        log(u.z*1e6, vmax/2*1e6);
+        real k = u.z * eta / dxP; // Permeability [m²] (1D ~ µm²)
+        log(k*1e12, (vmax/2) * eta / dxP * 1e12);
+
         NonUniformSample analytic, numeric;
         {int z=gridSize.z/2, y=gridSize.y/2; for(int x: range(gridSize.x)) {
                 const Cell& cell = source(x,y,z);
-                real rho = 0;
-                for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { // Cell density
-                    const real w = W[dx]*W[dy]*W[dz];
-                    const real phi = cell(dx,dy,dz);
-                    rho += w * phi;
+                real rho = 0; vec3 pu = 0;
+                for(int i: range(3*3*3)) {
+                    real wphi = w[i] * cell[i];
+                    rho += wphi;
+                    pu += wphi * v[i];
                 }
-                vec3 u = dt/2*g;
-                for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { // Cell velocity
-                    const real w = W[dx]*W[dy]*W[dz];
-                    const vec3 v = c * vec3(dx-1,dy-1,dz-1);
-                    const real phi = cell(dx,dy,dz);
-                    u += w * v * phi / rho;
-                }
+                vec3 u = (dt/2)*g + pu/rho;
                 numeric.insert(x*dx*1e6, u.z*1e6);
-                const real dxP = rho * g.z * dx / dx;
                 const real d = 1./sqrt(2.);
                 const real R = (gridSize.x-1+d) / 2 * dx;
                 const real r = abs((gridSize.x-1+d)/2 - (x+d/2)) * dx;
