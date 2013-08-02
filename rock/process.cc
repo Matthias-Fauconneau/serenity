@@ -88,7 +88,8 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             string value = s.untilEnd();
             assert_(value);
             assert_(!arguments.contains(key), key);
-            arguments.insert(String(key), String(value));
+            if(specialParameters.contains(key)) this->specialArguments.insert(String(key), String(value));
+            else arguments.insert(String(key), String(value));
         }
         else if(resultNames.contains(argument)) targets << argument;
         else if(parameters.contains(parameter)) arguments.insert(String(argument), String());
@@ -214,7 +215,10 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
 array<string> PersistentProcess::configure(const ref<string>& allArguments, const string& definition) {
     assert_(!results);
     array<string> targets = Process::configure(allArguments, definition);
-    if(specialArguments.contains("storageFolder"_)) storageFolder = Folder(specialArguments.at("storageFolder"_),currentWorkingDirectory());
+    if(specialArguments.contains("storageFolder"_)) {
+        log("Storing data in user-specified folder:",specialArguments.at("storageFolder"_));
+        storageFolder = Folder(specialArguments.at("storageFolder"_),currentWorkingDirectory());
+    }
     if(specialArguments.contains("indirect"_)) {
         log("Storing metadata in auxiliary files (instead of file names)");
         ResultFile::indirectID=1;

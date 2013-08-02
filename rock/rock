@@ -36,7 +36,7 @@ if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
 # Segments
-rock = Binary resampled threshold cylinder=source.cylinder mask=1 # Also clips to cylinder before distance field evaluation
+rock = Binary resampled threshold box=source.box mask=1 # if !box: Also clips to cylinder before distance field evaluation
 colored = Colorize resampled threshold # For visualization
 background = Maximum resampled threshold # For visualization
 foreground = Minimum resampled threshold # For visualization
@@ -61,8 +61,9 @@ if minimalSqRadius: pruned = ThresholdClip skeleton-tiled minimalSqRadius
 if !minimalSqRadius: pruned = skeleton-tiled
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-if crop.cylinder: crop = Crop pruned
-if !crop.cylinder: crop = pruned
+#if crop.cylinder: crop = Crop pruned
+#if !crop.cylinder: crop = pruned #FIXME: if !crop.cylinder and !crop.box
+crop = Crop pruned #FIXME: defaults to cylinder even with source.box (requires crop.box)
 
 # Floodfills skeleton
 unconnected = Binary crop threshold=1
@@ -125,6 +126,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-denoised = ToPNG denoised
   png-colored = ToPNG colored
   png-background = ToPNG background
+  png-position = ToPNG position
   png-distance = ToPNG distance invert=1
   png-skeleton = ToPNG connected invert=1 binary=1
   png-maximum = ToPNG maximum invert=1

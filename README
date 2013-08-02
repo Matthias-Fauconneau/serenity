@@ -18,6 +18,9 @@ Targets and arguments:
   - cylinder = x,y,r,z0,z1 | r
     Crops the volume to the cylinder of radius r centered at (x,y) including all slices of coordinate z with z0<=z<z1 (i.e excluding z1 slice for a total z1-z0 slices)
     \note Voxel coordinates starts from zero
+  - box = x0,y0,z0,x1,y1,z1
+    Crops the volume to the box from x0,y0,z0 to x1,y1,z1
+    \note Voxel coordinates starts from zero
   - extra
     Adds 2 voxels to the cylinder to compensate for margins lost to processing
   \note It can be useful to store the cropped/downsampled source volume on the filesystem when extracting/downsampling from a large original dataset takes a long time.
