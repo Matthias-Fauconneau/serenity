@@ -171,7 +171,7 @@ void binary(Volume8& target, const Volume16& source, uint16 threshold, bool inve
     uint8* const targetData = target;
     interleavedLookup(target);
     const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
-    uint64 count[2];
+    uint64 count[2] = {};
     parallel(0, Z, [&](uint, int z) {
         const uint16* const sourceZ = source + (tiled ? offsetZ[z] : z*XY);
         uint8* const targetZ = targetData + offsetZ[z];
@@ -189,7 +189,7 @@ void binary(Volume8& target, const Volume16& source, uint16 threshold, bool inve
             }
         }
     });
-    assert_(count[0] && count[1], "Empty segmentation using threshold",threshold);
+    assert_(count[0] && count[1], "Empty segmentation using threshold", threshold);
     target.maximum=1;
 }
 

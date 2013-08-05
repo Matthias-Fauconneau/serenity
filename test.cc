@@ -25,7 +25,7 @@ struct Cell {
 };
 
 struct Test : Widget {
-    const int3 gridSize = 252;
+    const int3 gridSize = 64-4;
     Grid<int> solid{gridSize};
     Grid<Cell> source{gridSize};
     Grid<Cell> target{gridSize};
@@ -49,8 +49,12 @@ struct Test : Widget {
     const vec3 g = vec3(0,0,9.8); // Body Force: Earth gravity pull [m/s²]
 
     // Physical parameters
-    const real dx = 2.96e-6; // Spatial resolution [m]
-    const real dxP = (rho * g.z * dx) / dx;  // Pressure gradient (~ applied pressure difference / thickness of the medium) (Assumes constant rho (incompressible flow))
+    //const real dx = 2.96e-6; // Spatial resolution [m]
+    const real dx = 1e-6; //11.84e-6; // Spatial resolution [m]
+    const real dxP = rho * g.z;  // Pressure gradient (applied pressure difference / thickness of the medium = (F/S)/δx = (ρgx³/x²)/x) (Assumes constant rho (incompressible flow))
+    const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
+    //const uint R = min(cx,cy);
+    const uint R = 1;
 
     // Lattice parameters
     const real dt = sq(dx)/nu; // Time step: δx² α νδt [s]
@@ -62,11 +66,16 @@ struct Test : Widget {
     uint64 t = 0;
 
     void initialize() {
-        Volume16 volume;
-        parseVolumeFormat(volume, "256x256x128+2+2+2-193-tiled-squared"_);
-        volume.data = readFile("/ptmp/Berea-2960-maximum.256x256x128+2+2+2-193-tiled-squared"_);
+        /*Volume16 volume;
+        parseVolumeFormat(volume, "64x64x32+2+2+2-19-tiled-squared"_);
+        volume.data = readFile("/ptmp/Berea-11840-minimalSqRadius:0.64x64x32+2+2+2-19-tiled-squared"_);
         for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Mirror volume
-            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = /*x<2||y<2||z<2||x>=gridSize.x-2||y>=gridSize.y-2||z>=gridSize.z-2||*/volume(x+2,y+2,z+2)==0 ? 1 : 0;
+            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = volume(x+2,y+2,z+2)==0 ? 1 : 0;
+        }*/
+
+        for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Mirror volume
+            const uint r2 = sq(x-cx) + sq(y-cy);
+            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = r2>R*R;
         }
 
         log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s");
@@ -77,10 +86,8 @@ struct Test : Widget {
         }
         for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
             Cell& cell = source(x,y,z);
-            /*if(solid(x,y,z)) for(int i: range(3*3*3)) cell[i] = 0;
-            for(int i: range(3*3*3)) cell[i] = rho / cb(3) / w[i];*/
             for(int i: range(3*3*3)) cell[i] = 0;
-            cell(1,1,1) = rho; // Starts at rest
+            cell(1,1,1) = rho / w[1*3*3+1*3+1]; // Starts at rest
         }
         t = 0;
     }
@@ -137,7 +144,7 @@ struct Test : Widget {
     bool mouseEvent(int2 cursor, int2 size, Event, Button) { sliceZ = clip(0.f, float(cursor.x)/size.x, 1.f); return false; }
 
     void render(int2 position, int2 size) {
-        vec3 U[8] = 0; real P[8] = {}; real N[8] = {};
+        vec3 U[8] = 0; real N[8] = {};
         parallel(gridSize.z, [&](uint id, uint z) {
             for(int y: range(gridSize.y)) {
                 for(int x: range(gridSize.x)) {
@@ -153,15 +160,20 @@ struct Test : Widget {
                     }
                     vec3 u = (dt/2)*g + pu/rho;
                     N[id]++;
-                    P[id] += rho;
                     U[id] += u;
                 }
             }
         });
-        real n=0; real p=0; vec3 u=0; for(uint i: range(8)) p+=P[i], u+=U[i], n+=N[i]; p/=n; u/=n; // Mean speed (~superficial fluid flow rate (m³/s)/m²)
-        real k = u.z * eta / dxP; // Permeability [m²] (1D ~ µm²)
-        log(p, ftoa(u.z / c,3),"c", u.z*1e6,"μm/s", k*1e15, "mD");
-        vec3 meanU = u;
+        real n=0; vec3 u=0; for(uint i: range(8)) u+=U[i], n+=N[i]; u/=n; // Mean speed
+        real meanV = u.z;
+        real epsilon = n/(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
+        real k = epsilon * meanV * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
+
+        real meanV_tube = dxP/(8*eta)*sq(R*dx);
+        real epsilon_tube = PI/4;
+        real k_tube = epsilon_tube * meanV_tube * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
+        log(gridSize.x/2*dx*1e6,"μm", meanV*1e6,"μm/s", meanV_tube*1e6,"μm/s", k*1e15,"mD", k_tube*1e15,"mD");
+        //log(t, ftoa(meanV / c,3),"c", meanV*1e6,"μm/s", k*1e15, "mD", dxP*gridSize.z*dx, "Pa /",gridSize.z*dx*1e6, "μm", dxP, "Pa / m");
 
         const int64 X=gridSize.x, Y=gridSize.y;
         assert_(2*gridSize.xy()==size);
@@ -179,7 +191,7 @@ struct Test : Widget {
                 }
                 u = (dt/2)*g + pu/rho;
             }
-            uint linear = clip(0,(int)round(0xFF*u.z/meanU.z),0xFF);
+            uint linear = clip(0,(int)round(0xFF*u.z/meanV),0xFF);
             extern uint8 sRGB_lookup[256];
             uint sRGB = sRGB_lookup[linear];
             for(int dy: range(2)) for(int dx: range(2)) framebuffer((position.x+x)*2+dx,(position.y+y)*2+dy) = byte4(sRGB,sRGB,sRGB,0xFF);

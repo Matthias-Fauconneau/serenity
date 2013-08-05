@@ -163,7 +163,7 @@ struct Rock : virtual PersistentProcess {
             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) targetPaths << argument;
             else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
                 if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments);
-                else assert_(File(argument,cwd).size()>=1<<20);
+                else assert_(File(argument,cwd).size()>=64*64*64*2);
                 arguments.insert(String("path"_), String(argument));
             }
             else if(!argument.contains('=')) targetPaths << argument;

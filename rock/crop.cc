@@ -55,7 +55,10 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
     margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
     assert_( margin >= minimalMargin );
-    assert_(int3(0)<=sourceMin && sourceMin<=min && min<max && max<=sourceMax, sourceMin, min, max, sourceMax);
+    assert_(int3(0)<=sourceMin, "source min:", sourceMin);
+    assert_(sourceMin<=min, "source min:", sourceMin, "crop min:", min);
+    assert_(min<max, "crop min:", min, "crop max:", max);
+    assert_(max<=sourceMax, "crop max:", max, "source max:", sourceMax);
     return {min, max, size, sampleCount, margin, !args.contains("box"_)};
 }
 
