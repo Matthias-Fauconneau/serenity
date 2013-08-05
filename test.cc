@@ -6,13 +6,25 @@
 #include "plot.h"
 #include "volume.h"
 
+#if 0
 typedef vector<xyz,double,3> vec3x64; // Double precision vector (FIXME: normalize units and use float)
 #define vec3 vec3x64
+#else
+#define real float
+#endif
+
+constexpr int3 gridSize {512,512,512};
+
+// from volume.cc
+/// Interleaves bits
+static uint64 interleave(uint64 bits, uint64 offset, uint stride=3) { uint64 interleavedBits=0; for(uint b=0; bits!=0; bits>>=1, b++) interleavedBits |= (bits&1) << (b*stride+offset); return interleavedBits; }
+/// Generates lookup tables of interleaved bits
+static buffer<uint64> interleavedLookup(uint size, uint offset, uint stride=3) { buffer<uint64> lookup(size); for(uint i=0; i<size; i++) { lookup[i]=interleave(i,offset,stride); } return lookup; }
+buffer<uint64> offsetX = interleavedLookup(gridSize.x,0), offsetY = interleavedLookup(gridSize.y,1), offsetZ = interleavedLookup(gridSize.z,2); // Offset lookup tables to tile grid
 
 template<Type T> struct Grid {
-    Grid(int3 size):size(size),cells(size.x*size.y*size.z){}
-    T& operator()(uint x, uint y, uint z) { assert(x<size.x && y<size.y && z<size.z, x,y,z); return cells[z*size.y*size.x+y*size.x+x]; }
-    int3 size;
+    Grid():cells(gridSize.x*gridSize.y*gridSize.z){}
+    T& operator()(uint x, uint y, uint z) { assert(x<gridSize.x && y<gridSize.y && z<gridSize.z, x,y,z); return cells[offsetZ[z]+offsetY[y]+offsetX[x]]; }
     buffer<T> cells;
 };
 
@@ -25,10 +37,9 @@ struct Cell {
 };
 
 struct Test : Widget {
-    const int3 gridSize = 512;
-    Grid<int> solid{gridSize};
-    Grid<Cell> source{gridSize};
-    Grid<Cell> target{gridSize};
+    Grid<byte> solid;
+    Grid<Cell> source;
+    Grid<Cell> target;
 
     Window window{this, int2(640,480), "3D Cylinder"_};
     Test() {
@@ -97,7 +108,7 @@ struct Test : Widget {
         total.start();
     }
 
-    tsc collide, stream, average, other, total;
+    tsc collide, stream, average, other, total; Time totalTime;
     void step() {
         if(other) other.stop();
         // Collision
@@ -174,7 +185,7 @@ struct Test : Widget {
         t++;
         permeability.insert(t, k*1e15);
         average.stop();
-        log(meanV*1e6,"μm/s", k*1e15,"mD", "(Collide:", str(100*collide/total)+"%"_, "Stream:", str(100*stream/total)+"%"_, "Average:", str(100*average/total)+"%"_, "Other:", str(100*other/total)+"%)"_);
+        log((totalTime/t)/1000.0, "s", meanV*1e6,"μm/s", k*1e15,"mD", "(Collide:", str(100*collide/total)+"%"_, "Stream:", str(100*stream/total)+"%"_, "Average:", str(100*average/total)+"%"_, "Other:", str(100*other/total)+"%)"_);
         other.start();
         window.render();
     }

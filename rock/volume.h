@@ -1,11 +1,6 @@
 #pragma once
 #include "image.h"
 
-/// Returns coordinates for the given Z-order curve index
-int3 zOrder(uint index);
-/// Returns Z-order curve index for the given coordinates
-uint zOrder(int3 coordinates);
-
 generic struct VolumeT;
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
