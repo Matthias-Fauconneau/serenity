@@ -30,12 +30,13 @@ struct Test : Widget {
     Grid<Cell> source{gridSize};
     Grid<Cell> target{gridSize};
 
-    Window window{this, 2*int2(gridSize.x, gridSize.z), "3D Cylinder"_};
+    Window window{this, int2(640,480), "3D Cylinder"_};
     Test() {
         initialize();
+        step();
         window.backgroundColor=window.backgroundCenter=1;
-        window.show();
         window.localShortcut(Escape).connect([]{exit();});
+        window.show();
     }
 
     const real W[3] = {1./6, 4./6, 1./6}; // Lattice weight kernel
@@ -60,6 +61,7 @@ struct Test : Widget {
     const real alpha = dt/tau; // Relaxation coefficient: α = δt/τ [1]
 
     uint64 t = 0;
+    NonUniformSample permeability;
 
     void initialize() {
 #if 1 // Import pore space from volume data file
@@ -91,12 +93,13 @@ struct Test : Widget {
             cell(1,1,1) = rho / w[1*3*3+1*3+1]; // Starts at rest
         }
         t = 0;
-        collide.reset(); stream.reset(); total.reset();
+        collide.reset(); stream.reset(); total.reset(); other.reset();
         total.start();
     }
 
-    tsc collide, stream, total;
+    tsc collide, stream, average, other, total;
     void step() {
+        if(other) other.stop();
         // Collision
         collide.start();
         parallel(gridSize.z, [this](uint, uint z) {
@@ -142,16 +145,8 @@ struct Test : Widget {
             }
         });
         stream.stop();
-        t++;
-        //log(str(dt*1000/(int)time)+"x RT"_);
-        log(double(collide)/double(total), double(stream)/double(total), double(collide)/double(stream));
-        window.render();
-    }
-
-    float sliceZ = 0.5;
-    bool mouseEvent(int2 cursor, int2 size, Event, Button) { sliceZ = clip(0.f, float(cursor.x)/size.x, 1.f); return false; }
-
-    void render(int2 position, int2 size) {
+        // Average speed
+        average.start();
         vec3 U[8]; real N[8]; for(uint i: range(8)) U[i]=0, N[i]=0;
         parallel(gridSize.z, [&](uint id, uint z) {
             for(int y: range(gridSize.y)) {
@@ -176,10 +171,21 @@ struct Test : Widget {
         real meanV = u.z;
         real epsilon = n/(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
         real k = epsilon * meanV * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
-        log(meanV*1e6,"μm/s", k*1e15,"mD");
+        t++;
+        permeability.insert(t, k*1e15);
+        average.stop();
+        log(meanV*1e6,"μm/s", k*1e15,"mD", "(Collide:", str(100*collide/total)+"%"_, "Stream:", str(100*stream/total)+"%"_, "Average:", str(100*average/total)+"%"_, "Other:", str(100*other/total)+"%)"_);
+        other.start();
+        window.render();
+    }
 
+#if 0 // Slice
+    float sliceZ = 0.5;
+    bool mouseEvent(int2 cursor, int2 size, Event, Button) { sliceZ = clip(0.f, float(cursor.x)/size.x, 1.f); return false; }
+
+    void render(int2 position, int2 size) {
         const int64 X=gridSize.x, Y=gridSize.y;
-        assert_(2*gridSize.xy()==size);
+        assert_(2*gridSize.xy()==sizegridSize.xy(), size);
         int z = sliceZ * (gridSize.z-1);
         assert_(z>=0 && z<gridSize.z);
         for(int y: range(Y)) for(int x: range(X)) {
@@ -201,4 +207,15 @@ struct Test : Widget {
         }
         step();
     }
+#else // Plot
+    void render(int2 position, int2 size) {
+        Plot plot;
+        plot.xlabel=String("t [step]"_), plot.ylabel=String("k [mD]"_);\
+        plot.dataSets << move(permeability);
+        plot.render(position, size);
+        permeability = move(plot.dataSets.first());
+        step();
+    }
+#endif
+
 } test;
