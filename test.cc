@@ -62,7 +62,6 @@ static vec3 v[3*3*3]; // Lattice velocities
 static void __attribute((constructor(20000))) computeWeights() {
     {String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<"W["_+str(dx)+"]*W["_+str(dy)+"]*W["_+str(dz)+"], "_; w[dz*3*3+dy*3+dx] = W[dx]*W[dy]*W[dz]; } log(s);}
     {String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<"vec3("_+str(dx-1)+","_+str(dy-1)+","_+str(dz-1)+"), "_; v[dz*3*3+dy*3+dx] = vec3(dx-1,dy-1,dz-1); } log(s);}
-    //{String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<str((2-dz)*3*3+(2-dy)*3+(2-dx))+", "_; reflect[dz*3*3+dy*3+dx]=(2-dz)*3*3+(2-dy)*3+(2-dx); } log(s); }
 }
 #else
 constexpr real w[3*3*3] = {
@@ -77,26 +76,40 @@ constexpr vec3 v[3*3*3] = {
         };
 #endif
 
+
+template<int dx, int dy, int dz, uint index> inline void stream(const byte* solid, const Cell* target, Cell* source, uint offset, int x, int y, int z, real& rho, real& pu) {
+    int sx = x-dx, sy = y-dy, sz = z-dz;
+    sz %= gridSize.z; // Periodic top/bottom horizontal boundary
+    uint sOffset = ::offsetX[sx]+::offsetY[sy]+::offsetZ[sz];
+    real phi = solid[sOffset] ? target[offset][26-index] : target[sOffset][index];
+    source[offset][index] = phi;
+    real wphi = w[index] * phi;
+    rho += wphi;
+    pu += wphi * v[index].z;
+}
+
 struct Test : Widget {
     Grid<byte> solid;
     Grid<Cell> source;
     Grid<Cell> target;
 
-    Window window{this, int2(640,480), "3D Cylinder"_};
+    Window window{this, int2(512)/*int2(640,480)*/, "3D Cylinder"_};
     Test() {
-        initialize();
-        step();
         window.backgroundColor=window.backgroundCenter=1;
         window.localShortcut(Escape).connect([]{exit();});
         window.show();
+        initialize();
+        step();
     }
 
-    uint64 t = 0;
+    uint t = 0;
+    uint profileStartStep=0; Time totalTime;
+    real meanV = 1;
     NonUniformSample permeability;
 
     void initialize() {
         log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s");
-#if 0 // Import pore space from volume data file
+#if 1 // Import pore space from volume data file
         Volume16 volume;
         const string path = arguments()[0];
         parseVolumeFormat(volume, section(path,'.',-2,-1));
@@ -104,17 +117,17 @@ struct Test : Widget {
         Map map(path, currentWorkingDirectory());
         volume.data = buffer<byte>(map);
         for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Mirror volume
-            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = volume(x,y,z)==0 ? 1 : 0;
+            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = (x==0||y==0||x==gridSize.x-1||y==gridSize.y-1||volume(x,y,z)==0) ? 1 : 0;
         }
 #else // Initialize pore space to tube
         const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
-        const uint R = min(cx,cy)/2;
+        const uint R = min(16,min(cx,cy));
         for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
             const uint r2 = sq(x-cx) + sq(y-cy);
             solid(x,y,gridSize.z-1-z) = solid(x,y,z) = r2>R*R;
         }
         real meanV_tube = dxP/(8*eta)*sq(R*dx);
-        real epsilon_tube = PI/4;
+        real epsilon_tube = PI*R*R/(gridSize.x*gridSize.y);
         real k_tube = epsilon_tube * meanV_tube * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
         log(meanV_tube*1e6,"μm/s", k_tube*1e15,"mD");
 #endif
@@ -123,13 +136,12 @@ struct Test : Widget {
             for(int i: range(3*3*3)) cell[i] = 0;
             cell(1,1,1) = rho / w[1*3*3+1*3+1]; // Starts at rest
         }
-        t = 0;
-        collide.reset(); stream.reset(); total.reset(); other.reset();
-        total.start(); totalTime.reset();
+        t = 0; totalTime.reset();
     }
 
-    tsc collide, stream, other, total; Time totalTime;
+    tsc total, collide, stream, other;
     void step() {
+        if(t==1) { profileStartStep=t; totalTime.reset(); total.start(); collide.reset(); stream.reset(); other.reset(); } // Resets after first timesteps to avoid inaccurate steady state timing profile (TODO: moving average)
         if(other) other.stop();
         // Collision
         collide.start();
@@ -144,8 +156,7 @@ struct Test : Widget {
                     uint offset = offsetZY + ::offsetX[x];
                     if(solid[offset]) continue;
                     const Cell& cell = source[offset];
-                    real rho = 0;
-                    vec3 pu = 0;
+                    real rho = 0; vec3 pu = 0;
                     for(int i: range(3*3*3)) {
                         real wphi = w[i] * cell[i];
                         rho += wphi;
@@ -154,10 +165,11 @@ struct Test : Widget {
                     vec3 u = (dt/(2*c))*g + pu/rho;
                     for(int i: range(3*3*3)) { // Relaxation
                         const real dotvu = dot(v[i],u); // m²/s²
-                        const real phieq = rho * ( 1 + dotvu/E + sq(dotvu)/(2*sq(E)) - sq(u)/(2*E)); // kg/m/s²
-                        const real BGK = (1-alpha)*cell[i] + alpha*phieq; //BGK relaxation
-                        const vec3 k = 1/sqrt(E) * (v[i]-u) + dotvu/sqrt(cb(E)) * v[i];
-                        const real body = dt/sqrt(E)*(1-dt/tau)*rho*dot(k,g); // External body force
+                        constexpr real a1 = sq(c)/E, a2 = sq(sq(c)/E)/2, a3 = sq(c)/(2*E);
+                        const real phieq = rho * (1 + a1 * dotvu + a2 * sq(dotvu) - a3 * sq(u)); // kg/m/s²
+                        const real BGK = (1-alpha) * cell[i] + alpha * phieq; //BGK relaxation
+                        constexpr real b0 = dt/sqrt(E)*(1-dt/tau)*c*g.z, b1 = b0/sqrt(E), b2 = b0*sq(c)/sqrt(cb(E));
+                        const real body =  rho * ( b1 * (v[i].z-u.z) + b2 * dotvu * v[i].z ); // External body force
                         target[offset][i] = BGK + body;
                     }
                 }
@@ -166,44 +178,40 @@ struct Test : Widget {
         collide.stop();
         // Streaming
         stream.start();
-        real N[8]; vec3 U[8]; for(uint i: range(8)) N[i]=0, U[i]=0;
+        uint N[8]={}; real U[8]={};
         parallel(gridSize.z, [this,&N,&U](uint id, uint z) {
             const byte* solid = this->solid.cells;
             Cell* source = this->source.cells.begin();
             const Cell* target = this->target.cells;
             uint offsetZ = ::offsetZ[z];
+            uint Ni=0; real Ui=0;
             for(int y: range(gridSize.y)) {
                 uint offsetZY = offsetZ + ::offsetY[y];
                 for(int x: range(gridSize.x)) {
                     uint offset = offsetZY + ::offsetX[x];
                     if(solid[offset]) continue;
-                    real rho = 0; vec3 pu = 0;
-                    for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) {
-                        int sx=x-(dx-1), sy=y-(dy-1), sz=z-(dz-1);
-                        sz &= (512-1); // Periodic top/bottom horizontal boundary
-                        uint sOffset = ::offsetX[sx]+::offsetY[sy]+::offsetZ[sz];
-                        uint index=dz*3*3+dy*3+dx, sIndex=index; //unrolled
-                        if(sx<0 || sy<0 || sx>=gridSize.x || sy>=gridSize.y || solid[sOffset]) { sOffset=offset, sIndex=26-index; }
-                        real phi = target[sOffset][sIndex];
-                        source[offset][index] = phi;
-                        real wphi = w[index] * phi;
-                        rho += wphi;
-                        pu += wphi * v[index];
-                    }
-                    vec3 u = pu/rho;
-                    N[id]++;
-                    U[id] += u;
+                    real rho = 0; real pu = 0;
+#define o(dx,dy,dz) ::stream<dx-1,dy-1,dz-1,dz*3*3+dy*3+dx>(solid,target,source,offset,x,y,z,rho,pu);
+                    o(0,0,0)o(1,0,0)o(2,0,0)o(0,1,0)o(1,1,0)o(2,1,0)o(0,2,0)o(1,2,0)o(2,2,0)
+                    o(0,0,1)o(1,0,1)o(2,0,1)o(0,1,1)o(1,1,1)o(2,1,1)o(0,2,1)o(1,2,1)o(2,2,1)
+                    o(0,0,2)o(1,0,2)o(2,0,2)o(0,1,2)o(1,1,2)o(2,1,2)o(0,2,2)o(1,2,2)o(2,2,2)
+#undef o
+                    real u = pu/rho;
+                    Ni++;
+                    Ui += u;
                 }
             }
+            N[id] += Ni;
+            U[id] += Ui;
         });
         stream.stop();
-        real n=0; vec3 u=0; for(uint i: range(8)) u+=U[i], n+=N[i]; assert_(n); u = c*( (dt/(2*c))*g + u/n); // Mean speed
-        real meanV = u.z;
-        real epsilon = n/(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
+        uint n=0; real u=0; for(uint i: range(8)) n+=N[i], u+=U[i]; assert(n); u = c*( (dt/(2*c))*g.z + u/n); // Mean speed
+        meanV = u;
+        real epsilon = real(n)/real(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
         real k = epsilon * meanV * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
         t++;
         permeability.insert(t, k*1e15);
-        log(totalTime/t, "ms", meanV*1e6,"μm/s", k*1e15,"mD", "(Collide:", str(100*collide/total)+"%"_, "Stream:", str(100*stream/total)+"%"_, "Other:", str(100*other/total)+"%)"_);
+        log(totalTime/(t-profileStartStep), "ms", meanV*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
         other.start();
         window.render();
     }
@@ -213,8 +221,8 @@ struct Test : Widget {
     bool mouseEvent(int2 cursor, int2 size, Event, Button) { sliceZ = clip(0.f, float(cursor.x)/size.x, 1.f); return false; }
 
     void render(int2 position, int2 size) {
+        constexpr int upscale=1; assert_(upscale*gridSize.xy()==size);
         const int64 X=gridSize.x, Y=gridSize.y;
-        assert_(2*gridSize.xy()==sizegridSize.xy(), size);
         int z = sliceZ * (gridSize.z-1);
         assert_(z>=0 && z<gridSize.z);
         for(int y: range(Y)) for(int x: range(X)) {
@@ -232,7 +240,7 @@ struct Test : Widget {
             uint linear = clip(0,(int)round(0xFF*u.z/meanV),0xFF);
             extern uint8 sRGB_lookup[256];
             uint sRGB = sRGB_lookup[linear];
-            for(int dy: range(2)) for(int dx: range(2)) framebuffer((position.x+x)*2+dx,(position.y+y)*2+dy) = byte4(sRGB,sRGB,sRGB,0xFF);
+            for(int dy: range(upscale)) for(int dx: range(upscale)) framebuffer((position.x+x)*upscale+dx,(position.y+y)*upscale+dy) = byte4(sRGB,sRGB,sRGB,0xFF);
         }
         step();
     }
