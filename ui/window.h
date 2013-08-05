@@ -5,7 +5,7 @@
 #include "image.h"
 #include "map.h"
 #include "widget.h"
-#include "x.h"
+union XEvent;
 
 enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
               Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
@@ -26,7 +26,7 @@ struct Window : Socket, Poll {
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size, const string& name,  const Image& icon) :
         Window(widget, size, name, icon, "_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread){}
-    virtual ~Window() { destroy(); }
+    virtual ~Window();
 
     /// Creates window.
     void create();
@@ -157,7 +157,7 @@ struct Window : Socket, Poll {
     uint16 sequence=-1;
     void send(const ref<byte>& request);
 
-    struct QEvent { uint8 type; XEvent event; };
+    struct QEvent { uint8 type; unique<XEvent> event; };
     array<QEvent> eventQueue;
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);

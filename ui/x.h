@@ -4,15 +4,6 @@
 
 #define fixed(T) packed ; static_assert(sizeof(T)==31,"")
 
-enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, CursorMask=1<<14 };
-enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3, EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15, StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, FocusChangeMask=1<<21, PropertyChangeMask=1<<22 };
-enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify };
-enum ModifierMask { ShiftMask=1<<0, LockMask=1<<1, ControlMask=1<<2, Mod1Mask=1<<3, Mod2Mask=1<<4, Mod3Mask=1<<5, Mod4Mask=1<<6, Mod5Mask=1<<7, Button1Mask=1<<8, Button2Mask=1<<9, Button3Mask=1<<10, Button4Mask=1<<11, Button5Mask=1<<12, AnyModifier=1<<15 };
-enum MapState { IsUnmapped, IsUnviewable, IsViewable };
-enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
-enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
-
-struct XError { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(XError);
 union XEvent {
     struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed;
     struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;
@@ -28,6 +19,15 @@ union XEvent {
     struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
     byte pad[31];
 } fixed(XEvent);
+struct XError { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(XError);
+
+enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, CursorMask=1<<14 };
+enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3, EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15, StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, FocusChangeMask=1<<21, PropertyChangeMask=1<<22 };
+enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify };
+enum ModifierMask { ShiftMask=1<<0, LockMask=1<<1, ControlMask=1<<2, Mod1Mask=1<<3, Mod2Mask=1<<4, Mod3Mask=1<<5, Mod4Mask=1<<6, Mod5Mask=1<<7, Button1Mask=1<<8, Button2Mask=1<<9, Button3Mask=1<<10, Button4Mask=1<<11, Button5Mask=1<<12, AnyModifier=1<<15 };
+enum MapState { IsUnmapped, IsUnviewable, IsViewable };
+enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
+enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
 
 struct ConnectionSetup { byte bom='l', pad=0; int16 major=11,minor=0; int16 nameSize=0, dataSize=0, pad2=0; };
 struct ConnectionSetupReply { int8 status,reason; int16 major,minor,additionnal; int32 release, ridBase, ridMask, motionBufferSize; int16 vendorLength, maxRequestSize; int8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode; int32 pad2; };

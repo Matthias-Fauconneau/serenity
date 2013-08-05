@@ -111,6 +111,7 @@ void Window::create() {
     created = true;
     registerPoll();
 }
+Window::~Window() { destroy(); }
 void Window::destroy() {
     if(!created) return;
     {FreeGC r; r.context=id+GContext; send(raw(r));}
@@ -301,7 +302,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
     for(;;) { uint8 type = read<uint8>();
         if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
         else if(type==1) return read<T>();
-        else eventQueue << QEvent{type, read<XEvent>()}; //queue events to avoid reentrance
+        else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
     }
 }
 void Window::render() { /*if(mapped)*/ queue(); }
@@ -391,7 +392,7 @@ String Window::getSelection(bool clipboard) {
         readLock.lock();
         uint8 type = read<uint8>();
         if((type&0b01111111)==SelectionNotify) { read<XEvent>(); readLock.unlock(); return getProperty<byte>(id,"UTF8_STRING"_); }
-        else eventQueue << QEvent{type, read<XEvent>()}; //queue events to avoid reentrance
+        else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
         readLock.unlock();
     }
 }
