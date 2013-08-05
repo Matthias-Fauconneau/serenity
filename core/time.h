@@ -14,7 +14,7 @@ int64 realTime();
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-struct tsc { uint64 total=0; uint64 tsc; void start(){tsc=rdtsc();} void stop(){total+=rdtsc()-tsc;} operator uint64(){return total;} };
+struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){assert(!tsc); tsc=rdtsc();} void stop(){assert(tsc); total+=rdtsc()-tsc; tsc=0;} operator uint64(){return total + (tsc?rdtsc()-tsc:0);} };
 #endif
 /// Logs the time spent executing a scope
 struct Time {

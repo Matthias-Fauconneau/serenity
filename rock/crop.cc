@@ -5,31 +5,30 @@
 String str(const CropVolume& crop) { return "("_+str(crop.min, crop.max)+")"_; }
 
 /// Parses volume to crop from user arguments
-CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extra, int3 minimalMargin) {
+CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extra) {
     int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
     if(args.contains("cylinder"_)) {
-        string cylinder = args.at("cylinder"_);
-        if(cylinder.contains(',')) { // x, y, r, zMin, zMax
-            Vector coordinates = parseVector(cylinder, true);
-            assert_(coordinates.size==5);
+        Vector coordinates = parseVector(args.at("cylinder"_), true);
+        if(coordinates.size==1) { // Crops centered cylinder
+            int r = coordinates[0];
+            min=center-int3(r), max=center+int3(r);
+        } else if(coordinates.size==5) { // x,y,r,z0,z1
             int x=coordinates[0], y=coordinates[1], r=coordinates[2]; min.z=coordinates[3], max.z=coordinates[4];
             min.x=x-r, min.y=y-r, max.x=x+r, max.y=y+r;
-        } else { // Crops centered cylinder
-            int r = toInteger(cylinder);
-            min=center-int3(r), max=center+int3(r);
-        }
+        } else error("Expected cylinder = r | x,y,r,z0,z1, got", args.at("cylinder"_));
         min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
     }
     if(args.value("box"_,""_)) {
-        string box = args.at("box"_);
-        if(box.contains(',')) {
-            Vector coordinates = parseVector(box, true);
-            assert_(coordinates.size==6);
+        Vector coordinates = parseVector(args.at("box"_), true);
+        if(coordinates.size==1) { // Crops centered box
+            int3 size = coordinates[0];
+            min=center-size/2, max=center+size/2;
+        } else if(coordinates.size==3) {
+            int3 size = int3(coordinates[0],coordinates[1],coordinates[2]);
+            min=center-size/2, max=center+size/2;
+        } else if(coordinates.size==6) {
             min=int3(coordinates[0],coordinates[1],coordinates[2]), max=int3(coordinates[3],coordinates[4],coordinates[5]);
-        } else { // Crops centered box
-            int r = toInteger(box);
-            min=center-int3(r), max=center+int3(r);
-        }
+        } else error("Expected box = size | size{x,y,z} | x0,y0,z0,x1,y1,z1, got", args.at("box"_));
         min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
     }
     if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
@@ -44,7 +43,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
     assert_(size.x == size.y);
     // Align sampleCount for correct tiled indexing
     int3 sampleCount = int3(nextPowerOfTwo(size.x), nextPowerOfTwo(size.y), nextPowerOfTwo(size.z));
-    int3 margin = ::max(minimalMargin, (sampleCount - size)/2);
+    int3 margin = (sampleCount - size)/2;
     sampleCount = int3(nextPowerOfTwo(size.x+2*margin.x), nextPowerOfTwo(size.y+2*margin.y), nextPowerOfTwo(size.z+2*margin.z));
     assert_(sampleCount>int3(1), sampleCount);
     while(sampleCount.y < sampleCount.z   ) sampleCount.y*=2; // Z-order: [Z Y] X z y x
@@ -54,7 +53,6 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
     while(sampleCount.x < sampleCount.y/2) sampleCount.x*=2; // Z-order: Z Y X z [y x]
     margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
-    assert_( margin >= minimalMargin );
     assert_(int3(0)<=sourceMin, "source min:", sourceMin);
     assert_(sourceMin<=min, "source min:", sourceMin, "crop min:", min);
     assert_(min<max, "crop min:", min, "crop max:", max);
@@ -94,7 +92,7 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
 class(Crop,Operation), virtual VolumePass<uint16> {
     string parameters() const override { return "cylinder box downsample"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin, 0, 1);
+        CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
         crop.min -= source.origin, crop.max -= source.origin;
         ::crop(target, source, crop);
         target.origin = crop.min;

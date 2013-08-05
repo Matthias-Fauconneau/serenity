@@ -10,4 +10,4 @@ struct CropVolume {
     bool cylinder;
 };
 /// Parses volume to crop from user arguments
-CropVolume parseCrop(const Dict& args, int3 min, int3 max, int3 extra=0, int3 minimalMargin=0);
+CropVolume parseCrop(const Dict& args, int3 min, int3 max, int3 extra=0);

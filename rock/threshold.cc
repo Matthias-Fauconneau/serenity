@@ -162,7 +162,7 @@ class(MaximumMeanGradient, Operation) {
 /// Segments by setting values over a fixed threshold
 void binary(Volume8& target, const Volume16& source, uint16 threshold, bool invert=false, int maskValue=0, bool cylinder=true) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
-    const int marginX=target.margin.x=max(1,source.margin.x), marginY=target.margin.y=max(1,source.margin.y), marginZ=target.margin.z=max(1,source.margin.z);
+    const int marginX=target.margin.x=source.margin.x, marginY=target.margin.y=source.margin.y, marginZ=target.margin.z=source.margin.z;
     bool tiled = source.tiled();
     assert_(X%16==0 && (!cylinder || X-2*marginX==Y-2*marginY));
     uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
