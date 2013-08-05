@@ -97,14 +97,14 @@ uint maximum(const Volume16& source) {
     return maximum;
 }
 
-Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, bool cylinder, bool invert, bool binary) {
+Image slice(const Volume& source, real normalizedZ, bool normalize, bool gamma, bool invert, bool binary) {
     int z = source.margin.z+normalizedZ*(source.sampleCount.z-2*source.margin.z-1);
     assert_(z >= source.margin.z && z<source.sampleCount.z-source.margin.z, normalizedZ, source.margin, source.sampleCount, z);
     //int z = normalizedZ*(source.sampleCount.z-1);
-    return slice(source, z, normalize, gamma, cylinder, invert, binary);
+    return slice(source, z, normalize, gamma, invert, binary);
 }
 
-Image slice(const Volume& source, int z, bool normalize, bool gamma, bool/* cylinder*/, bool invert, bool binary) {
+Image slice(const Volume& source, int z, bool normalize, bool gamma, bool invert, bool binary) {
     assert_(source.maximum);
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
     const int marginX=source.margin.x, marginY=source.margin.y;
@@ -113,9 +113,7 @@ Image slice(const Volume& source, int z, bool normalize, bool gamma, bool/* cyli
     uint normalizeFactor = normalize ? maximum : 0xFF;
     if(!normalize && maximum>0x8000) { normalizeFactor=0xFF00; static int unused once = (warn("16bit volume truncated to 8bit image slices"_),0); }
     assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum<=0x8000");
-    //uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
-         //if(uint(sq(x-X/2)+sq(y-Y/2)) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0); continue; }
         uint value = 0;
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((uint8*)source.data.data)[index];

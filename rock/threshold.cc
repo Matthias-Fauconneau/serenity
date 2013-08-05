@@ -164,8 +164,13 @@ void binary(Volume8& target, const Volume16& source, uint16 threshold, bool inve
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const int marginX=target.margin.x=source.margin.x, marginY=target.margin.y=source.margin.y, marginZ=target.margin.z=source.margin.z;
     bool tiled = source.tiled();
-    assert_(X%16==0 && (!cylinder || X-2*marginX==Y-2*marginY));
-    uint radiusSq = cylinder ? (X/2-marginX)*(Y/2-marginY) : -1;
+    assert_(X%16==0);
+    uint radiusSq = -1;
+    if(cylinder) {
+        assert_(X-2*marginX==Y-2*marginY);
+        radiusSq = sq(X/2-marginX);
+        error("Masking to cylinder");
+    }
     uint8 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq;
     uint8* const targetData = target;

@@ -34,7 +34,7 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
         rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
         rotation.y= clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
     } else {
-        Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
+        Image image = slice(volumes[currentIndex], sliceZ, true, true);
         while(2*image.size()<=size) image=upsample(image);
         int2 centered = (size-image.size())/2;
         float z = clip(0.f, float(cursor.x-centered.x)/(image.size().x-1), 1.f);
@@ -60,7 +60,7 @@ void SliceView::render(int2 position, int2 size) {
         assert_(volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1);
         ::render(framebuffer, volumes[0], volumes[1], view);
     } else {
-        Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
+        Image image = slice(volumes[currentIndex], sliceZ, true, true);
         while(2*image.size()<=size) image=upsample(image);
         int2 centered = position+(size-image.size())/2;
         blit(centered, image);
