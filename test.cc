@@ -23,9 +23,6 @@ template<Type T> struct Grid {
     buffer<T> cells;
 };
 
-typedef real Cell[28]; // Mass density (kg/m³) for each lattice velocity
-typedef uint ICell[27]; // Index lookup to stream
-
 // Physical constants
 constexpr real rho = 1e3; // Mass density: ρ[water] [kg/m³]
 constexpr real nu = 1e-6; // Kinematic viscosity: ν[water] [m²/s]
@@ -63,9 +60,10 @@ constexpr real vy[28] = {-1,-1,-1,0,0,0,1,1,1,-1,-1,-1,0,0,0,1,1,1,-1,-1,-1,0,0,
 constexpr real vz[28] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0};
 
 struct Test : Widget {
-    Grid<ICell> streamLookup;
-    Grid<Cell> source;
-    buffer<real> target {gridSize.x*gridSize.y*gridSize.z*28ul};
+    buffer<uint> streamLookup{gridSize.x*gridSize.y*gridSize.z*28ul}; //TODO: compress
+    // Mass density (kg/m³) for each lattice velocity
+    buffer<real> source {gridSize.x*gridSize.y*gridSize.z*28ul}; //TODO: compress
+    buffer<real> target {gridSize.x*gridSize.y*gridSize.z*28ul}; //TODO: compress
 
     Window window{this, /*int2(512)*/int2(640,480), "3D Cylinder"_};
     Test() {
@@ -90,6 +88,7 @@ struct Test : Widget {
         Map map(path, currentWorkingDirectory());
         volume.data = buffer<byte>(map);
         for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Setup stream lookup
+            uint offset = ::offsetX[x]+::offsetY[y]+::offsetZ[z]; //TODO: compress
             bool solid = volume(x,y,z<gridSize.z/2?z:gridSize.z-1-z)==0; // Mirror
             if(!solid) {
                 N++;
@@ -97,14 +96,17 @@ struct Test : Widget {
                     int sx=x-(dx-1), sy=y-(dy-1), sz=z-(dz-1);
                     sz &= (512-1); // Periodic top/bottom horizontal boundary
                     uint index=dz*3*3+dy*3+dx, sIndex=index; //unrolled
-                    uint offset = ::offsetX[x]+::offsetY[y]+::offsetZ[z]; // TODO: compress
+                    uint sOffset=offset; // TODO: compress
                     if(sx<0 || sy<0 || sx>=gridSize.x || sy>=gridSize.y || volume(sx,sy,sz<gridSize.z/2?sz:gridSize.z-1-sz)==0) sIndex=26-index;
-                    else offset = ::offsetX[sx]+::offsetY[sy]+::offsetZ[sz];  // TODO: compress
+                    else sOffset = ::offsetX[sx]+::offsetY[sy]+::offsetZ[sz];  // TODO: compress
                     assert_(offset*28+sIndex>0); // 0 is reserved to flag solid voxels (FIXME: compress)
-                    streamLookup(x,y,z)[index] = offset*28+sIndex; //TODO: compress
+                    streamLookup[offset*27+index] = sOffset*28+sIndex; //TODO: compress
                 }
+                real* cell = &source[offset*28];
+                for(int i: range(3*3*3)) cell[i] = 0;
+                cell[1*3*3+1*3+1] = rho / w[1*3*3+1*3+1]; // Starts at rest
             } else {
-                for(uint index: range(27)) streamLookup(x,y,z)[index] = 0;
+                for(uint index: range(27)) streamLookup[offset*27+index] = 0; //TODO: compress
             }
         }
 #else // Initialize pore space to tube
@@ -119,11 +121,6 @@ struct Test : Widget {
         real k_tube = epsilon_tube * meanV_tube * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
         log(meanV_tube*1e6,"μm/s", k_tube*1e15,"mD");
 #endif
-        for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
-            Cell& cell = source(x,y,z);
-            for(int i: range(3*3*3)) cell[i] = 0;
-            cell[1*3*3+1*3+1] = rho / w[1*3*3+1*3+1]; // Starts at rest
-        }
         t = 0;
         log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s","ε=",real(N)/real(gridSize.x*gridSize.y*gridSize.z));
     }
@@ -133,19 +130,19 @@ struct Test : Widget {
         if(t==0) log("Startup",totalTime);
         if(t==1) { profileStartStep=t; totalTime.reset(); total.start(); collide.reset(); stream.reset(); other.reset(); } // Resets after first timesteps to avoid inaccurate steady state timing profile (TODO: moving average)
         if(other) other.stop();
-        // Collision (43%)
+        // Collision
         collide.start();
         parallel(gridSize.z, [this](uint, uint z) {
-            const ICell* streamLookup = this->streamLookup.cells;
-            const Cell* source = this->source.cells;
+            const uint* streamLookup = this->streamLookup;
+            const real* source = this->source;
             real* target = this->target.begin();
             uint offsetZ = ::offsetZ[z];
             for(int y: range(gridSize.y)) {
                 uint offsetZY = offsetZ + ::offsetY[y];
                 for(int x: range(gridSize.x)) {
                     uint offset = offsetZY + ::offsetX[x];
-                    if(!streamLookup[offset]) continue;
-                    const Cell& cell = source[offset];
+                    if(!streamLookup[offset*27+0]) continue;
+                    const real* cell = source+offset*28;
                     real rho = 0, pux=0, puy=0, puz=0;
                     for(int i: range(3*3*3)) { //TODO: SIMD
                         real wphi = w[i] * cell[i];
@@ -171,12 +168,12 @@ struct Test : Widget {
             }
         });
         collide.stop();
-        // Streaming (55%)
+        // Streaming
         real U[8]={};
         stream.start();
         parallel(gridSize.z, [this,&U](uint id, uint z) { //TODO: ZOrder
-            const ICell* streamLookup = this->streamLookup.cells;
-            Cell* source = this->source.cells.begin();
+            const uint* streamLookup = this->streamLookup;
+            real* source = this->source.begin();
             const real* target = this->target;
             real Ui=0;
             uint offsetZ = ::offsetZ[z];
@@ -184,12 +181,12 @@ struct Test : Widget {
                 uint offsetZY = offsetZ + ::offsetY[y];
                 for(int x: range(gridSize.x)) {
                     uint offset = offsetZY + ::offsetX[x];
-                    if(!streamLookup[offset]) continue;
+                    if(!streamLookup[offset*27+0]) continue;
                     real rho = 0; real pu = 0;
                     for(uint index: range(27)) {
-                        real phi = target[streamLookup[offset][index]]; //Gather
+                        real phi = target[streamLookup[offset*27+index]]; //Gather
                         //TODO: SIMD
-                        source[offset][index] = phi;
+                        source[offset*28+index] = phi;
                         real wphi = w[index] * phi;
                         rho += wphi;
                         pu += wphi * vz[index];
