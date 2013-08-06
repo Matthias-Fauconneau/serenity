@@ -142,9 +142,9 @@ template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 /// Runs a loop in parallel chunks
 template<class F> void chunk_parallel(uint totalSize, F f) {
     constexpr uint chunkCount = coreCount;
-    assert_(totalSize%chunkCount==0, totalSize, chunkCount);
+    assert_(totalSize%chunkCount<chunkCount, totalSize, chunkCount, totalSize%chunkCount); //Last chunk will be smaller
     const uint chunkSize = totalSize/chunkCount;
-    parallel(chunkCount, [&](uint, uint chunkIndex) { f(chunkIndex*chunkSize, chunkSize); });
+    parallel(chunkCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
