@@ -2,12 +2,39 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
+// Types
 typedef long long v2di __attribute__ ((__vector_size__ (16)));
 typedef int v4si __attribute__ ((__vector_size__ (16)));
 typedef short v8hi __attribute__ ((__vector_size__ (16)));
 typedef char v16qi __attribute__ ((__vector_size__ (16)));
 typedef float v4sf __attribute__ ((__vector_size__ (16)));
+typedef double v4di __attribute__ ((__vector_size__ (32)));
+typedef float v8sf __attribute__ ((__vector_size__ (32)));
 
+// Constants
+unused const v4si _1i = {1,1,1,1};
+unused const v8hi _0h = {0,0,0,0};
+
+inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
+unused const v4sf _1f = float4( 1 );
+unused const v4sf _0f = float4( 0 );
+unused const v4sf _halff = float4( 1./2 );
+unused const v4sf _2f = float4( 2 );
+unused const v4sf _4f = float4( 4 );
+unused const v4sf _0001f = {0, 0, 0, 1};
+unused const v4sf _0101f = {0, 1, 0, 1};
+unused const v4sf _1110f = {1, 1, 1, 0};
+#define FLT_MAX __FLT_MAX__
+unused const v4sf mfloatMax = float4(-FLT_MAX);
+unused const v4sf floatMax = float4(FLT_MAX);
+unused const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
+unused const v4sf alphaTerm = {FLT_MAX, FLT_MAX, FLT_MAX, /*0.95*/1};
+unused const v4sf scaleTo8bit = float4(0xFF);
+unused const v4sf scaleFrom8bit = float4(1./0xFF);
+unused const v4sf scaleFrom16bit = float4(1./0xFFFF);
+unused const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
+
+// Memory
 inline void movnt(uint64* const ptr, uint64 v) { return  __builtin_ia32_movntq(ptr,v); }
 inline void sfence() { __builtin_ia32_sfence(); }
 
@@ -92,8 +119,6 @@ inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
 
 // v4sf
 
-inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
-
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
@@ -114,8 +139,16 @@ inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
 inline v4sf shuffle(v4sf a, v4sf b, int x, int y, int z, int w) { return __builtin_ia32_shufps(a, b, w<<6|z<<4|y<<2|x); }
 #endif
 inline v4sf hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
+/*inline v4sf sum2(v4sf a, v4sf b) { //TODO
+    v4sf sum = __builtin_ia32_haddps(a, b); //a0+a1, a2+a3, b0+b1, b2+b3
+__m128d sum_high = _mm256_extractf128_pd(sum1, 1); // extract upper 128 bits of result
+__m128d result = _mm_add_pd(sum_high, (__m128d) sum); // add upper 128 bits of sum to its lower 128 bits
+// lower 64 bits of result contain the sum of x1[0], x1[1], x1[2], x1[3]
+// upper 64 bits of result contain the sum of x2[0], x2[1], x2[2], x2[3]
+}*/
 inline v4sf dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x7f); }
 inline v4sf dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
+inline v4sf sum(v4sf a) { return dot4(a,_1f); } // a0+a1+a2+a3
 inline v4sf rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
 inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
@@ -142,28 +175,22 @@ inline v4sf normalize3(v4sf a) { return a * rsqrt(dot3(a,a)); }
 inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
+// v8sf
+
+/*inline v8sf loada(const float* const ptr) { return *(v8sf*)ptr; }
+inline void storea(float* const ptr, v8sf a) { *(v8sf*)ptr = a; }
+inline float sum8(v8sf x) {
+    const v4sf hiQuad = __builtin_ia32_vextractf128_ps256(x, 1); // hiQuad = ( x7, x6, x5, x4 )
+    const v4sf loQuad = __builtin_ia32_ps_ps256(x); // loQuad = ( x3, x2, x1, x0 )
+    const v4sf sumQuad = __builtin_ia32_addps(loQuad, hiQuad); // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
+    const v4sf loDual = sumQuad; // loDual = ( -, -, x1 + x5, x0 + x4 )
+    const v4sf hiDual = __builtin_ia32_movhlps(sumQuad, sumQuad); // hiDual = ( -, -, x3 + x7, x2 + x6 )
+    const v4sf sumDual = __builtin_ia32_addps(loDual, hiDual); // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
+    const v4sf lo = sumDual; // lo = ( -, -, -, x0 + x2 + x4 + x6 )
+    const v4sf hi = __builtin_ia32_shufps(sumDual, sumDual, 0x1); // hi = ( -, -, -, x1 + x3 + x5 + x7 )
+    const v4sf sum = __builtin_ia32_addss(lo, hi); // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
+    return __builtin_ia32_vec_ext_v4sf(sum, 0);
+}*/
 //inline v8si cvtps2dq(v8sf a) { return __builtin_ia32_cvtps2dq256(a); }
 //typedef long long m128i __attribute__ ((__vector_size__ (16), __may_alias__));
 //inline v8hi packus(v8si a) { return __builtin_ia32_packusdw128(__builtin_ia32_vextractf128_si256(a,0),__builtin_ia32_vextractf128_si256(a,1)); }
-
-// Constants
-unused const v4si _1i = {1,1,1,1};
-unused const v8hi _0h = {0,0,0,0};
-
-unused const v4sf _1f = float4( 1 );
-unused const v4sf _0f = float4( 0 );
-unused const v4sf _halff = float4( 1./2 );
-unused const v4sf _2f = float4( 2 );
-unused const v4sf _4f = float4( 4 );
-unused const v4sf _0001f = {0, 0, 0, 1};
-unused const v4sf _0101f = {0, 1, 0, 1};
-unused const v4sf _1110f = {1, 1, 1, 0};
-#define FLT_MAX __FLT_MAX__
-unused const v4sf mfloatMax = float4(-FLT_MAX);
-unused const v4sf floatMax = float4(FLT_MAX);
-unused const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
-unused const v4sf alphaTerm = {FLT_MAX, FLT_MAX, FLT_MAX, /*0.95*/1};
-unused const v4sf scaleTo8bit = float4(0xFF);
-unused const v4sf scaleFrom8bit = float4(1./0xFF);
-unused const v4sf scaleFrom16bit = float4(1./0xFFFF);
-unused const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
