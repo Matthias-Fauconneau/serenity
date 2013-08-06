@@ -5,13 +5,8 @@
 #include "text.h"
 #include "plot.h"
 #include "volume.h"
-
-#if 0
-typedef vector<xyz,double,3> vec3x64; // Double precision vector (FIXME: normalize units and use float)
-#define vec3 vec3x64
-#else
+#include "simd.h"
 #define real float
-#endif
 
 constexpr int3 gridSize {512,512,512};
 
@@ -28,14 +23,8 @@ template<Type T> struct Grid {
     buffer<T> cells;
 };
 
-struct Cell {
-    real phi[3*3*3]={}; // Mass density (kg/m³) for each lattice velocity
-    real operator[](uint i) const { assert(i<3*3*3); return phi[i]; }
-    real& operator[](uint i) { assert(i<3*3*3); return phi[i]; }
-    real operator()(uint dx, uint dy, uint dz) const { assert(dx<3 && dy<3 && dz<3,int(dx),int(dy),int(dz)); return phi[dz*3*3+dy*3+dx]; }
-    real& operator()(uint dx, uint dy, uint dz) { assert(dx<3 && dy<3 && dz<3,int(dx),int(dy),int(dz)); return phi[dz*3*3+dy*3+dx]; }
-};
-static_assert(sizeof(Cell)==3*3*3*sizeof(real),"");
+ // Mass density (kg/m³) for each lattice velocity
+typedef real Cell[28];
 
 // Physical constants
 constexpr real rho = 1e3; // Mass density: ρ[water] [kg/m³]
@@ -56,26 +45,22 @@ constexpr real alpha = dt/tau; // Relaxation coefficient: α = δt/τ [1]
 static_assert(alpha<1, "");
 
 constexpr real W[3] = {1./6, 4./6, 1./6}; // Lattice weight kernel
-#if 0// Cannot be constexpr'ed
-static real w[3*3*3]; // Explicit 3D Lattice weights
-static vec3 v[3*3*3]; // Lattice velocities
+#if 1// Cannot be constexpr'ed
 static void __attribute((constructor(20000))) computeWeights() {
-    {String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<"W["_+str(dx)+"]*W["_+str(dy)+"]*W["_+str(dz)+"], "_; w[dz*3*3+dy*3+dx] = W[dx]*W[dy]*W[dz]; } log(s);}
-    {String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<"vec3("_+str(dx-1)+","_+str(dy-1)+","_+str(dz-1)+"), "_; v[dz*3*3+dy*3+dx] = vec3(dx-1,dy-1,dz-1); } log(s);}
+    {String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<"W["_+str(dx)+"]*W["_+str(dy)+"]*W["_+str(dz)+"], "_; } log(s);}
+    {String s; for(int unused dz: range(3)) for(int unused dy: range(3)) for(int dx: range(3)) s<<str(dx-1)+","_; log(s);}
+    {String s; for(int unused dz: range(3)) for(int dy: range(3)) for(int unused dx: range(3)) s<<str(dy-1)+","_; log(s);}
+    {String s; for(int dz: range(3)) for(int unused dy: range(3)) for(int unused dx: range(3)) s<<str(dz-1)+","_; log(s);}
 }
-#else
+#endif
 constexpr real w[3*3*3] = {
         W[0]*W[0]*W[0], W[1]*W[0]*W[0], W[2]*W[0]*W[0], W[0]*W[1]*W[0], W[1]*W[1]*W[0], W[2]*W[1]*W[0], W[0]*W[2]*W[0], W[1]*W[2]*W[0], W[2]*W[2]*W[0],
         W[0]*W[0]*W[1], W[1]*W[0]*W[1], W[2]*W[0]*W[1], W[0]*W[1]*W[1], W[1]*W[1]*W[1], W[2]*W[1]*W[1], W[0]*W[2]*W[1], W[1]*W[2]*W[1], W[2]*W[2]*W[1],
         W[0]*W[0]*W[2], W[1]*W[0]*W[2], W[2]*W[0]*W[2], W[0]*W[1]*W[2], W[1]*W[1]*W[2], W[2]*W[1]*W[2], W[0]*W[2]*W[2], W[1]*W[2]*W[2], W[2]*W[2]*W[2]
 };
-constexpr vec3 v[3*3*3] = {
-        vec3(-1,-1,-1), vec3(0,-1,-1), vec3(1,-1,-1), vec3(-1,0,-1), vec3(0,0,-1), vec3(1,0,-1), vec3(-1,1,-1), vec3(0,1,-1), vec3(1,1,-1),
-        vec3(-1,-1, 0), vec3(0,-1, 0), vec3(1,-1, 0), vec3(-1,0, 0), vec3(0,0, 0), vec3(1,0, 0), vec3(-1,1, 0), vec3(0,1, 0), vec3(1,1, 0),
-        vec3(-1,-1, 1), vec3(0,-1, 1), vec3(1,-1, 1), vec3(-1,0, 1), vec3(0,0, 1), vec3(1,0, 1), vec3(-1,1, 1), vec3(0,1, 1), vec3(1,1, 1)
-        };
-#endif
-
+constexpr real vx[28] = {-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,0};
+constexpr real vy[28] = {-1,-1,-1,0,0,0,1,1,1,-1,-1,-1,0,0,0,1,1,1,-1,-1,-1,0,0,0,1,1,1,0};
+constexpr real vz[28] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0};
 
 template<int dx, int dy, int dz, uint index> inline void stream(const byte* solid, const Cell* target, Cell* source, uint offset, int x, int y, int z, real& rho, real& pu) {
     int sx = x-dx, sy = y-dy, sz = z-dz;
@@ -85,7 +70,7 @@ template<int dx, int dy, int dz, uint index> inline void stream(const byte* soli
     source[offset][index] = phi;
     real wphi = w[index] * phi;
     rho += wphi;
-    pu += wphi * v[index].z;
+    pu += wphi * vz[index];
 }
 
 struct Test : Widget {
@@ -93,7 +78,7 @@ struct Test : Widget {
     Grid<Cell> source;
     Grid<Cell> target;
 
-    Window window{this, int2(512)/*int2(640,480)*/, "3D Cylinder"_};
+    Window window{this, /*int2(512)*/int2(640,480), "3D Cylinder"_};
     Test() {
         window.backgroundColor=window.backgroundCenter=1;
         window.localShortcut(Escape).connect([]{exit();});
@@ -134,7 +119,7 @@ struct Test : Widget {
         for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
             Cell& cell = source(x,y,z);
             for(int i: range(3*3*3)) cell[i] = 0;
-            cell(1,1,1) = rho / w[1*3*3+1*3+1]; // Starts at rest
+            cell[1*3*3+1*3+1] = rho / w[1*3*3+1*3+1]; // Starts at rest
         }
         t = 0; totalTime.reset();
     }
@@ -156,21 +141,26 @@ struct Test : Widget {
                     uint offset = offsetZY + ::offsetX[x];
                     if(solid[offset]) continue;
                     const Cell& cell = source[offset];
-                    real rho = 0; vec3 pu = 0;
-                    for(int i: range(3*3*3)) {
+                    real rho = 0, pux=0, puy=0, puz=0;
+                    for(int i: range(3*3*3)) { //TODO: SIMD
                         real wphi = w[i] * cell[i];
                         rho += wphi;
-                        pu += wphi * v[i];
+                        pux += wphi * vx[i];
+                        puy += wphi * vy[i];
+                        puz += wphi * vz[i];
                     }
-                    vec3 u = (dt/(2*c))*g + pu/rho;
-                    for(int i: range(3*3*3)) { // Relaxation
-                        const real dotvu = dot(v[i],u); // m²/s²
-                        constexpr real a1 = sq(c)/E, a2 = sq(sq(c)/E)/2, a3 = sq(c)/(2*E);
-                        const real phieq = rho * (1 + a1 * dotvu + a2 * sq(dotvu) - a3 * sq(u)); // kg/m/s²
-                        const real BGK = (1-alpha) * cell[i] + alpha * phieq; //BGK relaxation
-                        constexpr real b0 = dt/sqrt(E)*(1-dt/tau)*c*g.z, b1 = b0/sqrt(E), b2 = b0*sq(c)/sqrt(cb(E));
-                        const real body =  rho * ( b1 * (v[i].z-u.z) + b2 * dotvu * v[i].z ); // External body force
-                        target[offset][i] = BGK + body;
+                    constexpr real gz = (dt/(2*c))*g.z;
+                    real ux = pux/rho, uy = puy/rho, uz = puz/rho + gz, sqU = ux*ux+uy*uy+uz*uz;
+                    for(int i=0; i<28; i+=4) { // Relaxation //TODO: SIMD
+                        const v4sf dotvu = float4(ux) * loada(vx+i) + float4(uy) * loada(vy+i) + float4(uz) * loada(vz+i); // m²/s²
+                        static constexpr v4sf a1 = float4(sq(c)/E), a2 = float4(sq(sq(c)/E)/2), a3 = float4(sq(c)/(2*E));
+                        const v4sf phieq = rho * (1 + a1 * dotvu + a2 * sq(dotvu) - a3 * float4(sqU)); // kg/m/s²
+                        static constexpr v4sf A = float4(alpha), iA = float4(1-alpha);
+                        const v4sf BGK = iA * loada(cell+i) + A * phieq; //BGK relaxation
+                        constexpr float b0 = dt/sqrt(E)*(1-dt/tau)*c*g.z;
+                        static constexpr v4sf b1 = float4(b0/sqrt(E)), b2 = float4(b0*sq(c)/sqrt(cb(E)));
+                        const v4sf body = float4(rho) * ( b1 * (loada(vz+i)-float4(uz)) + b2 * dotvu * loada(vz+i) ); // External body force
+                        storea(target[offset]+i, BGK + body);
                     }
                 }
             }

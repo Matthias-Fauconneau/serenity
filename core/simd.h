@@ -92,7 +92,10 @@ inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
 
 // v4sf
 
-inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
+inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
+
+inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
+inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
 inline v4sf andnot(v4sf a, v4sf b) { return __builtin_ia32_andnps(a, b); }
