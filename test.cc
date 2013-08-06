@@ -6,8 +6,11 @@
 #include "plot.h"
 #include "volume.h"
 #include "simd.h"
-#define real float
 
+#define TUBE 0
+#define SLICE 0
+
+#define real float
 constexpr int3 gridSize {512,512,512};
 
 // from volume.cc
@@ -72,6 +75,11 @@ struct Test : Widget {
     real meanV = 1; // in lattice unit speed [c]
     NonUniformSample permeability;
 
+#if TUBE
+    const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
+    const uint R = min(cx,cy)/8;
+#endif
+
     void setup() {
         Volume16 volume;
         const string path = arguments()[0];
@@ -83,47 +91,45 @@ struct Test : Widget {
         for(int index : range(X*Y*Z)) { // Setup lattice lookup
             int3 xyz = zOrder(index); int x=xyz.x, y=xyz.y, z=xyz.z;
             uint offset = z*Y*X+y*X+x; // Simple layout (only used during setup)
-#if 0 // Import pore space from volume data file
+#if !TUBE // Import pore space from volume data file
             if(volume(x,y,z<gridSize.z/2?z:gridSize.z-1-z)) {
 #else // Initialize pore space to tube
-            const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
-            const uint R = min(16,min(cx,cy));
             const uint r2 = sq(x-cx) + sq(y-cy);
             if(r2<=R*R) {
-                real meanV_tube = dxP/(8*eta)*sq(R*dx);
-                real epsilon_tube = PI*R*R/(gridSize.x*gridSize.y);
-                real k_tube = epsilon_tube * meanV_tube * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
-                static unused bool once = (log(meanV_tube*1e6,"μm/s", k_tube*1e15,"mD"), true);
 #endif
                 latticeLookup[offset] = N;
                 N++;
             } else {
-                latticeLookup[offset] = -1;
+                latticeLookup[offset] = Solid;
             }
         }
         assert_(N<1u<<31);
         streamLookup = buffer<uint>(28*N); //TODO: mmap
         source = buffer<real>(28*N); //TODO: mmap
-        target = buffer<real>(28*N); //TODO: mmap
+        target = buffer<real>(28*N+1); //TODO: mmap
+        target[28*N] = 0;
         for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Setup stream lookup
             uint offset = latticeLookup[z*Y*X+y*X+x];
             if(offset!=Solid) {
                 for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) {
                     int sx=x-(dx-1), sy=y-(dy-1), sz=z-(dz-1);
-                    sz %= gridSize.z; // Periodic top/bottom horizontal boundary
-                    uint index=dz*3*3+dy*3+dx, sIndex=index; //unrolled
+                    if(sz<0) sz+= gridSize.z; // Periodic top/bottom horizontal boundary
+                    if(sz>=gridSize.z) sz-= gridSize.z; // Periodic top/bottom horizontal boundary
+                    uint index=dz*3*3+dy*3+dx, sIndex=index;
                     uint sOffset=offset;
                     if(sx<0 || sy<0 || sx>=gridSize.x || sy>=gridSize.y || latticeLookup[sz*Y*X+sy*X+sx]==Solid) sIndex=26-index;
                     else sOffset = latticeLookup[sz*Y*X+sy*X+sx];
                     streamLookup[offset*28+index] = sOffset*28+sIndex;
                 }
-                streamLookup[27] = streamLookup[26];
+                streamLookup[offset*28+3*3*3] = 28*N; // Load 0
                 real* cell = &source[offset*28];
                 for(int i: range(3*3*3)) cell[i] = 0;
                 cell[1*3*3+1*3+1] = rho / w[1*3*3+1*3+1]; // Starts at rest
             }
         }
-        //latticeLookup=buffer<uint>(); Used by slice
+#if !SLICE
+        latticeLookup=buffer<uint>();
+#endif
         t = 0;
         log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s","ε=",real(N)/real(gridSize.x*gridSize.y*gridSize.z));
     }
@@ -175,7 +181,7 @@ struct Test : Widget {
             for(uint offset: range(start, start+size)) {
                 real* sourceCell = source + offset*28;
                 const uint* streamCell = streamLookup + offset*28;
-                v4sf rho = _0f; v4sf pu = _0f;
+                v4sf rho = _0f; v4sf puz = _0f;
                 for(int i=0; i<28; i+=4) { //TODO: 3*8+4
                     const uint* stream = streamCell + i;
                     const v4sf phi = {target[stream[0]], target[stream[1]],target[stream[2]],target[stream[3]]}; //Gather
@@ -183,9 +189,9 @@ struct Test : Widget {
                     storea(sourceCell+i, phi);
                     const v4sf wphi = loada(w+i) * phi;
                     rho += wphi;
-                    pu += wphi * loada(vz+i);
+                    puz += wphi * loada(vz+i);
                 }
-                Ui += sum(pu)/sum(rho);
+                Ui += sum(puz)/sum(rho);
             }
             U[id] += extractf(Ui, 0);
         });
@@ -197,11 +203,17 @@ struct Test : Widget {
         t++;
         permeability.insert(t, k*1e15);
         log(t, totalTime/(t-profileStartStep), "ms", meanV*c*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
+#if TUBE
+        real meanV_tube = dxP/(8*eta)*sq(R*dx);
+        real epsilon_tube = PI*R*R/(gridSize.x*gridSize.y);
+        real k_tube = epsilon_tube * meanV_tube * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
+        log("Tube", meanV_tube*1e6,"μm/s", k_tube*1e15,"mD");
+#endif
         other.start();
         window.render();
     }
 
-#if 0 // Slice
+#if SLICE // Slice
     Window window{this, int2(512), "Speed"_};
 
     float sliceZ = 0.5;
@@ -237,7 +249,7 @@ struct Test : Widget {
                 for(int dy: range(upscale)) for(int dx: range(upscale)) framebuffer((position.x+x)*upscale+dx,(position.y+y)*upscale+dy) = byte4(0,sRGB,0,0xFF);
             }
         }
-        step();
+        /*if(t<1024)*/ step();
     }
 #else // Plot
     Window window{this, int2(640,480), "Permeability"_};
