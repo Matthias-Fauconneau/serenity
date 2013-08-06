@@ -23,8 +23,8 @@ template<Type T> struct Grid {
     buffer<T> cells;
 };
 
- // Mass density (kg/m³) for each lattice velocity
-typedef real Cell[28];
+typedef real Cell[28]; // Mass density (kg/m³) for each lattice velocity
+typedef uint ICell[27]; // Index lookup to stream
 
 // Physical constants
 constexpr real rho = 1e3; // Mass density: ρ[water] [kg/m³]
@@ -45,7 +45,7 @@ constexpr real alpha = dt/tau; // Relaxation coefficient: α = δt/τ [1]
 static_assert(alpha<1, "");
 
 constexpr real W[3] = {1./6, 4./6, 1./6}; // Lattice weight kernel
-#if 1// Cannot be constexpr'ed
+#if 0// Cannot be constexpr'ed
 static void __attribute((constructor(20000))) computeWeights() {
     {String s; for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) { s<<"W["_+str(dx)+"]*W["_+str(dy)+"]*W["_+str(dz)+"], "_; } log(s);}
     {String s; for(int unused dz: range(3)) for(int unused dy: range(3)) for(int dx: range(3)) s<<str(dx-1)+","_; log(s);}
@@ -62,21 +62,10 @@ constexpr real vx[28] = {-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1,-1,0,1
 constexpr real vy[28] = {-1,-1,-1,0,0,0,1,1,1,-1,-1,-1,0,0,0,1,1,1,-1,-1,-1,0,0,0,1,1,1,0};
 constexpr real vz[28] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0};
 
-template<int dx, int dy, int dz, uint index> inline void stream(const byte* solid, const Cell* target, Cell* source, uint offset, int x, int y, int z, real& rho, real& pu) {
-    int sx = x-dx, sy = y-dy, sz = z-dz;
-    sz %= gridSize.z; // Periodic top/bottom horizontal boundary
-    uint sOffset = ::offsetX[sx]+::offsetY[sy]+::offsetZ[sz];
-    real phi = solid[sOffset] ? target[offset][26-index] : target[sOffset][index];
-    source[offset][index] = phi;
-    real wphi = w[index] * phi;
-    rho += wphi;
-    pu += wphi * vz[index];
-}
-
 struct Test : Widget {
-    Grid<byte> solid;
+    Grid<ICell> streamLookup;
     Grid<Cell> source;
-    Grid<Cell> target;
+    buffer<real> target {gridSize.x*gridSize.y*gridSize.z*28ul};
 
     Window window{this, /*int2(512)*/int2(640,480), "3D Cylinder"_};
     Test() {
@@ -84,16 +73,15 @@ struct Test : Widget {
         window.localShortcut(Escape).connect([]{exit();});
         window.show();
         initialize();
-        step();
     }
 
+    uint N = 0;
     uint t = 0;
     uint profileStartStep=0; Time totalTime;
     real meanV = 1;
     NonUniformSample permeability;
 
     void initialize() {
-        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s");
 #if 1 // Import pore space from volume data file
         Volume16 volume;
         const string path = arguments()[0];
@@ -101,15 +89,30 @@ struct Test : Widget {
         assert_(volume.margin==int3(0) && volume.sampleCount==int3(gridSize.x,gridSize.y,gridSize.z/2));
         Map map(path, currentWorkingDirectory());
         volume.data = buffer<byte>(map);
-        for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Mirror volume
-            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = (x==0||y==0||x==gridSize.x-1||y==gridSize.y-1||volume(x,y,z)==0) ? 1 : 0;
+        for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Setup stream lookup
+            bool solid = volume(x,y,z<gridSize.z/2?z:gridSize.z-1-z)==0; // Mirror
+            if(!solid) {
+                N++;
+                for(int dz: range(3)) for(int dy: range(3)) for(int dx: range(3)) {
+                    int sx=x-(dx-1), sy=y-(dy-1), sz=z-(dz-1);
+                    sz &= (512-1); // Periodic top/bottom horizontal boundary
+                    uint index=dz*3*3+dy*3+dx, sIndex=index; //unrolled
+                    uint offset = ::offsetX[x]+::offsetY[y]+::offsetZ[z]; // TODO: compress
+                    if(sx<0 || sy<0 || sx>=gridSize.x || sy>=gridSize.y || volume(sx,sy,sz<gridSize.z/2?sz:gridSize.z-1-sz)==0) sIndex=26-index;
+                    else offset = ::offsetX[sx]+::offsetY[sy]+::offsetZ[sz];  // TODO: compress
+                    assert_(offset*28+sIndex>0); // 0 is reserved to flag solid voxels (FIXME: compress)
+                    streamLookup(x,y,z)[index] = offset*28+sIndex; //TODO: compress
+                }
+            } else {
+                for(uint index: range(27)) streamLookup(x,y,z)[index] = 0;
+            }
         }
 #else // Initialize pore space to tube
         const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
         const uint R = min(16,min(cx,cy));
         for(int z: range(gridSize.z/2)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) {
             const uint r2 = sq(x-cx) + sq(y-cy);
-            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = r2>R*R;
+            solid(x,y,gridSize.z-1-z) = solid(x,y,z) = r2>R*R ? 1 : (N++, 0);
         }
         real meanV_tube = dxP/(8*eta)*sq(R*dx);
         real epsilon_tube = PI*R*R/(gridSize.x*gridSize.y);
@@ -121,25 +124,27 @@ struct Test : Widget {
             for(int i: range(3*3*3)) cell[i] = 0;
             cell[1*3*3+1*3+1] = rho / w[1*3*3+1*3+1]; // Starts at rest
         }
-        t = 0; totalTime.reset();
+        t = 0;
+        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s","ε=",real(N)/real(gridSize.x*gridSize.y*gridSize.z));
     }
 
     tsc total, collide, stream, other;
     void step() {
+        if(t==0) log("Startup",totalTime);
         if(t==1) { profileStartStep=t; totalTime.reset(); total.start(); collide.reset(); stream.reset(); other.reset(); } // Resets after first timesteps to avoid inaccurate steady state timing profile (TODO: moving average)
         if(other) other.stop();
-        // Collision
+        // Collision (43%)
         collide.start();
         parallel(gridSize.z, [this](uint, uint z) {
-            const byte* solid = this->solid.cells;
+            const ICell* streamLookup = this->streamLookup.cells;
             const Cell* source = this->source.cells;
-            Cell* target = this->target.cells.begin();
+            real* target = this->target.begin();
             uint offsetZ = ::offsetZ[z];
             for(int y: range(gridSize.y)) {
                 uint offsetZY = offsetZ + ::offsetY[y];
                 for(int x: range(gridSize.x)) {
                     uint offset = offsetZY + ::offsetX[x];
-                    if(solid[offset]) continue;
+                    if(!streamLookup[offset]) continue;
                     const Cell& cell = source[offset];
                     real rho = 0, pux=0, puy=0, puz=0;
                     for(int i: range(3*3*3)) { //TODO: SIMD
@@ -151,7 +156,7 @@ struct Test : Widget {
                     }
                     constexpr real gz = (dt/(2*c))*g.z;
                     real ux = pux/rho, uy = puy/rho, uz = puz/rho + gz, sqU = ux*ux+uy*uy+uz*uz;
-                    for(int i=0; i<28; i+=4) { // Relaxation //TODO: SIMD
+                    for(int i=0; i<28; i+=4) { // Relaxation
                         const v4sf dotvu = float4(ux) * loada(vx+i) + float4(uy) * loada(vy+i) + float4(uz) * loada(vz+i); // m²/s²
                         static constexpr v4sf a1 = float4(sq(c)/E), a2 = float4(sq(sq(c)/E)/2), a3 = float4(sq(c)/(2*E));
                         const v4sf phieq = rho * (1 + a1 * dotvu + a2 * sq(dotvu) - a3 * float4(sqU)); // kg/m/s²
@@ -160,48 +165,49 @@ struct Test : Widget {
                         constexpr float b0 = dt/sqrt(E)*(1-dt/tau)*c*g.z;
                         static constexpr v4sf b1 = float4(b0/sqrt(E)), b2 = float4(b0*sq(c)/sqrt(cb(E)));
                         const v4sf body = float4(rho) * ( b1 * (loada(vz+i)-float4(uz)) + b2 * dotvu * loada(vz+i) ); // External body force
-                        storea(target[offset]+i, BGK + body);
+                        storea(target+offset*28+i, BGK + body);
                     }
                 }
             }
         });
         collide.stop();
-        // Streaming
+        // Streaming (55%)
+        real U[8]={};
         stream.start();
-        uint N[8]={}; real U[8]={};
-        parallel(gridSize.z, [this,&N,&U](uint id, uint z) {
-            const byte* solid = this->solid.cells;
+        parallel(gridSize.z, [this,&U](uint id, uint z) { //TODO: ZOrder
+            const ICell* streamLookup = this->streamLookup.cells;
             Cell* source = this->source.cells.begin();
-            const Cell* target = this->target.cells;
+            const real* target = this->target;
+            real Ui=0;
             uint offsetZ = ::offsetZ[z];
-            uint Ni=0; real Ui=0;
             for(int y: range(gridSize.y)) {
                 uint offsetZY = offsetZ + ::offsetY[y];
                 for(int x: range(gridSize.x)) {
                     uint offset = offsetZY + ::offsetX[x];
-                    if(solid[offset]) continue;
+                    if(!streamLookup[offset]) continue;
                     real rho = 0; real pu = 0;
-#define o(dx,dy,dz) ::stream<dx-1,dy-1,dz-1,dz*3*3+dy*3+dx>(solid,target,source,offset,x,y,z,rho,pu);
-                    o(0,0,0)o(1,0,0)o(2,0,0)o(0,1,0)o(1,1,0)o(2,1,0)o(0,2,0)o(1,2,0)o(2,2,0)
-                    o(0,0,1)o(1,0,1)o(2,0,1)o(0,1,1)o(1,1,1)o(2,1,1)o(0,2,1)o(1,2,1)o(2,2,1)
-                    o(0,0,2)o(1,0,2)o(2,0,2)o(0,1,2)o(1,1,2)o(2,1,2)o(0,2,2)o(1,2,2)o(2,2,2)
-#undef o
+                    for(uint index: range(27)) {
+                        real phi = target[streamLookup[offset][index]]; //Gather
+                        //TODO: SIMD
+                        source[offset][index] = phi;
+                        real wphi = w[index] * phi;
+                        rho += wphi;
+                        pu += wphi * vz[index];
+                    }
                     real u = pu/rho;
-                    Ni++;
                     Ui += u;
                 }
             }
-            N[id] += Ni;
             U[id] += Ui;
         });
         stream.stop();
-        uint n=0; real u=0; for(uint i: range(8)) n+=N[i], u+=U[i]; assert(n); u = c*( (dt/(2*c))*g.z + u/n); // Mean speed
+        real u=0; for(uint i: range(8)) u+=U[i]; u = c*( (dt/(2*c))*g.z + u/N); // Mean speed
         meanV = u;
-        real epsilon = real(n)/real(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
+        real epsilon = real(N)/real(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
         real k = epsilon * meanV * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
         t++;
         permeability.insert(t, k*1e15);
-        log(totalTime/(t-profileStartStep), "ms", meanV*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
+        log(t, totalTime/(t-profileStartStep), "ms", meanV*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
         other.start();
         window.render();
     }
@@ -241,7 +247,7 @@ struct Test : Widget {
         plot.dataSets << move(permeability);
         plot.render(position, size);
         permeability = move(plot.dataSets.first());
-        step();
+        if(t<256) step();
     }
 #endif
 
