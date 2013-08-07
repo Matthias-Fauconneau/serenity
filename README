@@ -15,10 +15,10 @@ Targets and arguments:
   - downsample = [0]|1
     Downsamples the volume by two.
     \note Unlike "resample", the full resolution is never stored in memory as downsampling is done as the slices are loaded.
-  - cylinder = x,y,r,z0,z1 | r
+  - cylinder = x,y,r,z0,z1 | r,z | r
     Crops the volume to the cylinder of radius r centered at (x,y) including all slices of coordinate z with z0<=z<z1 (i.e excluding z1 slice for a total z1-z0 slices)
     \note Voxel coordinates starts from zero
-  - box = x0,y0,z0,x1,y1,z1 | r
+  - box = x0,y0,z0,x1,y1,z1 | x,y,z | r
     Crops the volume to the box from x0,y0,z0 to x1,y1,z1
     \note Voxel coordinates starts from zero
   - extra

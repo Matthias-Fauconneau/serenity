@@ -44,7 +44,7 @@ class(Summary, Operation) {
         {Plot plot; plot.title = String("Representative elementary volume"_), plot.xlabel=String("R [μm]"_), plot.ylabel=String("ε"_);
             plot.legends << String("Pore size distribution deviation"); plot.dataSets << parseNonUniformSample(results.getResult("ε(R)"_, args)->data);
             plots << move(plot);}
-        {Plot plot; plot.title = String("Largest bottleneck radius"_), plot.xlabel=String("r [μm]"_), plot.ylabel=String("V"_);
+        {Plot plot; plot.title = String("Bottleneck radius"_), plot.xlabel=String("r [μm]"_), plot.ylabel=String("V"_);
             plot.legends << String("Unconnected volume"); plot.dataSets << parseNonUniformSample(results.getResult("unconnected(λ)"_, args)->data);
             plot.legends << String("Connected volume"); plot.dataSets << parseNonUniformSample(results.getResult("connected(λ)"_, args)->data);
             plots << move(plot);}

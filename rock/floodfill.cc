@@ -4,7 +4,7 @@
 
 /// Clips volume to values above a thresold
 void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
-    chunk_parallel(source.size(), [&](uint offset, uint size) {
+    chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
         const uint16* const sourceData = source + offset;
         uint16* const targetData = target + offset;
         for(uint i : range(size)) targetData[i] = sourceData[i] > threshold ? sourceData[i] : 0;
@@ -67,7 +67,7 @@ class(FloodFill, Operation), virtual VolumeOperation {
 
 void intersect(Volume8& target, const Volume8& A, const Volume8& B) {
     assert(A.size() == B.size() && A.tiled() == B.tiled() && A.maximum==1 && B.maximum==1);
-    chunk_parallel(target.size(), [&](uint offset, uint size) {
+    chunk_parallel(target.size(), [&](uint, uint offset, uint size) {
         const uint8* const aData = A + offset;
         const uint8* const bData = B + offset;
         uint8* const targetData = target + offset;

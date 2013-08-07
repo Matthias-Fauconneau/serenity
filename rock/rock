@@ -128,7 +128,10 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-background = ToPNG background
   png-position = ToPNG position
   png-distance = ToPNG distance invert=1
-  png-skeleton = ToPNG connected invert=1 binary=1
+  png-skeleton = ToPNG skeleton invert=1
+  png-unconnected = ToPNG unconnected invert=1 binary=1
+  png-pruned = ToPNG pruned invert=1
+  png-connected = ToPNG connected invert=1 binary=1
   png-maximum = ToPNG maximum invert=1
   png-flood = ToPNG flood
   png-denoised-connected = ToPNG denoised-connected
@@ -141,6 +144,8 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   bmp-denoised-connected = ToBMP denoised-connected
   pore-not-flood8 = Normalize8 pore-not-flood
   bmp-pore-not-flood = ToBMP pore-not-flood8
+  maximum-mask8 = Normalize8 maximum-mask
+  bmp-maximum-mask = ToBMP maximum-mask8
  # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected

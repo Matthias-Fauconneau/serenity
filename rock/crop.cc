@@ -9,9 +9,13 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
     int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
     if(args.contains("cylinder"_)) {
         Vector coordinates = parseVector(args.at("cylinder"_), true);
+        if(args.value("downsample"_,"0"_)!="0"_) coordinates = 1./2 * coordinates;
         if(coordinates.size==1) { // Crops centered cylinder
             int r = coordinates[0];
             min=center-int3(r), max=center+int3(r);
+        } else if(coordinates.size==2) { // Crops centered cylinder
+            int r = coordinates[0], z=coordinates[1];
+            min=center-int3(r,r,z/2), max=center+int3(r,r,z/2);
         } else if(coordinates.size==5) { // x,y,r,z0,z1
             int x=coordinates[0], y=coordinates[1], r=coordinates[2]; min.z=coordinates[3], max.z=coordinates[4];
             min.x=x-r, min.y=y-r, max.x=x+r, max.y=y+r;
@@ -20,6 +24,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
     }
     if(args.value("box"_,""_)) {
         Vector coordinates = parseVector(args.at("box"_), true);
+        if(args.value("downsample"_,"0"_)!="0"_) coordinates = 1./2 * coordinates;
         if(coordinates.size==1) { // Crops centered box
             int3 size = coordinates[0];
             min=center-size/2, max=center+size/2;
@@ -31,7 +36,6 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
         } else error("Expected box = size | size{x,y,z} | x0,y0,z0,x1,y1,z1, got", args.at("box"_));
         min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
     }
-    if(args.value("downsample"_,"0"_)!="0"_) min.x /=2, min.y /= 2, min.z /= 2, max.x /= 2, max.y /= 2, max.z /= 2;
 
     assert_(int(max.x-min.x) == int(max.y-min.y), min, max);
     if((max.x-min.x)%2) { if(max.x%2) max.x--; else assert(min.x%2), min.x++; }
@@ -54,7 +58,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
     margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
     assert_(int3(0)<=sourceMin, "source min:", sourceMin);
-    assert_(sourceMin<=min, "source min:", sourceMin, "crop min:", min);
+    assert_(sourceMin<=min, "source min:", sourceMin, "crop min:", min, "crop max:", max, "source max:", sourceMax);
     assert_(min<max, "crop min:", min, "crop max:", max);
     assert_(max<=sourceMax, "crop max:", max, "source max:", sourceMax);
     return {min, max, size, sampleCount, margin, !args.contains("box"_)};

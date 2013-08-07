@@ -33,7 +33,7 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real
     UniformSample pdf ( sampleCount );
     pdf.scale = delta / (normalize ? max : 1);
     const real scale = 1./( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
-    chunk_parallel(pdf.size, [&](uint offset, uint size) { for(uint i : range(offset, offset+size)) {
+    chunk_parallel(pdf.size, [&](uint, uint offset, uint size) { for(uint i : range(offset, offset+size)) {
         const real x0 = i*delta;
         real sum = 0;
         for(auto sample: histogram) sum += real(sample.value) * exp(-1./2*sq((x0-sample.key)/h));

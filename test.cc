@@ -57,7 +57,7 @@ constexpr real vz[28] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,
 
 struct Test : Widget {
     buffer<uint> latticeLookup{gridSize.x*gridSize.y*gridSize.z}; // Index from coordinates to compressed stream,source,target buffers (-1 = solid)
-    static constexpr uint Solid = ~0;
+    static constexpr uint Solid = -1;
     buffer<uint> streamLookup; //[28N] Index into target to stream each lattice velocity
     buffer<real> source;//[28N] Mass density (kg/m³) for each lattice velocity (collision->stream)
     buffer<real> target;//[28N] Mass density (kg/m³) for each lattice velocity (stream->collision)
@@ -75,25 +75,25 @@ struct Test : Widget {
     real meanV = 1; // in lattice unit speed [c]
     NonUniformSample permeability;
 
-#if TUBE
-    const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
-    const uint R = min(cx,cy)/8;
-#endif
-
     void setup() {
         Volume16 volume;
         const string path = arguments()[0];
+        TextData s(path); s.until('-'); uint resolution = s.integer(); assert_(resolution == round(dx*1e9), resolution, int(round(dx*1e9)));
         parseVolumeFormat(volume, section(path,'.',-2,-1));
-        assert_(volume.margin==int3(0) && volume.sampleCount==int3(gridSize.x,gridSize.y,gridSize.z/2));
+        const int X=gridSize.x, Y=gridSize.y, Z=gridSize.z;
+        const int marginX=volume.margin.x, marginY=volume.margin.z, marginZ=volume.margin.z;
+        assert_(marginZ==0 && volume.sampleCount==int3(gridSize.x,gridSize.y,gridSize.z/2), volume.margin);
         Map map(path, currentWorkingDirectory());
         volume.data = buffer<byte>(map);
-        int X=gridSize.x, Y=gridSize.y, Z=gridSize.z;
+        Time latticeTime;
         for(int index : range(X*Y*Z)) { // Setup lattice lookup
             int3 xyz = zOrder(index); int x=xyz.x, y=xyz.y, z=xyz.z;
             uint offset = z*Y*X+y*X+x; // Simple layout (only used during setup)
 #if !TUBE // Import pore space from volume data file
-            if(volume(x,y,z<gridSize.z/2?z:gridSize.z-1-z)) {
+            if(x>=marginX && x<X-marginX && y>=marginY && y<Y-marginY && volume(x,y,z<gridSize.z/2?z:gridSize.z-1-z)) {
 #else // Initialize pore space to tube
+            const int cx = (gridSize.x-1)/2, cy = (gridSize.y-1)/2;
+            const uint R = 64;
             const uint r2 = sq(x-cx) + sq(y-cy);
             if(r2<=R*R) {
 #endif
@@ -103,11 +103,13 @@ struct Test : Widget {
                 latticeLookup[offset] = Solid;
             }
         }
+        log("Lattice setup", latticeTime);
         assert_(N<1u<<31);
         streamLookup = buffer<uint>(28*N); //TODO: mmap
         source = buffer<real>(28*N); //TODO: mmap
         target = buffer<real>(28*N+1); //TODO: mmap
         target[28*N] = 0;
+        Time streamTime;
         for(int z: range(gridSize.z)) for(int y: range(gridSize.y)) for(int x: range(gridSize.x)) { // Setup stream lookup
             uint offset = latticeLookup[z*Y*X+y*X+x];
             if(offset!=Solid) {
@@ -127,6 +129,7 @@ struct Test : Widget {
                 cell[1*3*3+1*3+1] = rho / w[1*3*3+1*3+1]; // Starts at rest
             }
         }
+        log("Stream setup", streamTime);
 #if !SLICE
         latticeLookup=buffer<uint>();
 #endif
@@ -196,7 +199,7 @@ struct Test : Widget {
             U[id] += extractf(Ui, 0);
         });
         stream.stop();
-        real u=0; for(uint i: range(8)) u+=U[i]; u = ( (dt/(2*c))*g.z + u/N); // Mean speed
+        real u=0; for(uint i: range(8)) u+=U[i]; u = ( /*(dt/(2*c))*g.z +*/ u/N); // Mean speed
         meanV = u;
         real epsilon = real(N)/real(gridSize.x*gridSize.y*gridSize.z); // Porosity ε
         real k = epsilon * meanV*c * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
@@ -204,6 +207,7 @@ struct Test : Widget {
         permeability.insert(t, k*1e15);
         log(t, totalTime/(t-profileStartStep), "ms", meanV*c*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
 #if TUBE
+        const uint R = 64;
         real meanV_tube = dxP/(8*eta)*sq(R*dx);
         real epsilon_tube = PI*R*R/(gridSize.x*gridSize.y);
         real k_tube = epsilon_tube * meanV_tube * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)

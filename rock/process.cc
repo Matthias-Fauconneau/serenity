@@ -284,20 +284,28 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
+static array<string> depChain;
 shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments) {
+    depChain << target;
     const Rule& rule = ruleForOutput(target, arguments);
-    if(!&rule && arguments.contains(target)) // Conversion from argument to result
+    if(!&rule && arguments.contains(target)) { // Conversion from argument to result
+        depChain.pop();
         return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_);
+    }
     assert_(&rule, "Unknown rule", target);
 
     // Simple forwarding rule
     if(!rule.operation) {
         assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded", rule);
+        depChain.pop();
         return getResult(rule.inputs.first(), arguments);
     }
 
     const shared<Result>& result = find(target, arguments);
-    if(&result && sameSince(target, result->timestamp, arguments)) return share(result); // Returns a cached result if still valid
+    if(&result && sameSince(target, result->timestamp, arguments)) {
+        depChain.pop();
+        return share(result); // Returns a cached result if still valid
+    }
     // Otherwise regenerates target using new inputs, arguments and/or implementations
 
     array<shared<Result>> inputs;
@@ -309,6 +317,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     compute(rule.operation, inputs, rule.outputs, arguments, relevantArguments, localArguments);
     assert_(&find(target, arguments), target, arguments);
+    depChain.pop();
     return share(find(target, arguments));
 }
 
@@ -354,13 +363,37 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                     String dataFile = ResultFile::indirectID ? fileID+".data"_ : copy(file);
                     if(ResultFile::indirectID && !existsFile(dataFile,storageFolder)) { remove(file,storageFolder); continue; } // Data already removed (removes metadata file)
                     String id = ResultFile::indirectID ? readFile(file, storageFolder) : copy(file);
-                    TextData s(id); s.whileNot('{'); if(!s) continue; parseDict(s); int userCount=s.mayInteger(); if(userCount>1 || !s.match('.')) continue; // Used data or not a process data
+                    TextData s(id); string name = s.whileNot('{'); if(!s) continue; Dict relevantArguments = parseDict(s); int userCount=s.mayInteger(); if(!s.match('.')) continue; // Used data or not a process data
+                    //FIXME: getting process (internal) userCount (BUG: filesystem (global) userCount is not up to date)
+                    for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) { userCount = results[i]->userCount; break; }
+                    if(userCount>1) continue; // Used data
+
                     if(File(dataFile, storageFolder).size() < 2<<20) continue; // Small files won't release much capacity
                     if(!(File(dataFile, storageFolder).stat().st_mode&S_IWUSR)) continue; // Locked file
                     long timestamp = File(dataFile, storageFolder).accessTime();
                     if(timestamp < minimum) minimum=timestamp, oldestMeta=move(id), oldestData=move(dataFile);
                 }
-                if(!oldestMeta) { if(outputSize<=6l<<30) error("Not enough space available for",output," need"_,outputSize,"B, only",available(storageFolder),"B available on",storageFolder.name()); else break; /*Virtual*/ }
+                if(!oldestMeta) {
+                    log(capacity(storageFolder));
+                    if(outputSize<capacity(storageFolder)) { // 6l<<30 or capacity(storageFolder) ?
+                        log("Dependency chain:", depChain);
+                        log("Results:");
+                        for(const shared<Result>& result: results) {
+                            if(result->data.size >= 2<<20 ) log(result->name, result->userCount,  result->data.size);
+                        }
+                        log("File system:");
+                        for(String& file: storageFolder.list(Files)) { // Lists required results
+                            if(ResultFile::indirectID && !endsWith(file,".meta"_)) continue;
+                            string fileID = file.slice(0,file.size-".meta"_.size);
+                            String dataFile = ResultFile::indirectID ? fileID+".data"_ : copy(file);
+                            assert(!(ResultFile::indirectID && !existsFile(dataFile,storageFolder)));
+                            String id = ResultFile::indirectID ? readFile(file, storageFolder) : copy(file);
+                            TextData s(id); s.whileNot('{'); if(!s) continue; parseDict(s); int userCount=s.mayInteger();
+                            if(File(dataFile, storageFolder).size() >= 2<<20) log(id, userCount, File(dataFile, storageFolder).size() );
+                        }
+                        error("Not enough space available for",output," need"_,outputSize/1e6,"MB, only",available(storageFolder)/1e6,"MB available on",storageFolder.name());
+                    } else break; /*Virtual*/
+                }
                 TextData s (oldestMeta); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->id.clear(); // Prevents rename

@@ -10,7 +10,7 @@
 /// Reference counter to be inherited by shared objects
 struct shareable {
     virtual void addUser() { ++userCount; }
-    virtual uint removeUser() { return --userCount; }
+    virtual uint removeUser() { error("removeUser"); return --userCount; }
     uint userCount = 1;
 };
 

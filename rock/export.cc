@@ -117,10 +117,10 @@ class(Mask, Operation), virtual VolumeOperation {
     }
 };
 
-/// Maps intensity to either red or green channel depending on binary classification
+/// Maps intensity to either blue or green channel depending on binary classification
 void colorize(Volume24& target, const Volume16& source, uint16 threshold) {
     const uint maximum = source.maximum;
-    chunk_parallel(source.size(), [&](uint offset, uint size) {
+    chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
         const uint16* const sourceData = source + offset;
         bgr* const targetData = target + offset;
         for(uint i : range(size)) {
@@ -139,7 +139,6 @@ class(Colorize, Operation), virtual VolumeOperation {
         colorize(outputs[0], inputs[0], integerThreshold);
     }
 };
-
 
 /// Exports volume to 8bit PNGs for visualization (normalized and gamma corrected)
 class(ToPNG, Operation), virtual VolumeOperation {
@@ -272,6 +271,11 @@ static String toCDL(const Volume& source) {
     return data;
 }
 class(ToCDL, Operation), virtual VolumeOperation {
+    size_t outputSize(const Dict&, const ref<Result*>& inputs, uint) override {
+        assert_(inputs);
+        assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
+        return toVolume(*inputs[0]).size() * 16;
+    }
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
         outputs[0]->metadata = String("cdl"_);
         outputs[0]->data = toCDL(inputs[0]);

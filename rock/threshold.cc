@@ -169,7 +169,7 @@ void binary(Volume8& target, const Volume16& source, uint16 threshold, bool inve
     if(cylinder) {
         assert_(X-2*marginX==Y-2*marginY);
         radiusSq = sq(X/2-marginX);
-        log("Masking to cylinder");
+        //log("Masking to cylinder");
     }
     uint8 mask[X*Y]; // Disk mask
     for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq;
@@ -194,7 +194,7 @@ void binary(Volume8& target, const Volume16& source, uint16 threshold, bool inve
             }
         }
     });
-    warn(count[0] && count[1], "Empty segmentation using threshold", threshold);
+    if(!(count[0] && count[1])) warn("Empty segmentation using threshold", threshold);
     target.maximum=1;
 }
 

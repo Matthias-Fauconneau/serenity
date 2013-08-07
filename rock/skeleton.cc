@@ -7,13 +7,13 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
     int sqNorm = sq(x0d) + sq(y0d) + sq(z0d); // Squared distance between feature points
     int xd=x+dx, yd=y+dy, zd=z+dz; // Second origin point
-    int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd; // Bisector (vector bisecting
+    int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd; // Bisector
     int sqDistance = sq(dx0d) + sq(dy0d) + sq(dz0d);
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     float norm = sqrt(float(sqDistance));
     // Prune using all methods (as rasterization is the bottleneck)
     if( sqNorm > minimalSqDiameter &&  // Constant pruning: feature point far enough apart (may filter small features)
-         //sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 53° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
+         //sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 126° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
          sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
             ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
@@ -55,5 +55,7 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
 class(Skeleton, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { integerMedialAxis(outputs[0],inputs[0], /*3*/1); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        integerMedialAxis(outputs[0],inputs[0], /*λ²=*/1); // 3 will remove artifacts due to discrete background but may also round corners
+    }
 };
