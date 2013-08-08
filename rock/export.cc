@@ -231,7 +231,7 @@ class(ToASCII, Operation), virtual VolumeOperation {
 
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
-static String toCDL(const Volume& source) {
+static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
     uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
@@ -255,9 +255,10 @@ static String toCDL(const Volume& source) {
     }
     positions.size = positionIndex-positions.begin(); assert(positions.size <= positions.capacity);
     values.size = valueIndex-values.begin(); assert(values.size <= values.capacity);
-    uint valueCount = values.size / (valueSize+1);
+    uint64 valueCount = values.size / (valueSize+1);
     string header = CDL();
-    String data (header.size + 3*valueCount*"0,"_.size + positions.size + values.size);
+    String data; data.data = outputBuffer.data, data.size=0, data.capacity=outputBuffer.size;
+    assert_(header.size + 3*valueCount*"0,"_.size + positions.size + values.size <= data.capacity);
     for(TextData s(header);;) {
         data << s.until('$'); // Copies header until next substitution
         /***/ if(s.match('#')) data << str(valueCount); // Substitutes non-zero values count
@@ -268,16 +269,18 @@ static String toCDL(const Volume& source) {
         else if(!s) break;
         else error("Unknown substitution",s.until(';'));
     }
-    return data;
+    assert_(data.size < outputBuffer.size);
+    data.capacity = 0; // Actually not heap allocated
+    outputBuffer.size = data.size;
 }
 class(ToCDL, Operation), virtual VolumeOperation {
     size_t outputSize(const Dict&, const ref<Result*>& inputs, uint) override {
         assert_(inputs);
         assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
-        return toVolume(*inputs[0]).size() * 16;
+        return toVolume(*inputs[0]).size() * 32;
     }
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
         outputs[0]->metadata = String("cdl"_);
-        outputs[0]->data = toCDL(inputs[0]);
+        toCDL(outputs[0]->data, inputs[0]);
     }
 };

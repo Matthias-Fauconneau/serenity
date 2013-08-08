@@ -243,7 +243,7 @@ String ftoa(double n, int precision, int pad, int exponent, bool inf) {
 
 String binaryPrefix(size_t value, string unit) {
     if(value < 1u<<10) return str(value, unit);
-    if(value < 10u<<20) return str(value>>10,"ki"_+unit);
-    if(value < 10u<<30) return str(value>>20,"Mi"_+unit);
-    return str(value>>30,"Gi"_+unit);
+    if(value < 10u<<20) return str(value/1e3,"ki"_+unit);
+    if(value < 10u<<30) return str(value/1e6,"Mi"_+unit);
+    return str(value/1e9,"Gi"_+unit);
 }

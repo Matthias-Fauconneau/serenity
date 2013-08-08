@@ -56,7 +56,13 @@ Targets and arguments:
    The threshold determination method to use or a manual threshold (given either in normalized or integer radiodensity)
    \note Otsu is the recommended robust statistic method, gradient is for backward compatibility only, Lorentz is an explicit model which may be more accurate but is prone to fail.
    \note otsu-parameters, otsu-interclass-deviation[-normalized], gradient-mean, lorentz-parameters, lorentz-rock, lorentz-notrock, lorentz-pore, lorentz-notpore can be used for insight in the determination.
-- colorize (visualization)
+- transposed (internal)
+   Transposed volume (to use an alternate cylinder axis)
+  - transpose = X|Y|[Z]
+     Input axis to map to the cylinder Z axis.
+- rock (internal)
+   Binary segmentation mask
+- colored (visualization)
   Visualization of radiodensities colored by the binary segmentation (pore in green, rock in red)
 - distance (internal)
   Distance field (squared distance from every pore voxel to the nearest rock voxel)
@@ -70,10 +76,6 @@ Targets and arguments:
   Cropped processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
   - crop.cylinder = x,y,r,z0,z1 | r
    Specification of the cylinder to crop in the original source coordinate (i.e before source crop (not this input))
-- transposed (internal)
- Transposed volume (to use an alternate connectivity axis when floodfilling)
- - transpose = X|Y|[Z]
-  Input axis to map to the output Z axis.
 - connected (internal)
  Skeleton without unconnected pores.
  connect-pore = 0|[1]

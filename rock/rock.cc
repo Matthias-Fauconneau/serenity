@@ -79,7 +79,7 @@ struct Rock : virtual PersistentProcess {
                         log(path+"/"_+fileName, "["_+binaryPrefix(data.size)+"]"_, time);
                     } else {
                         Time time;
-                        assert_(!(existsFile(path, cwd) && File(path, cwd).size() >= 1<<30 && data.size <= 1<<20), "Would override large existing result, need to be removed manually", path);
+                        //assert_(!(existsFile(path, cwd) && File(path, cwd).size() >= 4<<30 && data.size <= 1<<20), "Would override large existing result, need to be removed manually", path);
                         writeFile(path, data, cwd);
                         log(fileName,"->",path, "["_+binaryPrefix(data.size)+"]"_, time);
                     }

@@ -98,7 +98,6 @@ struct Thread : array<Poll*>, EventFD, Poll {
     int tid=0; // Thread system identifier
     pthread_t thread;
     Lock lock;
-    Map stack;
 
     Thread(int priority=0);
     ~Thread(){Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/}

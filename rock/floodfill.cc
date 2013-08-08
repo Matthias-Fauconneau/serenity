@@ -2,6 +2,16 @@
 #include "thread.h"
 #include "time.h"
 
+/// Transposes a volume permuting its coordinates
+void transpose(Volume16& target, const Volume16& source) {
+    const uint sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
+    const uint tX=sY, tY=sZ;
+    const uint16* const sourceData = source;
+    uint16* const targetData = target;
+    for(uint z: range(sZ)) for(uint y: range(sY)) for(uint x: range(sX)) targetData[x*tX*tY + z*tX + y] = sourceData[z*sX*sY + y*sX + x];
+}
+defineVolumePass(Transpose, uint16, transpose);
+
 /// Clips volume to values above a thresold
 void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
     chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
@@ -24,9 +34,9 @@ void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, ui
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint8* const sourceData = source;
 
-    buffer<short3> stackBuffer(1<<27); // 1024³~128MiB
+    buffer<short3> stackBuffer(1<<28); // 3GiB
     short3* const stack = stackBuffer.begin();
-    int stackSize=0;
+    uint64 stackSize=0;
 
     // Seeds faces
     if(seed[0]=='1') for(uint z=marginZ;z<Z-marginZ;z++) for(uint y=marginY;y<Y-marginY;y++) stack[stackSize++] = short3(marginX+margin,y,z);
@@ -46,10 +56,11 @@ void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, ui
         for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
             uint nx=x+dx, ny=y+dy, nz=z+dz;
             if(nx<marginX || nx>=X-marginX || ny<marginY || ny>=Y-marginY || nz<marginZ || nz>=Z-marginZ) continue;
-            uint index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
+            uint64 index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
             if(sourceData[index] && !targetData[index]) {
                 targetData[index] = sourceData[index]; // Marks previously unvisited skeleton voxel
                 stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
+                assert_(stackSize<stackBuffer.capacity);
             }
         }
     }

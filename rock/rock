@@ -35,11 +35,18 @@ otsu-interclass-deviation-normalized = NormalizeAreaXY otsu-interclass-deviation
 if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-radiodensity-unnormalized # Use this method for backward compatibility only
 if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
 
+# Transposes to use an alternate cylinder axis
+transpose = Transpose resampled
+if transpose=='X': transposed = transpose
+if transpose=='Y': transposed = Transpose transpose
+if transpose=='Z': transposed = resampled
+if !transpose: transposed = resampled
+
 # Segments
-rock = Binary resampled threshold box=source.box mask=1 # if !box: Also clips to cylinder before distance field evaluation
-colored = Colorize resampled threshold # For visualization
-background = Maximum resampled threshold # For visualization
-foreground = Minimum resampled threshold # For visualization
+rock = Binary transposed threshold box=source.box mask=1 # if !box: Also clips to cylinder before distance field evaluation
+colored = Colorize transposed threshold # For visualization
+background = Maximum transposed threshold # For visualization
+foreground = Minimum transposed threshold # For visualization
 
 # Discards unconnected rocks
 if !connect-rock: rock-connected = rock # Forwards unconnected skeleton

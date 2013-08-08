@@ -22,7 +22,7 @@ class(Summary, Operation) {
         UniformGrid<Item> slices;
         int scale=0;
         args.insert(String("z"_),0.5);
-        for(auto target: map<string, string>({"png-denoised"_, "png-background"_, "png-skeleton"_, "png-maximum"_},{"Density"_,"Pore"_,"Skeleton"_,"Maximum"_})) {
+        for(auto target: map<string, string>({"png-denoised"_, "png-background"_, "png-connected"_, "png-maximum"_},{"Density"_,"Pore"_,"Skeleton"_,"Maximum"_})) {
             shared<Result> result = results.getResult(target.key, args);
             Image slice = decodeImage(result->data);
             assert_(slice);
@@ -32,6 +32,13 @@ class(Summary, Operation) {
         args.remove("z"_);
         vbox << &slices;
         output(outputs, "slices"_, "png"_, [&]{VBox vbox (Linear::Share, Linear::Expand); vbox<<&header<<&slices; return encodePNG(renderToImage(&vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));});
+        HList<Text> properties;
+        properties << Text("Porosity: "_+format(Bold)+dec(round(parseScalar(results.getResult("porosity"_, args)->data)*100))+"%"_);
+        real resolution = parseScalar(results.getResult("resolution"_, args)->data);
+        for(auto result : map<string, string>({"critical-radius"_,"mean-radius"_,"representative-radius"_},{"Critical bottleneck radius"_,"Mean pore radius"_,"Representative radius"_})) {
+            real length = parseScalar(results.getResult(result.key, args)->data);
+            properties << Text(result.value+": "_+format(Bold)+dec(round(resolution*length))+" μm ("_+dec(round(length))+" vx)"_);
+        }
         UniformGrid<Plot> plots;
         assert_(args.at("threshold"_)=="otsu"_);
         {Plot otsu; otsu.title = String("Interclass deviation versus threshold"_), otsu.xlabel=String("μ"_), otsu.ylabel=String("σ"_);
@@ -49,13 +56,6 @@ class(Summary, Operation) {
             plot.legends << String("Connected volume"); plot.dataSets << parseNonUniformSample(results.getResult("connected(λ)"_, args)->data);
             plots << move(plot);}
         vbox << &plots;
-        HList<Text> properties;
-        properties << Text("Porosity: "_+format(Bold)+dec(round(parseScalar(results.getResult("porosity"_, args)->data)*100))+"%"_);
-        real resolution = parseScalar(results.getResult("resolution"_, args)->data);
-        for(auto result : map<string, string>({"critical-radius"_,"mean-radius"_,"representative-radius"_},{"Critical bottleneck radius"_,"Mean pore radius"_,"Representative radius"_})) {
-            real length = parseScalar(results.getResult(result.key, args)->data);
-            properties << Text(result.value+": "_+format(Bold)+dec(round(resolution*length))+" μm ("_+dec(round(length))+" vx)"_);
-        }
         vbox << &properties;
         output(outputs, "plots"_, "png"_, [&]{VBox vbox (Linear::Share, Linear::Expand); vbox<<&plots<<&properties; return encodePNG(renderToImage(&vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));});
         output(outputs, "summary"_, "png"_, [&]{return encodePNG(renderToImage(&vbox, 2*pageSize, 1.5*96/*dpi*/));});
