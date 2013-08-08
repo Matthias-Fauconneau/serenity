@@ -24,7 +24,7 @@ UniformHistogram histogram(const Volume16& source, CropVolume crop) {
                     const uint16* sourceZYX = sourceZY + offsetX[x];
                     if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
                         uint sample = sourceZYX[0];
-                        assert(sample <= source.maximum);
+                        assert_(sample <= source.maximum, sample, source.maximum);
                         histogram[sample]++;
                     }
                 }
@@ -37,7 +37,7 @@ UniformHistogram histogram(const Volume16& source, CropVolume crop) {
                     const uint16* sourceZYX = sourceZY + x;
                     if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
                         uint sample = sourceZYX[0];
-                        assert(sample <= source.maximum);
+                        assert_(sample <= source.maximum, sample, source.maximum);
                         histogram[sample]++;
                     }
                 }

@@ -86,7 +86,7 @@ if connect-pore=='top': connected = connected-top
 if connect-pore=='1': connected = connected-both
 
 # Rasterizes skeleton voxel as maximum spheres
-connected-skeleton = Mask crop connected invert=1 value=0
+connected-skeleton = Mask connected crop invert=1 value=0
 sphere-bins = Bin connected-skeleton
 maximum = Rasterize sphere-bins
 
@@ -123,7 +123,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
  maximum-mask = Binary maximum threshold threshold=1 box=crop.box
- denoised-connected = Mask denoised-tiled maximum-mask
+ denoised-connected = Mask maximum-mask denoised-tiled
  pore = Negate rock
  flood = Add pore maximum-mask
  not-flood = Negate maximum-mask

@@ -96,7 +96,7 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
             const short2* const sourceYX = sourceY + x*Z;
             short3* const targetYX = targetY + x;
             int Q[width]; uint16 S[width][Z], T[width][Z];
-            for(uint dx: range(width)) {
+            for(int64 dx: range(width)) {
                 int& q = Q[dx];
                 uint16* const s = S[dx];
                 uint16* const t = T[dx];
@@ -111,8 +111,8 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
                     }
                 }
             }
-            for(int u=Z-1; u>=0; u--) { // Backward scan
-                for(uint dx: range(width)) {
+            for(int64 u=Z-1; u>=0; u--) { // Backward scan
+                for(int64 dx: range(width)) {
                     int& q = Q[dx];
                     uint16* const s = S[dx];
                     uint16* const t = T[dx];

@@ -99,12 +99,19 @@ class(Minimum, Operation), virtual VolumeOperation {
 };
 
 /// Sets masked (mask=0) voxels where source is under/over masked value to masked value
-static void mask(Volume16& target, const Volume16& source, const Volume8& mask, uint16 value, bool invert) {
-    assert_(source.size()==mask.size() && target.size() == source.size() && target.tiled() && source.tiled() && mask.tiled(), source, mask, target, source.sampleCount-2*source.margin, mask.sampleCount-2*mask.margin, target.sampleCount-2*target.margin);
-    target.margin = mask.margin;
-    const uint8* const maskData = mask; const uint16* const sourceData = source; uint16* const targetData = target;
-    if(invert) for(uint index: range(source.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s<value ? s: value; }
-    else for(uint index: range(source.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s>value ? s: value; }
+static void mask(Volume16& target, const Volume8& mask, const Volume16& source, uint16 value, bool invert) {
+    assert_(mask.sampleCount-2*mask.margin<=source.sampleCount-2*source.margin);
+    if(mask.sampleCount == source.sampleCount && mask.tiled()==source.tiled()) {
+        const uint8* const maskData = mask; const uint16* const sourceData = source; uint16* const targetData = target;
+        if(invert) for(uint index: range(mask.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s<value ? s: value; }
+        else for(uint index: range(mask.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s>value ? s: value; }
+    } else {
+        int3 offset = source.margin-mask.margin; assert_(offset>int3(0));
+        const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z;
+        if(invert) for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { uint16 s = source(offset.x+x,offset.y+y,offset.z+z); target(x,y,z) = mask(x,y,z) || s<value ? s: value; }
+        else for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { uint16 s = source(offset.x+x,offset.y+y,offset.z+z); target(x,y,z) = mask(x,y,z) || s>value ? s: value; }
+    }
+    target.maximum = source.maximum; target.squared=source.squared;
 }
 class(Mask, Operation), virtual VolumeOperation {
     virtual string parameters() const { return "value invert"_; }

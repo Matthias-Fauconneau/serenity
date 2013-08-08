@@ -246,7 +246,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
         shared<ResultFile> result;
         if(!existsFolder(dataFile, storageFolder)) {
             File file = File(dataFile, storageFolder, ReadWrite);
-            if(file.size()<pageSize) { // Small file (<4K)
+            if(file.size()<(1<<16)) { // Small file (<64K)
                 result = shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), file.read(file.size()), dataFile, storageFolder.name());
             } else { // Memory-mapped file
                 result = shared<ResultFile>(name, file.modifiedTime(), move(arguments), String(metadata), Map(file, Map::Prot(Map::Read|Map::Write)), dataFile, storageFolder.name());
@@ -258,7 +258,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
                 string key = section(dataFile,'.',0,1), metadata=section(dataFile,'.',1,-1);
                 assert_(metadata == result->metadata);
                 File file = File(dataFile, folder, ReadWrite);
-                if(file.size()<pageSize) { // Small file (<4K)
+                if(file.size()<(1<<16)) { // Small file (<64K)
                     result->elements.insert(String(key), file.read(file.size()));
                 } else { // Memory-mapped file
                     result->maps << Map(file, Map::Prot(Map::Read|Map::Write));
@@ -391,7 +391,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                             if(File(dataFile, storageFolder).size() >= 2<<20) log(id, userCount, File(dataFile, storageFolder).size() );
                         }
                         error("Not enough space available for",output," need"_,outputSize/1e6,"MB, only",available(storageFolder)/1e6,"MB available on",storageFolder.name());
-                    } else break; /*Virtual*/
+                    } else { log("Overcommitting", outputSize/1024.0/1024.0/1024.0, "GiB /", capacity(storageFolder)/1024.0/1024.0/1024.0,"GiB"); break; } /*Overcommit virtual memory*/
                 }
                 TextData s (oldestMeta); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
@@ -413,7 +413,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
 
             File file(outputFileID, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
-            if(outputSize>=pageSize) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>6l<<30?0:Map::Populate)));
+            if(outputSize>=(1<<16)) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>6l<<30?0:Map::Populate)));
         }
         outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }
@@ -444,7 +444,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                 assert_(result->maps.size == 1);
                 mappedSize = result->maps[0].size;
                 assert_(mappedSize);
-                if(mappedSize<pageSize) result->data = copy(result->data); // Copies to anonymous memory before unmapping
+                if(mappedSize<(1<<16)) result->data = copy(result->data); // Copies to anonymous memory before unmapping
                 result->maps.clear();
             }
             File file = 0;
@@ -457,7 +457,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                 assert(result->data);
                 file.write(result->data);
             }
-            if(result->data.size>=pageSize) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)
+            if(result->data.size>=(1<<16)) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)
                 result->maps << Map(file);
                 result->data = buffer<byte>(result->maps.last());
             }

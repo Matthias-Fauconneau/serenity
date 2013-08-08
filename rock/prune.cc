@@ -19,14 +19,14 @@ class(Prune, Operation) {
             {args.at("connect-pore"_) = 0;
                 shared<Result> result = results.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;
-                log("unconnected\t", "√"_+str(r*r),"="_, r,"vx", resolution*r,"μm", ftoa(relativeVolume,4));
+                log("unconnected\t", "√"_+str(int(r*r)),"="_, r,"vx", resolution*r,"μm", ftoa(relativeVolume,4));
                 unconnectedVolume.insert(resolution*r, relativeVolume);
             }
             {args.at("connect-pore"_) = 1;
                 if(arguments.contains("connect-pore"_)) args.at("connect-pore"_) = copy(arguments.at("connect-pore"_));
                 shared<Result> result = results.getResult("volume"_, args); // Pore space volume (in voxels)
                 real relativeVolume = parseScalar(result->data) / totalVolume;
-                log(args.at("connect-pore"_)?:"connected"_,"\t", "√"_+str(r*r),"="_, r,"vx", resolution*r,"μm", ftoa(relativeVolume,4));
+                log(args.at("connect-pore"_)?:"connected"_,"\t", "√"_+str(int(r*r)),"="_, r,"vx", resolution*r,"μm", ftoa(relativeVolume,4));
                 connectedVolume.insert(resolution*r, relativeVolume);
                 if(!relativeVolume) break;
                 criticalRadius = r;

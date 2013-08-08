@@ -22,7 +22,7 @@ struct Volume {
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }
     size_t index(uint x, uint y, uint z) const {
-        assert(x<uint(sampleCount.x) && y<uint(sampleCount.y) && z<uint(sampleCount.z));
+        assert_(x<uint(sampleCount.x) && y<uint(sampleCount.y) && z<uint(sampleCount.z));
         return tiled() ? offsetX[x]+offsetY[y]+offsetZ[z] : uint64(z)*uint64(sampleCount.x*sampleCount.y)+y*sampleCount.x+x;
     }
     size_t index(int3 position) const { return index(position.x, position.y, position.z); }
