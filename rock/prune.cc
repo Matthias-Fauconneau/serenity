@@ -38,7 +38,10 @@ class(Prune, Operation) {
         output(outputs, "P(Sw)"_, "P [Pa](Sw).tsv"_, [&]{
             NonUniformSample P_Sw;
             const real gamma = 0.025 * 1e6; // Surface tension between oil and water (N/μm)
-            for(auto point: connectedVolume) P_Sw.insertMulti((connectedVolume[0]-point.value)/connectedVolume[0], gamma/(2*max(1.,point.key)));
+            for(auto point: connectedVolume) if(point.key>0) {
+                const real P = gamma/(2*point.key); // P=γ/2R
+                P_Sw.insertMulti((connectedVolume[0]-point.value)/connectedVolume[0], P);
+            }
             P_Sw.insertMulti(1,0);
             return toASCII(P_Sw);
         });

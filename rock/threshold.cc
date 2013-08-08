@@ -52,7 +52,7 @@ class(Otsu, Operation) {
                     "backgroundMean "_+str(parameters[2])+"\n"_
                     "foregroundMean "_+str(parameters[3])+"\n"_
                     "maximumDeviation "_+str(sqrt(maximumVariance/sq(totalCount)))+"\n"_; } );
-        output(outputs, "otsu-interclass-deviation"_, "σ(μ).tsv"_, [&]{ return toASCII(normalize(squareRoot(interclassVariance))); } );
+        output(outputs, "otsu-interclass-deviation"_, "σ(μ).tsv"_, [&]{ return "#Otsu Interclass Deviation\n"_+toASCII(normalize(squareRoot(interclassVariance))); } );
     }
 };
 

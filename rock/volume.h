@@ -64,9 +64,9 @@ uint maximum(const Volume16& source);
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);
 
-/// Returns an image of a volume slice (for visualization)
-Image slice(const Volume& volume, real z, bool normalize, bool gamma, bool invert=false, bool binary=false);
-Image slice(const Volume& volume, int z, bool normalize, bool gamma, bool invert=false, bool binary=false);
+/// Returns an 8bit image of a volume slice (for visualization)
+Image slice(const Volume& volume, real z, bool cylinder, bool normalize, bool gamma, bool invert=false, bool binary=false);
+Image slice(const Volume& volume, int z, bool cylinder, bool normalize, bool gamma, bool invert=false, bool binary=false);
 
-/// Returns an image of a volume slice (for interoperation)
+/// Returns a 16bit image of a volume slice (for interoperation)
 Image16 slice(const Volume& volume, int z);

@@ -34,7 +34,7 @@ void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, ui
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const uint8* const sourceData = source;
 
-    buffer<short3> stackBuffer(1<<28); // 3GiB
+    buffer<short3> stackBuffer(1ul<<30); // 12GiB
     short3* const stack = stackBuffer.begin();
     uint64 stackSize=0;
 

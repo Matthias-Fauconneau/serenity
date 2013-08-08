@@ -36,9 +36,9 @@ UniformSample operator-(const UniformSample& A, const UniformSample& B) { uint N
 real UniformSample::mean() const { return sum()/size; }
 real UniformSample::variance() const { real mean=UniformSample::mean(), ssd=0; for(uint i: range(size)) ssd += sq(at(i)-mean); return ssd/(size-1); }
 UniformSample parseUniformSample(const string& file) {
-    TextData s (file);
-    UniformSample sample(count(file,'\n'));
-    for(uint i: range(sample.size)) { real x=s.decimal(); assert_(x==i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }
+    uint sampleCount=0; for(TextData s(file);s;) { while(s.match('#')) s.until('\n'); sampleCount++; s.until('\n'); }
+    UniformSample sample(sampleCount);
+    {TextData s(file); for(uint i: range(sample.size)) { while(s.match('#')) s.until('\n'); real x=s.decimal(); assert_(x==i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }}
     return sample;
 }
 String toASCII(const UniformSample& A) {

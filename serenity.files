@@ -46,6 +46,8 @@ ui/font.cc
 ui/font.h
 ui/interface.h
 ui/layout.h
+ui/plot.cc
+ui/plot.h
 ui/text.cc
 ui/text.h
 ui/utf8.cc
@@ -91,8 +93,6 @@ rock/prune.cc
 rock/result.h
 rock/view.h
 rock/view.cc
-rock/plot.cc
-rock/plot.h
 rock/summary.cc
 rock/slice.h
 rock/diff.cc
