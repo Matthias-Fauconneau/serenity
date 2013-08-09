@@ -83,7 +83,8 @@ real NonUniformSample::interpolate(real x) const {
 }
 NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
 NonUniformSample abs(const NonUniformSample& A) { return NonUniformSample(A.keys, abs((const Vector&)A.values)); }
-NonUniformSample scaleDistribution(float scalar, NonUniformSample&& A) { for(real& x: A.keys) x *= scalar; for(real& y: A.values) y /= scalar; return move(A); }
+bool isNumber(real n) { return !__builtin_isnan(n) && n!=__builtin_inff() && n!=-__builtin_inff(); }
+NonUniformSample scaleDistribution(real scalar, NonUniformSample&& A) { for(real& x: A.keys) x *= scalar; for(real& y: A.values) { assert_(isNumber(y/scalar), y, scalar); y /= scalar;  } return move(A); }
 
 array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
     real delta = __DBL_MAX__, maximum=0;

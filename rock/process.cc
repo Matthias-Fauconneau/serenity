@@ -354,8 +354,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
 
         Map map; uint flags=Map::Populate;
         if(outputSize>0) { // Creates (or resizes) and maps an output result file
-            while(outputSize >= (existsFile(outputFileID, storageFolder) && File(outputFileID, storageFolder).size()<capacity(storageFolder) ? File(outputFileID, storageFolder).size() : 0) + available(storageFolder)
-                  - (1l<<30)) { // Leave 1GB margin
+            while(outputSize >= (existsFile(outputFileID, storageFolder) && File(outputFileID, storageFolder).size()<capacity(storageFolder) ? File(outputFileID, storageFolder).size() : 0) + available(storageFolder)) {
                 long minimum=realTime(); String oldestMeta, oldestData;
                 for(String& file: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     if(ResultFile::indirectID && !endsWith(file,".meta"_)) continue;
@@ -374,7 +373,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                     if(timestamp < minimum) minimum=timestamp, oldestMeta=move(id), oldestData=move(dataFile);
                 }
                 if(!oldestMeta) {
-                    if(outputSize<capacity(storageFolder)) { // 6l<<30 or capacity(storageFolder) ?
+                    if(outputSize<min<int64>(16l<<30,capacity(storageFolder))) {
                         log("Dependency chain:", depChain);
                         log("Results:");
                         for(const shared<Result>& result: results) {

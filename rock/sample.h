@@ -94,7 +94,7 @@ NonUniformSample operator*(real scalar, NonUniformSample&& A);
 /// Computes absolute values
 NonUniformSample abs(const NonUniformSample& A);
 /// Scales both the variable and the values of a distribution to keep the same area
-NonUniformSample scaleDistribution(float scalar, NonUniformSample&& A);
+NonUniformSample scaleDistribution(real scalar, NonUniformSample&& A);
 /// Parses a non-uniformly sampled distribution from tab-separated values
 NonUniformSample parseNonUniformSample(const string& file);
 /// Converts a non-uniformly sampled distribution to tab-separated values

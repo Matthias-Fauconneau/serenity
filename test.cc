@@ -19,16 +19,10 @@ static uint pack(uint bits, uint offset, uint stride=3) { uint packedBits=0; bit
 /// Uninterleaves 3 coordinates
 static int3 zOrder(uint index) { return int3(pack(index,0),pack(index,1),pack(index,2)); }
 
-// Physical constants
-constexpr real rho = 1e3; // Mass density: ρ[water] [kg/m³]
-constexpr real nu = 1e-6; // Kinematic viscosity: ν[water] [m²/s]
-constexpr real eta = rho * nu; // Dynamic viscosity: η[water] [Pa·s=kg/(m·s)]
-constexpr vec3 g = vec3(0,0,9.8); // Body Force: Earth gravity pull [m/s²]
-
-// Physical parameters
+// Primary physical parameters
 //constexpr real dx = 0.74e-6; // Spatial resolution: λ[berea] [m]
 constexpr real dx = 2e-6; // Spatial resolution: λ[P2PA1_02] [m]
-constexpr real dxP = rho * g.z;  // Pressure gradient (applied pressure difference / thickness of the medium = (F/S)/δx = (ρgx³/x²)/x) (Assumes constant rho (incompressible flow))
+constexpr real nu = 1e-6; // Kinematic viscosity: ν[water] [m²/s]
 
 // Lattice parameters
 constexpr real dt = sq(dx)/nu; // Time step: δx² α νδt [s]
@@ -37,6 +31,12 @@ constexpr real E = sq(c)/3; // Lattice internal energy density (e/c² = 1/3 opti
 constexpr real tau = nu / E; // Relaxation time: τ [s] = ν [m²/s] / e [m²/s²]
 constexpr real alpha = dt/tau; // Relaxation coefficient: α = δt/τ [1]
 static_assert(alpha<1, "");
+
+// Secondary physical parameters
+constexpr real rho = 1e3; // Mass density: ρ[water] [kg/m³]
+constexpr real eta = rho * nu; // Dynamic viscosity: η[water] [Pa·s=kg/(m·s)]
+constexpr vec3 g = vec3(0,0,9.8); // Body Force: Earth gravity pull [m/s²] (~0.0001 dx/dt²)
+constexpr real dxP = rho * g.z;  // Pressure gradient (applied pressure difference / thickness of the medium = (F/S)/δx = (ρgx³/x²)/x) (Assumes constant rho (incompressible flow))
 
 constexpr real W[3] = {1./6, 4./6, 1./6}; // Lattice weight kernel
 #if 0// Cannot be constexpr'ed
@@ -135,7 +135,7 @@ struct Test : Widget {
         latticeLookup=buffer<uint>();
 #endif
         t = 0;
-        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s","ε=",real(N)/real(gridSize.x*gridSize.y*gridSize.z));
+        log("dx=",dx*1e6,"μm", "dt=",dt*1e6,"μs", "c=",c,"m/s","ε=",real(N)/real(gridSize.x*gridSize.y*gridSize.z),"g=",g.z);
     }
 
     tsc total, collide, stream, other;
@@ -206,7 +206,7 @@ struct Test : Widget {
         real k = epsilon * meanV*c * eta / dxP; // Permeability [m²] (1D ~ µm²) // εu ~ superficial fluid flow rate (m³/s)/m²)
         t++;
         permeability.insert(t, k*1e15);
-        log(t, totalTime/(t-profileStartStep), "ms", meanV*c*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
+        log(t, totalTime/(t-profileStartStep), "ms", "u="+str(meanV),"c",meanV*c*1e6,"μm/s", k*1e15,"mD", total?str("(Collide:", str(round(100.0*collide/total))+"%"_, "Stream:", str(round(100.0*stream/total))+"%"_, "Other:", str(round(100.0*other/total))+"%)"_):""_);
 #if TUBE
         const uint R = 64;
         real meanV_tube = dxP/(8*eta)*sq(R*dx);
