@@ -116,7 +116,9 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
                     int& q = Q[dx];
                     uint16* const s = S[dx];
                     uint16* const t = T[dx];
-                    targetYX[u*X*Y+dx] = short3(sourceYX[dx*Z+s[q]].x, sourceYX[dx*Z+s[q]].y, s[q]);
+                    //assert(q>=0 && q<Z);
+                    uint sq = s[q];
+                    targetYX[u*X*Y+dx] = short3(sourceYX[dx*Z+sq].x, sourceYX[dx*Z+sq].y, sq);
                     if(u==t[q]) q--;
                 }
             }

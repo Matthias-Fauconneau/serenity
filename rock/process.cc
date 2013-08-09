@@ -352,10 +352,10 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
             result->id.clear(); // Reference count update would rewrite metadata
         }
 
-        Map map;
+        Map map; uint flags=Map::Populate;
         if(outputSize>0) { // Creates (or resizes) and maps an output result file
-            //while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + max(int64(0), (2<<30)-(capacity(storageFolder)-available(storageFolder)))) {
-            while(outputSize >= (existsFile(outputFileID, storageFolder) ? File(outputFileID, storageFolder).size() : 0) + available(storageFolder)) {
+            while(outputSize >= (existsFile(outputFileID, storageFolder) && File(outputFileID, storageFolder).size()<capacity(storageFolder) ? File(outputFileID, storageFolder).size() : 0) + available(storageFolder)
+                  - (1l<<30)) { // Leave 1GB margin
                 long minimum=realTime(); String oldestMeta, oldestData;
                 for(String& file: storageFolder.list(Files)) { // Discards oldest unused result (across all process hence the need for ResultFile's inter process reference counter)
                     if(ResultFile::indirectID && !endsWith(file,".meta"_)) continue;
@@ -391,29 +391,35 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                             if(File(dataFile, storageFolder).size() >= 2<<20) log(id, userCount, File(dataFile, storageFolder).size() );
                         }
                         error("Not enough space available for",output," need"_,outputSize/1e6,"MB, only",available(storageFolder)/1e6,"MB available on",storageFolder.name());
-                    } else { log("Overcommitting", outputSize/1024.0/1024.0/1024.0, "GiB /", capacity(storageFolder)/1024.0/1024.0/1024.0,"GiB"); break; } /*Overcommit virtual memory*/
+                    } else { //Overcommit virtual memory
+                        flags = 0;
+                        log("Overcommitting", outputSize/1024.0/1024.0/1024.0, "GiB /", capacity(storageFolder)/1024.0/1024.0/1024.0,"GiB"); break; }
                 }
                 TextData s (oldestMeta); string name = s.whileNot('{'); Dict relevantArguments = parseDict(s);
                 for(uint i: range(results.size)) if(results[i]->name==name && results[i]->relevantArguments==relevantArguments) {
                     ((shared<ResultFile>)results.take(i))->id.clear(); // Prevents rename
                     break;
                 }
-                if(!existsFile(oldestData, storageFolder) || outputSize > File(oldestData,storageFolder).size() + available(storageFolder)) { // Removes if not a file or need to recycle more than one file
-                    if(existsFile(oldestData, storageFolder)) ::remove(oldestData, storageFolder);
-                    else { // Array output (folder)
+                if(!existsFile(oldestData, storageFolder) || File(oldestData,storageFolder).size()>capacity(storageFolder) || outputSize > File(oldestData,storageFolder).size() + available(storageFolder)) { // Removes if not an allocated file or need to recycle more than one file
+                    if(existsFile(oldestData, storageFolder)) {
+                        //log("Removing file", oldestData);
+                        ::remove(oldestData, storageFolder);
+                    } else { // Array output (folder)
+                        //log("Removing folder", oldestData);
                         Folder folder(oldestData, storageFolder);
                         for(const String& file: folder.list(Files)) ::remove(file, folder);
                         remove(folder);
                     }
                     continue;
                 }
+                //log("Recycling file", oldestData);
                 ::rename(storageFolder, oldestData, storageFolder, outputFileID); // Renames last discarded file instead of removing (avoids page zeroing)
                 break;
             }
 
             File file(outputFileID, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
-            if(outputSize>=(1<<16)) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|(outputSize>6l<<30?0:Map::Populate)));
+            if(outputSize>=(1<<16)) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|flags));
         }
         outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }

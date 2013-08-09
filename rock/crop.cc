@@ -28,6 +28,9 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
         if(coordinates.size==1) { // Crops centered box
             int3 size = coordinates[0];
             min=center-size/2, max=center+size/2;
+        } else if(coordinates.size==2) { // Crops centered box
+            int r = coordinates[0], z=coordinates[1];
+            min=center-int3(r,r,z/2), max=center+int3(r,r,z/2);
         } else if(coordinates.size==3) {
             int3 size = int3(coordinates[0],coordinates[1],coordinates[2]);
             min=center-size/2, max=center+size/2;

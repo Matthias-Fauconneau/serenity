@@ -26,7 +26,8 @@ constexpr real eta = rho * nu; // Dynamic viscosity: η[water] [Pa·s=kg/(m·s)]
 constexpr vec3 g = vec3(0,0,9.8); // Body Force: Earth gravity pull [m/s²]
 
 // Physical parameters
-constexpr real dx = 0.74e-6; // Spatial resolution [m]
+//constexpr real dx = 0.74e-6; // Spatial resolution: λ[berea] [m]
+constexpr real dx = 2e-6; // Spatial resolution: λ[P2PA1_02] [m]
 constexpr real dxP = rho * g.z;  // Pressure gradient (applied pressure difference / thickness of the medium = (F/S)/δx = (ρgx³/x²)/x) (Assumes constant rho (incompressible flow))
 
 // Lattice parameters
@@ -264,7 +265,7 @@ struct Test : Widget {
         plot.dataSets << move(permeability);
         plot.render(position, size);
         permeability = move(plot.dataSets.first());
-        if(t<512) step();
+        if(t<384) step();
     }
 #endif
 
