@@ -110,14 +110,14 @@ struct BinaryData : virtual Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-#if __clang__ || __GNUC_MINOR__ < 8
+/*#if __clang__ || __GNUC_MINOR__ < 8
     TextData(){}
     default_move(TextData);
     TextData(buffer<byte>&& array) : Data(move(array)){}
     explicit TextData(const string& reference):Data(reference){}
-#else
+#else*/
     using Data::Data;
-#endif
+//#endif
 
     /// If input match \a key, advances \a pos by \a key size
     bool match(char key);

@@ -2,6 +2,7 @@
 /// \file math.h Floating-point builtins
 #include "core.h"
 
+/// Declares real as a double-precision floating point number
 typedef double real;
 
 constexpr real nan = __builtin_nan("");

@@ -5,6 +5,7 @@
 #include "math.h"
 
 // Scalar
+/// Converts an ASCII decimal to float
 real parseScalar(const string& data);
 String toASCII(real scalar);
 

@@ -176,6 +176,45 @@
     Command line: /pool/users/mfauconneau/rock.fast view summary /pool/5G/rock_physics/validation/test_cases/drpbm_berea/ct_scan/tif.org
 
 ## Developer information
+ Rock is written using [C++11][http://en.wikipedia.org/wiki/C++11]
+
+### Configuring local development environment without a package manager
+Install the scripts
+ cp scripts/* /ptmp/bin
+
+Fetch the package index
+ index
+
+Build and install gcc dependencies
+ build gmp-5.1.2
+ build mpfr-3.1.2
+ build mpc-1.0.1
+
+Build and install gcc
+ build gcc-4.8.1 --disable-multilib --enable-languages="c,c++" --with-mpc=/ptmp
+
+Add /ptmp/{bin,lib,include} to your system paths
+ cat env.txt >> ~/.bashrc
+Content of env.txt
+ export PATH=/ptmp/bin:$PATH
+ export LD_LIBRARY_PATH=/ptmp/lib:$LD_LIBRARY_PATH
+ export CPPFLAGS=-I/ptmp/include
+ export LDFLAGS=-L/ptmp/lib
+
+Build and install rock tool
+ cd /pool/users/mfauconneau/rock
+ sh build.sh fast rock /ptmp/bin
+
+Optionnal: Build and install gdb (debugger)
+ build gdb-7.6
+
+Optionnal: Build and install Qt and Qt Creator (IDE)
+ build-qt
+ build qt-creator-2.8.0
+ You can now open serenity.creator with Qt Creator
+ The code can be browsed using F2 to follow symbols (Alt-Left to go back)
+
+### Creating a new operator
     To create a new operator, copy an existing operator, closest to your goal, to a new implementation file (.cc).
     The build system automatically compile implementation file whenever the corresponding interface file (.h) is included.
     As all operators share the same Operation interface, an interface file is not required.
