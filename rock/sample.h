@@ -34,6 +34,7 @@ String toASCII(const Vector& a);
 /// Uniformly sampled distribution
 struct UniformSample : Vector {
     using Vector::Vector;
+    UniformSample(){}
     UniformSample(Vector&& A):Vector(move(A)){}
     /// Returns the sum of the samples
     real sum() const { return ::sum(*this); }
@@ -64,6 +65,7 @@ UniformSample mean(const ref<UniformSample>& samples);
 /// Represents a sample distribution by its histogram
 struct UniformHistogram : UniformSample {
     using UniformSample::UniformSample;
+    UniformHistogram() {}
     UniformHistogram(UniformSample&& A):UniformSample(move(A)){}
     /// Returns the number of samples represented by this histogram
     uint64 sampleCount() const { return UniformSample::sum(); }

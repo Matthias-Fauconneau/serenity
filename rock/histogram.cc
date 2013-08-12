@@ -4,24 +4,23 @@
 #include "thread.h"
 #include "crop.h"
 
-UniformHistogram histogram(const Volume16& source, CropVolume crop) {
+template<Type T> UniformHistogram histogram(const VolumeT<T>& source, CropVolume crop) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
-    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y;
     uint radiusSq = crop.cylinder ? sq(crop.size.x/2) : -1;
     int2 center = ((crop.min+crop.max)/2).xy();
     bool tiled=source.tiled();
     const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    const uint16* sourceData = source;
+    const T* sourceData = source;
     buffer<uint> histograms[coreCount];
     for(uint id: range(coreCount)) histograms[id] = buffer<uint>(source.maximum+1, source.maximum+1, 0);
     parallel(crop.min.z, crop.max.z, [&](uint id, uint z) {
         uint* const histogram = histograms[id].begin();
         if(tiled) {
-            const uint16* sourceZ = sourceData + offsetZ[z];
+            const T* sourceZ = sourceData + offsetZ[z];
             for(int y=crop.min.y; y<crop.max.y; y++) {
-                const uint16* sourceZY = sourceZ + offsetY[y];
+                const T* sourceZY = sourceZ + offsetY[y];
                 for(int x=crop.min.x; x<crop.max.x; x++) {
-                    const uint16* sourceZYX = sourceZY + offsetX[x];
+                    const T* sourceZYX = sourceZY + offsetX[x];
                     if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
                         uint sample = sourceZYX[0];
                         assert_(sample <= source.maximum, sample, source.maximum);
@@ -30,11 +29,12 @@ UniformHistogram histogram(const Volume16& source, CropVolume crop) {
                 }
             }
         } else {
-            const uint16* sourceZ = sourceData + z*X*Y;
+            const uint64 X=source.sampleCount.x, Y=source.sampleCount.y;
+            const T* sourceZ = sourceData + z*X*Y;
             for(int y=crop.min.y; y<crop.max.y; y++) {
-                const uint16* sourceZY = sourceZ + y*X;
+                const T* sourceZY = sourceZ + y*X;
                 for(int x=crop.min.x; x<crop.max.x; x++) {
-                    const uint16* sourceZYX = sourceZY + x;
+                    const T* sourceZYX = sourceZY + x;
                     if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
                         uint sample = sourceZYX[0];
                         assert_(sample <= source.maximum, sample, source.maximum);
@@ -59,7 +59,10 @@ class(Histogram, Operation) {
         Volume source = toVolume(*inputs[0]);
         CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
         crop.min -= source.origin, crop.max -= source.origin;
-        UniformHistogram histogram = ::histogram(source, crop);
+        UniformHistogram histogram;
+        if(source.sampleSize==sizeof(uint8)) histogram = ::histogram<uint8>(source, crop);
+        else if(source.sampleSize==sizeof(uint16)) histogram = ::histogram<uint16>(source, crop);
+        else error(source.sampleSize);
         outputs[0]->metadata = String("V("_+source.field+").tsv"_);
         outputs[0]->data = toASCII(histogram);
     }

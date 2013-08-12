@@ -1,16 +1,18 @@
-Usage: 
+# Rock documentation
+
+## Usage
  Command line arguments are interpreted as targets, paths or arguments (can be interleaved in any order).
  The first path to a folder is the path to the folder containing the source data set image slices (shorthand form of the "path" argument)
  Targets can be any output result from a production rule of the process definition.
  Each target will be copied to the corresponding target path (i.e first target with first target path, ...).
  Arguments affects either the process definition or the operations themselves.
 
-Targets and arguments:
-- source
-  Image slices from the "path" folder concatenated as a volume.
+## Targets and arguments
+- \ref Source "source"
+  %Image slices from the "path" folder concatenated as a volume.
   - path
     Path to the slice images folder (or to a volume file)
-    \note Folder names of the form "name-resolution" can be used to automatically assign the correct input resolution (in nm).
+    \note %Folder names of the form "name-resolution" can be used to automatically assign the correct input resolution (in nm).
               Otherwise the "resolution" argument will be used (default: 1μm)
   - downsample = [0]|1
     Downsamples the volume by two.
@@ -35,7 +37,7 @@ Targets and arguments:
   The physical size of the source volume in each dimension
 - denoised
   The denoised volume
-  - denoise = 0|average (unused)|[median]
+  - denoise = 0|[median]
     Selects the denoising method. Median filtering is recommended. Downsampling should be used instead of average filter. No filter should be used on already clean samples.
 - resampled
   The resampled volume
@@ -78,7 +80,7 @@ Targets and arguments:
    Specification of the cylinder to crop in the original source coordinate (i.e before source crop (not this input))
 - connected (internal)
  Skeleton without unconnected pores.
- connect-pore = 0|[1]
+ - connect-pore = 0|[1]
   Selects whether to discard unconnected pores.
 - histogram-radius[-scaled]
  Histogram of the pore radii (voxels versus radius)
@@ -94,7 +96,7 @@ Targets and arguments:
  - distribution-radius[-scaled]-normalized
   Pore size distribution normalized by the total volume (including rock (is a PDF (sums to 1)))
 - volume
-  Volume of the connected pore space in voxels
+  %Volume of the connected pore space in voxels
 - volume-total
   Total volume of the discrete cylinder in voxels
 - porosity
@@ -106,9 +108,9 @@ Targets and arguments:
 - ascii
   Volume of the rounded maximum radii exported in ASCII format (one sample per line formatted as "x, y, z, r")
 - png-{source,denoised,colorize,distance,skeleton,maximum}
-  Image slices of the volume exported in PNG format (normalized and gamma-compressed for visualization)
+  %Image slices of the volume exported in PNG format (normalized and gamma-compressed for visualization)
 - bmp-{source,denoised,distance,skeleton,maximum}
-  Image slices of the volume exported in BMP format (unnormalized and linear for interoperation)
+  %Image slices of the volume exported in BMP format (unnormalized and linear for interoperation)
 - [bmp-]denoised-connected
   Denoised volume with all unconnected pores set to "value"
   - value = <decimal>|<integer> [mandatory]
@@ -118,7 +120,7 @@ Targets and arguments:
   - [bmp-]pore-not-flood
     Volume with voxels assigned 255 for unconnected/unflooded pore space, or 0 otherwise (rock and connected/flooded pore space).
 
-Tools:
+## Tools:
 - Representative elementary volume:
  Computes the pore size distributions on 8 cylinders of varying radius R centered on the octants of the source volume
  - PSD(R)
@@ -158,7 +160,7 @@ Tools:
  - A = 0, B = 1
   Value of the parameter for each case
 
-Visualization:
+## Visualization
  - view
   Enables visualization. By default, all given targets are presented in a window.
  - slides
@@ -168,7 +170,14 @@ Visualization:
  - pdf
   Writes a PDF with one image per page into the home folder.
 
-Example:
- Rock binary: /pool/users/mfauconneau/rock.fast
- Berea dataset: /pool/5G/rock_physics/validation/test_cases/drpbm_berea/ct_scan/tif.org
- Command line: /pool/users/mfauconneau/rock.fast view summary /pool/5G/rock_physics/validation/test_cases/drpbm_berea/ct_scan/tif.org
+## Examples
+    Rock binary: /pool/users/mfauconneau/rock.fast
+    Berea dataset: /pool/5G/rock_physics/validation/test_cases/drpbm_berea/ct_scan/tif.org
+    Command line: /pool/users/mfauconneau/rock.fast view summary /pool/5G/rock_physics/validation/test_cases/drpbm_berea/ct_scan/tif.org
+
+## Developer information
+    To create a new operator, copy an existing operator, closest to your goal, to a new implementation file (.cc).
+    The build system automatically compile implementation file whenever the corresponding interface file (.h) is included.
+    As all operators share the same Operation interface, an interface file is not required.
+    The build system can still be configured to compile the implementation file using a commented include command (e.g //#include "median.h")
+    Operation is the most abstract interface, VolumeOperation should be used for operations on volume, VolumePass can be used for single input, single output volume operations.

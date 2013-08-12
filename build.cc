@@ -104,7 +104,7 @@ struct Build {
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
-                pids << execute("/ptmp/gcc-4.8.0/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
+                pids << execute("/ptmp/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
             }
         }
         return lastLinkEdit;
@@ -141,7 +141,7 @@ struct Build {
                 args << copy(files);
                 args << String("-L/ptmp/lib"_) << apply(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-                if(execute("/ptmp/gcc-4.8.0/bin/g++"_,toRefs(args))) fail();
+                if(execute("/ptmp/bin/g++"_,toRefs(args))) fail();
             }
             if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
         }

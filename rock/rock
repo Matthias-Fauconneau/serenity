@@ -48,9 +48,21 @@ colored = Colorize transposed threshold # For visualization
 background = Maximum transposed threshold # For visualization
 foreground = Minimum transposed threshold # For visualization
 
+# Original volume
+pore = Negate rock
+histogram-pore = Histogram pore
+histogram-pore-slice = Slice histogram-pore begin=1 # Excluding rock
+volume-unconnected = Sum histogram-pore-slice
+
 # Discards unconnected rocks
 if !connect-rock: rock-connected = rock # Forwards unconnected skeleton
 if connect-rock: rock-connected = FloodFill rock # Flood fills rock
+
+# Volume after connect-rock
+pore-connect-rock = Negate rock-connected
+histogram-pore-connect-rock = Histogram pore
+histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
+volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
@@ -98,7 +110,8 @@ histogram-radius = SquareRootVariable histogram-squaredRadius
 histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
 
 # Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
-volume = Sum histogram-squaredRadius
+volume-connect-pore = Sum histogram-squaredRadius
+volume = volume-connect-pore
 volume-total = Sum histogram
 porosity = Div volume volume-total # Computes porosity (= pore space volume / total volume )
 mean-radius = HistogramMean histogram-radius
@@ -124,8 +137,8 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  denoised-tiled = ZOrder denoised
  maximum-mask = Binary maximum threshold threshold=1 box=crop.box
  denoised-connected = Mask maximum-mask denoised-tiled
- pore = Negate rock
  flood = Add pore maximum-mask
+ histogram-flood = Histogram flood
  not-flood = Negate maximum-mask
  pore-not-flood = Intersect pore not-flood
  # Exports to PNG (normalized and gamma-compressed for visualization)

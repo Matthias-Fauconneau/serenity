@@ -12,9 +12,9 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
     int inprod = - dx*x0d - dy*y0d - dz*z0d;
     float norm = sqrt(float(sqDistance));
     // Prune using all methods (as rasterization is the bottleneck)
-    if( sqNorm > minimalSqDiameter &&  // Constant pruning: feature point far enough apart (may filter small features)
-         //sqNorm > sqDistance && // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 126° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
-         sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
+    if( sqNorm > minimalSqDiameter  // Constant pruning: feature point far enough apart (may filter small features)
+         //&& sqNorm > sqDistance // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 126° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
+         && sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
             ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
         if(crit>=0) { int r = sq(xf0-x) + sq(yf0-y) + sq(zf0-z); skel[0] = r; }
