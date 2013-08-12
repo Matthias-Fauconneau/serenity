@@ -1,0 +1,6 @@
+#!/bin/sh
+MATCH=$(egrep -io "$1\.tar\.[a-z0-9]+" /ptmp/distfiles/index | sort)
+test -n "$MATCH" && echo "$MATCH" && exit 0
+MATCH=$(egrep -io "$1-([0-9]+\.)+tar\.[a-z0-9]+" /ptmp/distfiles/index | sort)
+test -n "$MATCH" && echo "$MATCH" && exit 0
+egrep -io "[a-zA-Z0-9]*$1[a-zA-Z0-9]*(-[a-zA-Z0-9]+)*(\.[0-9]+)*\.[a-z0-9]+\.[a-z0-9]+" /ptmp/distfiles/index | sort

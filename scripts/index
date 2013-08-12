@@ -1,0 +1,5 @@
+mkdir -f /ptmp/distfiles
+cd /ptmp/distfiles
+wget -N http://distfiles.gentoo.org/distfiles
+cp index.html index
+unhtml index

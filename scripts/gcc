@@ -1,0 +1,32 @@
+Install the scripts
+ cp /pool/users/mfauconneau/scripts/* /ptmp/bin
+
+Add /ptmp/{bin,lib,include} to your system paths
+ cat env.txt >> ~/.bashrc
+Content of env.txt
+ export PATH=/ptmp/bin:$PATH
+ export LD_LIBRARY_PATH=/ptmp/lib:$LD_LIBRARY_PATH
+ export CPPFLAGS=-I/ptmp/include
+ export LDFLAGS=-L/ptmp/lib
+
+Fetch the package index
+ index
+
+Build and install gcc dependencies
+ build gmp-5.1.2
+ build mpfr-3.1.2
+ build mpc-1.0.1
+
+Build and install gcc
+ build gcc-4.8.1 --disable-multilib --enable-languages="c,c++" --with-mpc=/ptmp
+
+Build and install rock tool
+ cd /pool/users/mfauconneau/rock
+ sh build.sh fast rock /ptmp/bin
+
+Optionnal: Build and install gdb (debugger)
+ build gdb-7.6
+
+Optionnal: Build and install qt-creator (IDE)
+ build qt-creator-2.8.0
+ You can now open serenity.creator with Qt Creator
