@@ -181,6 +181,7 @@
 ### Configuring local development environment without a package manager
 Install the scripts
  cp scripts/* /ptmp/bin
+ ln -s /ptmp/lib /ptmp/lib64
 
 Fetch the package index
  index
@@ -213,6 +214,9 @@ Optionnal: Build and install Qt and Qt Creator (IDE)
  build qt-creator-2.8.0
  You can now open serenity.creator with Qt Creator
  The code can be browsed using F2 to follow symbols (Alt-Left to go back)
+
+Optionnal: Build and install git
+ build git-1.8.3.2
 
 ### Creating a new operator
     To create a new operator, copy an existing operator, closest to your goal, to a new implementation file (.cc).

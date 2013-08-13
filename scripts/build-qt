@@ -1,0 +1,15 @@
+#!/bin/sh
+PV=qt-everywhere-opensource-src-4.8.5
+BUILD=/dev/shm
+test -e $BUILD/$PV && echo "Removing $BUILD/$PV" && rm -rf $BUILD/$PV
+test -e /dev/shm/rock && echo "Removing /dev/shm/rock" && rm -rf /dev/shm/rock
+test -e $BUILD/$PV || unpack $PV || exit
+echo "Building $PV"
+cd $BUILD/$PV*
+export PATH=/ptmp/bin:/usr/bin:/bin
+export LD_LIBRARY_PATH=/ptmp/lib:/usr/lib/lib
+export PKG_CONFIG_PATH=/ptmp/lib/pkgconfig
+export CMAKE_ROOT=/ptmp/share/cmake-2.8
+export CPPFLAGS=-I/ptmp/include
+export LDFLAGS=-L/ptmp/lib
+test -e configure && ./configure -prefix /ptmp -opensource && make -j8 && make install && exit 0
