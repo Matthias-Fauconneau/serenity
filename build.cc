@@ -45,7 +45,7 @@ struct Build {
 
     array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
-    String find(const string& file) { for(String& path: sources) if(endsWith(path, file)) return String(path.contains('.')?section(path,'.',0,-2):path); return String(); }
+    String find(const string& file) { for(String& path: sources) if(section(path,'/',-2,-1)==file) return String(path.contains('.')?section(path,'.',0,-2):path); return String(); }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
     int64 parseHeader(const string& name) {
