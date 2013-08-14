@@ -170,6 +170,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected
  # Exports to CDL
+  cdl-skeleton = ToCDL skeleton
   cdl-flood = ToCDL flood
   cdl-maximum = ToCDL sqrt-scaled
   cdl = cdl-maximum
