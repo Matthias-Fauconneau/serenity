@@ -74,6 +74,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             resultNames += outputs; //for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
             rule.outputs = move(outputs);
             parameters += rule.parameters();
+            if(!rule.operation) assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "Invalid forwarding rule",rule,"or \nNo such operator", word, "in", Interface<Operation>::factories.keys);
             rules << move(rule);
         }
     }
@@ -296,7 +297,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     // Simple forwarding rule
     if(!rule.operation) {
-        assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded", rule);
+        assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "Invalid forwarding rule",rule,"or \nNo such operator", rule.operation, "in", Interface<Operation>::factories.keys);
         depChain.pop();
         return getResult(rule.inputs.first(), arguments);
     }

@@ -14,6 +14,7 @@
 //#include "average.h"
 //#include "median.h"
 //#include "resample.h"
+//#include "sample-operation.h"
 //#include "histogram.h"
 //#include "threshold.h"
 //#include "position.h"
