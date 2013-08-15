@@ -35,8 +35,8 @@ struct Process : ResultManager {
     /// Returns a cached Result for \a target with \a arguments (without checking validity)
     const shared<Result>& find(const string& target, const Dict& arguments);
 
-    /// Recursively verifies \a target output is the same since \a queryTime
-    bool sameSince(const string& target, int64 queryTime, const Dict& arguments);
+    /// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
+    bool sameSince(const string& target, int64 queryTime, const Dict& arguments) override;
 
     /// Converts matching scoped arguments to local arguments for execution
     Dict localArguments(const string& target, const Dict& scopeArguments);

@@ -129,6 +129,6 @@ ScalarMap parseMap(const string& file) {
 }
 String toASCII(const ScalarMap& A) {
     String s;
-    for(auto sample: A) s << sample.key << '\t' << ftoa(sample.value, 4, 0, true) << '\n';
+    for(auto sample: A) s << sample.key << '\t' << ftoa(sample.value, 9, 0, true) << '\n';
     return s;
 }

@@ -37,21 +37,46 @@ class(Compare, Operation) {
 
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
 class(Sweep, Operation) {
-    string parameters() const override { return "target parameter hold"_; }
+    string parameters() const override { return "target sweep hold"_; }
+    virtual bool sameSince(const Dict& args unused, int64 queryTime, ResultManager& results unused) {
+        string target = args.at("target"_), sweep = args.at("sweep"_);
+        for(string argSet: split(sweep,';')) {
+            Dict allArgs = copy(args);
+            TextData s("{"_+replace(String(argSet),',','|')+"}"_);
+            for(auto arg: parseDict(s)) allArgs.insert(copy(arg.key)) = copy(arg.value);
+            if(!results.sameSince(target, queryTime, allArgs)) return false;
+        }
+        return true;
+    }
     void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& process) override {
-        shared<Result> hold;
-        if(arguments.contains("hold"_)) hold = process.getResult(arguments.at("hold"_), arguments); // Prevents last common ancestor from being recycled (FIXME: automatic?)
-        string target = arguments.at("target"_), parameter = arguments.at("parameter"_);
         Dict args = copy(arguments);
+        shared<Result> hold;
+        if(args.contains("hold"_)) hold = process.getResult(args.take("hold"_), args); // Prevents last common ancestor from being recycled (FIXME: automatic?)
+        String target = args.take("target"_), sweep = args.take("sweep"_);
         map<String, shared<Result>> results;
-        for(string value: (string[]){"0"_,"1"_}) {
-            args[parameter] = String(value);
-            results.insert(String(value), process.getResult(target, args));
+        for(string argSet: split(sweep,';')) {
+            Dict allArgs = copy(args);
+            TextData s("{"_+replace(String(argSet),',','|')+"}"_);
+            for(auto arg: parseDict(s)) allArgs.insert(copy(arg.key)) = copy(arg.value);
+            log(target, allArgs);
+            shared<Result> result = process.getResult(target, allArgs);
+            if(result->metadata=="scalar"_) log(result->name, result->data);
+            results.insert(String(argSet), result);
         }
         outputElements(outputs, "sweep"_, results.values[0]->metadata, [&]{
             map<String, buffer<byte>> elements;
             for(auto result: results) elements.insert(copy(result.key), copy(result.value->data));
             return elements;
         });
+    }
+};
+
+/// Concatenates scalar elements in a single scalar map result
+class(Concatenate, Operation), virtual Pass {
+    void execute(const Dict&, Result& output, const Result& source) override {
+        ScalarMap map;
+        for(auto element: source.elements) map.insert(copy(element.key), parseScalar(element.value));
+        output.metadata = String("tsv"_);
+        output.data = toASCII(map);
     }
 };

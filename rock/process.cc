@@ -193,7 +193,6 @@ int Process::indexOf(const string& target, const Dict& arguments) {
 }
 const shared<Result>& Process::find(const string& target, const Dict& arguments) { int i = indexOf(target, arguments); return i>=0 ? results[i] : *(shared<Result>*)0; }
 
-/// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
 bool Process::sameSince(const string& target, int64 queryTime, const Dict& arguments) {
     const Rule& rule = ruleForOutput(target, arguments);
     if(!&rule && arguments.contains(target)) return true; // Conversion from argument to result
@@ -207,10 +206,7 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
         if(!sameSince(input, queryTime, arguments)) return false;
     }
     if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
-    /*if(Interface<Tool>::factories.contains(rule.operation)) { // Let high level operations reports its custom input for correct cache behavior
-        for(Interface<Tool>::instance(rule.operation)->inputs()
-    }*/
-    return true;
+    return !rule.operation || Interface<Operation>::instance(rule.operation)->sameSince(arguments, queryTime, *this); // Let high level operations check its custom input for correct cache behavior
 }
 
 array<string> PersistentProcess::configure(const ref<string>& allArguments, const string& definition) {
@@ -285,12 +281,9 @@ PersistentProcess::~PersistentProcess() {
     }
 }
 
-static array<string> depChain;
 shared<Result> PersistentProcess::getResult(const string& target, const Dict& arguments) {
-    depChain << target;
     const Rule& rule = ruleForOutput(target, arguments);
     if(!&rule && arguments.contains(target)) { // Conversion from argument to result
-        depChain.pop();
         return shared<ResultFile>(target, 0, Dict(), String("argument"_), copy(arguments.at(target)), ""_, ""_);
     }
     assert_(&rule, "Unknown rule", target);
@@ -298,13 +291,11 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
     // Simple forwarding rule
     if(!rule.operation) {
         assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "Invalid forwarding rule",rule,"or \nNo such operator", rule.operation, "in", Interface<Operation>::factories.keys);
-        depChain.pop();
         return getResult(rule.inputs.first(), arguments);
     }
 
     const shared<Result>& result = find(target, arguments);
     if(&result && sameSince(target, result->timestamp, arguments)) {
-        depChain.pop();
         return share(result); // Returns a cached result if still valid
     }
     // Otherwise regenerates target using new inputs, arguments and/or implementations
@@ -318,7 +309,6 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     compute(rule.operation, inputs, rule.outputs, arguments, relevantArguments, localArguments);
     assert_(&find(target, arguments), target, arguments);
-    depChain.pop();
     return share(find(target, arguments));
 }
 
@@ -375,7 +365,6 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                 }
                 if(!oldestMeta) {
                     if(outputSize<min<int64>(16l<<30,capacity(storageFolder))) {
-                        log("Dependency chain:", depChain);
                         log("Results:");
                         for(const shared<Result>& result: results) {
                             if(result->data.size >= 2<<20 ) log(result->name, result->userCount,  result->data.size);

@@ -1,7 +1,7 @@
 #include "volume-operation.h"
 #include "thread.h"
 
-inline void compare(uint16* const skel, const short3* const pos, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter) {
+template<bool sqrtPrune> inline void compare(uint16* const skel, const short3* const pos, int x, int y, int z, int dx, int dy, int dz, int da, int minimalSqDiameter) {
     int xf0=pos[0].x, yf0=pos[0].y, zf0=pos[0].z; // First feature point
     int xfd=pos[da].x, yfd=pos[da].y, zfd=pos[da].z; // Second feature point
     int x0d=xf0-xfd, y0d=yf0-yfd, z0d=zf0-zfd; // Vector between feature points
@@ -9,12 +9,11 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
     int xd=x+dx, yd=y+dy, zd=z+dz; // Second origin point
     int dx0d = xf0-x+xfd-xd, dy0d = yf0-y+yfd-yd, dz0d = zf0-z+zfd-zd; // Bisector
     int sqDistance = sq(dx0d) + sq(dy0d) + sq(dz0d);
-    int inprod = - dx*x0d - dy*y0d - dz*z0d;
+    int inprod = - dx*x0d - dy*y0d - dz*z0d; // Inner product of the vector between the voxel pair and the vector between their feature points
     float norm = sqrt(float(sqDistance));
     // Prune using all methods (as rasterization is the bottleneck)
-    if( sqNorm > minimalSqDiameter  // Constant pruning: feature point far enough apart (may filter small features)
-         //&& sqNorm > sqDistance // Linear (angle) pruning: tan(α/2) = o/2a > 1 <=> α > 2atan(2) > 126° (may cut corners, effective when sqDistance > sqNorm > sqDiameter)
-         && sqNorm >  2*inprod + norm + 1.5f // Square root pruning: No parameters (may disconnect skeleton)
+    if( sqrtPrune ? sqNorm >  2*inprod + norm + 1.5f : // Square root pruning: No parameters (may disconnect skeleton)
+            sqNorm > minimalSqDiameter  // Constant pruning: feature point far enough apart (may filter small features with λ²>3)
             ) {
         int crit = x0d*dx0d + y0d*dx0d + z0d*dx0d;
         if(crit>=0) { int r = sq(xf0-x) + sq(yf0-y) + sq(zf0-z); skel[0] = r; }
@@ -23,8 +22,7 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
 }
 
 /// Computes integer medial axis
-void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter) {
-    //assert_(minimalSqDiameter>=3);
+template<bool sqrtPrune> void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter) {
     const short3* const positionData = position;
     uint16* const targetData = target;
     clear(targetData, target.size());
@@ -40,9 +38,9 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
                 const short3* const pos = positionZY+x;
                 uint16* const skel = targetZY+x;
                 if(pos[0]!=short3(x,y,z)) {
-                    if(pos[-1]!=short3(x-1,y,z)) compare(skel,pos,x,y,z, -1,0,0, -1, minimalSqDiameter);
-                    if(pos[-X]!=short3(x,y-1,z)) compare(skel,pos,x,y,z, 0,-1,0, -X, minimalSqDiameter);
-                    if(pos[-XY]!=short3(x,y,z-1)) compare(skel,pos,x,y,z, 0,0,-1, -XY, minimalSqDiameter);
+                    if(pos[-1]!=short3(x-1,y,z)) compare<sqrtPrune>(skel,pos,x,y,z, -1,0,0, -1, minimalSqDiameter);
+                    if(pos[-X]!=short3(x,y-1,z)) compare<sqrtPrune>(skel,pos,x,y,z, 0,-1,0, -X, minimalSqDiameter);
+                    if(pos[-XY]!=short3(x,y,z-1)) compare<sqrtPrune>(skel,pos,x,y,z, 0,0,-1, -XY, minimalSqDiameter);
                 }
             }
         }
@@ -54,8 +52,12 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
 
 /// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
 class(Skeleton, Operation), virtual VolumeOperation {
+    string parameters() const override { return "minimalSqDiameter sqrtPrune"_; }
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        integerMedialAxis(outputs[0],inputs[0], /*λ²=*/1); // 3 will remove artifacts due to discrete background but may also round corners
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        int minimalSqDiameter = args.value("minimalSqDiameter"_, /*λ²=*/3);  // 3 will remove artifacts due to discrete background but may also round corners
+        bool sqrtPrune = args.value("sqrtPrune"_, 1);
+        if(sqrtPrune) integerMedialAxis<true>(outputs[0],inputs[0], minimalSqDiameter);
+        else integerMedialAxis<false>(outputs[0],inputs[0], minimalSqDiameter);
     }
 };

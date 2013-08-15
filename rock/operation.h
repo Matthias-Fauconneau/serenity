@@ -8,12 +8,16 @@ struct ResultManager {
     virtual shared<Result> getResult(const string& target, const Dict& arguments) abstract;
     /// Computes result of an operation
     virtual void compute(const string& operation, const ref<shared<Result>>& inputs, const ref<string>& outputNames, const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) abstract;
+    /// Returns if computing \a target with \a arguments would give the same result now compared to \a queryTime
+    virtual bool sameSince(const string& target, int64 queryTime, const Dict& arguments) abstract;
 };
 
  /// Executes an operation using inputs to compute outputs (of given sample sizes)
 struct Operation {
     /// Returns which parameters affects this operation output
     virtual string parameters() const { return ""_; }
+    /// Lets check custom inputs for correct cache behavior
+    virtual bool sameSince(const Dict& args unused, int64 queryTime unused, ResultManager& results unused) { return true; }
     /// Returns the desired intermediate data size in bytes for each outputs
     virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs

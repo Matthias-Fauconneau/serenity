@@ -74,6 +74,10 @@ distance = Distance position
 skeleton = Skeleton position
 skeleton-tiled = ZOrder skeleton
 
+histogram-skeleton = Histogram skeleton
+histogram-skeleton-slice = Slice histogram-skeleton begin=1 # Excluding rock
+volume-skeleton = Sum histogram-skeleton-slice
+
 # Discards small pores
 minimalSqRadius = '0'
 if minimalSqRadius: pruned = ThresholdClip skeleton-tiled minimalSqRadius
@@ -170,7 +174,8 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   tiff-denoised = ToTIFF denoised
   tiff-denoised-connected = ToTIFF denoised-connected
  # Exports to CDL
-  cdl-skeleton = ToCDL skeleton
+  skeleton-sqrt = SquareRoot skeleton
+  cdl-skeleton = ToCDL skeleton-sqrt
   cdl-flood = ToCDL flood
   cdl-maximum = ToCDL sqrt-scaled
   cdl = cdl-maximum
@@ -186,3 +191,4 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  slices plots summary = Summary
  compare = Compare
  sweep = Sweep
+ concatenate = Concatenate sweep

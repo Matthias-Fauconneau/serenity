@@ -25,7 +25,7 @@ class(ZOrder, Operation), virtual VolumeOperation {
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles)
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
 struct Ball { uint16 x,y,z,sqRadius; };
-const int overcommit = 16; // Allows more spheres intersections than voxels inside a tile (only virtual memory is reserved and committed only as needed when filling tile's sphere lists)
+const int overcommit = 32; // Allows more spheres intersections than voxels inside a tile (only virtual memory is reserved and committed only as needed when filling tile's sphere lists)
 struct Tile { uint64 ballCount=0; Ball balls[tileSize*overcommit-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
 
 /// Tests box-ball intersection

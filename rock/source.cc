@@ -84,8 +84,17 @@ class(Source, Operation), virtual VolumeOperation {
                     uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                     for(uint i: range(2)) {
                         Map file(slices[(min.z+z)*2+i],folder);
-                        Tiff16 tiff(file); assert_(tiff);
-                        tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);
+                        /*Tiff16 tiff(file); assert_(tiff);
+                        tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);*/
+                        if(isTiff(file)) { // Directly decodes slice images into the volume
+                            Tiff16 tiff(file);
+                            assert_(tiff, path, slices[min.z+z]);
+                            tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);
+                        } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
+                            Image image = decodeImage(file);
+                            uint16* const targetSlice = sliceBuffer.begin() + i*sX*sY;
+                            for(uint y: range(size.y*2)) for(uint x: range(size.x*2)) targetSlice[y*sX+x]  = image(min.x*2+x, min.y*2+y).b;
+                        }
                     }
                     for(uint y: range(size.y)) for(uint x: range(size.x)) {
                         uint16* const source = sliceBuffer.begin() + (y*2)*sX+(x*2);
@@ -93,19 +102,20 @@ class(Source, Operation), virtual VolumeOperation {
                                 source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
                     }
                 }
-            }
-            for(uint z: range(size.z)) {
-                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                Map file(slices[min.z+z], folder);
-                if(isTiff(file)) { // Directly decodes slice images into the volume
-                    Tiff16 tiff(file);
-                    assert_(tiff, path, slices[min.z+z]);
-                    tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
-                } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
-                    Image image = decodeImage(file);
-                    assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
-                    for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
+            } else {
+                for(uint z: range(size.z)) {
+                    if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                    uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                    Map file(slices[min.z+z], folder);
+                    if(isTiff(file)) { // Directly decodes slice images into the volume
+                        Tiff16 tiff(file);
+                        assert_(tiff, path, slices[min.z+z]);
+                        tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
+                    } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
+                        Image image = decodeImage(file);
+                        assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
+                    }
                 }
             }
         }
@@ -114,7 +124,8 @@ class(Source, Operation), virtual VolumeOperation {
         {TextData s (args.at("path"_));
             string name = s.until('-');
             output(otherOutputs, "name"_, "label"_, [&]{return name+"\n"_;});
-            float resolution = s ? s.decimal()/1000.0 : args.contains("resolution"_) ? toDecimal(args.at("resolution"_)) : 1; if(args.contains("downsample"_)) resolution *= 2;
+            float resolution = s ? s.decimal()/1000.0 : args.contains("resolution"_) ? toDecimal(args.at("resolution"_)) : 1;
+            if(args.contains("downsample"_)) resolution *= 2;
             output(otherOutputs, "resolution"_, "scalar"_, [&]{return str(resolution)+" μm\n"_;});
             int3 voxelSize = target.sampleCount-2*target.margin;
             output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(voxelSize.x)+"x"_+str(voxelSize.y)+"x"_+str(voxelSize.z) + " voxels"_;});

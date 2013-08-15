@@ -15,7 +15,7 @@ bool SliceView::view(const string& metadata, const string& name, const buffer<by
     return true;
 }
 
-string SliceView::name() { return names[currentIndex]; }
+string SliceView::name() { return names[currentIndex]; /*FIXME: interface with parent window title*/ }
 
 bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     if(button==WheelDown||button==WheelUp) {
@@ -60,7 +60,7 @@ void SliceView::render(int2 position, int2 size) {
         assert_(volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1);
         ::render(framebuffer, volumes[0], volumes[1], view);
     } else {
-        Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
+        Image image = slice(volumes[currentIndex], sliceZ, /*true*/false, true, true);
         while(2*image.size()<=size) image=upsample(image);
         int2 centered = position+(size-image.size())/2;
         blit(centered, image);

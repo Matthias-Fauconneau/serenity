@@ -103,6 +103,8 @@
   Relative volume of the pore space (i.e pore space volume over total volume)
 - mean-radius
   Mean radius of the pores (in voxels)
+- cdl-skeleton (visualization)
+  Volume of the skeleton radii exported in CDL format (to be converted to a netCDF file using ncgen)
 - cdl-maximum
   Volume of the rounded maximum radii exported in CDL format (to be converted to a netCDF file using ncgen)
 - ascii
