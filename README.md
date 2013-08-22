@@ -36,10 +36,3 @@ Optionnal: Build and install Qt and Qt Creator (IDE)
 
 Optionnal: Build and install git
  build git-1.8.3.2
-
-### Creating a new operator
-    To create a new operator, copy an existing operator, closest to your goal, to a new implementation file (.cc).
-    The build system automatically compile implementation file whenever the corresponding interface file (.h) is included.
-    As all operators share the same Operation interface, an interface file is not required.
-    The build system can still be configured to compile the implementation file using a commented include command (e.g //#include "median.h")
-    Operation is the most abstract interface, VolumeOperation should be used for operations on volume, VolumePass can be used for single input, single output volume operations.
