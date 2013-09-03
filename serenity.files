@@ -1,9 +1,7 @@
 README.md
 TODO
-build.cc
 build.sh
-test.sh
-test.cc
+build.cc
 
 core/array.h
 core/core.h
@@ -56,3 +54,25 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/x.h
+
+music.cc
+sequencer.h
+sequencer.cc
+sampler.h
+sampler.cc
+asound.h
+asound.cc
+midi.h
+midi.cc
+pdf.h
+pdf.cc
+score.h
+score.cc
+midiscore.h
+midiscore.cc
+keyboard.h
+keyboard.cc
+resample.h
+resample.cc
+flac.cc
+flac.h

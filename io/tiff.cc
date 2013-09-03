@@ -14,7 +14,7 @@ static toff_t tiffSeek(BinaryData& s, toff_t off, int whence) {
 static tsize_t tiffZero() {return 0; }
 static int tiffError() { error(""); return 0; }
 
-Image decodeTIFF(const ref<byte>& file) {
+Image decodeTIFF(const string& file) {
     BinaryData s (file);
     TIFF *const tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffError, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffZero, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffZero, (TIFFUnmapFileProc)tiffError);
     assert_(tiff);
@@ -26,7 +26,7 @@ Image decodeTIFF(const ref<byte>& file) {
     return image;
 }
 
-Tiff16::Tiff16(const ref<byte>& file) : s(file) {
+Tiff16::Tiff16(const string& file) : s(file) {
     TIFFSetWarningHandler(0);
     tiff = TIFFClientOpen("TIFF","r", (thandle_t)&s, (TIFFReadWriteProc)tiffRead, (TIFFReadWriteProc)tiffError, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffZero, (TIFFSizeProc)tiffSize, (TIFFMapFileProc)tiffZero, (TIFFUnmapFileProc)tiffError);
     assert_(tiff, file.size, hex(file.slice(0, 4)));

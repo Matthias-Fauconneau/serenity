@@ -50,9 +50,7 @@ inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_loaddqu
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 inline void storeu(uint32* const ptr, v4si a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
 inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxud128(a,b); }
-//inline v4si cmpgt(v4si a, v4si b) { return __builtin_ia32_pcmpgtd128(a, b); }
 inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
-//inline v4si blendv(v4si a, v4si b, v4si m) { return (v4si)__builtin_ia32_blendvps((v4sf)a, (v4sf)b, (v4sf)m); }
 
 #if NO_INLINE
 #define extracti __builtin_ia32_vec_ext_v4si
@@ -72,8 +70,6 @@ inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, im
 
 inline v8hi min(v8hi a, v8hi b) { return __builtin_ia32_pminuw128(a,b); }
 inline v8hi max(v8hi a, v8hi b) { return __builtin_ia32_pmaxuw128(a,b); }
-
-//inline v8hi cmpgt(v8hi a, v8hi b) { return __builtin_ia32_pcmpgtw128(a, b); }
 
 inline v4si unpacklo(v8hi a, v8hi b) { return (v4si)__builtin_ia32_punpcklwd128(a, b); }
 inline v4si unpackhi(v8hi a, v8hi b) { return (v4si)__builtin_ia32_punpckhwd128(a, b); }
@@ -120,12 +116,12 @@ inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
 // v4sf
 
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
+inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_loaddqu((char*)ptr); }
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
 inline v4sf andnot(v4sf a, v4sf b) { return __builtin_ia32_andnps(a, b); }
 inline v4sf bitXor(v4sf a, v4sf b) { return __builtin_ia32_xorps(a, b); }
-//inline v4sf cmpgt(v4sf a, v4sf b) { return __builtin_ia32_cmpgtps(a, b); }
 
 const v4sf signBit = (v4sf)(v4si){(int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000};
 inline v4sf negate(v4sf a) { return bitXor(a,  signBit); }
@@ -139,13 +135,6 @@ inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
 inline v4sf shuffle(v4sf a, v4sf b, int x, int y, int z, int w) { return __builtin_ia32_shufps(a, b, w<<6|z<<4|y<<2|x); }
 #endif
 inline v4sf hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
-/*inline v4sf sum2(v4sf a, v4sf b) { //TODO
-    v4sf sum = __builtin_ia32_haddps(a, b); //a0+a1, a2+a3, b0+b1, b2+b3
-__m128d sum_high = _mm256_extractf128_pd(sum1, 1); // extract upper 128 bits of result
-__m128d result = _mm_add_pd(sum_high, (__m128d) sum); // add upper 128 bits of sum to its lower 128 bits
-// lower 64 bits of result contain the sum of x1[0], x1[1], x1[2], x1[3]
-// upper 64 bits of result contain the sum of x2[0], x2[1], x2[2], x2[3]
-}*/
 inline v4sf dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x7f); }
 inline v4sf dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
 inline v4sf sum(v4sf a) { return dot4(a,_1f); } // a0+a1+a2+a3
@@ -174,23 +163,3 @@ inline v4sf normalize3(v4sf a) { return a * rsqrt(dot3(a,a)); }
 
 inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
-
-// v8sf
-
-/*inline v8sf loada(const float* const ptr) { return *(v8sf*)ptr; }
-inline void storea(float* const ptr, v8sf a) { *(v8sf*)ptr = a; }
-inline float sum8(v8sf x) {
-    const v4sf hiQuad = __builtin_ia32_vextractf128_ps256(x, 1); // hiQuad = ( x7, x6, x5, x4 )
-    const v4sf loQuad = __builtin_ia32_ps_ps256(x); // loQuad = ( x3, x2, x1, x0 )
-    const v4sf sumQuad = __builtin_ia32_addps(loQuad, hiQuad); // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
-    const v4sf loDual = sumQuad; // loDual = ( -, -, x1 + x5, x0 + x4 )
-    const v4sf hiDual = __builtin_ia32_movhlps(sumQuad, sumQuad); // hiDual = ( -, -, x3 + x7, x2 + x6 )
-    const v4sf sumDual = __builtin_ia32_addps(loDual, hiDual); // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
-    const v4sf lo = sumDual; // lo = ( -, -, -, x0 + x2 + x4 + x6 )
-    const v4sf hi = __builtin_ia32_shufps(sumDual, sumDual, 0x1); // hi = ( -, -, -, x1 + x3 + x5 + x7 )
-    const v4sf sum = __builtin_ia32_addss(lo, hi); // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
-    return __builtin_ia32_vec_ext_v4sf(sum, 0);
-}*/
-//inline v8si cvtps2dq(v8sf a) { return __builtin_ia32_cvtps2dq256(a); }
-//typedef long long m128i __attribute__ ((__vector_size__ (16), __may_alias__));
-//inline v8hi packus(v8si a) { return __builtin_ia32_packusdw128(__builtin_ia32_vextractf128_si256(a,0),__builtin_ia32_vextractf128_si256(a,1)); }

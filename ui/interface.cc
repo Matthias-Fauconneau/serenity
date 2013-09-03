@@ -1,6 +1,7 @@
 #include "interface.h"
 #include "display.h"
 #include "layout.h"
+#include "text.h"
 
 // ScrollArea
 void ScrollArea::render(int2 position, int2 size) {

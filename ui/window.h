@@ -22,10 +22,6 @@ struct Window : Socket, Poll {
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image(),
            const string& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread);
-    /// Creates an initially hidden window for \a widget, use \a show to display
-    /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size, const string& name,  const Image& icon) :
-        Window(widget, size, name, icon, "_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread){}
     virtual ~Window();
 
     /// Creates window.

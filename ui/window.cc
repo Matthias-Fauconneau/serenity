@@ -33,7 +33,7 @@ Image renderToImage(Widget* widget, int2 size, int imageResolution) {
     return image;
 }
 
-static __thread Window* window; // Current window for Widget event and render methods
+static thread_local Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
 bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
@@ -47,9 +47,15 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home())) {
-            BinaryData s(readFile(".Xauthority"_,home())); s.advance(4); s.untilNull();/*host*/ s.untilNull();/*display*/
-            send(String(raw(r)+s.read<byte>(align(4,(r.nameSize=18))+(r.dataSize=16))));
-        } else send(raw(r));
+            BinaryData s (readFile(".Xauthority"_,home()), true);
+            string name, data;
+            uint16 family unused = s.read();
+            {uint16 length = s.read(); string host unused = s.read<byte>(length); }
+            {uint16 length = s.read(); string port unused = s.read<byte>(length); }
+            {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
+            {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
+            send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
+        } else { warn("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
     }
     {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,string((byte*)&r.release,r.reason-1));
         read(align(4,r.vendorLength));

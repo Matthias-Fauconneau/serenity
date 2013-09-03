@@ -38,7 +38,7 @@ struct Data {
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    void advance(uint count) {assert(index+count<=buffer.size); index+=count; }
+    void advance(uint count) {assert(index+count<=buffer.size,index,count,buffer.size); index+=count; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
