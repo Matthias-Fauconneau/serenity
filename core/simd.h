@@ -52,12 +52,6 @@ inline void storeu(uint32* const ptr, v4si a) { __builtin_ia32_storedqu((char*)p
 inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxud128(a,b); }
 inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
 
-#if NO_INLINE
-#define extracti __builtin_ia32_vec_ext_v4si
-#else
-inline int extracti(v4si a, int index) { return __builtin_ia32_vec_ext_v4si(a, index); }
-#endif
-
 // v8hi
 
 inline v8hi short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
@@ -129,11 +123,7 @@ inline v4sf abs(v4sf a) { return andnot(signBit, a); }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
-#if NO_INLINE
-#define shuffle( a,  b,  x,  y,  z,  w) __builtin_ia32_shufps(a, b, (w)<<6|(z)<<4|(y)<<2|(x))
-#else
 inline v4sf shuffle(v4sf a, v4sf b, int x, int y, int z, int w) { return __builtin_ia32_shufps(a, b, w<<6|z<<4|y<<2|x); }
-#endif
 inline v4sf hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
 inline v4sf dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x7f); }
 inline v4sf dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
@@ -143,17 +133,8 @@ inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
 
 inline int mask(v4sf a) { return __builtin_ia32_movmskps(a); }
-#if NO_INLINE
-#define blend( a, b, m) __builtin_ia32_blendps(a, b, m)
-#else
 inline v4sf blend(v4sf a, v4sf b, int m) { return __builtin_ia32_blendps(a, b, m); }
-#endif
 inline v4sf blendv(v4sf a, v4sf b, v4sf m) { return __builtin_ia32_blendvps(a, b, m); }
-#if NO_INLINE
-#define extractf __builtin_ia32_vec_ext_v4sf
-#else
-inline float extractf(v4sf a, int index) { return __builtin_ia32_vec_ext_v4sf(a, index); }
-#endif
 
 inline v4sf transpose(v4sf a, v4sf b, v4sf c, v4sf d) { return shuffle(shuffle(a,b,0,0,0,0), shuffle(c,d,0,0,0,0),0,2,0,2); }
 inline v4sf dot2(v4sf a, v4sf b) { v4sf sq = a*b; return hadd(sq,sq); }

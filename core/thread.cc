@@ -135,7 +135,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    //setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); //FIXME: KDE
+    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
 }
 
 template<> void __attribute((noreturn)) error(const string& message) {
@@ -212,7 +212,7 @@ string getenv(const string& name) {
 
 array<string> arguments() {
     static String cmdline = File("proc/self/cmdline"_).readUpTo(4096);
-    assert_(cmdline.size<4096);
+    assert(cmdline.size<4096);
     return split(section(cmdline,0,1,-1),0);
 }
 

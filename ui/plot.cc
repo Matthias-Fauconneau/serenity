@@ -31,7 +31,7 @@ void Plot::render(int2 position, int2 size) {
         for(uint i: range(tickCount[axis]+1)) {
             real value = /*min[axis]+*/(max[axis]/*-min[axis]*/)*i/tickCount[axis];
             String label = ftoa(value, precision, 0, value>=10e5 ? 3 : 0);
-            assert_(label);
+            assert(label);
             ticks[axis] << Text(label);
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }

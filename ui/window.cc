@@ -23,7 +23,7 @@ Image renderToImage(Widget* widget, int2 size, int imageResolution) {
     ::currentClip = Rect(::framebuffer.size());
     ::resolution = imageResolution;
     fill(Rect(::framebuffer.size()),1);
-    assert_(widget);
+    assert(widget);
     widget->render(0,::framebuffer.size());
     Image image = move(::framebuffer);
     ::framebuffer = move(framebuffer);

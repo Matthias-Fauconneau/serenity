@@ -4,7 +4,7 @@
 
 #include "sequencer.h"
 #include "sampler.h"
-#include "asound.h"
+#include "audio.h"
 #include "midi.h"
 
 #include "window.h"
@@ -124,7 +124,8 @@ struct Music {
 
     Music() {
         layout << &sheets; sheets.expanding=true;
-        sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root));
+        //sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root));
+        sampler.open(audio.rate, "Salamander.sfz"_,Folder("Samples"_,root));
 
         array<String> files = folder.list(Files);
         for(String& file : files) {

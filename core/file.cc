@@ -93,7 +93,7 @@ void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
     assert_(existsFile(oldName,oldAt), oldName, newName);
     assert_(!existsFile(newName,newAt), oldName, newName);
-    assert_(newName.size<0x100, newName.size, newName);
+    assert_(newName.size<0x100);
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)));
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { assert_(oldName!=newName); rename(at, oldName, at, newName); }
@@ -115,7 +115,7 @@ void touchFile(const string& path, const Folder& at, bool setModified) { timespe
 void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate)); //FIXME: preserve executable flag
     for(size_t offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
-    assert_(newFile.size() == oldFile.size(), oldFile.size(), newFile.size());
+    assert(newFile.size() == oldFile.size());
 }
 
 int64 available(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }

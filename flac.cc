@@ -55,11 +55,6 @@ uint BitReader::utf8() {
 }
 
 typedef double double2 __attribute((vector_size(16)));
-#if __clang__
-#define extract(vec, i) vec[i]
-#else
-#define extract(vec, i) __builtin_ia32_vec_ext_v2df(vec,i)
-#endif
 
 enum Round { Even, Down, Up, Zero };
 void setRoundMode(Round round) {
@@ -112,13 +107,13 @@ void FLAC::parseFrame() {
 
 inline double roundDown(double x) { //depends on setRoundMode(Down) to round towards negative infinity
     const double lead = 0x1.0p52f+0x1.0p51f; //add leading bit to force rounding (+1p51 to also force negative numbers)
-    return x+lead-lead;
+    return x+lead-lead; // WARNING: miscompiles with -Ofast !
 }
 
 template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned, double*& misaligned, float*& signal) {
     double2 sum = {0,0};
     for(uint i: range(unroll)) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers
-    double sample = roundDown(extract(sum,0)+extract(sum,1))+double(*signal); //add residue to prediction [SS2SD=2]
+    double sample = roundDown(sum[0]+sum[1])+double(*signal); //add residue to prediction [SS2SD=2]
     aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; //write out contexts, misalign align, align misalign
     *signal = sample; signal++; //write out decoded sample [SD2SS=8]
 }
@@ -239,7 +234,7 @@ void FLAC::decodeFrame() {
             for(uint i: range(order)) sum += predictor[i+1] * even[i];
             double sample = roundDown(sum)+*signal;
             even[order]=odd[order]= sample; //write out context
-            *signal = sample; signal++; //write out decoded sample //TODO: float
+            *signal = sample; signal++; //write out decoded sample
         }
         #define o(n) case n: convolve<n>(predictor,even,odd,signal,end); break;
         switch((order+1)/2) {
@@ -252,7 +247,8 @@ void FLAC::decodeFrame() {
     setRoundMode(Even);
     index=align(8,index);
     skip(16);
-    assert(blockSize<=readIndex+audio.capacity-writeIndex,blockSize,readIndex,audio.capacity,writeIndex); audio.size+=blockSize;
+    assert(blockSize<=readIndex+audio.capacity-writeIndex,blockSize,readIndex,audio.capacity,writeIndex);
+    audio.size+=blockSize;
     uint beforeWrap=audio.capacity-writeIndex;
     if(blockSize>beforeWrap) {
         interleave<4>(channelMode,block[0],block[1],audio.begin()+writeIndex,audio.begin()+audio.capacity);

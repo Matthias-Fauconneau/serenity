@@ -1,17 +1,10 @@
 #pragma once
-/// \file asound.h ALSA PCM output interface
+/// \file audio.h PCM audio output interface
 #include "thread.h"
 #include "function.h"
 
 /// Audio output through ALSA PCM interface
-#define ASOUND 0
-#if ASOUND
-struct AudioOutput : /*Device,*/ Poll {
-    struct _snd_pcm* pcm=0;
-    bool running = false;
-#else
 struct AudioOutput : Device, Poll {
-#endif
     uint sampleBits = 0;
     uint channels = 2, rate = 0;
     uint periodSize = 0, bufferSize = 0;
@@ -35,10 +28,9 @@ struct AudioOutput : Device, Poll {
 private:
     function<uint(int16* output, uint size)> read16 = [](int16*,uint){return 0;};
     function<uint(int32* output, uint size)> read32 = [](int32*,uint){return 0;};
-#if !ASOUND
+
     Map maps[3];
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
-#endif
 };

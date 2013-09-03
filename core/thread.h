@@ -131,7 +131,7 @@ template<class F> void parallel(uint64 start, uint64 stop, F f) {
         threads[i].delegate = &delegate;
         pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
     }
-    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert_(status==0); }
+    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert(status==0); }
 #endif
 }
 template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
@@ -139,7 +139,7 @@ template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 /// Runs a loop in parallel chunks
 template<class F> void chunk_parallel(uint totalSize, F f) {
     constexpr uint chunkCount = coreCount;
-    assert_(totalSize%chunkCount<chunkCount, totalSize, chunkCount, totalSize%chunkCount); //Last chunk will be smaller
+    assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
     const uint chunkSize = totalSize/chunkCount;
     parallel(chunkCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }

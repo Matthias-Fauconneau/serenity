@@ -60,8 +60,8 @@ sequencer.h
 sequencer.cc
 sampler.h
 sampler.cc
-asound.h
-asound.cc
+audio.h
+audio.cc
 midi.h
 midi.cc
 pdf.h

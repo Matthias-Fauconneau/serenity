@@ -13,12 +13,12 @@ Image decodeBMP(const ref<byte>& file) {
 
     struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; };
     Header header = s.read<Header>();
-    assert_(header.headerSize==sizeof(Header));
-    assert_(header.planeCount==1);
-    assert_(header.compression==0);
+    assert(header.headerSize==sizeof(Header));
+    assert(header.planeCount==1);
+    assert(header.compression==0);
 
     if(header.depth<=8) s.advance((1<<header.depth)*sizeof(byte4)); // Assumes palette[i]=i
-    assert_(bitmapFileHeader.offset == s.index);
+    assert(bitmapFileHeader.offset == s.index);
 
     uint w=header.width, stride=align(4,w), h=header.height;
     uint size = header.depth*stride*h/8;
@@ -35,7 +35,7 @@ Image decodeBMP(const ref<byte>& file) {
 
 buffer<byte> encodeBMP(const Image& image) {
     buffer<byte4> palette (256); for(uint i: range(256)) palette[i]=byte4(i);
-    assert_(image.buffer.size == image.width*image.height);
+    assert(image.buffer.size == image.width*image.height);
     int stride = align(4, image.width);
     buffer<byte> data (image.height*stride); for(uint y: range(image.height)) for(uint x: range(image.width)) data[y*stride+x]=image(x,y).b;
     struct Header { uint32 headerSize, width, height; uint16 planeCount, depth; uint32 compression, size, xPPM, yPPM, colorCount, importantColorCount; } packed header
@@ -43,6 +43,6 @@ buffer<byte> encodeBMP(const Image& image) {
     struct FileHeader { uint16 type; uint32 size, reserved, offset; } packed fileHeader
                       = {'B'|('M'<<8), uint32(sizeof(FileHeader)+sizeof(Header)+palette.size*4+data.size), 0, uint32(sizeof(FileHeader)+sizeof(Header)+palette.size*4) };
     buffer<byte> file = raw(fileHeader)+raw(header)+cast<byte>(palette)+data;
-    assert_(file.size == sizeof(FileHeader)+sizeof(Header)+palette.size*4+data.size);
+    assert(file.size == sizeof(FileHeader)+sizeof(Header)+palette.size*4+data.size);
     return file;
 }

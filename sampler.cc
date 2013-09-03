@@ -74,8 +74,8 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                         while(flac.blockSize!=0 && size<period) { size+=flac.blockSize; flac.decodeFrame(); }
                         if(size>=period) { envelope << sumOfSquares(flac, period); flac.readIndex=(flac.readIndex+period)%flac.audio.capacity; size-=period; }
                     }
-                    log(String(path+".env"_),envelope.size);
-                    writeFile(String(path+".env"_),cast<byte,float>(envelope),folder);
+                    log(path+".env"_,envelope.size);
+                    writeFile(path+".env"_,cast<byte,float>(envelope),folder);
                 }
                 sample->envelope = array<float>(cast<float,byte>(readFile(String(path+".env"_),folder)));
                 if(!rate) rate=sample->flac.rate;
@@ -248,7 +248,9 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 }
 
 /// Audio mixer (realtime thread)
-inline void mix(v4sf& level, v4sf step, v4sf* out, v4sf* in, uint size) { for(uint i: range(size)) { out[i] += level * in[i]; level*=step; } }
+inline void mix(v4sf& level, v4sf step, v4sf* out, v4sf* in, uint size) {
+    for(uint i: range(size)) { out[i] += level * in[i]; level*=step; }
+}
 void Note::read(v4sf* out, uint size) {
     if(flac.blockSize==0 && readCount<int(size*2)) { readCount.counter=0; return; } // end of stream
     if(!readCount.tryAcquire(size*2)) {
