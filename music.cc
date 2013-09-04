@@ -97,7 +97,7 @@ struct KeyboardInput : Widget {
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder root {arguments() ? arguments()[0] : "/"_};
+    Folder root = "/"_; //{arguments() ? arguments()[0] : "/"_};
     Folder folder{"Sheets"_,root};
     ICON(music)
     VBox layout;
@@ -124,8 +124,12 @@ struct Music {
 
     Music() {
         layout << &sheets; sheets.expanding=true;
-        //sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root));
-        sampler.open(audio.rate, "Salamander.sfz"_,Folder("Samples"_,root));
+        if(arguments() && endsWith(arguments()[0],".sfz"_))
+            sampler.open(audio.rate, arguments()[0], root);
+        else {
+            //sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root)); //FIXME
+            sampler.open(audio.rate, "Salamander.sfz"_,Folder("Samples"_,root));
+        }
 
         array<String> files = folder.list(Files);
         for(String& file : files) {

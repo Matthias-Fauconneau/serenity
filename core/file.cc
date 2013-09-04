@@ -7,7 +7,7 @@ static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdent
 struct dirent { long ino, off; short len; char name[]; };
 enum {DT_DIR=4, DT_REG=8};
 
-#include <stdio.h> // renameat
+#include <stdio.h>
 #include <sys/sendfile.h>
 #include <sys/statvfs.h>
 
@@ -86,7 +86,12 @@ int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, requ
 Map::Map(const File& file, Prot prot, Flags flags) { size=file.size(); data = size?(byte*)check(mmap(0,size,prot,flags,file.fd,0)):0; }
 Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
 Map::~Map() { unmap(); }
-void Map::lock(uint size) const { check_(mlock(data, min<size_t>(this->size,size))); }
+void Map::lock(uint size) const {
+    static uint64 totalLocks=0, totalLockedMemory=0;
+    totalLocks++, totalLockedMemory+=align(4096,min<size_t>(this->size,size))/1024;
+    log("[",pad(str(totalLocks),3),"]+",pad(str(align(4096,min<size_t>(this->size,size))/1024),4), "KB =>",totalLockedMemory,"KB");
+    check_(mlock(data, min<size_t>(this->size,size)));
+}
 void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system

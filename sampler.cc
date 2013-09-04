@@ -7,6 +7,10 @@
 #include "time.h"
 #include "string.h"
 #include "math.h"
+#if REVERB
+#include <fftw3.h> //fftw3f
+#include <fftw3.h> //fftw3f_threads
+#endif
 
 int noteToMIDI(const string& value) {
     int note=24;
@@ -72,7 +76,11 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                     while(flac.blockSize!=0) {
                         const uint period=1<<8;
                         while(flac.blockSize!=0 && size<period) { size+=flac.blockSize; flac.decodeFrame(); }
-                        if(size>=period) { envelope << sumOfSquares(flac, period); flac.readIndex=(flac.readIndex+period)%flac.audio.capacity; size-=period; }
+                        if(size>=period) {
+                            envelope << sumOfSquares(flac, period);
+                            flac.readIndex=(flac.readIndex+period)%flac.audio.capacity;
+                            size-=period;
+                        }
                     }
                     log(path+".env"_,envelope.size);
                     writeFile(path+".env"_,cast<byte,float>(envelope),folder);
@@ -103,7 +111,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     for(Sample& s: samples) {
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
-        //s.map.lock(); // Locks compressed samples in memory (PERM error if unprivileged)
+        s.map.lock(); // Locks compressed samples in memory
 
         for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
             float shift = key-s.pitch_keycenter; //TODO: tune
@@ -113,7 +121,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                 layers.grow(layers.size+1);
                 layer = &layers.last();
                 layer->shift = shift;
-                layer->notes.reserve(128);
+                layer->notes.reserve(256);
                 if(shift || rate!=outputRate) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
                     new (&layer->resampler) Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate));
@@ -149,7 +157,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
         reverbFilter[c] = buffer<float>(N,0.f);
-        FFTW p = fftwf_plan_r2r_1d(N, filter[c], reverbFilter[c], FFTW_R2HC, FFTW_ESTIMATE);
+        FFTW p (fftwf_plan_r2r_1d(N, filter[c].begin(), reverbFilter[c].begin(), FFTW_R2HC, FFTW_ESTIMATE));
         fftwf_execute(p);
         //for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; // Low-pass (some samples are aliased) //FIXME: only on those samples
     }
@@ -157,11 +165,11 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     // Allocates reverb buffer and temporary buffers
     input = buffer<float>(N);
     for(int c=0;c<2;c++) {
-        reverbBuffer[c] = buffer<float>(N,0.f)
-        forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c], input, FFTW_R2HC, FFTW_ESTIMATE);
+        reverbBuffer[c] = buffer<float>(N,0.f);
+        forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c].begin(), input.begin(), FFTW_R2HC, FFTW_ESTIMATE);
     }
     product = buffer<float>(N,0.f);
-    backward = fftwf_plan_r2r_1d(N, product, input, FFTW_HC2R, FFTW_ESTIMATE);
+    backward = fftwf_plan_r2r_1d(N, product.begin(), input.begin(), FFTW_HC2R, FFTW_ESTIMATE);
 #endif
 }
 
@@ -191,7 +199,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
-                assert(layer && layer->notes.size<layer->notes.capacity);
+                assert_(layer && layer->notes.size<layer->notes.capacity);
 
                 layer->notes.append( ::copy(s.flac) ); // Copy predecoded buffer and corresponding FLAC decoder state
                 Note& note = layer->notes.last();
@@ -254,7 +262,7 @@ inline void mix(v4sf& level, v4sf step, v4sf* out, v4sf* in, uint size) {
 void Note::read(v4sf* out, uint size) {
     if(flac.blockSize==0 && readCount<int(size*2)) { readCount.counter=0; return; } // end of stream
     if(!readCount.tryAcquire(size*2)) {
-        log("decoder underrun");
+        log("decoder underrun", size*2, readCount.counter);
         readCount.acquire(size*2); //ensure decoder follows
     }
     uint beforeWrap = (flac.audio.capacity-flac.readIndex)/2;
@@ -301,8 +309,8 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
                 for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
 
                 // Complex multiplies input (reverb buffer) with kernel (reverb filter)
-                float* x = input;
-                float* y = reverbFilter[c];
+                const float* x = input;
+                const float* y = reverbFilter[c];
                 product[0] = x[0] * y[0];
                 for(uint j = 1; j < N/2; j++) {
                     float a = x[j];
@@ -351,7 +359,7 @@ void Sampler::stopRecord() {
 }
 
 #if REVERB
-Sampler::FFTW::~FFTW() { fftwf_destroy_plan(pointer); }
+Sampler::FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
 #endif
 Sampler::~Sampler() { stopRecord(); }
 constexpr uint Sampler::periodSize;

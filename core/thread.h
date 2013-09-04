@@ -39,22 +39,24 @@ struct Condition : handle<pthread_cond_t> {
 struct Semaphore {
     Lock mutex;
     Condition condition;
-    int counter;
+    int64 counter;
     /// Creates a semaphore with \a count initial ressources
-    Semaphore(int count=0) : counter(count) {}
+    Semaphore(int64 count=0) : counter(count) {}
     /// Acquires \a count ressources
-    inline void acquire(int count) {
+    inline void acquire(int64 count) {
         while(counter<count) pthread_cond_wait(&condition,&mutex);
-        counter-=count; assert(counter>=0);
+        __sync_sub_and_fetch(&counter,count); assert(counter>=0);
+        mutex.unlock();
     }
     /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int count) {	
-        if(counter<count) return false; counter-=count; return true;
+    inline bool tryAcquire(int64 count) {
+        if(counter<count) return false;
+        __sync_sub_and_fetch(&counter,count);
+        return true;
     }
     /// Releases \a count ressources
-    inline void release(int count) {
-        Locker lock(mutex);
-        counter+=count; 
+    inline void release(int64 count) {
+        __sync_add_and_fetch(&counter,count);
         pthread_cond_signal(&condition);
     }
     /// Returns available ressources \a count

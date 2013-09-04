@@ -52,7 +52,7 @@ void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 
 void Thread::run() {
     tid=gettid();
-    //if(priority!=20) check_(setpriority(0,0,priority)); //(PERM error if unprivileged)
+    if(priority) check_(setpriority(0,0,priority));
     while(!terminate) {
         uint size=this->size;
         if(size==1) break; // Terminates when no Poll objects are registered
@@ -97,8 +97,8 @@ void traceAllThreads() {
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
 }
-static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
-                                         "Invalid"_, "Denormal"_};
+static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
+                                      "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 static void handler(int sig, siginfo_t* info, void* ctx) {
 #if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
@@ -135,7 +135,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
+    setExceptions(Invalid | Denormal | DivisionByZero | Overflow /*| Underflow*/);
 }
 
 template<> void __attribute((noreturn)) error(const string& message) {

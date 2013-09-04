@@ -84,7 +84,11 @@ struct Build {
                     if(!modules.contains(module)) lastLinkEdit = max(lastLinkEdit, max(lastCompileEdit, processModule(module)));
                     parent.children << modules[modules.indexOf(module)].pointer;
                 } else { // library header
-                    for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) { string library=s.word(); if(library) libraries << String(library); break; }
+                    for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
+                        string library=s.identifier("_"_);
+                        if(library) { assert(s.peek()=='\n',s.until('\n')); libraries << String(library); }
+                        break;
+                    }
                 }
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {
@@ -136,7 +140,7 @@ struct Build {
                     file = move(object);
                 }
             }
-            String name = target+"."_+build;
+            string name = target;
             String binary = tmp+build+"/"_+name;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime()) {
                 array<String> args; args<<String("-o"_)<<copy(binary);

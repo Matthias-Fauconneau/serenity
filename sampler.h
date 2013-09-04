@@ -7,10 +7,8 @@
 #include "thread.h"
 #include "map.h"
 #include "simd.h"
-#define REVERB 0
-#if REVERB
-#include <fftw3.h>
-#endif
+#define REVERB 1
+typedef struct fftwf_plan_s* fftwf_plan;
 
 struct Note {
     default_move(Note);
@@ -65,10 +63,10 @@ struct Sampler : Poll {
     buffer<float> reverbBuffer[2]; // Mixer output in time-domain
 
     //uint reverbIndex=0; //ring buffer index TODO
-    buffer<float> input=0; // Buffer to hold transform of reverbBuffer
-    buffer<float> product=0; // Buffer to hold multiplication of signal and reverbFilter
+    buffer<float> input; // Buffer to hold transform of reverbBuffer
+    buffer<float> product; // Buffer to hold multiplication of signal and reverbFilter
 
-    struct FFTW : handle<fftwf_plan> { ~FFTW(); };
+    struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
     FFTW forward[2]; // FFTW plan to forward transform reverb buffer
     FFTW backward; // FFTW plan to backward transform product*/
 #endif
