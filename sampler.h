@@ -19,7 +19,7 @@ struct Note {
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
     Semaphore writeCount; //audio thread release free samples, decoder thread acquires
     uint16 releaseTime; //to compute step
-    uint8 key=0; //to match release sample
+    uint8 key=0, velocity=0; //to match release sample
     ref<float> envelope; //to level release sample
     /// Decodes frames until \a available samples is over \a need
     void decode(uint need);
@@ -50,9 +50,11 @@ struct Sampler : Poll {
     array<Layer> layers;
 
     uint rate = 0;
-    //static constexpr uint periodSize = 128; // same as resampler latency and 1m sound propagation time
-    //static constexpr uint periodSize = 512; // required for efficient FFT convolution (reverb) (TODO: ring buffer)
-    static constexpr uint periodSize = 1024; // maximum compatibility (when latency is not critical)
+    static constexpr uint periodSize = 64  ; // [1ms] Prevents samples to synchronize with shifted copies from same chord
+    //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
+    //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (TODO: ring buffer)
+    //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (TODO: ring buffer)
+    //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical)
 
 #if REVERB
     /// Convolution reverb

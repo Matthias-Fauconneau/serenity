@@ -144,7 +144,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     // Computes normalization
     float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-    const float scale = 0x1p6f/sqrt(sum); // Normalizes and scales 24->32bit (-2bit head room)
+    const float scale = 0x1p5f/sqrt(sum); // Normalizes and scales 24->32bit (-3bit head room)
 
     // Reverses, scales and deinterleaves filter
     buffer<float> filter[2];
@@ -192,6 +192,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
             note.step=(v4sf){step,step,step,step};
         }
         if(!current) return; //already fully decayed
+        velocity=current->velocity;
     }
     for(const Sample& s : samples) {
         if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
@@ -207,15 +208,14 @@ void Sampler::noteEvent(uint key, uint velocity) {
 
                 float level;
                 if(current) { //rt_decay is unreliable, matching levels works better
-                    level = current->actualLevel(1<<14) / note.actualLevel(1<<11);
-                    level *= current->level[0];
+                    level = current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11); //341ms/21ms
                     if(level>8) level=8;
                 } else {
                     level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
                 }
-                if(level<0x1p-15) return;
+                if(level<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
 
-                if(!current) note.key=key;
+                if(!current) note.key=key, note.velocity=velocity;
                 note.step=(v4sf){1,1,1,1};
                 note.releaseTime=s.releaseTime;
                 note.envelope=s.envelope;
@@ -335,7 +335,12 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
             for(uint i: range(2*size)) buffer[i] *= 0x1p5f; // 24bit samples to 32bit output with 3bit head room to add multiple notes
         }
         // Converts mixing buffer to signed 32bit output
-        for(uint i: range(size/2)) ((v4si*)output)[i] = cvtps2dq(((v4sf*)buffer)[i]);
+        bool clip=false;
+        for(uint i: range(size/2)) {
+            for(uint j: range(4)) { float s=buffer[4*i+j]; if(s<-0x1p31f || s>=0x1p31f) clip=true; }
+            ((v4si*)output)[i] = cvtps2dq(((v4sf*)buffer)[i]);
+        }
+        if(clip) log("Clipping occured: not enough headroom");
     }
 
     time+=size;
