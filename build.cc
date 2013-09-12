@@ -34,7 +34,9 @@ void generateSVG(const Node& root, const string& folder){
 }
 
 struct Build {
-    string target = arguments()[0], build = arguments().size>1?arguments()[1]:"debug"_, install = arguments().size>2?arguments()[2]:""_;
+    string target = arguments().size>=1?arguments()[0]:"test"_;
+    string build = arguments().size>=2?arguments()[1]:"debug"_;
+    string install = arguments().size>=3?arguments()[2]:""_;
     bool graph = build=="graph"_, compile = !graph;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
@@ -82,7 +84,11 @@ struct Build {
                     if(!modules.contains(module)) lastLinkEdit = max(lastLinkEdit, max(lastCompileEdit, processModule(module)));
                     parent.children << modules[modules.indexOf(module)].pointer;
                 } else { // library header
-                    for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) { string library=s.word(); if(library) libraries << String(library); break; }
+                    for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
+                        string library=s.identifier("_"_);
+                        if(library) { assert(s.peek()=='\n',s.until('\n')); libraries << String(library); }
+                        break;
+                    }
                 }
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {
@@ -98,12 +104,18 @@ struct Build {
                 static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -march=native -o"_);
                 array<String> args;
                 args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
-                if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DNO_INLINE"_) << String("-DASSERT"_);
-                else if(::find(build,"fast"_)) args << String("-g"_) << String("-Ofast"_);
-                else if(::find(build,"release"_)) args << String("-Ofast"_);
+                if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DASSERT"_);
+                else if(::find(build,"assert"_)) args << String("-g"_) << String("-O3"_) << String("-DASSERT"_);
+                else if(::find(build,"fast"_)) args << String("-g"_) << String("-O3"_);
+                else if(::find(build,"release"_)) args << String("-O3"_);
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
+                while(pids.size>=coreCount) { // Waits for a job to finish before launching a new unit
+                    int pid =  wait(); // Waits for any child to terminate
+                    if(wait(pid)) fail();
+                    pids.remove(pid);
+                }
                 pids << execute("/usr/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
             }
         }
@@ -121,7 +133,7 @@ struct Build {
                 Folder(tmp+"files"_, root(), true);
                 for(String& file: files) {
                     String path = find(replace(file,"_"_,"/"_));
-                    assert_(path, file);
+                    assert_(path, "No such file to embed", file);
                     Folder subfolder = Folder(section(path,'/',0,-2), folder);
                     string name = section(path,'/',-2,-1);
                     String object = tmp+"files/"_+name+".o"_;
@@ -133,8 +145,8 @@ struct Build {
                     file = move(object);
                 }
             }
-            String name = target+"."_+build;
-            String binary = tmp+build+"/"_+name;
+            string name = target;
+            String binary = tmp+build+"/"_+name+"."_+build;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime()) {
                 array<String> args; args<<String("-o"_)<<copy(binary);
                 args << apply(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
