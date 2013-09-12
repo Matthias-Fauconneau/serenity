@@ -190,7 +190,7 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
 
     int cwd = workingDirectory.fd;
     int pid = fork();
-    if(pid==0) { fchdir(cwd); if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
+    if(pid==0) { if(cwd!=AT_FDCWD) check_( fchdir(cwd) ); if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
     else if(wait) return ::wait(pid);
     else { wait4(pid,0,WNOHANG,0); return pid; }
 }

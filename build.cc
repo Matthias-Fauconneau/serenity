@@ -28,16 +28,16 @@ void generateSVG(const Node& root, const string& folder){
     array<const Node*> once;
     s << ::dot(once, root);
     s << "}"_;
-    String path = "/dev/shm/"_+name+".dot"_;
+    String path = "/var/tmp/"_+name+".dot"_;
     writeFile(path, s);
-    ::execute("/ptmp/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
+    ::execute("/usr/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
 }
 
 struct Build {
-    string build = arguments()[0], target = arguments()[1], install = arguments().size>2?arguments()[2]:""_;
+    string target = arguments()[0], build = arguments().size>1?arguments()[1]:"debug"_, install = arguments().size>2?arguments()[2]:""_;
     bool graph = build=="graph"_, compile = !graph;
     const Folder& folder = currentWorkingDirectory();
-    const string tmp = "/dev/shm/"_;
+    const string tmp = "/var/tmp/"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -95,7 +95,7 @@ struct Build {
         if(compile) {
             String object = tmp+build+"/"_+target+".o"_;
             if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
-                static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/ptmp/include -I/usr/include/freetype2 -march=native -o"_);
+                static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -march=native -o"_);
                 array<String> args;
                 args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
                 if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DNO_INLINE"_) << String("-DASSERT"_);
@@ -104,7 +104,7 @@ struct Build {
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
-                pids << execute("/ptmp/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
+                pids << execute("/usr/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
             }
         }
         return lastLinkEdit;
@@ -139,9 +139,9 @@ struct Build {
                 array<String> args; args<<String("-o"_)<<copy(binary);
                 args << apply(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
                 args << copy(files);
-                args << String("-L/ptmp/lib"_) << apply(libraries, [this](const String& library){ return "-l"_+library; });
+                args << apply(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-                if(execute("/ptmp/bin/g++"_,toRefs(args))) fail();
+                if(execute("/usr/bin/g++"_,toRefs(args))) fail();
             }
             if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
         }
