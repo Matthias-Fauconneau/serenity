@@ -141,7 +141,7 @@ struct Build {
                 }
             }
             string name = target;
-            String binary = tmp+build+"/"_+name;
+            String binary = tmp+build+"/"_+name+"."_+build;
             if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime()) {
                 array<String> args; args<<String("-o"_)<<copy(binary);
                 args << apply(modules, [this](const unique<Node>& module){ return tmp+build+"/"_+module->name+".o"_; });
