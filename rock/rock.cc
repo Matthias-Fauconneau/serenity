@@ -16,6 +16,7 @@
 //#include "resample.h"
 //#include "histogram.h"
 //#include "threshold.h"
+//#include "sample-operation.h"
 //#include "position.h"
 //#include "skeleton.h"
 //#include "floodfill.h"

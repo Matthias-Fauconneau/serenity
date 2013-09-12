@@ -10,8 +10,20 @@ class(Source, Operation), virtual VolumeOperation {
     CropVolume crop;
 
     string parameters() const override { return "path resolution cylinder box downsample extra"_; }
-    uint outputSampleSize(uint index) override { return index ? 0 : 2; }
-    size_t outputSize(const Dict& args, const ref<Result*>&, uint index) override {
+    uint outputSampleSize(const Dict& args, const ref<Result*>&, uint index) override {
+        if(index) return 0; // Extra outputs
+        assert_(args.contains("path"_), args);
+        string path = args.at("path"_);
+        if(!existsFolder(path, currentWorkingDirectory())) { // Volume source
+            TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
+            Map file(path, currentWorkingDirectory());
+            Volume volume = toVolume(metadata, buffer<byte>(file));
+            assert(volume.sampleSize);
+            return volume.sampleSize;
+        }
+        return 2; // Default to 16bit
+    }
+    size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
         if(index) return 0;
         int3 size;
         assert_(args.contains("path"_), args);
@@ -32,13 +44,14 @@ class(Source, Operation), virtual VolumeOperation {
             crop = parseCrop(args, 0, size, args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
         }
         assert(crop.sampleCount);
-        return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(0);
+        return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(args, inputs, 0);
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
         assert_(crop.size);
         int3 min=crop.min, size=crop.size;
         string path = args.at("path"_);
-        Volume16& target = outputs.first();
+        assert(outputs);
+        Volume& target = outputs.first();
         target.sampleCount = crop.sampleCount;
         target.margin = crop.margin;
         target.field = String("μ"_); // Radiodensity
@@ -46,18 +59,17 @@ class(Source, Operation), virtual VolumeOperation {
         const uint64 X= target.sampleCount.x, Y= target.sampleCount.y;
         const int64 marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;
-        uint16* const targetData = (Volume16&)outputs.first();
         if(!existsFolder(path, currentWorkingDirectory())) {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
-            Volume source;
-            if(!parseVolumeFormat(source, metadata)) error("Unknown format");
+            Map file(path, currentWorkingDirectory()); // Copy from disk to process managed memory
+            Volume source = toVolume(metadata, buffer<byte>(file));
             const uint64 sX = source.sampleCount.x, sY = source.sampleCount.y;
 
-            Map file(path, currentWorkingDirectory()); // Copy from disk to process managed memory
             if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
+                uint16* const targetData = (Volume16&)outputs.first();
                 for(uint z: range(size.z)) {
                     if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                    uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
+                    uint16* const sourceSlice = (uint16*)source.data.data + (min.z+z)*sX*sY;
                     uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                     for(uint y: range(size.y)) for(uint x: range(size.x)) {
                         uint16* const source = sourceSlice + (min.y+y)*2*sX+(min.x+x)*2;
@@ -65,17 +77,27 @@ class(Source, Operation), virtual VolumeOperation {
                                 source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
                     }
                 }
-            } else { // Reads from disk into process managed cache
+            } else if(source.sampleSize==2) { // Reads from disk into process managed cache (16bit)
+                uint16* const targetData = (Volume16&)outputs.first();
                 for(uint z: range(size.z)) {
                     if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                    uint16* const sourceSlice = (uint16*)file.data.pointer + (min.z+z)*sX*sY;
+                    uint16* const sourceSlice = (uint16*)source.data.data + (min.z+z)*sX*sY;
                     uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                     for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
                 }
-            }
+            } else if(source.sampleSize==1) { // Reads from disk into process managed cache (8bit)
+                uint8* const targetData = (Volume8&)outputs.first();
+                for(uint z: range(size.z)) {
+                    if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                    uint8* const sourceSlice = (uint8*)source.data.data + (min.z+z)*sX*sY;
+                    uint8* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                    for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
+                }
+            } else error(source.sampleSize);
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
+            uint16* const targetData = (Volume16&)outputs.first();
             if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
                 const uint64 sX = X*2, sY = Y*2;
                 buffer<uint16> sliceBuffer(2*sX*sY);
@@ -109,7 +131,8 @@ class(Source, Operation), virtual VolumeOperation {
                 }
             }
         }
-        target.maximum = maximum(target); // Some sources don't use the full range
+        if(target.sampleSize==1) target.maximum = (1<<(target.sampleSize*8))-1; //FIXME: target.maximum = maximum((Volume8&)target); // Some sources don't use the full range
+        if(target.sampleSize==2) target.maximum = maximum((Volume16&)target); // Some sources don't use the full range
         assert_(target.maximum, target.sampleCount, target.margin);
         {TextData s (args.at("path"_));
             string name = s.until('-');

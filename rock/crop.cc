@@ -41,7 +41,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
         min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
     }
     else {
-        if(args.value("downsample"_,"0"_)!="0"_) min /= 2, max /= 2;
+        if(args.value("downsample"_,"0"_)!="0"_) { assert(min/2*2==min && max/2*2==max); min /= 2, max /= 2; }
     }
 
     assert_(int(max.x-min.x) == int(max.y-min.y), min, max);

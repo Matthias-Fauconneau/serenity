@@ -132,10 +132,11 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
 
 # Export
+ source8 = Normalize8 source
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
- maximum-mask = Binary maximum threshold threshold=1 box=crop.box
+ maximum-mask = Binary maximum threshold=1 box=crop.box
  denoised-connected = Mask maximum-mask denoised-tiled
  flood = Add pore maximum-mask
  histogram-flood = Histogram flood

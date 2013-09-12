@@ -160,7 +160,7 @@ class(MaximumMeanGradient, Operation) {
 #endif
 
 /// Segments by setting values over a fixed threshold
-void binary(Volume8& target, const Volume16& source, uint16 threshold, bool invert=false, int maskValue=0, bool cylinder=true) {
+generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold, bool invert=false, int maskValue=0, bool cylinder=true) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const int marginX=target.margin.x=source.margin.x, marginY=target.margin.y=source.margin.y, marginZ=target.margin.z=source.margin.z;
     bool tiled = source.tiled();
@@ -178,11 +178,11 @@ void binary(Volume8& target, const Volume16& source, uint16 threshold, bool inve
     const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     uint64 count[2] = {};
     parallel(0, Z, [&](uint, int z) {
-        const uint16* const sourceZ = source + (tiled ? offsetZ[z] : z*XY);
+        const T* const sourceZ = source + (tiled ? offsetZ[z] : z*XY);
         uint8* const targetZ = targetData + offsetZ[z];
         if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const targetZY = targetZ + offsetY[y]; for(int x=0; x<X; x++) targetZY[x]=1; }
         else for(int y=0; y<Y; y++) {
-            const uint16* const sourceY = sourceZ + (tiled ? offsetY[y] : y*X);
+            const T* const sourceY = sourceZ + (tiled ? offsetY[y] : y*X);
             uint8* const targetZY = targetZ + offsetY[y];
             uint8* const maskY = mask + y*X;
             if(maskValue==1) { // Masked pixel are 1
@@ -203,13 +203,16 @@ class(Binary, Operation), virtual VolumeOperation {
     string parameters() const override { return "threshold invert mask box"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        real threshold = args.at("threshold"_);
-        uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, !args.contains("box"_));
+        execute(args, outputs, inputs, (real)args.at("threshold"_));
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
+        assert_(!args.contains("threshold"_) || !isDecimal(args.at("threshold"_)) || args.at("threshold"_)==otherInputs[0]->data);
+        execute(args, outputs, inputs, TextData(otherInputs[0]->data).decimal());
+    }
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, real threshold) {
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        ::binary(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, !args.contains("box"_));
+        /**/ if(inputs[0].sampleSize==1) ::binary<uint8>(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, !args.contains("box"_));
+        else if(inputs[0].sampleSize==2) ::binary<uint16>(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, !args.contains("box"_));
+        else error(inputs[0].sampleSize);
     }
 };

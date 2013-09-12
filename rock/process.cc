@@ -429,7 +429,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
     Dict args = copy(arguments);
     for(auto arg: relevantArguments) if(args.contains(arg.key)) args.at(arg.key)=copy(arg.value); else args.insert(copy(arg.key), copy(arg.value));
     operation->execute(args, localArguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
-    if((uint64)time>=950) log(operationName, localArguments ? str(localArguments) : ""_, time);
+    if((uint64)time>=50) log(operationName, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) {
         if(!output->timestamp) continue; // outputSize==-1: output was computed indirectly using an explicit ResultManager::compute
