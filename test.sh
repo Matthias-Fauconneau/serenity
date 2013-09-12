@@ -1,6 +1,6 @@
 #!/bin/sh
 function die { echo "Test failed"; exit -1; }
-cd /dev/shm
+cd /var/tmp
 test -e test || mkdir test
 SRC=berea-740.tif
 test -e $SRC || ln -s /ptmp/$SRC $SRC

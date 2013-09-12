@@ -45,6 +45,7 @@ ui/display.h
 ui/font.cc
 ui/font.h
 ui/interface.h
+ui/interface.cc
 ui/layout.h
 ui/plot.cc
 ui/plot.h
@@ -62,7 +63,6 @@ rock/export.cc
 rock/CDL
 rock/floodfill.cc
 rock/histogram.cc
-ui/interface.cc
 rock/layout.cc
 rock/operation.h
 rock/process.cc
