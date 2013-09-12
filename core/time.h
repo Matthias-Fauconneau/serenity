@@ -41,7 +41,7 @@ struct Date {
     /// Returns whether this date is in daylight saving time
     bool summerTime() const;
     /// Returns the local time offset from UTC in seconds (time zone + DST)
-    int localTimeOffset() const;
+    int localTimeOffset(int64 utc) const;
     /// Converts the date to Unix time (in seconds)
     operator int64() const;
 };

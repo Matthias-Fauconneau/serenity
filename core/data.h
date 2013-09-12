@@ -103,7 +103,8 @@ struct BinaryData : virtual Data {
    ArrayReadOperator read(uint size) { return {this,size}; }
 
    /// Reads \a size \a T elements (swap as needed)
-   generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+   //generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+   //template<Type T, size_t N> void read(const T (&buffer)[N]) { for(uint i: range(N)) buffer[i]=(T)read(); }
 
    bool isBigEndian = false;
 };
