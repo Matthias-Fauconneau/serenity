@@ -7,9 +7,10 @@ String str(const CropVolume& crop) { return "("_+str(crop.min, crop.max)+")"_; }
 /// Parses volume to crop from user arguments
 CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extra) {
     int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
-    if(args.contains("cylinder"_)) {
+    /**/ if(args.contains("cylinder"_)) {
+        assert_(!args.value("box"_,""_));
         Vector coordinates = parseVector(args.at("cylinder"_), true);
-        if(args.value("downsample"_,"0"_)!="0"_) coordinates = 1./2 * coordinates;
+        if(args.value("downsample"_,"0"_)!="0"_) coordinates = 1./2 * coordinates; // User inputs full size coordinates
         if(coordinates.size==1) { // Crops centered cylinder
             int r = coordinates[0];
             min=center-int3(r), max=center+int3(r);
@@ -22,9 +23,9 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
         } else error("Expected cylinder = r | x,y,r,z0,z1, got", args.at("cylinder"_));
         min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
     }
-    if(args.value("box"_,""_)) {
+    else if(args.value("box"_,""_)) {
         Vector coordinates = parseVector(args.at("box"_), true);
-        if(args.value("downsample"_,"0"_)!="0"_) coordinates = 1./2 * coordinates;
+        if(args.value("downsample"_,"0"_)!="0"_) coordinates = 1./2 * coordinates; // User inputs full size coordinates
         if(coordinates.size==1) { // Crops centered box
             int3 size = coordinates[0];
             min=center-size/2, max=center+size/2;
@@ -38,6 +39,9 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
             min=int3(coordinates[0],coordinates[1],coordinates[2]), max=int3(coordinates[3],coordinates[4],coordinates[5]);
         } else error("Expected box = size | size{x,y,z} | x0,y0,z0,x1,y1,z1, got", args.at("box"_));
         min -= extra, max += extra; // Adds extra voxels to user-specified geometry to compensate margins lost to process
+    }
+    else {
+        if(args.value("downsample"_,"0"_)!="0"_) min /= 2, max /= 2;
     }
 
     assert_(int(max.x-min.x) == int(max.y-min.y), min, max);
