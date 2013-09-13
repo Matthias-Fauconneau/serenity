@@ -198,6 +198,7 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
     else if(wait) return ::wait(pid);
     else { wait4(pid,0,WNOHANG,0); return pid; }
 }
+int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
 string getenv(const string& name) {

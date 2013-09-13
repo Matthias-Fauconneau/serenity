@@ -154,6 +154,10 @@ void __attribute((noreturn)) exit_thread(int status);
 /// Execute binary at \a path with command line arguments \a args
 /// \note if \a wait is false, Returns the PID to be used for wait
 int execute(const string& path, const ref<string>& args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory());
+/// Waits for any child process to change state
+int wait();
+/// Waits for process \a pid to change state
+/// \note Returns immediatly if process is waitable (already terminated)
 int64 wait(int pid);
 
 /// Returns value for environment variable \a name
