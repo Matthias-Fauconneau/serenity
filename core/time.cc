@@ -50,14 +50,23 @@ bool Date::summerTime() const { //FIXME: always European Summer Time
     return    (month>March    || (month==March    && (day>lastMarchSunday    || (day==lastMarchSunday    && hours>=1))))
             && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
 }
-int Date::localTimeOffset() const {
+int Date::localTimeOffset(int64 utc) const {
     assert(year>=0);
-    int offset = -8; //FIXME: hardcoded Central European Time (UTC+1) or Pacific Standard Time (UTC-8)
-    if(summerTime()) offset += 1;
-    return offset*60*60;
+    // Parses /etc/localtime to get local time zone offset (without DST)
+    static buffer<byte> localtime = readFile("etc/localtime");
+    BinaryData s (localtime, true);
+    s.advance(20);
+    uint unused gmtCount = s.read(), unused stdCount = s.read(), unused leapCount = s.read(), transitionCount = s.read(), infoCount = s.read(), nameCount = s.read();
+    ref<int> transitionTimes = s.read<int>(transitionCount);
+    uint i = 0; for(; i < transitionCount; i++) if(utc < (int)big32(transitionTimes[i])) break; i--;
+    ref<uint8> transitionIndices = s.read<uint8>(transitionCount);
+    uint index = transitionIndices[i];
+    struct ttinfo { int32 gmtOffset; uint8 isDST, nameIndex; } packed;
+    ref<ttinfo> infos = s.read<ttinfo>(infoCount);
+    return big32(infos[index].gmtOffset);
 }
 Date::Date(int64 time) {
-    int64 utc unused = time;
+    int64 utc = time;
     for(uint i unused: range(2)) { // First pass computes UTC date to determine DST, second pass computes local date
         seconds = time;
         minutes=seconds/60; seconds %= 60;
@@ -67,14 +76,15 @@ Date::Date(int64 time) {
         for(;;) { int nofDays = leap(year)?366:365; if(days>=nofDays) days-=nofDays, year++; else break; }
         for(;days>=daysInMonth(month,year);month++) days-=daysInMonth(month,year);
         day=days;
-        time += localTimeOffset(); // localTimeOffset is only defined once we computed the UTC date
+        time += localTimeOffset(utc); // localTimeOffset is only defined once we computed the UTC date
     }
     invariant();
     assert(long(*this)==utc);
 }
 Date::operator int64() const {
     invariant();
-    return ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0))*60+(seconds>=0?seconds:0)-localTimeOffset();
+    int64 local = ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0))*60+(seconds>=0?seconds:0);
+    return local-localTimeOffset(local /*FIXME*/);
 }
 
 bool operator <(const Date& a, const Date& b) {
