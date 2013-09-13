@@ -53,7 +53,7 @@ float Font::linearAdvance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TAR
 vec2 Font::size(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6); }
 
 const Glyph& Font::glyph(uint16 index, int) {
-    Glyph& glyph = cache[fontSize][index];
+    Glyph& glyph = cache[uint(fontSize)][index];
     if(glyph.valid) return glyph;
     glyph.valid=true;
 

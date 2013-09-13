@@ -198,12 +198,12 @@ struct Music {
     /// Smoothly scrolls towards target
     void smoothScroll() {
         if(pdfScore.annotations) return;
-        const float k=1./(8*60), b=1./2; //stiffness and damping constants
+        const float k=1./(2*60), b=1./2; //stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration
         pdfScore.delta=int2(round(position));
         if(round(target)!=round(position)) window.render();
-        if(!record) toggleRecord(); // DEBUG
+        if(!record) toggleRecord();
     }
     /// Toggles MIDI playing
     bool play=false;

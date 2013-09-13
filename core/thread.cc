@@ -13,6 +13,9 @@
 #include <sys/wait.h>
 #include <pwd.h>
 
+// Memory
+uint64 traceMemoryAllocation = -1;
+
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const string& buffer) { log_(buffer+"\n"_); }
@@ -137,6 +140,17 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTRAP, &sa, 0));
     //check_(sigaction(SIGFPE, &sa, 0));
     //setExceptions(Invalid | Denormal | DivisionByZero | Overflow /*| Underflow*/);
+}
+
+template<> void warn(const string& message) {
+    static bool reentrant = false;
+    if(!reentrant) { // Avoid hangs if tracing errors
+        reentrant = true;
+        String s = trace(1,0);
+        log_(s);
+        reentrant = false;
+    }
+    log(message);
 }
 
 template<> void __attribute((noreturn)) error(const string& message) {

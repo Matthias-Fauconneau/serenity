@@ -2,6 +2,8 @@
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
 
+extern uint64 traceMemoryAllocation;
+
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
     /// Default constructs an empty reference
@@ -54,14 +56,18 @@ generic struct buffer : mref<T> {
     /// Move constructor
     buffer(buffer&& o) : mref<T>((T*)o.data, o.size), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
-    buffer(size_t capacity, size_t size):mref<T>((T*)0,size),capacity(capacity){ assert(capacity>=size); if(!capacity) return; if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error(""); }
+    buffer(size_t capacity, size_t size):mref<T>((T*)0,size),capacity(capacity){
+     assert(capacity>=size); if(!capacity) return;
+     if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
+     if(capacity*sizeof(T)>=traceMemoryAllocation) { warn(">>",sizeof(T),capacity); }
+    }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
     buffer(size_t capacity, size_t size, const T& value) : buffer(capacity, size) { clear((T*)data, size, value); }
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
-    ~buffer(){ if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
+    ~buffer(){ if(capacity) { ::free((void*)data); if(capacity*sizeof(T)>=traceMemoryAllocation) log("<<",sizeof(T),capacity); } data=0; capacity=0; size=0; }
 
     // Overrides mref const operators
     T* begin() { return (T*)data; }

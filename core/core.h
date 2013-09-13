@@ -88,16 +88,17 @@ void log_(const string& message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
 template<> void log(const string& message);
+/// Logs a message to standard output and signals all threads to log their stack trace
+template<Type... Args> void warn(const Args&... args);
+template<> void warn(const string& message);
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const string& message) __attribute((noreturn));
 
 #if ASSERT
-#define warn error
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 #else
-#define warn log
 #define assert(expr, message...) ({})
 #endif
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)

@@ -38,7 +38,9 @@ void Record::start(const string& name, bool video, bool audio) {
         videoStream->time_base.den = videoCodec->time_base.den = fps;
         videoCodec->pix_fmt = PIX_FMT_YUV420P;
         if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-        avcodec_open2(videoCodec, codec, 0);
+        AVDictionary* options=0;
+        av_dict_set(&options, "preset","ultrafast",0);
+        avcodec_open2(videoCodec, codec, &options);
     }
 
     if(audio) { // Audio
@@ -81,6 +83,7 @@ void Record::captureVideoFrame() {
     int gotVideoPacket;
     avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
     avpicture_free((AVPicture*)frame);
+    avcodec_free_frame(&frame);
     if(gotVideoPacket) {
         if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
         pkt.stream_index = videoStream->index;
