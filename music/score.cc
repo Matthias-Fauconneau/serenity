@@ -10,6 +10,10 @@ void Score::onPath(const ref<vec2>& p) {
             tails << Line(p[0], p[1]);
         }
     } else if(p.size==5||p.size==13) {
+        if(span.x > 24 && span.y < 26) {
+            ties += Line(vec2(min.x,center.y),vec2(max.x,center.y));
+            debug[center]="I"_+str(int2(round(span)));
+        } else debug[center]="!I"_+str(int2(round(span)));
         if(span.x > 75 && span.x < 76 && span.y > 8 && span.y < 18) {
             tremolos << Line(p[0], p[3]);
         }
@@ -26,7 +30,7 @@ void Score::onPath(const ref<vec2>& p) {
     }
 }
 
-void Score::onGlyph(int index, vec2 pos, float size,const string& font, int code, int fontIndex) {
+void Score::onGlyph(int index, const vec2 pos, float size,const string& font, int code, int fontIndex) {
     if(!font) return;
     if(index == 0) {
         pass++;
@@ -96,6 +100,14 @@ void Score::onGlyph(int index, vec2 pos, float size,const string& font, int code
             }
         } else if(find(font,"NWCV15"_)) {
             if(code==97/*treble*/||code==98/*bass*/) {
+                if(lastClef.y != 0 && pos.y-lastClef.y>128 && staffCount!=1) {
+                    staffs << (lastClef.y+pos.y)/2;
+                    staffCount=1;
+                } else staffCount++;
+                lastClef=pos;
+            }
+        } else if(endsWith(font,"Maestro"_)) {
+            if(code==38/*treble*/||code==63/*bass*/) {
                 if(lastClef.y != 0 && pos.y-lastClef.y>128 && staffCount!=1) {
                     staffs << (lastClef.y+pos.y)/2;
                     staffCount=1;
@@ -197,18 +209,26 @@ void Score::onGlyph(int index, vec2 pos, float size,const string& font, int code
             }
             else if(code==106) duration = 8; //half
             else if(code==105) duration = 16; //whole
+        } else if(endsWith(font,"Maestro"_)) { //TODO: glyph OCR
+            //debug[int2(pos)]<<str(code);
+            if(code==207) {
+                if(size<2) duration = 0; //grace
+                else duration = 4; //quarter
+            }
+            else if(code==250) duration = 8; //half
+            else if(code==119) duration = 16; //whole
         } else if(font=="Manual"_) {
             uint i=0; for(;i<staffs.size && pos.y>staffs[i];i++) {}
             if(i>=notes.size) notes.grow(i+1);
             for(int x : notes[i].keys) if(abs(x-pos.x)<16) {
-                if(!notes[i].sorted(x).contains<int>(-pos.y)) notes[i].sorted(x).insertSorted(-pos.y, Note(index,4));
+                if(!notes[i].sorted<int>(x).contains<int>(-pos.y)) notes[i].sorted<int>(x).insertSorted<int>(-pos.y, Note(index,4));
                 goto break_;
             }
-            /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
+            /*else*/ notes[i].sorted<int>(pos.x).insertSorted<int>(-pos.y, Note(index,4));
             break_:;
         }
         if(duration<0) return;
-        if(notes[i].sorted(pos.x).contains<int>(-pos.y)) return;
+        if(notes[i].sorted<int>(pos.x).contains<int>(-pos.y)) return;
         if(staffs) {
             float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[min<int>(i,staffs.size-1)]));
             if(nearestStaffCut<20) { // Follow ledgers away from staff limit
@@ -235,21 +255,21 @@ void Score::onGlyph(int index, vec2 pos, float size,const string& font, int code
                 }
             }
         }
-        notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
+        notes[i].sorted<int>(pos.x).insertSorted<int>(-pos.y, Note(index,duration));
     }
 }
 
-struct Tie { uint li; int lx,ly; uint ri; int rx,ry; int dy; Tie():li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
+struct Tie { Score::Line o; uint li; int lx,ly; uint ri; int rx,ry; int dy; Tie(Score::Line o):o(o),li(0),lx(0),ly(0),ri(0),rx(0),ry(0){}};
 String str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)+")"_; }
-void Score::parse() {
+void Score::parse() { //FIXME: All the local rules makes recognition work only on specific sheets, this recognition should be reimplemented as a global optimization.
     if(!staffs) return; assert(staffs);
     staffs << (lastClef.y+110); //add a last split at the bottom of the last page
 
     /// Lengthens dotted notes
     for(const_pair< int,array<vec2>> dots: this->dots) {
-        for(vec2 pos: dots.value) for(int x : notes[dots.key].keys) {
+        for(vec2 pos: dots.value) for(int x : notes.at(dots.key).keys) {
             if(x>pos.x-16) break;
-            if(x>pos.x-48) for(int y : notes[dots.key][x].keys) if(-y>pos.y-16&&-y<pos.y+32) notes[dots.key][x].at(y).duration = notes[dots.key][x].at(y).duration*3/2;
+            if(x>pos.x-48) for(int y : notes.at(dots.key).at(x).keys) if(-y>pos.y-16&&-y<pos.y+32) notes.at(dots.key).at(x).at(y).duration = notes.at(dots.key).at(x).at(y).duration*3/2;
         }
     }
 
@@ -295,48 +315,66 @@ void Score::parse() {
 
     /// Detect and remove tied notes
     array<Tie> tied;
-    for(Line tie : ties) {
+    //for(Line tie : ties) {
+    for(uint i=0; i<ties.size; i++) { Line tie=ties[i]; // not range as ties may be moved back (on left note steal by another tie)
         int l = abs(tie.b.x-tie.a.x);
         uint staff=0; for(;staff<staffs.size-1 && tie.a.y>staffs[staff];staff++) {}
-        int noteBetween=0; int sameNoteBetween=0; Tie t;
+        int noteBetween=0; int sameNoteBetween=0; Tie t(tie);
         for(uint i=staff>0?staff-1:0;i<staff+1;i++) {
             for(int x : notes[i].keys) {
                 int lx = x-tie.a.x;
                 int rx = x-tie.b.x;
-                for(int y : notes[i][x].keys) {
+                for(int y : notes[i].at(x).keys) {
                     int ly = -y-tie.a.y;
 
                     /// Detect first note of a tie
                     if(!t.ly || abs(ly)<abs(t.dy)) {
-                        if(notes[i][x].at(y).duration>0/*not grace*/ && lx < 4 && lx>-46/*49*/ && ly>-34 && ly<15 && rx<1) {
-                            debug[vec2(x,-y)]<<str("L"_,lx);
-                            for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) goto alreadyTied;
+                        if(notes[i].at(x).at(y).duration>0/*not grace*/ && lx < 4 && lx>-46 && ly>=-30/*-34*/ && ly<32/*18*/ && rx<1) {
+                            for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) { debug[vec2(x,-y)]<<"D"_<<str(t2.dy,ly); goto alreadyTied; }
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                        } else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly,rx);
+                        } else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly);
                     }
 alreadyTied: ;
                 }
-                for(int y : notes[i][x].keys) {
+                if(!t.ly) { // No left tie found, try again and allow to steal an already tied note
+                    for(int y : notes[i].at(x).keys) {
+                        int ly = -y-tie.a.y;
+
+                        /// Detect first note of a tie
+                        if(!t.ly || abs(ly)<abs(t.dy)) {
+                            if(notes[i].at(x).at(y).duration>0/*not grace*/ && lx < 4 && lx>-46 && ly>=-30/*-34*/ && ly<32/*18*/ && rx<1) {
+                                for(uint j: range(tied.size)) { Tie t2=tied[j]; if(t2.li==i && t2.lx==x && t2.ly==y) { debug[vec2(x,-y)]<<"S"_<<str(t2.dy,ly); tied.removeAt(j); ties<<t2.o; /*Move tie back*/ goto stolen; } }
+                                error("Nothing to steal after stealing prevention"); stolen:;
+                                t.li=i; t.lx=x; t.ly=y; t.dy=ly;
+                            } else if(lx>-50 && lx<50 && ly>-50 && ly<50) debug[vec2(x,-y)]<<"!L"_+str(lx,ly);
+                        }
+                    }
+                }
+                for(int y : notes[i].at(x).keys) {
                     int ry = y-t.ly;
                     /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
                     if(lx > 0 && rx < -16 && abs(ry) < 7) {
                         noteBetween++;
                         if(abs(ry)<5) {
-                            if(notes[t.li][t.lx].at(t.ly).duration>=8 && sameNoteBetween==(l<330?1:2)) notes[i][x].remove(y);
+                            if(notes[t.li].at(t.lx).at(t.ly).duration>=8 && sameNoteBetween==(l<330?1:2)) notes[i].at(x).remove(y);
                             sameNoteBetween++;
                         }
+                        debug[vec2(x,-y)]<<"B"_;
                         break;
                     }
                     /// Detect right note of a tie
-                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-5/*13*/ && ry <=12 && rx < 21 && rx > -10) {
+                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210)) && ry>-5 && ry <=12 && rx < 21 && rx > -10) {
                         t.ri=i;t.rx=x; t.ry=y;
+                        //if(ry<=-4) for(Line t2: ties) if(sq(vec2(x,-y)-t2.b)<sq(vec2(x,-y)-tie.b)) { debug[vec2(x,-y)]<<"E"_<<str(int2(x,-y),int2(t2.b),int2(tie.b),ry); goto closerExists; }
                         tied << t; //defer remove for double ties
-                        debug[vec2(x,-y)]<<"R"_+str(rx,ry,t.ly);
-                        goto staffDone;
-                    } else if(rx>-50 && rx<50 && ry>-50 && ry<50) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
+                        debug[vec2(x,-y)]<<"R"_<<str(ry);
+                        debug[vec2(tie.b)]<<"R"_;
+                        goto continueTie; //goto staffDone;
+                        //closerExists:;
+                    } else if(rx>-100 && rx<100 && ry>-100 && ry<100) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
                 }
             }
-staffDone: ;
+//staffDone: ;
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>156)) && i+1<staffs.size && tie.b.x > notes[i].keys.last()+10 ) {
                 float ly=100; for(float y: keys) if(abs(-y-t.ly) < abs(ly)) ly = -y-t.ly;
@@ -358,6 +396,7 @@ alreadyTied1: ;
                         if(dy>=-15 && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
                             for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
+                            //debug[vec2(t.rx,-t.ry)]<<"R"_;
                             tied << t;
                             goto tieFound;
                         }
@@ -368,8 +407,14 @@ tieFound: ;
 trillCancelTie: ;
             }
         }
+        debug[vec2(tie.b)]<<(t.ly?"!R"_:"!L"_); continue;
+continueTie: ;
+        debug[vec2(t.lx,-t.ly)]<<str("L"_,t.dy);
     }
-    for(Tie t : tied) if(notes[t.ri][t.rx].contains(t.ry)) notes[t.ri][t.rx].remove(t.ry);
+    for(Tie t: tied) {
+        if(notes.at(t.ri).at(t.rx).contains<int>(t.ry)) notes.at(t.ri).at(t.rx).remove(t.ry);
+        //else { error(""); debug[vec2(t.rx,-t.ry)]<<"?"_; }
+    }
 
     /// Removes duplicates (added to tie only once)
     for(Staff& staff: notes) {
@@ -400,7 +445,7 @@ trillCancelTie: ;
         uint i=0; for(;i<staffs.size-1 && pos.y>staffs[i];i++) {}
         if(!notes[i].values) { error("Empty staff?"); continue; }
         int index=notes[i].values[0].values[0].scoreIndex-1;
-        for(int x : notes[i].keys) { if(x>pos.x) break; index=notes[i][x].values[0].scoreIndex; }
+        for(int x : notes[i].keys) { if(x>pos.x) break; index=notes[i].at(x).values[0].scoreIndex; }
         if(startIndex < -1) {
             startIndex=index;
         } else {
@@ -581,7 +626,7 @@ void Score::seek(uint unused time) {
     }
     if(!showActive) {
         map<int,vec4> activeNotes;
-        for(int i: expected.values) activeNotes.insert(indices?indices[i]:i,blue);
+        for(int i: expected.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,blue);
         activeNotesChanged(activeNotes);
     }
 }

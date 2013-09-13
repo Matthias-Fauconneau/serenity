@@ -98,10 +98,8 @@ struct Music {
     Thread thread{-20};
     Sequencer input{thread};
 
-#if SAMPLER
     Sampler sampler;
     AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
-#endif
 #if RECORD
     Record record;
 #endif
@@ -109,14 +107,13 @@ struct Music {
 
     Music() {
         layout << &sheets; sheets.expanding=true;
-#if SAMPLER
+
         if(arguments() && endsWith(arguments()[0],".sfz"_))
             sampler.open(audio.rate, arguments()[0], root);
         else {
             //sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root)); //FIXME
             sampler.open(audio.rate, "Salamander.sfz"_,Folder("Samples"_,root));
         }
-#endif
 
         array<String> files = folder.list(Files);
         for(String& file : files) {
@@ -128,11 +125,10 @@ struct Music {
         }
         sheets.itemPressed.connect(this,&Music::openSheet);
 
-#if SAMPLER
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
-#endif
+
         input.noteEvent.connect(&score,&Score::noteEvent);
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
@@ -161,9 +157,7 @@ struct Music {
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
-#if SAMPLER
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
-#endif
 #if RECORD
         window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
@@ -177,10 +171,8 @@ struct Music {
 
         showSheetList();
         if(arguments()) for(const Text& text: sheets) if(text.text==toUTF32(arguments()[0])) { openSheet(arguments()[0]); break; }
-#if SAMPLER
         audio.start();
         thread.spawn();
-#endif
         window.show();
     }
 
@@ -209,16 +201,8 @@ struct Music {
     bool play=false;
     void togglePlay() {
         play=!play;
-        if(play) { midi.seek(0); score.seek(0); score.showActive=true;
-#if SAMPLER
-            sampler.timeChanged.connect(&midi,&MidiFile::update);
-#endif
-        }
-        else { score.showActive=false;
-#if SAMPLER
-            sampler.timeChanged.delegates.clear();
-#endif
-        }
+        if(play) { midi.seek(0); score.seek(0); score.showActive=true; sampler.timeChanged.connect(&midi,&MidiFile::update); }
+        else { score.showActive=false; sampler.timeChanged.delegates.clear(); }
     }
 
 #if RECORD
