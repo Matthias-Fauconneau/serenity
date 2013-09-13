@@ -3,6 +3,7 @@
 
 int resolution = 96;
 Image framebuffer;
+Lock framebufferLock;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 

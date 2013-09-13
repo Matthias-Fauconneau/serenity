@@ -36,10 +36,10 @@ generic inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst,
 inline void copy(const mref<byte>& dst, const ref<byte>& src) { assert(dst.size==src.size, dst.size, src.size); copy(dst.begin(), src.begin(), src.size); }
 
 // C runtime memory allocation
-extern "C" void* malloc(size_t size);
-extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size);
-extern "C" void* realloc(void* buffer, size_t size);
-extern "C" void free(void* buffer);
+extern "C" void* malloc(size_t size) throw();
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) throw();
+extern "C" void* realloc(void* buffer, size_t size) throw();
+extern "C" void free(void* buffer) throw();
 
 /// Managed fixed-capacity mutable reference to an array of elements
 /// \note either an heap allocation managed by this object or a reference to memory managed by another object

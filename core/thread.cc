@@ -131,12 +131,12 @@ void __attribute((constructor(102))) setup_signals() {
     //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={0};
-    check_(sigaction(SIGFPE, &sa, 0));
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    setExceptions(Invalid | Denormal | DivisionByZero | Overflow /*| Underflow*/);
+    //check_(sigaction(SIGFPE, &sa, 0));
+    //setExceptions(Invalid | Denormal | DivisionByZero | Overflow /*| Underflow*/);
 }
 
 template<> void __attribute((noreturn)) error(const string& message) {
@@ -218,6 +218,7 @@ array<string> arguments() {
     return split(section(cmdline,0,1,-1),0);
 }
 
-const Folder& home() { static Folder home(getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir))); return home; }
+string homePath() { return getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir)); }
+const Folder& home() { static Folder home(homePath()); return home; }
 const Folder& config() { static Folder config(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache(".cache"_,home(),true); return cache; }

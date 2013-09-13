@@ -176,19 +176,18 @@ struct Music {
 
         showSheetList();
         if(arguments()) for(const Text& text: sheets) if(text.text==toUTF32(arguments()[0])) { openSheet(arguments()[0]); break; }
+        window.show();
         audio.start();
         thread.spawn();
-        window.show();
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float previous /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float next /* next bottom*/, float x) {
+    void nextStaff(float previous /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float unused next /* next bottom*/, float x) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
             // Always set current staff as second staff from bottom edge (allows to repeat page, track scrolling, see keyboard)
             float t = (x/pdfScore.normalizedScale)/(pdfScore.x2-pdfScore.x1); assert(t>=0 && t<=1);
-            log(pdfScore.normalizedScale,pdfScore.x1,pdfScore.x2,x/pdfScore.normalizedScale,t);
             //target = vec2(0, -(scale*( (1-t)*bottom + t*next )-pdfScore.ScrollArea::size.y)); // Align bottom edge between current bottom and next bottom
             target = vec2(0, -scale*( (1-t)*previous + t*top )); // Align top edge between previos top and current top
             if(!position) position=target, pdfScore.delta=int2(round(position));
@@ -204,6 +203,7 @@ struct Music {
         position = position + speed; //Euler integration
         pdfScore.delta=int2(round(position));
         if(round(target)!=round(position)) window.render();
+        if(!record) toggleRecord(); // DEBUG
     }
     /// Toggles MIDI playing
     bool play=false;

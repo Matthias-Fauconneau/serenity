@@ -14,7 +14,7 @@ void ScrollArea::render(int2 position, int2 size) {
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint());
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
-        delta.y += button==WheelUp?-64:64;
+        delta.y += (button==WheelUp?1:-1) * 64;
         delta = min(int2(0,0), max(size-hint, delta));
         return true;
     }
@@ -66,8 +66,8 @@ bool Selection::mouseEvent(int2 cursor, int2 unused size, Event event, Button bu
             }
         }
     }
-    if(button == WheelDown && index>0 && index<count()) { setActive(index-1); return true; }
-    if(button == WheelUp && index<count()-1) { setActive(index+1); return true; }
+    if(button == WheelUp && index>0 && index<count()) { setActive(index-1); return true; }
+    if(button == WheelDown && index<count()-1) { setActive(index+1); return true; }
     return false;
 }
 bool Selection::keyPress(Key key, Modifiers modifiers) {

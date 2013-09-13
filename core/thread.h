@@ -167,6 +167,7 @@ string getenv(const string& name, string value=""_);
 array<string> arguments();
 
 /// Returns standard folders
+string homePath(); //$HOME
 const Folder& home(); //$HOME
 const Folder& config(); //$HOME/.config
 const Folder& cache(); //$HOME/.cache

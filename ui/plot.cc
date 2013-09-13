@@ -2,7 +2,7 @@
 #include "window.h"
 #include "display.h"
 #include "text.h"
-#include "math.h"
+#include "builtin.h"
 
 int2 Plot::sizeHint() { return int2(-1080*4/3/2, -1080/2); }
 void Plot::render(int2 position, int2 size) {

@@ -72,6 +72,8 @@ music/midiscore.h
 music/midiscore.cc
 music/keyboard.h
 music/keyboard.cc
+music/record.h
+music/record.cc
 music/resample.h
 music/resample.cc
 music/flac.cc
