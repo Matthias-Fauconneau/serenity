@@ -205,7 +205,7 @@ String trace(int skip, void* ip) {
     int i=0;
     for(;i<32;i++) {
 #if __x86_64
-        if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
+        if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) { log(i,frame); break; } //1MB stack
 #else
         if(ptr(frame)<0x1000) break;
 #endif

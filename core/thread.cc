@@ -11,6 +11,7 @@
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <pwd.h>
 
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
@@ -159,7 +160,7 @@ static int exitStatus;
 int main() {
     mainThread.run();
     exit(0); // Signals all threads to terminate
-    for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
+    for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
@@ -201,14 +202,14 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
 int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
-string getenv(const string& name) {
+string getenv(const string& name, string value) {
     static String environ = File("proc/self/environ"_).readUpTo(8192);
     for(TextData s(environ);s;) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
     }
-    warn("Undefined environment variable"_, name);
-    return ""_;
+    if(!value) warn("Undefined environment variable"_, name);
+    return value;
 }
 
 array<string> arguments() {
@@ -217,6 +218,6 @@ array<string> arguments() {
     return split(section(cmdline,0,1,-1),0);
 }
 
-const Folder& home() { static Folder home(getenv("HOME"_)); return home; }
+const Folder& home() { static Folder home(getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir))); return home; }
 const Folder& config() { static Folder config(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache(".cache"_,home(),true); return cache; }

@@ -55,19 +55,15 @@ generic struct array : buffer<T> {
     /// \}
 
     /// Inserts an element at \a index
-    T& insertAt(int index, T&& e) {
+    template<Type V> T& insertAt(int index, V&& e) {
         assert(index>=0);
         reserve(++size);
         for(int i=size-2;i>=index;i--) copy((byte*)&at(i+1),(const byte*)&at(i),sizeof(T));
         new (&at(index)) T(move(e));
         return at(index);
     }
-    /// Inserts a value at \a index
-    T& insertAt(int index, const T& v) { return insertAt(index,v); }
     /// Inserts immediately before the first element greater than or equal to the argument
-    int insertSorted(T&& e) { size_t i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
-    /// Inserts immediately before the first element greater than or equal to the argument
-    int insertSorted(const T& v) { return insertSorted(v); }
+    template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }

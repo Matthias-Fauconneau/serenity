@@ -39,7 +39,7 @@ static Variant parse(TextData& s) {
         if(s[0]==' '&&(s[1]>='0'&&s[1]<='9')&&s[2]==' '&&s[3]=='R') s.advance(4); //FIXME: regexp
         return number.contains('.') ? Variant(toDecimal(number)) : Variant(toInteger(number));
     }
-    if(s.match('/')) return String(s.identifier("-+"_));
+    if(s.match('/')) return String(s.identifier("-+."_));
     if(s.match('(')) {
         String data;
         while(!s.match(')')) data<<s.character();
@@ -55,7 +55,7 @@ static Variant parse(TextData& s) {
         map<string,Variant> dict;
         for(;;) {
             for(;!s.match('/');s.advance(1)) if(s.match(">>"_)) goto dictionaryEnd;
-            string key = s.identifier();
+            string key = s.identifier("."_);
             dict.insert(key, parse(s));
         }
         dictionaryEnd: s.skip();
@@ -304,7 +304,7 @@ void PDF::open(const string& data) {
                 }
                 uint op = id[0]; if(id.size>1) { op|=id[1]<<8; if(id.size>2) op|=id[2]<<16; }
                 switch( op ) {
-                default: error("Unknown operator '"_+str((const char*)&op)+"'"_);
+                default: error("Unknown operator '"_+str((const char*)&op)+"'"_,id);
 #define OP(c) break;case c:
 #define OP2(c1,c2) break;case c1|c2<<8:
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
@@ -357,6 +357,8 @@ void PDF::open(const string& data) {
                                      << p2 << p2 << p2
                                      << vec2(p2.x,p1.y) << vec2(p2.x,p1.y) << vec2(p2.x,p1.y));
                     }
+                    OP2('S','C') ;
+                    OP2('s','c') ;
                     OP3('S','C','N') ;
                     OP3('s','c','n') ;
                     OP2('T','*') Tm=Tlm=mat32(0,-leading)*Tlm;
@@ -373,7 +375,9 @@ void PDF::open(const string& data) {
                         else if(e.type==Variant::Data) drawText(font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
-                    OP2('T','f') font = fonts.contains(args[0].data)?&fonts.at(args[0].data):0; fontSize=f(1);
+                    OP2('T','f')
+                            assert(fonts.contains(args[0].data), args[0].data);
+                            font = fonts.contains(args[0].data)?&fonts.at(args[0].data):0; fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); //intersect odd even clip
@@ -481,6 +485,7 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
 }
 
 void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, const string& data) {
+    assert(font);
     if(!font || !font->font->face) return;
     font->font->setSize(fontSize);
     for(uint8 code : data) {
@@ -527,7 +532,7 @@ void PDF::render(int2 position, int2 size) {
                     vec2 a = vec2(position)+scale*e.a, b=vec2(position)+scale*e.b;
                     if(cross(p-a,b-a)>0) goto outside;
                 }
-                /*else*/ framebuffer(x,y) = 0;
+                /*else*/ framebuffer(x,y) = byte4(0,0,0,0xFF);
                 outside:;
             }
         }

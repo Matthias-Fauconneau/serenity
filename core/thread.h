@@ -161,7 +161,7 @@ int wait();
 int64 wait(int pid);
 
 /// Returns value for environment variable \a name
-string getenv(const string& name);
+string getenv(const string& name, string value=""_);
 
 /// Returns command line arguments
 array<string> arguments();

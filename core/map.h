@@ -98,8 +98,6 @@ template<Type K, Type V> struct map {
         pair<K,V> operator* () const { return {*k,*v}; }
         const iterator& operator++ () { k++; v++; return *this; }
     };
-    /*iterator begin() { return iterator((K*)keys.begin(),(V*)values.begin()); }
-    iterator end() { return iterator((K*)keys.end(),(V*)values.end()); }*/
 
     array<K> keys;
     array<V> values;

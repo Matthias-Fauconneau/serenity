@@ -7,10 +7,8 @@
 #include "time.h"
 #include "string.h"
 #include "math.h"
-#if REVERB
 #include <fftw3.h> //fftw3f
 #include <fftw3.h> //fftw3f_threads
-#endif
 
 int noteToMIDI(const string& value) {
     int note=24;
@@ -130,7 +128,6 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
         }
     }
 
-#if REVERB
     array<byte> reverbFile = readFile("../reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
     assert(reverbMedia.rate == rate);
@@ -170,7 +167,6 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     }
     product = buffer<float>(N,0.f);
     backward = fftwf_plan_r2r_1d(N, product.begin(), input.begin(), FFTW_HC2R, FFTW_ESTIMATE);
-#endif
 }
 
 /// Input events (realtime thread)
@@ -296,7 +292,6 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
             }
         }
 
-#if REVERB
         if(enableReverb) { // Convolution reverb
             if(size!=periodSize) error("Expected period size ",periodSize,"got",size);
             // Deinterleaves mixed signal into reverb buffer
@@ -329,9 +324,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
                     buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
                 }
             }
-        } else
-#endif
-        {
+        } else {
             for(uint i: range(2*size)) buffer[i] *= 0x1p5f; // 24bit samples to 32bit output with 3bit head room to add multiple notes
         }
         // Converts mixing buffer to signed 32bit output
@@ -363,8 +356,6 @@ void Sampler::stopRecord() {
     if(record) { record.seek(4); record.write(raw<int32>(36+time)); record=0; }
 }
 
-#if REVERB
 Sampler::FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
-#endif
 Sampler::~Sampler() { stopRecord(); }
 constexpr uint Sampler::periodSize;

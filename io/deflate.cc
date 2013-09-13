@@ -518,7 +518,7 @@ tinfl_status tinfl_decompress(tinfl_decompressor *r, const mz_uint8 *pIn_buf_nex
               TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
             }
             num_extra = "\02\03\07"[dist - 16]; TINFL_GET_BITS(18, s, num_extra); s += "\03\03\013"[dist - 16];
-            TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s); counter += s;
+            if(s) { TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s); counter += s; }
           }
           if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter)
           {

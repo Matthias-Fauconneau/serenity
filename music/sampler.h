@@ -7,7 +7,6 @@
 #include "thread.h"
 #include "map.h"
 #include "simd.h"
-#define REVERB 1
 typedef struct fftwf_plan_s* fftwf_plan;
 
 struct Note {
@@ -53,10 +52,7 @@ struct Sampler : Poll {
     static constexpr uint periodSize = 64  ; // [1ms] Prevents samples to synchronize with shifted copies from same chord
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (TODO: ring buffer)
-    //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (TODO: ring buffer)
-    //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical)
 
-#if REVERB
     /// Convolution reverb
     bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint reverbSize=0; // Reverb filter size
@@ -71,7 +67,6 @@ struct Sampler : Poll {
     struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
     FFTW forward[2]; // FFTW plan to forward transform reverb buffer
     FFTW backward; // FFTW plan to backward transform product*/
-#endif
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;

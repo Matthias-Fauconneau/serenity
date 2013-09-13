@@ -104,7 +104,7 @@ struct Build {
                 static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -march=native -o"_);
                 array<String> args;
                 args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
-                if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-DASSERT"_);
+                if(::find(build,"debug"_)) args << String("-g"_) << String("-Og"_) << String("-fno-omit-frame-pointer") << String("-DASSERT"_);
                 else if(::find(build,"assert"_)) args << String("-g"_) << String("-O3"_) << String("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << String("-g"_) << String("-O3"_);
                 else if(::find(build,"release"_)) args << String("-O3"_);
