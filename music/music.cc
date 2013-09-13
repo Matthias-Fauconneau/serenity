@@ -14,8 +14,9 @@
 #include "midiscore.h"
 #include "keyboard.h"
 
+#define RECORD 1
 #if RECORD
-//#include "record.h"
+#include "record.h"
 #endif
 
 // Simple human readable/editable format for score synchronization annotations
@@ -85,7 +86,11 @@ struct Music {
     Folder folder{"Sheets"_,root};
     ICON(music)
     VBox layout;
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
+#if RECORD
+    Window window {&layout,int2(1280,720),"Piano"_,musicIcon()};
+#else
+    Window window {&layout,int2(1280,720/*0,0*/),"Piano"_,musicIcon()};
+#endif
     List<Text> sheets;
 
     String name;
@@ -177,16 +182,19 @@ struct Music {
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float current, float next, float x) {
+    void nextStaff(float previous /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float next /* next bottom*/, float x) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
             // Always set current staff as second staff from bottom edge (allows to repeat page, track scrolling, see keyboard)
-            float t = (x/pdfScore.normalizedScale-pdfScore.x1)/(pdfScore.x2-pdfScore.x1); assert(t>=0 && t<=1);
-            target = vec2(0, -(scale*( (1-t)*current + t*next )-pdfScore.ScrollArea::size.y));
+            float t = (x/pdfScore.normalizedScale)/(pdfScore.x2-pdfScore.x1); assert(t>=0 && t<=1);
+            log(pdfScore.normalizedScale,pdfScore.x1,pdfScore.x2,x/pdfScore.normalizedScale,t);
+            //target = vec2(0, -(scale*( (1-t)*bottom + t*next )-pdfScore.ScrollArea::size.y)); // Align bottom edge between current bottom and next bottom
+            target = vec2(0, -scale*( (1-t)*previous + t*top )); // Align top edge between previos top and current top
             if(!position) position=target, pdfScore.delta=int2(round(position));
         }
-        midiScore.center(int2(0,current));
+        midiScore.center(int2(0,bottom));
+        smoothScroll();
     }
     /// Smoothly scrolls towards target
     void smoothScroll() {

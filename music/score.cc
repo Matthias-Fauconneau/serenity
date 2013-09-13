@@ -600,14 +600,13 @@ void Score::expect() {
                 errors = 0; showExpected = false; // Hides highlighting while succeeding
             }
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size-1) {
-                assert(currentStaff<staffs.size);
                 currentStaff++;
                 currentX=0;
             }
             currentX = max(currentX, positions[i].x);
             i++;
         }
-        nextStaff(staffs[min<int>(staffs.size-1,currentStaff+1)],staffs[min<int>(staffs.size-1,currentStaff+2)], currentX);
+        nextStaff(currentStaff>1?staffs[currentStaff-2]:0,currentStaff>0?staffs[currentStaff-1]:0,staffs[currentStaff],staffs[min<int>(staffs.size-1,currentStaff+1)], currentX);
         chordSize = expected.size();
         noteIndex += chords.values[chordIndex].size;
         chordIndex++;

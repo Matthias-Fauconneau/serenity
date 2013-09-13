@@ -63,7 +63,7 @@ struct Score {
     void seek(uint time);
     void noteEvent(uint, uint);
     signal<const map<int,vec4>&> activeNotesChanged;
-    signal<float,float,float> nextStaff;
+    signal<float,float,float,float,float> nextStaff;
     map<vec2, String> debug;
     int pass=-1;
     int msScore=0; //HACK

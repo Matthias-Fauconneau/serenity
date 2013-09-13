@@ -512,8 +512,7 @@ void PDF::render(int2 position, int2 size) {
         ::blit(position+int2(scale*blit.pos),blit.resized);
     }
 
-    //for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale}))) {
-    for(const Line& l: lines) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale}))) {
         vec2 a = scale*l.a, b = scale*l.b;
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
@@ -538,7 +537,7 @@ void PDF::render(int2 position, int2 size) {
         }
     }
 
-    int i=0;//characters.binarySearch(Character{0,0,0,vec2(-position-int2(0,100))/scale,0});
+    int i = characters.binarySearch(Character{0,0,0,vec2(-position-int2(0,100))/scale,0});
     for(const Character& c: characters.slice(i)) {
         int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
         if(pos.y<=currentClip.min.y-100) { i++; continue; }

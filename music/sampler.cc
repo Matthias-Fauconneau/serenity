@@ -130,10 +130,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     array<byte> reverbFile = readFile("../reverb.flac"_,folder);
     FLAC reverbMedia(reverbFile);
-    assert(reverbMedia.rate == rate, reverbMedia.rate, rate);
+    assert(reverbMedia.rate == rate);
     reverbSize = reverbMedia.duration;
     N = reverbSize+periodSize;
-    buffer<float> stereoFilter(2*reverbSize, 2*reverbSize, 0.f);
+    buffer<float> stereoFilter(2*reverbSize,0.f);
     for(uint i=0;i<reverbSize;) {
         uint read = reverbMedia.read((float2*)(stereoFilter+2*i),min(1u<<16,reverbSize-i));
         i+=read;
@@ -145,7 +145,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     // Reverses, scales and deinterleaves filter
     buffer<float> filter[2];
-    for(int c=0;c<2;c++) filter[c] = buffer<float>(N,N,0.f);
+    for(int c=0;c<2;c++) filter[c] = buffer<float>(N,0.f);
     for(uint i: range(reverbSize)) for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
 
     fftwf_init_threads();
@@ -153,7 +153,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
-        reverbFilter[c] = buffer<float>(N,N,0.f);
+        reverbFilter[c] = buffer<float>(N,0.f);
         FFTW p (fftwf_plan_r2r_1d(N, filter[c].begin(), reverbFilter[c].begin(), FFTW_R2HC, FFTW_ESTIMATE));
         fftwf_execute(p);
         //for(uint i: range(N/2-N/4,N/2+N/4)) reverbFilter[c][i]=0; // Low-pass (some samples are aliased) //FIXME: only on those samples
@@ -162,10 +162,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     // Allocates reverb buffer and temporary buffers
     input = buffer<float>(N);
     for(int c=0;c<2;c++) {
-        reverbBuffer[c] = buffer<float>(N,N,0.f);
+        reverbBuffer[c] = buffer<float>(N,0.f);
         forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c].begin(), input.begin(), FFTW_R2HC, FFTW_ESTIMATE);
     }
-    product = buffer<float>(N,N,0.f);
+    product = buffer<float>(N,0.f);
     backward = fftwf_plan_r2r_1d(N, product.begin(), input.begin(), FFTW_HC2R, FFTW_ESTIMATE);
 }
 
