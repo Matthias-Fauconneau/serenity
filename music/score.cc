@@ -10,9 +10,9 @@ void Score::onPath(const ref<vec2>& p) {
             tails << Line(p[0], p[1]);
         }
     } else if(p.size==5||p.size==13) {
-        if(span.x > 24 && span.y < 26) {
+        if(span.x > 12 && span.y < 28) {
             ties += Line(vec2(min.x,center.y),vec2(max.x,center.y));
-            debug[center]="I"_+str(int2(round(span)));
+            debug[center]<<"I"_;
         } else debug[center]="!I"_+str(int2(round(span)));
         if(span.x > 75 && span.x < 76 && span.y > 8 && span.y < 18) {
             tremolos << Line(p[0], p[3]);
@@ -112,7 +112,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
                     staffs << (lastClef.y+pos.y)/2;
                     staffCount=1;
                 } else staffCount++;
-                lastClef=pos;
+                lastClef=pos; keys<<pos.y;
             }
         } else if(font=="Manual"_) { // Manual annotations
             if(!staffs || (pos.x < 300 && lastPos.x > 640 && pos.y > lastPos.y)) { staffs << lastClef.y+40; lastClef=pos; }
@@ -371,7 +371,7 @@ alreadyTied: ;
                         debug[vec2(tie.b)]<<"R"_;
                         goto continueTie; //goto staffDone;
                         //closerExists:;
-                    } else if(rx>-100 && rx<100 && ry>-100 && ry<100) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
+                    } else if(rx>-42 && rx<42 && ry>-42 && ry<42) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
                 }
             }
 //staffDone: ;
@@ -396,10 +396,10 @@ alreadyTied1: ;
                         if(dy>=-15 && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
                             for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
-                            //debug[vec2(t.rx,-t.ry)]<<"R"_;
+                            debug[vec2(t.rx,-t.ry)]<<"^R"_<<str(dy);
                             tied << t;
                             goto tieFound;
-                        }
+                        } else debug[vec2(t.rx,-t.ry)]<<"!R"_<<str(dy);
 alreadyTied2: ;
                     }
                 }
