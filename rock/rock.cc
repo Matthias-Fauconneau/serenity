@@ -23,6 +23,7 @@
 //#include "rasterize.h"
 //#include "kernel-density-estimation.h"
 //#include "export.h"
+//#include "list.h"
 
 //#include "slice.h"
 //#include "plot.h"

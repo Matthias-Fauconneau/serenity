@@ -86,6 +86,7 @@ rock/sample.cc
 rock/crop.cc
 rock/crop.h
 rock/sample-operation.cc
+rock/list.cc
 
 rock/slice.cc
 rock/REV.cc
@@ -96,4 +97,3 @@ rock/view.cc
 rock/summary.cc
 rock/slice.h
 rock/diff.cc
-rock/isosurface.cc

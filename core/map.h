@@ -13,7 +13,7 @@ template<Type K, Type V> struct map {
     map(const ref<K>& keys, const ref<V>& values):keys(keys),values(values){ assert_(keys.size==values.size); }
 
     uint size() const { return keys.size; }
-    void reserve(int size) { return keys.reserve(size); values.reserve(size); }
+    void reserve(int size) { keys.reserve(size); values.reserve(size); }
     void clear() { keys.clear(); values.clear(); }
 
     explicit operator bool() const { return keys.size; }

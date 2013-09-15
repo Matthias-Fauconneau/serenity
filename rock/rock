@@ -72,7 +72,7 @@ distance = Distance position
 
 # Computes skeleton (medial axis)
 skeleton = Skeleton position
-skeleton-tiled = ZOrder skeleton
+skeleton-tiled = ZOrder skeleton #FIXME: output tiled position in positionZ
 
 # Discards small pores
 minimalSqRadius = '0'
@@ -97,8 +97,20 @@ if connect-pore=='bottom': connected = connected-bottom
 if connect-pore=='top': connected = connected-top
 if connect-pore=='1': connected = connected-both
 
-# Rasterizes skeleton voxel as maximum spheres
+# Masks skeleton keeping only unpruned connected voxels
 connected-skeleton = Mask connected crop invert=1 value=0
+
+# Computes histogram of maximum squared radii of skeleton voxels
+histogram-skeleton-bg = Histogram connected-skeleton
+histogram-skeleton = Slice histogram begin=1 # Excluding background
+
+# Clips small maximum balls before generating maximum balls list (in contrast to minimalSqRadius, clip after pruning)
+minimalSqRadiusAfter = '64'
+connected-skeleton-large = ThresholdClip connected-skeleton minimalSqRadiusAfter
+# Generates a list of balls from the skeleton volume
+maximum-balls = List connected-skeleton-large
+
+# Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin connected-skeleton
 maximum = Rasterize sphere-bins
 
