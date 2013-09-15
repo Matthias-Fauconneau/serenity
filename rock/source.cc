@@ -20,8 +20,13 @@ class(Source, Operation), virtual VolumeOperation {
             Volume volume = toVolume(metadata, buffer<byte>(file));
             assert(volume.sampleSize);
             return volume.sampleSize;
+        } else { // Image slices
+            Folder folder = Folder(path, currentWorkingDirectory());
+            array<String> slices = folder.list(Files|Sorted);
+            assert_(slices, path);
+            Map file (slices.first(), folder);
+            return isTiff(file) ? 2 : 1; // Assumes TIFF (only) are 16bit
         }
-        return 2; // Default to 16bit
     }
     size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
         if(index) return 0;
@@ -66,7 +71,8 @@ class(Source, Operation), virtual VolumeOperation {
             const uint64 sX = source.sampleCount.x, sY = source.sampleCount.y;
 
             if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
-                uint16* const targetData = (Volume16&)outputs.first();
+                assert_(source.sampleSize==2);
+                uint16* const targetData = (Volume16&)target;
                 for(uint z: range(size.z)) {
                     if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                     uint16* const sourceSlice = (uint16*)source.data.data + (min.z+z)*sX*sY;
@@ -78,7 +84,7 @@ class(Source, Operation), virtual VolumeOperation {
                     }
                 }
             } else if(source.sampleSize==2) { // Reads from disk into process managed cache (16bit)
-                uint16* const targetData = (Volume16&)outputs.first();
+                uint16* const targetData = (Volume16&)target;
                 for(uint z: range(size.z)) {
                     if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                     uint16* const sourceSlice = (uint16*)source.data.data + (min.z+z)*sX*sY;
@@ -86,7 +92,7 @@ class(Source, Operation), virtual VolumeOperation {
                     for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = sourceSlice[(min.y+y)*sX+min.x+x];
                 }
             } else if(source.sampleSize==1) { // Reads from disk into process managed cache (8bit)
-                uint8* const targetData = (Volume8&)outputs.first();
+                uint8* const targetData = (Volume8&)target;
                 for(uint z: range(size.z)) {
                     if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                     uint8* const sourceSlice = (uint8*)source.data.data + (min.z+z)*sX*sY;
@@ -97,39 +103,70 @@ class(Source, Operation), virtual VolumeOperation {
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             array<String> slices = folder.list(Files|Sorted);
-            uint16* const targetData = (Volume16&)outputs.first();
-            if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
-                const uint64 sX = X*2, sY = Y*2;
-                buffer<uint16> sliceBuffer(2*sX*sY);
-                for(uint z: range(size.z)) {
-                    if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                    uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                    for(uint i: range(2)) {
-                        Map file(slices[(min.z+z)*2+i],folder);
-                        Tiff16 tiff(file); assert_(tiff);
-                        tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);
+            if(target.sampleSize==2) {
+                uint16* const targetData = (Volume16&)target;
+                if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
+                    const uint64 sX = X*2, sY = Y*2;
+                    buffer<uint16> sliceBuffer(2*sX*sY);
+                    for(uint z: range(size.z)) {
+                        if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                        uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                        for(uint i: range(2)) {
+                            Map file(slices[(min.z+z)*2+i],folder);
+                            assert_(isTiff(file)); // Directly decodes slice images into the slice buffer
+                            Tiff16 tiff(file); assert_(tiff);
+                            tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);
+                        }
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                            uint16* const source = sliceBuffer.begin() + (y*2)*sX+(x*2);
+                            targetSlice[y*X+x] = (source[0] + source[1] + source[sX] + source[sX+1] +
+                                    source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                        }
                     }
-                    for(uint y: range(size.y)) for(uint x: range(size.x)) {
-                        uint16* const source = sliceBuffer.begin() + (y*2)*sX+(x*2);
-                        targetSlice[y*X+x] = (source[0] + source[1] + source[sX] + source[sX+1] +
-                                source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                } else {
+                    for(uint z: range(size.z)) {
+                        if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                        uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                        Map file(slices[min.z+z], folder);
+                        assert_(isTiff(file)); // Directly decodes slice images into the volume
+                        Tiff16 tiff(file);
+                        assert_(tiff, path, slices[min.z+z]);
+                        tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
                     }
                 }
-            }
-            for(uint z: range(size.z)) {
-                if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                Map file(slices[min.z+z], folder);
-                if(isTiff(file)) { // Directly decodes slice images into the volume
-                    Tiff16 tiff(file);
-                    assert_(tiff, path, slices[min.z+z]);
-                    tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
-                } else { // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
-                    Image image = decodeImage(file);
-                    assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
-                    for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
+            } else if(target.sampleSize==1) {
+                uint8* const targetData = (Volume8&)target;
+                if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
+                    const uint64 sX = X*2, sY = Y*2;
+                    buffer<uint8> sliceBuffer(2*sX*sY);
+                    for(uint z: range(size.z)) {
+                        if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                        uint8* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                        for(uint i: range(2)) {
+                            Map file(slices[(min.z+z)*2+i],folder);
+                            assert_(!isTiff(file)); // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
+                            Image image = decodeImage(file);
+                            assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
+                            for(uint y: range(size.y*2)) for(uint x: range(size.x*2)) sliceBuffer[i*sX*sY+y*sX+x] = image(min.x*2+x, min.y*2+y).b;
+                        }
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                            uint8* const source = sliceBuffer.begin() + (y*2)*sX+(x*2);
+                            targetSlice[y*X+x] = (source[0] + source[1] + source[sX] + source[sX+1] +
+                                    source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                        }
+                    }
+                } else {
+                    for(uint z: range(size.z)) {
+                        if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                        uint8* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                        Map file(slices[min.z+z], folder);
+                        assert_(!isTiff(file)); // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
+                        Image image = decodeImage(file);
+                        assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
+                    }
                 }
-            }
+            } else error(target.sampleSize);
         }
         if(target.sampleSize==1) target.maximum = (1<<(target.sampleSize*8))-1; //FIXME: target.maximum = maximum((Volume8&)target); // Some sources don't use the full range
         if(target.sampleSize==2) target.maximum = maximum((Volume16&)target); // Some sources don't use the full range
