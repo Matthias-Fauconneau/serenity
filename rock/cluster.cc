@@ -22,85 +22,76 @@ buffer<array<short3> > parseLists(const string& data) {
     return lists;
 }
 
-struct Node {
-    //Node(short3 position):position(position){}
-    short3 position;
-    array<short3> roots; //FIXME: Use a pointer into a pool of root sets
+struct Family : array<uint64> {
+    Family(uint64 root):root(root){}
+    uint64 root;
 };
 
-array<Node> cluster(/*Volume16& target,*/ const Volume16& source, buffer<array<short3>> lists) {
-    assert_(source.tiled());
+array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
+    uint64* const targetData = target;
+    clear(targetData, target.size());
+
+    assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
-    /*uint16* const targetData = target;
-    rawCopy(targetData, sourceData, source.size());*/
     const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    array<Node> nodes;
+    array<Family> families;
     for(int R2=lists.size-1; R2>=0; R2--) { // Process balls from largest to smallest
         const array<short3>& balls = lists[R2];
         float R1 = sqrt((float)R2);
         int R = ceil(R1);
         for(short3 P: balls) {
-            log(R1, P, nodes.size);
-            array<short3> roots;
-            for(Node& node: nodes) if(node.position==P) { roots=copy(node.roots); break; }
-            if(!roots) roots << P; // Current node is a root
+            uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
+            log(R1, P);
+            Family* family = 0; uint64 root = 0;
+            for(Family& f: families) if(f.contains(parent)) { family=&f, root=f.root; break; }
+            if(!family) { families << Family(parent); family=&families.last(); root=parent; } // parent is a root
             for(int z: range(max(0,P.z-2*R),min(Z,P.z+2*R))) {
-                const uint16* sourceZ = sourceData + offsetZ[z];
+                uint64 iZ = offsetZ[z];
                 for(int y: range(max(0,P.y-2*R),min(Y,P.y+2*R))) {
-                    const uint16* sourceZY = sourceZ + offsetY[y];
+                    uint64 iZY = iZ + offsetY[y];
                     for(int x: range(max(0,P.x-2*R),max(X,P.x+2*R))) { // Scans voxels for overlapping balls
-                        const uint16* sourceZYX = sourceZY + offsetX[x];
-                        int d2 = sq(x-P.x)+sq(y-P.y)+sq(z-P.z);
-                        float d = sqrt((float)d2);
+                        uint64 index = iZY + offsetX[x];
+                        uint16 r2 = sourceData[index]; float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
+                        uint16 previousRoot = targetData[index]; // Previously assigned root (0 if unprocessed)
+                        int d2 = sq(x-P.x)+sq(y-P.y)+sq(z-P.z); float d = sqrt((float)d2); // Distance between parent and candidate
+                        if(r2<=minimum) continue; // Background voxel (or under processing threshold)
+                        if(previousRoot==root) continue; // Already assigned to the same family
                         if(d2>4*R2) continue; //>=? By processing from large to small, no overlapping ball can be outside a 2R radius
-                        uint16 r2 = sourceZYX[0];
-                        if(!r2) continue; // Background
-                        float r = sqrt((float)r2);
                         if(r2>R2) continue; // Only adds smaller (or equal) balls
                         if(d>R1+r) continue; // Overlaps when d<R+r
-                        for(Node& node: nodes) if(node.position==short3(x,y,z)) { // FIXME: use a volume of array<Node> ?
-                            for(short3 root: roots) if(!node.roots.contains(root)) node.roots << P;
-                            goto break_;
-                        }
-                        nodes << Node{short3(x,y,z),copy(roots)};
-                        break_:;
+                        targetData[index] = root; // Updates last assigned root
+                        if(!family->contains(index)) family->append( index ); // This might be a second connection to the family after inheriting from another root //FIXME: binary search
                     }
                 }
             }
         }
     }
-    return nodes;
+    return families;
 }
 
 /// Converts parents to a text file formatted as (x y z:( x y z)+)*\n
-String toASCII(const array<Node>& nodes) {
+String toASCII(const array<Family>& families) {
     uint size = 0; // Estimates data size to avoid unnecessary reallocations
-    for(const Node& node: nodes) if(node.roots.size) size += (3*5+2) + (node.roots.size)*(3*5+1);
+    for(const Family& family: families) /*if(family.size)*/ size += (3*5+2) + (family.size)*(3*5+1);
     String text (size);
-    for(const Node& node: nodes) { // Sort values in descending order
-        const array<short3>& list = node.roots;
-        if(!list.size) continue;
-        text << str(node.position)+":"_;
-        for(uint i: range(list.size)) { short3 p = list[i]; text << ' ' << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3); }
+    for(const Family& family: families) {
+        //if(!family.size) continue; // Might be an isolated root (also includes them)
+        int3 position = zOrder(family.root); // Convert back Z-order index to position
+        text << str(position)+":\n"_;
+        for(uint i: range(family.size)) { int3 p = zOrder(family[i]); text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ((i+1)%16?"  "_:"\n"_); }
         text << "\n"_;
     }
     return text;
 }
 
-/// Recursively parents each balls with all smaller overlapping balls
-/*class(Cluster, Operation), virtual VolumeOperation {
-    //uint outputSampleSize(uint) override { return sizeof(uint16); }
-    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const mref<Result*>& otherOutputs, const ref<Result*>& otherInputs) override {
-        map<short3,array<short3>> parents = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data));
-        otherOutputs[0]->metadata = String("parents"_);
+/// Computes trees of overlapping balls
+class(Cluster, Operation), virtual VolumeOperation {
+    string parameters() const override { return "minimum"_; }
+    uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint64) : 0; }
+    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const mref<Result*>& otherOutputs, const ref<Result*>& otherInputs) override {
+        array<Family> parents = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
+        otherOutputs[0]->metadata = String("families"_);
         otherOutputs[0]->data = toASCII(parents);
-    }
-};*/
-class(Cluster, Operation) {
-    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        array<Node> parents = cluster(toVolume(*inputs[0]), parseLists(inputs[1]->data));
-        outputs[0]->metadata = String("parents"_);
-        outputs[0]->data = toASCII(parents);
     }
 };

@@ -12,9 +12,9 @@ static uint64 interleave(uint64 bits, uint64 offset, uint stride=3) { uint64 int
 static buffer<uint64> interleavedLookup(uint size, uint offset, uint stride=3) { buffer<uint64> lookup(size); for(uint i=0; i<size; i++) { lookup[i]=interleave(i,offset,stride); } return lookup; }
 
 /// Pack interleaved bits
-//static uint pack(uint bits, uint offset, uint stride=3) { uint packedBits=0; bits>>=offset; for(uint b=0; bits!=0; bits>>=stride, b++) packedBits |= (bits&1) << b; return packedBits; }
+static uint pack(uint64 bits, uint offset, uint stride=3) { uint packedBits=0; bits>>=offset; for(uint b=0; bits!=0; bits>>=stride, b++) packedBits |= (bits&1) << b; return packedBits; }
 /// Uninterleaves 3 coordinates
-//static int3 zOrder(uint index) { return int3(pack(index,0),pack(index,1),pack(index,2)); }
+int3 zOrder(uint64 index) { return int3(pack(index,0),pack(index,1),pack(index,2)); }
 
 void interleavedLookup(Volume& target) {
     if(target.tiled()) return;

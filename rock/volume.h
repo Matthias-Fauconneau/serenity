@@ -63,6 +63,8 @@ uint maximum(const Volume16& source);
 
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);
+/// Uninterleaves 3 coordinates
+int3 zOrder(uint64 index);
 
 /// Returns an 8bit image of a volume slice (for visualization)
 Image slice(const Volume& volume, real z, bool cylinder, bool normalize, bool gamma, bool invert=false, bool binary=false);
