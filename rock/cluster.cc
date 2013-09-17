@@ -43,25 +43,52 @@ array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<ar
         for(short3 P: balls) {
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             log(R1, P);
-            Family* family = 0; uint64 root = 0;
-            for(Family& f: families) if(f.contains(parent)) { family=&f, root=f.root; break; }
-            if(!family) { families << Family(parent); family=&families.last(); root=parent; } // parent is a root
-            for(int z: range(max(0,P.z-2*R),min(Z,P.z+2*R))) {
-                uint64 iZ = offsetZ[z];
-                for(int y: range(max(0,P.y-2*R),min(Y,P.y+2*R))) {
-                    uint64 iZY = iZ + offsetY[y];
-                    for(int x: range(max(0,P.x-2*R),max(X,P.x+2*R))) { // Scans voxels for overlapping balls
-                        uint64 index = iZY + offsetX[x];
-                        uint16 r2 = sourceData[index]; float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
-                        uint16 previousRoot = targetData[index]; // Previously assigned root (0 if unprocessed)
-                        int d2 = sq(x-P.x)+sq(y-P.y)+sq(z-P.z); float d = sqrt((float)d2); // Distance between parent and candidate
-                        if(r2<=minimum) continue; // Background voxel (or under processing threshold)
-                        if(previousRoot==root) continue; // Already assigned to the same family
-                        if(d2>4*R2) continue; //>=? By processing from large to small, no overlapping ball can be outside a 2R radius
-                        if(r2>R2) continue; // Only adds smaller (or equal) balls
-                        if(d>R1+r) continue; // Overlaps when d<R+r
-                        targetData[index] = root; // Updates last assigned root
-                        if(!family->contains(index)) family->append( index ); // This might be a second connection to the family after inheriting from another root //FIXME: binary search
+            array<Family*> parentFamilies;
+            for(Family& f: families) if(f.contains(parent)) parentFamilies << &f;
+            if(!parentFamilies) { families << Family(parent); parentFamilies << &families.last(); } // parent is a root
+            if(parentFamilies.size==1) { // Fast path for the common case of a balls belonging to a single family (pores)
+                Family* family = parentFamilies.first(); uint64 root = family->root;
+                for(int z: range(max(0,P.z-2*R),min(Z,P.z+2*R))) {
+                    uint64 iZ = offsetZ[z];
+                    for(int y: range(max(0,P.y-2*R),min(Y,P.y+2*R))) {
+                        uint64 iZY = iZ + offsetY[y];
+                        for(int x: range(max(0,P.x-2*R),max(X,P.x+2*R))) { // Scans voxels for overlapping balls
+                            uint64 index = iZY + offsetX[x];
+                            uint16 r2 = sourceData[index]; float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
+                            uint16 previousRoot = targetData[index]; // Previously assigned root (0 if unprocessed)
+                            int d2 = sq(x-P.x)+sq(y-P.y)+sq(z-P.z); float d = sqrt((float)d2); // Distance between parent and candidate
+                            if(r2<=minimum) continue; // Background voxel (or under processing threshold)
+                            if(previousRoot==root) continue; // Already assigned to the same family
+                            if(d2>4*R2) continue; //>=? By processing from large to small, no overlapping ball can be outside a 2R radius
+                            if(r2>R2) continue; // Only adds smaller (or equal) balls
+                            if(d>R1+r) continue; // Overlaps when d<R+r
+                            targetData[index] = root; // Updates last assigned root
+                            if(!family->contains(index)) family->append( index ); // This might be a second connection to the family after inheriting from another root //FIXME: binary search
+                        }
+                    }
+                }
+            } else { // Slow path for balls belonging to multiple family (throats)
+                array<uint64> roots; for(const Family* family: parentFamilies) roots << family->root; uint64 root = roots.first();
+                for(int z: range(max(0,P.z-2*R),min(Z,P.z+2*R))) {
+                    uint64 iZ = offsetZ[z];
+                    for(int y: range(max(0,P.y-2*R),min(Y,P.y+2*R))) {
+                        uint64 iZY = iZ + offsetY[y];
+                        for(int x: range(max(0,P.x-2*R),max(X,P.x+2*R))) { // Scans voxels for overlapping balls
+                            uint64 index = iZY + offsetX[x];
+                            uint16 r2 = sourceData[index]; float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
+                            uint16 previousRoot = targetData[index]; // Previously assigned root (0 if unprocessed)
+                            int d2 = sq(x-P.x)+sq(y-P.y)+sq(z-P.z); float d = sqrt((float)d2); // Distance between parent and candidate
+                            if(r2<=minimum) continue; // Background voxel (or under processing threshold)
+                            if(roots.contains(previousRoot)) continue; // Already assigned to the same family //FIXME: is this conservative?
+                            //if(previousRoot==root) continue; // Already assigned to the same family //FIXME: might be enough
+                            if(d2>4*R2) continue; //>=? By processing from large to small, no overlapping ball can be outside a 2R radius
+                            if(r2>R2) continue; // Only adds smaller (or equal) balls
+                            if(d>R1+r) continue; // Overlaps when d<R+r
+                            targetData[index] = root; // Updates last assigned root with the first root of the root sets
+                            for(Family* family: parentFamilies) {
+                                if(!family->contains(index)) family->append( index ); // This might be another connection //FIXME: binary search
+                            }
+                        }
                     }
                 }
             }
