@@ -27,7 +27,7 @@ Vector operator+(const Vector& A, const Vector& B);
 Vector operator-(const Vector& A, const Vector& B);
 
 /// Parses a vector from comma-separated values
-Vector parseVector(const string& file, bool integer=false);
+Vector parseVector(const string& data, bool integer=false);
 String toASCII(const Vector& a);
 
 // UniformSample
@@ -55,7 +55,7 @@ UniformSample operator+(const UniformSample& A, const UniformSample& B);
 /// Substracts two sample
 UniformSample operator-(const UniformSample& A, const UniformSample& B);
 /// Parses a uniformly sampled distribution from tab-separated values
-UniformSample parseUniformSample(const string& file);
+UniformSample parseUniformSample(const string& data);
 /// Converts a uniformly sampled distribution to tab-separated values
 String toASCII(const UniformSample& A);
 
@@ -99,7 +99,7 @@ NonUniformSample abs(const NonUniformSample& A);
 /// Scales both the variable and the values of a distribution to keep the same area
 NonUniformSample scaleDistribution(real scalar, NonUniformSample&& A);
 /// Parses a non-uniformly sampled distribution from tab-separated values
-NonUniformSample parseNonUniformSample(const string& file);
+NonUniformSample parseNonUniformSample(const string& data);
 /// Converts a non-uniformly sampled distribution to tab-separated values
 String toASCII(const NonUniformSample& A);
 
@@ -122,6 +122,6 @@ struct NonUniformHistogram : NonUniformSample {
 /// Set of named scalars
 typedef map<String, real> ScalarMap;
 
-ScalarMap parseMap(const string& file);
+ScalarMap parseMap(const string& data);
 /// Converts a scalar map to tab-separated values
 String toASCII(const ScalarMap& A);

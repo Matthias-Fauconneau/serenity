@@ -16,9 +16,9 @@ Vector abs(const Vector& A) { uint N=A.size; Vector R(N); for(uint i: range(N)) 
 Vector sq(const Vector& A) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=sq(A[i]); return R; }
 Vector operator+(const Vector& A, const Vector& B) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=A[i]+B[i]; return R; }
 Vector operator-(const Vector& A, const Vector& B) { uint N=A.size; Vector R(N); for(uint i: range(N)) R[i]=A[i]-B[i]; return R; }
-Vector parseVector(const string& file, bool integer)  {
-    TextData s (file);
-    Vector vector(count(file,',')+1);
+Vector parseVector(const string& data, bool integer)  {
+    TextData s (data);
+    Vector vector(count(data,',')+1);
     for(uint i: range(vector.size)) { vector[i] = integer ? s.integer() : s.decimal(); if(i<vector.size-1) s.skip(","_); s.skip(); }
     return vector;
 }
@@ -35,10 +35,10 @@ UniformSample operator-(const UniformSample& A, const UniformSample& B) { uint N
 
 real UniformSample::mean() const { return sum()/size; }
 real UniformSample::variance() const { real mean=UniformSample::mean(), ssd=0; for(uint i: range(size)) ssd += sq(at(i)-mean); return ssd/(size-1); }
-UniformSample parseUniformSample(const string& file) {
-    uint sampleCount=0; for(TextData s(file);s;) { while(s.match('#')) s.until('\n'); sampleCount++; s.until('\n'); }
+UniformSample parseUniformSample(const string& data) {
+    uint sampleCount=0; for(TextData s(data);s;) { while(s.match('#')) s.until('\n'); sampleCount++; s.until('\n'); }
     UniformSample sample(sampleCount);
-    {TextData s(file); for(uint i: range(sample.size)) { while(s.match('#')) s.until('\n'); real x=s.decimal(); assert_(x==i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }}
+    {TextData s(data); for(uint i: range(sample.size)) { while(s.match('#')) s.until('\n'); real x=s.decimal(); assert_(x==i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }}
     return sample;
 }
 String toASCII(const UniformSample& A) {
@@ -101,8 +101,8 @@ array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
     return samples;
 }
 
-NonUniformSample parseNonUniformSample(const string& file) {
-    TextData s (file);
+NonUniformSample parseNonUniformSample(const string& data) {
+    TextData s (data);
     NonUniformSample sample;
     while(s) { if(s.match('#')) s.until('\n'); else { real x=s.decimal(); s.skip("\t"_); sample.insertMulti(x, s.decimal()); s.skip("\n"_); } }
     return sample;
@@ -118,9 +118,9 @@ real NonUniformHistogram::sum() const { real sum=0; for(auto sample: *this) sum 
 real NonUniformHistogram::variance() const { real sampleMean=mean(), ssd=0; for(auto sample: *this) ssd += sample.value*sq(sample.key-sampleMean); return ssd/sampleCount(); }
 
 // ScalarMap
-ScalarMap parseMap(const string& file) {
+ScalarMap parseMap(const string& data) {
     map<String, real> dict;
-    for(TextData s(file);s;) {
+    for(TextData s(data);s;) {
         string key = s.until('\t');
         string value = s.until('\n');
         dict.insert(String(key), toDecimal(value));

@@ -24,6 +24,7 @@
 //#include "kernel-density-estimation.h"
 //#include "export.h"
 //#include "list.h"
+//#include "cluster.h"
 
 //#include "slice.h"
 //#include "plot.h"

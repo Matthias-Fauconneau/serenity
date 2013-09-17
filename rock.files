@@ -97,3 +97,4 @@ rock/view.cc
 rock/summary.cc
 rock/slice.h
 rock/diff.cc
+rock/cluster.cc
