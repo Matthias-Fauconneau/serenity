@@ -61,7 +61,7 @@ class(List, Operation) {
         Volume source = toVolume(*inputs[0]);
         CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
         crop.min -= source.origin, crop.max -= source.origin;
-        buffer<array<short3>> lists = list(source, crop, (uint)args.at("minimum"));
+        buffer<array<short3>> lists = list(source, crop, (uint)args.at("minimum"_));
         outputs[0]->metadata = String("list"_);
         outputs[0]->data = toASCII(lists);
     }
