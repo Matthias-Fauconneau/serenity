@@ -51,7 +51,7 @@ class(Source, Operation), virtual VolumeOperation {
         assert(crop.sampleCount);
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(args, inputs, 0);
     }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override { //FIXME: template for 8bit vs 16bit sample size
         assert_(crop.size);
         int3 min=crop.min, size=crop.size;
         string path = args.at("path"_);
@@ -71,18 +71,31 @@ class(Source, Operation), virtual VolumeOperation {
             const uint64 sX = source.sampleCount.x, sY = source.sampleCount.y;
 
             if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
-                assert_(source.sampleSize==2);
-                uint16* const targetData = (Volume16&)target;
-                for(uint z: range(size.z)) {
-                    if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
-                    uint16* const sourceSlice = (uint16*)source.data.data + (min.z+z)*sX*sY;
-                    uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                    for(uint y: range(size.y)) for(uint x: range(size.x)) {
-                        uint16* const source = sourceSlice + (min.y+y)*2*sX+(min.x+x)*2;
-                        targetSlice[y*X+x] = (source[0] + source[1] + source[sX*2] + source[sX+1] +
-                                source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                if(source.sampleSize==2) { // Reads from disk into process managed cache (16bit)
+                    uint16* const targetData = (Volume16&)target;
+                    for(uint z: range(size.z)) {
+                        if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                        uint16* const sourceSlice = (uint16*)source.data.data + (min.z+z)*sX*sY;
+                        uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                            uint16* const source = sourceSlice + (min.y+y)*2*sX+(min.x+x)*2;
+                            targetSlice[y*X+x] = (source[0] + source[1] + source[sX*2] + source[sX+1] +
+                                    source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                        }
                     }
-                }
+                } else if(source.sampleSize==1) {
+                    uint8* const targetData = (Volume8&)target;
+                    for(uint z: range(size.z)) {
+                        if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
+                        uint8* const sourceSlice = (uint8*)source.data.data + (min.z+z)*sX*sY;
+                        uint8* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
+                        for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                            uint8* const source = sourceSlice + (min.y+y)*2*sX+(min.x+x)*2;
+                            targetSlice[y*X+x] = (source[0] + source[1] + source[sX*2] + source[sX+1] +
+                                    source[sX*sY+0] + source[sX*sY+1] + source[sX*sY+sX] + source[sX*sY+sX+1])/8;
+                        }
+                    }
+                } else error(source.sampleSize);
             } else if(source.sampleSize==2) { // Reads from disk into process managed cache (16bit)
                 uint16* const targetData = (Volume16&)target;
                 for(uint z: range(size.z)) {

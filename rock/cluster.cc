@@ -42,7 +42,7 @@ array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<ar
         int R = ceil(R1);
         for(short3 P: balls) {
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
-            log(R1, P);
+            //log(R1, P);
             array<Family*> parentFamilies;
             for(Family& f: families) if(f.contains(parent)) parentFamilies << &f;
             if(!parentFamilies) { families << Family(parent); parentFamilies << &families.last(); } // parent is a root
@@ -52,7 +52,7 @@ array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<ar
                     uint64 iZ = offsetZ[z];
                     for(int y: range(max(0,P.y-2*R),min(Y,P.y+2*R))) {
                         uint64 iZY = iZ + offsetY[y];
-                        for(int x: range(max(0,P.x-2*R),max(X,P.x+2*R))) { // Scans voxels for overlapping balls
+                        for(int x: range(max(0,P.x-2*R),min(X,P.x+2*R))) { // Scans voxels for overlapping balls
                             uint64 index = iZY + offsetX[x];
                             uint16 r2 = sourceData[index]; float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
                             uint16 previousRoot = targetData[index]; // Previously assigned root (0 if unprocessed)
@@ -73,7 +73,7 @@ array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<ar
                     uint64 iZ = offsetZ[z];
                     for(int y: range(max(0,P.y-2*R),min(Y,P.y+2*R))) {
                         uint64 iZY = iZ + offsetY[y];
-                        for(int x: range(max(0,P.x-2*R),max(X,P.x+2*R))) { // Scans voxels for overlapping balls
+                        for(int x: range(max(0,P.x-2*R),min(X,P.x+2*R))) { // Scans voxels for overlapping balls
                             uint64 index = iZY + offsetX[x];
                             uint16 r2 = sourceData[index]; float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
                             uint16 previousRoot = targetData[index]; // Previously assigned root (0 if unprocessed)
