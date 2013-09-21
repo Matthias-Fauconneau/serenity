@@ -1,4 +1,4 @@
-/// \file histogram.cc Histograms volume
+/// \file list.cc Computes lists of positions for each value
 #include "sample.h"
 #include "volume-operation.h"
 #include "thread.h"

@@ -98,3 +98,4 @@ rock/summary.cc
 rock/slice.h
 rock/diff.cc
 rock/cluster.cc
+rock/link.cc

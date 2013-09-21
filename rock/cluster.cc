@@ -1,4 +1,4 @@
-/// \file histogram.cc Histograms volume
+/// \file cluster.cc Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
 #include "sample.h"
 #include "volume-operation.h"
 #include "thread.h"
@@ -44,7 +44,7 @@ array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<ar
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             //log(R1, P);
             array<Family*> parentFamilies;
-            for(Family& f: families) if(f.contains(parent)) parentFamilies << &f;
+            for(Family& f: families) if(f.contains(parent)) parentFamilies << &f; //FIXME: O(N²)
             if(!parentFamilies) { families << Family(parent); parentFamilies << &families.last(); } // parent is a root
             if(parentFamilies.size==1) { // Fast path for the common case of a balls belonging to a single family (pores)
                 Family* family = parentFamilies.first(); uint64 root = family->root;
@@ -97,7 +97,7 @@ array<Family> cluster(VolumeT<uint64>& target, const Volume16& source, buffer<ar
     return families;
 }
 
-/// Converts parents to a text file formatted as (x y z:( x y z)+)*\n
+/// Converts families to a text file formatted as ((x y z):( x y z)+\n)*
 String toASCII(const array<Family>& families) {
     uint size = 0; // Estimates data size to avoid unnecessary reallocations
     for(const Family& family: families) /*if(family.size)*/ size += (3*5+2) + (family.size)*(3*5+1);
@@ -117,8 +117,8 @@ class(Cluster, Operation), virtual VolumeOperation {
     string parameters() const override { return "minimum"_; }
     uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint64) : 0; }
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const mref<Result*>& otherOutputs, const ref<Result*>& otherInputs) override {
-        array<Family> parents = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
+        array<Family> families = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
         otherOutputs[0]->metadata = String("families"_);
-        otherOutputs[0]->data = toASCII(parents);
+        otherOutputs[0]->data = toASCII(families);
     }
 };

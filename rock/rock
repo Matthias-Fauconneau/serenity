@@ -110,6 +110,9 @@ maximum-balls-lists = List connected-skeleton minimum=16
 # Generates a list of families from the skeleton volume
 last-root-index maximum-balls-families = Cluster connected-skeleton maximum-balls-lists minimum=16
 
+# Links together roots with common descendants (throats)
+root-nodes = Link maximum-balls-families
+
 # Rasterizes skeleton voxel as maximum spheres
 sphere-bins = Bin connected-skeleton
 maximum = Rasterize sphere-bins

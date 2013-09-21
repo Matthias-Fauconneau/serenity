@@ -63,6 +63,8 @@ uint maximum(const Volume16& source);
 
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);
+/// Interleaves 3 coordinates
+uint64 zOrder(int3 coordinates);
 /// Uninterleaves 3 coordinates
 int3 zOrder(uint64 index);
 
