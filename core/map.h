@@ -101,6 +101,8 @@ template<Type K, Type V> struct map {
         pair<K,V> operator* () const { return {*k,*v}; }
         const iterator& operator++ () { k++; v++; return *this; }
     };
+    iterator begin() { return iterator(keys.begin(),values.begin()); }
+    iterator end() { return iterator(keys.end(),values.end()); }
 
     array<K> keys;
     array<V> values;

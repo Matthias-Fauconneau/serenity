@@ -61,8 +61,8 @@ struct bspModel {
 };
 
 struct BSP {
-    char magic[4]; //"IBSP" (or "XBSP" for XReaL)
-    int version; //ET:47 XReaL:48
+    char magic[4]; // "IBSP" (or "XBSP" for XReaL)
+    int version; // ET:47 XReaL:48
 #define LUMP(T,s,p) \
     struct { int offset, length; } s##Lump; \
     inline ref<T> p() const { return ref<T>((const T*)((const char*)this+s##Lump.offset), s##Lump.length / sizeof(T)); }
@@ -83,4 +83,5 @@ struct BSP {
     LUMP( char, lightMap, lightMaps ) // Packed lightmap data.
     LUMP( char, lightVoxel, lightVolume ) // Local illumination data.
     LUMP( char, visData, visData )   // Cluster-cluster visibility data.
+#undef LUMP
 };

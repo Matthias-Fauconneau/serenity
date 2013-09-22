@@ -81,3 +81,4 @@ music/flac.h
 
 et/et.cc
 et/bsp.h
+et/md3.h
