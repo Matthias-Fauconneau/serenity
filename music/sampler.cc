@@ -330,7 +330,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
         // Converts mixing buffer to signed 32bit output
         bool clip=false;
         for(uint i: range(size/2)) {
-            for(uint j: range(4)) { float s=buffer[4*i+j]; if(s<-0x1p31f || s>=0x1p31f) clip=true; }
+            for(uint j: range(4)) { float s=buffer[4*i+j]; if(s<-0x1p31f || s>=(0x1p31f-0.5f)) clip=true; }
             ((v4si*)output)[i] = cvtps2dq(((v4sf*)buffer)[i]);
         }
         if(clip) log("Clipping occured: not enough headroom");

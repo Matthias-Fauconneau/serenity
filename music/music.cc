@@ -111,7 +111,7 @@ struct Music {
     vec2 position=0, target=0, speed=0; //smooth scroll
 
     Music() {
-        layout << &sheets; sheets.expanding=true;
+        window.localShortcut(Escape).connect([]{exit();});
 
         if(arguments() && endsWith(arguments()[0],".sfz"_))
             sampler.open(audio.rate, arguments()[0], root);
@@ -120,26 +120,16 @@ struct Music {
             sampler.open(audio.rate, "Salamander.sfz"_,Folder("Samples"_,root));
         }
 
-        array<String> files = folder.list(Files);
-        for(String& file : files) {
-            if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
-                for(const Text& text: sheets) if(text.text==toUTF32(section(file,'.'))) goto break_;
-                /*else*/ sheets << String(section(file,'.'));
-                break_:;
-            }
-        }
-        sheets.itemPressed.connect(this,&Music::openSheet);
-
-        midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
-        keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
-
+#if 1
         input.noteEvent.connect(&score,&Score::noteEvent);
         input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
+        midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         midi.noteEvent.connect(&score,&Score::noteEvent);
         midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
 
+        keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
         keyboard.noteEvent.connect(&score,&Score::noteEvent);
         keyboard.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
@@ -157,16 +147,11 @@ struct Music {
         score.nextStaff.connect(this,&Music::nextStaff);
         score.annotationsChanged.connect(this,&Music::annotationsChanged);
 
-        window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
-#if RECORD
-        window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
-        sampler.frameReady.connect(&record,&Record::capture);
-#endif
         window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
@@ -174,10 +159,23 @@ struct Music {
         window.localShortcut(Delete).connect(&score,&Score::remove);
         window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
 
+        layout << &sheets; sheets.expanding=true;
+        array<String> files = folder.list(Files);
+        for(String& file : files) {
+            if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
+                for(const Text& text: sheets) if(text.text==toUTF32(section(file,'.'))) goto break_;
+                /*else*/ sheets << String(section(file,'.'));
+                break_:;
+            }
+        }
+        sheets.itemPressed.connect(this,&Music::openSheet);
         showSheetList();
         if(arguments()) for(const Text& text: sheets) if(text.text==toUTF32(arguments()[0])) { openSheet(arguments()[0]); break; }
 #if RECORD
+        window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
+        sampler.frameReady.connect(&record,&Record::capture);
         layout<<&keyboard;
+#endif
 #endif
         window.show();
         audio.start();

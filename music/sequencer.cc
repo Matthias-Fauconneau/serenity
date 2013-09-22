@@ -5,7 +5,13 @@
 #include "midi.h"
 #include "time.h"
 
-Sequencer::Sequencer(Thread& thread) : Device("/dev/snd/midiC1D0"_,ReadOnly), Poll(Device::fd,POLLIN,thread) { registerPoll(); }
+Device getMIDIDevice() {
+    Folder snd("/dev/snd");
+    for(const String& device: snd.list(Devices)) if(startsWith(device, "midi"_)) return Device(device, snd, ReadOnly);
+    error("No MIDI device found"); //FIXME: Block and watch folder until connected
+}
+
+Sequencer::Sequencer(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread) { registerPoll(); }
 
 void Sequencer::event() {
     uint8 key=read<uint8>();

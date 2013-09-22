@@ -46,8 +46,15 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
+Device getPCMDevice() {
+    Folder snd("/dev/snd");
+    for(const String& device: snd.list(Devices)) if(startsWith(device, "pcm"_) && endsWith(device,"D0p"_)) return Device(device, snd, ReadWrite);
+    for(const String& device: snd.list(Devices)) if(startsWith(device, "pcm"_) && endsWith(device,"p"_)) return Device(device, snd, ReadWrite);
+    error("No PCM playback device found"); //FIXME: Block and watch folder until connected
+}
+
 AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
-    : Device("/dev/snd/pcmC0D0p"_,ReadWrite), Poll(Device::fd,POLLOUT,thread) {
+    : Device(getPCMDevice()), Poll(Device::fd,POLLOUT,thread) { //FIXME: list devices
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
