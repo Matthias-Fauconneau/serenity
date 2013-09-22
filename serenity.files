@@ -78,3 +78,6 @@ music/resample.h
 music/resample.cc
 music/flac.cc
 music/flac.h
+
+et/et.cc
+et/bsp.h

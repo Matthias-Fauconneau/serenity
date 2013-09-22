@@ -5,7 +5,7 @@
 #include <sys/syscall.h>
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
 struct dirent { long ino, off; short len; char name[]; };
-enum {DT_DIR=4, DT_REG=8};
+enum {DT_BLK=1<<0, DT_CHR=1<<1, DT_DIR=1<<2, DT_REG=1<<3};
 
 #include <stdio.h>
 #include <sys/sendfile.h>
@@ -39,7 +39,9 @@ array<String> Folder::list(uint flags) const {
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
             //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
-            if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==0/*HACK!*/) && flags&Files)) { if(flags&Sorted) list.insertSorted(String(name)); else list << String(name); }
+            if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==0/*HACK!*/) && flags&Files) || (type==DT_CHR && flags&Devices)) {
+                if(flags&Sorted) list.insertSorted(String(name)); else list << String(name);
+            }
             if(type==DT_DIR && flags&Recursive) for(const String& file: Folder(name,*this).list(flags)) { if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file; }
         }
     }

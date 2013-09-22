@@ -79,7 +79,7 @@ generic struct array : buffer<T> {
     /// Removes all matching elements
     template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
-    template<Type F> void filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; }
+    template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
     /// Returns the index of the first occurence of \a key. Returns -1 if \a key could not be found.
     template<Type K> int indexOf(const K& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }

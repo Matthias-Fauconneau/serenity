@@ -60,6 +60,9 @@ template<Type K, Type V> struct map {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << key; values << value; return values.last();
     }
+    template<Type KK> V& insertMulti(const KK& key, V&& value) {
+        keys << key; values << move(value); return values.last();
+    }
     template<Type KK> V& insertMulti(const KK& key, const V& value) {
         keys << key; values << value; return values.last();
     }
