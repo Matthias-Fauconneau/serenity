@@ -42,6 +42,8 @@ ui/display.cc
 ui/display.h
 ui/font.cc
 ui/font.h
+ui/gl.cc
+ui/gl.h
 ui/interface.h
 ui/layout.h
 ui/plot.cc
@@ -82,3 +84,11 @@ music/flac.h
 et/et.cc
 et/bsp.h
 et/md3.h
+et/shader.h
+et/shader.cc
+et/object.h
+et/object.cc
+et/scene.h
+et/scene.cc
+et/view.h
+et/view.cc
