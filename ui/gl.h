@@ -25,11 +25,14 @@ struct GLUniform {
 
 struct GLShader {
     GLShader(){}
-    GLShader(const ref<byte>& source, const ref<byte>& tags=""_);
-    void compile(uint type, const ref<byte>& source);
+    GLShader(const string& source, const string& tags=""_):GLShader(source, ref<string>{tags}){}
+    GLShader(const string& source, const ref<string>& stages={""_});
+    void compile(uint type, const string& source);
     void bind();
-    uint attribLocation(const ref<byte>&);
-    GLUniform operator[](const ref<byte>&);
+    void bindSamplers(const ref<string>& textures);
+    void bindFragments(const ref<string>& fragments);
+    uint attribLocation(const string&);
+    GLUniform operator[](const string&);
     //static uint maxUniformBlockSize();
 
     handle<uint> id;
@@ -39,13 +42,7 @@ struct GLShader {
     array<String> sampler2D; // names of declared sampler2D
 };
 
-#define SHADER( name ) \
-extern char _binary_ ## name ##_glsl_start[]; \
-extern char _binary_ ## name ##_glsl_end[]; \
-static ref<byte> name (_binary_ ## name ##_glsl_start,_binary_ ## name ##_glsl_end);
-
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
-
 struct GLVertexBuffer {
     GLVertexBuffer(){}
     default_move(GLVertexBuffer);

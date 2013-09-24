@@ -93,7 +93,7 @@ void Scene::parseMaterialFile(string path) {
             else if(key=="vertexColor"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; }
             else if(key=="alphaGen"_||key=="alphagen"_) { if(args[0]=="vertex"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; } }
             else if(key=="tcMod"_||key=="tcmod"_) {
-                if(args[0]=="scale"_) current->tcScale=vec3(toDecimal(args[1]),toDecimal(args[2]),1).xy();
+                if(args[0]=="scale"_) current->tcScale=vec3(toDecimal(args[1]),toDecimal(args[2]),1);
                 //TODO: rotate
             }
             else if(key=="rgbGen"_||key=="rgbgen"_) {
@@ -223,7 +223,8 @@ found:
     return surfaces;
 }
 
-Scene::Scene(string file, const Folder& data) : data(data) {
+Scene::Scene(string file, const Folder& data) {
+    ::data = Folder("."_,data);
     /// Parse shader scripts
     array<String> materials = search("materials/"_,".mtr"_);
     if(!materials) materials = search("scripts/"_,".shader"_);
@@ -243,14 +244,14 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             while(s && (s.skip(), !s.match("}"_))) {
                 s.skip("\""_); string key = s.until("\""_);
                 s.skip(); s.skip("\""_); string value = s.until("\""_);
-                entity.insert(key,value);
+                entity.insert(String(key),String(value));
             }
-            if(entity.contains("targetname"_)) targets.insertMulti(entity.at("targetname"_), copy(entity)); //move?
-            entities.insertMulti(entity.at("classname"_), move(entity));
+            if(entity.contains("targetname"_)) targets.insertMulti(copy(entity.at("targetname"_)), copy(entity)); //move?
+            entities.insertMulti(copy(entity.at("classname"_)), move(entity));
         } else if(s.match('\0')) break;
         else error("Expected '{'"_, s.line());
     }
-    entities.at("worldspawn"_).insert("model"_, "*0"_);
+    entities.at("worldspawn"_).insert(String("model"_), String("*0"_));
 
     /// BSP Vertices
     buffer<Vertex> vertices (bsp.vertices().size);
@@ -299,7 +300,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
                         water->z=max(water->z,(transform*object.surface->bbMax).z);
                         continue;
                     }*/
-                //object.shader->bind(); //force shader compilation
+                object.surface.shader->bind(); // Forces shader compilation for correct split
                 const Shader* shader = object.surface.shader;
                 GLShader* id = shader->program;
                 if(shader->name=="textures/common/caulk"_) shadowOnly[id] << object;
@@ -318,4 +319,14 @@ Scene::Scene(string file, const Folder& data) : data(data) {
                             e.value("noshadows"_)!="1"_);
         }
     }
+}
+
+vec4 Scene::defaultPosition() const {
+    const Entity& player = entities.value("info_player_intermission"_, entities.at("info_player_start"_));
+    vec3 position = toVec3(player.at("origin"_));
+    if(player.contains("angle"_)) return vec4(position, float(toDecimal(player.at("angle"_))*PI/180));
+    else if(player.contains("target"_)) {
+        vec3 forward = toVec3(targets.at(player.at("target"_)).at("origin"_))-position;
+        return vec4(position, float(atan(forward.y,forward.x)-PI/2));
+    } else error("Undefined default position"_);
 }

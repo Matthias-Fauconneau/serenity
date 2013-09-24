@@ -4,6 +4,8 @@
 #include "image.h"
 #include "thread.h"
 
+extern bool softwareRendering;
+
 /// Framebuffer of the window being rendered (X11 shared memory to be used only under Window::render)
 extern Image framebuffer;
 extern Lock framebufferLock;

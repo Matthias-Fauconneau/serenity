@@ -1,6 +1,7 @@
 #include "display.h"
 #include "math.h"
 
+bool softwareRendering;
 int resolution = 96;
 Image framebuffer;
 Lock framebufferLock;

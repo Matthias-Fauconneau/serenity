@@ -86,7 +86,7 @@ struct Build {
                 } else { // library header
                     for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
                         string library=s.identifier("_"_);
-                        if(library) { assert(s.peek()=='\n',s.until('\n')); libraries << String(library); }
+                        if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += String(library); }
                         break;
                     }
                 }

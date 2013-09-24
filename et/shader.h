@@ -1,5 +1,8 @@
 #pragma once
 #include "gl.h"
+#include "file.h"
+
+extern Folder data;
 
 struct Texture {
     Texture(const string& path=""_/*, string type="albedo"_*/) : path(path), type("albedo"_) {}
@@ -7,9 +10,9 @@ struct Texture {
 
     String path;
     String type; //FIXME: convert to flags
-    //const GLTexture* texture = 0;
+    GLTexture* texture = 0;
     bool alpha = false;
-    vec2 tcScale {1,1};    //vec3 tcScale {1,1,1/*.0/16*/};
+    vec3 tcScale {1,1,1/*.0/16*/};
     vec3 rgbScale {1,1,1};
     //string heightMap;
     //bool inverted = true;
@@ -19,7 +22,7 @@ struct Texture {
 
 struct Shader : array<Texture> {
     Shader(string type="transform surface"_): name(type), type(type) {}
-    //GLShader* bind();
+    GLShader* bind();
 
     String name;
     String type;

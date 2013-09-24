@@ -18,7 +18,7 @@ struct Surface {
     /// \note Handles tangent basis generation
     void addTriangle(const ref<Vertex>& sourceVertices, int i1, int i2, int i3);
     ///
-    //void draw(GLShader* program,bool withTexcoord,bool withNormal,bool withAlpha,bool withTangent);
+    void draw(GLShader& program, bool withTexcoord, bool withNormal, bool withAlpha, bool withTangent);
     ///
     //bool raycast(vec3 origin, vec3 direction, float& z);
 
@@ -28,14 +28,14 @@ struct Surface {
     array<uint> indices;
     GLVertexBuffer vertexBuffer;
     GLIndexBuffer indexBuffer;
-    const Shader* shader = 0;
+    Shader* shader = 0;
 };
 
 
 struct Object {
-    Object(const Surface& surface) : surface(surface) {}
+    Object(Surface& surface) : surface(surface) {}
 
-    const Surface& surface;
+    Surface& surface;
     vec3 uniformColor {1,1,1};
     mat4 transform;
     vec3 center; vec3 extent; // Bounding box center and extent

@@ -18,9 +18,10 @@ Image renderToImage(Widget* widget, int2 size, int imageResolution=::resolution)
 
 /// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
+    enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image(),
+    Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image(), Renderer renderer=Raster,
            const string& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread);
     virtual ~Window();
 
@@ -104,6 +105,8 @@ struct Window : Socket, Poll {
     /// Window position and size
     int2 position=0, size=0;
 
+    /// Selects between software or OpenGL rendering
+    Renderer renderer;
     /// Window background intensity and opacity
     float backgroundColor=14./16, backgroundCenter=15./16, backgroundOpacity=1;
     bool clearBackground = true, featherBorder = false;

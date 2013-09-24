@@ -114,6 +114,7 @@ struct mat4 {
     void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
+inline bool operator !=( mat4 a, mat4 b ) { for(int i=0;i<16;i++) if(a.data[i]!=b.data[i]) return true; return false; }
 
 template<int M, int N> inline String str(const float a[M*N]) {
     String s; s<<"\n["_;

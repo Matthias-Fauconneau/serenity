@@ -42,58 +42,63 @@ GLUniform GLShader::operator[](const string& name) {
     return GLUniform(id,location);
 }
 
-GLShader::GLShader(const string& source, const string& tags) {
+GLShader::GLShader(const string& source, const ref<string>& stages) {
     id = glCreateProgram();
     array<string> knownTags;
     for(uint type: (uint[]){GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
-        array<string> tags_;
-        tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
         String global, main;
-        TextData s (source);
-        array<uint> scope;
-        for(uint nest=0;s;) { //for each line
-            static array<string> qualifiers = split("struct const uniform attribute varying"_);
-            static array<string> types = split("void float vec2 vec3 vec4"_);
-            uint lineStart = s.index;
-            s.whileAny(" \t"_);
-            string identifier = s.identifier("_"_);
-            s.whileAny(" \t"_);
-            if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
-                if(tags_.contains(identifier)) {
-                    knownTags += identifier;
-                    scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
-                } else { // Skip scope
-                    for(uint nest=1; nest;) {
-                        if(!s) error(source, "Unmatched {"_);
-                        if(s.match('{')) nest++;
-                        else if(s.match('}')) nest--;
+        for(uint i: range(stages.size)) { string tags = stages[i];
+            String stageGlobal, stageMain;
+            array<string> tags_;
+            tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
+            TextData s (source);
+            array<uint> scope;
+            for(uint nest=0;s;) { //for each line
+                static array<string> qualifiers = split("struct const uniform attribute varying in out"_);
+                static array<string> types = split("void float vec2 vec3 vec4"_);
+                uint lineStart = s.index;
+                s.whileAny(" \t"_);
+                string identifier = s.identifier("_"_);
+                s.whileAny(" \t"_);
+                if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
+                    if(tags_.contains(identifier)) {
+                        knownTags += identifier;
+                        scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
+                    } else { // Skip scope
+                        for(uint nest=1; nest;) {
+                            if(!s) error(source, "Unmatched {"_);
+                            if(s.match('{')) nest++;
+                            else if(s.match('}')) nest--;
+                            else s.advance(1);
+                        }
+                        if(!s.match('\n')) error("Expecting newline after scope");
+                    }
+                    continue;
+                }
+                bool function = false;
+                if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
+                    function = true;
+                    s.until('{');
+                    for(uint n=nest+1;s && n>nest;) {
+                        if(s.match('{')) n++;
+                        else if(s.match('}')) n--;
                         else s.advance(1);
                     }
-                    if(!s.match('\n')) error("Expecting newline after scope");
                 }
-                continue;
-            }
-            bool function = false;
-            if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
-                function = true;
-                s.until('{');
-                for(uint n=nest+1;s && n>nest;) {
-                    if(s.match('{')) n++;
-                    else if(s.match('}')) n--;
+                if(identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << String(s.identifier("_"_));
+                while(s && !s.match('\n')) {
+                    if(s.match('{')) nest++;
+                    else if(s.match('}')) nest--;
                     else s.advance(1);
                 }
+                if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
+                string line = s.slice(lineStart, s.index-lineStart);
+                if(trim(line)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain) << line;
             }
-            if(identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << String(s.identifier("_"_));
-            while(s && !s.match('\n')) {
-                if(s.match('{')) nest++;
-                else if(s.match('}')) nest--;
-                else s.advance(1);
-            }
-            if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
-            string line = s.slice(lineStart, s.index-lineStart);
-            if(trim(line)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? global : main) << line;
+            global << replace(stageGlobal,"$",str(i-1));
+            main << replace(stageMain,"$",str(i-1));
         }
-        String glsl = global+"\nvoid main() {\n"_+main+"\n}\n"_;
+        String glsl = "#version 130\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
         uint shader = glCreateShader(type);
         const char* data = glsl.data; int size = glsl.size;
         glShaderSource(shader, 1, &data,&size);
@@ -115,15 +120,20 @@ GLShader::GLShader(const string& source, const string& tags) {
     if(!status || length>1) {
         ::buffer<byte> buffer(length-1);
         glGetProgramInfoLog(id, length-1, 0, buffer.begin());
-        error(tags, "Program failed\n", buffer);
+        error(stages, "Program failed\n", buffer);
     }
-    for(string& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag);
+    for(string tags: stages) for(string& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag);
 }
 void GLShader::bind() { glUseProgram(id); }
+void GLShader::bindSamplers(const ref<string> &textures) { for(int i: range(textures.size)) { GLUniform tex = operator[](textures[i]); if(tex) tex = i; } }
+void GLShader::bindFragments(const ref<string> &fragments) { for(uint i: range(fragments.size)) glBindFragDataLocation(id, i, fragments[i]); }
 uint GLShader::attribLocation(const string& name) {
     int location = attribLocations.value(String(name),-1);
-    if(location<0) attribLocations.insert(String(name), location=glGetAttribLocation(id,strz(name)));
-    if(location<0) error("Unknown attribute"_,name);
+    if(location<0) {
+        location=glGetAttribLocation(id,strz(name));
+        if(location>=0) attribLocations.insert(String(name), location);
+    }
+    //if(location<0) error("Unknown attribute"_,name);
     return (uint)location;
 }
 
@@ -151,8 +161,9 @@ void GLVertexBuffer::upload(const ref<byte>& vertices) {
 }
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
     assert(vertexBuffer); assert(elementSize<=4);
-    int index = program.attribLocation(strz(name));
-    assert(index>=0,"unused attribute"_,name);
+    int index = program.attribLocation(name);
+    //assert(index>=0,"Unknown attribute"_,name);
+    if(index<0) return;
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glEnableVertexAttribArray(index);
     glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)(offset));

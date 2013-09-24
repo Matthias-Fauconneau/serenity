@@ -8,11 +8,29 @@
 #include "png.h"
 #include "linux.h"
 #include "x.h"
+#include "gl.h"
+#undef packed
+#define Time XTime
+#define Cursor XCursor
+#define Depth XDepth
+#define Window XWindow
+#define Screen XScreen
+#define XEvent XXEvent
+#include <GL/glx.h> //X11
+#undef Time
+#undef Cursor
+#undef Depth
+#undef Window
+#undef Screen
+#undef XEvent
+#undef None
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 int2 displaySize;
+Display* glDisplay;
+GLXContext glContext;
 
 Image renderToImage(Widget* widget, int2 size, int imageResolution) {
     Image framebuffer = move(::framebuffer);
@@ -40,8 +58,8 @@ void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, const string& type, Thread& thread)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
+Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, Renderer renderer, const string& type, Thread& thread)
+    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
@@ -103,6 +121,18 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     setTitle(title);
     setIcon(icon);
     setType(type);
+    if(renderer == OpenGL) {
+        if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
+        if(!glContext) {
+            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, 0};
+            int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
+            const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
+            glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
+            assert(glContext);
+        }
+        glXMakeCurrent(glDisplay, id, glContext);
+        //glXSwapIntervalMESA(1); SGI?
+    }
 }
 
 void Window::create() {
@@ -138,51 +168,62 @@ void Window::event() {
         currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
-        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-            if(shm) {
-                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                shmdt(buffer.data);
-                shmctl(shm, IPC_RMID, 0);
+        if(renderer == Raster) {
+            ::softwareRendering=true;
+            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
+                if(shm) {
+                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                    shmdt(buffer.data);
+                    shmctl(shm, IPC_RMID, 0);
+                }
+                buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
+                shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+                buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+                {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             }
-            buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
-            shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
-        }
-        framebuffer=share(buffer);
-        {Locker lock(framebufferLock);
-            currentClip=Rect(size);
-            if(clearBackground) {
-                if(backgroundCenter==backgroundColor) {
-                    fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                } else { // Oxygen-like radial gradient background
-                    const int radius=256;
-                    int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                            a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                    if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                    uint* dst=(uint*)framebuffer.data;
-                    for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                        int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                        dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+            framebuffer=share(buffer);
+            {Locker lock(framebufferLock);
+                currentClip=Rect(size);
+                if(clearBackground) {
+                    if(backgroundCenter==backgroundColor) {
+                        fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                    } else { // Oxygen-like radial gradient background
+                        const int radius=256;
+                        int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                                a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
+                        if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                        uint* dst=(uint*)framebuffer.data;
+                        for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                            int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
+                            dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                        }
                     }
                 }
+                widget->render(0,size);
+                assert(!clipStack);
             }
+
+            if(featherBorder) { //feather borders
+                const bool corner = 1;
+                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+                if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+                if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            }
+            Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+            r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
+            r.srcW=size.x; r.srcH=size.y; send(raw(r));
+            state=Server;
+            //framebuffer=Image(); // Leave for capture
+        } else {
+            ::softwareRendering=false;
+            glXMakeCurrent(glDisplay, id, glContext);
+            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
+            currentClip=Rect(size);
             widget->render(0,size);
             assert(!clipStack);
+            glFinish(); //FIXME: glFlush
         }
-
-        if(featherBorder) { //feather borders
-            const bool corner = 1;
-            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-            if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-            if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-        }
-        Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-        r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
-        r.srcW=size.x; r.srcH=size.y; send(raw(r));
-        state=Server;
-        //framebuffer=Image(); // Leave for capture
         frameReady();
     } else for(;;) {
         readLock.lock();
@@ -266,10 +307,10 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
         } else if(type==KeyPress) {
             Key key = KeySym(e.key, e.state);
-            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); //normal keyPress event
+            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); // Normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
-                if(shortcut) (*shortcut)(); //local window shortcut
+                if(shortcut) (*shortcut)(); // Local window shortcut
             }
         }
         else if(type==KeyRelease) {
@@ -279,7 +320,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
             signal<>* shortcut = shortcuts.find(Widget::Leave);
-            if(shortcut) (*shortcut)(); //local window shortcut
+            if(shortcut) (*shortcut)(); // Local window shortcut
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                    e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
         }
@@ -294,8 +335,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
             signal<>* shortcut = shortcuts.find(Escape);
-            if(shortcut) (*shortcut)(); //local window shortcut
-            else widget->keyPress(Escape, NoModifiers);
+            if(shortcut) (*shortcut)(); // Local window shortcut
+            else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
+            else exit(0); // Exits application by default
         }
         else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}

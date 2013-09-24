@@ -84,6 +84,7 @@ music/flac.h
 et/et.cc
 et/bsp.h
 et/md3.h
+et/shader
 et/shader.h
 et/shader.cc
 et/object.h

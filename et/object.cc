@@ -1,6 +1,7 @@
 #include "object.h"
 
 uint Surface::addVertex(Vertex v) {
+    assert(!vertexBuffer);
     if(!vertices) bbMin=bbMax=v.position; else bbMin=min(bbMin,v.position), bbMax=max(bbMax,v.position); // Initializes or updates bounding box
     vertices<<v; return vertices.size-1; // Appends vertex
 }
@@ -23,4 +24,27 @@ void Surface::addTriangle(const ref<Vertex>& sourceVertices, int i1, int i2, int
     v1.tangent += tangent, v2.tangent += tangent, v3.tangent += tangent;
     v1.bitangent += bitangent, v2.bitangent += bitangent, v3.bitangent += bitangent;
     indices << indexMap[i1] << indexMap[i2] << indexMap[i3];
+}
+
+void Surface::draw(GLShader& program,bool withTexcoord,bool withNormal, bool /*withAlpha*/,bool withTangent) {
+    if(!vertexBuffer) {
+        indexMap.clear();
+        indexBuffer.upload(indices);
+
+        for(Vertex& v: vertices) { // Projects tangents on normal plane
+            v.tangent = normalize(v.tangent - v.normal * dot(v.normal, v.tangent));
+            v.bitangent = normalize(v.bitangent - v.normal * dot(v.normal, v.bitangent));
+        }
+        vertexBuffer.upload(vertices);
+    }
+    #define offsetof __builtin_offsetof
+    vertexBuffer.bindAttribute(program, "position"_, 3, offsetof(Vertex,position));
+    if(withTexcoord) vertexBuffer.bindAttribute(program, "texcoord"_, 2, offsetof(Vertex,texcoord));
+    if(withNormal) vertexBuffer.bindAttribute(program, "normal"_, 3, offsetof(Vertex,normal));
+    /*if(withAlpha)*/ vertexBuffer.bindAttribute(program, "alpha"_, 1, offsetof(Vertex,alpha));
+    if(withTangent) {
+        vertexBuffer.bindAttribute(program, "tangent"_, 3, offsetof(Vertex,tangent));
+        vertexBuffer.bindAttribute(program, "bitangent"_, 3, offsetof(Vertex,bitangent));
+    }
+    indexBuffer.draw();
 }
