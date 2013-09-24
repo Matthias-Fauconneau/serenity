@@ -218,7 +218,7 @@ void Window::event() {
         } else {
             ::softwareRendering=false;
             glXMakeCurrent(glDisplay, id, glContext);
-            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
+            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearDepth|ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
             currentClip=Rect(size);
             widget->render(0,size);
             assert(!clipStack);

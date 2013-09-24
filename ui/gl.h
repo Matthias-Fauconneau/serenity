@@ -25,7 +25,7 @@ struct GLUniform {
 
 struct GLShader {
     GLShader(){}
-    GLShader(const string& source, const string& tags=""_):GLShader(source, ref<string>{tags}){}
+    GLShader(const string& source, const string& tags):GLShader(source, ref<string>{tags}){}
     GLShader(const string& source, const ref<string>& stages={""_});
     void compile(uint type, const string& source);
     void bind();

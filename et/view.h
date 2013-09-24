@@ -6,7 +6,12 @@ struct Object;
 
 struct View : Widget {
     View(Scene& scene);
-    void render(int2 position, int2 size);
+
+    void render(int2 position, int2 size) override;
+    bool keyPress(Key key, Modifiers) override;
+    bool keyRelease(Key key, Modifiers) override;
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+
     void render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender,bool withShadow, bool reverseWinding=false*/);
     enum Sort { FrontToBack=0, BackToFront=1 };
     void draw(map<GLShader*,array<Object>>& objects,Sort sort=FrontToBack);
@@ -23,7 +28,7 @@ struct View : Widget {
     vec3 velocity;
     vec3 momentum;
     float speed=2;
-    int walk=0,strafe=0,jump=0;
-    float pitch=PI/2, yaw=0;
-    //QPoint drag; bool grab = 0;
+    int walk=0, strafe=0, jump=0;
+    float yaw = 0, pitch=PI/2;
+    int2 dragStart; vec2 deltaStart;
 };
