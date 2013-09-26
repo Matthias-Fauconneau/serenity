@@ -3,7 +3,7 @@
 #include "time.h"
 
 /// Tiles a volume recursively into bricks (using 3D Z ordering)
-template<Type T> void zOrder(VolumeT<T>& target, const VolumeT<T>& source) {
+generic void zOrder(VolumeT<T>& target, const VolumeT<T>& source) {
     assert_(!source.tiled());
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const T* const sourceData = source;
@@ -24,7 +24,7 @@ class(ZOrder, Operation), virtual VolumeOperation {
 
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles)
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
-struct Ball { uint16 x,y,z,sqRadius; };
+struct Ball { uint16 x,y,z,sqRadius, attribute; };
 const int overcommit = 16; // Allows more spheres intersections than voxels inside a tile (only virtual memory is reserved and committed only as needed when filling tile's sphere lists)
 struct Tile { uint64 ballCount=0; Ball balls[tileSize*overcommit-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
 
@@ -38,8 +38,9 @@ inline uint dmin(int size, int vx, int vy, int vz) {
 }
 
 /// Bins each skeleton voxel as a ball to tiles of 16³ voxels
-void bin(Volume& target, const Volume16& source) {
+void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
     const uint16* const sourceData = source;
+    const uint16* const attributeData = attribute;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
@@ -53,7 +54,9 @@ void bin(Volume& target, const Volume16& source) {
     parallel(marginZ,Z-marginZ, [&](uint, uint z) { //TODO: Z-order
         for(int y=marginY; y<Y-marginY; y++) {
             for(int x=marginX; x<X-marginX; x++) {
-                uint sqRadius = sourceData[offsetZ[z]+offsetY[y]+offsetX[x]];
+                uint64 offset = offsetZ[z]+offsetY[y]+offsetX[x];
+                uint16 sqRadius = sourceData[offset];
+                uint16 attribute = attributeData[offset];
                 if(!sqRadius) continue;
                 float ballRadius = sqrt(float(sqRadius));
                 int radius = ceil(ballRadius);
@@ -67,7 +70,7 @@ void bin(Volume& target, const Volume16& source) {
                                 assert(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere*/
                                 assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), dx, X/tileSide, dy, Y/tileSide, dz, Z/tileSide,  tile->ballCount);
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
-                                tile->balls[index] = {uint16(x),uint16(y),uint16(z),uint16(sqRadius)}; // Appends the ball to intersecting tiles
+                                tile->balls[index] = {uint16(x),uint16(y),uint16(z),sqRadius,attribute}; // Appends the ball to intersecting tiles
                             }
                         }
                     }
@@ -78,10 +81,11 @@ void bin(Volume& target, const Volume16& source) {
 #if DEBUG
     uint64 maximum=0; for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) maximum = max(maximum, targetData[i].ballCount); log(maximum); assert(maximum);
 #endif
+    target.maximum=attribute.maximum;
 }
 class(Bin, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(Tile)/tileSide/tileSide/tileSide; }
-    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { bin(outputs[0], inputs[0]); }
+    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { bin(outputs[0], inputs[0], inputs[1]); }
 };
 
 /// Rasterizes each skeleton voxel as a ball (with maximum blending)
@@ -101,13 +105,14 @@ void rasterize(Volume16& target, const Volume& source) {
         int tileX = x*tileSide, tileY = y*tileSide, tileZ = z*tileSide; // first voxel coordinates
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         struct Block { uint16 min=0, max=0; } blocks[blockCount*blockCount*blockCount]; // min/max values for each block (for hierarchical culling) (ala Hi-Z) [256B]
-        uint16 tile[tileSize] = {}; // Half-tiled target buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
+        uint16 tileR[tileSize] = {}; // Half-tiled 'R'-buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
+        uint16 tile[tileSize] = {}; // Target buffer for fragment output (attribute)
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];
-            int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
+            int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius, attribute=ball.attribute;
 #if 0 // Full 60s
             for(int dz=0; dz<tileSide; dz++) for(int dy=0; dy<tileSide; dy++) for(int dx=0; dx<tileSide; dx++) {
-                uint16* const voxel = tile + offsetX[dx] + offsetY[dy] + offsetZ[dz];
+                uint16* const voxel = tileR + offsetX[dx] + offsetY[dy] + offsetZ[dz];
                 if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
             }
 #elif 0 // Clip 18s
@@ -126,11 +131,15 @@ void rasterize(Volume16& target, const Volume& source) {
                 int blockBallX=tileBallX-blockX, blockBallY=tileBallY-blockY, blockBallZ=tileBallZ-blockZ;
                 int dmin = ::dmin(blockSide, blockBallX, blockBallY, blockBallZ);
                 if(dmin >= sqRadius)  continue; // Rejects whole block if fully outside
+                uint16* const blockR = tileR + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
                 uint16* const block = tile + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
                 const int blockSqRadius = 3*(blockSide-1)*(blockSide-1);
                 if(sqRadius>=HiZ.max) {
                     if(dmin == 0 && sqRadius>blockSqRadius) { // Accepts whole block
-                        for(uint i=0; i<blockSize; i++) block[i]=sqRadius;
+                        for(uint i=0; i<blockSize; i++) {
+                            blockR[i]=sqRadius;
+                            block[i]=attribute;
+                        }
                         HiZ.min = sqRadius, HiZ.max = sqRadius;
                         continue;
                     }
@@ -138,9 +147,10 @@ void rasterize(Volume16& target, const Volume& source) {
                 }
                 uint min=-1;
                 for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
-                    uint16* const voxel = block + dz*blockSide*blockSide + dy*blockSide + dx;
-                    if(sqRadius>voxel[0] && sq(blockBallX-dx)+sq(blockBallY-dy)+sq(blockBallZ-dz)<sqRadius) voxel[0] = sqRadius;
-                    if(voxel[0]<min) min = voxel[0]; // FIXME: skip when possible
+                    uint16& R = blockR[dz*blockSide*blockSide + dy*blockSide + dx];
+                    uint16& D = block[dz*blockSide*blockSide + dy*blockSide + dx];
+                    if(sqRadius>R && sq(blockBallX-dx)+sq(blockBallY-dy)+sq(blockBallZ-dz)<sqRadius) { R = sqRadius; D = attribute; }
+                    if(R<min) min = R; // FIXME: skip when possible
                 }
                 HiZ.min=min;
             }

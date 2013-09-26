@@ -125,10 +125,10 @@ class(Mask, Operation), virtual VolumeOperation {
 };
 
 /// Maps intensity to either blue or green channel depending on binary classification
-void colorize(Volume24& target, const Volume16& source, uint16 threshold) {
+generic void colorize(Volume24& target, const VolumeT<T>& source, uint16 threshold) {
     const uint maximum = source.maximum;
     chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
-        const uint16* const sourceData = source + offset;
+        const T* const sourceData = source + offset;
         bgr* const targetData = target + offset;
         for(uint i : range(size)) {
             uint8 c = 0xFF*sourceData[i]/maximum;
@@ -143,7 +143,9 @@ class(Colorize, Operation), virtual VolumeOperation {
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        colorize(outputs[0], inputs[0], integerThreshold);
+        if(inputs[0].sampleSize==1) colorize<uint8>(outputs[0], inputs[0], integerThreshold);
+        else if(inputs[0].sampleSize==2) colorize<uint16>(outputs[0], inputs[0], integerThreshold);
+        else error(inputs[0].sampleSize);
     }
 };
 

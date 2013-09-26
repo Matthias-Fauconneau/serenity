@@ -105,23 +105,26 @@ histogram-skeleton-bg = Histogram connected-skeleton
 histogram-skeleton = Slice histogram begin=1 # Excluding background
 
 # Generates lists of balls for each radius from the skeleton volume
-maximum-balls-lists = List connected-skeleton #minimum=16
+maximum-balls-lists = List connected-skeleton
 
 # Generates a list of families from the skeleton volume
-last-root-index maximum-balls-families = Cluster connected-skeleton maximum-balls-lists #minimum=16
+last-root-index maximum-balls-families = Cluster connected-skeleton maximum-balls-lists
 
 # Links together roots with common descendants (throats)
 root-nodes = Link maximum-balls-families
 
-# Colorizes skeleton using pore families
-colored-skeleton = ColorizeSkeleton connected-skeleton maximum-balls-families
+# Writes root index (into families) of each voxel
+family-skeleton = RootIndex connected-skeleton maximum-balls-families
 
-# Rasterizes skeleton voxel as maximum spheres (with color attributes)
-color-sphere-bins = ColorBin connected-skeleton
-color-maximum = ColorRasterize color-sphere-bins
+# Rasterizes skeleton voxel as maximum spheres (with family index attribute)
+family-sphere-bins = Bin connected-skeleton family-skeleton
+family-maximum = Rasterize family-sphere-bins
+
+# Colorizes each pore in a different color
+colored-families = ColorizeIndex family-maximum
 
 # Rasterizes skeleton voxel as maximum spheres
-sphere-bins = Bin connected-skeleton
+sphere-bins = Bin connected-skeleton connected-skeleton
 maximum = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
@@ -178,6 +181,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-maximum = ToPNG maximum invert=1
   png-flood = ToPNG flood
   png-denoised-connected = ToPNG denoised-connected
+  png-colored-families = ToPNG colored-families
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised

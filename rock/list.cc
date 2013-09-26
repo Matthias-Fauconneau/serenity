@@ -23,7 +23,7 @@ buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 mini
                 const uint16* sourceZYX = sourceZY + offsetX[x];
                 if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
                     uint value = sourceZYX[0];
-                    if(value<minimum) continue; // Ignores zeroes
+                    if(value<=minimum) continue; // Ignores small radii (and background minimum>=0)
                     assert(value <= source.maximum);
                     list[value] << short3(x,y,z);
                 }

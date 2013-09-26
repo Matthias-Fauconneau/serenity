@@ -118,6 +118,8 @@ generic struct xyzw {
     vector< ::xyz,T,3> xyw() const { return vector< ::xyz,T,3>(x,y,w); }
     vector< ::xy,T,2> xy()const{ return vector< ::xy,T,2>(x,y); }
 };
+/// Integer x,y,z,w vector (16bit)
+typedef vector<xyzw,uint16,4> short4;
 /// Floating-point x,y,z,w vector
 typedef vector<xyzw,float,4> vec4;
 

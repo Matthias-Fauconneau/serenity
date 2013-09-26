@@ -45,7 +45,7 @@ struct Data {
     ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
 
     ::buffer<byte> buffer;
-    uint index=0;
+    uint64 index=0;
 };
 
 /// Provides a convenient interface to parse binary inputs

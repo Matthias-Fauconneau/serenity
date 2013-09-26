@@ -24,7 +24,7 @@ array<Family> parseFamilies(const string& data) {
     while(s) {
         s.skip("("_); Family family (zOrder(parsePosition(s))); s.skip("):\n"_); s.skip();
         while(s && s.peek()!='(') { family << zOrder(parsePosition(s)); s.skip(); }
-        if(!family.size) continue; // Ignores single member families
+        //if(!family.size) continue; // Ignores single member families
         families << move(family);
     }
     return families;
