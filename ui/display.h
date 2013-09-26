@@ -43,7 +43,7 @@ inline void line(int2 p1, int2 p2, vec4 color=black) { line(vec2(p1),vec2(p2),co
 inline void line(int x1, int y1, int x2, int y2, vec4 color=black) { line(vec2(x1,y1),vec2(x2,y2),color); }
 
 /// Converts linear float in [0,1] to sRGB
-inline uint sRGB(float x) { extern uint8 sRGB_lookup[256]; return sRGB_lookup[ clip<int>(0, 0xFF*x, 0xFF) ]; }
+inline uint8 sRGB(float x) { extern uint8 sRGB_lookup[256]; return sRGB_lookup[ clip<int>(0, 0xFF*x, 0xFF) ]; }
 
 /// Converts hue, saturation, value to linear RGB
 vec3 HSVtoRGB(float h, float s, float v);

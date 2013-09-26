@@ -99,3 +99,5 @@ rock/slice.h
 rock/diff.cc
 rock/cluster.cc
 rock/link.cc
+rock/pore.cc
+rock/color-rasterize.cc

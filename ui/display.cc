@@ -96,7 +96,10 @@ void line(vec2 p1, vec2 p2, vec4 color) {
 }
 
 vec3 HSVtoRGB(float h, float s, float v) {
-    float H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
+    float H = h*6; //h C [0,1]
+    //float H = h/PI*3; //h C [0,2PI]
+    float C = v*s;
+    float X = C*(1-abs(mod(H,2)-1));
     int i=H;
     if(i==0) return vec3(C,X,0);
     if(i==1) return vec3(X,C,0);
