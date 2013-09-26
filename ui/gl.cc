@@ -9,18 +9,10 @@
 
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
-void glBlend(bool enable, bool add) {
-    if(enable) {
-        glEnable(GL_BLEND);
-        if(add) {
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // alpha blend
-        } else {
-            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
-            glBlendFunc(GL_ONE,GL_ONE); // substractive blend
-        }
-    } else glDisable(GL_BLEND);
-}
+void glAlphaTest(bool enable) { if(enable) glEnable(GL_ALPHA_TEST); else glDisable(GL_ALPHA_TEST); }
+void glBlendAdd() { glBlendFunc(GL_ONE,GL_ONE); glEnable(GL_BLEND); }
+void glBlendAlpha() { glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE); glEnable(GL_BLEND); }
+void glBlendNone() { glDisable(GL_BLEND); }
 
 /// Shader
 
@@ -95,10 +87,11 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
                 string line = s.slice(lineStart, s.index-lineStart);
                 if(trim(line)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain) << line;
             }
-            global << replace(stageGlobal,"$",str(i-1));
-            main << replace(stageMain,"$",str(i-1));
+            global << replace(stageGlobal,"$"_,str(i-1));
+            main << replace(stageMain,"$"_,str(i-1));
         }
         String glsl = "#version 130\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
+        this->source = copy(glsl);
         uint shader = glCreateShader(type);
         const char* data = glsl.data; int size = glsl.size;
         glShaderSource(shader, 1, &data,&size);
@@ -122,7 +115,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
         glGetProgramInfoLog(id, length-1, 0, buffer.begin());
         error(stages, "Program failed\n", buffer);
     }
-    for(string tags: stages) for(string& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag);
+    for(string tags: stages) for(string& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag, tags, stages);
 }
 void GLShader::bind() { glUseProgram(id); }
 void GLShader::bindSamplers(const ref<string> &textures) { for(int i: range(textures.size)) { GLUniform tex = operator[](textures[i]); if(tex) tex = i; } }
@@ -272,9 +265,9 @@ GLTexture::GLTexture(int width, int height, uint format, const void* data) : wid
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     if((format&3)==sRGB8)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8*/GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     if((format&3)==sRGBA)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8_ALPHA8*/GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     if((format&3)==Depth24)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
     if((format&3)==RGB16F)

@@ -1,6 +1,7 @@
 #pragma once
 #include "widget.h"
 #include "gl.h"
+#include "function.h"
 struct Scene;
 struct Object;
 
@@ -16,8 +17,10 @@ struct View : Widget {
     enum Sort { FrontToBack=0, BackToFront=1 };
     void draw(map<GLShader*,array<Object>>& objects,Sort sort=FrontToBack);
 
-    Scene& scene;
+    signal<> contentChanged;
 
+    Scene& scene;
+    Object* selected=0;
     //GLTexture depthBuffer,albedoBuffer,normalBuffer,refractionBuffer,refractionDepthBuffer,reflectionBuffer,lightBuffer,finalBuffer;
     //GLFrameBuffer surfaceRender,refractionSurfaceRender,refractionRender,reflectionRender,lightRender,finalRender;
 
@@ -26,8 +29,7 @@ struct View : Widget {
 
     vec3 position;
     vec3 velocity;
-    vec3 momentum;
-    float speed=2;
+    float sprint=2;
     int walk=0, strafe=0, jump=0;
     float yaw = 0, pitch=PI/2;
     int2 dragStart; vec2 deltaStart;

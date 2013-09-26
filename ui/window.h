@@ -117,6 +117,8 @@ struct Window : Socket, Poll {
     Widget* focus=0;
     /// Current widget that has the drag focus
     Widget* drag=0;
+    /// Current widget that gets keyboard events reported without modifiers (when in focus)
+    Widget* directInput=0;
 
     /// Current cursor
     Cursor cursor = Cursor::Arrow;

@@ -8,7 +8,10 @@
 void glFramebufferSRGB(bool enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
-void glBlend(bool enable, bool add=true);
+void glAlphaTest(bool enable);
+void glBlendAdd();
+void glBlendAlpha();
+void glBlendNone();
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
@@ -40,6 +43,7 @@ struct GLShader {
     map<String, int> attribLocations;
     map<String, int> uniformLocations;
     array<String> sampler2D; // names of declared sampler2D
+    String source;
 };
 
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };

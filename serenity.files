@@ -93,3 +93,5 @@ et/scene.h
 et/scene.cc
 et/view.h
 et/view.cc
+io/tga.cc
+io/jpeg.cc

@@ -16,7 +16,7 @@ void Scene::parseMaterialFile(string path) {
         string name = s.identifier("/_"_);
         if(!name) error("Unexpected outside shader definition", s.line(), "in", path, s.slice(0,s.index));
         Shader& shader = shaders[name]; /*May already exist*/ shader.name=String(name); shader.clear(); shader.properties.clear(); shader.program=0;
-        shader.file=path; shader.firstLine=line;
+        shader.file=String(path); shader.firstLine=line; uint shaderFirstLineIndex = s.index;
         int nest=0,comment=0; Texture* current=0; bool alphaBlend=false;
         while(s) {
             s.skip();
@@ -50,7 +50,7 @@ void Scene::parseMaterialFile(string path) {
                         Texture map(args[0],"tangent");
                         if(args[0]=="displacemap") {
                             map.path=args[1];
-                            map.type+=" displace cone";
+                            map.type<<" displace cone";
                             if(args[2]=="invertColor") {
                                 map.heightMap=args[3];
                             } else {
@@ -60,14 +60,14 @@ void Scene::parseMaterialFile(string path) {
                         } else if(args[0]=="addnormals") {
                             map.path=args[1];
                             if(args[2]=="heightMap") {
-                                map.type+=" displace cone";
+                                map.type<<" displace cone";
                                 map.heightMap=args[3];
                             }
                         } else {
                             if(args[0]=="_flat") { warning("normalMap _flat is a noop"); continue; }
                             if(args.value(1)=="heightMap") {
                                 map.path=""; //TODO: compute normal from height
-                                map.type+=" displace cone";
+                                map.type<<" displace cone";
                                 map.heightMap=args[2];
                             }
                         }
@@ -120,13 +120,14 @@ void Scene::parseMaterialFile(string path) {
                         current->alpha=true; current->type<<" alphaBlend"_; continue;
                     }
                 }
-                current->type+=" sfactor_"_+toLower(sfactor)+" dfactor_"_+toLower(dfactor);
+                current->type << " sfactor_"_+toLower(sfactor)+" dfactor_"_+toLower(dfactor);
             }
             else error("Unknown key",key, args);
         }
         //if(!shader) error("Empty shader",name, s.slice(0,s.index)); //Happens on fog shader
         if(shader.size>8) error("Too many textures for shader",name,"in",path);
         shader.lastLine=line;
+        shader.source=String(s.slice(shaderFirstLineIndex,s.index-shaderFirstLineIndex));
     }
 }
 
@@ -154,22 +155,22 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
     }
 
     for(pair<int, Surface> surface: surfaces) {
-        string name = strz(bsp.shaders()[surface.key].name);
+        string name = str(bsp.shaders()[surface.key].name);
         unique<Shader>& shader = shaders[name];
         //if(name.contains(QRegExp("ocean")/*|water|icelake*/)){shader.name=name; model<<Object(surfaces[i],shader); continue; }
-        /*if(shader.properties.contains("skyparms")) { /// remove sky surfaces, parse sky params
-                QString q3map_sun = shader.properties.value("q3map_sun");
-                if(!q3map_sun.isEmpty()) {
-                    if(!sky) sky = new Sky;
-                    vec3 angles = vec3(q3map_sun.section(" ",4))*PI/180;
-                    sky.sunDirection = vec3(cos(angles.x)*cos(angles.y),sin(angles.x)*cos(angles.y),sin(angles.y));
-                    sky.sunIntensity=q3map_sun.section(" ",3,3).toFloat()/100;
-                    Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
-                    sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
-                }
-                continue;
+        if(shader->properties.contains("skyparms"_)) { /// remove sky surfaces, parse sky params
+            /*QString q3map_sun = shader.properties.value("q3map_sun");
+            if(!q3map_sun.isEmpty()) {
+                if(!sky) sky = new Sky;
+                vec3 angles = vec3(q3map_sun.section(" ",4))*PI/180;
+                sky.sunDirection = vec3(cos(angles.x)*cos(angles.y),sin(angles.x)*cos(angles.y),sin(angles.y));
+                sky.sunIntensity=q3map_sun.section(" ",3,3).toFloat()/100;
+                Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
+                sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
             }*/
-        if(!shader) { shader->name=String(name); shader->append(Texture(name)); }
+            continue;
+        }
+        if(!shader->name) { shader->name=String(name); shader->append(Texture(name)); }
         surface.value.shader = shader.pointer;
     }
     return move(surfaces.values);
@@ -194,37 +195,30 @@ array<Surface> Scene::importMD3(string modelPath) {
                     vec3(cos(longitude)*sin(latitude),sin(longitude)*sin(latitude),cos(latitude)) );
         }
         Surface target;
-        for(const md3Triangle& face: surface.triangles()) target.addTriangle(vertices, face[0], face[1], face[2] );
+        for(const md3Triangle& face: surface.triangles()) target.addTriangle(vertices, face[2], face[1], face[0] );
 
-        string shaderName;
+        String name = String(str(surface.shaders().first().name));
         if(surface.shaders().size!=1) error("Multiple shader unsupported");
-        for(const md3Shader& shader : surface.shaders()) {
-            string name = strz(shader.name); //if(name.contains('.')) name=name.section('.',0,-2);
-            String path = name.contains('/') ? String(name) : section(modelPath,'/',0,-2)+"/"_+name;
-            string skin = name; //name.section("[",2).remove(']');
-            for(string path : search(section(modelPath,'/',0,-2),".skin"_)) {
-                TextData s = readFile(path,data);
-                while(s) {
-                    array<string> entry = split(trim(s.line()),',');
-                    if(entry.size>=2 && entry[0]==skin) {
-                        if(entry[1].contains('.')) entry[1]=section(entry[1],'.',0,-2);
-                        shaderName = entry[1];
-                        goto found; //break 2;
-                    }
+        for(string path : search(section(modelPath,'/',0,-2)+"/"_,".skin"_)) {
+            TextData s = readFile(path,data);
+            while(s) {
+                array<string> entry = split(trim(s.line()),',');
+                if(entry.size>=2 && entry[0]==str(surface.name)) {
+                    if(entry[1].contains('.')) entry[1]=section(entry[1],'.',0,-2);
+                    name = String(entry[1]);
+                    break;
                 }
             }
-found:
-            if(shaders.contains(shaderName)) target.shader = shaders.at(shaderName).pointer;
-            else { Shader* shader = shaders[copy(path)].pointer; if(!shader) { shader->name=copy(path); shader->append(Texture(path)); } target.shader=shader; }
-            break;
         }
+        if(shaders.contains(name)) target.shader = shaders.at(name).pointer;
+        else { Shader* shader = shaders[copy(name)].pointer; if(!shader->name) { shader->name=copy(name); shader->append(Texture(name)); } target.shader=shader; }
         surfaces << move(target);
     }
     return surfaces;
 }
 
 Scene::Scene(string file, const Folder& data) {
-    ::data = Folder("."_,data);
+    ::data = Folder("."_, data);
     /// Parse shader scripts
     array<String> materials = search("materials/"_,".mtr"_);
     if(!materials) materials = search("scripts/"_,".shader"_);
@@ -255,7 +249,7 @@ Scene::Scene(string file, const Folder& data) {
 
     /// BSP Vertices
     buffer<Vertex> vertices (bsp.vertices().size);
-    for(uint i: range(bsp.vertices().size)) { const ibspVertex& v = bsp.vertices()[i]; vertices[i] = Vertex(v.position, v.texture, v.normal, v.color[3]); }
+    for(uint i: range(bsp.vertices().size)) { const ibspVertex& v = bsp.vertices()[i]; vertices[i] = Vertex(v.position, vec2(v.texture.x,1-v.texture.y), v.normal, v.color[3]/255.f); }
 
     /// BSP Faces
     for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)]<< importBSP(bsp, vertices, leaf.firstFace, leaf.numFaces, true);
@@ -300,14 +294,16 @@ Scene::Scene(string file, const Folder& data) {
                         water->z=max(water->z,(transform*object.surface->bbMax).z);
                         continue;
                     }*/
-                object.surface.shader->bind(); // Forces shader compilation for correct split
-                const Shader* shader = object.surface.shader;
-                GLShader* id = shader->program;
-                if(shader->name=="textures/common/caulk"_) shadowOnly[id] << object;
-                else if(shader->blendAdd) blendAdd[id] << object;
-                else if(shader->blendAlpha) blendAlpha[id] << object;
-                else if(shader->alphaTest) alphaTest[id] << object;
-                else opaque[id] << object;
+                Shader* shader = object.surface.shader;
+                if(!shader || shader->name=="textures/common/caulk"_) shadowOnly << object;
+                else {
+                    shader->bind(); // Forces shader compilation for correct split
+                    GLShader* id = shader->program;
+                    /**/ if(shader->blendAdd) blendAdd[id] << object;
+                    else if(shader->blendAlpha) blendAlpha[id] << object;
+                    else if(shader->alphaTest) alphaTest[id] << object;
+                    else opaque[id] << object;
+                }
             }
         }
         if(e.at("classname"_)=="light"_) {
@@ -319,6 +315,12 @@ Scene::Scene(string file, const Folder& data) {
                             e.value("noshadows"_)!="1"_);
         }
     }
+    // WARNING: Object arrays shall not be reallocated after taking these pointers
+    //for(array<Object>& a: opaque.values+alphaTest.values+blendAdd.values+blendAlpha.values/*except shadowOnly*/) for(Object& o: a) objects << &o;
+    for(array<Object>& a: opaque.values) for(Object& o: a) objects << &o;
+    for(array<Object>& a: alphaTest.values) for(Object& o: a) objects << &o;
+    for(array<Object>& a: blendAdd.values) for(Object& o: a) objects << &o;
+    for(array<Object>& a: blendAlpha.values) for(Object& o: a) objects << &o;
 }
 
 vec4 Scene::defaultPosition() const {

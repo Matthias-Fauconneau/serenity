@@ -20,6 +20,8 @@ struct Scene {
     map<String,Entity> targets;
     map<String,unique<Shader>> shaders; // Referenced by Surfaces
     map<String, array<Surface>> models;
-    map<GLShader*,array<Object>> opaque, alphaTest, blendAdd, blendAlpha, shadowOnly; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
+    array<Object> shadowOnly;
+    map<GLShader*,array<Object>> opaque, alphaTest, blendAdd, blendAlpha; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
+    array<Object*> objects; // For hit tests
     array<Light> lights;
 };

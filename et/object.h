@@ -20,7 +20,7 @@ struct Surface {
     ///
     void draw(GLShader& program, bool withTexcoord, bool withNormal, bool withAlpha, bool withTangent);
     ///
-    //bool raycast(vec3 origin, vec3 direction, float& z);
+    bool raycast(vec3 origin, vec3 direction, float& z);
 
     vec3 bbMin,bbMax;
     map<int,int> indexMap;

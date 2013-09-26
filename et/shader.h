@@ -16,18 +16,18 @@ struct Texture {
     vec3 rgbScale {1,1,1};
     //string heightMap;
     //bool inverted = true;
-
-    //static map<string,GLTexture> textures;
 };
+inline String str(const Texture& o) { return str(o.path, o.type); }
 
 struct Shader : array<Texture> {
-    Shader(string type="transform surface"_): name(type), type(type) {}
+    Shader(string type="transform surface"_): type(type) {}
     GLShader* bind();
 
     String name;
     String type;
     GLShader* program = 0;
     bool polygonOffset=false, alphaTest=false, blendAdd=false, blendAlpha=false, tangentSpace=false, vertexBlend=false;
-    string file; int firstLine=0, lastLine=0;
+    String file; int firstLine=0, lastLine=0; String source;
     map<string,String> properties;
 };
+inline String str(const Shader& o) { return str(o.name,o.type,(ref<Texture>)o); }

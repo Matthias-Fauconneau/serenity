@@ -306,7 +306,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             drag=0;
             if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
         } else if(type==KeyPress) {
-            Key key = KeySym(e.key, e.state);
+            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
             if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); // Normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
@@ -314,7 +314,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             }
         }
         else if(type==KeyRelease) {
-            Key key = KeySym(e.key, e.state);
+            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
             if(focus && focus->keyRelease(key, (Modifiers)e.state)) render();
         }
         else if(type==EnterNotify || type==LeaveNotify) {
@@ -391,7 +391,7 @@ void Window::setGeometry(int2 position, int2 size) {
 Key Window::KeySym(uint8 code, uint8 state) {
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
     array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-    if(!keysyms) return (Key)0;
+    if(!keysyms) error(code,state); //return (Key)0;
     if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
     return (Key)keysyms[state&1 && keysyms.size>=2];
 }

@@ -12,12 +12,31 @@ View::View(Scene &scene) : scene(scene) {
 
 void View::render(int2, int2 size) {
     int w = size.x, h = size.y;
+
+    // Updates view
+    view=mat4(); view.rotateX(-pitch); view.rotateZ(-yaw); // World to view coordinates transform (i.e rotates world in the reverse direction)
+    // Assumes constant frame rate (60fps)
+    velocity += view.inverse()*vec3(strafe*sprint,0,-walk*sprint)+vec3(0,0,jump*sprint);
+    velocity *= 31.0/32; // Velocity damping (friction)
+    position += velocity;
+    view.translate( -position );
+    projection=mat4(); projection.perspective(PI/4, w, h, 1, 32768); inverseProjection=projection.inverse();
+    // Computes view frustum planes
+    mat4 m = projection*view;
+    planes[0] = vec4( m(3,0) + m(0,0), m(3,1) + m(0,1), m(3,2) + m(0,2), m(3,3) + m(0,3) );
+    planes[1] = vec4( m(3,0) - m(0,0), m(3,1) - m(0,1), m(3,2) - m(0,2), m(3,3) - m(0,3) );
+    planes[2] = vec4( m(3,0) - m(1,0), m(3,1) - m(1,1), m(3,2) - m(1,2), m(3,3) - m(1,3) );
+    planes[3] = vec4( m(3,0) + m(1,0), m(3,1) + m(1,1), m(3,2) + m(1,2), m(3,3) + m(1,3) );
+    planes[4] = vec4( m(2,0), m(2,1), m(2,2), m(2,3) );
+    planes[5] = vec4( m(3,0) - m(2,0), m(3,1) - m(2,1), m(3,2) - m(2,2), m(3,3) - m(2,3) );
+    for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
+
 #if 0
     if(lightRender.depth.width!=w||lightRender.depth.height!=h) { //#OPTI: alias/reuse buffers when possible
         depthBuffer.allocate(w,h,Depth);
         albedoBuffer.allocate(w,h);
         normalBuffer.allocate(w,h);
-        if(scene->water) {
+        if(scene.water) {
             refractionDepthBuffer.allocate(w,h,Depth);
             refractionBuffer.allocate(w,h);
             reflectionBuffer.allocate(w,h,Float);
@@ -32,17 +51,16 @@ void View::render(int2, int2 size) {
         finalRender.attach(depthBuffer,finalBuffer); finalRender.depthWrite=false;
     }
 #endif
-    projection=mat4(); projection.perspective(PI/4, w, h, 1, 16384); inverseProjection=projection.inverse();
-    view=mat4(); view.rotateX(-pitch); view.rotateZ(-yaw); view.translate( -position );
-    /*if(scene->water&&position.z>scene->water->z) {
-        scene->water->render(this);
-        clipPlane=vec4(0,0,1,-scene->water->z);
+
+    /*if(scene.water&&position.z>scene.water->z) {
+        scene.water->render(this);
+        clipPlane=vec4(0,0,1,-scene.water->z);
     } else*/ clipPlane=vec4(0,0,0,0);
     render(/*surfaceRender, lightRender, true*/);
-    /*if(scene->water) {
-        if( position.z>scene->water->z ) {
+    /*if(scene.water) {
+        if( position.z>scene.water->z ) {
             GLTexture::bindSamplers(refractionDepthBuffer,refractionBuffer,reflectionBuffer);
-            scene->water->compose(vec2(1.0/w,1.0/h),projection,view,scene->sky?scene->sky->fogOpacity:8192);
+            scene.water->compose(vec2(1.0/w,1.0/h),projection,view,scene.sky?scene.sky->fogOpacity:8192);
         } else {
             static Shader* underwater; if(!underwater) underwater=new Shader("screen deferred position underwater");
             GLShader& program = *underwater->bind();
@@ -50,7 +68,7 @@ void View::render(int2, int2 size) {
             float nearPlane = (projection.inverse()*vec3(0,0,-1)).z, farPlane = (projection.inverse()*vec3(0,0,1)).z;
             program["A"]= - farPlane / (farPlane - nearPlane); program["B"]= farPlane * nearPlane / (farPlane - nearPlane);
             program["inverseProjectionMatrix"]= projection.inverse();
-            program["waterPlane"] = view.inverse().transpose()*vec4(0,0,-1,scene->water->z);
+            program["waterPlane"] = view.inverse().transpose()*vec4(0,0,-1,scene.water->z);
             DepthTest=false; glBlendAlpha(); renderQuad(); glBlendNone();
         }
     }*/
@@ -69,25 +87,17 @@ void View::render(int2, int2 size) {
         program["deviceScale"]=vec2(1.0/w,1.0/h);
         DepthTest=false; renderQuad();
     }*/
+
+    if( norm(velocity) > 0.1 ) contentChanged(); // Keeps rendering at 60fps
 }
 
 void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool withShadow, bool reverseWinding*/) {
-    // Computes view frustum planes
-    mat4 m = projection*view;
-    planes[0] = vec4( m(3,0) + m(0,0), m(3,1) + m(0,1), m(3,2) + m(0,2), m(3,3) + m(0,3) );
-    planes[1] = vec4( m(3,0) - m(0,0), m(3,1) - m(0,1), m(3,2) - m(0,2), m(3,3) - m(0,3) );
-    planes[2] = vec4( m(3,0) - m(1,0), m(3,1) - m(1,1), m(3,2) - m(1,2), m(3,3) - m(1,3) );
-    planes[3] = vec4( m(3,0) + m(1,0), m(3,1) + m(1,1), m(3,2) + m(1,2), m(3,3) + m(1,3) );
-    planes[4] = vec4( m(2,0), m(2,1), m(2,2), m(2,3) );
-    planes[5] = vec4( m(3,0) - m(2,0), m(3,1) - m(2,1), m(3,2) - m(2,2), m(3,3) - m(2,3) );
-    for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
-
     // Draws opaque and alpha tested objects into G-Buffer
 #if 1
     //deferRender.bind(true);
     /*if(clipPlane.x||clipPlane.y||clipPlane.z) ClipPlane=true;*/ glDepthTest(true); //if(reverseWinding) glReverseWinding();
-    if(scene.opaque) { glCullFace(true); draw( scene.opaque ); }
-    //if(scene.alphaTest) { glCullFace(false); /*AlphaTest=true;*/ draw( scene.alphaTest ); glCullFace(true); /*AlphaTest=false;*/ }
+    if(scene.opaque) { glCullFace(true); draw(scene.opaque); }
+    if(scene.alphaTest) { glCullFace(false); glAlphaTest(true); glBlendAlpha(); draw(scene.alphaTest); glCullFace(true); glBlendNone(); }
 #endif
     // Draws lights using G-Buffer
 #if 0
@@ -130,34 +140,34 @@ void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool
 
     //DepthBoundsTest=false;
     if(scene.sky) scene.sky->render(projection,view,scene,deferRender,targetRender,withShadow); //TODO: cull sky indoor
-
+#endif
     // Forward render transparent objects
-    /*if(clipPlane.x||clipPlane.y||clipPlane.z) ClipPlane=true;*/ DepthTest=true;  //TODO: forward lighting
-    if(reverseWinding) glReverseWinding();
-    glBlendAdd();
-    if(scene.blendAdd.count()) draw(scene.blendAdd);
-    if(scene.blendAlpha.count()) {
+    /*if(clipPlane.x||clipPlane.y||clipPlane.z) ClipPlane=true;*/ glDepthTest(true);  //TODO: forward lighting
+    //if(reverseWinding) glReverseWinding();
+    if(scene.blendAdd) {
+        glBlendAdd();
+        draw(scene.blendAdd);
+    }
+    if(scene.blendAlpha) {
       /*PolygonOffsetFill=true; glPolygonOffset(-2,-1);*/ glBlendAlpha();
       draw(scene.blendAlpha,BackToFront);
       /*PolygonOffsetFill=false;*/
     }
-    if(reverseWinding) glNormalWinding();
-    /*ClipPlane=false;*/ DepthTest=false; glBlendNone();
-#endif
+    //if(reverseWinding) glNormalWinding();
+    /*ClipPlane=false;*/ glDepthTest(false); glBlendNone();
 }
 
 void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
     for(pair<GLShader*, array<Object>> e: objects) {
-        //GLShader program("vertex {\n attribute vec4 position;\n uniform mat4 modelViewProjectionMatrix;\n gl_Position = modelViewProjectionMatrix * position;\n }\n fragment {\n out vec4 color;\n color = vec4(1,1,1,1);\n }\n"_);
         GLShader& program = *e.key;
         program.bind();
         //shader["fogOpacity"] = /*scene.sky ? scene.sky->fogOpacity :*/ 8192;
         //shader["clipPlane"] = clipPlane;
-        program.bindFragments({"albedo"_,"normal"_});
+        program.bindFragments({"albedo"_}); //program.bindFragments({"albedo"_,"normal"_});
         program.bindSamplers({"tex0"_,"tex1"_,"tex2"_,"tex3"_});
 
         array<Object>& objects = e.value;
-        mat4 currentTransform=mat4(0); vec3 currentColor; vec3 tcScales[4],rgbScales[4]; // Save current state to minimize state changes (TODO: UBOs)
+        mat4 currentTransform=mat4(0); vec3 currentColor=0; vec3 tcScales[4]={0,0,0,0}, rgbScales[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
 #ifdef VIEW_FRUSTUM_CULLING
         QMap<float,Object*> depthSort; //useless without proper partitionning
         for(int n=0;n<objects.count();n++) { Object* object = objects[n];
@@ -192,7 +202,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 string tcNames[] = {"tcScale0"_,"tcScale1"_,"tcScale2"_,"tcScale3"_};
                 if(tcScales[i]!=tex.tcScale) { program[tcNames[i]]=tex.tcScale; tcScales[i]=tex.tcScale; }
                 string rgbNames[] = {"rgbScale0"_,"rgbScale1"_,"rgbScale2"_,"rgbScale3"_};
-                if(rgbScales[i]!=tex.rgbScale) { program[rgbNames[i]]=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
+                if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program[rgbNames[i]]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
                 tex.texture->bind(i);
             }
             object.surface.draw(program, true, true, shader.vertexBlend, shader.tangentSpace);
@@ -212,54 +222,61 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
 }
 
 bool View::keyPress(Key key, Modifiers) {
-    if(key=='w') walk++;
-    if(key=='a') strafe--;
-    if(key=='s') walk--;
-    if(key=='d') strafe++;
-    //if(key==Control) jump--; //modifiers&Control
-    if(key==' ') jump++;
-    //if(key==Shift) speed=8; //modifiers&Shift
-    if(key=='q') velocity=vec3(0,0,0);
-    //if(key=='x') enableFXAA=!enableFXAA;
-    return true;
+    /**/ if(key=='w') walk++;
+    else if(key=='a') strafe--;
+    else if(key=='s') walk--;
+    else if(key=='d') strafe++;
+    else if(key==ControlKey) jump--;
+    else if(key==' ') jump++;
+    else if(key==ShiftKey) sprint = 8;
+    else if(key=='q') velocity=vec3(0,0,0);
+    else return false;
+    return true; // Starts rendering (if view was still)
 }
 bool View::keyRelease(Key key, Modifiers) {
     if(key=='w') walk--;
     if(key=='a') strafe++;
     if(key=='s') walk++;
     if(key=='d') strafe--;
-    //if(key==Control) jump++;
+    if(key==ControlKey) jump++;
     if(key==' ') jump--;
-    //if(key==Shift) speed=2;
+    if(key==ShiftKey) sprint = 2;
     return false;
 }
 bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+    setFocus(this);
     // TODO: Wheel -> velocity=vec3(0,0,e->delta()/60);
     if(event==Press && button==LeftButton) { dragStart=cursor; deltaStart=vec2(yaw, pitch); }
     if(event==Release && button==LeftButton && dragStart==cursor) {
-        /*mat4 transform; transform.perspective(PI/4, (float)width()/height(), 1, 16384);
-        transform.rotateX(-pitch); transform.rotateZ(-yaw);
-        vec3 direction = transform.inverse() * normalize(vec3(2.0*e->x()/width()-1,1-2.0*e->y()/height(),1));
-        float minZ=65536; int hit=-1;
-        for(int i=0;i<scene->objects.count();i++) { if(scene->objects[i].surface.shader->name.contains("caulk")) continue;
-            mat4 toObject = scene->objects[i].transform.inverse();
-            if(scene->objects[i].surface->raycast(toObject*position,toObject.normalMatrix()*direction,minZ)) hit=i;
+        mat4 transform; transform.perspective(PI/4, size.x, size.y, 1, 32768);
+        transform.rotateX(-pitch); transform.rotateZ(-yaw); //transform.translate(-position);*/
+        /*mat4 view=mat4(); view.rotateX(-pitch); view.rotateZ(-yaw); view.translate( -position );
+        mat4 projection=mat4(); projection.perspective(PI/4, size.x, size.y, 1, 32768);
+        mat4 transform = projection*view;*/
+
+        vec3 direction = transform.inverse() * normalize(vec3(2.0*cursor.x/size.x-1,1-2.0*cursor.y/size.y,1));
+        float minZ=65536; Object* hit=0;
+        for(Object* object: scene.objects) {
+            mat4 toObject = object->transform.inverse();
+            if(object->surface.raycast(toObject*position/*vec3(0,0,0)*/,toObject.normalMatrix()*direction,minZ)) hit=object;
         }
-        static Object* selected;
-        if(selected) selected->uniformColor=vec3(1,1,1);
-        if(hit>=0) { selected=&scene->objects[hit]; selected->uniformColor=vec3(1,0.5,0.5); }*/
+        if(selected) selected->uniformColor=vec3(1,1,1); // Deselect previous
+        if(hit) {
+            selected=hit;
+            selected->uniformColor=vec3(1,0.5,0.5);
+            log(selected->surface.shader->name);
+            //log(selected->surface.shader->file, selected->surface.shader->firstLine, selected->surface.shader->lastLine);
+            /*log(*selected->surface.shader);
+            log(selected->surface.shader->source);*/
+            log(selected->surface.shader->program->source);
+        }
+        return true;
     }
     if(event==Motion && button==LeftButton) {
         setDrag(this);
-        vec2 delta = deltaStart + float(PI/size.x)*vec2(cursor-dragStart);
+        vec2 delta = deltaStart - float(PI/size.x)*vec2(cursor-dragStart);
         yaw = delta.x; pitch = clip<float>(0, delta.y, PI);
         return true;
     }
     return false;
 }
-/* TODO: 60fps
-    mat4 view; view.rotateZ(yaw); view.rotateX(pitch);
-    velocity += view*vec3(strafe*speed,0,-walk*speed)+vec3(0,0,jump*speed);
-    velocity *= 31.0/32; position += velocity;
-    if( length(velocity) > 0.1 ) update(); else timer.stop();
-*/

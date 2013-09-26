@@ -1,13 +1,23 @@
 #include "shader.h"
+//#include "jpeg.h"
+//#include "tga.h"
 
-Folder data = ""_;
+Folder data __attribute((init_priority(1000))) = ""_;
 map<String,unique<GLTexture>> textures;
 FILE(shader)
 
 void Texture::upload() {
+    if(endsWith(path,".tga"_)) path=String(section(path,'.',0,-2));
     if(!textures.contains(path)) {
         if(find(type,"albedo"_)) {
-            Image image = decodeImage(readFile(path));
+            Map file;
+            if(existsFile(path,data)) file=Map(path,data);
+            else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
+            else if(existsFile(path+".jpg"_,data)) file=Map(path+".jpg"_,data);
+            else if(existsFile(path+".tga"_,data)) file=Map(path+".tga"_,data);
+            assert(file, data.name()+"/"_+path);
+            Image image = decodeImage(file);
+            assert(image, path);
             if(image.alpha) {
                 byte4* data=image.data; int w=image.width; int h=image.height;
                 for(int y: range(h)) for(int x: range(w)) {
