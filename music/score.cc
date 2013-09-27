@@ -36,7 +36,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
         pass++;
         if(histogram) { //TODO: OCR
             map<int, int> sorted;
-            for(const_pair<int,int> sample: histogram) if(!sorted.contains(sample.value)) sorted.insertSorted(sample.value, sample.key); //insertion sort
+            for(const_pair<int,int> sample: (const map<int,int>&)histogram) if(!sorted.contains(sample.value)) sorted.insertSorted(sample.value, sample.key); //insertion sort
             quarter = sorted.values.last();
             if(sorted.values[sorted.values.size-3]==9) half = 9;
             else half = sorted.values[sorted.values.size-4];
@@ -266,7 +266,7 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
     staffs << (lastClef.y+110); //add a last split at the bottom of the last page
 
     /// Lengthens dotted notes
-    for(const_pair< int,array<vec2>> dots: this->dots) {
+    for(const_pair< int,array<vec2>> dots: (const map<int, array<vec2>>&)this->dots) {
         for(vec2 pos: dots.value) for(int x : notes.at(dots.key).keys) {
             if(x>pos.x-16) break;
             if(x>pos.x-48) for(int y : notes.at(dots.key).at(x).keys) if(-y>pos.y-16&&-y<pos.y+32) notes.at(dots.key).at(x).at(y).duration = notes.at(dots.key).at(x).at(y).duration*3/2;

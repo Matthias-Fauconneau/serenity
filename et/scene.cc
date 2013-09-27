@@ -139,6 +139,12 @@ array<String> Scene::search(const string& query, const string& type) {
     return files;
 }
 
+Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
+    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[16];
+    for(int i:range(16)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
+    return (Vertex)(*(Vertex*)V);
+}
+
 array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int firstFace, int numFaces, bool leaf) {
     map<int, Surface> surfaces;
     for(int f: range(firstFace,firstFace+numFaces)) {
@@ -151,7 +157,26 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
                         face.firstVertex+bsp.indices()[face.firstIndex+i+1],
                         face.firstVertex+bsp.indices()[face.firstIndex+i+0]);
             }
-        } else if(face.numIndices) error("Unsupported face.type",face.type,face.numIndices);
+        } else if(face.type==2) {
+            int w = face.size[0], h = face.size[1];
+            assert(w%2==1 && h%2==1 && w*h==face.numVertices && face.numIndices==0);
+            for(int y=0;y<h-2;y+=2) for(int x=0;x<w-2;x+=2) {
+                const int level=4;
+                ref<Vertex> control = vertices.slice(face.firstVertex+y*w+x,w*h);
+                static array<Vertex> interpolatedVertices; int firstIndex = interpolatedVertices.size; // HACK: Surface::addTriangle expects same array between calls
+                for(int j: range(level+1)) for(int k: range(level+1)) {
+                    float u = float(j)/float(level), v = float(k)/float(level);
+                    interpolatedVertices << bezier(bezier(control[0*w+0],control[0*w+1],control[0*w+2],u),
+                            bezier(control[1*w+0],control[1*w+1],control[1*w+2], u),
+                            bezier(control[2*w+0],control[2*w+1],control[2*w+2], u), v);
+                }
+                for(int j: range(level)) for(int k: range(level)) {
+                    int i = firstIndex + j*(level+1) + k;
+                    surface.addTriangle(interpolatedVertices, i+(level+1), i+1, i+0 );
+                    surface.addTriangle(interpolatedVertices, i+(level+1)+1, i+1, i+(level+1) );
+                }
+            }
+        } else error("Unsupported face.type",face.type,face.numIndices);
     }
 
     for(pair<int, Surface> surface: surfaces) {

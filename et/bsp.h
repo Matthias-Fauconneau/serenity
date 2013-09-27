@@ -30,7 +30,7 @@ struct bspFace {
     int effect;  // Index into lump 12 (Effects), or -1.
     int type;    // Face type. 1=polygon, 2=patch, 3=mesh, 4=billboard
     int firstVertex;  // Index of first vertex.
-    int numVertexes; // Number of vertices.
+    int numVertices; // Number of vertices.
     int firstIndex; // Index of first mesh index.
     int numIndices;  // Number of indices.
     int lightMapIndex; // Lightmap index.

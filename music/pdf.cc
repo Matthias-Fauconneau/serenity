@@ -548,7 +548,7 @@ void PDF::render(int2 position, int2 size) {
         i++;
     }
 
-    for(const_pair<vec2,String> text: annotations) {
+    for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
         int2 pos = position+int2(text.key*scale/normalizedScale);
         if(pos.y<=currentClip.min.y) continue;
         if(pos.y>=currentClip.max.y) continue; //break;

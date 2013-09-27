@@ -61,7 +61,7 @@ template<Type K, Type V> struct map {
         keys << key; values << value; return values.last();
     }
     template<Type KK> V& insertMulti(KK&& key, V&& value) { keys << forward<KK>(key); values << move(value); return values.last(); }
-    template<Type KK> V& insertMulti(KK&& key, const V& value) { keys << forward(key); values << value; return values.last(); }
+    template<Type KK> V& insertMulti(KK&& key, const V& value) { keys << forward<KK>(key); values << value; return values.last(); }
     template<Type KK> V& insertSorted(const KK& key, const V& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         return values.insertAt(keys.insertSorted(key),value);

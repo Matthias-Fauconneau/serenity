@@ -73,8 +73,8 @@ Sequencer::~Sequencer() {
 
     struct { char name[4]={'M','T','h','d'}; int32 size=big32(6); int16 format=big16(0);
         int16 trackCount=big16(1); int16 timeDivision=big16(500); } packed MThd;
-    write(raw(MThd));
+    record.write(raw(MThd));
     struct { char name[4]={'M','T','r','k'}; int32 size=0; } packed MTrk; MTrk.size=big32(track.size);
-    write(raw(MTrk));
-    write(track);
+    record.write(raw(MTrk));
+    record.write(track);
 }

@@ -1,6 +1,7 @@
 /// \file music.cc Keyboard (piano) practice application
 #include "thread.h"
 #include "file.h"
+#include "time.h"
 
 #include "sequencer.h"
 #include "sampler.h"
@@ -74,7 +75,7 @@ struct PDFScore : PDF {
     void render(int2 position, int2 size) override {
         PDF::render(position,size);
         if(annotations) for(vec2 pos: positions) fill(position+int2(scale*pos)-int2(2)+Rect(4),red);
-        if(positions) for(const_pair<int,vec4> highlight: colors) {
+        if(positions) for(const_pair<int,vec4> highlight: (const map<int,vec4>&)colors) {
             fill(position+int2(scale*positions[highlight.key])-int2(3)+Rect(6),green);
         }
     }
@@ -180,6 +181,7 @@ struct Music {
         window.show();
         audio.start();
         thread.spawn();
+        input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
     }
 
     /// Called by score to scroll PDF as needed when playing
