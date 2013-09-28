@@ -29,4 +29,5 @@ struct Scene {
     array<Object*> objects; // For hit tests
     vec3 gridMin, gridMax; GLTexture lightGrid[3]; // Light grid
     vec3 backgroundColor = vec3(77,80,91)/255.f; // FIXME: get from skyparms outer box texture
+    Shader* sky = 0;
 };

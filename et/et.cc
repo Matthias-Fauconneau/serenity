@@ -3,7 +3,7 @@
 #include "view.h"
 #include "window.h"
 /*Ideas:
- - sky, (lightmap/lightgrid | sun+lights (etxmap), shadows (soft PCF)), water (reflection, refraction)
+ - sun shader, dynamic lighting (sun, lights (etxmap), shadows (soft PCF)), water (reflection, refraction)
  - procedural textures: +normal, specular, displacement (relaxed cone stepping, tesselation)
  - atmosphere: tonemapping, bloom, color grading, clouds, sun/moon/stars, dynamic water (waves, caustics), rain/snow, specular reflection
  - shadows: sample distribution shadow maps, exponential variance soft shadows (+multisampling)

@@ -343,7 +343,7 @@ void PDF::open(const string& data) {
                     OP2('B','T') Tm=Tlm=mat3x2();
                     OP2('c','s') ;//set fill colorspace
                     OP2('C','S') ;//set stroke colorspace
-                    OP2('c','m') Cm=mat3x2(f(0),f(1),f(4),f(2),f(3),f(5))*Cm; // m11, m12, m21, m22, dx, dy
+                    OP2('c','m') Cm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
                         blits<<Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)),{}};
@@ -378,7 +378,7 @@ void PDF::open(const string& data) {
                     OP2('T','f')
                             assert(fonts.contains(args[0].data), args[0].data);
                             font = fonts.contains(args[0].data)?&fonts.at(args[0].data):0; fontSize=f(1);
-                    OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(4),f(2),f(3),f(5)); // m11, m12, m21, m22, dx, dy
+                    OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); //intersect odd even clip
                 }

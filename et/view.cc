@@ -147,31 +147,15 @@ void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool
     // Forward render transparent objects
     /*if(clipPlane.x||clipPlane.y||clipPlane.z) ClipPlane=true;*/ glDepthTest(true);  //TODO: forward lighting
     //if(reverseWinding) glReverseWinding();
-    if(scene.blendAdd) {
-        glBlendAdd();
-        draw(scene.blendAdd);
-    }
+    if(scene.blendAdd) { glBlendAdd(); draw(scene.blendAdd); }
     if(scene.blendAlpha) {
-      /*PolygonOffsetFill=true; glPolygonOffset(-2,-1);*/ glBlendAlpha();
-      draw(scene.blendAlpha,BackToFront);
-      /*PolygonOffsetFill=false;*/
+      //PolygonOffsetFill=true; glPolygonOffset(-2,-1);
+        glBlendAlpha(); draw(scene.blendAlpha,BackToFront);
+      //PolygonOffsetFill=false;
     }
     //if(reverseWinding) glNormalWinding();
     /*ClipPlane=false;*/ glDepthTest(false); glBlendNone();
 }
-
-//#include "sky.h"
-extern struct shaderCommands_t {
-    uint indexes[10000];
-    vec4 xyz[10000];
-    vec2 texCoords0[10000];
-
-    uint numIndexes = 0;
-    uint numVertexes = 0;
-} tess;
-extern void drawSky(float cloudHeight);
-
-extern vec4 origin;
 
 void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
     for(pair<GLShader*, array<Object>> e: objects) {
@@ -182,7 +166,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         program.bindFragments({"albedo"_}); //program.bindFragments({"albedo"_,"normal"_});
 
         array<Object>& objects = e.value;
-        mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]; vec3 rgbScales[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
+        mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbScales[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
 #ifdef VIEW_FRUSTUM_CULLING
         QMap<float,Object*> depthSort; //useless without proper partitionning
         for(int n=0;n<objects.count();n++) { Object* object = objects[n];
@@ -203,6 +187,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             Shader& shader = *object.surface.shader;
             assert_(&shader);
 
+            if(shader.cloudHeight) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
             if(object.transform != currentTransform) {
                 program["modelViewProjectionMatrix"_] = projection*view*object.transform;
                 program["normalMatrix"_]= (view*object.transform).normalMatrix();
@@ -237,26 +222,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 }
             }
 
-            if(shader.cloudHeight) { // Convert sky surface to skybox
-                //FIXME: Hack into ET sources
-                assert_(tess.numIndexes<10000);
-                assert_(tess.numVertexes<10000);
-                tess.numIndexes = object.surface.indices.size;
-                tess.numVertexes = object.surface.vertices.size;
-                for(uint i: range(tess.numIndexes)) tess.indexes[i] = object.surface.indices[i];
-                for(uint i: range(tess.numVertexes)) tess.xyz[i] = vec4(object.surface.vertices[i].position, 1.f);
-                origin = vec4(position,1.f);
-                drawSky(shader.cloudHeight);
-                Surface surface; surface.shader = &shader; // Clear geometry
-                // Clouds layer (TODO: static (just project the right texture coordinates to the sky surfaces + alpha blend (modulate?))
-                buffer<Vertex> vertices (tess.numVertexes);
-                for(uint i: range(tess.numVertexes)) vertices[i] = Vertex(vec3(tess.xyz[i][0],tess.xyz[i][1],tess.xyz[i][2]),tess.texCoords0[i],0);
-                for(uint i=0; i<tess.numIndexes; i+=3) surface.addTriangle(vertices, tess.indexes[i+2], tess.indexes[i+1], tess.indexes[i]); // Reverse winding
-                glWireframe();
-                surface.draw(program, true, true, shader.vertexBlend, shader.tangentSpace);
-                glSolid();
-            } else continue;
-            //object.surface.draw(program, true, true, shader.vertexBlend, shader.tangentSpace);
+            object.surface.draw(program, true, true, shader.vertexBlend, shader.tangentSpace);
 
             /*if(object.uniformColor!=vec3(1,1,1)) { // Shows bounding box (for debugging)
                 CullFace=false;

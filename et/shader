@@ -288,7 +288,7 @@ forward {
   in vec3 vertexColor;
   albedo.rgb *= vertexColor; // Vertex lighting
   albedo.rgb=vec3(sRGB(albedo.r),sRGB(albedo.g),sRGB(albedo.b));
-  albedo.rgb=vec3(T,0);
+  //albedo.rgb=vec3(T,0);
  }
 }
 

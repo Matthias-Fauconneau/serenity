@@ -100,10 +100,12 @@ void Scene::parseMaterialFile(string path) {
             else if(key=="vertexColor"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; }
             else if(key=="alphaGen"_||key=="alphagen"_) { if(args[0]=="vertex"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; } }
             else if(key=="tcMod"_||key=="tcmod"_) {
-                /**/ if(args[0]=="scale"_ || args[0]=="Scale"_) current->tcMod = mat3x2(toDecimal(args[1]),toDecimal(args[2])) * current->tcMod;
+                /**/ if(args[0]=="scale"_ || args[0]=="Scale"_) {
+                    //current->tcMod = mat3x2(toDecimal(args[1]),0, 0,toDecimal(args[2]), 0,0) * current->tcMod;
+                }
                 else if(args[0]=="transform"_) {
                     array<double> m = apply(args.slice(1),toDecimal); // m00 m01 m10 m11 dx dy
-                    current->tcMod = mat3x2(m[0],m[1],m[4],m[2],m[3],m[5]) * current->tcMod;
+                    current->tcMod = mat3x2(m[0],m[1], m[2],m[3], m[4],m[5]) * current->tcMod;
                 }
                 else if(args[0]=="rotate"_) {/*TODO*/}
                 else if(args[0]=="scroll"_) {/*TODO*/}
@@ -198,7 +200,11 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
     map<ID, Surface> surfaces;
     for(int f: range(firstFace,firstFace+numFaces)) {
         const bspFace& face = bsp.faces()[leaf?bsp.leafFaces()[f]:f];
+        string name = str(bsp.shaders()[face.texture].name);
+        Shader& shader = shaders[name];
+        if(shader.cloudHeight) { if(sky) assert_(sky==&shader); else sky=&shader; continue; }
         Surface& surface = surfaces[ID{face.texture, face.lightMapIndex}]; // Ensures surfaces are split by textures/lightmaps changes
+        if(!surface.shader) surface.shader = &getShader(name, face.lightMapIndex);
         if(face.type==1||face.type==3) {
             for(int i=0;i<face.numIndices;i+=3) {
                 surface.addTriangle(vertices,
@@ -228,24 +234,6 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
         } else error("Unsupported face.type",face.type,face.numIndices);
     }
 
-    for(pair<ID, Surface> surface: surfaces) {
-        string name = str(bsp.shaders()[surface.key.texture].name);
-        //const Shader& shader = shaders[name];
-        //if(name.contains(QRegExp("ocean")/*|water|icelake*/)){shader.name=name; model<<Object(surfaces[i],shader); continue; }
-        /*if(shader.properties.contains("skyparms"_)) { // remove sky surfaces, parse sky params
-            QString q3map_sun = shader.properties.value("q3map_sun");
-            if(!q3map_sun.isEmpty()) {
-                if(!sky) sky = new Sky;
-                vec3 angles = vec3(q3map_sun.section(" ",4))*PI/180;
-                sky.sunDirection = vec3(cos(angles.x)*cos(angles.y),sin(angles.x)*cos(angles.y),sin(angles.y));
-                sky.sunIntensity=q3map_sun.section(" ",3,3).toFloat()/100;
-                Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
-                sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
-            }
-            continue;
-        }*/
-        surface.value.shader = &getShader(name, surface.key.lightmap);
-    }
     return move(surfaces.values);
 }
 
@@ -347,6 +335,80 @@ Scene::Scene(string file, const Folder& data) {
         models["*"_+str(i)]<< importBSP(bsp, vertices, model.firstFace, model.numFaces, false);
     }
 
+
+    if(sky) { /// Generates skybox model
+        array<Vertex> vertices;
+        Surface surface;
+        for(int i = 0; i < 5; i++) { //FIXME: implement Surface::addTriangle without index indirection
+            const int SKY_SUBDIVISIONS = 8;
+            float MIN_T = i==4 ? -(SKY_SUBDIVISIONS/2) : -1;
+            uint firstIndex = vertices.size;
+
+            for(int t = MIN_T + (SKY_SUBDIVISIONS/2); t <= SKY_SUBDIVISIONS; t++) { // Iterates through the subdivisions
+                for(int s = 0; s <= SKY_SUBDIVISIONS; s++) { // Compute vector from view origin to sky side integral point
+                    vec3 skyVec;
+                    float boxSize = 32768 / sqrt(3.); // zFar
+                    vec3 b(((s - (SKY_SUBDIVISIONS/2)) / ( float ) (SKY_SUBDIVISIONS/2)) * boxSize, ((t - (SKY_SUBDIVISIONS/2)) / ( float ) (SKY_SUBDIVISIONS/2)) * boxSize, boxSize);
+                    for(int j = 0 ; j < 3 ; j++) {
+                        static int st_to_vec[6][3] = { // 1 = s, 2 = t, 3 = cloud?
+                            { 3,  -1, 2 },
+                            { -3, 1,  2 },
+                            { 1,  3,  2 },
+                            { -1, -3, 2 },
+                            { -2, -1, 3 }, // 0 degrees yaw, look straight up
+                            { 2,  -1, -3}   // look straight down
+                        };
+                        int k = st_to_vec[i][j];
+                        if (k < 0) skyVec[j] = -b[-k - 1];
+                        else skyVec[j] = b[k - 1];
+                    }
+                    // Computes parametric value 'p' that intersects with cloud layer
+                    float radiusWorld = 4096;
+                    float p = (1.0f / (2 * sq(skyVec))) *
+                        (-2 * skyVec[2] * radiusWorld +
+                         2 * sqrt(sq(skyVec[2]) * sq(radiusWorld) +
+                                  2 * sq(skyVec[0]) * radiusWorld * sky->cloudHeight +
+                                  sq(skyVec[0]) * sq(sky->cloudHeight) +
+                                  2 * sq(skyVec[1]) * radiusWorld * sky->cloudHeight +
+                                  sq(skyVec[1]) * sq(sky->cloudHeight) +
+                                  2 * sq(skyVec[2]) * radiusWorld * sky->cloudHeight +
+                                  sq(skyVec[2]) * sq(sky->cloudHeight)));
+                    // Computes intersection point based on p
+                    vec3 v = p * skyVec;
+                    v.z += radiusWorld;
+                    v = normalize(v);
+                    float sRad = acos(v.x);
+                    float tRad = acos(v.y);
+                    vertices << Vertex(skyVec,vec2(sRad,tRad),0);
+                }
+            }
+
+            for(int t = 0; t < (SKY_SUBDIVISIONS/2) - MIN_T; t++) {
+                for(int s = 0; s < SKY_SUBDIVISIONS; s++) {
+                    surface.addTriangle(vertices, firstIndex + s + 1 + t * (SKY_SUBDIVISIONS+1), firstIndex + s + (t + 1) * (SKY_SUBDIVISIONS+1), firstIndex + s + t * (SKY_SUBDIVISIONS+1));
+                    surface.addTriangle(vertices, firstIndex + s + 1 + t * (SKY_SUBDIVISIONS+1), firstIndex + s + 1 + (t + 1) * (SKY_SUBDIVISIONS+1), firstIndex + s + (t + 1) * (SKY_SUBDIVISIONS+1));
+                }
+            }
+        }
+        surface.shader = sky;
+        array<Surface> model; model << move(surface);
+        models.insert(String("*skybox"_), move(model));
+        entities.insert(String("sky"_)).insert(String("model"_), String("*skybox"_));
+
+        /*if(shader.properties.contains("skyparms"_)) { // remove sky surfaces, parse sky params
+            QString q3map_sun = shader.properties.value("q3map_sun");
+            if(!q3map_sun.isEmpty()) {
+                if(!sky) sky = new Sky;
+                vec3 angles = vec3(q3map_sun.section(" ",4))*PI/180;
+                sky.sunDirection = vec3(cos(angles.x)*cos(angles.y),sin(angles.x)*cos(angles.y),sin(angles.y));
+                sky.sunIntensity=q3map_sun.section(" ",3,3).toFloat()/100;
+                Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
+                sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
+            }
+            continue;
+        }*/
+    }
+
     /// Converts Entities to Objects
     for(const Entity& e: entities.values) {
         //if(e.contains("target")) transform.translate(vec3(targets[e["target"]]["origin"]));
@@ -396,6 +458,7 @@ Scene::Scene(string file, const Folder& data) {
             }
         }
     }
+
     // WARNING: Object arrays shall not be reallocated after taking these pointers
     //for(array<Object>& a: opaque.values+alphaTest.values+blendAdd.values+blendAlpha.values/*except shadowOnly*/) for(Object& o: a) objects << &o;
     for(array<Object>& a: opaque.values) for(Object& o: a) objects << &o;

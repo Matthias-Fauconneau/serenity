@@ -5,9 +5,9 @@
 /// 2D affine transformation
 struct mat3x2 {
     float data[3*2];
-    mat3x2(float d=1) : data{d,0,0, 0,d,0} {}
-    mat3x2(float dx, float dy) : data{1,0,dx, 0,1,dy} {}
-    mat3x2(float m11, float m12, float dx, float m21, float m22, float dy):data{m11,m12,dx,m21,m22,dy}{}
+    mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
+    mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
+    mat3x2(float m11, float m12, float m21, float m22, float dx, float dy):data{m11,m12, m21,m22, dx,dy}{}
 
     float M(int i, int j) const { return data[j*2+i]; }
     float& M(int i, int j) { return data[j*2+i]; }
@@ -133,7 +133,7 @@ struct mat4 {
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
 inline bool operator !=( mat4 a, mat4 b ) { for(int i=0;i<16;i++) if(a.data[i]!=b.data[i]) return true; return false; }
 
-template<int M, int N> inline String str(const float a[M*N]) {
+template<int N, int M> inline String str(const float a[M*N]) {
     String s; s<<"\n["_;
     for(int i=0;i<M;i++) {
         if(N==1) s = s+"\t"_+str(a[i]);
@@ -147,5 +147,6 @@ template<int M, int N> inline String str(const float a[M*N]) {
     s<<" ]"_;
     return s;
 }
+inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }
 inline String str(const mat4& M) { return str<4,4>(M.data); }
