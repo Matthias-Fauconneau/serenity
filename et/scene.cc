@@ -31,8 +31,9 @@ void Scene::parseMaterialFile(string path) {
             array<string> args = split(value); //l.replace(QRegExp("[,()]")," ").simplified().split(' ').mid(1);
             args.filter([](const string& s){return s=="("_||s==")"_;});
             /**/ if(key=="map"_) {
-                if(startsWith(args[0],"$"_)) { current=0; continue; } //TODO: lightmap
+                //if(startsWith(args[0],"$"_)) { current=0; continue; } //TODO: lightmap
                 if(!current) { shader.append(Texture()); current=&shader.last(); }
+                if(args[0]=="$lightmap"_) current->type<<" lightmap"_;
                 current->path = String(args[0]);
             }
             else if(split("implicitMap implicitBlend implicitMask lightmap clampmap diffusemap"_).contains(key)) {
@@ -40,6 +41,7 @@ void Scene::parseMaterialFile(string path) {
                 if(map=="-"_) map = name;
                 shader.append(Texture(map)); current=&shader.last();
                 if(key=="implicitMask"_||key=="implicitBlend"_) { current->alpha=true; current->type<<" alphaTest"_; shader.alphaTest=true; }
+                //TODO: lightmap
             }
             /*else if(key=="bumpmap"_||key=="normalmap") {
                         bool hasBumpMap=false; foreach(Texture t,shader) if(t.type.contains("tangent")) {
@@ -140,16 +142,20 @@ array<String> Scene::search(const string& query, const string& type) {
 }
 
 Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
-    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[16];
-    for(int i:range(16)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
+    size_t N = sizeof(Vertex)/sizeof(float);
+    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[N];
+    for(int i:range(N)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
     return (Vertex)(*(Vertex*)V);
 }
 
+struct ID { int texture, lightmap; };
+bool operator==(const ID& a, const ID& b) { return a.texture==b.texture && a.lightmap==b.lightmap; }
+string str(const ID& o) { return str(o.texture, o.lightmap); }
 array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int firstFace, int numFaces, bool leaf) {
-    map<int, Surface> surfaces;
+    map<ID, Surface> surfaces;
     for(int f: range(firstFace,firstFace+numFaces)) {
         const bspFace& face = bsp.faces()[leaf?bsp.leafFaces()[f]:f];
-        Surface& surface = surfaces[face.texture];
+        Surface& surface = surfaces[ID{face.texture, face.lightMapIndex}]; // Ensures surfaces are split by textures/lightmaps changes
         if(face.type==1||face.type==3) {
             for(int i=0;i<face.numIndices;i+=3) {
                 surface.addTriangle(vertices,
@@ -179,11 +185,11 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
         } else error("Unsupported face.type",face.type,face.numIndices);
     }
 
-    for(pair<int, Surface> surface: surfaces) {
-        string name = str(bsp.shaders()[surface.key].name);
-        unique<Shader>& shader = shaders[name];
+    for(pair<ID, Surface> surface: surfaces) {
+        string name = str(bsp.shaders()[surface.key.texture].name);
+        Shader& shader = shaders[name];
         //if(name.contains(QRegExp("ocean")/*|water|icelake*/)){shader.name=name; model<<Object(surfaces[i],shader); continue; }
-        if(shader->properties.contains("skyparms"_)) { /// remove sky surfaces, parse sky params
+        if(shader.properties.contains("skyparms"_)) { /// remove sky surfaces, parse sky params
             /*QString q3map_sun = shader.properties.value("q3map_sun");
             if(!q3map_sun.isEmpty()) {
                 if(!sky) sky = new Sky;
@@ -195,8 +201,14 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
             }*/
             continue;
         }
-        if(!shader->name) { shader->name=String(name); shader->append(Texture(name)); }
-        surface.value.shader = shader.pointer;
+        if(!shader.name) { shader.name=String(name); shader.append(Texture(name)); } //TODO: $lightmap
+        for(Texture& texture: shader) {
+            if(texture.path=="$lightmap"_) {
+                if(surface.key.lightmap>=0) texture.path = this->name+"/lm_"_+dec(surface.key.lightmap,4)+".tga"_; // Assumes extern "high resolution" lightmaps are always used (TODO: intern lightmaps)
+                else texture.path = String("$white"_);
+            }
+        }
+        surface.value.shader = &shader;
     }
     return move(surfaces.values);
 }
@@ -244,11 +256,8 @@ array<Surface> Scene::importMD3(string modelPath) {
 
 Scene::Scene(string file, const Folder& data) {
     ::data = Folder("."_, data);
-    /// Parse shader scripts
-    array<String> materials = search("materials/"_,".mtr"_);
-    if(!materials) materials = search("scripts/"_,".shader"_);
-    if(!materials) error("No materials/*.mtr nor scripts/*.shader material shader script files found");
-    for(string path: materials) parseMaterialFile(path);
+    assert(endsWith(file,".bsp"_));
+    name = String(section(file,'.',0,-2));
 
     /// Loads BSP scene
     Map map = Map(file, data);
@@ -272,18 +281,34 @@ Scene::Scene(string file, const Folder& data) {
     }
     entities.at("worldspawn"_).insert(String("model"_), String("*0"_));
 
-    /// BSP Vertices
-    buffer<Vertex> vertices (bsp.vertices().size);
-    for(uint i: range(bsp.vertices().size)) { const ibspVertex& v = bsp.vertices()[i]; vertices[i] = Vertex(v.position, vec2(v.texture.x,1-v.texture.y), v.normal, v.color[3]/255.f); }
+    /// Loads lights (before parsing shaders to activate lightmaps if lights are not included in the BSP)
+    for(const Entity& e: entities.values) {
+        if(e.at("classname"_)=="light"_) {
+            lights << Light(toVec3(e.at("origin"_)),
+                            toVec3(e.value("light_radius"_,"300"_)).x,
+                            toVec3(e.value("_color"_,"1 1 1"_)),
+                            e.value("nodiffuse"_)!="1"_,
+                            e.value("nospecular"_)!="1"_,
+                            e.value("noshadows"_)!="1"_);
+        }
+    }
 
-    /// BSP Faces
+    /// Parses shader scripts
+    array<String> materials = search("materials/"_,".mtr"_);
+    if(!materials) materials = search("scripts/"_,".shader"_);
+    if(!materials) error("No materials/*.mtr nor scripts/*.shader material shader script files found");
+    for(string path: materials) parseMaterialFile(path);
+
+    /// Loads BSP geometry
+    buffer<Vertex> vertices (bsp.vertices().size);
+    for(uint i: range(bsp.vertices().size)) { const ibspVertex& v = bsp.vertices()[i]; vertices[i] = Vertex(v.position, vec2(v.texture.x,1-v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,1-v.lightmap.y)); }
     for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)]<< importBSP(bsp, vertices, leaf.firstFace, leaf.numFaces, true);
     for(uint i: range(bsp.models().size)) {
         const bspModel& model = bsp.models()[i];
         models["*"_+str(i)]<< importBSP(bsp, vertices, model.firstFace, model.numFaces, false);
     }
 
-    /// Convert Entities to Objects
+    /// Converts Entities to Objects
     for(const Entity& e: entities.values) {
         //if(e.contains("target")) transform.translate(vec3(targets[e["target"]]["origin"]));
         if(e.contains("model"_)) {
@@ -330,14 +355,6 @@ Scene::Scene(string file, const Folder& data) {
                     else opaque[id] << object;
                 }
             }
-        }
-        if(e.at("classname"_)=="light"_) {
-            lights << Light(toVec3(e.at("origin"_)),
-                            toVec3(e.value("light_radius"_,"300"_)).x,
-                            toVec3(e.value("_color"_,"1 1 1"_)),
-                            e.value("nodiffuse"_)!="1"_,
-                            e.value("nospecular"_)!="1"_,
-                            e.value("noshadows"_)!="1"_);
         }
     }
     // WARNING: Object arrays shall not be reallocated after taking these pointers

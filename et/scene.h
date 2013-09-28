@@ -16,12 +16,13 @@ struct Scene {
     /// Default position as (x, y, z, yaw angle)
     vec4 defaultPosition() const;
 
+    String name;
     map<String,Entity> entities;
     map<String,Entity> targets;
+    array<Light> lights;
     map<String,unique<Shader>> shaders; // Referenced by Surfaces
     map<String, array<Surface>> models;
     array<Object> shadowOnly;
     map<GLShader*,array<Object>> opaque, alphaTest, blendAdd, blendAlpha; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
     array<Object*> objects; // For hit tests
-    array<Light> lights;
 };

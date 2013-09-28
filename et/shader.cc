@@ -10,29 +10,35 @@ void Texture::upload() {
     if(endsWith(path,".tga"_)) path=String(section(path,'.',0,-2));
     if(!textures.contains(path)) {
         if(find(type,"albedo"_)) {
-            Map file;
-            if(existsFile(path,data)) file=Map(path,data);
-            else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
-            else if(existsFile(path+".jpg"_,data)) file=Map(path+".jpg"_,data);
-            else if(existsFile(path+".tga"_,data)) file=Map(path+".tga"_,data);
-            assert(file, data.name()+"/"_+path);
-            Image image = decodeImage(file);
-            assert(image, path);
-            if(image.alpha && alpha) {
-                byte4* data=image.data; int w=image.width; int h=image.height;
-                for(int y: range(h)) for(int x: range(w)) {
-                    byte4& t = data[y*w+x];
-                    /*if(alpha)*/ { // Fill transparent pixels for correct alpha linear blend color (using nearest opaque pixels)
-                        if(t.a>=0x80) continue; // Only fills pixel under alphaTest threshold
-                        int alphaMax=0x80;
-                        for(int dy=-1;dy<1;dy++) for(int dx=-1;dx<1;dx++) {
-                            byte4& s = data[(y+dy+h)%h*w+(x+dx+w)%w]; // Assumes wrapping coordinates
-                            if(s.a > alphaMax) { alphaMax=s.a; t=byte4(s.b,s.g,s.r, t.a); } // FIXME: alpha-weighted blend of neighbours
-                        }
-                    } /*else { // Asserts opaque
+            Image image;
+            if(path=="$white"_) {
+                image = Image(1,1);
+                image(0,0) = 0xFF;
+            } else {
+                Map file;
+                if(existsFile(path,data)) file=Map(path,data);
+                else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
+                else if(existsFile(path+".jpg"_,data)) file=Map(path+".jpg"_,data);
+                else if(existsFile(path+".tga"_,data)) file=Map(path+".tga"_,data);
+                assert_(file, data.name()+"/"_+path);
+                image = decodeImage(file);
+                assert_(image, path);
+                if(image.alpha && alpha) {
+                    byte4* data=image.data; int w=image.width; int h=image.height;
+                    for(int y: range(h)) for(int x: range(w)) {
+                        byte4& t = data[y*w+x];
+                        /*if(alpha)*/ { // Fill transparent pixels for correct alpha linear blend color (using nearest opaque pixels)
+                            if(t.a>=0x80) continue; // Only fills pixel under alphaTest threshold
+                            int alphaMax=0x80;
+                            for(int dy=-1;dy<1;dy++) for(int dx=-1;dx<1;dx++) {
+                                byte4& s = data[(y+dy+h)%h*w+(x+dx+w)%w]; // Assumes wrapping coordinates
+                                if(s.a > alphaMax) { alphaMax=s.a; t=byte4(s.b,s.g,s.r, t.a); } // FIXME: alpha-weighted blend of neighbours
+                            }
+                        } /*else { // Asserts opaque
                         assert(t.a==0xFF, path);
                         t.a=0xFF;
                     }*/
+                    }
                 }
             }
             textures.insert(copy(path),unique<GLTexture>(image, (image.alpha?sRGBA:sRGB8)|Mipmap|Bilinear|Anisotropic));

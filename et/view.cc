@@ -200,7 +200,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 Texture& tex = shader[i];
                 if(!tex.texture) tex.upload();
                 string tcNames[] = {"tcScale0"_,"tcScale1"_,"tcScale2"_,"tcScale3"_};
-                if(tcScales[i]!=tex.tcScale) { program[tcNames[i]]=tex.tcScale; tcScales[i]=tex.tcScale; }
+                if(tcScales[i]!=tex.tcScale) { GLUniform uniform = program[tcNames[i]]; if(uniform) uniform=tex.tcScale; tcScales[i]=tex.tcScale; }
                 string rgbNames[] = {"rgbScale0"_,"rgbScale1"_,"rgbScale2"_,"rgbScale3"_};
                 if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program[rgbNames[i]]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
                 tex.texture->bind(i);
@@ -245,14 +245,10 @@ bool View::keyRelease(Key key, Modifiers) {
 }
 bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     setFocus(this);
-    // TODO: Wheel -> velocity=vec3(0,0,e->delta()/60);
     if(event==Press && button==LeftButton) { dragStart=cursor; deltaStart=vec2(yaw, pitch); }
     if(event==Release && button==LeftButton && dragStart==cursor) {
         mat4 transform; transform.perspective(PI/4, size.x, size.y, 1, 32768);
         transform.rotateX(-pitch); transform.rotateZ(-yaw); //transform.translate(-position);*/
-        /*mat4 view=mat4(); view.rotateX(-pitch); view.rotateZ(-yaw); view.translate( -position );
-        mat4 projection=mat4(); projection.perspective(PI/4, size.x, size.y, 1, 32768);
-        mat4 transform = projection*view;*/
 
         vec3 direction = transform.inverse() * normalize(vec3(2.0*cursor.x/size.x-1,1-2.0*cursor.y/size.y,1));
         float minZ=65536; Object* hit=0;
@@ -265,9 +261,7 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
             selected=hit;
             selected->uniformColor=vec3(1,0.5,0.5);
             log(selected->surface.shader->name);
-            //log(selected->surface.shader->file, selected->surface.shader->firstLine, selected->surface.shader->lastLine);
-            /*log(*selected->surface.shader);
-            log(selected->surface.shader->source);*/
+            log(selected->surface.shader->source);
             log(selected->surface.shader->program->source);
         }
         return true;

@@ -7,6 +7,7 @@
 
 /// Context
 
+void glFramebufferSRGB(bool enable) { if(enable) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB); }
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
 void glAlphaTest(bool enable) { if(enable) glEnable(GL_ALPHA_TEST); else glDisable(GL_ALPHA_TEST); }
@@ -91,7 +92,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
             main << replace(stageMain,"$"_,str(i-1));
         }
         String glsl = "#version 130\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
-        this->source = copy(glsl);
+        this->source << copy(glsl);
         uint shader = glCreateShader(type);
         const char* data = glsl.data; int size = glsl.size;
         glShaderSource(shader, 1, &data,&size);

@@ -124,7 +124,7 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     if(renderer == OpenGL) {
         if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
         if(!glContext) {
-            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, 0};
+            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB, 0};
             int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
             const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
             glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);

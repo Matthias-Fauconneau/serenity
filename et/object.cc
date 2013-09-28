@@ -43,6 +43,7 @@ void Surface::draw(GLShader& program,bool withTexcoord,bool withNormal, bool /*w
     if(withTexcoord) vertexBuffer.bindAttribute(program, "texcoord"_, 2, offsetof(Vertex,texcoord));
     if(withNormal) vertexBuffer.bindAttribute(program, "normal"_, 3, offsetof(Vertex,normal));
     /*if(withAlpha)*/ vertexBuffer.bindAttribute(program, "alpha"_, 1, offsetof(Vertex,alpha));
+    vertexBuffer.bindAttribute(program, "lightmap"_, 2, offsetof(Vertex,lightmap));
     if(withTangent) {
         vertexBuffer.bindAttribute(program, "tangent"_, 3, offsetof(Vertex,tangent));
         vertexBuffer.bindAttribute(program, "bitangent"_, 3, offsetof(Vertex,bitangent));

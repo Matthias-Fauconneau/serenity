@@ -5,11 +5,6 @@
 generic struct bgr { T b,g,r; operator byte4() const { return byte4 {b,g,r,0xFF}; } };
 typedef vector<bgr,uint8,3> bgr3;
 
-/*generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,0xFF}; } };
-typedef vector<rgb,uint8,3> rgb3;
-generic struct rgba { T r,g,b,a; operator byte4() const { return byte4 {b,g,r,a}; } };
-typedef vector<rgba,uint8,4> rgba4;*/
-
 /// Decodes Windows device independent bitmap (DIB) headers
 Image decodeTGA(const ref<byte>& file) {
     BinaryData s(file);

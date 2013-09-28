@@ -140,8 +140,8 @@ struct Build {
                     int64 lastFileEdit = File(name, subfolder).modifiedTime();
                     if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
                         if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
-                        lastEdit = max(lastEdit, lastFileEdit);
                     }
+                    lastEdit = max(lastEdit, lastFileEdit);
                     file = move(object);
                 }
             }

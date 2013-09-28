@@ -66,6 +66,10 @@ surface {
   in float alpha;
   out float vertexAlpha;
   vertexAlpha = alpha;
+
+  in vec2 lightmap;
+  out vec2 vertexLightmap;
+  vertexLightmap = lightmap;
  }
  fragment {
   in vec2 vertexTexCoord;
@@ -77,6 +81,7 @@ surface {
   out vec3 normal;
   normal = (vertexNormal+1)/2;
   in float vertexAlpha;
+  in vec2 vertexLightmap;
   fog {
    in vec3 viewPos;
    uniform float fogOpacity;
@@ -133,7 +138,10 @@ texture {
   uniform sampler2D tex$;
   uniform vec3 tcScale$;
   uniform vec3 rgbScale$;
-  vec4 sample$ = /*vec4(rgbScale$,1)**/texture(tex$,T*tcScale$.xy);
+  vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,T*tcScale$.xy);
+  lightmap {
+   sample$ = texture(tex$,vertexLightmap);
+  }
   vertexAlpha {
    sample$.a = vertexAlpha;
   }
@@ -186,7 +194,7 @@ texture {
    albedo.a=(sample$.r+sample$.b+sample$.g)/3;
   }
   albedo {
-   albedo.rgb = /*uniformColor**/sfactor$*sample$.rgb + dfactor$*albedo.rgb;
+   albedo.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*albedo.rgb;
    fog {
      albedo *= max(0,1-length(viewPos)/fogOpacity);
    }

@@ -43,7 +43,7 @@ struct GLShader {
     map<String, int> attribLocations;
     map<String, int> uniformLocations;
     array<String> sampler2D; // names of declared sampler2D
-    String source;
+    array<String> source;
 };
 
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
