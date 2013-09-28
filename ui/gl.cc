@@ -14,6 +14,8 @@ void glAlphaTest(bool enable) { if(enable) glEnable(GL_ALPHA_TEST); else glDisab
 void glBlendAdd() { glBlendFunc(GL_ONE,GL_ONE); glEnable(GL_BLEND); }
 void glBlendAlpha() { glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE); glEnable(GL_BLEND); }
 void glBlendNone() { glDisable(GL_BLEND); }
+void glWireframe() { glPolygonMode(GL_FRONT,GL_LINE); }
+void glSolid() { glPolygonMode(GL_FRONT,GL_FILL); }
 
 /// Shader
 
@@ -23,6 +25,7 @@ void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program);
 void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
 void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
 void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
+void GLUniform::operator=(mat3x2 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3x2fv(location,1,0,m.data); }
 void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
 void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
 

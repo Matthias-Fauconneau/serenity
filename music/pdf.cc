@@ -291,8 +291,8 @@ void PDF::open(const string& data) {
             }
             TextData s = move(data);
             //y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
-            Cm=Tm=mat32(); array<mat32> stack;
-            Font* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat32 Tlm;
+            Cm=Tm=mat3x2(); array<mat3x2> stack;
+            Font* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat3x2 Tlm;
             array<array<vec2>> path;
             array<Variant> args;
             while(s.skip(), s) {
@@ -340,10 +340,10 @@ void PDF::open(const string& data) {
                     OP('W') path.clear(); //intersect winding clip
                     OP('y') ;//curveTo (replicate last)
 
-                    OP2('B','T') Tm=Tlm=mat32();
+                    OP2('B','T') Tm=Tlm=mat3x2();
                     OP2('c','s') ;//set fill colorspace
                     OP2('C','S') ;//set stroke colorspace
-                    OP2('c','m') Cm=mat32(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
+                    OP2('c','m') Cm=mat3x2(f(0),f(1),f(4),f(2),f(3),f(5))*Cm; // m11, m12, m21, m22, dx, dy
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
                         blits<<Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)),{}};
@@ -361,24 +361,24 @@ void PDF::open(const string& data) {
                     OP2('s','c') ;
                     OP3('S','C','N') ;
                     OP3('s','c','n') ;
-                    OP2('T','*') Tm=Tlm=mat32(0,-leading)*Tlm;
+                    OP2('T','*') Tm=Tlm=mat3x2(0,-leading)*Tlm;
                     OP2('T','c') spacing=f(0);
-                    OP2('T','d') Tm=Tlm=mat32(f(0),f(1))*Tlm;
-                    OP2('T','D') Tm=Tlm=mat32(f(0),f(1))*Tlm; leading=-f(1);
+                    OP2('T','d') Tm=Tlm=mat3x2(f(0),f(1))*Tlm;
+                    OP2('T','D') Tm=Tlm=mat3x2(f(0),f(1))*Tlm; leading=-f(1);
                     OP2('T','L') leading=f(0);
                     OP2('T','r') ; //set render mode
                     OP2('T','z') ; //set horizontal scaling
-                    OP('\'') { Tm=Tlm=mat32(0,-leading)*Tlm; drawText(font,fontSize,spacing,wordSpacing,args[0].data); }
+                    OP('\'') { Tm=Tlm=mat3x2(0,-leading)*Tlm; drawText(font,fontSize,spacing,wordSpacing,args[0].data); }
                     OP2('T','j') drawText(font,fontSize,spacing,wordSpacing,args[0].data);
                     OP2('T','J') for(const auto& e : args[0].list) {
-                        if(e.type==Variant::Integer||e.type==Variant::Real) Tm=mat32(-e.real()*fontSize/1000,0)*Tm;
+                        if(e.type==Variant::Integer||e.type==Variant::Real) Tm=mat3x2(-e.real()*fontSize/1000,0)*Tm;
                         else if(e.type==Variant::Data) drawText(font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
                     OP2('T','f')
                             assert(fonts.contains(args[0].data), args[0].data);
                             font = fonts.contains(args[0].data)?&fonts.at(args[0].data):0; fontSize=f(1);
-                    OP2('T','m') Tm=Tlm=mat32(f(0),f(1),f(2),f(3),f(4),f(5));
+                    OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(4),f(2),f(3),f(5)); // m11, m12, m21, m22, dx, dy
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); //intersect odd even clip
                 }
@@ -489,7 +489,7 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
     font->font->setSize(fontSize);
     for(uint8 code : data) {
         if(code==0) continue;
-        mat32 Trm = Tm*Cm;
+        mat3x2 Trm = Tm*Cm;
         uint16 index = font->font->index(code);
         vec2 position = vec2(Trm.dx,Trm.dy);
         if(position.y<y1) y1=position.y; if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
@@ -497,7 +497,7 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size) advance += fontSize*font->widths[code]/1000;
         else advance += font->font->linearAdvance(index);
-        Tm = mat32(advance, 0) * Tm;
+        Tm = mat3x2(advance, 0) * Tm;
     }
 }
 

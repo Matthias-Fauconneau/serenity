@@ -13,7 +13,7 @@ struct Texture {
     String type; // albedo|displace|tangent|lightmap|lightgrid + shading attributes (FIXME: convert to flags)
     GLTexture* texture = 0;
     bool alpha = false, clamp = false;
-    vec3 tcScale {1,1,1/*.0/16*/};
+    mat3x2 tcMod;
     vec3 rgbScale {1,1,1};
     //string heightMap;
     //bool inverted = true;
@@ -21,7 +21,7 @@ struct Texture {
 inline String str(const Texture& o) { return "Texture("_+str(o.path, o.type)+")"_; }
 inline Texture copy(const Texture& o) {
     Texture t;
-    t.path = copy(o.path), t.type = copy(o.type), t.alpha = o.alpha, t.clamp=o.clamp; t.tcScale=o.tcScale, t.rgbScale=o.rgbScale;
+    t.path = copy(o.path), t.type = copy(o.type), t.alpha = o.alpha, t.clamp=o.clamp; t.tcMod=o.tcMod, t.rgbScale=o.rgbScale;
     return t;
 }
 struct Shader : array<Texture> {
@@ -32,6 +32,7 @@ struct Shader : array<Texture> {
     String type;
     GLShader* program = 0;
     bool polygonOffset=false, alphaTest=false, blendAdd=false, blendAlpha=false, tangentSpace=false, vertexBlend=false; // FIXME: bitfield
+    /*Texture skyBox[6];*/ float cloudHeight=0;
     String file; int firstLine=0, lastLine=0; String source;
     map<string,String> properties;
 };

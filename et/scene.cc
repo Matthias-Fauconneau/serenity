@@ -86,7 +86,12 @@ void Scene::parseMaterialFile(string path) {
             else if(key=="polygonOffset"_ || key=="polygonoffset"_) shader.polygonOffset=true;
             else if(key=="surfaceParm"_||key=="surfaceparm"_) { if(args[0]=="trans"_||args[0]=="alphashadow"_) alphaBlend=true; }
             else if(key=="sort"_) { if(key=="additive"_) alphaBlend=true; }
-            else if(key=="skyparms"_) { shader.clear(); shader.properties["skyparms"_]=String(value); }
+            else if(key=="skyparms"_) {
+                //assert_(args[0]!="-"_, path, name);
+                //for(shader.skyBox = Texture(args[0]); //TODO: asserts uniform color box #4D505B
+                shader.cloudHeight = toDecimal(args[1]);
+                assert_(args[2]=="-"_);
+            }
             else if(key=="fogparms"_) { shader.properties.insert("fogparms"_, String(args[3])); } //FIXME: fog color
             else if(key=="q3map_sun"_||key=="q3map_sunExt"_) shader.properties["q3map_sun"_]=String(value);
             else if(split("nocompress nopicmip nomipmaps nofog fog waterfogvars cull tcGen tcgen depthWrite depthwrite depthFunc detail qer_editorimage qer_trans q3map_globaltexture q3map_lightimage q3map_surfacelight q3map_clipModel q3map_shadeangle"_).contains(key)) {} // Ignored or default
@@ -95,8 +100,16 @@ void Scene::parseMaterialFile(string path) {
             else if(key=="vertexColor"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; }
             else if(key=="alphaGen"_||key=="alphagen"_) { if(args[0]=="vertex"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; } }
             else if(key=="tcMod"_||key=="tcmod"_) {
-                if(args[0]=="scale"_) current->tcScale=vec3(toDecimal(args[1]),toDecimal(args[2]),1);
-                //TODO: rotate
+                /**/ if(args[0]=="scale"_ || args[0]=="Scale"_) current->tcMod = mat3x2(toDecimal(args[1]),toDecimal(args[2])) * current->tcMod;
+                else if(args[0]=="transform"_) {
+                    array<double> m = apply(args.slice(1),toDecimal); // m00 m01 m10 m11 dx dy
+                    current->tcMod = mat3x2(m[0],m[1],m[4],m[2],m[3],m[5]) * current->tcMod;
+                }
+                else if(args[0]=="rotate"_) {/*TODO*/}
+                else if(args[0]=="scroll"_) {/*TODO*/}
+                else if(args[0]=="stretch"_) {/*TODO*/}
+                else if(args[0]=="turb"_) {/*TODO*/}
+                else error(key, args);
             }
             else if(key=="rgbGen"_||key=="rgbgen"_) {
                 if(args[0]=="const"_) current->rgbScale=vec3(toDecimal(args[1]),toDecimal(args[2]),toDecimal(args[3]));
@@ -217,10 +230,10 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
 
     for(pair<ID, Surface> surface: surfaces) {
         string name = str(bsp.shaders()[surface.key.texture].name);
-        const Shader& shader = shaders[name];
+        //const Shader& shader = shaders[name];
         //if(name.contains(QRegExp("ocean")/*|water|icelake*/)){shader.name=name; model<<Object(surfaces[i],shader); continue; }
-        if(shader.properties.contains("skyparms"_)) { /// remove sky surfaces, parse sky params
-            /*QString q3map_sun = shader.properties.value("q3map_sun");
+        /*if(shader.properties.contains("skyparms"_)) { // remove sky surfaces, parse sky params
+            QString q3map_sun = shader.properties.value("q3map_sun");
             if(!q3map_sun.isEmpty()) {
                 if(!sky) sky = new Sky;
                 vec3 angles = vec3(q3map_sun.section(" ",4))*PI/180;
@@ -228,9 +241,9 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
                 sky.sunIntensity=q3map_sun.section(" ",3,3).toFloat()/100;
                 Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
                 sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
-            }*/
+            }
             continue;
-        }
+        }*/
         surface.value.shader = &getShader(name, surface.key.lightmap);
     }
     return move(surfaces.values);

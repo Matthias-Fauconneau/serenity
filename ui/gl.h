@@ -12,6 +12,8 @@ void glAlphaTest(bool enable);
 void glBlendAdd();
 void glBlendAlpha();
 void glBlendNone();
+void glWireframe();
+void glSolid();
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
@@ -22,6 +24,7 @@ struct GLUniform {
     void operator=(vec2);
     void operator=(vec3);
     void operator=(vec4);
+    void operator=(mat3x2);
     void operator=(mat3);
     void operator=(mat4);
     int program, location;

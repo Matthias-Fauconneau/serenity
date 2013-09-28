@@ -28,4 +28,5 @@ struct Scene {
     map<GLShader*,array<Object>> opaque, alphaTest, blendAdd, blendAlpha; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
     array<Object*> objects; // For hit tests
     vec3 gridMin, gridMax; GLTexture lightGrid[3]; // Light grid
+    vec3 backgroundColor = vec3(77,80,91)/255.f; // FIXME: get from skyparms outer box texture
 };

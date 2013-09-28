@@ -193,9 +193,9 @@ tangent {
 albedo {
  fragment {
   uniform sampler2D tex$;
-  uniform vec3 tcScale$;
+  uniform mat3x2 tcMod$;
   uniform vec3 rgbScale$;
-  vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,T*tcScale$.xy);
+  vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,tcMod$*vec3(T,1));
   vertexAlpha {
    sample$.a = vertexAlpha;
   }
@@ -288,6 +288,7 @@ forward {
   in vec3 vertexColor;
   albedo.rgb *= vertexColor; // Vertex lighting
   albedo.rgb=vec3(sRGB(albedo.r),sRGB(albedo.g),sRGB(albedo.b));
+  albedo.rgb=vec3(T,0);
  }
 }
 

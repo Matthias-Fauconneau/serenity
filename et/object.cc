@@ -36,7 +36,6 @@ void Surface::draw(GLShader& program,bool withTexcoord,bool withNormal, bool /*w
             v.bitangent = normalize(v.bitangent - v.normal * dot(v.normal, v.bitangent));
         }
         vertexBuffer.upload(vertices);
-        //log(indexBuffer.indexCount/3,"triangles");
     }
     #define offsetof __builtin_offsetof
     vertexBuffer.bindAttribute(program, "position"_, 3, offsetof(Vertex,position));

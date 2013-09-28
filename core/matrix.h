@@ -2,13 +2,30 @@
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
 
+/// 2D affine transformation
+struct mat3x2 {
+    float data[3*2];
+    mat3x2(float d=1) : data{d,0,0, 0,d,0} {}
+    mat3x2(float dx, float dy) : data{1,0,dx, 0,1,dy} {}
+    mat3x2(float m11, float m12, float dx, float m21, float m22, float dy):data{m11,m12,dx,m21,m22,dy}{}
+
+    float M(int i, int j) const { return data[j*2+i]; }
+    float& M(int i, int j) { return data[j*2+i]; }
+    float operator()(int i, int j) const { return M(i,j); }
+    float& operator()(int i, int j) { return M(i,j); }
+
+    mat3x2 operator*(mat3x2 b) const {mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r; }
+    vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
+};
+inline bool operator !=(const mat3x2& a, const mat3x2& b) { for(int i=0;i<6;i++) if(a.data[i]!=b.data[i]) return true; return false; }
+
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
 struct mat3 {
     float data[3*3];
-    mat3(float d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d; }
-    mat3(float dx, float dy) : mat3(vec3(1,0,0),vec3(0,1,0),vec3(dx,dy,1)){}
-    mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
+    mat3(float d=1) : data{d,0,0, 0,d,0, 0,0,d} {}
+    mat3(float dx, float dy) : data{1,0,0, 0,1,0, dx,dy,1} {}
+    //mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
     float M(int i, int j) const { return data[j*3+i]; }
     float& M(int i, int j) { return data[j*3+i]; }
