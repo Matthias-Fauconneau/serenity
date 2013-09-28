@@ -27,5 +27,5 @@ struct Scene {
     array<Object> shadowOnly;
     map<GLShader*,array<Object>> opaque, alphaTest, blendAdd, blendAlpha; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
     array<Object*> objects; // For hit tests
-    vec3 gridMin, gridMax; GLTexture lightGrid[2]; // Light grid
+    vec3 gridMin, gridMax; GLTexture lightGrid[3]; // Light grid
 };

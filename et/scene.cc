@@ -34,14 +34,14 @@ void Scene::parseMaterialFile(string path) {
                 if(!current) { shader.append(Texture()); current=&shader.last(); }
                 current->path = String(args[0]);
                 if(key=="clampmap"_) current->clamp=true;
-                if(key=="lightmap"_) assert(current->path=="$lightmap"_);
+                if(key=="lightmap"_) assert_(current->path=="$lightmap"_);
             }
             else if(split("implicitMap implicitBlend implicitMask"_).contains(key)) {
                 string map = args[0];
                 if(map=="-"_) map = name;
                 shader.append(Texture(map)); current=&shader.last();
                 if(key=="implicitMask"_||key=="implicitBlend"_) { current->alpha=true; current->type<<" alphaTest"_; shader.alphaTest=true; }
-                shader.append(Texture("$lightmap"_)); shader.last().type<<" sfactor_dst_color dfactor_zero"_;
+                shader.append(Texture("$lightmap"_));
             }
             /*else if(key=="bumpmap"_||key=="normalmap") {
                         bool hasBumpMap=false; foreach(Texture t,shader) if(t.type.contains("tangent")) {
@@ -175,14 +175,7 @@ Shader& Scene::getShader(string name, int lightmap) {
                     {int albedo=0; for(const Texture& tex: lightMapShader) albedo += find(tex.type,"albedo"_); assert_(albedo, lightMapShader);}
                 }
                 return lightMapShader;
-            } else if(texture.path=="$lightmap"_) {
-                //texture.path = String("$lightgrid0"_);
-                texture.type = String("lightgrid"_);
-                /*shader << Texture("$lightgrid1"_); // Reserve second texture sampler
-                shader.last().type = String(""_); // Handled by first slot
-                {int albedo=0; for(const Texture& tex: shader) albedo += find(tex.type,"albedo"_); assert_(albedo, shader);}
-                break;*/
-            }
+            } else if(texture.path=="$lightmap"_) texture.type = String("lightgrid"_);
         }
     }
     return shader;
@@ -333,7 +326,7 @@ Scene::Scene(string file, const Folder& data) {
     for(uint i: range(bsp.vertices().size)) {
         const ibspVertex& v = bsp.vertices()[i];
         //assert(v.color[0]==0xFF && v.color[1]==0xFF && v.color[2]==0xFF, v.color[0], v.color[1], v.color[2]);
-        vertices[i] = Vertex(v.position, vec2(v.texture.x,1-v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,1-v.lightmap.y));
+        vertices[i] = Vertex(v.position, vec2(v.texture.x,/*1-*/v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,/*1-*/v.lightmap.y),vec3(v.color[0]/255.f,v.color[1]/255.f,v.color[2]/255.f));
     }
     for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)]<< importBSP(bsp, vertices, leaf.firstFace, leaf.numFaces, true);
     for(uint i: range(bsp.models().size)) {
@@ -402,18 +395,37 @@ Scene::Scene(string file, const Folder& data) {
     ref<float> worldBB = bsp.models()[0].boundingBox;
     gridMin = vec3(worldBB[0],worldBB[1],worldBB[2]);
     gridMax = vec3(worldBB[3],worldBB[4],worldBB[5]);
-    uint nx = floor(gridMax.x / gridSize.x) - ceil(gridMin.x / gridSize.x) + 1;
-    uint ny = floor(gridMax.y / gridSize.y) - ceil(gridMin.y / gridSize.y) + 1;
-    uint nz = floor(gridMax.z / gridSize.z) - ceil(gridMin.z / gridSize.z) + 1;
+    int nx = floor(gridMax.x / gridSize.x) - ceil(gridMin.x / gridSize.x) + 1;
+    int ny = floor(gridMax.y / gridSize.y) - ceil(gridMin.y / gridSize.y) + 1;
+    int nz = floor(gridMax.z / gridSize.z) - ceil(gridMin.z / gridSize.z) + 1;
     assert(nx*ny*nz == bsp.lightVolume().size);
-    buffer<byte4> lightData[2] = {buffer<byte4>(nx*ny*nz),buffer<byte4>(nx*ny*nz)};
-    for(int i: range(nx*ny*nz)) { // Splits 8 components in 2 3D textures
+    buffer<byte4> lightData[3] = {buffer<byte4>(nx*ny*nz),buffer<byte4>(nx*ny*nz),buffer<byte4>(nx*ny*nz)};
+    for(int i: range(nx*ny*nz)) { // Splits 9 components in 3 3D textures
         const ibspVoxel& voxel = bsp.lightVolume()[i];
-        lightData[0][i] = byte4(voxel.ambient[0],voxel.ambient[1],voxel.ambient[2],voxel.dir[0]);
-        lightData[1][i] = byte4(voxel.directional[0], voxel.directional[1], voxel.directional[2], voxel.dir[1]); //TODO
+        lightData[0][i] = byte4(voxel.ambient[2], voxel.ambient[1], voxel.ambient[0], 0);
+        lightData[1][i] = byte4(voxel.directional[2], voxel.directional[1], voxel.directional[0], 0);
+        float longitude = 2*PI*voxel.dir[0]/255.f, latitude = 2*PI*voxel.dir[1]/255.f;
+        vec3 lightDirection = clip(vec3(0),round((vec3(cos(latitude)*sin(longitude),sin(longitude)*sin(latitude),cos(longitude))+vec3(1))/2.f*float(0xFF)), vec3(0xFF));
+        lightData[2][i] = byte4(lightDirection[2], lightDirection[1], lightDirection[0], 0);
+    }
+    for(int z: range(nz)) for(int y: range(ny)) for(int x: range(nx)) {
+        byte4& color = lightData[1][z*ny*nx+y*nx+x];
+        // Fills direction for correct linear interpolation of directions
+        int l = int(color[0])*int(color[0])+int(color[1])*int(color[1])+int(color[2])*int(color[2]);
+        int alphaMax=0; //3*0x80*0x80;
+        if(l>alphaMax) continue; // Only fills pixel under threshold
+        byte4 direction = lightData[2][z*ny*nx+y*nx+x];
+        for(int dz=-1;dz<1;dz++) for(int dy=-1;dy<1;dy++) for(int dx=-1;dx<1;dx++) {
+            int offset = clip(0,z+dz,nz)*ny*nx+clip(0,y+dy,ny)*nx+clip(0,x+dx,nx);
+            byte4& color = lightData[1][offset]; // Clamp coordinates
+            int l = int(color[0])*int(color[0])+int(color[1])*int(color[1])+int(color[2])*int(color[2]);
+            if(l > alphaMax) { alphaMax=l; direction=lightData[2][offset]; } // FIXME: alpha-weighted blend of neighbours
+        }
+        lightData[2][z*ny*nx+y*nx+x] = direction;
     }
     lightGrid[0] = GLTexture(nx,ny,nz,lightData[0]);
     lightGrid[1] = GLTexture(nx,ny,nz,lightData[1]);
+    lightGrid[2] = GLTexture(nx,ny,nz,lightData[2]);
 }
 
 vec4 Scene::defaultPosition() const {

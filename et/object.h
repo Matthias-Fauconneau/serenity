@@ -3,8 +3,8 @@
 
 struct Vertex {
     vec3 position; vec2 texcoord; vec3 normal; vec3 tangent; vec3 bitangent; float alpha,ambient; // 16f=64B
-    vec2 lightmap;
-    Vertex(vec3 position,vec2 texcoord,vec3 normal,float alpha=0,vec2 lightmap=0):position(position),texcoord(texcoord),normal(normal),alpha(alpha),lightmap(lightmap) {}
+    vec2 lightmap; vec3 color;
+    Vertex(vec3 position,vec2 texcoord,vec3 normal,float alpha=0,vec2 lightmap=0, vec3 color=1):position(position),texcoord(texcoord),normal(normal),alpha(alpha),lightmap(lightmap),color(color) {}
 };
 
 struct Surface {

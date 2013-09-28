@@ -193,6 +193,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 if(modelLightMatrix) {
                     mat4 light; light.scale(vec3(1)/(scene.gridMax-scene.gridMin)); light.translate(-scene.gridMin);
                     modelLightMatrix = light*object.transform;
+                    program["viewNormalMatrix"_] = view.normalMatrix(); // World to view normal matrix
                 }
                 /*if(tangentSpace) { //for displacement mapping
                     program["modelViewMatrix"_]= view*object.transform;
@@ -203,16 +204,12 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             if(object.uniformColor!=currentColor) { GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor; currentColor=object.uniformColor; }
             for(int i: range(shader.size)) {
                 Texture& tex = shader[i];
-#if 0
-                /**/ if(tex.path=="$lightgrid0"_) { assert(tex.type=="lightgrid"_); program["lightGrid0"_]=i; scene.lightGrid[0].bind(i); assert_(shader.last().path=="$lightgrid1"_, shader); }
-                else if(tex.path=="$lightgrid1"_) { assert(tex.type=="lightgrid"_); program["lightGrid1"_]=i; scene.lightGrid[1].bind(i); }
-#else
                 if(tex.path=="$lightmap"_) {
-                    assert(tex.type=="lightgrid"_);
+                    assert_(tex.type=="lightgrid"_);
                     program["lightGrid0"_]=i; scene.lightGrid[0].bind(i);
                     program["lightGrid1"_]=int(shader.size); scene.lightGrid[1].bind(shader.size);
+                    program["lightGrid2"_]=int(shader.size+1); scene.lightGrid[2].bind(shader.size+1);
                 }
-#endif
                 else {
                     if(!tex.texture) tex.upload();
                     program["tex"_+str(i)] = i;

@@ -102,9 +102,9 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
         int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
         int length=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&length);
         if(!status || length>1) {
-            ::buffer<byte> buffer(length-1);
-            glGetShaderInfoLog(shader, length-1, 0, buffer.begin());
-            error(glsl,"Shader failed\n",buffer);
+            ::buffer<byte> buffer(length);
+            glGetShaderInfoLog(shader, length, 0, buffer.begin());
+            error(glsl, buffer.slice(0,buffer.size-1));
         }
         glAttachShader(id, shader);
     }
@@ -113,9 +113,9 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
     int status=0; glGetProgramiv(id, GL_LINK_STATUS, &status);
     int length=0; glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
     if(!status || length>1) {
-        ::buffer<byte> buffer(length-1);
-        glGetProgramInfoLog(id, length-1, 0, buffer.begin());
-        error(stages, "Program failed\n", buffer);
+        ::buffer<byte> buffer(length);
+        glGetProgramInfoLog(id, length, 0, buffer.begin());
+        error(stages, "Program failed\n", buffer.slice(0,buffer.size-1));
     }
     for(string tags: stages) for(string& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag, tags, stages);
 }
@@ -301,10 +301,16 @@ GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_3D, id);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    //if(format&Bilinear) {
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Cannot linearly interpolate angles
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    /*} else { // Default is GL_NEAREST_MIPMAP_LINEAR
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }*/
+    glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    //if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_3D); ?
 }
 
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }

@@ -20,8 +20,8 @@ Image decodeTGA(const ref<byte>& file) {
     if(header.imageType==2) {
         if(size>s.available(size)) { warn("Invalid TGA"); return Image(); }
         const uint8* src = s.read<uint8>(size).data;
-        /**/ if(depth==24) for(uint i: range(w*h)) dst[i] = ((bgr3*)src)[i];
-        else if(depth==32) for(uint i: range(w*h)) dst[i] = ((byte4*)src)[i];
+        /**/ if(depth==24) for(uint y: range(h)) for(uint x: range(w)) dst[(h-1-y)*w+x] = ((bgr3*)src)[y*w+x]; // Flips and unpacks to 32bit
+        else if(depth==32) for(uint y: range(h)) for(uint x: range(w)) dst[(h-1-y)*w+x] = ((byte4*)src)[y*w+x]; // Flips
         else error("depth", depth);
     } else {
         for(uint i=0;i<w*h;) {
@@ -40,6 +40,7 @@ Image decodeTGA(const ref<byte>& file) {
                 for(uint unused j: range(header-127)) dst[i++] = c;
             }
         }
+        image = flip(move(image));
     }
     return image;
 }
