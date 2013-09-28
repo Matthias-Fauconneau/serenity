@@ -160,7 +160,7 @@ Shader& Scene::getShader(string name, int lightmap) {
         shader.append(Texture("$lightmap"_));
     }
     for(Texture& texture: shader) {
-        if(texture.path=="$lightmap"_ || texture.path=="$lightgrid0"_) {
+        if(texture.path=="$lightmap"_ /*|| texture.path=="$lightgrid0"_*/) {
             if(lightmap>=0) {
                 String lightMapID = "/lm_"_+dec(lightmap,4);
                 Shader& lightMapShader = shaders[name+lightMapID];
@@ -176,12 +176,12 @@ Shader& Scene::getShader(string name, int lightmap) {
                 }
                 return lightMapShader;
             } else if(texture.path=="$lightmap"_) {
-                texture.path = String("$lightgrid0"_);
+                //texture.path = String("$lightgrid0"_);
                 texture.type = String("lightgrid"_);
-                shader << Texture("$lightgrid1"_); // Reserve second texture sampler
+                /*shader << Texture("$lightgrid1"_); // Reserve second texture sampler
                 shader.last().type = String(""_); // Handled by first slot
                 {int albedo=0; for(const Texture& tex: shader) albedo += find(tex.type,"albedo"_); assert_(albedo, shader);}
-                break;
+                break;*/
             }
         }
     }

@@ -161,11 +161,9 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
     for(pair<GLShader*, array<Object>> e: objects) {
         GLShader& program = *e.key;
         program.bind();
-        {GLUniform min=program["gridMin"_], max=program["gridMax"_]; if(min || max) min=scene.gridMin, max=scene.gridMax;}
         //shader["fogOpacity"] = /*scene.sky ? scene.sky->fogOpacity :*/ 8192;
         //shader["clipPlane"] = clipPlane;
         program.bindFragments({"albedo"_}); //program.bindFragments({"albedo"_,"normal"_});
-        program.bindSamplers({"tex0"_,"tex1"_,"tex2"_,"tex3"_});
 
         array<Object>& objects = e.value;
         mat4 currentTransform=mat4(0); vec3 currentColor=0; vec3 tcScales[4]={0,0,0,0}, rgbScales[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
@@ -191,6 +189,11 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             if(object.transform != currentTransform) {
                 program["modelViewProjectionMatrix"_] = projection*view*object.transform;
                 program["normalMatrix"_]= (view*object.transform).normalMatrix();
+                GLUniform modelLightMatrix=program["modelLightMatrix"_]; // Model to world
+                if(modelLightMatrix) {
+                    mat4 light; light.scale(vec3(1)/(scene.gridMax-scene.gridMin)); light.translate(-scene.gridMin);
+                    modelLightMatrix = light*object.transform;
+                }
                 /*if(tangentSpace) { //for displacement mapping
                     program["modelViewMatrix"_]= view*object.transform;
                     program["viewOrigin"_]= (view*object.transform).inverse()*vec3(0,0,0);
@@ -200,14 +203,22 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             if(object.uniformColor!=currentColor) { GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor; currentColor=object.uniformColor; }
             for(int i: range(shader.size)) {
                 Texture& tex = shader[i];
-                /**/ if(tex.path=="$lightgrid0"_) { assert(tex.type=="lightgrid"_); program["lightGrid0"_]=i; scene.lightGrid[0].bind(i); }
+#if 0
+                /**/ if(tex.path=="$lightgrid0"_) { assert(tex.type=="lightgrid"_); program["lightGrid0"_]=i; scene.lightGrid[0].bind(i); assert_(shader.last().path=="$lightgrid1"_, shader); }
                 else if(tex.path=="$lightgrid1"_) { assert(tex.type=="lightgrid"_); program["lightGrid1"_]=i; scene.lightGrid[1].bind(i); }
+#else
+                if(tex.path=="$lightmap"_) {
+                    assert(tex.type=="lightgrid"_);
+                    program["lightGrid0"_]=i; scene.lightGrid[0].bind(i);
+                    program["lightGrid1"_]=int(shader.size); scene.lightGrid[1].bind(shader.size);
+                }
+#endif
                 else {
                     if(!tex.texture) tex.upload();
-                    string tcNames[] = {"tcScale0"_,"tcScale1"_,"tcScale2"_,"tcScale3"_};
-                    if(tcScales[i]!=tex.tcScale) { GLUniform uniform = program[tcNames[i]]; if(uniform) uniform=tex.tcScale; tcScales[i]=tex.tcScale; }
-                    string rgbNames[] = {"rgbScale0"_,"rgbScale1"_,"rgbScale2"_,"rgbScale3"_};
-                    if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program[rgbNames[i]]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
+                    program["tex"_+str(i)] = i;
+                    assert_(i<4);
+                    if(tcScales[i]!=tex.tcScale) { GLUniform uniform = program["tcScale"_+str(i)]; if(uniform) uniform=tex.tcScale; tcScales[i]=tex.tcScale; }
+                    if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program["rgbScale"_+str(i)]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
                     tex.texture->bind(i);
                 }
             }

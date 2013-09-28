@@ -78,22 +78,22 @@ struct BSP {
 #define LUMP(T,s,p) \
     struct { int offset, length; } s##Lump; \
     inline ref<T> p() const { return ref<T>((const T*)((const char*)this+s##Lump.offset), s##Lump.length / sizeof(T)); }
-    LUMP( char, entity, entities )  // Game-related object descriptions.
-    LUMP( bspShader, shader, shaders )  // Surface descriptions.
-    LUMP( vec4, plane, planes )    // Planes used by map geometry.
-    LUMP( char, node, nodes )     // BSP tree nodes.
-    LUMP( bspLeaf, leaf, leaves )     // BSP tree leaves.
-    LUMP( int, leafFace, leafFaces ) // Lists of face indices, one list per leaf.
-    LUMP( int, leafBrush, leafBrushes)// Lists of brush indices, one list per leaf.
-    LUMP( bspModel, model, models ) // Descriptions of rigid world geometry in map.
-    LUMP( char, brush, brushes )   // Convex polyhedra used to describe solid space.
-    LUMP( char, brushSide, brushSides )// Brush surfaces.
+    LUMP( char, entity, entities )  // Game-related object descriptions
+    LUMP( bspShader, shader, shaders )  // Surface descriptions
+    LUMP( vec4, plane, planes )    // Planes used by map geometry
+    LUMP( char, node, nodes )     // BSP tree nodes
+    LUMP( bspLeaf, leaf, leaves )     // BSP tree leaves
+    LUMP( int, leafFace, leafFaces ) // Lists of face indices, one list per leaf
+    LUMP( int, leafBrush, leafBrushes)// Lists of brush indices, one list per leaf
+    LUMP( bspModel, model, models ) // Descriptions of rigid world geometry in map
+    LUMP( char, brush, brushes )   // Convex polyhedra used to describe solid space
+    LUMP( char, brushSide, brushSides )// Brush surfaces
     LUMP( ibspVertex, vertex, vertices )  // Vertices used to describe faces. //FIXME: or xbspVertex
     LUMP( int, index, indices ) // Lists of indices
-    LUMP( char, effect, effects )   // List of special map effects.
-    LUMP( bspFace, face, faces )     // Surface geometry.
-    LUMP( char, lightMap, lightMaps ) // Packed lightmap data.
-    LUMP( ibspVoxel, lightVoxel, lightVolume ) // Local illumination data.
-    LUMP( char, visData, visData )   // Cluster-cluster visibility data.
+    LUMP( char, effect, effects )   // List of special map effects
+    LUMP( bspFace, face, faces )     // Surface geometry
+    LUMP( char, lightMap, lightMaps ) // Packed lightmap data
+    LUMP( ibspVoxel, lightVoxel, lightVolume ) // Local illumination data //FIXME: or xbspVoxel
+    LUMP( char, visData, visData )   // Cluster-cluster visibility data
 #undef LUMP
 };

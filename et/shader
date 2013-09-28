@@ -259,23 +259,24 @@ lightmap {
 
 lightgrid {
  vertex {
-  uniform vec3 gridMin;
-  uniform vec3 gridMax;
   out vec3 lightTexCoords;
-  lightTexCoords = (position.xyz-gridMin)/(gridMax-gridMin);
+  uniform mat4 modelLightMatrix;
+  lightTexCoords = (modelLightMatrix * position).xyz;
  }
  fragment {
   in vec3 lightTexCoords;
   uniform sampler3D lightGrid0;
   uniform sampler3D lightGrid1;
-  albedo.rgb *= texture(lightGrid0, lightTexCoords).rgb;
+  albedo.rgb *= (texture(lightGrid0, lightTexCoords).rgb + texture(lightGrid1, lightTexCoords).rgb); // Assumes dot(normal, dir) = 1
  }
 }
 
 
 gamma {
  fragment {
-  albedo.rgb = pow(albedo.rgb, vec3(1/1.3)); // Applies default ET gamma before writing pixel (forward rendering)
+  float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; } // Applies sRGB compression before writing pixel (forward rendering)
+  //float sRGB(float c) { return pow(c,1/1.3); } // Applies default ET gamma (1.3) before writing pixel (forward rendering) (sRGB (^2.4) displays squared original values)
+  albedo.rgb=vec3(sRGB(albedo.r),sRGB(albedo.g),sRGB(albedo.b));
  }
 }
 
