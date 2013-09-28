@@ -118,30 +118,80 @@ debug {
  }
 }
 
-texture {
+displace {
  vertex {
-  tangent {
-   in vec3 tangent;
-   in vec3 bitangent;
-   out vec3 vertexTangent;
-   vertexTangent = normalMatrix * tangent;
-   out vec3 vertexBiTangent;
-   vertexBiTangent = normalMatrix * bitangent;
+  uniform vec3 viewOrigin;
+  out vec3 tangentViewRay;
+  tangentViewRay = transpose(mat3(tangent, bitangent, normal)) * (viewOrigin-position.xyz);
+ }
+ fragment {
+  in vec3 tangentViewRay;
+  relief {
+   vec3 V = normalize(tangentViewRay);
+   vec2 S = tcScale$.z * V.xy / V.z;
+   const int linearSteps = 15;
+   const float depthStep = 1.0 / float(linearSteps);
+   float depth = 0.0;
+   float height,previousHeight=1.0;
+   for(int i=0; i<linearSteps; ++i) {
+    depth += depthStep;
+    height = texture(tex$, T + S * depth).a;
+    if(depth >= height) break;
+    previousHeight=height;
+   }
+   float bestDepth = depth;
+   const int bisectionSteps = 6;
+   float size = depthStep;
+   for(int i=0; i<bisectionSteps; ++i) {
+    size *= 0.5;
+    float height = texture(tex$, T + S * depth).a;
+    if(depth >= height) {
+     bestDepth = depth;
+     depth -= 2.0 * size;
+    }
+    depth += size;
+   }
+   T += S*bestDepth;
   }
-  displace {
-   uniform vec3 viewOrigin;
-   out vec3 tangentViewRay;
-   tangentViewRay = transpose(mat3(tangent, bitangent, normal)) * (viewOrigin-position.xyz);
+  cone {
+   vec3 V = normalize(tangentViewRay);
+   vec3 S = vec3( tcScale$.z * V.xy / V.z, 1.0 );
+   float rayRatio = length(S.xy);
+   const int coneSteps = 16;
+   vec3 P=vec3(T,0.0);
+   for(int i=0; i<coneSteps; i++) {
+     vec4 t = texture(tex$, P.xy);
+     P += S*t.b*clamp(t.a-P.z,0.0,1.0)/(rayRatio+t.b);
+   }
+   T = P.xy;
   }
  }
+}
+
+tangent {
+ vertex {
+  in vec3 tangent;
+  in vec3 bitangent;
+  out vec3 vertexTangent;
+  vertexTangent = normalMatrix * tangent;
+  out vec3 vertexBiTangent;
+  vertexBiTangent = normalMatrix * bitangent;
+ }
+ tangent {
+  in vec3 vertexTangent;
+  in vec3 vertexBiTangent;
+  vec3 computeNormal( vec2 xy ) { return vec3( xy, sqrt(1.0 - xy.x*xy.x - xy.y*xy.y) ); }
+  normal = sfactor$*((mat3(-vertexTangent,vertexBiTangent,vertexNormal) * computeNormal(2.0*texture(tex$,T*tcScale$.xy).xy-1.0))+1)/2
+           + dfactor$*normal.rgb;
+ }
+}
+
+albedo {
  fragment {
   uniform sampler2D tex$;
   uniform vec3 tcScale$;
   uniform vec3 rgbScale$;
   vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,T*tcScale$.xy);
-  lightmap {
-   sample$ = texture(tex$,vertexLightmap);
-  }
   vertexAlpha {
    sample$.a = vertexAlpha;
   }
@@ -193,61 +243,39 @@ texture {
    dfactor$=vec3(1.0)-sample$.rgb;
    albedo.a=(sample$.r+sample$.b+sample$.g)/3;
   }
-  albedo {
-   albedo.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*albedo.rgb;
-   fog {
-     albedo *= max(0,1-length(viewPos)/fogOpacity);
-   }
+  albedo.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*albedo.rgb;
+  fog {
+    albedo *= max(0,1-length(viewPos)/fogOpacity);
   }
-  displace {
-   in vec3 tangentViewRay;
-   relief {
-    vec3 V = normalize(tangentViewRay);
-    vec2 S = tcScale$.z * V.xy / V.z;
-    const int linearSteps = 15;
-    const float depthStep = 1.0 / float(linearSteps);
-    float depth = 0.0;
-    float height,previousHeight=1.0;
-    for(int i=0; i<linearSteps; ++i) {
-     depth += depthStep;
-     height = texture(tex$, T + S * depth).a;
-     if(depth >= height) break;
-     previousHeight=height;
-    }
-    float bestDepth = depth;
-    const int bisectionSteps = 6;
-    float size = depthStep;
-    for(int i=0; i<bisectionSteps; ++i) {
-     size *= 0.5;
-     float height = texture(tex$, T + S * depth).a;
-     if(depth >= height) {
-      bestDepth = depth;
-      depth -= 2.0 * size;
-     }
-     depth += size;
-    }
-    T += S*bestDepth;
-   }
-   cone {
-    vec3 V = normalize(tangentViewRay);
-    vec3 S = vec3( tcScale$.z * V.xy / V.z, 1.0 );
-    float rayRatio = length(S.xy);
-    const int coneSteps = 16;
-    vec3 P=vec3(T,0.0);
-    for(int i=0; i<coneSteps; i++) {
-      vec4 t = texture(tex$, P.xy);
-      P += S*t.b*clamp(t.a-P.z,0.0,1.0)/(rayRatio+t.b);
-    }
-    T = P.xy;
-   }
-  }
-  tangent {
-   in vec3 vertexTangent;
-   in vec3 vertexBiTangent;
-   vec3 computeNormal( vec2 xy ) { return vec3( xy, sqrt(1.0 - xy.x*xy.x - xy.y*xy.y) ); }
-   normal = sfactor$*((mat3(-vertexTangent,vertexBiTangent,vertexNormal) * computeNormal(2.0*texture(tex$,T*tcScale$.xy).xy-1.0))+1)/2
-            + dfactor$*normal.rgb;
-  }
+ }
+}
+
+lightmap {
+ fragment {
+  uniform sampler2D tex$;
+  albedo.rgb *= texture(tex$,vertexLightmap).rgb;
+ }
+}
+
+lightgrid {
+ vertex {
+  uniform vec3 gridMin;
+  uniform vec3 gridMax;
+  out vec3 lightTexCoords;
+  lightTexCoords = (position.xyz-gridMin)/(gridMax-gridMin);
+ }
+ fragment {
+  in vec3 lightTexCoords;
+  uniform sampler3D lightGrid0;
+  uniform sampler3D lightGrid1;
+  albedo.rgb *= texture(lightGrid0, lightTexCoords).rgb;
+ }
+}
+
+
+gamma {
+ fragment {
+  albedo.rgb = pow(albedo.rgb, vec3(1/1.3)); // Applies default ET gamma before writing pixel (forward rendering)
  }
 }
 

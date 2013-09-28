@@ -161,6 +161,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
     for(pair<GLShader*, array<Object>> e: objects) {
         GLShader& program = *e.key;
         program.bind();
+        {GLUniform min=program["gridMin"_], max=program["gridMax"_]; if(min || max) min=scene.gridMin, max=scene.gridMax;}
         //shader["fogOpacity"] = /*scene.sky ? scene.sky->fogOpacity :*/ 8192;
         //shader["clipPlane"] = clipPlane;
         program.bindFragments({"albedo"_}); //program.bindFragments({"albedo"_,"normal"_});
@@ -186,6 +187,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         for(Object& object: objects) {
 #endif
             Shader& shader = *object.surface.shader;
+            assert_(&shader);
             if(object.transform != currentTransform) {
                 program["modelViewProjectionMatrix"_] = projection*view*object.transform;
                 program["normalMatrix"_]= (view*object.transform).normalMatrix();
@@ -196,14 +198,18 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 currentTransform=object.transform;
             }
             if(object.uniformColor!=currentColor) { GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor; currentColor=object.uniformColor; }
-            for(uint i: range(shader.size)) {
+            for(int i: range(shader.size)) {
                 Texture& tex = shader[i];
-                if(!tex.texture) tex.upload();
-                string tcNames[] = {"tcScale0"_,"tcScale1"_,"tcScale2"_,"tcScale3"_};
-                if(tcScales[i]!=tex.tcScale) { GLUniform uniform = program[tcNames[i]]; if(uniform) uniform=tex.tcScale; tcScales[i]=tex.tcScale; }
-                string rgbNames[] = {"rgbScale0"_,"rgbScale1"_,"rgbScale2"_,"rgbScale3"_};
-                if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program[rgbNames[i]]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
-                tex.texture->bind(i);
+                /**/ if(tex.path=="$lightgrid0"_) { assert(tex.type=="lightgrid"_); program["lightGrid0"_]=i; scene.lightGrid[0].bind(i); }
+                else if(tex.path=="$lightgrid1"_) { assert(tex.type=="lightgrid"_); program["lightGrid1"_]=i; scene.lightGrid[1].bind(i); }
+                else {
+                    if(!tex.texture) tex.upload();
+                    string tcNames[] = {"tcScale0"_,"tcScale1"_,"tcScale2"_,"tcScale3"_};
+                    if(tcScales[i]!=tex.tcScale) { GLUniform uniform = program[tcNames[i]]; if(uniform) uniform=tex.tcScale; tcScales[i]=tex.tcScale; }
+                    string rgbNames[] = {"rgbScale0"_,"rgbScale1"_,"rgbScale2"_,"rgbScale3"_};
+                    if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program[rgbNames[i]]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
+                    tex.texture->bind(i);
+                }
             }
             object.surface.draw(program, true, true, shader.vertexBlend, shader.tangentSpace);
 

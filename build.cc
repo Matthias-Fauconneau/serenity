@@ -139,6 +139,7 @@ struct Build {
                     String object = tmp+"files/"_+name+".o"_;
                     int64 lastFileEdit = File(name, subfolder).modifiedTime();
                     if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
+                        log(name);
                         if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
                     }
                     lastEdit = max(lastEdit, lastFileEdit);
@@ -153,6 +154,7 @@ struct Build {
                 args << copy(files);
                 args << apply(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
+                log(name);
                 if(execute("/usr/bin/g++"_,toRefs(args))) fail();
             }
             if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);

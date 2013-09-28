@@ -30,18 +30,18 @@ void Scene::parseMaterialFile(string path) {
             string value = s.untilAny("\r\n"_);
             array<string> args = split(value); //l.replace(QRegExp("[,()]")," ").simplified().split(' ').mid(1);
             args.filter([](const string& s){return s=="("_||s==")"_;});
-            /**/ if(key=="map"_) {
-                //if(startsWith(args[0],"$"_)) { current=0; continue; } //TODO: lightmap
+            /**/ if(key=="map"_ || key=="clampmap"_ || key=="lightmap"_) { //diffusemap
                 if(!current) { shader.append(Texture()); current=&shader.last(); }
-                if(args[0]=="$lightmap"_) current->type<<" lightmap"_;
                 current->path = String(args[0]);
+                if(key=="clampmap"_) current->clamp=true;
+                if(key=="lightmap"_) assert(current->path=="$lightmap"_);
             }
-            else if(split("implicitMap implicitBlend implicitMask lightmap clampmap diffusemap"_).contains(key)) {
+            else if(split("implicitMap implicitBlend implicitMask"_).contains(key)) {
                 string map = args[0];
                 if(map=="-"_) map = name;
                 shader.append(Texture(map)); current=&shader.last();
                 if(key=="implicitMask"_||key=="implicitBlend"_) { current->alpha=true; current->type<<" alphaTest"_; shader.alphaTest=true; }
-                //TODO: lightmap
+                shader.append(Texture("$lightmap"_)); shader.last().type<<" sfactor_dst_color dfactor_zero"_;
             }
             /*else if(key=="bumpmap"_||key=="normalmap") {
                         bool hasBumpMap=false; foreach(Texture t,shader) if(t.type.contains("tangent")) {
@@ -141,16 +141,53 @@ array<String> Scene::search(const string& query, const string& type) {
     return files;
 }
 
-Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
-    size_t N = sizeof(Vertex)/sizeof(float);
-    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[N];
-    for(int i:range(N)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
-    return (Vertex)(*(Vertex*)V);
-}
-
 struct ID { int texture, lightmap; };
 bool operator==(const ID& a, const ID& b) { return a.texture==b.texture && a.lightmap==b.lightmap; }
 string str(const ID& o) { return str(o.texture, o.lightmap); }
+
+Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
+    size_t N = sizeof(Vertex)/sizeof(float);
+    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[N];
+    for(int i: range(N)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
+    return (Vertex)(*(Vertex*)V);
+}
+
+Shader& Scene::getShader(string name, int lightmap) {
+    Shader& shader = shaders[name];
+    if(!shader.name) {
+        shader.name=String(name);
+        shader.append(Texture(name));
+        shader.append(Texture("$lightmap"_));
+    }
+    for(Texture& texture: shader) {
+        if(texture.path=="$lightmap"_ || texture.path=="$lightgrid0"_) {
+            if(lightmap>=0) {
+                String lightMapID = "/lm_"_+dec(lightmap,4);
+                Shader& lightMapShader = shaders[name+lightMapID];
+                if(!lightMapShader.name) {
+                    lightMapShader = copy(shader);
+                    if(lightMapShader.last().path=="$lightgrid1"_) lightMapShader.pop();
+                    assert(lightMapShader.size==shader.size);
+                    for(Texture& texture: lightMapShader) if(texture.path=="$lightmap"_) {
+                        texture.type = String("lightmap"_);
+                        texture.path = this->name+lightMapID; // Assumes extern "high resolution" lightmaps are always used (TODO: intern lightmaps)
+                    }
+                    {int albedo=0; for(const Texture& tex: lightMapShader) albedo += find(tex.type,"albedo"_); assert_(albedo, lightMapShader);}
+                }
+                return lightMapShader;
+            } else if(texture.path=="$lightmap"_) {
+                texture.path = String("$lightgrid0"_);
+                texture.type = String("lightgrid"_);
+                shader << Texture("$lightgrid1"_); // Reserve second texture sampler
+                shader.last().type = String(""_); // Handled by first slot
+                {int albedo=0; for(const Texture& tex: shader) albedo += find(tex.type,"albedo"_); assert_(albedo, shader);}
+                break;
+            }
+        }
+    }
+    return shader;
+}
+
 array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int firstFace, int numFaces, bool leaf) {
     map<ID, Surface> surfaces;
     for(int f: range(firstFace,firstFace+numFaces)) {
@@ -187,7 +224,7 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
 
     for(pair<ID, Surface> surface: surfaces) {
         string name = str(bsp.shaders()[surface.key.texture].name);
-        Shader& shader = shaders[name];
+        const Shader& shader = shaders[name];
         //if(name.contains(QRegExp("ocean")/*|water|icelake*/)){shader.name=name; model<<Object(surfaces[i],shader); continue; }
         if(shader.properties.contains("skyparms"_)) { /// remove sky surfaces, parse sky params
             /*QString q3map_sun = shader.properties.value("q3map_sun");
@@ -201,14 +238,7 @@ array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int
             }*/
             continue;
         }
-        if(!shader.name) { shader.name=String(name); shader.append(Texture(name)); } //TODO: $lightmap
-        for(Texture& texture: shader) {
-            if(texture.path=="$lightmap"_) {
-                if(surface.key.lightmap>=0) texture.path = this->name+"/lm_"_+dec(surface.key.lightmap,4)+".tga"_; // Assumes extern "high resolution" lightmaps are always used (TODO: intern lightmaps)
-                else texture.path = String("$white"_);
-            }
-        }
-        surface.value.shader = &shader;
+        surface.value.shader = &getShader(name, surface.key.lightmap);
     }
     return move(surfaces.values);
 }
@@ -247,8 +277,7 @@ array<Surface> Scene::importMD3(string modelPath) {
                 }
             }
         }
-        if(shaders.contains(name)) target.shader = shaders.at(name).pointer;
-        else { Shader* shader = shaders[copy(name)].pointer; if(!shader->name) { shader->name=copy(name); shader->append(Texture(name)); } target.shader=shader; }
+        target.shader = &getShader(name);
         surfaces << move(target);
     }
     return surfaces;
@@ -301,7 +330,11 @@ Scene::Scene(string file, const Folder& data) {
 
     /// Loads BSP geometry
     buffer<Vertex> vertices (bsp.vertices().size);
-    for(uint i: range(bsp.vertices().size)) { const ibspVertex& v = bsp.vertices()[i]; vertices[i] = Vertex(v.position, vec2(v.texture.x,1-v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,1-v.lightmap.y)); }
+    for(uint i: range(bsp.vertices().size)) {
+        const ibspVertex& v = bsp.vertices()[i];
+        //assert(v.color[0]==0xFF && v.color[1]==0xFF && v.color[2]==0xFF, v.color[0], v.color[1], v.color[2]);
+        vertices[i] = Vertex(v.position, vec2(v.texture.x,1-v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,1-v.lightmap.y));
+    }
     for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)]<< importBSP(bsp, vertices, leaf.firstFace, leaf.numFaces, true);
     for(uint i: range(bsp.models().size)) {
         const bspModel& model = bsp.models()[i];
@@ -363,6 +396,24 @@ Scene::Scene(string file, const Folder& data) {
     for(array<Object>& a: alphaTest.values) for(Object& o: a) objects << &o;
     for(array<Object>& a: blendAdd.values) for(Object& o: a) objects << &o;
     for(array<Object>& a: blendAlpha.values) for(Object& o: a) objects << &o;
+
+    /// Light Volume
+    vec3 gridSize = toVec3(entities.at("worldspawn"_).at("gridsize"_));
+    ref<float> worldBB = bsp.models()[0].boundingBox;
+    gridMin = vec3(worldBB[0],worldBB[1],worldBB[2]);
+    gridMax = vec3(worldBB[3],worldBB[4],worldBB[5]);
+    uint nx = floor(gridMax.x / gridSize.x) - ceil(gridMin.x / gridSize.x) + 1;
+    uint ny = floor(gridMax.y / gridSize.y) - ceil(gridMin.y / gridSize.y) + 1;
+    uint nz = floor(gridMax.z / gridSize.z) - ceil(gridMin.z / gridSize.z) + 1;
+    assert(nx*ny*nz == bsp.lightVolume().size);
+    buffer<byte4> lightData[2] = {buffer<byte4>(nx*ny*nz),buffer<byte4>(nx*ny*nz)};
+    for(int i: range(nx*ny*nz)) { // Splits 8 components in 2 3D textures
+        const ibspVoxel& voxel = bsp.lightVolume()[i];
+        lightData[0][i] = byte4(voxel.ambient[0],voxel.ambient[1],voxel.ambient[2],voxel.dir[0]);
+        lightData[1][i] = byte4(voxel.directional[0], voxel.directional[1], voxel.directional[2], voxel.dir[1]); //TODO
+    }
+    lightGrid[0] = GLTexture(nx,ny,nz,lightData[0]);
+    lightGrid[1] = GLTexture(nx,ny,nz,lightData[1]);
 }
 
 vec4 Scene::defaultPosition() const {

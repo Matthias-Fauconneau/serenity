@@ -18,6 +18,7 @@ void glBlendNone() { glDisable(GL_BLEND); }
 /// Shader
 
 void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
+//void GLUniform::operator=(uint v) { assert(location>=0); glUseProgram(program); glUniform1ui(location,v); }
 void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program); glUniform1f(location,v); }
 void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
 void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
@@ -262,7 +263,7 @@ void glDrawLine(GLShader& shader, vec2 p1, vec2 p2) {
 }
 
 /// Texture
-GLTexture::GLTexture(int width, int height, uint format, const void* data) : width(width), height(height), format(format) {
+GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : width(width), height(height), format(format) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     if((format&3)==sRGB8)
@@ -284,7 +285,7 @@ GLTexture::GLTexture(int width, int height, uint format, const void* data) : wid
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     if(format&Anisotropic) {
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
+        //glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
     }
     if(format&Clamp) {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -296,8 +297,22 @@ GLTexture::GLTexture(const Image& image, uint format)
     : GLTexture(image.width, image.height, (image.alpha?sRGBA:sRGB8)|format, image.data) {
     assert(width==image.stride);
 }
+GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data) : width(width), height(height), depth(depth), format(sRGBA|Bilinear|Clamp) {
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_3D, id);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
-void GLTexture::bind(uint sampler) const { assert(id); glActiveTexture(GL_TEXTURE0+sampler); glBindTexture(GL_TEXTURE_2D, id); }
+void GLTexture::bind(uint sampler) const {
+    assert(id);
+    glActiveTexture(GL_TEXTURE0+sampler);
+    glBindTexture(depth?GL_TEXTURE_3D:GL_TEXTURE_2D, id);
+}
 
 /// Framebuffer
 

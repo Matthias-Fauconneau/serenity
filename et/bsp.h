@@ -9,7 +9,13 @@
     float color[4];
     float lightColor[4];
     vec3 lightDirection;
-};*/
+};
+struct xbspVoxel {
+    vec3 ambient;
+    vec3 directional;
+    uint8 dir[2];
+};
+*/
 
 struct ibspVertex {
     vec3 position;
@@ -26,20 +32,20 @@ struct bspShader {
 };
 
 struct bspFace {
-    int texture; // Texture index.
-    int effect;  // Index into lump 12 (Effects), or -1.
+    int texture; // Texture index
+    int effect;  // Index into lump 12 (Effects), or -1
     int type;    // Face type. 1=polygon, 2=patch, 3=mesh, 4=billboard
-    int firstVertex;  // Index of first vertex.
-    int numVertices; // Number of vertices.
-    int firstIndex; // Index of first mesh index.
-    int numIndices;  // Number of indices.
-    int lightMapIndex; // Lightmap index.
-    int lightMapStart[2]; // Corner of this face's lightmap image in lightmap.
-    int lightMapSize[2]; // Size of this face's lightmap image in lightmap.
-    float lightMapOrigin[3]; // World space origin of lightmap.
-    float lm_vecs[2][3]; //  World space lightmap s and t unit vectors.
-    float normal[3]; // Surface normal.
-    int size[2]; // Patch dimensions.
+    int firstVertex;  // Index of first vertex
+    int numVertices; // Number of vertices
+    int firstIndex; // Index of first mesh index
+    int numIndices;  // Number of indices
+    int lightMapIndex; // Lightmap index
+    int lightMapStart[2]; // Corner of this face's lightmap image in lightmap
+    int lightMapSize[2]; // Size of this face's lightmap image in lightmap
+    float lightMapOrigin[3]; // World space origin of lightmap
+    float lm_vecs[2][3]; //  World space lightmap s and t unit vectors
+    float normal[3]; // Surface normal
+    int size[2]; // Patch dimensions
 };
 
 struct bspLeaf {
@@ -58,6 +64,12 @@ struct bspModel {
     int numFaces;
     int firstBrush;
     int numBrushes;
+};
+
+struct ibspVoxel {
+    uint8 ambient[3]; //Ambient color component (RGB)
+    uint8 directional[3]; //Directional color component (RGB)
+    uint8 dir[2]; //Direction to light (phi, theta)
 };
 
 struct BSP {
@@ -81,7 +93,7 @@ struct BSP {
     LUMP( char, effect, effects )   // List of special map effects.
     LUMP( bspFace, face, faces )     // Surface geometry.
     LUMP( char, lightMap, lightMaps ) // Packed lightmap data.
-    LUMP( char, lightVoxel, lightVolume ) // Local illumination data.
+    LUMP( ibspVoxel, lightVoxel, lightVolume ) // Local illumination data.
     LUMP( char, visData, visData )   // Cluster-cluster visibility data.
 #undef LUMP
 };

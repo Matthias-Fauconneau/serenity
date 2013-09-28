@@ -3,18 +3,15 @@
 //#include "tga.h"
 
 Folder data __attribute((init_priority(1000))) = ""_;
-map<String,unique<GLTexture>> textures;
+map<String,unique<GLTexture>> textures __attribute((init_priority(1000)));
 FILE(shader)
 
 void Texture::upload() {
     if(endsWith(path,".tga"_)) path=String(section(path,'.',0,-2));
     if(!textures.contains(path)) {
-        if(find(type,"albedo"_)) {
+        if(find(type,"albedo"_) || find(type,"lightmap"_)) {
             Image image;
-            if(path=="$white"_) {
-                image = Image(1,1);
-                image(0,0) = 0xFF;
-            } else {
+            {
                 Map file;
                 if(existsFile(path,data)) file=Map(path,data);
                 else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
@@ -41,7 +38,7 @@ void Texture::upload() {
                     }
                 }
             }
-            textures.insert(copy(path),unique<GLTexture>(image, (image.alpha?sRGBA:sRGB8)|Mipmap|Bilinear|Anisotropic));
+            textures.insert(copy(path),unique<GLTexture>(image, (image.alpha?sRGBA:sRGB8)|Mipmap|Bilinear|Anisotropic|(clamp?Clamp:0)));
         } else error(type); /*{
             QImage image;
             if(QFile::exists(findImage(path+"_cone"))) image=loadImage(path+"_cone");
@@ -104,7 +101,8 @@ GLShader* Shader::bind() {
     if(!program) {
         static map<String,unique<GLShader>> programs;
         array<String> stages; stages << copy(type);
-        for(const Texture& texture: *this) stages<<"texture "_+texture.type;
+        for(const Texture& texture: *this) stages << copy(texture.type);
+        stages << String("gamma"_); //FIXME: Forward rendering only
         String id = join(stages,";"_);
         if(!programs.contains(id)) programs.insert(copy(id), unique<GLShader>(shader(), toRefs(stages)));
         program = programs.at(id).pointer;

@@ -17,6 +17,7 @@ struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
     explicit operator bool() { return location>=0; }
     void operator=(int);
+    //void operator=(uint);
     void operator=(float);
     void operator=(vec2);
     void operator=(vec3);
@@ -97,18 +98,19 @@ void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 enum Format { sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3, Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
 struct GLTexture {
     handle<uint> id;
-    uint width=0, height=0;
+    uint width=0, height=0, depth=0;
     uint format;
 
     GLTexture(){}
     default_move(GLTexture);
-    GLTexture(int width, int height, uint format=sRGB8, const void* data=0);
+    GLTexture(uint width, uint height, uint format=sRGB8, const void* data=0);
     GLTexture(const Image& image, uint format=sRGB8);
+    GLTexture(uint width, uint height, uint depth, const ref<byte4>& data);
     ~GLTexture();
 
     void bind(uint sampler=0) const;
     operator bool() const { return id; }
-    int2 size() const { return int2(width,height); }
+    //int2 size() const { return int2(width,height); }
 };
 
 enum { ClearDepth=0x100, ClearColor=0x4000 };
