@@ -41,10 +41,9 @@ void View::render(int2, int2 size) {
 
     glDepthTest(true);
     if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
-    //glPolygonOffsetFill(true); glPolygonOffset(-2,-1);
     if(scene.blendAlpha) { glBlendAlpha(); draw(scene.blendAlpha,BackToFront); }
     if(scene.blendColor)  { glBlendColor(); draw(scene.blendColor,BackToFront); }
-    glBlendNone(); //glPolygonOffsetFill(false);
+    glBlendNone();
     glDepthTest(false);
 
     frameBuffer.blit(resolvedBuffer); // Resolves multisample buffer into resolvedBuffer
@@ -70,10 +69,11 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         GLShader& program = disableShaders ? simple.bind() : *e.key;
         program.bind();
         program.bindFragments({"color"_});
-        program["fog"_] = scene.fog;
+        if(program["fog"_]) program["fog"_] = scene.fog;
 
         array<Object>& objects = e.value;
-        mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbGens[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
+        // Save current state to minimize state changes (TODO: UBOs)
+        bool polygonOffset=false; mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbGens[4]={0,0,0,0};
 #ifdef VIEW_FRUSTUM_CULLING
         QMap<float,Object*> depthSort; //useless without proper partitionning
         for(int n=0;n<objects.count();n++) { Object* object = objects[n];
@@ -92,13 +92,17 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         for(Object& object: objects) {
 #endif
             Shader& shader = object.surface.shader;
-            assert(shader.program==program);
+            assert(shader.program == &program);
+            if(polygonOffset!=shader.polygonOffset) {
+                glPolygonOffsetFill(polygonOffset=shader.polygonOffset);
+                glDepthMask(!polygonOffset);
+            }
 
             if(shader.skyBox) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
             if(object.transform != currentTransform) {
                 program["modelViewProjectionMatrix"_] = projection*view*object.transform;
-                program["normalMatrix"_]= (view*object.transform).normalMatrix();
-                program["modelViewMatrix"_] = view*object.transform;
+                if(program["normalMatrix"_]) program["normalMatrix"_]= (view*object.transform).normalMatrix();
+                if(program["modelViewMatrix"_]) program["modelViewMatrix"_] = view*object.transform;
                 GLUniform modelLightMatrix=program["modelLightMatrix"_]; // Model to world
                 if(modelLightMatrix) {
                     mat4 light; light.scale(vec3(1)/(scene.gridMax-scene.gridMin)); light.translate(-scene.gridMin);
@@ -132,6 +136,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             //static uint i=0; if(i++%2) continue; // DEBUG: check if draw call limited
             object.surface.draw(program);
         }
+        if(polygonOffset) { glPolygonOffsetFill(false);  glDepthMask(true); }
     }
 }
 
@@ -177,7 +182,6 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
             selected->uniformColor=vec3(1,0.5,0.5);
             log(selected->surface.shader.name);
             log(selected->surface.shader.source);
-            log(selected->surface.shader.program->source);
         }
         return true;
     }

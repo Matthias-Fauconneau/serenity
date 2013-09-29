@@ -50,7 +50,7 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
             else if(key=="fogparms"_) shader.properties.insert(String("fogparms"_), join(args," "_));
             else if(key=="q3map_sun"_||key=="q3map_sunext"_) shader.properties[String("q3map_sun"_)]=String(value);
             else if(key=="sunshader"_) shader.properties[String("sunshader"_)]=String(value);
-            else if(key=="nofog"_) shader.type=replace(shader.type,"position fog"_,""_);
+            else if(key=="nofog"_) shader.final.clear();
             else if(split(
                         "tesssize qer_nocarve q3map_normalimage q3map_lightmapsize q3map_lightmapmergable q3map_lightmapaxis "
                         "q3map_tcgen q3map_tcmod q3map_baseshader q3map_baseshader q3map_foliage q3map_surfacesurfaceparm "

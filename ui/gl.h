@@ -5,8 +5,10 @@
 struct mat3x2; struct mat3; struct mat4;
 struct Image;
 
+extern "C" void glDepthMask(uint8 enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
+void glPolygonOffsetFill(bool enable);
 void glBlendAlpha();
 void glBlendColor();
 void glBlendNone();

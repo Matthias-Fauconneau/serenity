@@ -28,7 +28,7 @@ struct Scene {
     VertexBuffer vertices; // Referenced by Surfaces
     map<String, array<Surface>> models;
     Shader* sky = 0;
-    vec4 fog; // RGB, distance
+    vec4 fog = vec4(1,1,1,32768); // RGB, distance
     vec3 gridMin, gridMax; GLTexture lightGrid[3]; // Light grid
     map<GLShader*,array<Object>> opaque, blendAlpha, blendColor; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
     array<Object*> objects; // For hit tests

@@ -109,7 +109,7 @@ array<Surface> Scene::importBSP(const BSP& bsp, int firstFace, int numFaces, boo
 array<Surface> Scene::importMD3(string modelPath) {
     Map map = Map(modelPath,data);
     const MD3& md3 = *(const MD3*)map.data.pointer;
-    assert(ref<byte>(md3.magic)=="IDP3"_ && md3.version==15, modelPath);
+    assert(ref<byte>(md3.magic)=="IDP3"_ && md3.version==15); //TODO: MDC models IDPCv2
     array<Surface> surfaces (md3.surfaceCount);
     for(uint offset=md3.surfaceOffset; offset!=md3.endOffset; offset+=md3.surface(offset).endOffset) {
         const md3Surface& surface = md3.surface(offset);
@@ -246,7 +246,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             models.insert(String("*skybox"_), move(model));
             entities.insert(String("sky"_)).insert(String("model"_), String("*skybox"_));
         }
-        { // Sun
+        if(sky->properties.contains("sunshader"_)) { // Sun
             Shader& shader = getShader(sky->properties.at("sunshader"_));
             assert_(shader.blendAlpha);
             shader.skyBox = true;
@@ -272,7 +272,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             entities.insert(String("sun"_)).insert(String("model"_), String("*sun"_));
         }
     }
-    {// Fog
+    if(entities.at("worldspawn"_).contains("fog"_)) { // Fog
         Shader& fog = shaders.at(entities.at("worldspawn"_).at("_fog"_));
         array<double> v = apply(split(fog.properties.at("fogparms"_)), toDecimal);
         this->fog = vec4(v[0],v[1],v[2],v[3]);
@@ -280,8 +280,12 @@ Scene::Scene(string file, const Folder& data) : data(data) {
 
     /// Converts Entities to Objects (and compile shaders)
     for(const Entity& e: entities.values) if(e.contains("model"_)) {
-        string name = e.at("model"_);
-        if(!models.contains(name) && !startsWith(name,"*"_)) models[name]=importMD3(search(section(name,'.',0,-2)+"."_,"md3"_).first());
+        String name = replace(e.at("model"_),"\\"_,"/"_);
+        if(!models.contains(name) && !startsWith(name,"*"_)) {
+            array<String> files = search(section(name,'.',0,-2)+"."_,"md3"_);
+            if(!files && search(section(name,'.',0,-2)+"."_,"mdc"_)) continue; //TODO: MDC support
+            models.insert(copy(name), importMD3(files.first()));
+        }
         if(!models.contains(name)) { error(name); continue; }
         if(!models.at(name)) continue; // Some BSP models are empty
         mat4 transform;
@@ -303,7 +307,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             shader.bind(); // Forces shader compilation for correct split
             GLShader* id = shader.program;
             if(shader.blendAlpha) blendAlpha[id] << object;
-            else if(shader.blendColor) error("blendColor");
+            else if(shader.blendColor) blendColor[id] << object;
             else opaque[id] << object;
         }
     }
@@ -316,7 +320,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
     int nx = floor(gridMax.x / gridSize.x) - ceil(gridMin.x / gridSize.x) + 1;
     int ny = floor(gridMax.y / gridSize.y) - ceil(gridMin.y / gridSize.y) + 1;
     int nz = floor(gridMax.z / gridSize.z) - ceil(gridMin.z / gridSize.z) + 1;
-    assert(nx*ny*nz == bsp.lightVolume().size);
+    assert(uint(nx*ny*nz) == bsp.lightVolume().size);
     buffer<byte4> lightData[3] = {buffer<byte4>(nx*ny*nz),buffer<byte4>(nx*ny*nz),buffer<byte4>(nx*ny*nz)};
     for(int i: range(nx*ny*nz)) { // Splits 9 components in 3 3D textures
         const ibspVoxel& voxel = bsp.lightVolume()[i];
@@ -353,6 +357,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
     for(Object* object: objects) for(Texture& texture: object->surface.shader) if(texture.path!="$lightmap"_ && !texture.texture) {
         String& path = texture.path;
         if(endsWith(path,".tga"_)) path=String(section(path,'.',0,-2));
+        path = replace(path,"\\"_,"/"_);
         if(!textures.contains(path)) {
             Map file;
             if(existsFile(path,data)) file=Map(path,data);
@@ -371,7 +376,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
 }
 
 vec4 Scene::defaultPosition() const {
-    const Entity& player = entities.value("info_player_intermission"_, entities.at("info_player_start"_));
+    const Entity& player = *(entities.find("info_player_intermission"_) ?: &entities.at("info_player_start"_));
     vec3 position = toVec3(player.at("origin"_));
     if(player.contains("angle"_)) return vec4(position, float(toDecimal(player.at("angle"_))*PI/180));
     else if(player.contains("target"_)) {

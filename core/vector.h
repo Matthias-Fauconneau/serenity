@@ -112,7 +112,7 @@ typedef vector<xyz,uint16,3> short3;
 typedef vector<xyz,float,3> vec3;
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 inline vec3 normal(vec3 v) {
-    int index; float min=1;
+    int index=0; float min=v[0];
     for(int i: range(3)) if(abs(v[i]) < min) index=i, min=abs(v[i]);
     vec3 t=0; t[index]=1;
     return normalize(cross(v, t));

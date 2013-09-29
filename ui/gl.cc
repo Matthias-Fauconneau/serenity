@@ -10,7 +10,9 @@
 /// Context
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
-void glAlphaTest(bool enable) { if(enable) glEnable(GL_ALPHA_TEST); else glDisable(GL_ALPHA_TEST); }
+void glPolygonOffsetFill(bool enable) {
+    if(enable) { glPolygonOffset(-1,-2); glEnable(GL_POLYGON_OFFSET_FILL); } else glDisable(GL_POLYGON_OFFSET_FILL);
+}
 void glBlendAlpha() { glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
 void glBlendColor() { glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
 void glBlendNone() { glDisable(GL_BLEND); }
@@ -298,7 +300,7 @@ GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCou
 
     glGenRenderbuffers(1, &depthBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, depthBuffer);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_DEPTH_COMPONENT24, width, height);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_DEPTH_COMPONENT32, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer);
 
     glGenRenderbuffers(1, &colorBuffer);

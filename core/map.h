@@ -43,6 +43,7 @@ template<Type K, Type V> struct map {
         return i>=0 ? values[i] : value;
     }
 
+    template<Type KK> const V* find(const KK& key) const { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
     template<Type KK> V* find(const KK& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
     template<Type KK> V& insert(KK&& key) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
