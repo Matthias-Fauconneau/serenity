@@ -3,6 +3,7 @@
 #include "gl.h"
 #include "function.h"
 #include "shader.h"
+#include "time.h"
 struct Scene;
 struct Object;
 
@@ -14,7 +15,7 @@ struct View : Widget {
     bool keyRelease(Key key, Modifiers) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
-    void render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender,bool withShadow, bool reverseWinding=false*/);
+    void render();
     enum Sort { FrontToBack=0, BackToFront=1 };
     void draw(map<GLShader*,array<Object>>& objects,Sort sort=FrontToBack);
 
@@ -30,8 +31,10 @@ struct View : Widget {
 
     vec3 position = 0;
     vec3 velocity = 0;
-    float sprint=2;
+    float sprint = 16;
     int walk=0, strafe=0, jump=0;
     float yaw = 0, pitch=PI/2;
     int2 dragStart = 0; vec2 deltaStart = 0;
+    Time time;
+    float frameTime = 0;
 };

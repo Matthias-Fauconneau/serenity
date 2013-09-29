@@ -16,8 +16,7 @@ void View::render(int2, int2 size) {
     // Updates view
     view=mat4(); view.rotateX(-pitch); view.rotateZ(-yaw); // World to view coordinates transform (i.e rotates world in the reverse direction)
     // Assumes constant frame rate (60fps)
-    velocity += view.inverse()*vec3(strafe*sprint,0,-walk*sprint)+vec3(0,0,jump*sprint);
-    velocity *= 31.0/32; // Velocity damping (friction)
+    velocity = (3.f/4)*velocity + view.inverse()*vec3(strafe*sprint,0,-walk*sprint)+vec3(0,0,jump*sprint); // Friction + Impulse
     position += velocity;
     view.translate( -position );
     projection=mat4(); projection.perspective(PI/4, w, h, 1, 32768); inverseProjection=projection.inverse();
@@ -43,67 +42,21 @@ void View::render(int2, int2 size) {
         glDrawRectangle(program);
     }
 
-    if( norm(velocity) > 0.1 ) contentChanged(); // Keeps rendering at 60fps
+    /*if( norm(velocity) > 0.1 )*/ contentChanged(); // Keeps rendering at 60fps
+    const float alpha = 0;
+    frameTime = alpha*frameTime + (1-alpha)*(float)time;
+    log(str(int(round(frameTime*1000)))+"ms"_, ftoa(1/frameTime,1)+"fps"_);
+    time.reset();
 }
 
-void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool withShadow, bool reverseWinding*/) {
-    // Draws opaque and alpha tested objects into G-Buffer
-#if 1
-    //deferRender.bind(true);
+void View::render() {
     glDepthTest(true);
     if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
-#endif
-    // Draws lights using G-Buffer
-#if 0
-    DepthTest=false;
-    targetRender.bind(true); deferRender.bindSamplers();
-    glBlendAdd();
-    static GLShader program; if(!program.id) program.compile(getGLSL(QStringList("screen deferred position light"),"vertex"),
-                                                             getGLSL(QStringList("screen deferred position light"),"fragment")
-                                                             .replace("%",QString::number(1)));
-    program.bind();
-    program.bindSamplers("depthBuffer","albedoBuffer","normalBuffer");
-    program.bindFragments("color");
-    float nearPlane=(inverseProjection*vec3(0,0,-1)).z, farPlane=(inverseProjection*vec3(0,0,1)).z;
-    program["A"]= farPlane/(nearPlane-farPlane); program["B"]= farPlane*nearPlane/(nearPlane-farPlane);
-    program["fogOpacity"]=scene.sky?scene.sky->fogOpacity:8192;
-    program["inverseProjectionMatrix"]=inverseProjection;
-
-    for(int n=0;n<scene.lights.count();n++) { Light* light = &scene.lights[n]; //OPTI: query visible
-        // View frustum culling
-        int shortcut=light.planeIndex;
-        if( dot(light.origin, planes[shortcut].xyz()) <= -planes[shortcut].w-light.radius ) goto cull;
-        for(int i=0;i<6;i++) if( dot(light.origin, planes[i].xyz())+planes[i].w <= -light.radius ) {
-            light.planeIndex=i;
-            goto cull;
-        }
-        {
-            light.project(projection,view);
-            vec4 lightPosition[1]; vec3 lightColor[1];
-            lightPosition[0]=vec4(light.center.x,light.center.y,light.center.z,light.radius);
-            program["lightPosition"].set(lightPosition,1);
-            lightColor[0]=light.color;
-            program["lightColor"].set(lightColor,1);
-            light.clipMin.z=(light.clipMin.z+1)/2;
-            light.clipMax.z=(light.clipMax.z+1)/2;
-            renderQuad(light.clipMin,light.clipMax);
-        }
-        cull: ;
-    }
-#endif
-    // Forward render transparent objects
-    glDepthTest(true);  //TODO: forward lighting
-    if(scene.blendAlpha) {
-      //PolygonOffsetFill=true; glPolygonOffset(-2,-1);
-        glBlendAlpha(); draw(scene.blendAlpha,BackToFront);
-      //PolygonOffsetFill=false;
-    }
-    if(scene.blendColor) {
-      //PolygonOffsetFill=true; glPolygonOffset(-2,-1);
-        glBlendColor(); draw(scene.blendColor,BackToFront);
-      //PolygonOffsetFill=false;
-    }
-    glDepthTest(false); glBlendNone();
+    //glPolygonOffsetFill(true); glPolygonOffset(-2,-1);
+    if(scene.blendAlpha) { glBlendAlpha(); draw(scene.blendAlpha,BackToFront); }
+    if(scene.blendColor)  { glBlendColor(); draw(scene.blendColor,BackToFront); }
+    glBlendNone(); //glPolygonOffsetFill(false);
+    glDepthTest(false);
 }
 
 void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
@@ -177,7 +130,7 @@ bool View::keyPress(Key key, Modifiers) {
     else if(key=='d') strafe++;
     else if(key==ControlKey) jump--;
     else if(key==' ') jump++;
-    else if(key==ShiftKey) sprint = 8;
+    else if(key==ShiftKey) sprint *= 4;
     else if(key=='q') velocity=vec3(0,0,0);
     else return false;
     return true; // Starts rendering (if view was still)
@@ -189,7 +142,7 @@ bool View::keyRelease(Key key, Modifiers) {
     if(key=='d') strafe--;
     if(key==ControlKey) jump++;
     if(key==' ') jump--;
-    if(key==ShiftKey) sprint = 2;
+    if(key==ShiftKey) sprint /= 4;
     return false;
 }
 bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
