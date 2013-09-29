@@ -14,7 +14,7 @@ struct Scene {
 
     array<String> search(const string& query, const string& type);
     /// Gets or creates a shader ensuring correct lighting method (map, grid or dynamic)
-    Shader& getShader(string name, int lightmap=-1);
+    Shader& getShader(string name, int lightmap=-2);
     array<Surface> importBSP(const BSP& bsp, int firstFace, int numFaces, bool leaf);
     array<Surface> importMD3(string modelPath);
     /// Default position as (x, y, z, yaw angle)

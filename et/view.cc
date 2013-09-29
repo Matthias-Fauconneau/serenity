@@ -51,7 +51,7 @@ void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool
 #if 1
     //deferRender.bind(true);
     glDepthTest(true);
-    if(scene.opaque) { glCullFace(true); draw(scene.opaque); }
+    if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
 #endif
     // Draws lights using G-Buffer
 #if 0
@@ -114,7 +114,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         program.bindFragments({"color"_});
 
         array<Object>& objects = e.value;
-        mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbScales[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
+        mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbGens[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
 #ifdef VIEW_FRUSTUM_CULLING
         QMap<float,Object*> depthSort; //useless without proper partitionning
         for(int n=0;n<objects.count();n++) { Object* object = objects[n];
@@ -147,22 +147,22 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 currentTransform=object.transform;
             }
             if(object.uniformColor!=currentColor) { GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor; currentColor=object.uniformColor; }
-            for(int i: range(shader.size)) {
+            int sampler=0; for(int i: range(shader.size)) {
                 Texture& tex = shader[i];
-                if(tex.path=="$lightmap"_) {
-                    assert_(tex.type=="lightgrid"_);
-                    program["lightGrid0"_]=i; scene.lightGrid[0].bind(i);
-                    program["lightGrid1"_]=int(shader.size); scene.lightGrid[1].bind(shader.size);
-                    program["lightGrid2"_]=int(shader.size+1); scene.lightGrid[2].bind(shader.size+1);
-                }
-                else {
+                if(tex.texture) {
                     assert_(tex.texture);
-                    program["tex"_+str(i)] = i;
+                    program["tex"_+str(i)] = sampler;
                     assert_(i<4);
                     if(tcMods[i]!=tex.tcMod) { GLUniform uniform = program["tcMod"_+str(i)]; if(uniform) uniform=tex.tcMod; tcMods[i]=tex.tcMod; }
-                    if(rgbScales[i]!=tex.rgbScale) { GLUniform uniform = program["rgbScale"_+str(i)]; if(uniform) uniform=tex.rgbScale; rgbScales[i]=tex.rgbScale; }
-                    tex.texture->bind(i);
+                    if(rgbGens[i]!=tex.rgbGen) { GLUniform uniform = program["rgbGen"_+str(i)]; if(uniform) uniform=tex.rgbGen; rgbGens[i]=tex.rgbGen; }
+                    tex.texture->bind(sampler);
+                    sampler++;
                 }
+            }
+            if(find(shader.type,"lightgrid"_)) {
+                program["lightGrid0"_]=sampler; scene.lightGrid[0].bind(sampler); sampler++;
+                program["lightGrid1"_]=sampler; scene.lightGrid[1].bind(sampler); sampler++;
+                program["lightGrid2"_]=sampler; scene.lightGrid[2].bind(sampler); sampler++;
             }
 
             object.surface.draw(program);

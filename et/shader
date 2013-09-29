@@ -47,6 +47,19 @@ surface {
 
   attribute vec3 color;
   vertexColor = color;
+
+  lightgrid {
+   uniform mat4 modelLightMatrix;
+   vec3 lightTexCoords = (modelLightMatrix * position).xyz;
+   uniform sampler3D lightGrid0; // Ambient color
+   uniform sampler3D lightGrid1; // Directionnal color
+   uniform sampler3D lightGrid2; // Direction
+   vec3 ambient = texture(lightGrid0, lightTexCoords).rgb;
+   vec3 directional = texture(lightGrid1, lightTexCoords).rgb;
+   vec3 lightDirection = normalize((texture(lightGrid2, lightTexCoords).xyz*2)-1);
+   uniform mat3 viewNormalMatrix;
+   vertexColor.rgb *= (ambient.rgb + max(0,dot(viewNormalMatrix * lightDirection,vertexNormal))*directional.rgb);
+  }
  }
  fragment {
   uniform vec3 uniformColor;
@@ -59,46 +72,50 @@ color {
  fragment {
   uniform sampler2D tex$;
   uniform mat3x2 tcMod$;
-  uniform vec3 rgbScale$;
-  vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,tcMod$*vec3(vertexTexCoord,1));
-  vertexAlpha { sample$.a = vertexAlpha; }
+  uniform vec3 rgbGen$;
+  {
+   vec3 rgbGen = rgbGen$;
+   vertexColor { rgbGen = vertexColor; }
+   vec4 sample = vec4(rgbGen,1)*texture(tex$,tcMod$*vec3(vertexTexCoord,1));
+   vertexAlpha { sample.a = vertexAlpha; }
 
-  vec3 sfactor$=vec3(1);
-  sfactor_zero { sfactor$=vec3(0); }
-  sfactor_one { sfactor$=vec3(1); }
-  sfactor_src_color { sfactor$=sample$.rgb; }
-  sfactor_dst_color { sfactor$=color.rgb; }
-  sfactor_src_alpha { sfactor$=vec3(sample$.a); }
-  sfactor_one_minus_src_alpha { sfactor$=vec3(1.0-sample$.a); }
-  sfactor_one_minus_dst_alpha { sfactor$=vec3(1.0-color.a); }
-  sfactor_one_minus_dst_color { sfactor$=vec3(1.0-color.rgb); }
+   vec3 sfactor=vec3(1);
+   sfactor_zero { sfactor=vec3(0); }
+   sfactor_one {}
+   sfactor_src_color { sfactor=sample.rgb; }
+   sfactor_dst_color { sfactor=color.rgb; }
+   sfactor_src_alpha { sfactor=vec3(sample.a); }
+   sfactor_one_minus_src_alpha { sfactor=vec3(1.0-sample.a); }
+   sfactor_one_minus_dst_alpha { sfactor=vec3(1.0-color.a); }
+   sfactor_one_minus_dst_color { sfactor=vec3(1.0-color.rgb); }
 
-  vec3 dfactor$=vec3(0);
-  dfactor_zero { dfactor$=vec3(0); }
-  dfactor_one { dfactor$=vec3(1); }
-  dfactor_src_color { dfactor$=sample$.rgb; }
-  dfactor_dst_color { dfactor$=color.rgb; }
-  dfactor_src_alpha { dfactor$=vec3(sample$.a); }
-  dfactor_one_minus_src_alpha { dfactor$=vec3(1.0-sample$.a); }
-  dfactor_one_minus_src_color { dfactor$=vec3(1.0)-sample$.rgb; }
-  dfactor_src_color_plus_src_color { dfactor$=2*sample$.rgb; }
+   vec3 dfactor=vec3(0);
+   dfactor_zero {}
+   dfactor_one { dfactor=vec3(1); }
+   dfactor_src_color { dfactor=sample.rgb; }
+   dfactor_dst_color { dfactor=color.rgb; }
+   dfactor_src_alpha { dfactor=vec3(sample.a); }
+   dfactor_one_minus_src_alpha { dfactor=vec3(1.0-sample.a); }
+   dfactor_one_minus_src_color { dfactor=vec3(1.0)-sample.rgb; }
+   dfactor_src_color_plus_src_color { dfactor=2*sample.rgb; }
 
-  color.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*color.rgb;
+   color.rgb = uniformColor*sfactor*sample.rgb + dfactor*color.rgb;
 
-  blend_zero { color.a = 0; }
-  blend_one { color.a = 1; }
-  blend_src_alpha { color.a = sample$.a; }
-  blend_one_minus_src_alpha {
-   color.a = 1-sample$.a;
-   sfactor_src_alpha { if( sample$.a < 0.5 ) discard; }
+   blend_zero { color.a = 0; }
+   blend_one { color.a = 1; }
+   blend_src_alpha { color.a = sample.a; }
+   blend_one_minus_src_alpha {
+    color.a = 1-sample.a;
+    sfactor_src_alpha { if( sample.a < 0.5 ) discard; }
+   }
+   blend_one_minus_src_color_to_alpha { color.a = 1-(sample.r+sample.g+sample.b)/3; }
+   blend_src_color { color.rgb = sample.rgb; }
+   blend_one_minus_src_color { color.rgb = 1-sample.rgb; }
+   blend_one_plus_src_color { color.rgb = 1+sample.rgb; }
+   blend_src_color_plus_src_color { color.rgb = 2*sample.rgb; }
+   blend_one_minus_src_color_minus_src_color { color.rgb = 1-2*sample.rgb; }
+   blend_one_minus_src_color_minus_src_color_to_alpha { color.a = 1-2*(sample.r+sample.g+sample.b)/3; }
   }
-  blend_one_minus_src_color_to_alpha { color.a = 1-(sample$.r+sample$.g+sample$.b)/3; }
-  blend_src_color { color.rgb = sample$.rgb; }
-  blend_one_minus_src_color { color.rgb = 1-sample$.rgb; }
-  blend_one_plus_src_color { color.rgb = 1+sample$.rgb; }
-  blend_src_color_plus_src_color { color.rgb = 2*sample$.rgb; }
-  blend_one_minus_src_color_minus_src_color { color.rgb = 1-2*sample$.rgb; }
-  blend_one_minus_src_color_minus_src_color_to_alpha { color.a = 1-2*(sample$.r+sample$.g+sample$.b)/3; }
  }
 }
 
@@ -109,22 +126,9 @@ lightmap {
  }
 }
 
-lightgrid {
- vertex {
-  out vec3 lightTexCoords;
-  uniform mat4 modelLightMatrix;
-  lightTexCoords = (modelLightMatrix * position).xyz;
- }
+vertexlight {
  fragment {
-  in vec3 lightTexCoords;
-  uniform sampler3D lightGrid0; // Ambient color
-  uniform sampler3D lightGrid1; // Directionnal color
-  uniform sampler3D lightGrid2; // Direction
-  vec3 ambient = texture(lightGrid0, lightTexCoords).rgb;
-  vec3 directional = texture(lightGrid1, lightTexCoords).rgb;
-  vec3 lightDirection = normalize((texture(lightGrid2, lightTexCoords).xyz*2)-1);
-  uniform mat3 viewNormalMatrix;
-  color.rgb *= vertexColor; //(ambient.rgb + max(0,dot(viewNormalMatrix * lightDirection,vertexNormal))*directional.rgb);
+  color.rgb *= vertexColor;
  }
 }
 

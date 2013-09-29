@@ -46,8 +46,6 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
             }
             else if(key=="animmap"_) { shader.append(Texture(args[1])); current=&shader.last(); }
             else if(key=="polygonoffset"_ ) shader.polygonOffset=true;
-            else if(key=="surfaceparm"_) {}
-            else if(key=="sort"_) {}
             else if(key=="skyparms"_) shader.properties[String("skyparms"_)] = String(args[1]);
             else if(key=="fogparms"_) shader.properties.insert(String("fogparms"_), String(args[3]));
             else if(key=="q3map_sun"_||key=="q3map_sunext"_) shader.properties[String("q3map_sun"_)]=String(value);
@@ -56,9 +54,9 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
                         "tesssize qer_nocarve q3map_normalimage q3map_lightmapsize q3map_lightmapmergable q3map_lightmapaxis "
                         "q3map_tcgen q3map_tcmod q3map_baseshader q3map_baseshader q3map_foliage q3map_surfacesurfaceparm "
                         "q3map_lightsubdivide q3map_nofog q3map_skylight q3map_lightrgb q3map_nonplanar qer_alphafunc fogvars skyfogvars "
-                        "q3map_forcesunlight q3map_novertexshadows deformvertexes q3map_lightmapsamplesize q3map_terrain nomipmap "
-                        "entitymergable fogonly distancecull q3map_bouncescale q3map_forcemeta q3map_lightmapsampleoffset qer_models "
-                        "nocompress nopicmip nomipmaps nofog fog waterfogvars cull tcgen tcgen depthwrite depthwrite depthfunc detail "
+                        "q3map_forcesunlight q3map_novertexshadows deformvertexes q3map_lightmapsamplesize q3map_terrain nomipmap cull "
+                        "entitymergable fogonly distancecull q3map_bouncescale q3map_forcemeta q3map_lightmapsampleoffset qer_models sort "
+                        "nocompress nopicmip nomipmaps nofog fog waterfogvars tcgen tcgen depthwrite depthwrite depthfunc detail surfaceparm "
                         "qer_editorimage qer_trans q3map_globaltexture q3map_lightimage q3map_surfacelight q3map_clipmodel q3map_shadeangle"_
                         ).contains(key)) {} // Ignored or default
             else if(!current) { error("No current texture for",key,args,name); continue; }
@@ -82,9 +80,11 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
                 else error(key, args);
             }
             else if(key=="rgbgen"_) {
-                if(args[0]=="const"_) current->rgbScale=vec3(toDecimal(args[1]),toDecimal(args[2]),toDecimal(args[3]));
-                if(args[0]=="wave"_) current->rgbScale=vec3(toDecimal(args[2]),toDecimal(args[3]),toDecimal(args[4]));
-                //else
+                if(args[0]=="const"_) current->rgbGen=vec3(toDecimal(args[1]),toDecimal(args[2]),toDecimal(args[3]));
+                else if(args[0]=="wave"_) current->rgbGen=vec3(toDecimal(args[2]),toDecimal(args[3]),toDecimal(args[4]));
+                else if(split("vertex exactvertex"_).contains(toLower(args[0]))) current->type <<" vertexColor"_;
+                else if(split("identity identitylighting lightingdiffuse entity oneminusentity environment"_).contains(toLower(args[0]))) {}
+                else error(name, key, args[0]);
             }
             else if(key=="blend"_||key=="blendfunc"_||key=="blenfunc"_) {
                 String sfactor,dfactor; //FIXME: flags

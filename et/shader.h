@@ -5,7 +5,7 @@ struct Folder;
 
 unique<GLTexture> upload(const ref<byte>& file);
 
-struct Texture {
+struct Texture { // ->Stage
     Texture(const string& path=""_) : path(path), type("color"_) {}
 
     String path;
@@ -13,12 +13,12 @@ struct Texture {
     GLTexture* texture = 0;
     bool alpha = false, clamp = false;
     mat3x2 tcMod;
-    vec3 rgbScale {1,1,1};
+    vec3 rgbGen {1,1,1};
 };
 inline String str(const Texture& o) { return "Texture("_+str(o.path, o.type)+")"_; }
 inline Texture copy(const Texture& o) {
     Texture t;
-    t.path = copy(o.path), t.type = copy(o.type), t.alpha = o.alpha, t.clamp=o.clamp; t.tcMod=o.tcMod, t.rgbScale=o.rgbScale;
+    t.path = copy(o.path), t.type = copy(o.type), t.alpha = o.alpha, t.clamp=o.clamp; t.tcMod=o.tcMod, t.rgbGen=o.rgbGen;
     return t;
 }
 struct Shader : array<Texture> {

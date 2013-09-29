@@ -25,22 +25,27 @@ Shader& Scene::getShader(string name, int lightmap) {
         shader.append(Texture("$lightmap"_));
     }
     for(Texture& texture: shader) {
-        if(texture.path=="$lightmap"_ /*|| texture.path=="$lightgrid0"_*/) {
+        if(texture.path=="$lightmap"_) {
             if(lightmap>=0) {
                 String lightMapID = "/lm_"_+dec(lightmap,4);
                 Shader& lightMapShader = shaders[name+lightMapID];
                 if(!lightMapShader.name) {
                     lightMapShader = copy(shader);
-                    if(lightMapShader.last().path=="$lightgrid1"_) lightMapShader.pop();
-                    assert(lightMapShader.size==shader.size);
                     for(Texture& texture: lightMapShader) if(texture.path=="$lightmap"_) {
                         texture.type = String("lightmap"_);
                         texture.path = this->name+lightMapID; // Assumes extern "high resolution" lightmaps are always used (TODO: intern lightmaps)
                     }
-                    {int color=0; for(const Texture& tex: lightMapShader) color += find(tex.type,"color"_); assert_(color, lightMapShader);}
                 }
                 return lightMapShader;
-            } else if(texture.path=="$lightmap"_) texture.type = String("lightgrid"_);
+            } else if(lightmap==-2) {
+                Shader& lightGridShader = shaders[name+"/lightgrid"_];
+                if(!lightGridShader.name) {
+                    lightGridShader = copy(shader);
+                    lightGridShader.type << " lightgrid"_; // Evaluates lightgrid every vertex
+                    for(Texture& texture: lightGridShader) if(texture.path=="$lightmap"_) texture.type = String("vertexlight"_);
+                }
+                return lightGridShader;
+            } else texture.type = String("vertexlight"_);
         }
     }
     return shader;
@@ -64,8 +69,8 @@ array<Surface> Scene::importBSP(const BSP& bsp, int firstFace, int numFaces, boo
         string name = str(bsp.shaders()[face.texture].name);
         Shader& shader = shaders[name];
         if(shader.properties.contains("skyparms"_)) { if(sky) assert_(sky==&shader); else sky=&shader; continue; }
-        ID id{face.texture, face.lightMapIndex}; // Ensures surfaces are split by textures/lightmaps changes
-        if(!surfaces.contains(id)) surfaces.insert(id, Surface(getShader(name, face.lightMapIndex), vertices));
+        ID id{face.texture, max(-1,face.lightMapIndex)}; // Ensures surfaces are split by textures/lightmaps changes
+        if(!surfaces.contains(id)) surfaces.insert(id, Surface(getShader(name, max(-1,face.lightMapIndex)), vertices));
         Surface& surface = surfaces.at(id);
         if(face.type==1||face.type==3) {
             for(int i=0;i<face.numIndices;i+=3) {
