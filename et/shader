@@ -137,10 +137,19 @@ fog {
 
 gamma {
  fragment {
-  uniform sampler2D source;
+  uniform sampler2DMS source;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; } // Applies sRGB compression before writing pixel
   out vec4 color;
-  color.rgb = texture(source, texCoord).rgb;
+  //color.rgb = texture(source, texCoord).rgb;
+  color = vec4(0);
+  const int sampleCount = 8;
+  ivec2 pixel = ivec2(textureSize(source)*texCoord);
+  for (int i = 0; i<sampleCount; i++) {
+      //float weight = 1./sampleCount; //texelFetch (sampleWeightSampler, i).r;
+      vec4 sample = texelFetch(source, pixel, i);
+      color += sample; // weight * sample;
+  }
+  color = 1./sampleCount * color;
   color = vec4(sRGB(color.r),sRGB(color.g),sRGB(color.b),1);
  }
 }

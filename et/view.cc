@@ -8,6 +8,7 @@
 View::View(Scene& scene) : scene(scene) {
     vec4 position_yaw = scene.defaultPosition();
     position = position_yaw.xyz(), yaw=position_yaw.w;
+    vertexBuffer.upload(ref<vec2>{vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
 }
 
 void View::render(int2, int2 size) {
@@ -30,7 +31,7 @@ void View::render(int2, int2 size) {
     planes[5] = vec4( m(3,0) - m(2,0), m(3,1) - m(2,1), m(3,2) - m(2,2), m(3,3) - m(2,3) );
     for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
 
-    if(frameBuffer.depthTexture.size() != size) frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
+    if(frameBuffer.depthTexture.size() != size) frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24|Multisample), GLTexture(w,h, sRGB8|Multisample));
     frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.fog.xyz(),1.f));
 
     glDepthTest(true);
@@ -43,9 +44,10 @@ void View::render(int2, int2 size) {
 
     GLFrameBuffer::bindWindow(0, size, 0);
     {GLShader& program = gamma.bind();
-        program.bindSamplers({"tex"_}); program.bindFragments({"color"_});
-        frameBuffer.colorTexture.bind(0);
-        glDrawRectangle(program);
+        program.bindFragments({"color"_});
+        program.bindSamplers({"tex"_}); frameBuffer.colorTexture.bind(0);
+        vertexBuffer.bindAttribute(program,"position"_,2);
+        vertexBuffer.draw(TriangleStrip);
     }
 
     /*if( norm(velocity) > 0.1 )*/ contentChanged(); // Keeps rendering at 60fps

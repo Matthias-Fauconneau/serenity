@@ -35,7 +35,7 @@ struct GLShader {
     uint attribLocation(const string&);
     GLUniform operator[](const string&);
 
-    handle<uint> id;
+    handle<uint> id = 0;
     map<String, int> attribLocations;
     map<String, int> uniformLocations;
     array<String> sampler2D;
@@ -58,9 +58,9 @@ struct GLVertexBuffer {
 
     operator bool() const { return id; }
 
-    handle<uint> id;
-    uint vertexCount=0;
-    uint vertexSize=0;
+    handle<uint> id = 0;
+    uint vertexCount = 0;
+    uint vertexSize = 0;
 };
 
 struct GLIndexBuffer {
@@ -79,17 +79,16 @@ struct GLIndexBuffer {
     operator bool() { return id; }
 
     PrimitiveType primitiveType=Triangle;
-    handle<uint> id;
+    handle<uint> id = 0;
     uint indexCount=0;
     uint indexSize=0;
     bool primitiveRestart=false;
 };
 
-void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1), bool texCoord=false);
-
-enum Format { sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3, Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
+enum Format { sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3,
+              Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6, Multisample=1<<7 };
 struct GLTexture {
-    handle<uint> id;
+    handle<uint> id = 0;
     uint width=0, height=0, depth=0;
     uint format;
 
@@ -109,9 +108,9 @@ enum { ClearDepth=0x100, ClearColor=0x4000 };
 struct GLFrameBuffer {
     GLFrameBuffer(){}
     default_move(GLFrameBuffer);
-    GLFrameBuffer(GLTexture&& depth);
+    //GLFrameBuffer(GLTexture&& depth);
     GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
-    GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
+    //GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
     ~GLFrameBuffer();
 
     operator bool() const { return id; }
@@ -120,7 +119,7 @@ struct GLFrameBuffer {
     void blit(uint target);
     void blit(GLTexture&);
 
-    handle<uint> id, depthBuffer, colorBuffer;
-    uint width=0, height=0;
+    handle<uint> id = 0, depthBuffer = 0, colorBuffer = 0;
+    uint width = 0, height = 0;
     GLTexture depthTexture, colorTexture;
 };

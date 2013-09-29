@@ -95,7 +95,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
             global << replace(stageGlobal,"$"_,str(i-1));
             main << replace(stageMain,"$"_,str(i-1));
         }
-        String glsl = "#version 130\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
+        String glsl = "#version 150\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
         this->source << copy(glsl);
         uint shader = glCreateShader(type);
         const char* data = glsl.data; int size = glsl.size;
@@ -149,24 +149,25 @@ void* GLVertexBuffer::mapVertexBuffer() {
     glBindBuffer(GL_ARRAY_BUFFER, id);
     return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
 }
-void GLVertexBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
+void GLVertexBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); }
 void GLVertexBuffer::upload(const ref<byte>& vertices) {
     if(!id) glGenBuffers(1, &id);
     glBindBuffer(GL_ARRAY_BUFFER, id);
     glBufferData(GL_ARRAY_BUFFER, vertices.size, vertices.data, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
-    assert(id); assert(elementSize<=4);
+    assert_(id>0); assert_(elementSize<=4);
     int index = program.attribLocation(name);
     if(index<0) return;
     glBindBuffer(GL_ARRAY_BUFFER, id);
+    glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
+    //assert_(!glGetError()); //First call to glVertexAttribPointer logs an user error to MESA_DEBUG for some reason :/
     glEnableVertexAttribArray(index);
-    glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)(offset));
 }
 void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, id);
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 /// Index buffer
@@ -210,39 +211,28 @@ void GLIndexBuffer::draw() const {
     if(primitiveRestart) glDisableClientState(GL_PRIMITIVE_RESTART_NV);
 }
 
-void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
-    shader.bind();
-    glBindBuffer(GL_ARRAY_BUFFER,0);
-    int positionIndex = shader.attribLocation("position"_);
-    assert_(positionIndex>=0);
-    vec2 positions[] = { vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y) };
-    glVertexAttribPointer(positionIndex, 2, GL_FLOAT, 0, 0, positions);
-    glEnableVertexAttribArray(positionIndex);
-    int texCoordIndex;
-    if(texCoord) {
-        texCoordIndex = shader.attribLocation("texCoord"_);
-        assert_(texCoordIndex>=0);
-        vec2 texCoords[] = { vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0) }; //flip Y
-        glVertexAttribPointer(texCoordIndex,2,GL_FLOAT,0,0,texCoords);
-        glEnableVertexAttribArray(texCoordIndex);
-    }
-    glDrawArrays(GL_TRIANGLE_STRIP,0,4);
-    glDisableVertexAttribArray(positionIndex);
-    if(texCoord) glDisableVertexAttribArray(texCoordIndex);
-}
-
 /// Texture
 GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : width(width), height(height), format(format) {
     glGenTextures(1, &id);
-    glBindTexture(GL_TEXTURE_2D, id);
-    if((format&3)==sRGB8)
-        glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8*/GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-    if((format&3)==sRGBA)
-        glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8_ALPHA8*/GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-    if((format&3)==Depth24)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
-    if((format&3)==RGB16F)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+    if(format&Multisample) {
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, id);
+        int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
+        int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
+        assert_(colorSamples==depthSamples);
+        /***/ if((format&3)==sRGB8) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
+        else if((format&3)==Depth24) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
+        else error(format);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, id);
+        if((format&3)==sRGB8)
+            glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8*/GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        if((format&3)==sRGBA)
+            glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8_ALPHA8*/GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        if((format&3)==Depth24)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
+        if((format&3)==RGB16F)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+    }
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
     }
@@ -280,26 +270,27 @@ GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
 void GLTexture::bind(uint sampler) const {
     assert(id);
     glActiveTexture(GL_TEXTURE0+sampler);
-    glBindTexture(depth?GL_TEXTURE_3D:GL_TEXTURE_2D, id);
+    glBindTexture(depth?GL_TEXTURE_3D:(format&Multisample)?GL_TEXTURE_2D_MULTISAMPLE:GL_TEXTURE_2D, id);
 }
 
 /// Framebuffer
 
-GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
+/*GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
-}
+}*/
 GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
-    assert(depth.size()==color.size());
+    assert_(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture.id, 0);
+    uint target = depthTexture.format&Multisample? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, target, depthTexture.id, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, colorTexture.id, 0);
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
 }
-GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
+/*GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
 
     glGenFramebuffers(1,&id);
@@ -316,7 +307,7 @@ GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCou
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("");
-}
+}*/
 GLFrameBuffer::~GLFrameBuffer() {
     if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer);
     if(colorBuffer) glDeleteRenderbuffers(1, &colorBuffer);

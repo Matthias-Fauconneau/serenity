@@ -26,6 +26,7 @@ struct View : Widget {
     GLFrameBuffer frameBuffer;
     Shader simple {"transform surface"_};
     Shader gamma {"screen gamma"_};
+    GLVertexBuffer vertexBuffer;
 
     mat4 projection, inverseProjection, view; vec4 planes[6]; vec3 signs[6];
     vec3 position = 0;
