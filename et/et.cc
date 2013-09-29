@@ -3,7 +3,7 @@
 #include "view.h"
 #include "window.h"
 /*Ideas:
- - MSAA, dynamic lighting (sun, lights (etxmap), shadows (soft PCF))
+ - dynamic lighting (sun, lights (etxmap), shadows (soft PCF))
  - procedural textures: +normal, specular, displacement (relaxed cone stepping, tesselation)
  - atmosphere: tonemapping, bloom, color grading, specular reflection, refraction, waves, caustics, rain/snow
  - shadows: sample distribution shadow maps, exponential variance soft shadows (+multisampling)
