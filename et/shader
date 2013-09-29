@@ -70,10 +70,6 @@ surface {
   in vec2 lightmap;
   out vec2 vertexLightmap;
   vertexLightmap = lightmap;
-
-  in vec3 color;
-  out vec3 vertexColor;
-  vertexColor = color;
  }
  fragment {
   in vec2 vertexTexCoord;
@@ -199,13 +195,6 @@ albedo {
   vertexAlpha {
    sample$.a = vertexAlpha;
   }
-  alphaTest {
-   if( sample$.a < 0.5 ) discard;
-   albedo.a = sample$.a;
-  }
-  alphaBlend {
-   albedo.a = sample$.a;
-  }
   vec3 sfactor$=vec3(1),dfactor$=vec3(0);
   sfactor_zero {
    sfactor$=vec3(0);
@@ -224,6 +213,12 @@ albedo {
   }
   sfactor_one_minus_src_alpha {
    sfactor$=vec3(1.0-sample$.a);
+  }
+  sfactor_one_minus_dst_alpha {
+   sfactor$=vec3(1.0-albedo.a); //FIXME
+  }
+  sfactor_one_minus_dst_color {
+   sfactor$=vec3(1.0-albedo.rgb); //FIXME
   }
   dfactor_zero {
    dfactor$=vec3(0);
@@ -245,9 +240,47 @@ albedo {
   }
   dfactor_one_minus_src_color {
    dfactor$=vec3(1.0)-sample$.rgb;
-   albedo.a=(sample$.r+sample$.b+sample$.g)/3;
+  }
+  dfactor_src_color_plus_src_color {
+   dfactor$=2*sample$.rgb;
   }
   albedo.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*albedo.rgb;
+  blend_zero {
+   albedo.a = 0;
+  }
+  blend_one {
+   albedo.a = 1;
+  }
+  blend_src_alpha {
+   albedo.a = sample$.a;
+  }
+  blend_one_minus_src_alpha {
+   albedo.a = 1-sample$.a;
+   sfactor_src_alpha {
+    if( sample$.a < 0.5 ) discard;
+   }
+  }
+  blend_one_minus_src_color_to_alpha {
+   albedo.a = 1-(sample$.r+sample$.g+sample$.b)/3;
+  }
+  blend_src_color {
+   albedo.rgb = sample$.rgb;
+  }
+  blend_one_minus_src_color {
+   albedo.rgb = 1-sample$.rgb;
+  }
+  blend_one_plus_src_color {
+   albedo.rgb = 1+sample$.rgb; // Clip ?
+  }
+  blend_src_color_plus_src_color {
+   albedo.rgb = 2*sample$.rgb; // Clip ?
+  }
+  blend_one_minus_src_color_minus_src_color {
+   albedo.rgb = 1-2*sample$.rgb; // Clip ?
+  }
+  blend_one_minus_src_color_minus_src_color_to_alpha {
+   albedo.rgb = 1-2*(sample$.r+sample$.g+sample$.b)/3; // Clip ?
+  }
   fog {
     albedo *= max(0,1-length(viewPos)/fogOpacity);
   }
@@ -281,233 +314,11 @@ lightgrid {
  }
 }
 
-forward {
+gamma {
  fragment {
+  uniform sampler2D source;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; } // Applies sRGB compression before writing pixel
-  //float sRGB(float c) { return pow(c,1/1.3); } // Applies default ET gamma (1.3) before writing pixel (sRGB (^2.4) displays squared original values)
-  in vec3 vertexColor;
-  albedo.rgb *= vertexColor; // Vertex lighting
-  albedo.rgb=vec3(sRGB(albedo.r),sRGB(albedo.g),sRGB(albedo.b));
-  //albedo.rgb=vec3(T,0);
- }
-}
-
-light {
- fragment {
-  color.rgb = vec3(0);
-  uniform sampler2D albedoBuffer;
-  vec4 albedo = texture(albedoBuffer,texCoord);
-  uniform sampler2D normalBuffer;
-  vec3 normal = texture(normalBuffer,texCoord).xyz*2-1;
-
-  uniform vec4 lightPosition[%];
-  uniform vec3 lightColor[%];
-  for(int i=0;i<%;i++) {
-   vec3 L = lightPosition[i].xyz-P; float l=length(L);
-   float falloff = lightPosition[i].w-l;
-   if(falloff<=0) continue;
-   float lambert = dot(normal,L/l);
-   if(lambert<=0) continue;
-   //vec3 H = normalize(L + V); #TODO: specular
-   color.rgb += lightColor[i]*lambert*falloff/255.0; //linear fallof
-  }
-  uniform float fogOpacity;
-  color.rgb *= albedo.rgb*max(0,1.0-length(P)/fogOpacity);
- }
-}
-
-sky {
- fragment {
-  const vec3 sunColor = vec3(0.75, 0.5, 0.25);
-  const vec3 skyColor = vec3(0.25, 0.5, 0.75);
-  uniform vec3 sunDirection;
-  if(depth==1) {
-   uniform float sunIntensity;
-   const float Kr=0.0025,Km=0.0001,g=-0.990;
-   float cos = dot(sunDirection, normalize(viewRay));
-   float miePhase = ((1.0 - g*g) / (2.0 + g*g)) * (1.0 + cos*cos) / pow(1.0 + g*g - 2.0*g*cos, 1.5);
-   color.rgb = sunIntensity*( skyColor + sunColor*20*Km*miePhase );
-  } else {
-   uniform sampler2D normalBuffer;
-   vec3 N = texture(normalBuffer,texCoord).xyz*2-1;
-   uniform sampler2D albedoBuffer;
-   vec4 albedo = texture(albedoBuffer,texCoord);
-   float light = dot(N,sunDirection);
-   shadow {
-    if(light<=0) {
-      light=0;
-    } else {
-     uniform float splits[4];
-     uniform mat4 viewToLightMatrix[4];
-     uniform sampler2DShadow shadowMaps[4];
-     uniform float shadowScale;
-     float PCF=0;
-     if(P.z > splits[0]) {
-       vec4 L = (viewToLightMatrix[0]*vec4(P,1));
-       for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++)
-        PCF += textureProj(shadowMaps[0],vec4((L.xy+vec2(i,j)*shadowScale)*L.w,L.z,L.w));
-     } else if(P.z > splits[1]) {
-       vec4 L = (viewToLightMatrix[1]*vec4(P,1));
-       for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++)
-        PCF += textureProj(shadowMaps[1],vec4((L.xy+vec2(i,j)*shadowScale)*L.w,L.z,L.w));
-     } else if(P.z > splits[2]) {
-       vec4 L = (viewToLightMatrix[2]*vec4(P,1));
-       for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++)
-        PCF += textureProj(shadowMaps[2],vec4((L.xy+vec2(i,j)*shadowScale)*L.w,L.z,L.w));
-     } else if(P.z > splits[3]) {
-       vec4 L = (viewToLightMatrix[3]*vec4(P,1));
-       for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++)
-        PCF += textureProj(shadowMaps[3],vec4((L.xy+vec2(i,j)*shadowScale)*L.w,L.z,L.w));
-     }
-     light *= (1-PCF/4);
-    }
-   }
-   uniform float fogOpacity;
-   //TODO: replace ambient term with proper indirect lighting
-   color.rgb = mix( albedo.rgb*sunIntensity*(0.125+light), skyColor, min(1,length(P)/fogOpacity) );
-  }
- }
-}
-
-water {
- fragment {
-  const float n1=1,n2=1.333,n=n1/n2;
-  uniform vec3 viewNormal;
-
-  //Fresnel
-  vec3 I = normalize(viewPos);
-  float cosI=-dot(I,viewNormal), cosT=sqrt(1-n*n*(1-cosI*cosI));
-  float Rs=(n1*cosI-n2*cosT)/(n1*cosI+n2*cosT), Rp=(n1*cosT-n2*cosI)/(n1*cosT+n2*cosI);
-  float R = (Rs*Rs+Rp*Rp)/2;
-
-  //Refraction
-  vec3 refractedRay = n*I - (n+cosT)*viewNormal;
-  float directLength = length(P)-length(viewPos);
-  float refractedLength = (1-viewNormal.z)*texCoord.y*directLength*cosI/cosT;
-  vec3 refractedViewPos = viewPos+refractedLength*mix( I, refractedRay, cosI/cosT );
-  uniform mat4 projectionMatrix;
-  vec4 refractedProjPos = projectionMatrix*vec4(refractedViewPos,1);
-  vec2 refractedTexCoord = (1+refractedProjPos.xy/refractedProjPos.w)/2;
-
-  const vec3 skyColor = vec3(0.25, 0.5, 0.75);
-  const vec3 waterColor = vec3(0, 0.15, 0.115);
-  const float waterOpacity=1024;
-  uniform sampler2D refractionBuffer;
-  uniform sampler2D reflectionBuffer;
-  uniform float fogOpacity;
-  if(refractedTexCoord.y>=0.001) {
-   color.rgb = mix( mix( texture(refractionBuffer,refractedTexCoord).rgb,
-                    mix(waterColor,skyColor,min(1,length(viewPos)/fogOpacity)),min(1,refractedLength/waterOpacity)),
-                    texture(reflectionBuffer,texCoord).rgb, R );
-  } else {
-   color.rgb = mix( texture(refractionBuffer,texCoord).rgb, waterColor, min(1,length(P)/waterOpacity));
-  }
- }
-}
-
-underwater {
- fragment {
-  uniform vec4 waterPlane;
-  const float waterOpacity=1024;
-  const vec3 waterColor = vec3(0, 0.15, 0.115);
-  float len = length(P);
-  float d = dot(P,waterPlane.xyz);
-  if( d>waterPlane.w ) color = vec4(waterColor,min(1,length(P)*waterPlane.w/(d*waterOpacity)+max(0,1-dot(normalize(P),waterPlane.xyz))/2));
-  else color = vec4(waterColor,min(1,len/waterOpacity));
- }
-}
-
-minmax {
- fragment {
-  uniform sampler2D depthBuffer;
-  uniform vec2 deviceScale;
-  out vec2 minmax;
-  minmax=vec2(1,0);
-  uniform int halfSize;
-  for(int y=-halfSize;y<halfSize;y++) for(int x=-halfSize;x<halfSize;x++) { //texCoord is at fragment center
-      float depth = texture(depthBuffer,texCoord+vec2(x,y)*deviceScale).r;
-      minmax = vec2(min(minmax.r,depth),max(minmax.g,depth));
-  }
- }
-}
-
-tonemap {
- fragment {
-  uniform sampler2D tex;
-  uniform vec2 deviceScale;
-  //#TODO: readback, smooth, use shader constant
-  float scale = 1.0; //clamp(0.5/dot(vec3(0.299,0.587,0.114),(textureLod(tex,texCoord,16.0).rgb)),7.0/8,1.0);
-  vec3 c = texture(tex,texCoord).rgb*scale; //linear scale
-  float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; }
-  //float sRGB(float c) { return pow(c,1/1.3); } //ET default gamma
-  color.rgb=vec3(sRGB(c.r),sRGB(c.g),sRGB(c.b));
- }
-}
-
-fxaa {
- fragment {
-  uniform sampler2D tex;
-  uniform vec2 deviceScale;
-  const float subpixelCap = 3.0/4;
-  const float subpixelTrim = 1.0/4;
-  const float subpixelTrimScale = 1/(1-subpixelTrim);
-  float luma(vec3 rgb) { return rgb.y * (0.587/0.299) + rgb.x; }
-  vec3 tap(vec2 pos) { return texture(tex, pos).rgb; }
-  vec3 tap(int dx,int dy) { return texture(tex, texCoord+vec2(dx,dy)*deviceScale).rgb; }
-  vec3 rgbN = tap(0,-1); float lumaN = luma(rgbN);
-  vec3 rgbW = tap(-1,0); float lumaW = luma(rgbW);
-  vec3 rgbM = tap(0,0); float lumaM = luma(rgbM);
-  vec3 rgbE = tap(1,0); float lumaE = luma(rgbE);
-  vec3 rgbS = tap(0,1); float lumaS = luma(rgbS);
-  float rangeMin = min(lumaM, min(min(lumaN, lumaW), min(lumaS, lumaE)));
-  float rangeMax = max(lumaM, max(max(lumaN, lumaW), max(lumaS, lumaE)));
-  float range = rangeMax - rangeMin;
-  if(range < max(1.0/24, rangeMax/8)) { color.rgb=rgbM; return; }
-  float lumaL = (lumaN +lumaW+lumaE+lumaS)/4;
-  float rangeL = abs(lumaL - lumaM);
-  float blendL = clamp(((rangeL/range)-subpixelTrim)*subpixelTrimScale,0,subpixelCap);
-  vec3 rgbNW = tap(-1,-1); float lumaNW = luma(rgbNW);
-  vec3 rgbNE = tap(1,-1); float lumaNE = luma(rgbNE);
-  vec3 rgbSW = tap(-1,1); float lumaSW = luma(rgbSW);
-  vec3 rgbSE = tap(1,1); float lumaSE = luma(rgbSE);
-  vec3 rgbL = (rgbN+rgbW+rgbM+rgbE+rgbS+rgbNW+rgbNE+rgbSW+rgbSE) / 9;
-  float edgeVert = abs(lumaNW/4 - lumaN/2 + lumaNE/4) +
-                   abs(lumaW /2 - lumaM   + lumaE /2) +
-                   abs(lumaSW/4 - lumaS/2 + lumaSE/4) ;
-  float edgeHorz = abs(lumaNW/4 - lumaW/2 + lumaSW/4) +
-                   abs(lumaN /2 - lumaM   + lumaS /2) +
-                   abs(lumaNE/4 - lumaE/2 + lumaSE/4) ;
-  bool horzSpan = edgeHorz >= edgeVert;
-  float lengthSign = horzSpan ? -deviceScale.y : -deviceScale.x;
-  if(!horzSpan) { lumaN = lumaW; lumaS = lumaE; }
-  float gradientN = abs(lumaN - lumaM), gradientS = abs(lumaS - lumaM);
-  lumaN = (lumaN + lumaM) / 2; lumaS = (lumaS + lumaM) / 2;
-  if(gradientN < gradientS) { lumaN = lumaS; gradientN = gradientS; lengthSign *= -1.0; }
-  vec2 posN = texCoord+(horzSpan?vec2(0,lengthSign/2):vec2(lengthSign/2,0));
-  gradientN /= 4;
-  vec2 posP = posN;
-  vec2 offNP = horzSpan?vec2(deviceScale.x,0):vec2(0,deviceScale.y);
-  float lumaEndN = lumaN, lumaEndP = lumaN;
-  bool doneN = false, doneP = false;
-  posN += offNP * vec2(-1,-1); posP += offNP*vec2(1,1);
-  for(int i=0;i<16;i++) {
-      if(!doneN) lumaEndN = luma(tap(posN));
-      if(!doneP) lumaEndP = luma(tap(posP));
-      doneN = doneN || (abs(lumaEndN - lumaN) >= gradientN);
-      doneP = doneP || (abs(lumaEndP - lumaN) >= gradientN);
-      if(doneN && doneP) break;
-      if(!doneN) posN -= offNP;
-      if(!doneP) posP += offNP;
-  }
-  float dstN = horzSpan ? texCoord.x - posN.x : texCoord.y - posN.y;
-  float dstP = horzSpan ? posP.x - texCoord.x : posP.y - texCoord.y;
-  bool directionN = dstN < dstP;
-  lumaEndN = directionN ? lumaEndN : lumaEndP;
-  if(((lumaM - lumaN) < 0.0) == ((lumaEndN - lumaN) < 0.0)) lengthSign = 0.0;
-  float spanLength = dstP+dstN;
-  dstN = directionN ? dstN : dstP;
-  float subPixelOffset = (0.5+(dstN*(-1/spanLength)))*lengthSign;
-  vec3 rgbF = tap(texCoord+(horzSpan?vec2(0,subPixelOffset):vec2(subPixelOffset,0)));
-  color.rgb = mix(rgbF, rgbL, blendL);
+  color.rgb = texture(source, texCoord).rgb;
+  color = vec4(sRGB(color.r),sRGB(color.g),sRGB(color.b),1);
  }
 }

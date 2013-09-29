@@ -2,6 +2,7 @@
 #include "widget.h"
 #include "gl.h"
 #include "function.h"
+#include "shader.h"
 struct Scene;
 struct Object;
 
@@ -21,8 +22,8 @@ struct View : Widget {
 
     Scene& scene;
     Object* selected=0;
-    //GLTexture depthBuffer,albedoBuffer,normalBuffer,refractionBuffer,refractionDepthBuffer,reflectionBuffer,lightBuffer,finalBuffer;
-    //GLFrameBuffer surfaceRender,refractionSurfaceRender,refractionRender,reflectionRender,lightRender,finalRender;
+    GLFrameBuffer frameBuffer;
+    Shader gamma {"screen deferred gamma"_};
 
     //->Camera
     mat4 projection, inverseProjection, view; vec4 planes[6]; vec3 signs[6]; vec4 clipPlane;

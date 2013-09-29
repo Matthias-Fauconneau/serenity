@@ -1,7 +1,6 @@
 #pragma once
 /// \file vector.h Vector definitions and operations
 #include "string.h"
-#include "simd.h"
 #include "math.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
@@ -97,14 +96,13 @@ typedef vector<xy,int,2> int2;
 typedef vector<xy,uint16,2> short2;
 /// Single precision x,y vector
 typedef vector<xy,float,2> vec2;
-inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
+inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 
 generic struct xyz {
     T x,y,z;
     vector<xy,T,2> xy() const { return vector< ::xy,T,2>(x,y); }
-    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vector<xyz,int,3> int3;
@@ -113,6 +111,12 @@ typedef vector<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vector<xyz,float,3> vec3;
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
+inline vec3 normal(vec3 v) {
+    int index; float min=1;
+    for(int i: range(3)) if(abs(v[i]) < min) index=i, min=abs(v[i]);
+    vec3 t=0; t[index]=1;
+    return normalize(cross(v, t));
+}
 
 generic struct xyzw {
     T x,y,z,w;
@@ -123,20 +127,6 @@ generic struct xyzw {
 /// Floating-point x,y,z,w vector
 typedef vector<xyzw,float,4> vec4;
 
-/// Axis-aligned rectangle
-struct Rect {
-    int2 min,max;
-    explicit Rect(int2 max):min(0,0),max(max){}
-    Rect(int x, int y):min(0,0),max(x,y){}
-    Rect(int2 min, int2 max):min(min),max(max){}
-    bool contains(int2 p) { return p>=min && p<max; }
-    bool contains(Rect r) { return r.min>=min && r.max<=max; }
-    explicit operator bool() { return (max-min)>int2(0,0); }
-    int2& position() { return min; }
-    int2 size() { return max-min; }
-};
-inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
-inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
-inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
-inline bool operator ==(Rect a, Rect b) { return a.min==b.min && a.max==b.max; }
-inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
+generic struct bgra { T b,g,r,a; };
+/// Integer b,g,r,a vector (8bit)
+typedef vector<bgra,uint8,4> byte4;

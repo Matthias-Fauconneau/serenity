@@ -2,9 +2,6 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 
-generic struct bgra { T b,g,r,a; };
-typedef vector<bgra,uint8,4> byte4;
-
 struct Image {
     Image(){}
     Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha) : buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha){}

@@ -5,7 +5,7 @@
 #include "file.h"
 #include "gl.h"
 
-View::View(Scene &scene) : scene(scene) {
+View::View(Scene& scene) : scene(scene) {
     vec4 position_yaw = scene.defaultPosition();
     position = position_yaw.xyz(), yaw=position_yaw.w;
 }
@@ -31,65 +31,17 @@ void View::render(int2, int2 size) {
     planes[5] = vec4( m(3,0) - m(2,0), m(3,1) - m(2,1), m(3,2) - m(2,2), m(3,3) - m(2,3) );
     for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
 
-#if 0
-    if(lightRender.depth.width!=w||lightRender.depth.height!=h) { //#OPTI: alias/reuse buffers when possible
-        depthBuffer.allocate(w,h,Depth);
-        albedoBuffer.allocate(w,h);
-        normalBuffer.allocate(w,h);
-        if(scene.water) {
-            refractionDepthBuffer.allocate(w,h,Depth);
-            refractionBuffer.allocate(w,h);
-            reflectionBuffer.allocate(w,h,Float);
-        }
-        lightBuffer.allocate(w,h/*,Float|Mipmap*/);
-        finalBuffer.allocate(w,h,Bilinear|Clamp); //Gamma|
-        surfaceRender.attach(depthBuffer,albedoBuffer,normalBuffer);
-        refractionSurfaceRender.attach(refractionDepthBuffer,albedoBuffer,normalBuffer);
-        refractionRender.attach(refractionDepthBuffer,refractionBuffer); refractionRender.depthWrite=false;
-        reflectionRender.attach(depthBuffer,reflectionBuffer); reflectionRender.depthWrite=false;
-        lightRender.attach(depthBuffer,lightBuffer); lightRender.depthWrite=false;
-        finalRender.attach(depthBuffer,finalBuffer); finalRender.depthWrite=false;
-    }
-#endif
+    if(frameBuffer.depthTexture.size() != size) frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
+    frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.backgroundColor,1.f));
 
-    // Assumes whole window widget
-    GLFrameBuffer::bindWindow(0, size, ClearDepth|ClearColor, vec4(scene.backgroundColor,1.f));
-
-    /*if(scene.water&&position.z>scene.water->z) {
-        scene.water->render(this);
-        clipPlane=vec4(0,0,1,-scene.water->z);
-    } else*/ clipPlane=vec4(0,0,0,0);
     render(/*surfaceRender, lightRender, true*/);
-    /*if(scene.water) {
-        if( position.z>scene.water->z ) {
-            GLTexture::bindSamplers(refractionDepthBuffer,refractionBuffer,reflectionBuffer);
-            scene.water->compose(vec2(1.0/w,1.0/h),projection,view,scene.sky?scene.sky->fogOpacity:8192);
-        } else {
-            static Shader* underwater; if(!underwater) underwater=new Shader("screen deferred position underwater");
-            GLShader& program = *underwater->bind();
-            GLTexture::bindSamplers(depthBuffer); program.bindSamplers("depthBuffer"); program.bindFragments("color");
-            float nearPlane = (projection.inverse()*vec3(0,0,-1)).z, farPlane = (projection.inverse()*vec3(0,0,1)).z;
-            program["A"]= - farPlane / (farPlane - nearPlane); program["B"]= farPlane * nearPlane / (farPlane - nearPlane);
-            program["inverseProjectionMatrix"]= projection.inverse();
-            program["waterPlane"] = view.inverse().transpose()*vec4(0,0,-1,scene.water->z);
-            DepthTest=false; glBlendAlpha(); renderQuad(); glBlendNone();
-        }
-    }*/
-    /*{static Shader* tonemap; if(!tonemap) tonemap=new Shader("screen deferred tonemap"); GLShader& program = *tonemap->bind();
-        finalRender.bind(); program.bindFragments("color");
-        if(enableFXAA) lightBuffer.generateMipmap();
-        else GLFrameBuffer::bindWindow(w,h);
-        GLTexture::bindSamplers(lightBuffer); program.bindSamplers("tex");
-        program["deviceScale"]=vec2(1.0/w,1.0/h);
-        DepthTest=false; renderQuad();
+
+    GLFrameBuffer::bindWindow(0, size, 0);
+    {GLShader& program = gamma.bind();
+        program.bindSamplers({"tex"_}); program.bindFragments({"color"_});
+        frameBuffer.colorTexture.bind(0);
+        glDrawRectangle(program);
     }
-    if(enableFXAA) {
-        static Shader* fxaa; if(!fxaa) fxaa=new Shader("screen deferred fxaa"); GLShader& program = *fxaa->bind();
-        GLFrameBuffer::bindWindow(w,h); program.bindFragments("color");
-        GLTexture::bindSamplers(finalBuffer); program.bindSamplers("tex");
-        program["deviceScale"]=vec2(1.0/w,1.0/h);
-        DepthTest=false; renderQuad();
-    }*/
 
     if( norm(velocity) > 0.1 ) contentChanged(); // Keeps rendering at 60fps
 }
@@ -98,15 +50,13 @@ void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool
     // Draws opaque and alpha tested objects into G-Buffer
 #if 1
     //deferRender.bind(true);
-    /*if(clipPlane.x||clipPlane.y||clipPlane.z) ClipPlane=true;*/ glDepthTest(true); //if(reverseWinding) glReverseWinding();
+    glDepthTest(true);
     if(scene.opaque) { glCullFace(true); draw(scene.opaque); }
-    if(scene.alphaTest) { glCullFace(false); glAlphaTest(true); glBlendAlpha(); draw(scene.alphaTest); glCullFace(true); glBlendNone(); }
 #endif
     // Draws lights using G-Buffer
 #if 0
-    /*ClipPlane=false;*/ DepthTest=false; if(reverseWinding) glNormalWinding();
+    DepthTest=false;
     targetRender.bind(true); deferRender.bindSamplers();
-    //DepthBoundsTest=true;
     glBlendAdd();
     static GLShader program; if(!program.id) program.compile(getGLSL(QStringList("screen deferred position light"),"vertex"),
                                                              getGLSL(QStringList("screen deferred position light"),"fragment")
@@ -140,21 +90,20 @@ void View::render(/*GLFrameBuffer& deferRender,GLFrameBuffer& targetRender, bool
         }
         cull: ;
     }
-
-    //DepthBoundsTest=false;
-    if(scene.sky) scene.sky->render(projection,view,scene,deferRender,targetRender,withShadow); //TODO: cull sky indoor
 #endif
     // Forward render transparent objects
-    /*if(clipPlane.x||clipPlane.y||clipPlane.z) ClipPlane=true;*/ glDepthTest(true);  //TODO: forward lighting
-    //if(reverseWinding) glReverseWinding();
-    if(scene.blendAdd) { glBlendAdd(); draw(scene.blendAdd); }
+    glDepthTest(true);  //TODO: forward lighting
     if(scene.blendAlpha) {
       //PolygonOffsetFill=true; glPolygonOffset(-2,-1);
         glBlendAlpha(); draw(scene.blendAlpha,BackToFront);
       //PolygonOffsetFill=false;
     }
-    //if(reverseWinding) glNormalWinding();
-    /*ClipPlane=false;*/ glDepthTest(false); glBlendNone();
+    if(scene.blendColor) {
+      //PolygonOffsetFill=true; glPolygonOffset(-2,-1);
+        glBlendColor(); draw(scene.blendColor,BackToFront);
+      //PolygonOffsetFill=false;
+    }
+    glDepthTest(false); glBlendNone();
 }
 
 void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
@@ -187,7 +136,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             Shader& shader = *object.surface.shader;
             assert_(&shader);
 
-            if(shader.cloudHeight) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
+            if(shader.skyBox) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
             if(object.transform != currentTransform) {
                 program["modelViewProjectionMatrix"_] = projection*view*object.transform;
                 program["normalMatrix"_]= (view*object.transform).normalMatrix();
@@ -213,7 +162,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                     program["lightGrid2"_]=int(shader.size+1); scene.lightGrid[2].bind(shader.size+1);
                 }
                 else {
-                    if(!tex.texture) tex.upload();
+                    assert_(tex.texture);
                     program["tex"_+str(i)] = i;
                     assert_(i<4);
                     if(tcMods[i]!=tex.tcMod) { GLUniform uniform = program["tcMod"_+str(i)]; if(uniform) uniform=tex.tcMod; tcMods[i]=tex.tcMod; }
@@ -222,18 +171,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 }
             }
 
-            object.surface.draw(program, true, true, shader.vertexBlend, shader.tangentSpace);
-
-            /*if(object.uniformColor!=vec3(1,1,1)) { // Shows bounding box (for debugging)
-                CullFace=false;
-                static Shader* debug; if(!debug) debug=new Shader("transform debug"); GLShader& program = *debug->bind();
-                program.bindFragments("albedo","normal");
-                program["modelViewProjectionMatrix"]= projection*view;
-                program["normalMatrix"]= view.normalMatrix();
-                renderBox(program,object.center-object.extent,object.center+object.extent);
-                CullFace=true;
-                shader.bind();
-            }*/
+            object.surface.draw(program);
         }
     }
 }
@@ -271,7 +209,7 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
         float minZ=65536; Object* hit=0;
         for(Object* object: scene.objects) {
             mat4 toObject = object->transform.inverse();
-            if(object->surface.raycast(toObject*position/*vec3(0,0,0)*/,toObject.normalMatrix()*direction,minZ)) hit=object;
+            if(object->surface.intersect(toObject*position,toObject.normalMatrix()*direction,minZ)) hit=object;
         }
         if(selected) selected->uniformColor=vec3(1,1,1); // Deselect previous
         if(hit) {

@@ -1,25 +1,20 @@
 #pragma once
 #include "string.h"
 #include "vector.h"
-#include "matrix.h"
 #include "map.h"
-#include "image.h"
+struct mat3x2; struct mat3; struct mat4;
+struct Image;
 
-void glFramebufferSRGB(bool enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
-void glAlphaTest(bool enable);
-void glBlendAdd();
 void glBlendAlpha();
+void glBlendColor();
 void glBlendNone();
-void glWireframe();
-void glSolid();
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
     explicit operator bool() { return location>=0; }
     void operator=(int);
-    //void operator=(uint);
     void operator=(float);
     void operator=(vec2);
     void operator=(vec3);
@@ -32,7 +27,6 @@ struct GLUniform {
 
 struct GLShader {
     GLShader(){}
-    GLShader(const string& source, const string& tags):GLShader(source, ref<string>{tags}){}
     GLShader(const string& source, const ref<string>& stages={""_});
     void compile(uint type, const string& source);
     void bind();
@@ -40,13 +34,11 @@ struct GLShader {
     void bindFragments(const ref<string>& fragments);
     uint attribLocation(const string&);
     GLUniform operator[](const string&);
-    //static uint maxUniformBlockSize();
 
     handle<uint> id;
-    //using pointer comparison (only works with string literals)
     map<String, int> attribLocations;
     map<String, int> uniformLocations;
-    array<String> sampler2D; // names of declared sampler2D
+    array<String> sampler2D;
     array<String> source;
 };
 
@@ -93,10 +85,7 @@ struct GLIndexBuffer {
     bool primitiveRestart=false;
 };
 
-vec2 project(vec2 p);
 void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1), bool texCoord=false);
-void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord=false);
-void glDrawLine(GLShader& shader, vec2 p1, vec2 p2);
 
 enum Format { sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3, Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6 };
 struct GLTexture {
@@ -113,13 +102,15 @@ struct GLTexture {
 
     void bind(uint sampler=0) const;
     operator bool() const { return id; }
-    //int2 size() const { return int2(width,height); }
+    int2 size() const { return int2(width,height); }
 };
 
 enum { ClearDepth=0x100, ClearColor=0x4000 };
 struct GLFrameBuffer {
     GLFrameBuffer(){}
+    default_move(GLFrameBuffer);
     GLFrameBuffer(GLTexture&& depth);
+    GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
     GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
     ~GLFrameBuffer();
 
@@ -131,5 +122,5 @@ struct GLFrameBuffer {
 
     handle<uint> id, depthBuffer, colorBuffer;
     uint width=0, height=0;
-    GLTexture depthTexture;
+    GLTexture depthTexture, colorTexture;
 };

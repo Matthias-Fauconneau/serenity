@@ -1,26 +1,23 @@
 #include "gl.h"
-#include "data.h"
+#include "matrix.h"
+#include "data.h" //FIXME -> et/shader.cc?
+#include "image.h" //FIXME -> et/shader.cc?
 
 #undef packed
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h> //GL
 
 /// Context
-
-void glFramebufferSRGB(bool enable) { if(enable) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB); }
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
 void glAlphaTest(bool enable) { if(enable) glEnable(GL_ALPHA_TEST); else glDisable(GL_ALPHA_TEST); }
-void glBlendAdd() { glBlendFunc(GL_ONE,GL_ONE); glEnable(GL_BLEND); }
-void glBlendAlpha() { glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE); glEnable(GL_BLEND); }
+void glBlendAlpha() { glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
+void glBlendColor() { glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
 void glBlendNone() { glDisable(GL_BLEND); }
-void glWireframe() { glPolygonMode(GL_FRONT,GL_LINE); }
-void glSolid() { glPolygonMode(GL_FRONT,GL_FILL); }
 
 /// Shader
 
 void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
-//void GLUniform::operator=(uint v) { assert(location>=0); glUseProgram(program); glUniform1ui(location,v); }
 void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program); glUniform1f(location,v); }
 void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
 void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
@@ -160,7 +157,6 @@ void GLVertexBuffer::upload(const ref<byte>& vertices) {
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
     assert(vertexBuffer); assert(elementSize<=4);
     int index = program.attribLocation(name);
-    //assert(index>=0,"Unknown attribute"_,name);
     if(index<0) return;
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glEnableVertexAttribArray(index);
@@ -202,10 +198,6 @@ void GLIndexBuffer::upload(const ref<uint>& indices) {
 }
 void GLIndexBuffer::draw() const {
     assert(indexBuffer);
-    /*if (primitiveType == Point) {
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-        glEnable(GL_POINT_SPRITE);
-    }*/
     if(primitiveType == Line) {
         glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
@@ -226,13 +218,15 @@ void GLIndexBuffer::draw() const {
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     shader.bind();
     glBindBuffer(GL_ARRAY_BUFFER,0);
-    uint positionIndex = shader.attribLocation("position");
+    int positionIndex = shader.attribLocation("position"_);
+    assert_(positionIndex>=0);
     vec2 positions[] = { vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y) };
-    glVertexAttribPointer(positionIndex,2,GL_FLOAT,0,0,positions);
+    glVertexAttribPointer(positionIndex, 2, GL_FLOAT, 0, 0, positions);
     glEnableVertexAttribArray(positionIndex);
-    uint texCoordIndex;
+    int texCoordIndex;
     if(texCoord) {
-        texCoordIndex = shader.attribLocation("texCoord");
+        texCoordIndex = shader.attribLocation("texCoord"_);
+        assert_(texCoordIndex>=0);
         vec2 texCoords[] = { vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0) }; //flip Y
         glVertexAttribPointer(texCoordIndex,2,GL_FLOAT,0,0,texCoords);
         glEnableVertexAttribArray(texCoordIndex);
@@ -240,29 +234,6 @@ void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     glDrawArrays(GL_TRIANGLE_STRIP,0,4);
     glDisableVertexAttribArray(positionIndex);
     if(texCoord) glDisableVertexAttribArray(texCoordIndex);
-}
-
-vec2 viewportSize;
-vec2 project(vec2 p) { return vec2(2*p.x/viewportSize.x-1,1-2*p.y/viewportSize.y); }
-void glDrawRectangle(GLShader& shader, Rect rect, bool texCoord) {
-    glDrawRectangle(shader, project(vec2(rect.min.x,rect.max.y)), project(vec2(rect.max.x,rect.min.y)), texCoord);
-}
-
-void glDrawLine(GLShader& shader, vec2 p1, vec2 p2) {
-    shader.bind();
-    glBindBuffer(GL_ARRAY_BUFFER,0);
-    uint positionIndex = shader.attribLocation("position");
-    vec2 positions[] = { project(p1+vec2(0.5)), project(p2+vec2(0.5)) };
-    glVertexAttribPointer(positionIndex,2,GL_FLOAT,0,0,positions);
-    glEnableVertexAttribArray(positionIndex);
-    glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    glEnable(GL_BLEND);
-    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-    glEnable(GL_LINE_SMOOTH);
-    glLineWidth(2);
-    glDrawArrays(GL_LINES,0,2);
-    glDisableVertexAttribArray(positionIndex);
 }
 
 /// Texture
@@ -296,7 +267,7 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
     }
     if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_2D);
 }
-GLTexture::GLTexture(const Image& image, uint format)
+GLTexture::GLTexture(const Image& image, uint format) //FIXME: -> et/shader.cc ?
     : GLTexture(image.width, image.height, (image.alpha?sRGBA:sRGB8)|format, image.data) {
     assert(width==image.stride);
 }
@@ -304,16 +275,10 @@ GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_3D, id);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-    //if(format&Bilinear) {
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Cannot linearly interpolate angles
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    /*} else { // Default is GL_NEAREST_MIPMAP_LINEAR
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }*/
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    //if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_3D); ?
 }
 
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
@@ -329,6 +294,14 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
+}
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
+    assert(depth.size()==color.size());
+    glGenFramebuffers(1,&id);
+    glBindFramebuffer(GL_FRAMEBUFFER,id);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture.id, 0);
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
 }
 GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
@@ -357,7 +330,6 @@ GLFrameBuffer::~GLFrameBuffer() {
 void GLFrameBuffer::bind(uint clearFlags, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
   glViewport(0,0,width,height);
-  viewportSize = vec2(width,height);
   if(clearFlags) {
       if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
       assert((clearFlags&(~(ClearDepth|ClearColor)))==0, clearFlags);
@@ -367,9 +339,8 @@ void GLFrameBuffer::bind(uint clearFlags, vec4 color) {
 void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4 color) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glViewport(position.x,position.y,size.x,size.y);
-  viewportSize = vec2(size);
   if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
-  glClear(clearFlags);
+  if(clearFlags) glClear(clearFlags);
 }
 void GLFrameBuffer::blit(uint target) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER,id);

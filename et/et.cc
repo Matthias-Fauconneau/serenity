@@ -3,9 +3,9 @@
 #include "view.h"
 #include "window.h"
 /*Ideas:
- - sun shader, dynamic lighting (sun, lights (etxmap), shadows (soft PCF)), water (reflection, refraction)
+ - fog, profile+optimize, dynamic lighting (sun, lights (etxmap), shadows (soft PCF)), MSAA
  - procedural textures: +normal, specular, displacement (relaxed cone stepping, tesselation)
- - atmosphere: tonemapping, bloom, color grading, clouds, sun/moon/stars, dynamic water (waves, caustics), rain/snow, specular reflection
+ - atmosphere: tonemapping, bloom, color grading, specular reflection, refraction, waves, caustics, rain/snow
  - shadows: sample distribution shadow maps, exponential variance soft shadows (+multisampling)
  - indirect lighting: ambient occlusion volumes, voxel global illumination, sparse virtual textures
 */

@@ -2,9 +2,9 @@
 #include "shader.h"
 
 struct Vertex {
-    vec3 position; vec2 texcoord; vec3 normal; vec3 tangent; vec3 bitangent; float alpha,ambient; // 16f=64B
-    vec2 lightmap; vec3 color;
-    Vertex(vec3 position,vec2 texcoord,vec3 normal,float alpha=0,vec2 lightmap=0, vec3 color=1):position(position),texcoord(texcoord),normal(normal),alpha(alpha),lightmap(lightmap),color(color) {}
+    vec3 position; float alpha; vec2 texcoord; vec2 lightmap; vec3 normal; // 11
+    Vertex(vec3 position,vec2 texcoord,vec3 normal,float alpha=0,vec2 lightmap=0) :
+        position(position), alpha(alpha), texcoord(texcoord), lightmap(lightmap), normal(normal) {}
 };
 
 struct Surface {
@@ -18,10 +18,10 @@ struct Surface {
     /// \note Assumes identical sourceVertices between all calls
     /// \note Handles tangent basis generation
     void addTriangle(const ref<Vertex>& sourceVertices, int i1, int i2, int i3);
-    ///
-    void draw(GLShader& program, bool withTexcoord, bool withNormal, bool withAlpha, bool withTangent);
-    ///
-    bool raycast(vec3 origin, vec3 direction, float& z);
+    /// Renders the surface using \a program
+    void draw(GLShader& program);
+    /// Intersects the surface with a ray
+    bool intersect(vec3 origin, vec3 direction, float& z);
 
     vec3 bbMin,bbMax;
     map<int,int> indexMap;
@@ -32,7 +32,6 @@ struct Surface {
     Shader* shader = 0;
 };
 
-
 struct Object {
     Object(Surface& surface) : surface(surface) {}
 
@@ -41,17 +40,4 @@ struct Object {
     mat4 transform;
     vec3 center; vec3 extent; // Bounding box center and extent
     int planeIndex = 0; // Last hit bounding box plane index
-};
-
-struct Light {
-    Light( vec3 origin, float radius, vec3 color, bool diffuse, bool specular, bool shadow) : origin(origin), radius(radius), color(color), diffuse(diffuse), specular(specular),shadow(shadow) {}
-    //void project(const mat4& projection,const mat4& view);
-    bool operator<(const Light& other) const { return -center.z < -other.center.z; }
-
-    vec3 origin;
-    float radius;
-    vec3 color;
-    bool diffuse,specular,shadow;
-    vec3 clipMin,clipMax,center;
-    int planeIndex = 0;
 };

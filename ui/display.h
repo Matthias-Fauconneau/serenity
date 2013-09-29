@@ -1,6 +1,7 @@
 #pragma once
 /// \file display.h 2D graphics primitives (fill, blit, line)
 #include "vector.h"
+#include "rect.h"
 #include "image.h"
 #include "thread.h"
 

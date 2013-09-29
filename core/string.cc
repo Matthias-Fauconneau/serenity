@@ -98,7 +98,7 @@ bool isDecimal(const string& number) {
     const byte* i = number.begin();
     if(*i == '-' || *i == '+') ++i;
     for(bool gotDot=false, gotE=false;i!=number.end();++i) {
-        /***/ if(!gotDot && *i == '.') gotDot=true;
+        /**/  if(!gotDot && *i == '.') gotDot=true;
         else if(!gotE && *i == 'e') gotE=true;
         else if(*i<'0' || *i>'9') return false;
     }

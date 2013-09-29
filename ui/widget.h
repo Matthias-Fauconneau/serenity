@@ -1,6 +1,7 @@
 #pragma once
 /// \file widget.h Widget interface to compose user interfaces
 #include "vector.h"
+#include "rect.h"
 
 /// Key symbols
 enum Key {

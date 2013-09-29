@@ -1,152 +1,13 @@
 #include "scene.h"
+#include "object.h"
+
+#include "material.h"
 #include "bsp.h"
 #include "md3.h"
 
-vec3 toVec3(const string& data) { TextData s(data); vec3 v; for(uint i: range(3)) { v[i]=s.decimal(); if(i<2) s.skip(" "_); } return v; }
+#include "time.h"
 
-void Scene::parseMaterialFile(string path) {
-    int line=0; //FIXME: ->TextData
-    int comment=0;
-    for(TextData s(readFile(path,data)); s; s.skip()) {
-        s.skip();
-        if(s.match("//"_)) { s.until('\n'); continue; }
-        if(s.match("/*"_)) { comment++; continue; }
-        if(s.match("*/"_)) { comment--; continue; }
-        if(comment) continue;
-        string name = s.identifier("/_"_);
-        if(!name) error("Unexpected outside shader definition", s.line(), "in", path, s.slice(0,s.index));
-        Shader& shader = shaders[name]; /*May already exist*/ shader.name=String(name); shader.clear(); shader.properties.clear(); shader.program=0;
-        shader.file=String(path); shader.firstLine=line; uint shaderFirstLineIndex = s.index;
-        int nest=0,comment=0; Texture* current=0; bool alphaBlend=false;
-        while(s) {
-            s.skip();
-            if(s.match("//"_)) { s.until('\n'); continue; }
-            if(s.match("/*"_)) { comment++; continue; }
-            if(s.match("*/"_)) { comment--; continue; }
-            if(comment) continue;
-            if(s.match('{')) { nest++; continue; }
-            if(s.match('}')) { nest--; if(nest==0) break; if(nest==1) current=0; continue; }
-            string key = s.identifier("_"_); s.whileAny(" "_);
-            string value = s.untilAny("\r\n"_);
-            array<string> args = split(value); //l.replace(QRegExp("[,()]")," ").simplified().split(' ').mid(1);
-            args.filter([](const string& s){return s=="("_||s==")"_;});
-            /**/ if(key=="map"_ || key=="clampmap"_ || key=="lightmap"_) { //diffusemap
-                if(!current) { shader.append(Texture()); current=&shader.last(); }
-                current->path = String(args[0]);
-                if(key=="clampmap"_) current->clamp=true;
-                if(key=="lightmap"_) assert_(current->path=="$lightmap"_);
-            }
-            else if(split("implicitMap implicitBlend implicitMask"_).contains(key)) {
-                string map = args[0];
-                if(map=="-"_) map = name;
-                shader.append(Texture(map)); current=&shader.last();
-                if(key=="implicitMask"_||key=="implicitBlend"_) { current->alpha=true; current->type<<" alphaTest"_; shader.alphaTest=true; }
-                shader.append(Texture("$lightmap"_));
-            }
-            /*else if(key=="bumpmap"_||key=="normalmap") {
-                        bool hasBumpMap=false; foreach(Texture t,shader) if(t.type.contains("tangent")) {
-                            hasBumpMap=true;
-                            warning("duplicate bumpMap stage");
-                        }
-                        if(hasBumpMap) continue;
-                        Texture map(args[0],"tangent");
-                        if(args[0]=="displacemap") {
-                            map.path=args[1];
-                            map.type<<" displace cone";
-                            if(args[2]=="invertColor") {
-                                map.heightMap=args[3];
-                            } else {
-                                map.inverted=false;
-                                map.heightMap=args[2];
-                            }
-                        } else if(args[0]=="addnormals") {
-                            map.path=args[1];
-                            if(args[2]=="heightMap") {
-                                map.type<<" displace cone";
-                                map.heightMap=args[3];
-                            }
-                        } else {
-                            if(args[0]=="_flat") { warning("normalMap _flat is a noop"); continue; }
-                            if(args.value(1)=="heightMap") {
-                                map.path=""; //TODO: compute normal from height
-                                map.type<<" displace cone";
-                                map.heightMap=args[2];
-                            }
-                        }
-                        shader.prepend(map); shader.tangentSpace=true;
-                    } else ifMatch("specularmap") {
-                        shader.append(Texture(args[0],"specular")); current=&shader.last();
-                    } else ifMatch("stage") {
-                        if(!current) { shader.append(Texture()); current=&shader.last(); }
-                        if(args[0]=="diffusemap") current->type="albedo";
-                        else if(args[0]=="normalmap"||args[0]=="bumpmap") current->type="tangent";
-                    }*/
-            else if(key=="animMap"_) { shader.append(Texture(args[1])); current=&shader.last(); }
-            //else ifMatch2("cull","none disable twosided") shader.doubleSided=true; //split("a b").contains(args[0])
-            else if(key=="polygonOffset"_ || key=="polygonoffset"_) shader.polygonOffset=true;
-            else if(key=="surfaceParm"_||key=="surfaceparm"_) { if(args[0]=="trans"_||args[0]=="alphashadow"_) alphaBlend=true; }
-            else if(key=="sort"_) { if(key=="additive"_) alphaBlend=true; }
-            else if(key=="skyparms"_) {
-                //assert_(args[0]!="-"_, path, name);
-                //for(shader.skyBox = Texture(args[0]); //TODO: asserts uniform color box #4D505B
-                shader.cloudHeight = toDecimal(args[1]);
-                assert_(args[2]=="-"_);
-            }
-            else if(key=="fogparms"_) { shader.properties.insert("fogparms"_, String(args[3])); } //FIXME: fog color
-            else if(key=="q3map_sun"_||key=="q3map_sunExt"_) shader.properties["q3map_sun"_]=String(value);
-            else if(split("nocompress nopicmip nomipmaps nofog fog waterfogvars cull tcGen tcgen depthWrite depthwrite depthFunc detail qer_editorimage qer_trans q3map_globaltexture q3map_lightimage q3map_surfacelight q3map_clipModel q3map_shadeangle"_).contains(key)) {} // Ignored or default
-            else if(!current) { /*error("No current texture for",key,args); Happens on explicit $lightmap blendFunc multiply*/ continue; }
-            else if(key=="alphaFunc"_||key=="alphafunc"_) { current->alpha=true; current->type<<" alphaTest"_; shader.alphaTest=true; }
-            else if(key=="vertexColor"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; }
-            else if(key=="alphaGen"_||key=="alphagen"_) { if(args[0]=="vertex"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; } }
-            else if(key=="tcMod"_||key=="tcmod"_) {
-                /**/ if(args[0]=="scale"_ || args[0]=="Scale"_) {
-                    //current->tcMod = mat3x2(toDecimal(args[1]),0, 0,toDecimal(args[2]), 0,0) * current->tcMod;
-                }
-                else if(args[0]=="transform"_) {
-                    array<double> m = apply(args.slice(1),toDecimal); // m00 m01 m10 m11 dx dy
-                    current->tcMod = mat3x2(m[0],m[1], m[2],m[3], m[4],m[5]) * current->tcMod;
-                }
-                else if(args[0]=="rotate"_) {/*TODO*/}
-                else if(args[0]=="scroll"_) {/*TODO*/}
-                else if(args[0]=="stretch"_) {/*TODO*/}
-                else if(args[0]=="turb"_) {/*TODO*/}
-                else error(key, args);
-            }
-            else if(key=="rgbGen"_||key=="rgbgen"_) {
-                if(args[0]=="const"_) current->rgbScale=vec3(toDecimal(args[1]),toDecimal(args[2]),toDecimal(args[3]));
-                if(args[0]=="wave"_) current->rgbScale=vec3(toDecimal(args[2]),toDecimal(args[3]),toDecimal(args[4]));
-                //else
-            }
-            else if(key=="blend"_||key=="blendFunc"_||key=="blendfunc"_||key=="blenfunc"_) {
-                if(shader.size==1&&!alphaBlend) continue;
-                string sfactor,dfactor; //FIXME: flags
-                if(args[0]=="add"_) { sfactor="one"_; dfactor="one"_; }
-                else if(args[0]=="filter"_) { sfactor="dst_color"_; dfactor="zero"_; }
-                else if(args[0]=="detail"_) { sfactor="dst_color"_; dfactor="src_color"_; }
-                else if(args[0]=="decal"_) { sfactor="dst_color"_; dfactor="src_color"_; }
-                else if(args[0]=="blend"_) { sfactor="src_alpha"_; dfactor="one_minus_src_alpha"_; }
-                else { assert(args.size==2, args, "'"_+args[0]+"'"_, hex(args[0]), args[0]=="blend"_); sfactor=args[0].slice(3); dfactor=args[1].slice(3);
-                    if(toLower(sfactor)=="zero"_ && toLower(dfactor)=="src_color"_) { sfactor="dst_color"_; dfactor="zero"_; }
-                }
-                if(sfactor=="one"_ && dfactor=="zero"_) continue;
-                if(alphaBlend) { shader.blendAlpha=true;
-                    if(!find(shader.type,"fog"_)) shader.type<<" position fog"_; current->type<<" fog"_;
-                    if(sfactor=="one"_ && dfactor=="one"_) { shader.blendAdd=true; continue; }
-                    if((sfactor=="src_alpha"_&&dfactor=="one_minus_src_alpha"_)||(sfactor=="dst_color"_&&dfactor=="zero"_)) {
-                        current->alpha=true; current->type<<" alphaBlend"_; continue;
-                    }
-                }
-                current->type << " sfactor_"_+toLower(sfactor)+" dfactor_"_+toLower(dfactor);
-            }
-            else error("Unknown key",key, args);
-        }
-        //if(!shader) error("Empty shader",name, s.slice(0,s.index)); //Happens on fog shader
-        if(shader.size>8) error("Too many textures for shader",name,"in",path);
-        shader.lastLine=line;
-        shader.source=String(s.slice(shaderFirstLineIndex,s.index-shaderFirstLineIndex));
-    }
-}
+vec3 toVec3(const string& data) { TextData s(data); vec3 v; for(uint i: range(3)) { v[i]=s.decimal(); if(i<2) s.skip(" "_); } return v; }
 
 array<String> Scene::search(const string& query, const string& type) {
     array<String> files;
@@ -154,17 +15,6 @@ array<String> Scene::search(const string& query, const string& type) {
     string fileName = section(query,'/',-2,-1);
     if(existsFolder(folder,data)) for(const String& file: Folder(folder, data).list(Files)) if(startsWith(file, fileName) && endsWith(file, type)) files << folder+"/"_+file;
     return files;
-}
-
-struct ID { int texture, lightmap; };
-bool operator==(const ID& a, const ID& b) { return a.texture==b.texture && a.lightmap==b.lightmap; }
-string str(const ID& o) { return str(o.texture, o.lightmap); }
-
-Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
-    size_t N = sizeof(Vertex)/sizeof(float);
-    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[N];
-    for(int i: range(N)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
-    return (Vertex)(*(Vertex*)V);
 }
 
 Shader& Scene::getShader(string name, int lightmap) {
@@ -196,13 +46,24 @@ Shader& Scene::getShader(string name, int lightmap) {
     return shader;
 }
 
+struct ID { int texture, lightmap; };
+bool operator==(const ID& a, const ID& b) { return a.texture==b.texture && a.lightmap==b.lightmap; }
+string str(const ID& o) { return str(o.texture, o.lightmap); }
+
+Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
+    size_t N = sizeof(Vertex)/sizeof(float);
+    const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[N];
+    for(int i: range(N)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
+    return (Vertex)(*(Vertex*)V);
+}
+
 array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int firstFace, int numFaces, bool leaf) {
     map<ID, Surface> surfaces;
     for(int f: range(firstFace,firstFace+numFaces)) {
         const bspFace& face = bsp.faces()[leaf?bsp.leafFaces()[f]:f];
         string name = str(bsp.shaders()[face.texture].name);
         Shader& shader = shaders[name];
-        if(shader.cloudHeight) { if(sky) assert_(sky==&shader); else sky=&shader; continue; }
+        if(shader.properties.contains("skyparms"_)) { if(sky) assert_(sky==&shader); else sky=&shader; continue; }
         Surface& surface = surfaces[ID{face.texture, face.lightMapIndex}]; // Ensures surfaces are split by textures/lightmaps changes
         if(!surface.shader) surface.shader = &getShader(name, face.lightMapIndex);
         if(face.type==1||face.type==3) {
@@ -277,8 +138,7 @@ array<Surface> Scene::importMD3(string modelPath) {
     return surfaces;
 }
 
-Scene::Scene(string file, const Folder& data) {
-    ::data = Folder("."_, data);
+Scene::Scene(string file, const Folder& data) : data(data) {
     assert(endsWith(file,".bsp"_));
     name = String(section(file,'.',0,-2));
 
@@ -304,125 +164,113 @@ Scene::Scene(string file, const Folder& data) {
     }
     entities.at("worldspawn"_).insert(String("model"_), String("*0"_));
 
-    /// Loads lights (before parsing shaders to activate lightmaps if lights are not included in the BSP)
-    for(const Entity& e: entities.values) {
-        if(e.at("classname"_)=="light"_) {
-            lights << Light(toVec3(e.at("origin"_)),
-                            toVec3(e.value("light_radius"_,"300"_)).x,
-                            toVec3(e.value("_color"_,"1 1 1"_)),
-                            e.value("nodiffuse"_)!="1"_,
-                            e.value("nospecular"_)!="1"_,
-                            e.value("noshadows"_)!="1"_);
-        }
-    }
-
     /// Parses shader scripts
-    array<String> materials = search("materials/"_,".mtr"_);
-    if(!materials) materials = search("scripts/"_,".shader"_);
-    if(!materials) error("No materials/*.mtr nor scripts/*.shader material shader script files found");
-    for(string path: materials) parseMaterialFile(path);
+    array<String> materials = search("scripts/"_,".shader"_);
+    if(!materials) error("No scripts/*.shader material shader script files found");
+    for(string path: materials) shaders << parseMaterialFile(readFile(path,data));
 
     /// Loads BSP geometry
     buffer<Vertex> vertices (bsp.vertices().size);
     for(uint i: range(bsp.vertices().size)) {
         const ibspVertex& v = bsp.vertices()[i];
-        //assert(v.color[0]==0xFF && v.color[1]==0xFF && v.color[2]==0xFF, v.color[0], v.color[1], v.color[2]);
-        vertices[i] = Vertex(v.position, vec2(v.texture.x,/*1-*/v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,/*1-*/v.lightmap.y),vec3(v.color[0]/255.f,v.color[1]/255.f,v.color[2]/255.f));
+        vertices[i] = Vertex(v.position, vec2(v.texture.x,v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,v.lightmap.y));
     }
+    Time time;
     for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)]<< importBSP(bsp, vertices, leaf.firstFace, leaf.numFaces, true);
     for(uint i: range(bsp.models().size)) {
         const bspModel& model = bsp.models()[i];
         models["*"_+str(i)]<< importBSP(bsp, vertices, model.firstFace, model.numFaces, false);
     }
+    log("Surfaces",time);
 
+    if(sky) {
+        float boxSize = 32768 / sqrt(3.); // Corners at zFar
+        { // Sky
+            array<Vertex> vertices;
+            Surface surface;
+            for(int i = 0; i < 5; i++) { //FIXME: implement Surface::addTriangle without index indirection
+                const int skySubdivisions = 8;
+                float MIN_T = i==4 ? -(skySubdivisions/2) : -1;
+                uint firstIndex = vertices.size;
 
-    if(sky) { /// Generates skybox model
-        array<Vertex> vertices;
-        Surface surface;
-        for(int i = 0; i < 5; i++) { //FIXME: implement Surface::addTriangle without index indirection
-            const int SKY_SUBDIVISIONS = 8;
-            float MIN_T = i==4 ? -(SKY_SUBDIVISIONS/2) : -1;
-            uint firstIndex = vertices.size;
-
-            for(int t = MIN_T + (SKY_SUBDIVISIONS/2); t <= SKY_SUBDIVISIONS; t++) { // Iterates through the subdivisions
-                for(int s = 0; s <= SKY_SUBDIVISIONS; s++) { // Compute vector from view origin to sky side integral point
-                    vec3 skyVec;
-                    float boxSize = 32768 / sqrt(3.); // zFar
-                    vec3 b(((s - (SKY_SUBDIVISIONS/2)) / ( float ) (SKY_SUBDIVISIONS/2)) * boxSize, ((t - (SKY_SUBDIVISIONS/2)) / ( float ) (SKY_SUBDIVISIONS/2)) * boxSize, boxSize);
-                    for(int j = 0 ; j < 3 ; j++) {
-                        static int st_to_vec[6][3] = { // 1 = s, 2 = t, 3 = cloud?
-                            { 3,  -1, 2 },
-                            { -3, 1,  2 },
-                            { 1,  3,  2 },
-                            { -1, -3, 2 },
-                            { -2, -1, 3 }, // 0 degrees yaw, look straight up
-                            { 2,  -1, -3}   // look straight down
-                        };
-                        int k = st_to_vec[i][j];
-                        if (k < 0) skyVec[j] = -b[-k - 1];
-                        else skyVec[j] = b[k - 1];
+                for(int t = MIN_T + (skySubdivisions/2); t <= skySubdivisions; t++) { // Iterates through the subdivisions
+                    for(int s = 0; s <= skySubdivisions; s++) { // Compute vector from view origin to sky side integral point
+                        vec3 skyVec;
+                        vec3 b (
+                                    ((s - (skySubdivisions/2)) / ( float ) (skySubdivisions/2)) * boxSize,
+                                    ((t - (skySubdivisions/2)) / ( float ) (skySubdivisions/2)) * boxSize,
+                                    boxSize);
+                        for(int j = 0 ; j < 3 ; j++) {
+                            static int st_to_vec[6][3] = {{ 3,  -1, 2 }, { -3, 1,  2 }, { 1,  3,  2 }, { -1, -3, 2 }, { -2, -1, 3 }};
+                            int k = st_to_vec[i][j];
+                            skyVec[j] = k < 0 ? -b[-k - 1] : b[k - 1];
+                        }
+                        // Computes parametric value 'p' that intersects with cloud layer
+                        float radiusWorld = 4096;
+                        float cloudHeight = toDecimal(sky->properties.at("skyparms"_));
+                        float p = (sqrt(sq(skyVec.z) * sq(radiusWorld) +
+                                        2 * sq(skyVec[0]) * radiusWorld * cloudHeight + sq(skyVec[0]) * sq(cloudHeight) +
+                                        2 * sq(skyVec[1]) * radiusWorld * cloudHeight + sq(skyVec[1]) * sq(cloudHeight) +
+                                        2 * sq(skyVec[2]) * radiusWorld * cloudHeight + sq(skyVec[2]) * sq(cloudHeight)) - skyVec.z * radiusWorld) / sq(skyVec);
+                        vec3 v = p * skyVec; v.z += radiusWorld; v = normalize(v);
+                        float sRad = acos(v.x);
+                        float tRad = acos(v.y);
+                        vertices << Vertex(skyVec,vec2(sRad,tRad),0);
                     }
-                    // Computes parametric value 'p' that intersects with cloud layer
-                    float radiusWorld = 4096;
-                    float p = (1.0f / (2 * sq(skyVec))) *
-                        (-2 * skyVec[2] * radiusWorld +
-                         2 * sqrt(sq(skyVec[2]) * sq(radiusWorld) +
-                                  2 * sq(skyVec[0]) * radiusWorld * sky->cloudHeight +
-                                  sq(skyVec[0]) * sq(sky->cloudHeight) +
-                                  2 * sq(skyVec[1]) * radiusWorld * sky->cloudHeight +
-                                  sq(skyVec[1]) * sq(sky->cloudHeight) +
-                                  2 * sq(skyVec[2]) * radiusWorld * sky->cloudHeight +
-                                  sq(skyVec[2]) * sq(sky->cloudHeight)));
-                    // Computes intersection point based on p
-                    vec3 v = p * skyVec;
-                    v.z += radiusWorld;
-                    v = normalize(v);
-                    float sRad = acos(v.x);
-                    float tRad = acos(v.y);
-                    vertices << Vertex(skyVec,vec2(sRad,tRad),0);
+                }
+                for(int t = 0; t < (skySubdivisions/2) - MIN_T; t++) {
+                    for(int s = 0; s < skySubdivisions; s++) {
+                        surface.addTriangle(vertices,
+                                            firstIndex + s + 1 + t * (skySubdivisions+1),
+                                            firstIndex + s + (t + 1) * (skySubdivisions+1),
+                                            firstIndex + s + t * (skySubdivisions+1));
+                        surface.addTriangle(vertices,
+                                            firstIndex + s + 1 + t * (skySubdivisions+1),
+                                            firstIndex + s + 1 + (t + 1) * (skySubdivisions+1),
+                                            firstIndex + s + (t + 1) * (skySubdivisions+1));
+                    }
                 }
             }
-
-            for(int t = 0; t < (SKY_SUBDIVISIONS/2) - MIN_T; t++) {
-                for(int s = 0; s < SKY_SUBDIVISIONS; s++) {
-                    surface.addTriangle(vertices, firstIndex + s + 1 + t * (SKY_SUBDIVISIONS+1), firstIndex + s + (t + 1) * (SKY_SUBDIVISIONS+1), firstIndex + s + t * (SKY_SUBDIVISIONS+1));
-                    surface.addTriangle(vertices, firstIndex + s + 1 + t * (SKY_SUBDIVISIONS+1), firstIndex + s + 1 + (t + 1) * (SKY_SUBDIVISIONS+1), firstIndex + s + (t + 1) * (SKY_SUBDIVISIONS+1));
-                }
-            }
+            surface.shader = sky;
+            surface.shader->skyBox = true;
+            array<Surface> model; model << move(surface);
+            models.insert(String("*skybox"_), move(model));
+            entities.insert(String("sky"_)).insert(String("model"_), String("*skybox"_));
         }
-        surface.shader = sky;
-        array<Surface> model; model << move(surface);
-        models.insert(String("*skybox"_), move(model));
-        entities.insert(String("sky"_)).insert(String("model"_), String("*skybox"_));
+        { // Sun
+            array<string> sun = split(sky->properties.at("q3map_sun"_),' ');
+            float azimuth = toDecimal(sun[4])*PI/180, elevation=toDecimal(sun[5])*PI/180;
+            vec3 sunDirection = vec3(cos(azimuth)*cos(elevation),sin(azimuth)*cos(elevation),sin(elevation));
+            float sunSize = boxSize * 0.2; // ~ 6 degrees
+            vec3 center = boxSize * sunDirection;
+            vec3 u = normal(sunDirection);
+            vec3 v = cross(sunDirection, u);
 
-        /*if(shader.properties.contains("skyparms"_)) { // remove sky surfaces, parse sky params
-            QString q3map_sun = shader.properties.value("q3map_sun");
-            if(!q3map_sun.isEmpty()) {
-                if(!sky) sky = new Sky;
-                vec3 angles = vec3(q3map_sun.section(" ",4))*PI/180;
-                sky.sunDirection = vec3(cos(angles.x)*cos(angles.y),sin(angles.x)*cos(angles.y),sin(angles.y));
-                sky.sunIntensity=q3map_sun.section(" ",3,3).toFloat()/100;
-                Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
-                sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
-            }
-            continue;
-        }*/
+            array<Vertex> vertices;
+            vertices << Vertex(center+sunSize*(-u-v),vec2(0,0),0) << Vertex(center+sunSize*(-u+v),vec2(1,0),0)
+                     << Vertex(center+sunSize*(+u+v),vec2(1,1),0) << Vertex(center+sunSize*(+u-v),vec2(0,1),0);
+            Surface surface;
+            surface.addTriangle(vertices, 0, 1, 2);
+            surface.addTriangle(vertices, 2, 3, 0);
+
+            surface.shader = &getShader(sky->properties.at("sunshader"_));
+            assert_(surface.shader->blendAlpha);
+            surface.shader->skyBox = true;
+            array<Surface> model; model << move(surface);
+            models.insert(String("*sun"_), move(model));
+            entities.insert(String("sun"_)).insert(String("model"_), String("*sun"_));
+
+            //Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
+            //sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
+        }
     }
 
-    /// Converts Entities to Objects
+    /// Converts Entities to Objects (and compile shaders)
     for(const Entity& e: entities.values) {
         //if(e.contains("target")) transform.translate(vec3(targets[e["target"]]["origin"]));
         if(e.contains("model"_)) {
             string name = e.at("model"_);
-            if(!models.contains(name) && !startsWith(name,"*"_)) {
-                array<String> paths = search(section(name,'.',0,-2)+"."_,"md3"_);
-                //for(string type: ref<string>{"md3"_}) {
-                for(string path : paths) {
-                    /*if(!endsWith(path, type)) continue;
-                            if(endsWith(name,".md3"_))*/ { models[name]=importMD3(path); break /*2*/; }
-                }
-                //}
-            }
+            if(!models.contains(name) && !startsWith(name,"*"_)) models[name]=importMD3(search(section(name,'.',0,-2)+"."_,"md3"_).first());
             if(!models.contains(name)) { error(name); continue; }
             if(!models.at(name)) continue; // Some BSP models are empty
             mat4 transform;
@@ -439,32 +287,19 @@ Scene::Scene(string file, const Folder& data) {
                     min=::min(min, corner), max=::max(max, transform*corner);
                 }
                 object.center = 1.f/2*(min+max), object.extent = 1.f/2*abs(max-min);
-                /*if(object.shader->name.contains(QRegExp("ocean"))) { //|water|icelake
-                        if(!water) water = new Water();
-                        water->surfaces<<object;
-                        water->z=max(water->z,(transform*object.surface->bbMax).z);
-                        continue;
-                    }*/
                 Shader* shader = object.surface.shader;
-                if(!shader || shader->name=="textures/common/caulk"_) shadowOnly << object;
-                else {
+                assert_(shader);
+                /*if(!shader || shader->name=="textures/common/caulk"_) shadowOnly << object;
+                else {*/
                     shader->bind(); // Forces shader compilation for correct split
                     GLShader* id = shader->program;
-                    /**/ if(shader->blendAdd) blendAdd[id] << object;
-                    else if(shader->blendAlpha) blendAlpha[id] << object;
-                    else if(shader->alphaTest) alphaTest[id] << object;
+                    if(shader->blendAlpha) blendAlpha[id] << object;
+                    else if(shader->blendColor) error("blendColor");
                     else opaque[id] << object;
-                }
+                //}
             }
         }
     }
-
-    // WARNING: Object arrays shall not be reallocated after taking these pointers
-    //for(array<Object>& a: opaque.values+alphaTest.values+blendAdd.values+blendAlpha.values/*except shadowOnly*/) for(Object& o: a) objects << &o;
-    for(array<Object>& a: opaque.values) for(Object& o: a) objects << &o;
-    for(array<Object>& a: alphaTest.values) for(Object& o: a) objects << &o;
-    for(array<Object>& a: blendAdd.values) for(Object& o: a) objects << &o;
-    for(array<Object>& a: blendAlpha.values) for(Object& o: a) objects << &o;
 
     /// Light Volume
     vec3 gridSize = toVec3(entities.at("worldspawn"_).at("gridsize"_));
@@ -502,6 +337,26 @@ Scene::Scene(string file, const Folder& data) {
     lightGrid[0] = GLTexture(nx,ny,nz,lightData[0]);
     lightGrid[1] = GLTexture(nx,ny,nz,lightData[1]);
     lightGrid[2] = GLTexture(nx,ny,nz,lightData[2]);
+
+    // WARNING: Object arrays shall not be reallocated after taking these pointers
+    for(array<Object>& a: opaque.values) for(Object& o: a) objects << &o;
+    for(array<Object>& a: blendAlpha.values) for(Object& o: a) objects << &o;
+    for(array<Object>& a: blendColor.values) for(Object& o: a) objects << &o;
+
+    for(Object* object: objects) for(Texture& texture: *object->surface.shader) if(texture.path!="$lightmap"_ && !texture.texture) {
+        String& path = texture.path;
+        if(endsWith(path,".tga"_)) path=String(section(path,'.',0,-2));
+        if(!textures.contains(path)) {
+            Map file;
+            if(existsFile(path,data)) file=Map(path,data);
+            else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
+            else if(existsFile(path+".jpg"_,data)) file=Map(path+".jpg"_,data);
+            else if(existsFile(path+".tga"_,data)) file=Map(path+".tga"_,data);
+            assert_(file, data.name()+"/"_+path);
+            textures.insert(copy(path), upload(file));
+        }
+        texture.texture = textures.at(path).pointer;
+    }
 }
 
 vec4 Scene::defaultPosition() const {
