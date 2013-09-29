@@ -40,7 +40,7 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
                 if(key=="implicitmask"_||key=="implicitblend"_) {
                     current->alpha=true;
                     current->type<<" sfactor_src_alpha blend_one_minus_src_alpha"_;
-                    shader.blendAlpha=true;
+                    shader.blendAlpha=true; shader.doubleSided=true;
                 }
                 shader.append(Texture("$lightmap"_));
             }
@@ -51,6 +51,7 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
             else if(key=="q3map_sun"_||key=="q3map_sunext"_) shader.properties[String("q3map_sun"_)]=String(value);
             else if(key=="sunshader"_) shader.properties[String("sunshader"_)]=String(value);
             else if(key=="nofog"_) shader.final.clear();
+            else if(key=="cull"_) { if(args[0]=="disable"_) shader.doubleSided=true; }
             else if(split(
                         "tesssize qer_nocarve q3map_normalimage q3map_lightmapsize q3map_lightmapmergable q3map_lightmapaxis "
                         "q3map_tcgen q3map_tcmod q3map_baseshader q3map_baseshader q3map_foliage q3map_surfacesurfaceparm "
@@ -62,7 +63,7 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
                         ).contains(key)) {} // Ignored or default
             else if(!current) { error("No current texture for",key,args,name); continue; }
             else if(key=="alphafunc"_) {
-                current->alpha=true; current->type<<" sfactor_src_alpha blend_one_minus_src_alpha"_; shader.blendAlpha=true;
+                current->alpha=true; current->type<<" sfactor_src_alpha blend_one_minus_src_alpha"_; shader.blendAlpha=true; shader.doubleSided=true;
             }
             else if(key=="vertexcolor"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; }
             else if(key=="alphagen"_) { if(args[0]=="vertex"_) { current->type<<" vertexAlpha"_; shader.vertexBlend=true; } }
@@ -82,7 +83,7 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
             }
             else if(key=="rgbgen"_) {
                 if(args[0]=="const"_) current->rgbGen=vec3(toDecimal(args[1]),toDecimal(args[2]),toDecimal(args[3]));
-                else if(args[0]=="wave"_) current->rgbGen=vec3(toDecimal(args[2]),toDecimal(args[3]),toDecimal(args[4]));
+                else if(args[0]=="wave"_) { if(toDecimal(args[2])>0) current->rgbGen=vec3(toDecimal(args[2])); }
                 else if(split("vertex exactvertex"_).contains(toLower(args[0]))) current->type <<" vertexColor"_;
                 else if(split("identity identitylighting lightingdiffuse entity oneminusentity environment"_).contains(toLower(args[0]))) {}
                 else error(name, key, args[0]);
@@ -108,14 +109,14 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
                     assert_(sfactor=="zero"_||sfactor=="one"_||sfactor=="src_alpha"_||sfactor=="src_color"_, name, sfactor, dfactor);
                     current->type<<" blend_"_+dfactor;
                     if(dfactor=="one"_||dfactor=="src_alpha"_||dfactor=="one_minus_src_alpha"_) {
-                        shader.blendAlpha=true; // Multiply destination by alpha and add source
+                        shader.blendAlpha=true; shader.doubleSided=true; // Multiply destination by alpha and add source
                     }
                     else if(sfactor=="zero"_) {
                         assert_(find(dfactor,"src_color"_), name, sfactor, dfactor);
-                        shader.blendColor=true; // Multiply destination by source
+                        shader.blendColor=true; shader.doubleSided=true; // Multiply destination by source
                     }
                     else if(dfactor=="one_minus_src_color"_||dfactor=="one_minus_src_color_minus_src_color"_) { // Approximate using average as alpha
-                        shader.blendAlpha=true;
+                        shader.blendAlpha=true; shader.doubleSided=true;
                         current->type<<"to_alpha"_; // blend_one_minus_src_color_to_alpha
                     } else if(dfactor=="zero"_) {} // Replace destination with source (opaque)
                     else error(name, sfactor, dfactor);

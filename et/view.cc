@@ -39,8 +39,8 @@ void View::render(int2, int2 size) {
     }
     frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.fog.xyz(),1.f));
 
-    glDepthTest(true);
-    if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
+    glDepthTest(true); glCullFace(true);
+    if(scene.opaque) draw(scene.opaque);
     if(scene.blendAlpha) { glBlendAlpha(); draw(scene.blendAlpha,BackToFront); }
     if(scene.blendColor)  { glBlendColor(); draw(scene.blendColor,BackToFront); }
     glBlendNone();
@@ -73,7 +73,8 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
 
         array<Object>& objects = e.value;
         // Save current state to minimize state changes (TODO: UBOs)
-        bool polygonOffset=false; mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbGens[4]={0,0,0,0};
+        bool polygonOffset=false, doubleSided=false;
+        mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbGens[4]={0,0,0,0};
 #ifdef VIEW_FRUSTUM_CULLING
         QMap<float,Object*> depthSort; //useless without proper partitionning
         for(int n=0;n<objects.count();n++) { Object* object = objects[n];
@@ -97,6 +98,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 glPolygonOffsetFill(polygonOffset=shader.polygonOffset);
                 glDepthMask(!polygonOffset);
             }
+            if(doubleSided!=shader.doubleSided) glCullFace(!(doubleSided=shader.doubleSided));
 
             if(shader.skyBox) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
             if(object.transform != currentTransform) {

@@ -100,7 +100,7 @@ array<Surface> Scene::importBSP(const BSP& bsp, int firstFace, int numFaces, boo
                     surface.addTriangle(i+(level+1)+1, i+1, i+(level+1) );
                 }
             }
-        } else error("Unsupported face.type",face.type,face.numIndices);
+        } //else error("Unsupported face.type",face.type,face.numIndices); TODO: foliage
     }
 
     return move(surfaces.values);
@@ -289,7 +289,8 @@ Scene::Scene(string file, const Folder& data) : data(data) {
         if(!models.contains(name)) { error(name); continue; }
         if(!models.at(name)) continue; // Some BSP models are empty
         mat4 transform;
-        if(e.contains("target"_) && targets.at(e.at("target"_)).contains("origin"_)) transform.translate(toVec3(targets.at(e.at("target"_)).at("origin"_)));
+        if(e.contains("target"_) && targets.contains(e.at("target"_)) && targets.at(e.at("target"_)).contains("origin"_))
+            transform.translate(toVec3(targets.at(e.at("target"_)).at("origin"_)));
         transform.translate(toVec3(e.value("origin"_,"0 0 0"_)));
         transform.scale(toDecimal(e.value("modelscale"_,"1"_)));
         transform.rotateZ(toDecimal(e.value("angle"_,"0"_))*PI/180);
@@ -360,12 +361,19 @@ Scene::Scene(string file, const Folder& data) : data(data) {
         path = replace(path,"\\"_,"/"_);
         if(!textures.contains(path)) {
             Map file;
-            if(existsFile(path,data)) file=Map(path,data);
-            else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
-            else if(existsFile(path+".jpg"_,data)) file=Map(path+".jpg"_,data);
-            else if(existsFile(path+".tga"_,data)) file=Map(path+".tga"_,data);
-            assert_(file, data.name()+"/"_+path);
-            textures.insert(copy(path), upload(file));
+            unique<GLTexture> texture;
+            if(path=="$whiteimage"_) {
+                byte4 white(0xFF);
+                texture = unique<GLTexture>(1,1,sRGB8,(const void*)&white);
+            } else {
+                if(existsFile(path,data)) file=Map(path,data);
+                else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);
+                else if(existsFile(path+".jpg"_,data)) file=Map(path+".jpg"_,data);
+                else if(existsFile(path+".tga"_,data)) file=Map(path+".tga"_,data);
+                assert_(file, data.name()+"/"_+path);
+                texture = upload(file);
+            }
+            textures.insert(copy(path), move(texture));
         }
         texture.texture = textures.at(path).pointer;
     }
