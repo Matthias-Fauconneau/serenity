@@ -137,6 +137,16 @@ fog {
 
 gamma {
  fragment {
+  uniform sampler2D source;
+  float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; } // Applies sRGB compression before writing pixel
+  out vec4 color;
+  color.rgb = texture(source, texCoord).rgb;
+  color = vec4(sRGB(color.r),sRGB(color.g),sRGB(color.b),1);
+ }
+}
+
+gammaMS {
+ fragment {
   uniform sampler2DMS source;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; } // Applies sRGB compression before writing pixel
   out vec4 color;

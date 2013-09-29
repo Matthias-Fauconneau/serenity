@@ -24,6 +24,7 @@ struct View : Widget {
     Scene& scene;
     Object* selected=0;
     GLFrameBuffer frameBuffer;
+    GLTexture resolvedBuffer;
     Shader simple {"transform surface"_};
     Shader gamma {"screen gamma"_};
     GLVertexBuffer vertexBuffer;
@@ -31,7 +32,7 @@ struct View : Widget {
     mat4 projection, inverseProjection, view; vec4 planes[6]; vec3 signs[6];
     vec3 position = 0;
     vec3 velocity = 0;
-    float sprint = 16;
+    float sprint = 8;
     int walk=0, strafe=0, jump=0;
     float yaw = 0, pitch=PI/2;
     int2 dragStart = 0; vec2 deltaStart = 0;

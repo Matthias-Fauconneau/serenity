@@ -31,7 +31,12 @@ void View::render(int2, int2 size) {
     planes[5] = vec4( m(3,0) - m(2,0), m(3,1) - m(2,1), m(3,2) - m(2,2), m(3,3) - m(2,3) );
     for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
 
-    if(frameBuffer.depthTexture.size() != size) frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24|Multisample), GLTexture(w,h, sRGB8|Multisample));
+    if(frameBuffer.size() != size) {
+        //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24|Multisample), GLTexture(w,h, sRGB8|Multisample));
+        frameBuffer = GLFrameBuffer(w,h,sRGB8,-1);
+        //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
+        resolvedBuffer = GLTexture(w,h);
+    }
     frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.fog.xyz(),1.f));
 
     glDepthTest(true);
@@ -42,15 +47,16 @@ void View::render(int2, int2 size) {
     glBlendNone(); //glPolygonOffsetFill(false);
     glDepthTest(false);
 
+    frameBuffer.blit(resolvedBuffer); // Resolves multisample buffer into resolvedBuffer
     GLFrameBuffer::bindWindow(0, size, 0);
     {GLShader& program = gamma.bind();
         program.bindFragments({"color"_});
-        program.bindSamplers({"tex"_}); frameBuffer.colorTexture.bind(0);
+        program.bindSamplers({"tex"_}); resolvedBuffer.bind(0); //frameBuffer.colorTexture.bind(0);
         vertexBuffer.bindAttribute(program,"position"_,2);
         vertexBuffer.draw(TriangleStrip);
     }
 
-    /*if( norm(velocity) > 0.1 )*/ contentChanged(); // Keeps rendering at 60fps
+    if( norm(velocity) > 0.1 ) contentChanged(); // Keeps rendering at 60fps
     frameCount++;
     const float alpha = 0; frameTime = alpha*frameTime + (1-alpha)*(float)time;
     String status = dec(round(frameTime*1000),3)+"ms "_+ftoa(1/frameTime,1,2)+"fps"_;

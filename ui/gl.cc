@@ -95,7 +95,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
             global << replace(stageGlobal,"$"_,str(i-1));
             main << replace(stageMain,"$"_,str(i-1));
         }
-        String glsl = "#version 150\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
+        String glsl = "#version 130\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_;
         this->source << copy(glsl);
         uint shader = glCreateShader(type);
         const char* data = glsl.data; int size = glsl.size;
@@ -279,18 +279,18 @@ void GLTexture::bind(uint sampler) const {
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
+    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }*/
-GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
+/*GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
     assert_(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     uint target = depthTexture.format&Multisample? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, target, depthTexture.id, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, colorTexture.id, 0);
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("Incomplete framebuffer");
-}
-/*GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
+    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+}*/
+GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
 
     glGenFramebuffers(1,&id);
@@ -303,11 +303,11 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth
 
     glGenRenderbuffers(1, &colorBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format==RGB16F?GL_RGB16F:GL_SRGB8, width, height);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format==RGB16F?GL_RGB16F:GL_RGB8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) error("");
-}*/
+    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+}
 GLFrameBuffer::~GLFrameBuffer() {
     if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer);
     if(colorBuffer) glDeleteRenderbuffers(1, &colorBuffer);
@@ -334,11 +334,11 @@ void GLFrameBuffer::blit(uint target) {
     glBlitFramebuffer(0,0,width,height,0,0,width,height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 void GLFrameBuffer::blit(GLTexture& color) {
-    assert(color.width==width, color.height==height);
-    uint target;
+    assert_(color.width==width && color.height==height);
+    uint target=0;
     glGenFramebuffers(1,&target);
     glBindFramebuffer(GL_FRAMEBUFFER,target);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,color.id,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.id, 0);
     blit(target);
     glDeleteFramebuffers(1,&target);
 }
