@@ -159,6 +159,15 @@ void Window::destroy() {
 // Render
 void Window::event() {
     window=this;
+    for(;;) { // Always try to process some X input events before rendering (even when not waked up by an X input event)
+        readLock.lock();
+        if(!poll()) { readLock.unlock(); break; }
+        uint8 type = read<uint8>();
+        XEvent e = read<XEvent>();
+        readLock.unlock();
+        processEvent(type, e);
+        while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
+    };
     if(revents==IDLE) {
         if(autoResize) {
             int2 hint = widget->sizeHint();
@@ -222,18 +231,10 @@ void Window::event() {
             currentClip=Rect(size);
             widget->render(0,size);
             assert(!clipStack);
-            glFinish(); //FIXME: glFlush
+            glFlush();
         }
         frameReady();
-    } else for(;;) {
-        readLock.lock();
-        if(!poll()) { readLock.unlock(); break; }
-        uint8 type = read<uint8>();
-        XEvent e = read<XEvent>();
-        readLock.unlock();
-        processEvent(type, e);
-        while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
-    };
+    }
     window=0;
 }
 

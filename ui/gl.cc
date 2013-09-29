@@ -201,14 +201,6 @@ void GLIndexBuffer::upload(const ref<uint>& indices) {
 }
 void GLIndexBuffer::draw() const {
     assert(id);
-    if(primitiveType == Line) {
-        glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-        glEnable(GL_BLEND);
-        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-        glEnable(GL_LINE_SMOOTH);
-        glLineWidth(2);
-    }
     if(primitiveRestart) {
         glEnableClientState(GL_PRIMITIVE_RESTART_NV);
         glPrimitiveRestartIndex(indexSize==GL_UNSIGNED_SHORT?0xFFFF:0xFFFFFFFF);

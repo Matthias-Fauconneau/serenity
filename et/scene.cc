@@ -31,6 +31,7 @@ Shader& Scene::getShader(string name, int lightmap) {
                 Shader& lightMapShader = shaders[name+lightMapID];
                 if(!lightMapShader.name) {
                     lightMapShader = copy(shader);
+                    lightMapShader.name = name+lightMapID;
                     for(Texture& texture: lightMapShader) if(texture.path=="$lightmap"_) {
                         texture.type = String("lightmap"_);
                         texture.path = this->name+lightMapID; // Assumes extern "high resolution" lightmaps are always used (TODO: intern lightmaps)
@@ -41,6 +42,7 @@ Shader& Scene::getShader(string name, int lightmap) {
                 Shader& lightGridShader = shaders[name+"/lightgrid"_];
                 if(!lightGridShader.name) {
                     lightGridShader = copy(shader);
+                    lightGridShader.name = name+"/lightgrid"_;
                     lightGridShader.type << " lightgrid"_; // Evaluates lightgrid every vertex
                     for(Texture& texture: lightGridShader) if(texture.path=="$lightmap"_) texture.type = String("vertexlight"_);
                 }
@@ -183,7 +185,6 @@ Scene::Scene(string file, const Folder& data) : data(data) {
         vertices << Vertex(v.position, vec2(v.texture.x,v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,v.lightmap.y),
                 vec3(v.color[0]/255.f,v.color[1]/255.f,v.color[2]/255.f));
     }
-    for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)] << importBSP(bsp, leaf.firstFace, leaf.numFaces, true);
     for(uint i: range(bsp.models().size)) {
         const bspModel& model = bsp.models()[i];
         models["*"_+str(i)]<< importBSP(bsp, model.firstFace, model.numFaces, false);
@@ -274,34 +275,32 @@ Scene::Scene(string file, const Folder& data) : data(data) {
     }
 
     /// Converts Entities to Objects (and compile shaders)
-    for(const Entity& e: entities.values) {
-        //if(e.contains("target")) transform.translate(vec3(targets[e["target"]]["origin"]));
-        if(e.contains("model"_)) {
-            string name = e.at("model"_);
-            if(!models.contains(name) && !startsWith(name,"*"_)) models[name]=importMD3(search(section(name,'.',0,-2)+"."_,"md3"_).first());
-            if(!models.contains(name)) { error(name); continue; }
-            if(!models.at(name)) continue; // Some BSP models are empty
-            mat4 transform;
-            transform.translate(toVec3(e.value("origin"_,"0 0 0"_)));
-            transform.scale(toDecimal(e.value("modelscale"_,"1"_)));
-            transform.rotateZ(toDecimal(e.value("angle"_,"0"_))*PI/180);
-            for(Object object: models.at(name)) {
-                object.transform = transform;
-                vec3 A = transform * object.surface.bbMin, B = transform * object.surface.bbMax;
-                // Computes world axis-aligned bounding box of object's oriented bounding box
-                vec3 O = 1.f/2*(A+B), min = O, max = O;
-                for(int i: range(1)) for(int j: range(1)) for(int k: range(1)) {
-                    vec3 corner = transform*vec3((i?A:B).x,(j?A:B).y,(k?A:B).z);
-                    min=::min(min, corner), max=::max(max, transform*corner);
-                }
-                object.center = 1.f/2*(min+max), object.extent = 1.f/2*abs(max-min);
-                Shader& shader = object.surface.shader;
-                shader.bind(); // Forces shader compilation for correct split
-                GLShader* id = shader.program;
-                if(shader.blendAlpha) blendAlpha[id] << object;
-                else if(shader.blendColor) error("blendColor");
-                else opaque[id] << object;
+    for(const Entity& e: entities.values) if(e.contains("model"_)) {
+        string name = e.at("model"_);
+        if(!models.contains(name) && !startsWith(name,"*"_)) models[name]=importMD3(search(section(name,'.',0,-2)+"."_,"md3"_).first());
+        if(!models.contains(name)) { error(name); continue; }
+        if(!models.at(name)) continue; // Some BSP models are empty
+        mat4 transform;
+        if(e.contains("target"_) && targets.at(e.at("target"_)).contains("origin"_)) transform.translate(toVec3(targets.at(e.at("target"_)).at("origin"_)));
+        transform.translate(toVec3(e.value("origin"_,"0 0 0"_)));
+        transform.scale(toDecimal(e.value("modelscale"_,"1"_)));
+        transform.rotateZ(toDecimal(e.value("angle"_,"0"_))*PI/180);
+        for(Object object: models.at(name)) {
+            object.transform = transform;
+            vec3 A = transform * object.surface.bbMin, B = transform * object.surface.bbMax;
+            // Computes world axis-aligned bounding box of object's oriented bounding box
+            vec3 O = 1.f/2*(A+B), min = O, max = O;
+            for(int i: range(1)) for(int j: range(1)) for(int k: range(1)) {
+                vec3 corner = transform*vec3((i?A:B).x,(j?A:B).y,(k?A:B).z);
+                min=::min(min, corner), max=::max(max, transform*corner);
             }
+            object.center = 1.f/2*(min+max), object.extent = 1.f/2*abs(max-min);
+            Shader& shader = object.surface.shader;
+            shader.bind(); // Forces shader compilation for correct split
+            GLShader* id = shader.program;
+            if(shader.blendAlpha) blendAlpha[id] << object;
+            else if(shader.blendColor) error("blendColor");
+            else opaque[id] << object;
         }
     }
 
@@ -361,6 +360,10 @@ Scene::Scene(string file, const Folder& data) : data(data) {
         }
         texture.texture = textures.at(path).pointer;
     }
+
+    uint indexCount=0; for(Object* object: objects) indexCount+=object->surface.indices.size;
+    log(opaque.size()+blendAlpha.size()+blendColor.size(),"shaders", objects.size,"objects",vertices.size,"vertices",indexCount/3,"faces");
+    //for(Object* object: objects) log(object->surface.shader.name);
 }
 
 vec4 Scene::defaultPosition() const {

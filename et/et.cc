@@ -3,7 +3,7 @@
 #include "view.h"
 #include "window.h"
 /*Ideas:
- - fog, profile+optimize, dynamic lighting (sun, lights (etxmap), shadows (soft PCF)), MSAA
+ - fog, dynamic lighting (sun, lights (etxmap), shadows (soft PCF)), MSAA
  - procedural textures: +normal, specular, displacement (relaxed cone stepping, tesselation)
  - atmosphere: tonemapping, bloom, color grading, specular reflection, refraction, waves, caustics, rain/snow
  - shadows: sample distribution shadow maps, exponential variance soft shadows (+multisampling)
@@ -20,6 +20,7 @@ struct ET {
         window.localShortcut(Escape).connect([]{exit();});
         window.widget=window.focus=window.directInput=&view;
         view.contentChanged.connect(&window,&Window::render);
+        view.statusChanged.connect([this](string status){window.setTitle(status);});
         window.clearBackground = false;
         window.show();
     }

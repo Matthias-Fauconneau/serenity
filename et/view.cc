@@ -33,7 +33,13 @@ void View::render(int2, int2 size) {
     if(frameBuffer.depthTexture.size() != size) frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
     frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.backgroundColor,1.f));
 
-    render(/*surfaceRender, lightRender, true*/);
+    glDepthTest(true);
+    if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
+    //glPolygonOffsetFill(true); glPolygonOffset(-2,-1);
+    if(scene.blendAlpha) { glBlendAlpha(); draw(scene.blendAlpha,BackToFront); }
+    if(scene.blendColor)  { glBlendColor(); draw(scene.blendColor,BackToFront); }
+    glBlendNone(); //glPolygonOffsetFill(false);
+    glDepthTest(false);
 
     GLFrameBuffer::bindWindow(0, size, 0);
     {GLShader& program = gamma.bind();
@@ -43,25 +49,17 @@ void View::render(int2, int2 size) {
     }
 
     /*if( norm(velocity) > 0.1 )*/ contentChanged(); // Keeps rendering at 60fps
-    const float alpha = 0;
-    frameTime = alpha*frameTime + (1-alpha)*(float)time;
-    log(str(int(round(frameTime*1000)))+"ms"_, ftoa(1/frameTime,1)+"fps"_);
+    frameCount++;
+    const float alpha = 0; frameTime = alpha*frameTime + (1-alpha)*(float)time;
+    String status = dec(round(frameTime*1000),3)+"ms "_+ftoa(1/frameTime,1,2)+"fps"_;
+    if(frameCount%32==0) statusChanged(status);
+    //if(isPowerOfTwo(frameCount) && frameCount>1) log(dec(frameCount,4), status);
     time.reset();
-}
-
-void View::render() {
-    glDepthTest(true);
-    if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
-    //glPolygonOffsetFill(true); glPolygonOffset(-2,-1);
-    if(scene.blendAlpha) { glBlendAlpha(); draw(scene.blendAlpha,BackToFront); }
-    if(scene.blendColor)  { glBlendColor(); draw(scene.blendColor,BackToFront); }
-    glBlendNone(); //glPolygonOffsetFill(false);
-    glDepthTest(false);
 }
 
 void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
     for(pair<GLShader*, array<Object>> e: objects) {
-        GLShader& program = *e.key;
+        GLShader& program = disableShaders ? simple.bind() : *e.key;
         program.bind();
         //shader["fogOpacity"] = /*scene.sky ? scene.sky->fogOpacity :*/ 8192;
         program.bindFragments({"color"_});
@@ -86,6 +84,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         for(Object& object: objects) {
 #endif
             Shader& shader = object.surface.shader;
+            assert(shader.program==program);
 
             if(shader.skyBox) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
             if(object.transform != currentTransform) {
@@ -99,7 +98,10 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 }
                 currentTransform=object.transform;
             }
-            if(object.uniformColor!=currentColor) { GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor; currentColor=object.uniformColor; }
+            if(object.uniformColor!=currentColor) {
+                GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor;
+                currentColor=object.uniformColor;
+            }
             int sampler=0; for(int i: range(shader.size)) {
                 Texture& tex = shader[i];
                 if(tex.texture) {
@@ -118,6 +120,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                 program["lightGrid2"_]=sampler; scene.lightGrid[2].bind(sampler); sampler++;
             }
 
+            //static uint i=0; if(i++%2) continue; // DEBUG: check if draw call limited
             object.surface.draw(program);
         }
     }
@@ -132,6 +135,7 @@ bool View::keyPress(Key key, Modifiers) {
     else if(key==' ') jump++;
     else if(key==ShiftKey) sprint *= 4;
     else if(key=='q') velocity=vec3(0,0,0);
+    else if(key=='f') disableShaders=!disableShaders;
     else return false;
     return true; // Starts rendering (if view was still)
 }

@@ -183,6 +183,8 @@ generic T sum(const ref<T>& a) { T sum=0; for(const T& e: a) sum += e; return su
 inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+/// Returns whether an integer is a power of two
+inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 /// Returns floor(log2(v))
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
