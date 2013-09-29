@@ -47,14 +47,12 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
             tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
             TextData s (source);
             array<uint> scope;
-            for(uint nest=0;s;) { //for each line
-                static array<string> qualifiers = split("struct const uniform attribute varying in out"_);
-                static array<string> types = split("void float vec2 vec3 vec4"_);
-                uint lineStart = s.index;
+            for(uint nest=0;s;) { //for each line             
+                uint start = s.index;
                 s.whileAny(" \t"_);
                 string identifier = s.identifier("_"_);
                 s.whileAny(" \t"_);
-                if(identifier && s.match("{\n"_)) { //scope: "[a-z]+ {"
+                if(identifier && s.match("{"_)) { //scope: "[a-z]+ {"
                     if(tags_.contains(identifier)) {
                         knownTags += identifier;
                         scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
@@ -65,11 +63,13 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
                             else if(s.match('}')) nest--;
                             else s.advance(1);
                         }
-                        if(!s.match('\n')) error("Expecting newline after scope");
+                        //if(!s.match('\n')) error("Expecting newline after scope");
                     }
-                    continue;
+                    start = s.index;
                 }
                 bool function = false;
+                static array<string> types = split("void float vec2 vec3 vec4"_);
+                static array<string> qualifiers = split("struct const uniform attribute varying in out"_);
                 if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
                     function = true;
                     s.until('{');
@@ -82,11 +82,14 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
                 if(identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D << String(s.identifier("_"_));
                 while(s && !s.match('\n')) {
                     if(s.match('{')) nest++;
-                    else if(s.match('}')) nest--;
+                    else if(s.match('}')) { nest--;
+                        if(scope && nest==scope.last()) { //Remove matching scope closing bracket
+                            scope.pop(); stageMain<<s.slice(start, s.index-1-start); start=s.index;
+                        }
+                    }
                     else s.advance(1);
                 }
-                if(scope && nest==scope.last()) { scope.pop(); continue; } // Remove matching scope closing bracket
-                string line = s.slice(lineStart, s.index-lineStart);
+                string line = s.slice(start, s.index-start);
                 if(trim(line)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain) << line;
             }
             global << replace(stageGlobal,"$"_,str(i-1));
@@ -134,31 +137,31 @@ uint GLShader::attribLocation(const string& name) {
 
 /// Vertex buffer
 
-GLVertexBuffer::~GLVertexBuffer() { if(vertexBuffer) glDeleteBuffers(1,&vertexBuffer); }
+GLVertexBuffer::~GLVertexBuffer() { if(id) glDeleteBuffers(1,&id); }
 void GLVertexBuffer::allocate(int vertexCount, int vertexSize) {
     this->vertexCount = vertexCount;
     this->vertexSize = vertexSize;
-    if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    if(!id) glGenBuffers(1, &id);
+    glBindBuffer(GL_ARRAY_BUFFER, id);
     glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW);
 }
 void* GLVertexBuffer::mapVertexBuffer() {
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, id);
     return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
 }
 void GLVertexBuffer::unmapVertexBuffer() { glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ARRAY_BUFFER, 0); }
 void GLVertexBuffer::upload(const ref<byte>& vertices) {
-    if(!vertexBuffer) glGenBuffers(1, &vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    if(!id) glGenBuffers(1, &id);
+    glBindBuffer(GL_ARRAY_BUFFER, id);
     glBufferData(GL_ARRAY_BUFFER, vertices.size, vertices.data, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertexCount = vertices.size/vertexSize;
 }
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
-    assert(vertexBuffer); assert(elementSize<=4);
+    assert(id); assert(elementSize<=4);
     int index = program.attribLocation(name);
     if(index<0) return;
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, id);
     glEnableVertexAttribArray(index);
     glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)(offset));
 }
@@ -168,36 +171,36 @@ void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
 }
 /// Index buffer
 
-GLIndexBuffer::~GLIndexBuffer() { if(indexBuffer) glDeleteBuffers(1,&indexBuffer); }
+GLIndexBuffer::~GLIndexBuffer() { if(id) glDeleteBuffers(1,&id); }
 void GLIndexBuffer::allocate(int indexCount) {
     this->indexCount = indexCount;
     if(indexCount) {
-        if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        if(!id) glGenBuffers(1, &id);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount*sizeof(uint), 0, GL_STATIC_DRAW );
     }
 }
 uint* GLIndexBuffer::mapIndexBuffer() {
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
     return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
 }
 void GLIndexBuffer::unmapIndexBuffer() { glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
 void GLIndexBuffer::upload(const ref<uint16>& indices) {
-    if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    if(!id) glGenBuffers(1, &id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint16), indices.data, GL_STATIC_DRAW);
     indexCount = indices.size;
     indexSize = GL_UNSIGNED_SHORT;
 }
 void GLIndexBuffer::upload(const ref<uint>& indices) {
-    if(!indexBuffer) glGenBuffers(1, &indexBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    if(!id) glGenBuffers(1, &id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
     indexCount = indices.size;
     indexSize = GL_UNSIGNED_INT;
 }
 void GLIndexBuffer::draw() const {
-    assert(indexBuffer);
+    assert(id);
     if(primitiveType == Line) {
         glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
@@ -210,7 +213,7 @@ void GLIndexBuffer::draw() const {
         glEnableClientState(GL_PRIMITIVE_RESTART_NV);
         glPrimitiveRestartIndex(indexSize==GL_UNSIGNED_SHORT?0xFFFF:0xFFFFFFFF);
     }
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
     glDrawElements(primitiveType, indexCount, indexSize, 0);
     if(primitiveRestart) glDisableClientState(GL_PRIMITIVE_RESTART_NV);
 }

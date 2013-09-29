@@ -111,8 +111,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
         GLShader& program = *e.key;
         program.bind();
         //shader["fogOpacity"] = /*scene.sky ? scene.sky->fogOpacity :*/ 8192;
-        //shader["clipPlane"] = clipPlane;
-        program.bindFragments({"albedo"_}); //program.bindFragments({"albedo"_,"normal"_});
+        program.bindFragments({"color"_});
 
         array<Object>& objects = e.value;
         mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbScales[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
@@ -133,8 +132,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
 #else
         for(Object& object: objects) {
 #endif
-            Shader& shader = *object.surface.shader;
-            assert_(&shader);
+            Shader& shader = object.surface.shader;
 
             if(shader.skyBox) { object.transform = mat4(); object.transform.translate(position); } // Clouds move with view
             if(object.transform != currentTransform) {
@@ -146,10 +144,6 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
                     modelLightMatrix = light*object.transform;
                     program["viewNormalMatrix"_] = view.normalMatrix(); // World to view normal matrix
                 }
-                /*if(tangentSpace) { //for displacement mapping
-                    program["modelViewMatrix"_]= view*object.transform;
-                    program["viewOrigin"_]= (view*object.transform).inverse()*vec3(0,0,0);
-                }*/
                 currentTransform=object.transform;
             }
             if(object.uniformColor!=currentColor) { GLUniform uniformColor = program["uniformColor"_]; if(uniformColor) uniformColor=object.uniformColor; currentColor=object.uniformColor; }
@@ -215,9 +209,9 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
         if(hit) {
             selected=hit;
             selected->uniformColor=vec3(1,0.5,0.5);
-            log(selected->surface.shader->name);
-            log(selected->surface.shader->source);
-            log(selected->surface.shader->program->source);
+            log(selected->surface.shader.name);
+            log(selected->surface.shader.source);
+            log(selected->surface.shader.program->source);
         }
         return true;
     }

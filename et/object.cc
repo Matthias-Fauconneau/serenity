@@ -1,30 +1,28 @@
 #include "object.h"
 
-uint Surface::addVertex(Vertex v) {
-    assert(!vertexBuffer);
-    if(!vertices) bbMin=bbMax=v.position; else bbMin=min(bbMin,v.position), bbMax=max(bbMax,v.position); // Initializes or updates bounding box
-    vertices<<v; return vertices.size-1; // Appends vertex
+Surface::Surface(Shader& shader, VertexBuffer& vertices, array<uint>&& indices) : shader(shader), vertices(vertices), indices(move(indices)) {
+    if(this->indices) bbMin=bbMax=vertices[this->indices.first()].position; // Initializes bounding box
+    for(uint i: this->indices) { vec3 p = vertices[i].position; bbMin=min(bbMin,p), bbMax=max(bbMax,p); } // Computes bounding box
 }
 
-void Surface::addTriangle(const ref<Vertex>& sourceVertices, int i1, int i2, int i3) {
-    if(!indexMap.contains(i1)) indexMap[i1]=addVertex(sourceVertices[i1]);
-    if(!indexMap.contains(i2)) indexMap[i2]=addVertex(sourceVertices[i2]);
-    if(!indexMap.contains(i3)) indexMap[i3]=addVertex(sourceVertices[i3]);
-    indices << indexMap[i1] << indexMap[i2] << indexMap[i3];
+void Surface::addTriangle(int a, int b, int c) {
+    if(!indices)  bbMin=bbMax=vertices[a].position;
+    indices.reserve(indices.size+3);
+    {vec3 p = vertices[a].position; bbMin=min(bbMin,p), bbMax=max(bbMax,p); indices<<a;}
+    {vec3 p = vertices[b].position; bbMin=min(bbMin,p), bbMax=max(bbMax,p); indices<<b;}
+    {vec3 p = vertices[c].position; bbMin=min(bbMin,p), bbMax=max(bbMax,p); indices<<c;}
 }
 
 void Surface::draw(GLShader& program) {
-    if(!vertexBuffer) {
-        indexMap.clear();
-        indexBuffer.upload(indices);
-        vertexBuffer.upload(vertices);
-    }
+    if(!vertices.id) vertices.upload(vertices);
+    if(!indexBuffer.id) indexBuffer.upload(indices);
     #define offsetof __builtin_offsetof
-    vertexBuffer.bindAttribute(program, "position"_, 3, offsetof(Vertex,position));
-    vertexBuffer.bindAttribute(program, "texcoord"_, 2, offsetof(Vertex,texcoord));
-    vertexBuffer.bindAttribute(program, "normal"_, 3, offsetof(Vertex,normal));
-    vertexBuffer.bindAttribute(program, "alpha"_, 1, offsetof(Vertex,alpha));
-    vertexBuffer.bindAttribute(program, "lightmap"_, 2, offsetof(Vertex,lightmap));
+    vertices.bindAttribute(program, "position"_, 3, offsetof(Vertex,position));
+    vertices.bindAttribute(program, "alpha"_, 1, offsetof(Vertex,alpha));
+    vertices.bindAttribute(program, "texcoord"_, 2, offsetof(Vertex,texcoord));
+    vertices.bindAttribute(program, "normal"_, 3, offsetof(Vertex,normal));
+    vertices.bindAttribute(program, "lightmap"_, 2, offsetof(Vertex,lightmap));
+    vertices.bindAttribute(program, "color"_, 3, offsetof(Vertex,color));
     indexBuffer.draw();
 }
 

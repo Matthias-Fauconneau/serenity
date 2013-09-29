@@ -23,7 +23,7 @@ struct View : Widget {
     Scene& scene;
     Object* selected=0;
     GLFrameBuffer frameBuffer;
-    Shader gamma {"screen deferred gamma"_};
+    Shader gamma {"screen gamma"_};
 
     //->Camera
     mat4 projection, inverseProjection, view; vec4 planes[6]; vec3 signs[6]; vec4 clipPlane;

@@ -15,7 +15,7 @@ struct Scene {
     array<String> search(const string& query, const string& type);
     /// Gets or creates a shader ensuring correct lighting method (map, grid or dynamic)
     Shader& getShader(string name, int lightmap=-1);
-    array<Surface> importBSP(const BSP& bsp, const ref<Vertex>& vertices, int firstFace, int numFaces, bool leaf);
+    array<Surface> importBSP(const BSP& bsp, int firstFace, int numFaces, bool leaf);
     array<Surface> importMD3(string modelPath);
     /// Default position as (x, y, z, yaw angle)
     vec4 defaultPosition() const;
@@ -25,6 +25,7 @@ struct Scene {
     map<String,Entity> entities;
     map<String,Entity> targets;
     map<String,unique<Shader>> shaders; // Referenced by Surfaces
+    VertexBuffer vertices; // Referenced by Surfaces
     map<String, array<Surface>> models;
     Shader* sky = 0;  vec3 backgroundColor = vec3(77,80,91)/255.f; // FIXME: get from skyparms outer box texture
     vec3 gridMin, gridMax; GLTexture lightGrid[3]; // Light grid

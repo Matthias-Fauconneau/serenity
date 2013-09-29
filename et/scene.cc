@@ -37,7 +37,7 @@ Shader& Scene::getShader(string name, int lightmap) {
                         texture.type = String("lightmap"_);
                         texture.path = this->name+lightMapID; // Assumes extern "high resolution" lightmaps are always used (TODO: intern lightmaps)
                     }
-                    {int albedo=0; for(const Texture& tex: lightMapShader) albedo += find(tex.type,"albedo"_); assert_(albedo, lightMapShader);}
+                    {int color=0; for(const Texture& tex: lightMapShader) color += find(tex.type,"color"_); assert_(color, lightMapShader);}
                 }
                 return lightMapShader;
             } else if(texture.path=="$lightmap"_) texture.type = String("lightgrid"_);
@@ -57,39 +57,40 @@ Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
     return (Vertex)(*(Vertex*)V);
 }
 
-array<Surface> Scene::importBSP(const BSP& bsp, const ref<Vertex>& vertices, int firstFace, int numFaces, bool leaf) {
+array<Surface> Scene::importBSP(const BSP& bsp, int firstFace, int numFaces, bool leaf) {
     map<ID, Surface> surfaces;
     for(int f: range(firstFace,firstFace+numFaces)) {
         const bspFace& face = bsp.faces()[leaf?bsp.leafFaces()[f]:f];
         string name = str(bsp.shaders()[face.texture].name);
         Shader& shader = shaders[name];
         if(shader.properties.contains("skyparms"_)) { if(sky) assert_(sky==&shader); else sky=&shader; continue; }
-        Surface& surface = surfaces[ID{face.texture, face.lightMapIndex}]; // Ensures surfaces are split by textures/lightmaps changes
-        if(!surface.shader) surface.shader = &getShader(name, face.lightMapIndex);
+        ID id{face.texture, face.lightMapIndex}; // Ensures surfaces are split by textures/lightmaps changes
+        if(!surfaces.contains(id)) surfaces.insert(id, Surface(getShader(name, face.lightMapIndex), vertices));
+        Surface& surface = surfaces.at(id);
         if(face.type==1||face.type==3) {
             for(int i=0;i<face.numIndices;i+=3) {
-                surface.addTriangle(vertices,
-                                    face.firstVertex+bsp.indices()[face.firstIndex+i+2],
-                        face.firstVertex+bsp.indices()[face.firstIndex+i+1],
-                        face.firstVertex+bsp.indices()[face.firstIndex+i+0]);
+                surface.addTriangle(face.firstVertex+bsp.indices()[face.firstIndex+i+2],
+                                                face.firstVertex+bsp.indices()[face.firstIndex+i+1],
+                                                face.firstVertex+bsp.indices()[face.firstIndex+i+0]);
             }
         } else if(face.type==2) {
             int w = face.size[0], h = face.size[1];
             assert(w%2==1 && h%2==1 && w*h==face.numVertices && face.numIndices==0);
+            const int level=4;
+            vertices.reserve(vertices.size+(w/2)*(h/2)*sq(level+1));
             for(int y=0;y<h-2;y+=2) for(int x=0;x<w-2;x+=2) {
-                const int level=4;
                 ref<Vertex> control = vertices.slice(face.firstVertex+y*w+x,w*h);
-                static array<Vertex> interpolatedVertices; int firstIndex = interpolatedVertices.size; // HACK: Surface::addTriangle expects same array between calls
+                uint firstIndex = vertices.size;
                 for(int j: range(level+1)) for(int k: range(level+1)) {
                     float u = float(j)/float(level), v = float(k)/float(level);
-                    interpolatedVertices << bezier(bezier(control[0*w+0],control[0*w+1],control[0*w+2],u),
-                            bezier(control[1*w+0],control[1*w+1],control[1*w+2], u),
-                            bezier(control[2*w+0],control[2*w+1],control[2*w+2], u), v);
+                    vertices << bezier(bezier(control[0*w+0],control[0*w+1],control[0*w+2],u),
+                                        bezier(control[1*w+0],control[1*w+1],control[1*w+2], u),
+                                        bezier(control[2*w+0],control[2*w+1],control[2*w+2], u), v);
                 }
                 for(int j: range(level)) for(int k: range(level)) {
-                    int i = firstIndex + j*(level+1) + k;
-                    surface.addTriangle(interpolatedVertices, i+(level+1), i+1, i+0 );
-                    surface.addTriangle(interpolatedVertices, i+(level+1)+1, i+1, i+(level+1) );
+                    uint i = firstIndex + j*(level+1) + k;
+                    surface.addTriangle(i+(level+1), i+1, i+0);
+                    surface.addTriangle(i+(level+1)+1, i+1, i+(level+1) );
                 }
             }
         } else error("Unsupported face.type",face.type,face.numIndices);
@@ -106,18 +107,6 @@ array<Surface> Scene::importMD3(string modelPath) {
     for(uint offset=md3.surfaceOffset; offset!=md3.endOffset; offset+=md3.surface(offset).endOffset) {
         const md3Surface& surface = md3.surface(offset);
         assert(ref<byte>(surface.magic)=="IDP3"_, surface.magic);
-        buffer<Vertex> vertices (surface.vertexCount);
-        for(uint i : range(surface.vertices().size)) {
-            md3Vertex v = surface.vertices()[i];
-            vec2 textureCoordinates = surface.textureCoordinates()[i];
-            float latitude = v.latitude*(2*PI/255), longitude = v.longitude*(2*PI/255);
-            vertices[i] = Vertex(
-                        vec3(v.position[0]/64.f,v.position[1]/64.f,v.position[2]/64.f),
-                    vec2(textureCoordinates.x, 1.f-textureCoordinates.y /*Convert from upper left origin to OpenGL right handed (lower left)*/),
-                    vec3(cos(longitude)*sin(latitude),sin(longitude)*sin(latitude),cos(latitude)) );
-        }
-        Surface target;
-        for(const md3Triangle& face: surface.triangles()) target.addTriangle(vertices, face[2], face[1], face[0] );
 
         String name = String(str(surface.shaders().first().name));
         if(surface.shaders().size!=1) error("Multiple shader unsupported");
@@ -132,7 +121,20 @@ array<Surface> Scene::importMD3(string modelPath) {
                 }
             }
         }
-        target.shader = &getShader(name);
+
+        uint firstIndex = vertices.size;
+        vertices.reserve(vertices.size+surface.vertexCount);
+        for(uint i : range(surface.vertices().size)) {
+            md3Vertex v = surface.vertices()[i];
+            vec2 textureCoordinates = surface.textureCoordinates()[i];
+            float latitude = v.latitude*(2*PI/255), longitude = v.longitude*(2*PI/255);
+            vertices << Vertex(vec3(v.position[0]/64.f,v.position[1]/64.f,v.position[2]/64.f), vec2(textureCoordinates.x, textureCoordinates.y),
+                                           vec3(cos(longitude)*sin(latitude),sin(longitude)*sin(latitude),cos(latitude)) );
+        }
+
+        Surface target(getShader(name), vertices);
+        for(const md3Triangle& face: surface.triangles()) target.addTriangle(firstIndex+face[2], firstIndex+face[1], firstIndex+face[0] );
+
         surfaces << move(target);
     }
     return surfaces;
@@ -170,26 +172,27 @@ Scene::Scene(string file, const Folder& data) : data(data) {
     for(string path: materials) shaders << parseMaterialFile(readFile(path,data));
 
     /// Loads BSP geometry
-    buffer<Vertex> vertices (bsp.vertices().size);
+    vertices.reserve(bsp.vertices().size); // Reserves more to append bezier patches and md3 models
     for(uint i: range(bsp.vertices().size)) {
         const ibspVertex& v = bsp.vertices()[i];
-        vertices[i] = Vertex(v.position, vec2(v.texture.x,v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,v.lightmap.y));
+        vertices << Vertex(v.position, vec2(v.texture.x,v.texture.y), v.normal, v.color[3]/255.f, vec2(v.lightmap.x,v.lightmap.y),
+                vec3(v.color[0]/255.f,v.color[1]/255.f,v.color[2]/255.f));
     }
-    Time time;
-    for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)]<< importBSP(bsp, vertices, leaf.firstFace, leaf.numFaces, true);
+    for(const bspLeaf& leaf: bsp.leaves()) models["*"_+str(0)] << importBSP(bsp, leaf.firstFace, leaf.numFaces, true);
     for(uint i: range(bsp.models().size)) {
         const bspModel& model = bsp.models()[i];
-        models["*"_+str(i)]<< importBSP(bsp, vertices, model.firstFace, model.numFaces, false);
+        models["*"_+str(i)]<< importBSP(bsp, model.firstFace, model.numFaces, false);
     }
-    log("Surfaces",time);
 
     if(sky) {
         float boxSize = 32768 / sqrt(3.); // Corners at zFar
         { // Sky
-            array<Vertex> vertices;
-            Surface surface;
-            for(int i = 0; i < 5; i++) { //FIXME: implement Surface::addTriangle without index indirection
-                const int skySubdivisions = 8;
+            sky->skyBox = true;
+
+            const int skySubdivisions = 8;
+            vertices.reserve(vertices.size+5*skySubdivisions*skySubdivisions);
+            Surface surface(*sky, vertices);
+            for(int i = 0; i < 5; i++) {
                 float MIN_T = i==4 ? -(skySubdivisions/2) : -1;
                 uint firstIndex = vertices.size;
 
@@ -218,26 +221,29 @@ Scene::Scene(string file, const Folder& data) : data(data) {
                         vertices << Vertex(skyVec,vec2(sRad,tRad),0);
                     }
                 }
+
                 for(int t = 0; t < (skySubdivisions/2) - MIN_T; t++) {
                     for(int s = 0; s < skySubdivisions; s++) {
-                        surface.addTriangle(vertices,
-                                            firstIndex + s + 1 + t * (skySubdivisions+1),
-                                            firstIndex + s + (t + 1) * (skySubdivisions+1),
-                                            firstIndex + s + t * (skySubdivisions+1));
-                        surface.addTriangle(vertices,
-                                            firstIndex + s + 1 + t * (skySubdivisions+1),
-                                            firstIndex + s + 1 + (t + 1) * (skySubdivisions+1),
-                                            firstIndex + s + (t + 1) * (skySubdivisions+1));
+                        surface.addTriangle(
+                                    firstIndex + s + 1 + t * (skySubdivisions+1),
+                                    firstIndex + s + (t + 1) * (skySubdivisions+1),
+                                    firstIndex + s + t * (skySubdivisions+1));
+                        surface.addTriangle(
+                                    firstIndex + s + 1 + t * (skySubdivisions+1),
+                                    firstIndex + s + 1 + (t + 1) * (skySubdivisions+1),
+                                    firstIndex + s + (t + 1) * (skySubdivisions+1));
                     }
                 }
             }
-            surface.shader = sky;
-            surface.shader->skyBox = true;
             array<Surface> model; model << move(surface);
             models.insert(String("*skybox"_), move(model));
             entities.insert(String("sky"_)).insert(String("model"_), String("*skybox"_));
         }
         { // Sun
+            Shader& shader = getShader(sky->properties.at("sunshader"_));
+            assert_(shader.blendAlpha);
+            shader.skyBox = true;
+
             array<string> sun = split(sky->properties.at("q3map_sun"_),' ');
             float azimuth = toDecimal(sun[4])*PI/180, elevation=toDecimal(sun[5])*PI/180;
             vec3 sunDirection = vec3(cos(azimuth)*cos(elevation),sin(azimuth)*cos(elevation),sin(elevation));
@@ -246,16 +252,13 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             vec3 u = normal(sunDirection);
             vec3 v = cross(sunDirection, u);
 
-            array<Vertex> vertices;
+            uint firstIndex = vertices.size;
             vertices << Vertex(center+sunSize*(-u-v),vec2(0,0),0) << Vertex(center+sunSize*(-u+v),vec2(1,0),0)
                      << Vertex(center+sunSize*(+u+v),vec2(1,1),0) << Vertex(center+sunSize*(+u-v),vec2(0,1),0);
-            Surface surface;
-            surface.addTriangle(vertices, 0, 1, 2);
-            surface.addTriangle(vertices, 2, 3, 0);
+            Surface surface(shader, vertices);
+            surface.addTriangle(firstIndex+0, firstIndex+1, firstIndex+2);
+            surface.addTriangle(firstIndex+2, firstIndex+3, firstIndex+0);
 
-            surface.shader = &getShader(sky->properties.at("sunshader"_));
-            assert_(surface.shader->blendAlpha);
-            surface.shader->skyBox = true;
             array<Surface> model; model << move(surface);
             models.insert(String("*sun"_), move(model));
             entities.insert(String("sun"_)).insert(String("model"_), String("*sun"_));
@@ -287,16 +290,12 @@ Scene::Scene(string file, const Folder& data) : data(data) {
                     min=::min(min, corner), max=::max(max, transform*corner);
                 }
                 object.center = 1.f/2*(min+max), object.extent = 1.f/2*abs(max-min);
-                Shader* shader = object.surface.shader;
-                assert_(shader);
-                /*if(!shader || shader->name=="textures/common/caulk"_) shadowOnly << object;
-                else {*/
-                    shader->bind(); // Forces shader compilation for correct split
-                    GLShader* id = shader->program;
-                    if(shader->blendAlpha) blendAlpha[id] << object;
-                    else if(shader->blendColor) error("blendColor");
-                    else opaque[id] << object;
-                //}
+                Shader& shader = object.surface.shader;
+                shader.bind(); // Forces shader compilation for correct split
+                GLShader* id = shader.program;
+                if(shader.blendAlpha) blendAlpha[id] << object;
+                else if(shader.blendColor) error("blendColor");
+                else opaque[id] << object;
             }
         }
     }
@@ -343,7 +342,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
     for(array<Object>& a: blendAlpha.values) for(Object& o: a) objects << &o;
     for(array<Object>& a: blendColor.values) for(Object& o: a) objects << &o;
 
-    for(Object* object: objects) for(Texture& texture: *object->surface.shader) if(texture.path!="$lightmap"_ && !texture.texture) {
+    for(Object* object: objects) for(Texture& texture: object->surface.shader) if(texture.path!="$lightmap"_ && !texture.texture) {
         String& path = texture.path;
         if(endsWith(path,".tga"_)) path=String(section(path,'.',0,-2));
         if(!textures.contains(path)) {

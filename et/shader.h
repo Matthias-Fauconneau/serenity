@@ -6,7 +6,7 @@ struct Folder;
 unique<GLTexture> upload(const ref<byte>& file);
 
 struct Texture {
-    Texture(const string& path=""_) : path(path), type("albedo"_) {}
+    Texture(const string& path=""_) : path(path), type("color"_) {}
 
     String path;
     String type; // FIXME: convert to flags

@@ -1,11 +1,11 @@
 transform {
+ varying vec3 viewPos;
  vertex {
   attribute vec4 position;
   uniform mat4 modelViewProjectionMatrix;
   gl_Position = modelViewProjectionMatrix * position;
   position {
    uniform mat4 modelViewMatrix;
-   out vec3 viewPos;
    viewPos = (modelViewMatrix*position).xyz;
   }
  }
@@ -25,272 +25,87 @@ screen {
  }
 }
 
-deferred {
- fragment {
-  out vec4 color;
-  transform {
-   uniform vec2 deviceScale;
-   vec2 texCoord=gl_FragCoord.xy*deviceScale;
-  }
-  position {
-   uniform sampler2D depthBuffer;
-   uniform float A; uniform float B;
-   transform {
-    in vec3 viewPos;
-    vec3 getPosition(float depth) { return viewPos * B /((A + depth)*viewPos.z); }
-   }
-   screen {
-    in vec3 viewRay;
-    vec3 getPosition(float depth) { return viewRay * B / (A + depth); }
-   }
-   float depth = texture(depthBuffer,texCoord).r;
-   vec3 P = getPosition(depth);
-  }
- }
-}
-
 surface {
+ varying vec2 vertexTexCoord;
+ varying vec3 vertexNormal;
+ varying float vertexAlpha;
+ varying vec2 vertexLightmap;
+ varying vec3 vertexColor;
  vertex {
-  uniform vec4 clipPlane;
-  gl_ClipDistance[0] = dot(position,clipPlane);
-
-  in vec2 texcoord;
-  out vec2 vertexTexCoord;
+  attribute vec2 texcoord;
   vertexTexCoord = texcoord;
 
-  in vec3 normal;
   uniform mat3 normalMatrix;
-  out vec3 vertexNormal;
+  attribute vec3 normal;
   vertexNormal = normalMatrix * normal;
 
-  in float alpha;
-  out float vertexAlpha;
+  attribute float alpha;
   vertexAlpha = alpha;
 
-  in vec2 lightmap;
-  out vec2 vertexLightmap;
+  attribute vec2 lightmap;
   vertexLightmap = lightmap;
+
+  attribute vec3 color;
+  vertexColor = color;
  }
  fragment {
-  in vec2 vertexTexCoord;
-  vec2 T = vertexTexCoord;
   uniform vec3 uniformColor;
-  out vec4 albedo;
-  albedo = vec4(1);
-  in vec3 vertexNormal;
-  out vec3 normal;
-  normal = (vertexNormal+1)/2;
-  in float vertexAlpha;
-  in vec2 vertexLightmap;
-  fog {
-   in vec3 viewPos;
-   uniform float fogOpacity;
-  }
+  out vec4 color;
+  color = vec4(1);
  }
 }
 
-alphaShadow {
- vertex {
-  in vec2 texcoord;
-  out vec2 vertexTexCoord;
-  vertexTexCoord = texcoord;
- }
- fragment {
-  in vec2 vertexTexCoord;
-  uniform sampler2D tex0;
-  if( texture(tex0,vertexTexCoord).a < 0.5 ) discard;
- }
-}
-
-debug {
- vertex {
-  in vec3 normal;
-  uniform mat3 normalMatrix;
-  out vec3 vertexNormal;
-  vertexNormal = normalMatrix * normal;
- }
- fragment {
-  out vec4 albedo;
-  albedo = vec4(1,1,1,1);
-  in vec3 vertexNormal;
-  out vec3 normal;
-  normal = (vertexNormal+1)/2;
- }
-}
-
-displace {
- vertex {
-  uniform vec3 viewOrigin;
-  out vec3 tangentViewRay;
-  tangentViewRay = transpose(mat3(tangent, bitangent, normal)) * (viewOrigin-position.xyz);
- }
- fragment {
-  in vec3 tangentViewRay;
-  relief {
-   vec3 V = normalize(tangentViewRay);
-   vec2 S = tcScale$.z * V.xy / V.z;
-   const int linearSteps = 15;
-   const float depthStep = 1.0 / float(linearSteps);
-   float depth = 0.0;
-   float height,previousHeight=1.0;
-   for(int i=0; i<linearSteps; ++i) {
-    depth += depthStep;
-    height = texture(tex$, T + S * depth).a;
-    if(depth >= height) break;
-    previousHeight=height;
-   }
-   float bestDepth = depth;
-   const int bisectionSteps = 6;
-   float size = depthStep;
-   for(int i=0; i<bisectionSteps; ++i) {
-    size *= 0.5;
-    float height = texture(tex$, T + S * depth).a;
-    if(depth >= height) {
-     bestDepth = depth;
-     depth -= 2.0 * size;
-    }
-    depth += size;
-   }
-   T += S*bestDepth;
-  }
-  cone {
-   vec3 V = normalize(tangentViewRay);
-   vec3 S = vec3( tcScale$.z * V.xy / V.z, 1.0 );
-   float rayRatio = length(S.xy);
-   const int coneSteps = 16;
-   vec3 P=vec3(T,0.0);
-   for(int i=0; i<coneSteps; i++) {
-     vec4 t = texture(tex$, P.xy);
-     P += S*t.b*clamp(t.a-P.z,0.0,1.0)/(rayRatio+t.b);
-   }
-   T = P.xy;
-  }
- }
-}
-
-tangent {
- vertex {
-  in vec3 tangent;
-  in vec3 bitangent;
-  out vec3 vertexTangent;
-  vertexTangent = normalMatrix * tangent;
-  out vec3 vertexBiTangent;
-  vertexBiTangent = normalMatrix * bitangent;
- }
- tangent {
-  in vec3 vertexTangent;
-  in vec3 vertexBiTangent;
-  vec3 computeNormal( vec2 xy ) { return vec3( xy, sqrt(1.0 - xy.x*xy.x - xy.y*xy.y) ); }
-  normal = sfactor$*((mat3(-vertexTangent,vertexBiTangent,vertexNormal) * computeNormal(2.0*texture(tex$,T*tcScale$.xy).xy-1.0))+1)/2
-           + dfactor$*normal.rgb; //FIXME: spherical interpolation ?
- }
-}
-
-albedo {
+color {
  fragment {
   uniform sampler2D tex$;
   uniform mat3x2 tcMod$;
   uniform vec3 rgbScale$;
-  vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,tcMod$*vec3(T,1));
-  vertexAlpha {
-   sample$.a = vertexAlpha;
-  }
-  vec3 sfactor$=vec3(1),dfactor$=vec3(0);
-  sfactor_zero {
-   sfactor$=vec3(0);
-  }
-  sfactor_one {
-   sfactor$=vec3(1);
-  }
-  sfactor_src_color {
-   sfactor$=sample$.rgb;
-  }
-  sfactor_dst_color {
-   sfactor$=albedo.rgb;
-  }
-  sfactor_src_alpha {
-   sfactor$=vec3(sample$.a);
-  }
-  sfactor_one_minus_src_alpha {
-   sfactor$=vec3(1.0-sample$.a);
-  }
-  sfactor_one_minus_dst_alpha {
-   sfactor$=vec3(1.0-albedo.a); //FIXME
-  }
-  sfactor_one_minus_dst_color {
-   sfactor$=vec3(1.0-albedo.rgb); //FIXME
-  }
-  dfactor_zero {
-   dfactor$=vec3(0);
-  }
-  dfactor_one {
-   dfactor$=vec3(1);
-  }
-  dfactor_src_color {
-   dfactor$=sample$.rgb;
-  }
-  dfactor_dst_color {
-   dfactor$=albedo.rgb;
-  }
-  dfactor_src_alpha {
-   dfactor$=vec3(sample$.a);
-  }
-  dfactor_one_minus_src_alpha {
-   dfactor$=vec3(1.0-sample$.a);
-  }
-  dfactor_one_minus_src_color {
-   dfactor$=vec3(1.0)-sample$.rgb;
-  }
-  dfactor_src_color_plus_src_color {
-   dfactor$=2*sample$.rgb;
-  }
-  albedo.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*albedo.rgb;
-  blend_zero {
-   albedo.a = 0;
-  }
-  blend_one {
-   albedo.a = 1;
-  }
-  blend_src_alpha {
-   albedo.a = sample$.a;
-  }
+  vec4 sample$ = vec4(rgbScale$,1)*texture(tex$,tcMod$*vec3(vertexTexCoord,1));
+  vertexAlpha { sample$.a = vertexAlpha; }
+
+  vec3 sfactor$=vec3(1);
+  sfactor_zero { sfactor$=vec3(0); }
+  sfactor_one { sfactor$=vec3(1); }
+  sfactor_src_color { sfactor$=sample$.rgb; }
+  sfactor_dst_color { sfactor$=color.rgb; }
+  sfactor_src_alpha { sfactor$=vec3(sample$.a); }
+  sfactor_one_minus_src_alpha { sfactor$=vec3(1.0-sample$.a); }
+  sfactor_one_minus_dst_alpha { sfactor$=vec3(1.0-color.a); }
+  sfactor_one_minus_dst_color { sfactor$=vec3(1.0-color.rgb); }
+
+  vec3 dfactor$=vec3(0);
+  dfactor_zero { dfactor$=vec3(0); }
+  dfactor_one { dfactor$=vec3(1); }
+  dfactor_src_color { dfactor$=sample$.rgb; }
+  dfactor_dst_color { dfactor$=color.rgb; }
+  dfactor_src_alpha { dfactor$=vec3(sample$.a); }
+  dfactor_one_minus_src_alpha { dfactor$=vec3(1.0-sample$.a); }
+  dfactor_one_minus_src_color { dfactor$=vec3(1.0)-sample$.rgb; }
+  dfactor_src_color_plus_src_color { dfactor$=2*sample$.rgb; }
+
+  color.rgb = uniformColor*sfactor$*sample$.rgb + dfactor$*color.rgb;
+
+  blend_zero { color.a = 0; }
+  blend_one { color.a = 1; }
+  blend_src_alpha { color.a = sample$.a; }
   blend_one_minus_src_alpha {
-   albedo.a = 1-sample$.a;
-   sfactor_src_alpha {
-    if( sample$.a < 0.5 ) discard;
-   }
+   color.a = 1-sample$.a;
+   sfactor_src_alpha { if( sample$.a < 0.5 ) discard; }
   }
-  blend_one_minus_src_color_to_alpha {
-   albedo.a = 1-(sample$.r+sample$.g+sample$.b)/3;
-  }
-  blend_src_color {
-   albedo.rgb = sample$.rgb;
-  }
-  blend_one_minus_src_color {
-   albedo.rgb = 1-sample$.rgb;
-  }
-  blend_one_plus_src_color {
-   albedo.rgb = 1+sample$.rgb; // Clip ?
-  }
-  blend_src_color_plus_src_color {
-   albedo.rgb = 2*sample$.rgb; // Clip ?
-  }
-  blend_one_minus_src_color_minus_src_color {
-   albedo.rgb = 1-2*sample$.rgb; // Clip ?
-  }
-  blend_one_minus_src_color_minus_src_color_to_alpha {
-   albedo.rgb = 1-2*(sample$.r+sample$.g+sample$.b)/3; // Clip ?
-  }
-  fog {
-    albedo *= max(0,1-length(viewPos)/fogOpacity);
-  }
+  blend_one_minus_src_color_to_alpha { color.a = 1-(sample$.r+sample$.g+sample$.b)/3; }
+  blend_src_color { color.rgb = sample$.rgb; }
+  blend_one_minus_src_color { color.rgb = 1-sample$.rgb; }
+  blend_one_plus_src_color { color.rgb = 1+sample$.rgb; }
+  blend_src_color_plus_src_color { color.rgb = 2*sample$.rgb; }
+  blend_one_minus_src_color_minus_src_color { color.rgb = 1-2*sample$.rgb; }
+  blend_one_minus_src_color_minus_src_color_to_alpha { color.a = 1-2*(sample$.r+sample$.g+sample$.b)/3; }
  }
 }
 
 lightmap {
  fragment {
   uniform sampler2D tex$;
-  albedo.rgb *= texture(tex$,vertexLightmap).rgb;
+  color.rgb *= texture(tex$,vertexLightmap).rgb;
  }
 }
 
@@ -309,8 +124,7 @@ lightgrid {
   vec3 directional = texture(lightGrid1, lightTexCoords).rgb;
   vec3 lightDirection = normalize((texture(lightGrid2, lightTexCoords).xyz*2)-1);
   uniform mat3 viewNormalMatrix;
-  albedo.rgb *= (ambient.rgb + max(0,dot(viewNormalMatrix * lightDirection,vertexNormal))*directional.rgb);
-  //albedo.rgb = vec3(dot(viewNormalMatrix * lightDirection,vertexNormal));
+  color.rgb *= vertexColor; //(ambient.rgb + max(0,dot(viewNormalMatrix * lightDirection,vertexNormal))*directional.rgb);
  }
 }
 
@@ -318,6 +132,7 @@ gamma {
  fragment {
   uniform sampler2D source;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1/2.4)-0.055; else return 12.92*c; } // Applies sRGB compression before writing pixel
+  out vec4 color;
   color.rgb = texture(source, texCoord).rgb;
   color = vec4(sRGB(color.r),sRGB(color.g),sRGB(color.b),1);
  }

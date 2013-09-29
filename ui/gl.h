@@ -56,9 +56,9 @@ struct GLVertexBuffer {
     void bindAttribute(GLShader& program, const ref<byte>& name, int elementSize, uint64 offset = 0/*, bool instance = false*/) const;
     void draw(PrimitiveType primitiveType) const;
 
-    operator bool() const { return vertexBuffer; }
+    operator bool() const { return id; }
 
-    handle<uint> vertexBuffer;
+    handle<uint> id;
     uint vertexCount=0;
     uint vertexSize=0;
 };
@@ -76,10 +76,10 @@ struct GLIndexBuffer {
     void upload(const ref<uint>& indices);
     void draw() const;
 
-    operator bool() { return indexBuffer; }
+    operator bool() { return id; }
 
     PrimitiveType primitiveType=Triangle;
-    handle<uint> indexBuffer;
+    handle<uint> id;
     uint indexCount=0;
     uint indexSize=0;
     bool primitiveRestart=false;

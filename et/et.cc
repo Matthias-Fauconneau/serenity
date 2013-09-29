@@ -11,7 +11,7 @@
 */
 
 struct ET {
-    Window window{0, int2(840,525),"ET Map Viewer"_,Image(),Window::OpenGL};
+    Window window{0, int2(1050,1050),"ET Map Viewer"_,Image(),Window::OpenGL};
 
     Folder data = "opt/enemy-territory/etmain"_;
     Scene scene {data.list(Files|Recursive).filter([](const string& file){return !endsWith(file,".bsp"_);}).first(), data};
