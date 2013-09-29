@@ -1,9 +1,15 @@
 transform {
- varying vec3 viewPos;
  vertex {
   attribute vec4 position;
   uniform mat4 modelViewProjectionMatrix;
   gl_Position = modelViewProjectionMatrix * position;
+ }
+ position {
+  varying vec3 viewPos;
+  vertex {
+    uniform mat4 modelViewMatrix;
+    viewPos = (modelViewMatrix*position).xyz;
+   }
  }
 }
 screen {
@@ -119,6 +125,13 @@ lightmap {
 vertexlight {
  fragment {
   color.rgb *= vertexColor;
+ }
+}
+
+fog {
+ fragment {
+  uniform vec4 fog;
+  color.rgba = mix(color.rgba, vec4(fog.rgb,0), min(length(viewPos)/fog.a,1));
  }
 }
 

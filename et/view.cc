@@ -31,7 +31,7 @@ void View::render(int2, int2 size) {
     for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
 
     if(frameBuffer.depthTexture.size() != size) frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
-    frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.backgroundColor,1.f));
+    frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.fog.xyz(),1.f));
 
     glDepthTest(true);
     if(scene.opaque) { glCullFace(true); draw(scene.opaque); glCullFace(false); }
@@ -61,8 +61,8 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
     for(pair<GLShader*, array<Object>> e: objects) {
         GLShader& program = disableShaders ? simple.bind() : *e.key;
         program.bind();
-        //shader["fogOpacity"] = /*scene.sky ? scene.sky->fogOpacity :*/ 8192;
         program.bindFragments({"color"_});
+        program["fog"_] = scene.fog;
 
         array<Object>& objects = e.value;
         mat4 currentTransform=mat4(0); vec3 currentColor=0; mat3x2 tcMods[4]={0,0,0,0}; vec3 rgbGens[4]={0,0,0,0}; // Save current state to minimize state changes (TODO: UBOs)
@@ -90,6 +90,7 @@ void View::draw(map<GLShader*, array<Object>>& objects, Sort /*sort*/) {
             if(object.transform != currentTransform) {
                 program["modelViewProjectionMatrix"_] = projection*view*object.transform;
                 program["normalMatrix"_]= (view*object.transform).normalMatrix();
+                program["modelViewMatrix"_] = view*object.transform;
                 GLUniform modelLightMatrix=program["modelLightMatrix"_]; // Model to world
                 if(modelLightMatrix) {
                     mat4 light; light.scale(vec3(1)/(scene.gridMax-scene.gridMin)); light.translate(-scene.gridMin);

@@ -47,16 +47,17 @@ map<String,unique<Shader> > parseMaterialFile(string data) {
             else if(key=="animmap"_) { shader.append(Texture(args[1])); current=&shader.last(); }
             else if(key=="polygonoffset"_ ) shader.polygonOffset=true;
             else if(key=="skyparms"_) shader.properties[String("skyparms"_)] = String(args[1]);
-            else if(key=="fogparms"_) shader.properties.insert(String("fogparms"_), String(args[3]));
+            else if(key=="fogparms"_) shader.properties.insert(String("fogparms"_), join(args," "_));
             else if(key=="q3map_sun"_||key=="q3map_sunext"_) shader.properties[String("q3map_sun"_)]=String(value);
             else if(key=="sunshader"_) shader.properties[String("sunshader"_)]=String(value);
+            else if(key=="nofog"_) shader.type=replace(shader.type,"position fog"_,""_);
             else if(split(
                         "tesssize qer_nocarve q3map_normalimage q3map_lightmapsize q3map_lightmapmergable q3map_lightmapaxis "
                         "q3map_tcgen q3map_tcmod q3map_baseshader q3map_baseshader q3map_foliage q3map_surfacesurfaceparm "
                         "q3map_lightsubdivide q3map_nofog q3map_skylight q3map_lightrgb q3map_nonplanar qer_alphafunc fogvars skyfogvars "
                         "q3map_forcesunlight q3map_novertexshadows deformvertexes q3map_lightmapsamplesize q3map_terrain nomipmap cull "
                         "entitymergable fogonly distancecull q3map_bouncescale q3map_forcemeta q3map_lightmapsampleoffset qer_models sort "
-                        "nocompress nopicmip nomipmaps nofog fog waterfogvars tcgen tcgen depthwrite depthwrite depthfunc detail surfaceparm "
+                        "nocompress nopicmip nomipmaps fog waterfogvars tcgen tcgen depthwrite depthwrite depthfunc detail surfaceparm "
                         "qer_editorimage qer_trans q3map_globaltexture q3map_lightimage q3map_surfacelight q3map_clipmodel q3map_shadeangle"_
                         ).contains(key)) {} // Ignored or default
             else if(!current) { error("No current texture for",key,args,name); continue; }

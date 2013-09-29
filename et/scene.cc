@@ -194,12 +194,13 @@ Scene::Scene(string file, const Folder& data) : data(data) {
         float boxSize = 32768 / sqrt(3.); // Corners at zFar
         { // Sky
             sky->skyBox = true;
+            sky->final.clear(); // Disable fog
 
             const int skySubdivisions = 8;
             vertices.reserve(vertices.size+5*skySubdivisions*skySubdivisions);
             Surface surface(*sky, vertices);
             for(int i = 0; i < 5; i++) {
-                float MIN_T = i==4 ? -(skySubdivisions/2) : -1;
+                float MIN_T = i==4 ? -(skySubdivisions/2) : 0;
                 uint firstIndex = vertices.size;
 
                 for(int t = MIN_T + (skySubdivisions/2); t <= skySubdivisions; t++) { // Iterates through the subdivisions
@@ -249,6 +250,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             Shader& shader = getShader(sky->properties.at("sunshader"_));
             assert_(shader.blendAlpha);
             shader.skyBox = true;
+            shader.final.clear(); // Disable fog
 
             array<string> sun = split(sky->properties.at("q3map_sun"_),' ');
             float azimuth = toDecimal(sun[4])*PI/180, elevation=toDecimal(sun[5])*PI/180;
@@ -268,10 +270,12 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             array<Surface> model; model << move(surface);
             models.insert(String("*sun"_), move(model));
             entities.insert(String("sun"_)).insert(String("model"_), String("*sun"_));
-
-            //Shader fog = shaders.value(entities["worldspawn"]["_fog"]);
-            //sky.fogOpacity = fog.properties.value("fogparms","16384").toFloat();
         }
+    }
+    {// Fog
+        Shader& fog = shaders.at(entities.at("worldspawn"_).at("_fog"_));
+        array<double> v = apply(split(fog.properties.at("fogparms"_)), toDecimal);
+        this->fog = vec4(v[0],v[1],v[2],v[3]);
     }
 
     /// Converts Entities to Objects (and compile shaders)

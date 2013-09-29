@@ -27,6 +27,7 @@ GLShader& Shader::bind() {
         static map<String,unique<GLShader>> programs;
         array<String> stages; stages << copy(type);
         for(const Texture& texture: *this) stages << copy(texture.type);
+        stages << copy(final);
         String id = join(stages,";"_);
         if(!programs.contains(id)) programs.insert(copy(id), unique<GLShader>(shader(), toRefs(stages)));
         program = programs.at(id).pointer;

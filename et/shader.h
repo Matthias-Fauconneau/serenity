@@ -22,11 +22,12 @@ inline Texture copy(const Texture& o) {
     return t;
 }
 struct Shader : array<Texture> {
-    Shader(string type="transform surface"_): type(type) {}
+    Shader(): type("transform surface position"_), final("fog"_) {}
+    Shader(const string& type): type(type) {}
     GLShader& bind();
 
     String name;
-    String type;
+    String type, final;
     GLShader* program = 0;
     bool polygonOffset=false, blendAlpha=false, blendColor=false, vertexBlend=false, skyBox=false; // FIXME: bitfield
     String source;
@@ -34,7 +35,7 @@ struct Shader : array<Texture> {
 };
 inline String str(const Shader& o) { return str(o.name,o.type,o.size,(ref<Texture>)o)+"\n"_+o.source; }
 inline Shader copy(const Shader& o) {
-    Shader t(o.type); t.name=copy(o.name);
+    Shader t; t.type=copy(o.type), t.final=copy(o.final); t.name=copy(o.name);
     t.polygonOffset=o.polygonOffset, t.blendAlpha=o.blendAlpha, t.blendColor=o.blendColor, t.vertexBlend=o.vertexBlend, t.skyBox=o.skyBox;
     t.source=copy(o.source), t.properties=copy(o.properties);
     t << (ref<Texture>)o;

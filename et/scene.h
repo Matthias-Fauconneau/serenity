@@ -27,7 +27,8 @@ struct Scene {
     map<String,unique<Shader>> shaders; // Referenced by Surfaces
     VertexBuffer vertices; // Referenced by Surfaces
     map<String, array<Surface>> models;
-    Shader* sky = 0;  vec3 backgroundColor = vec3(77,80,91)/255.f; // FIXME: get from skyparms outer box texture
+    Shader* sky = 0;
+    vec4 fog; // RGB, distance
     vec3 gridMin, gridMax; GLTexture lightGrid[3]; // Light grid
     map<GLShader*,array<Object>> opaque, blendAlpha, blendColor; // Objects splitted by renderer state and indexed by GL Shader (to minimize context switches)
     array<Object*> objects; // For hit tests
