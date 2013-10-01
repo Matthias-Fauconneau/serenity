@@ -112,11 +112,11 @@ struct GLFrameBuffer {
     default_move(GLFrameBuffer);
     //GLFrameBuffer(GLTexture&& depth);
     //GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
-    GLFrameBuffer(uint width, uint height, uint format=sRGB8, int sampleCount=0);
+    GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=sRGB8);
     ~GLFrameBuffer();
 
     void bind(uint clearFlags=0, vec4 color=1);
-    static void bindWindow(int2 position, int2 size, uint clearFlags=ClearDepth|ClearColor, vec4 color=1);
+    static void bindWindow(int2 position, int2 size, uint clearFlags=0, vec4 color=1);
     void blit(uint target);
     void blit(GLTexture&);
     operator bool() const { return id; }

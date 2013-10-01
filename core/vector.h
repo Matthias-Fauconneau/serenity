@@ -70,7 +70,7 @@ generic vector abs(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=abs(v[
 generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
 generic vector sign(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=ceil(v[i]); return r;  }
 generic vector floor(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=floor(v[i]); return r;  }
-generic vector fract(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=fract(v[i]); return r;  }
+generic vector fract(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=mod(v[i],1); return r;  }
 generic vector round(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=round(v[i]); return r;  }
 generic vector ceil(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=ceil(v[i]); return r;  }
 generic vector min(const vector& a, const vector& b){ vector r; for(uint i=0;i<N;i++) r[i]=min(a[i],b[i]); return r; }

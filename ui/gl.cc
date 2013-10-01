@@ -54,7 +54,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
                 s.whileAny(" \t"_);
                 string identifier = s.identifier("_"_);
                 s.whileAny(" \t"_);
-                if(identifier && s.match("{"_)) { //scope: "[a-z]+ {"
+                if(identifier && identifier!="else"_ && s.match("{"_)) { //scope: "[a-z]+ {"
                     if(tags_.contains(identifier)) {
                         knownTags += identifier;
                         scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
@@ -292,7 +292,7 @@ void GLTexture::bind(uint sampler) const {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, colorTexture.id, 0);
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }*/
-GLFrameBuffer::GLFrameBuffer(uint width, uint height, uint format, int sampleCount):width(width),height(height){
+GLFrameBuffer::GLFrameBuffer(uint width, uint height, int sampleCount, uint format):width(width),height(height){
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
 
     glGenFramebuffers(1,&id);

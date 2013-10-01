@@ -134,3 +134,10 @@ generic struct shared {
 };
 generic shared<T> copy(const shared<T>& o) { return shared<T>(copy(*o.pointer)); }
 generic shared<T> share(const shared<T>& o) { return shared<T>(o); }
+
+/// Reference counter to be inherited by shared objects
+struct shareable {
+    virtual void addUser() { ++userCount; }
+    virtual uint removeUser() { return --userCount; }
+    uint userCount = 1;
+};

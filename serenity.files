@@ -29,14 +29,16 @@ core/trace.cc
 core/trace.h
 core/vector.h
 
-io/deflate.cc
-io/deflate.h
-io/png.cc
-io/png.h
-io/tiff.cc
-io/tiff.h
 io/bmp.cc
 io/bmp.h
+io/deflate.cc
+io/deflate.h
+io/jpeg.cc
+io/png.cc
+io/png.h
+io/tga.cc
+io/tiff.cc
+io/tiff.h
 
 ui/display.cc
 ui/display.h
@@ -52,6 +54,7 @@ ui/text.cc
 ui/text.h
 ui/utf8.cc
 ui/utf8.h
+ui/rect.h
 ui/widget.h
 ui/window.cc
 ui/window.h
@@ -93,8 +96,10 @@ et/scene.h
 et/scene.cc
 et/view.h
 et/view.cc
-io/tga.cc
-io/jpeg.cc
 et/material.h
 et/material.cc
-ui/rect.h
+
+blender/blender
+blender/blender.cc
+blender/blender.h
+blender/sdna.h

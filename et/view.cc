@@ -8,7 +8,7 @@
 View::View(Scene& scene) : scene(scene) {
     vec4 position_yaw = scene.defaultPosition();
     position = position_yaw.xyz(), yaw=position_yaw.w;
-    vertexBuffer.upload(ref<vec2>{vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
+    vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
 }
 
 void View::render(int2, int2 size) {
@@ -33,7 +33,7 @@ void View::render(int2, int2 size) {
 
     if(frameBuffer.size() != size) {
         //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24|Multisample), GLTexture(w,h, sRGB8|Multisample));
-        frameBuffer = GLFrameBuffer(w,h,sRGB8,-1);
+        frameBuffer = GLFrameBuffer(w,h,-1);
         //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
         resolvedBuffer = GLTexture(w,h);
     }
