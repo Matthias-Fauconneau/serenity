@@ -90,16 +90,15 @@ enum { PART_DRAW_EMITTER=8 };
 enum { PSYS_VG_DENSITY=0 };
 enum { SOCK_CUSTOM=-1, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER, SOCK_BOOLEAN, SOCK_INT=6, SOCK_STRING	};
 enum { SH_NODE_MATERIAL=100, SH_NODE_RGB, SH_NODE_VALUE, SH_NODE_MIX_RGB, SH_NODE_VALTORGB, SH_NODE_RGBTOBW,
-       SH_NODE_TEXTURE, SH_NODE_NORMAL, SH_NODE_GEOMETRY, SH_NODE_MAPPING,
-       SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB, SH_NODE_CAMERA=114, SH_NODE_MATH, SH_NODE_VECT_MATH, SH_NODE_SQUEEZE,
-       SH_NODE_MATERIAL_EXT, SH_NODE_INVERT,
+       SH_NODE_TEXTURE, SH_NODE_NORMAL, SH_NODE_GEOMETRY, SH_NODE_MAPPING, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB,
+       SH_NODE_CAMERA=114, SH_NODE_MATH, SH_NODE_VECT_MATH, SH_NODE_SQUEEZE, SH_NODE_MATERIAL_EXT, SH_NODE_INVERT,
        SH_NODE_SEPRGB, SH_NODE_COMBRGB, SH_NODE_HUE_SAT,NODE_DYNAMIC,SH_NODE_OUTPUT_MATERIAL, SH_NODE_OUTPUT_WORLD,
        SH_NODE_OUTPUT_LAMP, SH_NODE_FRESNEL, SH_NODE_MIX_SHADER, SH_NODE_ATTRIBUTE, SH_NODE_BACKGROUND,
        SH_NODE_BSDF_ANISOTROPIC, SH_NODE_BSDF_DIFFUSE, SH_NODE_BSDF_GLOSSY, SH_NODE_BSDF_GLASS,
-       SH_NODE_BSDF_TRANSLUCENT, SH_NODE_BSDF_TRANSPARENT, SH_NODE_BSDF_VELVET, SH_NODE_EMISSION,
-       SH_NODE_NEW_GEOMETRY, SH_NODE_LIGHT_PATH, SH_NODE_TEX_IMAGE, SH_NODE_TEX_SKY, SH_NODE_TEX_GRADIENT,
-       SH_NODE_TEX_VORONOI, SH_NODE_TEX_MAGIC, SH_NODE_TEX_WAVE, SH_NODE_TEX_NOISE, SH_NODE_TEX_MUSGRAVE,
-       SH_NODE_TEX_COORD, SH_NODE_ADD_SHADER, SH_NODE_TEX_ENVIRONMENT, SH_NODE_OUTPUT_TEXTURE, SH_NODE_HOLDOUT,
+       SH_NODE_BSDF_TRANSLUCENT=137, SH_NODE_BSDF_TRANSPARENT, SH_NODE_BSDF_VELVET, SH_NODE_EMISSION,
+       SH_NODE_NEW_GEOMETRY, SH_NODE_LIGHT_PATH, SH_NODE_TEX_IMAGE, SH_NODE_TEX_SKY=145, SH_NODE_TEX_GRADIENT,
+       SH_NODE_TEX_VORONOI, SH_NODE_TEX_MAGIC, SH_NODE_TEX_WAVE, SH_NODE_TEX_NOISE, SH_NODE_TEX_MUSGRAVE=152,
+       SH_NODE_TEX_COORD=155, SH_NODE_ADD_SHADER, SH_NODE_TEX_ENVIRONMENT, SH_NODE_OUTPUT_TEXTURE, SH_NODE_HOLDOUT,
        SH_NODE_LAYER_WEIGHT, SH_NODE_VOLUME_TRANSPARENT, SH_NODE_VOLUME_ISOTROPIC, SH_NODE_GAMMA, SH_NODE_TEX_CHECKER,
        SH_NODE_BRIGHTCONTRAST, SH_NODE_LIGHT_FALLOFF, SH_NODE_OBJECT_INFO, SH_NODE_PARTICLE_INFO, SH_NODE_TEX_BRICK,
        SH_NODE_BUMP, SH_NODE_SCRIPT, SH_NODE_AMBIENT_OCCLUSION, SH_NODE_BSDF_REFRACTION, SH_NODE_TANGENT,
@@ -139,6 +138,7 @@ String str(const Input& o) {
 }
 
 struct Node : shareable {
+    virtual String toGLSL() const { error("Unimplemented", str()); }
     virtual String str() const { String s; s<<name; if(inputs) s<<"("_+::str(inputs)+")"_; return s; }
 
     string name;
@@ -170,24 +170,55 @@ struct MathNode : Node {
     Operation operation;
 };
 
+struct MixRGBNode : Node {};
+struct VectorMathNode : Node {};
+struct GeometryNode : Node {};
+struct MappingNode : Node {};
+
+struct SeparateRGBNode : Node {};
+struct BrightContrastNode : Node {};
+struct HueSaturationNode : Node {};
+
 struct MixShaderNode : Node {
+    String toGLSL() const override{ return inputs[2].node->toGLSL(); } // Stub
     String str() const override { return ::str(inputs[2]); } // Stub
 };
 
-// Stubs
-struct BsdfDiffuseNode : Node {};
-//struct TexNoiseNode : Node {};
+struct BSDFNode : Node {
+    String toGLSL() const override{ return "color=vec4"_+::str(inputs[0].value)+";"_; }
+    String str() const override { return ::str(inputs[0].value); }
+};
+struct BsdfDiffuseNode : BSDFNode {};
+struct BsdfTranslucentNode : BSDFNode {};
+struct BsdfTransparentNode : BSDFNode {};
+struct BsdfGlassNode : BSDFNode {};
+
+struct TexCoordNode : Node {};
+struct TexImageNode : Node {};
+struct TexNoiseNode : Node {};
 
 /// Parses Blender nodes
 shared<Node> parse(const bNode& o) {
     shared<Node> node = 0;
+    //FIXME: automatic map (factory)
     /**/  if(o.type==SH_NODE_VALUE) node = shared<ValueNode>(o.outputs.first->ns.vec[0]);
+    else if(o.type==SH_NODE_MIX_RGB) node = shared<MixRGBNode>();
     else if(o.type==SH_NODE_MATH) node = shared<MathNode>(o.custom1);
+    else if(o.type==SH_NODE_VECT_MATH) node = shared<VectorMathNode>();
+    else if(o.type==SH_NODE_NEW_GEOMETRY) node = shared<GeometryNode>();
+    else if(o.type==SH_NODE_MAPPING) node = shared<MappingNode>();
+    else if(o.type==SH_NODE_SEPRGB) node = shared<SeparateRGBNode>();
+    else if(o.type==SH_NODE_BRIGHTCONTRAST) node = shared<BrightContrastNode>();
+    else if(o.type==SH_NODE_HUE_SAT) node = shared<HueSaturationNode>();
     else if(o.type==SH_NODE_MIX_SHADER) node = shared<MixShaderNode>();
     else if(o.type==SH_NODE_BSDF_DIFFUSE) node = shared<BsdfDiffuseNode>();
-    /*else if(o.type==SH_NODE_TEX_NOISE) node = shared<TexNoiseNode>();
-    else error(o.type, o.idname, o.name);*/
-    else node = shared<Node>();
+    else if(o.type==SH_NODE_BSDF_TRANSLUCENT) node = shared<BsdfTranslucentNode>();
+    else if(o.type==SH_NODE_BSDF_TRANSPARENT) node = shared<BsdfTransparentNode>();
+    else if(o.type==SH_NODE_BSDF_GLASS) node = shared<BsdfGlassNode>();
+    else if(o.type==SH_NODE_TEX_COORD) node = shared<TexCoordNode>();
+    else if(o.type==SH_NODE_TEX_IMAGE) node = shared<TexImageNode>();
+    else if(o.type==SH_NODE_TEX_NOISE) node = shared<TexNoiseNode>();
+    else error(o.type, o.idname, o.name); //else node = shared<Node>();
     node->name = section(str(o.idname),'.');
     for(const bNodeSocket& socket: o.inputs) {
         if(socket.link) node->inputs << Input(str(socket.name), parse(*socket.link->fromnode));
@@ -337,12 +368,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         for(const Struct::Field& field: type.fields) {
             if(!field.reference) {
                 if(field.type->fields) for(uint i unused: range(field.count)) fix(blocks, *field.type, data.Data::read(field.type->size));
-                else {
-                    /*const float f=0.65;
-                    *//*  if(field.typeName=="float"_) { assert_(field.type->size==sizeof(float)); assert_(!data.read<float>(field.count).contains(f), type.name, field.name); }
-                    else if(field.typeName=="double"_) { assert_(field.type->size==sizeof(double)); assert_(!data.read<double>(field.count).contains(f)); }
-                    else*/ data.advance(field.count*field.type->size);
-                }
+                else data.advance(field.count*field.type->size);
             } else for(uint i unused: range(field.count)) {
                 uint64& pointer = (uint64&)data.read<uint64>();
                 if(!pointer) continue;
@@ -558,9 +584,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                             }
                     }
                     //TODO: convert Node tree to GLSL, load textures
-                    log(name, surface);
-                    //+surface.toGLSL()
-                    unique<Shader> shader(name,  GLShader(blender(), {"transform normal texCoord diffuse shadow sun sky "_}));
+                    unique<Shader> shader(name,  GLShader(blender()+surface->toGLSL(), {"transform normal texCoord diffuse shadow sun sky "_}));
                     shaders.insert(copy(name), move(shader));
                 }
                 Surface surface(shaders.at(name));
@@ -722,8 +746,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
             rotation.y= clip(float(-PI/2),rotation.y,float(0)); // Keep pitch between [-PI/2,0]
         }
-        else if(event == Press && button == WheelDown) focalLength += zoomSpeed;
-        else if(event == Press && button == WheelUp) focalLength = max(1.f,focalLength-zoomSpeed);
+        else if(event == Press && button == WheelUp) focalLength += zoomSpeed;
+        else if(event == Press && button == WheelDown) focalLength = max(1.f,focalLength-zoomSpeed);
         else return false;
         return true;
     }
