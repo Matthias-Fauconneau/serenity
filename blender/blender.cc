@@ -86,6 +86,42 @@ String str(const Struct& o, const array<const Struct*>& defined={}) {
 enum class ObjectType { Empty, Mesh, Curve, Surf, Font, MBall, Lamp=10, Camera };
 enum { PART_DRAW_EMITTER=8 };
 enum { PSYS_VG_DENSITY=0 };
+enum { SOCK_CUSTOM=-1, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER, SOCK_BOOLEAN, SOCK_INT=6, SOCK_STRING	};
+enum { SH_NODE_MATERIAL=100, SH_NODE_RGB, SH_NODE_VALUE, SH_NODE_MIX_RGB, SH_NODE_VALTORGB, SH_NODE_RGBTOBW,
+       SH_NODE_TEXTURE, SH_NODE_NORMAL, SH_NODE_GEOMETRY, SH_NODE_MAPPING,
+       SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB, SH_NODE_CAMERA=114, SH_NODE_MATH, SH_NODE_VECT_MATH, SH_NODE_SQUEEZE,
+       SH_NODE_MATERIAL_EXT, SH_NODE_INVERT,
+       SH_NODE_SEPRGB, SH_NODE_COMBRGB, SH_NODE_HUE_SAT,NODE_DYNAMIC,SH_NODE_OUTPUT_MATERIAL, SH_NODE_OUTPUT_WORLD,
+       SH_NODE_OUTPUT_LAMP, SH_NODE_FRESNEL, SH_NODE_MIX_SHADER, SH_NODE_ATTRIBUTE, SH_NODE_BACKGROUND,
+       SH_NODE_BSDF_ANISOTROPIC, SH_NODE_BSDF_DIFFUSE, SH_NODE_BSDF_GLOSSY, SH_NODE_BSDF_GLASS,
+       SH_NODE_BSDF_TRANSLUCENT, SH_NODE_BSDF_TRANSPARENT, SH_NODE_BSDF_VELVET, SH_NODE_EMISSION,
+       SH_NODE_NEW_GEOMETRY, SH_NODE_LIGHT_PATH, SH_NODE_TEX_IMAGE, SH_NODE_TEX_SKY, SH_NODE_TEX_GRADIENT,
+       SH_NODE_TEX_VORONOI, SH_NODE_TEX_MAGIC, SH_NODE_TEX_WAVE, SH_NODE_TEX_NOISE, SH_NODE_TEX_MUSGRAVE,
+       SH_NODE_TEX_COORD, SH_NODE_ADD_SHADER, SH_NODE_TEX_ENVIRONMENT, SH_NODE_OUTPUT_TEXTURE, SH_NODE_HOLDOUT,
+       SH_NODE_LAYER_WEIGHT, SH_NODE_VOLUME_TRANSPARENT, SH_NODE_VOLUME_ISOTROPIC, SH_NODE_GAMMA, SH_NODE_TEX_CHECKER,
+       SH_NODE_BRIGHTCONTRAST, SH_NODE_LIGHT_FALLOFF, SH_NODE_OBJECT_INFO, SH_NODE_PARTICLE_INFO, SH_NODE_TEX_BRICK,
+       SH_NODE_BUMP, SH_NODE_SCRIPT, SH_NODE_AMBIENT_OCCLUSION, SH_NODE_BSDF_REFRACTION, SH_NODE_TANGENT,
+       SH_NODE_NORMAL_MAP, SH_NODE_HAIR_INFO, SH_NODE_SUBSURFACE_SCATTERING, SH_NODE_WIREFRAME, SH_NODE_BSDF_TOON,
+       SH_NODE_WAVELENGTH };
+/*struct bNodeType {
+    void *next, *prev;
+    short needs_free;
+
+    char idname[64];
+    int type;
+
+    char ui_name[64];
+    char ui_description[256];
+    int ui_icon;
+
+    float width, minwidth, maxwidth;
+    float height, minheight, maxheight;
+    short nclass, flag, compatibility;
+
+    struct bNodeSocketTemplate *inputs, *outputs;
+
+    char storagename[64];
+};*/
 
 // Renderer definitions
 struct Vertex {
@@ -102,16 +138,69 @@ String str(const Vertex& v) { return "("_+str(v.position, v.normal, v.texCoord)+
 struct Node;
 
 struct Input {
+    Input(string name, shared<Node>&& node):name(name),node(move(node)){}
+    Input(string name, vec4 value):name(name),value(value){}
     string name;
-    shared<Node> node;
+    shared<Node> node = 0;
+    vec4 value = 0;
 };
-String str(const Input& o) { String s; s<<o.name; if(o.node) s<<":"_<<str(o.node); return s; }
+String str(const Input& o) {
+    String s;
+    /**/  if(o.node) s<<str(o.node);
+    else if(o.value.x==o.value.y && o.value.x==o.value.z && o.value.x==o.value.w) s<<o.name<<":"_<<str(o.value.x);
+    else s<<o.name<<":"_<<str(o.value);
+    return s;
+}
 
 struct Node : shareable {
+    virtual String str() const { String s; s<<name; if(inputs) s<<"("_+::str(inputs)+")"_; return s; }
+
     string name;
     array<Input> inputs;
 };
-String str(const Node& o) { String s; s<<o.name; if(o.inputs) s<<"("_+str(o.inputs)+")"_; return s; }
+String str(const Node& o) { return o.str(); }
+
+struct ValueNode : Node {
+    ValueNode(float value):value(value){}
+    String str() const override { return ::str(value); }
+
+    float value;
+};
+
+struct MathNode : Node {
+    enum Operation { Add, Sub, Mul, Div, Sin, Cos, Tan, ASin, ACos, ATan, Power, Log, Min, Max, Round, Less, More, Modulo };
+
+    MathNode(short operation):operation(Operation(operation)){}
+    String str() const override {
+        static const ref<string> operationNames {"+"_, "-"_, "*"_, "/"_, "Sin"_, "Cos"_, "Tan"_, "ASin"_, "ACos"_, "ATan"_,
+                    "^"_, "Log"_, "Min"_, "Max"_, "Round"_, "Less"_, "More"_, "Modulo"_};
+        assert(operation<operationNames.size, (int)operation);
+        if(operation==Add || operation==Sub || operation==Mul || operation==Div)
+            return "("_+::str(inputs[0])+" "_+operationNames[operation]+" "_+::str(inputs[1])+")"_;
+        else return operationNames[operation]+"("_+::str(inputs)+")"_;
+    }
+
+    Operation operation;
+};
+
+/// Parses Blender nodes
+shared<Node> parse(const bNode& o) {
+    shared<Node> node = 0;
+    /**/  if(o.type==SH_NODE_VALUE) node = shared<ValueNode>(o.outputs.first->ns.vec[0]);
+    else if(o.type==SH_NODE_MATH) node = shared<MathNode>(o.custom1);
+    else node = shared<Node>();
+    node->name = section(str(o.idname),'.');
+    for(const bNodeSocket& socket: o.inputs) {
+        if(socket.link) node->inputs << Input(str(socket.name), parse(*socket.link->fromnode));
+        else {
+            /**/  if(socket.type==SOCK_FLOAT) node->inputs << Input(str(socket.name), socket.ns.vec[0]);
+            else if(socket.type==SOCK_VECTOR) node->inputs << Input(str(socket.name), vec4(socket.ns.vec));
+            else if(socket.type==SOCK_RGBA) node->inputs << Input(str(socket.name), vec4(socket.ns.vec));
+            else error(node->name, socket.name, socket.type, socket.identifier, socket.name, socket.idname);
+        }
+    }
+    return node;
+}
 
 struct Model {
     mat4 transform;
@@ -120,7 +209,7 @@ struct Model {
 
     struct Material {
         String name;
-        Node surface;
+        shared<Node> surface;
         GLShader shader;
         array<GLTexture> textures;
 
@@ -243,7 +332,12 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         for(const Struct::Field& field: type.fields) {
             if(!field.reference) {
                 if(field.type->fields) for(uint i unused: range(field.count)) fix(blocks, *field.type, data.Data::read(field.type->size));
-                else data.advance(field.count*field.type->size);
+                else {
+                    /*const float f=0.65;
+                    *//*  if(field.typeName=="float"_) { assert_(field.type->size==sizeof(float)); assert_(!data.read<float>(field.count).contains(f), type.name, field.name); }
+                    else if(field.typeName=="double"_) { assert_(field.type->size==sizeof(double)); assert_(!data.read<double>(field.count).contains(f)); }
+                    else*/ data.advance(field.count*field.type->size);
+                }
             } else for(uint i unused: range(field.count)) {
                 uint64& pointer = (uint64&)data.read<uint64>();
                 if(!pointer) continue;
@@ -352,6 +446,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                         else assert(f.reference);
                     }
                 }
+                //error(structs.contains("ShaderNodeValue"_));
             }
             if(identifier == "ENDB"_) break;
         }
@@ -387,16 +482,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         }
         assert(sizeof(ID)==structs[structs.indexOf("ID"_)].size);
         assert(sizeof(ListBase<>)==structs[structs.indexOf("ListBase"_)].size);
-    }
-
-    /// Parses Blender nodes
-    Node parse(const bNode& o) {
-        Node node;
-        node.name = section(str(o.name),'.');
-        for(const bNodeSocket& socket: o.inputs) {
-            if(socket.link) node.inputs << Input{str(socket.name), shared<Node>(parse(*socket.link->fromnode))};
-        }
-        return node;
     }
 
     /// Extracts relevant data from Blender structures
@@ -459,11 +544,10 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 material.name = replace(replace(simplify(toLower(str(bMaterial.id.name+2)))," "_,"_"),"."_,"_"_);
                 if(bMaterial.use_nodes) {
                     bNodeTree* tree = bMaterial.nodetree;
-                    log(material.name);
                     for(const bNode& node: tree->nodes) {
-                        if(str(node.name)=="Material Output"_)
+                        if(node.type==SH_NODE_OUTPUT_MATERIAL)
                             for(const bNodeSocket& socket: node.inputs) {
-                                if(str(socket.name)=="Surface"_) material.surface = parse(*socket.link->fromnode);
+                                if(str(socket.name)=="Surface"_) material.surface = ::parse(*socket.link->fromnode);
                             }
                     }
                     error(material.surface);

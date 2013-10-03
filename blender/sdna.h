@@ -24,16 +24,16 @@ struct ID {
 };
 
 template<class T> struct ID_iterator {
-    const ID* pointer;
-    ID_iterator(const ID* pointer):pointer(pointer){}
+    const T* pointer;
+    ID_iterator(const T* pointer):pointer(pointer){}
     void operator++() { pointer = pointer->next; }
     bool operator!=(const ID_iterator<T>& b) const { return pointer != b.pointer; }
-    const T& operator*() const { return (const T&)*pointer; }
+    const T& operator*() const { return *pointer; }
 };
 
 template<class T=void> struct ListBase {
- const ID* first;
- const ID* last;
+ const T* first;
+ const T* last;
  const ID_iterator<T> begin() const { return first; }
  const ID_iterator<T> end() const { return 0; }
 };
