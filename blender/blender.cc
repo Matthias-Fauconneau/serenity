@@ -1,6 +1,8 @@
+#define Material bMaterial
 #define Image bImage
 #define Key bKey
 #include "blender.h"
+#undef Material
 #undef Image
 #undef Key
 #include "thread.h"
@@ -103,25 +105,6 @@ enum { SH_NODE_MATERIAL=100, SH_NODE_RGB, SH_NODE_VALUE, SH_NODE_MIX_RGB, SH_NOD
        SH_NODE_BUMP, SH_NODE_SCRIPT, SH_NODE_AMBIENT_OCCLUSION, SH_NODE_BSDF_REFRACTION, SH_NODE_TANGENT,
        SH_NODE_NORMAL_MAP, SH_NODE_HAIR_INFO, SH_NODE_SUBSURFACE_SCATTERING, SH_NODE_WIREFRAME, SH_NODE_BSDF_TOON,
        SH_NODE_WAVELENGTH };
-/*struct bNodeType {
-    void *next, *prev;
-    short needs_free;
-
-    char idname[64];
-    int type;
-
-    char ui_name[64];
-    char ui_description[256];
-    int ui_icon;
-
-    float width, minwidth, maxwidth;
-    float height, minheight, maxheight;
-    short nclass, flag, compatibility;
-
-    struct bNodeSocketTemplate *inputs, *outputs;
-
-    char storagename[64];
-};*/
 
 // Renderer definitions
 struct Vertex {
@@ -147,8 +130,11 @@ struct Input {
 String str(const Input& o) {
     String s;
     /**/  if(o.node) s<<str(o.node);
-    else if(o.value.x==o.value.y && o.value.x==o.value.z && o.value.x==o.value.w) s<<o.name<<":"_<<str(o.value.x);
-    else s<<o.name<<":"_<<str(o.value);
+    else {
+        if(o.name!="Value"_) s<<o.name<<":"_;
+        if(o.value.x==o.value.y && o.value.x==o.value.z && o.value.x==o.value.w) s<<str(o.value.x);
+        else s<<str(o.value);
+    }
     return s;
 }
 
@@ -158,7 +144,7 @@ struct Node : shareable {
     string name;
     array<Input> inputs;
 };
-String str(const Node& o) { return o.str(); }
+String str(const Node& o) { static int prefix=0; prefix++; String s = "\n"_+repeat(" "_,prefix)+o.str(); prefix--; /*Assumes single line*/  return s; }
 
 struct ValueNode : Node {
     ValueNode(float value):value(value){}
@@ -172,22 +158,35 @@ struct MathNode : Node {
 
     MathNode(short operation):operation(Operation(operation)){}
     String str() const override {
-        static const ref<string> operationNames {"+"_, "-"_, "*"_, "/"_, "Sin"_, "Cos"_, "Tan"_, "ASin"_, "ACos"_, "ATan"_,
+        static const ref<string> operationNames {"Add"_, "Sub"_, "Mul"_, "Div"_, "Sin"_, "Cos"_, "Tan"_, "ASin"_, "ACos"_, "ATan"_,
                     "^"_, "Log"_, "Min"_, "Max"_, "Round"_, "Less"_, "More"_, "Modulo"_};
         assert(operation<operationNames.size, (int)operation);
-        if(operation==Add || operation==Sub || operation==Mul || operation==Div)
+        //if(operation==Mul && inputs[1].value.x==1) return ::str(inputs[0]); // =$*1
+        /*if(operation==Add || operation==Sub || operation==Mul || operation==Div)
             return "("_+::str(inputs[0])+" "_+operationNames[operation]+" "_+::str(inputs[1])+")"_;
-        else return operationNames[operation]+"("_+::str(inputs)+")"_;
+        else*/ return operationNames[operation]+"("_+::str(inputs)+")"_;
     }
 
     Operation operation;
 };
+
+struct MixShaderNode : Node {
+    String str() const override { return ::str(inputs[2]); } // Stub
+};
+
+// Stubs
+struct BsdfDiffuseNode : Node {};
+//struct TexNoiseNode : Node {};
 
 /// Parses Blender nodes
 shared<Node> parse(const bNode& o) {
     shared<Node> node = 0;
     /**/  if(o.type==SH_NODE_VALUE) node = shared<ValueNode>(o.outputs.first->ns.vec[0]);
     else if(o.type==SH_NODE_MATH) node = shared<MathNode>(o.custom1);
+    else if(o.type==SH_NODE_MIX_SHADER) node = shared<MixShaderNode>();
+    else if(o.type==SH_NODE_BSDF_DIFFUSE) node = shared<BsdfDiffuseNode>();
+    /*else if(o.type==SH_NODE_TEX_NOISE) node = shared<TexNoiseNode>();
+    else error(o.type, o.idname, o.name);*/
     else node = shared<Node>();
     node->name = section(str(o.idname),'.');
     for(const bNodeSocket& socket: o.inputs) {
@@ -202,23 +201,26 @@ shared<Node> parse(const bNode& o) {
     return node;
 }
 
+struct Shader : array<GLTexture> {
+    Shader(const string& name, GLShader&& shader):name(name),shader(move(shader)){}
+    String name;
+    GLShader shader;
+};
+
+struct Surface {
+    Surface(Shader& shader):shader(shader){}
+    String name;
+    Shader& shader;
+    array<uint> indices;
+    GLIndexBuffer indexBuffer;
+    GLVertexBuffer vertexBuffer;
+};
+
 struct Model {
     mat4 transform;
 
     array<Vertex> vertices;
-
-    struct Material {
-        String name;
-        shared<Node> surface;
-        GLShader shader;
-        array<GLTexture> textures;
-
-        GLVertexBuffer vertexBuffer;
-        array<uint> indices;
-        GLIndexBuffer indexBuffer;
-    };
-    array<Material> materials;
-
+    array<Surface> surfaces;
     array<mat4> instances;
 
     // Rendering order
@@ -260,6 +262,9 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     GLShader sky {blender(),{"skymap"_}};
     GLTexture skymap;
     GLVertexBuffer vertexBuffer;
+
+    // Shaders
+    map<String, unique<Shader>> shaders;
 
     // Geometry
     array<Model> models;
@@ -539,19 +544,26 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             model.transform = transform; //for emitter and particles
 
             for(int materialIndex: range(mesh.totcol)) {
-                Model::Material material;
-                const Material& bMaterial = *mesh.mat[materialIndex];
-                material.name = replace(replace(simplify(toLower(str(bMaterial.id.name+2)))," "_,"_"),"."_,"_"_);
-                if(bMaterial.use_nodes) {
-                    bNodeTree* tree = bMaterial.nodetree;
+                const bMaterial& material = *mesh.mat[materialIndex];
+                String name = replace(replace(simplify(toLower(str(material.id.name+2)))," "_,"_"),"."_,"_"_);
+                if(!shaders.contains(name)) {
+                    if(!material.use_nodes) continue; // Only supports node shaders
+                    assert(material.use_nodes, name);
+                    bNodeTree* tree = material.nodetree;
+                    shared<Node> surface;
                     for(const bNode& node: tree->nodes) {
                         if(node.type==SH_NODE_OUTPUT_MATERIAL)
                             for(const bNodeSocket& socket: node.inputs) {
-                                if(str(socket.name)=="Surface"_) material.surface = ::parse(*socket.link->fromnode);
+                                if(str(socket.name)=="Surface"_) surface = ::parse(*socket.link->fromnode);
                             }
                     }
-                    error(material.surface);
+                    //TODO: convert Node tree to GLSL, load textures
+                    log(name, surface);
+                    //+surface.toGLSL()
+                    unique<Shader> shader(name,  GLShader(blender(), {"transform normal texCoord diffuse shadow sun sky "_}));
+                    shaders.insert(copy(name), move(shader));
                 }
+                Surface surface(shaders.at(name));
 
                 ref<MLoop> indices(mesh.mloop, mesh.totloop);
                 for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
@@ -560,11 +572,11 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     uint a=indices[poly.loopstart].v, b=indices[poly.loopstart+1].v;
                     for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
                         uint c = indices[index].v;
-                        material.indices << a << b << c;
+                        surface.indices << a << b << c;
                         b = c;
                     }
                 }
-                assert(material.indices, "Empty material");
+                assert(surface.indices, "Empty surface");
 
                 if(mesh.mloopuv) { // Assigns UV coordinates to vertices
                     ref<MLoopUV> texCoords(mesh.mloopuv, mesh.totloop);
@@ -573,18 +585,18 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                         if(poly.mat_nr!=materialIndex) continue;
                         {
                             vec2 texCoord = fract(vec2(texCoords[poly.loopstart].uv));
-                            vec2& a = model.vertices[material.indices[i]].texCoord;
+                            vec2& a = model.vertices[surface.indices[i]].texCoord;
                             if(a && sq(a-texCoord)>0.01) error("TODO: duplicate vertex");
                             a = texCoord;
                         }{
                             vec2 texCoord = fract(vec2(texCoords[poly.loopstart+1].uv));
-                            vec2& b = model.vertices[material.indices[i+1]].texCoord;
+                            vec2& b = model.vertices[surface.indices[i+1]].texCoord;
                             if(b && sq(b-texCoord)>0.01) error("TODO: duplicate vertex");
                             b = texCoord;
                         }
                         for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
                             vec2 texCoord = fract(vec2(texCoords[index].uv));
-                            vec2& c = model.vertices[material.indices[i+2]].texCoord;
+                            vec2& c = model.vertices[surface.indices[i+2]].texCoord;
                             if(c && sq(c-texCoord)>0.01) error("TODO: duplicate vertex");
                             c = texCoord;
                             i += 3; // Keep indices counter synchronized with MPoly
@@ -592,7 +604,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     }
                 }
 
-                model.materials << move(material);
+                model.surfaces << move(surface);
             }
 
             bool render = scene->lay&object.lay; // Visible layers
@@ -613,8 +625,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 // Selects N random faces
                 Random random;
                 for(int n=0; n</*particle.totpart/200*/256;) {
-                    assert(model.materials.size==1);
-                    const array<uint>& indices = model.materials[0].indices;
+                    assert(model.surfaces.size==1);
+                    const array<uint>& indices = model.surfaces[0].indices;
                     uint index = random % (indices.size/3) * 3;
                     uint a=indices[index], b=indices[index+1], c=indices[index+2];
                     uint densityVG = particle.vgroup[PSYS_VG_DENSITY];
@@ -667,38 +679,34 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
         for(uint i=0; i<models.size;) {
             Model& model = models[i];
-            if(!model.materials || !model.instances) { models.removeAt(i); continue; } else i++;
+            if(!model.surfaces || !model.instances) { models.removeAt(i); continue; } else i++;
 
-            for(Model::Material& material : model.materials) {
+            for(Surface& surface : model.surfaces) {
                 // Remap indices
                 buffer<uint> remap(model.vertices.size, model.vertices.size, -1);
-                array<uint> indices (material.indices.size);
+                array<uint> indices (surface.indices.size);
                 array<Vertex> vertices (model.vertices.size);
-                for(uint index: material.indices) {
+                for(uint index: surface.indices) {
                     uint newIndex = remap[index];
                     if(newIndex == uint(-1)) { newIndex=remap[index]=vertices.size; vertices << model.vertices[index]; }
                     indices << newIndex;
                 }
 
                 // Uploads geometry
-                material.vertexBuffer.upload<Vertex>(vertices);
+                surface.vertexBuffer.upload<Vertex>(vertices);
                 if(vertices.size<=0x10000) {
                     array<uint16> indices16 (indices.size); //16bit indices
                     for(uint index: indices) { assert(index<0x10000); indices16 << index; }
-                    material.indexBuffer.upload(indices16);
+                    surface.indexBuffer.upload(indices16);
                 } else {
-                    material.indexBuffer.upload(indices);
+                    surface.indexBuffer.upload(indices);
                 }
-
-                // Compiles shader
-                String stage = "transform normal texCoord diffuse shadow sun sky "_ +""_/*material.name*/; //FIXME: material nodes
-                material.shader = GLShader(blender(), {stage});
 
                 // Loads textures
                 int unit=1;
-                for(const String& name: material.shader.sampler2D) {
-                    material.shader[name] = unit++;
-                    material.textures<<GLTexture(decodeImage(readFile(name+".jpg"_, folder)), Mipmap|Bilinear|Anisotropic);
+                for(const String& name: surface.shader.shader.sampler2D) {
+                    surface.shader.shader[name] = unit++;
+                    surface.shader<<GLTexture(decodeImage(readFile(name+".jpg"_, folder)), Mipmap|Bilinear|Anisotropic);
                 }
             }
         }
@@ -738,7 +746,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
             shadow.bind();
             for(Model& model: models) {
-                for(const Model::Material& material: model.materials) {
+                for(const Model::Material& material: model.surfaces) {
                     material.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
                     for(const mat4& instance: model.instances) {
                         shadow["modelViewTransform"] = sun*instance;
@@ -776,8 +784,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
         //profile( map<String, GLTimerQuery> profile; )
         for(Model& model: models) {
-            for(Model::Material& material: model.materials) {
-                GLShader& shader = material.shader;
+            for(Surface& surface: model.surfaces) {
+                GLShader& shader = surface.shader.shader;
                 shader.bind();
                 shader.bindFragments({"color"_});
                 //shader["shadowScale"_] = 1.f/sunShadow.depthTexture.width;
@@ -786,11 +794,11 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 shader["skyLightDirection"_] = skyLightDirection;
 
                 {int i=1; for(const String& name: shader.sampler2D) shader[name] = i++; }
-                {int i=1; for(const GLTexture& texture : material.textures) texture.bind(i++); }
+                {int i=1; for(const GLTexture& texture : surface.shader) texture.bind(i++); }
 
-                material.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
-                material.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
-                if(shader.sampler2D) material.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Vertex,texCoord));
+                surface.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
+                surface.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
+                if(shader.sampler2D) surface.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Vertex,texCoord));
 
                 //profile( GLTimerQuery timerQuery; timerQuery.start(); )
                 for(const mat4& instance : model.instances.slice(0,1)) {
@@ -798,7 +806,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     shader["normalMatrix"_] = instance.normalMatrix();
                     shader["shadowTransform"_] = sun*instance;
                     if(shader["modelTransform"_]) shader["modelTransform"_] = instance;
-                    material.indexBuffer.draw();
+                    surface.indexBuffer.draw();
                 }
                 //profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
             }
