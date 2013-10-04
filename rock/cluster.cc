@@ -85,8 +85,8 @@ array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<
                             uint newIndex = parentIndex;
                             for(Family* family: otherSet.families) if(!parentFamilies.contains(family)) {
                                 unique<FamilySet> set; set->families << parentSet.families; set->families += otherSet.families;
-                                uint newIndex = familiesLookup.size; // New family set lookup index
-                                log("New family set", parentIndex, otherIndex, "{",parentFamilies,"}", "{", otherSet.families, "}","->",newIndex,set->families);
+                                newIndex = familiesLookup.size; // New family set lookup index
+                                //log("New family set", parentIndex, otherIndex, "{",parentFamilies,"}", "{", otherSet.families, "}","->",newIndex,set->families);
                                 familiesLookup << move(set);
                             } //else No-op union as other sets is included in parent set
                             parentSet.unions.insert(otherIndex, newIndex);

@@ -20,8 +20,8 @@ struct VolumeOperation : virtual Operation {
     virtual uint outputSampleSize(uint index unused) { return 0; } // No volume output by default
     virtual uint outputSampleSize(const Dict&, const ref<Result*>&, uint index) { return this->outputSampleSize(index); }
     size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
-        assert_(inputs);
-        assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
+        assert(inputs);
+        assert(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
         return toVolume(*inputs[0]).size() * this->outputSampleSize(args,inputs,index);
     }
     /// Actual operation (overriden by implementation)
@@ -50,6 +50,7 @@ struct VolumeOperation : virtual Operation {
             if(sampleSize) {
                 Volume volume;
                 volume.sampleSize = sampleSize;
+                assert(outputs[index]->data);
                 volume.data = unsafeReference(outputs[index]->data);
                 if(inputVolumes) { // Inherits initial metadata from previous operation
                     const Volume& source = inputVolumes.first();

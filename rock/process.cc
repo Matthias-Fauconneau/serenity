@@ -418,7 +418,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
 
             File file(outputFileID, storageFolder, Flags(ReadWrite|Create));
             file.resize(outputSize);
-            if(outputSize>=(1<<16)) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|flags));
+            if(outputSize>=(1<<15)) map = Map(file, Map::Prot(Map::Read|Map::Write), Map::Flags(Map::Shared|flags));
         }
         outputs << shared<ResultFile>(output, currentTime(), Dict(), String(), move(map), output, storageFolder.name());
     }

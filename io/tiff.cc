@@ -51,7 +51,7 @@ void Tiff16::read(uint16* target, uint x0, uint y0, uint w, uint h, uint stride)
 }
 Tiff16::~Tiff16() { TIFFClose(tiff); }
 
-static tsize_t tiffWrite(BinaryData& s, const byte* data, tsize_t size) { assert_(s.index+size<=tsize_t(s.buffer.capacity)); copy(s.buffer.begin()+s.index, data, size); s.index+=size; if(s.index>s.buffer.size) s.buffer.size=s.index; return size; }
+static tsize_t tiffWrite(BinaryData& s, const byte* data, tsize_t size) { assert_(s.index+size<=s.buffer.capacity); copy(s.buffer.begin()+s.index, data, size); s.index+=size; if(s.index>s.buffer.size) s.buffer.size=s.index; return size; }
 buffer<byte> encodeTIFF(const Image16& image) {
     BinaryData s ( buffer<byte>(4096+image.height*image.width*2, 0) );
     TIFF* tiff = TIFFClientOpen("TIFF", "w", (thandle_t)&s, (TIFFReadWriteProc)tiffZero, (TIFFReadWriteProc)tiffWrite, (TIFFSeekProc)tiffSeek, (TIFFCloseProc)tiffZero, (TIFFSizeProc)tiffError, (TIFFMapFileProc)tiffError, (TIFFUnmapFileProc)tiffError);

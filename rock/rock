@@ -2,7 +2,10 @@
 
 # Concatenates image slice files in a volume
 # \note Parses resolution from input folder name as "name-resolution"
-source name resolution voxelSize physicalSize = Source
+synthetic = '0'
+if !synthetic: source name resolution voxelSize physicalSize = Source
+# Generates a synthetic pore network for debugging and validation
+if synthetic: source = Synthetic
 
 # Denoises
 denoise = 'median'

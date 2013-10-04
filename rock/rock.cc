@@ -10,6 +10,7 @@
 // Includes all operators, tools and views
 //#include "volume.h"
 //#include "source.h"
+//#include "synthetic.h"
 //include "resample.h"
 //#include "average.h"
 //#include "median.h"

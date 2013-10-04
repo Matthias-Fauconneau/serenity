@@ -14,14 +14,16 @@ void rootIndex(Volume16& target, const ref<Family>& families) {
     clear(targetData,target.size());
     target.maximum=0; // 0 = background
     for(const Family& family: families) {
-        if(!family.size) continue; // Avoids wasting a color index on a single voxel (FIXME: better color map)
+        //if(!family.size) continue;
         target.maximum++;
     }
     target.maximum++; // maximum = Multiple family index
     uint i=0; for(const Family& family: families) {
-        if(!family.size) continue; // Avoids wasting a color index on a single voxel (FIXME: better color map)
+        //if(!family.size) continue;
         i++;
         assert(i<1<<16);
+        if(!targetData[family.root]) targetData[family.root] = i;
+        else targetData[family.root] = target.maximum; // Multiple family
         for(uint64 index: family) {
             if(!targetData[index]) targetData[index] = i;
             else targetData[index] = target.maximum; // Multiple family
@@ -41,7 +43,7 @@ void colorizeIndex(Volume24& target, const Volume16& source) {
     clear(targetData,target.size(),{0,0,0});
     bgr colors[target.maximum+1];
     for(uint i: range(target.maximum)) {
-        vec3 rgb = HSVtoRGB(float(i)/float(target.maximum), 1, 1);
+        vec3 rgb = HSVtoRGB(float((i*(target.maximum-1)/3)%target.maximum)/float(target.maximum), 1, 1);
         colors[i] = bgr{sRGB(rgb.x),sRGB(rgb.y),sRGB(rgb.z)};
     }
     colors[0]={0,0,0};
