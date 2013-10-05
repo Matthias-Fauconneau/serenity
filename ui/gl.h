@@ -110,7 +110,7 @@ enum { ClearDepth=0x100, ClearColor=0x4000 };
 struct GLFrameBuffer {
     GLFrameBuffer(){}
     default_move(GLFrameBuffer);
-    //GLFrameBuffer(GLTexture&& depth);
+    GLFrameBuffer(GLTexture&& depth);
     //GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
     GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=sRGB8);
     ~GLFrameBuffer();

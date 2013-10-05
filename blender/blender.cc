@@ -189,7 +189,7 @@ struct MixRGBNode : Node {
 
 struct GeometryNode : Node {
     String toGLSL(String&, string output) const override{
-        if(output=="Normal"_) return String("vec4(normal, 0)"_);
+        if(output=="Normal"_) return String("vec4(nodeNormal, 0)"_);
         else error(output);
     }
 };
@@ -237,7 +237,7 @@ struct BsdfGlassNode : BSDFNode {};
 
 struct TexCoordNode : Node {
     String toGLSL(String&, string output) const override{
-        if(output=="Generated"_) return String("vPosition"_);
+        if(output=="Generated"_) return String("vec4(vPosition.x,1-vPosition.y,vPosition.z,1)"_);
         //else if(output=="Normal"_) return String("vNormal"_);
         else if(output=="UV"_) return String("vTexCoords"_);
         else error(output);
@@ -324,7 +324,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
     float focalLength = 90; // current focal length (in mm for a 36mm sensor)
     const float zoomSpeed = 10; // in mm/click
-    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL};
+    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 24, 8};
 
     // Renderer
     GLFrameBuffer framebuffer;
@@ -343,8 +343,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
     // Light
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
-    const float sunYaw = 4*PI/3;
-    const float sunPitch = -PI/3;
     mat4 sun; // sun light transform
     GLFrameBuffer sunShadow;
 
@@ -368,7 +366,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         parse();
 
         // FIXME: get from .blend
-        sun=mat4(); sun.rotateX(sunPitch); sun.rotateZ(sunYaw);
         skymap = GLTexture(decodeImage(readFile(String(sky.sampler2D.first()+".png"_), folder)), Bilinear);
 
         window.localShortcut(Escape).connect([]{exit();});
@@ -543,7 +540,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
         file.seek(0);
         string version = file.read<byte>(12);
-        if(version!=sdnaVersion) {
+        if(version!=sdnaVersion || false) {
             array<const Struct*> defined;
             defined << &structs[structs.indexOf("void"_)]
                     << &structs[structs.indexOf("char"_)] << &structs[structs.indexOf("short"_)] << &structs[structs.indexOf("int"_)]
@@ -553,6 +550,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             String header = "#pragma once\n#include \"sdna.h\"\nconst string sdnaVersion = \""_+version+"\"_;\n"_;
             header << DNAtoC(structs[structs.indexOf("Scene"_)], defined, defining, structs);
             header << DNAtoC(structs[structs.indexOf("NodeTexImage"_)], defined, defining, structs);
+            //header << DNAtoC(structs[structs.indexOf("Lamp"_)], defined, defining, structs);
             header = replace(header,"Material"_,"bMaterial"_); //FIXME: whole words only
             header = replace(header,"Image"_,"bImage"_); //FIXME: whole words only
             header = replace(header,"Key"_,"bKey"_); //FIXME: whole words only
@@ -586,12 +584,21 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             const Object& object = *base.object;
             Model model;
 
+            mat4 transform;
+            for(uint i: range(4)) for(uint j: range(4)) transform(i,j) = object.obmat[j*4+i];
+
+            if(ObjectType(object.type) == ObjectType::Lamp) {
+                assert(sun==mat4());
+                assert(object.rotmode==1);
+                sun.rotateX(object.rot[0]);
+                sun.rotateY(object.rot[1]);
+                sun.rotateZ(object.rot[2]);
+                //sun = transform.normalMatrix();
+                continue;
+            }
             if(ObjectType(object.type) != ObjectType::Mesh) continue;
             const Mesh& mesh = *(Mesh*)object.data;
             if(!mesh.mvert) continue;
-
-            mat4 transform;
-            for(uint i: range(4)) for(uint j: range(4)) transform(i,j) = object.obmat[j*4+i];
             float scale = norm(vec3(transform(0,0),transform(1,1),transform(2,2)));
             if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
 
@@ -610,18 +617,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 // Computes object bounds
                 objectMin=min(objectMin, vertex.position);
                 objectMax=max(objectMax, vertex.position);
-
-                if(scale<10) { // Ignores water plane
-                    // Computes scene bounds in world space to fit view
-                    vec3 position = transform*vertex.position;
-                    worldMin=min(worldMin, position);
-                    worldMax=max(worldMax, position);
-
-                    // Compute scene bounds in light space to fit shadow
-                    vec3 P = sun*position;
-                    lightMin=min(lightMin,P);
-                    lightMax=max(lightMax,P);
-                }
             }
             // Scales positions and transforms to keep unit bounding box in object space
             for(Vertex& vertex: model.vertices) {
@@ -714,7 +709,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
                 // Selects N random faces
                 Random random;
-                for(int n=0; n</*particle.totpart/200*/256;) {
+                for(int n=0; n</*particle.totpart/200*//*256*/64;) {
                     assert(model.surfaces.size==1);
                     const array<uint>& indices = model.surfaces[0].indices;
                     uint index = random % (indices.size/3) * 3;
@@ -803,6 +798,23 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         }
         //quicksort(models); // Sorts by rendering cost (i.e render most instanced object last)
 
+        for(Model& model: models) {
+            for(const mat4& instance : model.instances) {
+                //if(scale>10) continue; // Ignores water plane
+                for(Vertex& vertex: model.vertices) {
+                    // Computes scene bounds in world space to fit view
+                    vec3 position = instance*vertex.position;
+                    worldMin=min(worldMin, position);
+                    worldMax=max(worldMax, position);
+
+                    // Compute scene bounds in light space to fit shadow
+                    assert(sun!=mat4());
+                    vec3 P = sun*position;
+                    lightMin=min(lightMin,P);
+                    lightMax=max(lightMax,P);
+                }
+            }
+        }
         worldCenter = (worldMin+worldMax)/2.f; worldRadius=norm(worldMax.xy()-worldMin.xy())/2.f; //FIXME: compute smallest enclosing sphere
     }
 
@@ -821,44 +833,46 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
     //profile( map<String, GLTimerQuery> lastProfile; )
     void render(int2 unused position, int2 unused size) override {
+        glCullFace(true);
         // Render sun shadow map
-        /*if(!sunShadow) {
-            sunShadow = GLFrameBuffer(GLTexture(4096,4096,Depth24|Shadow|Bilinear|Clamp));
+        if(!sunShadow) {
+            sunShadow = GLFrameBuffer(GLTexture(8192,8192,Depth24|Shadow|Bilinear|Clamp)); //FIXME: aspect ratio
             sunShadow.bind(ClearDepth);
 
             // Normalizes to [-1,1]
-            sun=mat4();
-            sun.scale(vec3(1,1,-1));
-            sun.translate(-1);
-            sun.scale(2.f/(lightMax-lightMin));
-            sun.translate(-lightMin);
-            sun.rotateX(sunPitch);
-            sun.rotateZ(sunYaw);
+            mat4 normalize;
+            normalize.scale(vec3(1,1,-1)); // -> [-1,1]
+            normalize.translate(-1); // -> [-1,1]
+            normalize.scale(2.f/(lightMax-lightMin)); // -> [0,2]
+            normalize.translate(-lightMin); // -> [0,max-min]
+            sun = normalize * sun;
+            //log(lightMin, sun*lightMin, lightMax, sun*lightMax);
 
             shadow.bind();
             for(Model& model: models) {
-                for(const Model::Material& material: model.surfaces) {
-                    material.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
+                for(const Surface& surface: model.surfaces) {
+                    surface.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
                     for(const mat4& instance: model.instances) {
                         shadow["modelViewTransform"] = sun*instance;
-                        material.indexBuffer.draw();
+                        surface.indexBuffer.draw();
                     }
                 }
             }
 
-            // Normalizes xyz to [0,1]
+            // Normalizes from [-1,1] to [0,1]
             mat4 sampler2D;
             sampler2D.scale(1./2);
             sampler2D.translate(1);
             sun = sampler2D * sun;
-        }*/
+        }
+        GLFrameBuffer::bindWindow(position, size, ClearDepth);
 
         uint width=size.x, height = size.y;
-        if(framebuffer.size() != size) {
-            framebuffer=GLFrameBuffer(width,height); /*-1,RGB16F*/
+        /*if(framebuffer.size() != size) {
+            framebuffer=GLFrameBuffer(width,height,-1);
             resolvedBuffer=GLTexture(width,height);
         }
-        framebuffer.bind(ClearDepth);
+        framebuffer.bind(ClearDepth);*/
 
         // Computes view transform
         mat4 view;
@@ -868,9 +882,10 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
+        //view = sun;
 
         // World-space lighting
-        vec3 sunLightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
+        vec3 sunLightDirection = normalize(sun.normalMatrix()*vec3(0,0,-1));
         vec3 skyLightDirection = vec3(0,0,1);
 
         //profile( map<String, GLTimerQuery> profile; )
@@ -879,8 +894,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 GLShader& shader = surface.shader.shader;
                 shader.bind();
                 shader.bindFragments({"color"_});
-                //shader["shadowScale"_] = 1.f/sunShadow.depthTexture.width;
-                //shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
+                shader["shadowScale"_] = 1.f/sunShadow.depthTexture.width;
+                shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
                 shader["sunLightDirection"_] = sunLightDirection;
                 shader["skyLightDirection"_] = skyLightDirection;
 
@@ -892,11 +907,10 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 if(shader.sampler2D) surface.vertexBuffer.bindAttribute(shader,"aTexCoords",2,__builtin_offsetof(Vertex,texCoord));
 
                 //profile( GLTimerQuery timerQuery; timerQuery.start(); )
-                for(const mat4& instance : model.instances.slice(0,1)) {
+                for(const mat4& instance : model.instances) {
                     shader["modelViewTransform"_] = view*instance;
-                    //shader["normalMatrix"_] = instance.normalMatrix();
-                    //shader["shadowTransform"_] = sun*instance;
-                    if(shader["modelTransform"_]) shader["modelTransform"_] = instance;
+                    shader["normalMatrix"_] = instance.normalMatrix();
+                    shader["shadowTransform"_] = sun*instance;
                     surface.indexBuffer.draw();
                 }
                 //profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
@@ -910,11 +924,11 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         vertexBuffer.bindAttribute(sky,"position"_,2);
         vertexBuffer.draw(TriangleStrip);
 
-        framebuffer.blit(resolvedBuffer);
+        /*framebuffer.blit(resolvedBuffer);
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size, 0);
         present["framebuffer"_]=0; resolvedBuffer.bind(0);
         vertexBuffer.bindAttribute(present,"position"_,2);
-        vertexBuffer.draw(TriangleStrip);
+        vertexBuffer.draw(TriangleStrip);*/
 
         //profile( log(window.renderTime, lastProfile); lastProfile = move(profile); )
     }

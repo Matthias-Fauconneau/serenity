@@ -1162,7 +1162,8 @@ static mz_bool tdefl_compress_fast(tdefl_compressor *d)
       mz_uint probe_pos = d->m_hash[hash];
       d->m_hash[hash] = (mz_uint16)lookahead_pos;
 
-      if (((cur_match_dist = (mz_uint16)(lookahead_pos - probe_pos)) <= dict_size) && ((*(const mz_uint32 *)(d->m_dict + (probe_pos &= TDEFL_LZ_DICT_SIZE_MASK)) & 0xFFFFFF) == first_trigram))
+      if (((cur_match_dist = (mz_uint16)(lookahead_pos - probe_pos)) <= dict_size) &&
+              ((*(const mz_uint32 *)(d->m_dict + (probe_pos &= TDEFL_LZ_DICT_SIZE_MASK)) & 0xFFFFFF) == first_trigram))
       {
         const mz_uint16 *p = (const mz_uint16 *)pCur_dict;
         const mz_uint16 *q = (const mz_uint16 *)(d->m_dict + probe_pos);

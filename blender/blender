@@ -1,10 +1,10 @@
 transform {
- varying vec4 vPosition;
+ varying vec3 vPosition;
  vertex {
   uniform mat4 modelViewTransform;
   attribute vec3 aPosition;
   gl_Position = modelViewTransform*vec4(aPosition,1);
-  vPosition = vec4(aPosition, 1);
+  vPosition = aPosition;
  }
 }
 
@@ -19,10 +19,12 @@ screen {
 
 normal {
  varying vec3 vNormal;
+ varying vec3 nodeNormal;
  vertex {
   uniform mat3 normalMatrix;
   attribute vec3 aNormal;
-  vNormal = /*normalMatrix**/aNormal;
+  vNormal = normalMatrix*aNormal;
+  nodeNormal = aNormal;
  }
  fragment {
   vec3 normal = normalize(vNormal);
@@ -53,17 +55,16 @@ shadow {
  fragment {
   uniform sampler2DShadow shadowMap;
   float shadowLight = 0;
-  /*for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
+  for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
      shadowLight += shadow2DProj(shadowMap,
      vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
-  shadowLight /= 4;*/
-  shadowLight = 1;
+  shadowLight /= 4;
  }
 }
 
 sun {
  fragment {
-  const vec3 sunColor = vec3(0.875, 0.75, 0.5);
+  const vec3 sunColor = vec3(1, 1, 1);
   uniform vec3 sunLightDirection;
   diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
  }
@@ -71,7 +72,7 @@ sun {
 
 sky {
  fragment {
-  const vec3 skyColor = vec3(0.125, 0.25, 0.5);
+  const vec3 skyColor = vec3(1, 1, 1);
   uniform vec3 skyLightDirection;
   diffuseLight += (1.f+dot(skyLightDirection, normal))/2.f * skyColor;
  }

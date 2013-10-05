@@ -277,12 +277,12 @@ void GLTexture::bind(uint sampler) const {
 
 /// Framebuffer
 
-/*GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-}*/
+}
 /*GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
     assert_(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
