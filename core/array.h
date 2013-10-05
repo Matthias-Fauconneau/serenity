@@ -44,7 +44,7 @@ generic struct array : buffer<T> {
     array& operator<<(T&& e) { size_t s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
     array& operator<<(array<T>&& a) {size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(move(a[i])); return *this; }
     array& operator<<(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
-    array& operator<<(const ref<T>& a) {size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(copy(a[i])); return *this; }
+    array& operator<<(const ref<T>& a) {assert(a.size<1<<16); size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(copy(a[i])); return *this; }
     /// \}
 
     /// \name Appends once (if not already contained) operators

@@ -1,10 +1,4 @@
-#define Material bMaterial
-#define Image bImage
-#define Key bKey
 #include "blender.h"
-#undef Material
-#undef Image
-#undef Key
 #include "thread.h"
 #include "string.h"
 #include "data.h"
@@ -120,10 +114,14 @@ String str(const Vertex& v) { return "("_+str(v.position, v.normal, v.texCoord)+
 struct Node;
 
 struct Input {
-    Input(string name, shared<Node>&& node):name(name),node(move(node)){}
+    Input(string name, shared<Node>&& node, string output):name(name),node(move(node)), output(output){}
     Input(string name, vec4 value):name(name),value(value){}
+
+    String toGLSL(String& global) const;
+
     string name;
     shared<Node> node = 0;
+    string output;
     vec4 value = 0;
 };
 String str(const Input& o) {
@@ -138,63 +136,124 @@ String str(const Input& o) {
 }
 
 struct Node : shareable {
-    virtual String toGLSL() const { error("Unimplemented", str()); }
+    virtual String toGLSL(String&, string output) const { error("Unimplemented", output, str()); }
     virtual String str() const { String s; s<<name; if(inputs) s<<"("_+::str(inputs)+")"_; return s; }
 
     string name;
     array<Input> inputs;
 };
 String str(const Node& o) { static int prefix=0; prefix++; String s = "\n"_+repeat(" "_,prefix)+o.str(); prefix--; /*Assumes single line*/  return s; }
+String Input::toGLSL(String& global) const { return node ? node->toGLSL(global, output):"vec4"_+::str(value); }
 
 struct ValueNode : Node {
     ValueNode(float value):value(value){}
     String str() const override { return ::str(value); }
-
+    String toGLSL(String&, string) const override { return ::str(value); }
     float value;
 };
 
+enum Operation { Add, Sub, Mul, Div, Sin, Cos, Tan, ASin, ACos, ATan, Power, Log, Min, Max, Round, Less, More, Modulo };
+static const ref<string> operationNames {"add"_, "sub"_, "mul"_, "div"_, "sin"_, "cos"_, "tan"_, "asin"_, "acos"_, "atan"_,
+            "power"_, "log"_, "min"_, "max"_, "round"_, "less"_, "more"_, "modulo"_};
 struct MathNode : Node {
-    enum Operation { Add, Sub, Mul, Div, Sin, Cos, Tan, ASin, ACos, ATan, Power, Log, Min, Max, Round, Less, More, Modulo };
 
     MathNode(short operation):operation(Operation(operation)){}
     String str() const override {
-        static const ref<string> operationNames {"Add"_, "Sub"_, "Mul"_, "Div"_, "Sin"_, "Cos"_, "Tan"_, "ASin"_, "ACos"_, "ATan"_,
-                    "^"_, "Log"_, "Min"_, "Max"_, "Round"_, "Less"_, "More"_, "Modulo"_};
         assert(operation<operationNames.size, (int)operation);
-        //if(operation==Mul && inputs[1].value.x==1) return ::str(inputs[0]); // =$*1
-        /*if(operation==Add || operation==Sub || operation==Mul || operation==Div)
-            return "("_+::str(inputs[0])+" "_+operationNames[operation]+" "_+::str(inputs[1])+")"_;
-        else*/ return operationNames[operation]+"("_+::str(inputs)+")"_;
+        return operationNames[operation]+"("_+::str(inputs)+")"_;
     }
-
+    String toGLSL(String& global, string) const override {
+        return operationNames[operation]+"("_+inputs[0].toGLSL(global)+(inputs.size==2?", "_+inputs[1].toGLSL(global):String())+")"_;
+    }
     Operation operation;
 };
 
-struct MixRGBNode : Node {};
-struct VectorMathNode : Node {};
-struct GeometryNode : Node {};
-struct MappingNode : Node {};
+enum VectorOperation { VectorAdd, VectorSubstract, NormalizeAdd, Dot, Cross, Normalize };
+static const ref<string> vectorOperationNames {"addVector"_, "subVector"_, "normalizeadd"_, "dot"_,"cross"_,"normalize"};
+struct VectorMathNode : Node {
+    VectorMathNode(short operation):operation(VectorOperation(operation)){}
+    String str() const override {
+        assert(operation<vectorOperationNames.size, (int)operation);
+        return vectorOperationNames[operation]+"("_+::str(inputs)+")"_;
+    }
+    String toGLSL(String& global, string) const override {
+        if(operation==Dot && inputs[1].value==vec4(0,0,1,0)) return inputs[0].toGLSL(global)+".z"_;
+        return vectorOperationNames[operation]+"("_+inputs[0].toGLSL(global)+(inputs.size==2?", "_+inputs[1].toGLSL(global):String())+")"_;
+    }
+    VectorOperation operation;
+};
+
+struct MixRGBNode : Node {
+    String toGLSL(String& global, string) const override { return "mix("_+inputs[1].toGLSL(global)+","_+inputs[2].toGLSL(global)+", "_+inputs[0].toGLSL(global)+")"_; }
+};
+
+struct GeometryNode : Node {
+    String toGLSL(String&, string output) const override{
+        if(output=="Normal"_) return String("vec4(normal, 0)"_);
+        else error(output);
+    }
+};
+struct MappingNode : Node {
+    MappingNode(const mat4& transform) : transform(transform) {}
+    String toGLSL(String& global, string) const override{
+        mat4 scale; scale.scale(transform(0,0)); assert(transform==scale, transform); // Uniform scale
+        return ::str(transform(0,0))+"*"_+inputs[0].toGLSL(global);
+    }
+    mat4 transform;
+};
 
 struct SeparateRGBNode : Node {};
-struct BrightContrastNode : Node {};
-struct HueSaturationNode : Node {};
+struct BrightContrastNode : Node {
+    String toGLSL(String& global, string) const override {
+        return "brightness_contrast("_+
+                inputs[0].toGLSL(global)+", "_+
+                ::str(inputs[1].value.x)+", "_+
+                ::str(inputs[2].value.x)+")"_;
+    }
+};
+struct HueSaturationNode : Node {
+    String toGLSL(String& global, string) const override {
+        return "hue_sat("_+
+                ::str(inputs[0].value.x)+", "_+
+                ::str(inputs[1].value.x)+", "_+
+                ::str(inputs[2].value.x)+", "_+
+                inputs[4].toGLSL(global)+")"_;
+    }
+};
 
 struct MixShaderNode : Node {
-    String toGLSL() const override{ return inputs[2].node->toGLSL(); } // Stub
-    String str() const override { return ::str(inputs[2]); } // Stub
+    String toGLSL(String& global, string) const override { return inputs[2].toGLSL(global); } // Stub
+    //String str() const override { return ::str(inputs[2]); } // Stub
 };
 
 struct BSDFNode : Node {
-    String toGLSL() const override{ return "color=vec4"_+::str(inputs[0].value)+";"_; }
-    String str() const override { return ::str(inputs[0].value); }
+    String toGLSL(String& global, string) const override{ return "color="_+inputs[0].toGLSL(global)+";"_; }
+    String str() const override { return ::str(inputs[0]); }
 };
 struct BsdfDiffuseNode : BSDFNode {};
 struct BsdfTranslucentNode : BSDFNode {};
 struct BsdfTransparentNode : BSDFNode {};
 struct BsdfGlassNode : BSDFNode {};
 
-struct TexCoordNode : Node {};
-struct TexImageNode : Node {};
+struct TexCoordNode : Node {
+    String toGLSL(String&, string output) const override{
+        if(output=="Generated"_) return String("vPosition"_);
+        //else if(output=="Normal"_) return String("vNormal"_);
+        else if(output=="UV"_) return String("vTexCoords"_);
+        else error(output);
+    }
+};
+struct TexImageNode : Node {
+    TexImageNode(const string& name) : name(replace(replace(replace(section(section(name,'/',-2,-1),'.')," "_,""_),"("_,""_),")"_,""_)) {}
+
+    String toGLSL(String& global, string) const override{
+        global<<"uniform sampler2D "_+name+";\n"_;
+        return "texture("_+name+", "_+(inputs[0].node?inputs[0].toGLSL(global):String("vTexCoords"_))+".xy)"_;
+    }
+    String str() const override { return name+"("_+::str(inputs)+")"_; }
+
+    String name;
+};
 struct TexNoiseNode : Node {};
 
 /// Parses Blender nodes
@@ -204,9 +263,9 @@ shared<Node> parse(const bNode& o) {
     /**/  if(o.type==SH_NODE_VALUE) node = shared<ValueNode>(o.outputs.first->ns.vec[0]);
     else if(o.type==SH_NODE_MIX_RGB) node = shared<MixRGBNode>();
     else if(o.type==SH_NODE_MATH) node = shared<MathNode>(o.custom1);
-    else if(o.type==SH_NODE_VECT_MATH) node = shared<VectorMathNode>();
+    else if(o.type==SH_NODE_VECT_MATH) node = shared<VectorMathNode>(o.custom1);
     else if(o.type==SH_NODE_NEW_GEOMETRY) node = shared<GeometryNode>();
-    else if(o.type==SH_NODE_MAPPING) node = shared<MappingNode>();
+    else if(o.type==SH_NODE_MAPPING) node = shared<MappingNode>((mat4&)((TexMapping*)o.storage)->mat);
     else if(o.type==SH_NODE_SEPRGB) node = shared<SeparateRGBNode>();
     else if(o.type==SH_NODE_BRIGHTCONTRAST) node = shared<BrightContrastNode>();
     else if(o.type==SH_NODE_HUE_SAT) node = shared<HueSaturationNode>();
@@ -216,12 +275,12 @@ shared<Node> parse(const bNode& o) {
     else if(o.type==SH_NODE_BSDF_TRANSPARENT) node = shared<BsdfTransparentNode>();
     else if(o.type==SH_NODE_BSDF_GLASS) node = shared<BsdfGlassNode>();
     else if(o.type==SH_NODE_TEX_COORD) node = shared<TexCoordNode>();
-    else if(o.type==SH_NODE_TEX_IMAGE) node = shared<TexImageNode>();
+    else if(o.type==SH_NODE_TEX_IMAGE) { node = shared<TexImageNode>(str((const char*)(((bImage*)o.id)->name))); }
     else if(o.type==SH_NODE_TEX_NOISE) node = shared<TexNoiseNode>();
     else error(o.type, o.idname, o.name); //else node = shared<Node>();
     node->name = section(str(o.idname),'.');
     for(const bNodeSocket& socket: o.inputs) {
-        if(socket.link) node->inputs << Input(str(socket.name), parse(*socket.link->fromnode));
+        if(socket.link) { node->inputs << Input(str(socket.name), parse(*socket.link->fromnode), str((const char*)socket.link->fromsock->identifier)); }
         else {
             /**/  if(socket.type==SOCK_FLOAT) node->inputs << Input(str(socket.name), socket.ns.vec[0]);
             else if(socket.type==SOCK_VECTOR) node->inputs << Input(str(socket.name), vec4(socket.ns.vec));
@@ -446,20 +505,20 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                         string name = names[(uint16)data.read()];
                         uint reference=0, count=1;
                         TextData s (name);
-                        if(s.match("(*"_)) { //parse function pointers
+                        if(s.match("(*"_)) { // Parses function pointers
                             name.data+=2; name.size-=2+3;
                             type = "void"_; reference++;
                         } else {
-                            while(s.match('*')) { //parse references
+                            while(s.match('*')) { // Parses references
                                 name.data++; name.size--;
                                 reference++;
                             }
                         }
-                        s.whileNot('['); if(s.match('[')) { //parse static arrays
+                        s.whileNot('['); if(s.match('[')) { // Parses static arrays
                             name.size -= 1+(s.buffer.size-s.index);
                             count = s.integer();
                             s.match(']');
-                            while(s.match('[')) { // Flatten multiple indices
+                            while(s.match('[')) { // Flattens multiple indices
                                 count *= s.integer();
                                 s.match(']');
                             }
@@ -473,11 +532,10 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 for(Struct& s: structs) {
                     for(Struct::Field& f: s.fields) {
                         int index = structs.indexOf(f.typeName);
-                        if(index>=0) f.type = &structs[index]; // structs may not be reallocated after taking these references
+                        if(index>=0) f.type = &structs[index]; // Structs may not be reallocated after taking these references
                         else assert(f.reference);
                     }
                 }
-                //error(structs.contains("ShaderNodeValue"_));
             }
             if(identifier == "ENDB"_) break;
         }
@@ -494,6 +552,10 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             array<const Struct*> defining;
             String header = "#pragma once\n#include \"sdna.h\"\nconst string sdnaVersion = \""_+version+"\"_;\n"_;
             header << DNAtoC(structs[structs.indexOf("Scene"_)], defined, defining, structs);
+            header << DNAtoC(structs[structs.indexOf("NodeTexImage"_)], defined, defining, structs);
+            header = replace(header,"Material"_,"bMaterial"_); //FIXME: whole words only
+            header = replace(header,"Image"_,"bImage"_); //FIXME: whole words only
+            header = replace(header,"Key"_,"bKey"_); //FIXME: whole words only
             error(header);
         }
         while(file) { // Fixes pointers
@@ -583,8 +645,12 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                                 if(str(socket.name)=="Surface"_) surface = ::parse(*socket.link->fromnode);
                             }
                     }
-                    //TODO: convert Node tree to GLSL, load textures
-                    unique<Shader> shader(name,  GLShader(blender()+surface->toGLSL(), {"transform normal texCoord diffuse shadow sun sky "_}));
+                    String global;
+                    String local = surface->toGLSL(global, "Color"_);
+                    //log(name, surface, global, local);
+                    static String helpers = readFile("gpu_shader_material.glsl"_,folder);
+                    unique<Shader> shader(name,  GLShader(blender()+"fragment {\n"_+helpers+global+local+"\n}"_,
+                    {"transform normal texCoord diffuse shadow sun sky "_}));
                     shaders.insert(copy(name), move(shader));
                 }
                 Surface surface(shaders.at(name));
@@ -730,7 +796,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 int unit=1;
                 for(const String& name: surface.shader.shader.sampler2D) {
                     surface.shader.shader[name] = unit++;
-                    surface.shader<<GLTexture(decodeImage(readFile(name+".jpg"_, folder)), Mipmap|Bilinear|Anisotropic);
+                    String file = existsFile(name+".png"_,folder) ? name+".png"_ : name+".jpg"_;
+                    surface.shader<<GLTexture(decodeImage(readFile(file, folder)), Mipmap|Bilinear|Anisotropic);
                 }
             }
         }
@@ -822,12 +889,12 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
                 surface.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
                 surface.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
-                if(shader.sampler2D) surface.vertexBuffer.bindAttribute(shader,"aTexCoord",2,__builtin_offsetof(Vertex,texCoord));
+                if(shader.sampler2D) surface.vertexBuffer.bindAttribute(shader,"aTexCoords",2,__builtin_offsetof(Vertex,texCoord));
 
                 //profile( GLTimerQuery timerQuery; timerQuery.start(); )
                 for(const mat4& instance : model.instances.slice(0,1)) {
                     shader["modelViewTransform"_] = view*instance;
-                    shader["normalMatrix"_] = instance.normalMatrix();
+                    //shader["normalMatrix"_] = instance.normalMatrix();
                     shader["shadowTransform"_] = sun*instance;
                     if(shader["modelTransform"_]) shader["modelTransform"_] = instance;
                     surface.indexBuffer.draw();

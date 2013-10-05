@@ -17,7 +17,7 @@ struct mat3x2 {
     mat3x2 operator*(mat3x2 b) const {mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r; }
     vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
 };
-inline bool operator !=(const mat3x2& a, const mat3x2& b) { for(int i=0;i<6;i++) if(a.data[i]!=b.data[i]) return true; return false; }
+inline bool operator ==(const mat3x2& a, const mat3x2& b) { for(int i=0;i<6;i++) if(a.data[i]!=b.data[i]) return false; return true; }
 
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
@@ -131,7 +131,7 @@ struct mat4 {
     void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
-inline bool operator !=( mat4 a, mat4 b ) { for(int i=0;i<16;i++) if(a.data[i]!=b.data[i]) return true; return false; }
+inline bool operator ==( mat4 a, mat4 b ) { for(int i=0;i<16;i++) if(a.data[i]!=b.data[i]) return false; return true; }
 
 template<int N, int M> inline String str(const float a[M*N]) {
     String s; s<<"\n["_;

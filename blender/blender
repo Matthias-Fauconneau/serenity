@@ -1,17 +1,19 @@
 transform {
+ varying vec4 vPosition;
  vertex {
   uniform mat4 modelViewTransform;
   attribute vec3 aPosition;
   gl_Position = modelViewTransform*vec4(aPosition,1);
+  vPosition = vec4(aPosition, 1);
  }
 }
 
 screen {
- varying vec2 texCoord;
+ varying vec2 texCoords;
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0,1);
-  texCoord = (position+1)/2;
+  texCoords = (position+1)/2;
  }
 }
 
@@ -20,7 +22,7 @@ normal {
  vertex {
   uniform mat3 normalMatrix;
   attribute vec3 aNormal;
-  vNormal = normalMatrix*aNormal;
+  vNormal = /*normalMatrix**/aNormal;
  }
  fragment {
   vec3 normal = normalize(vNormal);
@@ -28,10 +30,10 @@ normal {
 }
 
 texCoord {
- varying vec2 vTexCoord;
+ varying vec2 vTexCoords;
  vertex {
-  attribute vec2 aTexCoord;
-  vTexCoord = aTexCoord;
+  attribute vec2 aTexCoords;
+  vTexCoords = aTexCoords;
  }
 }
 
@@ -103,7 +105,7 @@ present {
  fragment {
   uniform sampler2D framebuffer;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1.0/2.4)-0.055; else return 12.92*c; }
-  vec3 c = texture2D(framebuffer, texCoord).rgb;
+  vec3 c = texture2D(framebuffer, texCoords).rgb;
   color.rgb = vec3(sRGB(c.r), sRGB(c.g), sRGB(c.b));
  }
 }

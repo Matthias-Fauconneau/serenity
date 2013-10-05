@@ -10,7 +10,7 @@ enum Key {
     KP_Enter=0xff8d, KP_Multiply=0xffaa, KP_Add, KP_Separator, KP_Sub, KP_Decimal, KP_Divide, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
     ShiftKey=0xffe1, ControlKey=0xffe3,
     Delete=0xffff,
-    Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19, Power=0x1008ff2a
+    Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19 //, Power=0x1008ff2a
 };
 enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4/*, Meta=1<<6*/ };
 

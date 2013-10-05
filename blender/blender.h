@@ -175,7 +175,7 @@ struct ColorBand {
     short ipotype;
     CBData data[32];
 };
-struct ImageUser {
+struct bImageUser {
     struct Scene* scene;
     int framenr;
     int frames;
@@ -308,7 +308,7 @@ struct bNode {
     int pad2;
     struct uiBlock* block;
 };
-struct bNodeInstanceKey {
+struct bNodeInstancebKey {
     int value;
 };
 struct bNodeTree {
@@ -337,7 +337,7 @@ struct bNodeTree {
     ListBase<> inputs;
     ListBase<> outputs;
     struct bNodeInstanceHash* previews;
-    bNodeInstanceKey active_viewer_key;
+    bNodeInstancebKey active_viewer_key;
     int pad;
     struct bNodeTreeExec* execdata;
     void* progress;
@@ -354,7 +354,7 @@ struct PackedFile {
     int seek;
     void* data;
 };
-struct PreviewImage {
+struct PreviewbImage {
     int w[2];
     int h[2];
     short changed[2];
@@ -365,7 +365,7 @@ struct PreviewImage {
 struct ColorManagedColorspaceSettings {
     char name[64];
 };
-struct Image {
+struct bImage {
     ID id;
     char name[1024];
     ListBase<> ibufs;
@@ -389,7 +389,7 @@ struct Image {
     int bindcode;
     int* repbind;
     PackedFile* packedfile;
-    PreviewImage* preview;
+    PreviewbImage* preview;
     float lastupdate;
     int lastused;
     short animspeed;
@@ -407,7 +407,7 @@ struct Image {
 };
 struct EnvMap {
     struct Object* object;
-    Image* ima;
+    bImage* ima;
     struct ImBuf* cube[6];
     float imat[16];
     float obimat[9];
@@ -558,13 +558,13 @@ struct Tex {
     float checkerdist;
     float nabla;
     float pad1;
-    ImageUser iuser;
+    bImageUser iuser;
     bNodeTree* nodetree;
     Ipo* ipo;
-    Image* ima;
+    bImage* ima;
     ColorBand* coba;
     EnvMap* env;
-    PreviewImage* preview;
+    PreviewbImage* preview;
     PointDensity* pd;
     VoxelData* vd;
     OceanTex* ot;
@@ -644,7 +644,7 @@ struct Group {
     int layer;
     float dupli_ofs[3];
 };
-struct Material {
+struct bMaterial {
     ID id;
     AnimData* adt;
     short material_type;
@@ -749,7 +749,7 @@ struct Material {
     bNodeTree* nodetree;
     Ipo* ipo;
     Group* group;
-    PreviewImage* preview;
+    PreviewbImage* preview;
     float friction;
     float fh;
     float reflect;
@@ -1045,14 +1045,14 @@ struct ParticleSettings {
     short use_modifier_stack;
     short pad[3];
 };
-struct ParticleKey {
+struct ParticlebKey {
     float co[3];
     float vel[3];
     float rot[4];
     float ave[3];
     float time;
 };
-struct HairKey {
+struct HairbKey {
     float co[3];
     float time;
     float weight;
@@ -1073,10 +1073,10 @@ struct BoidParticle {
     float rt;
 };
 struct ParticleData {
-    ParticleKey state;
-    ParticleKey prev_state;
-    HairKey* hair;
-    ParticleKey* keys;
+    ParticlebKey state;
+    ParticlebKey prev_state;
+    HairbKey* hair;
+    ParticlebKey* keys;
     BoidParticle* boid;
     int totkey;
     float time;
@@ -1216,8 +1216,8 @@ struct ParticleSystem {
     ChildParticle* child;
     struct PTCacheEdit* edit;
     void* free_edit;
-    struct ParticleCacheKey** pathcache;
-    struct ParticleCacheKey** childcache;
+    struct ParticleCachebKey** pathcache;
+    struct ParticleCachebKey** childcache;
     ListBase<> pathcachebufs;
     ListBase<> childcachebufs;
     ClothModifierData* clmd;
@@ -1326,9 +1326,9 @@ struct FluidsimModifierData {
     struct FluidsimSettings* fss;
     PointCache* point_cache;
 };
-struct KeyBlock {
-    struct KeyBlock* next;
-    struct KeyBlock* prev;
+struct bKeyBlock {
+    struct bKeyBlock* next;
+    struct bKeyBlock* prev;
     float pos;
     float curval;
     short type;
@@ -1344,10 +1344,10 @@ struct KeyBlock {
     float slidermin;
     float slidermax;
 };
-struct Key {
+struct bKey {
     ID id;
     AnimData* adt;
-    KeyBlock* refkey;
+    bKeyBlock* refkey;
     char elemstr[32];
     int elemsize;
     int pad;
@@ -1373,7 +1373,7 @@ struct MPoly {
     char pad;
 };
 struct MTexPoly {
-    Image* tpage;
+    bImage* tpage;
     char flag;
     char transp;
     short mode;
@@ -1405,7 +1405,7 @@ struct MFace {
 };
 struct MTFace {
     float uv[8];
-    Image* tpage;
+    bImage* tpage;
     char flag;
     char transp;
     short mode;
@@ -1495,8 +1495,8 @@ struct Mesh {
     AnimData* adt;
     BoundBox* bb;
     Ipo* ipo;
-    Key* key;
-    Material** mat;
+    bKey* key;
+    bMaterial** mat;
     MSelect* mselect;
     MPoly* mpoly;
     MTexPoly* mtpoly;
@@ -1683,7 +1683,7 @@ struct Object {
     ListBase<> modifiers;
     int mode;
     int restore_mode;
-    Material** mat;
+    bMaterial** mat;
     char* matbits;
     int totcol;
     int actcol;
@@ -1863,7 +1863,7 @@ struct World {
     short pr_texture;
     short use_nodes;
     short pad[2];
-    PreviewImage* preview;
+    PreviewbImage* preview;
     bNodeTree* nodetree;
 };
 struct Base {
@@ -2171,7 +2171,7 @@ struct Editing {
     rctf over_border;
 };
 struct BrushClone {
-    Image* image;
+    bImage* image;
     float offset[2];
     float alpha;
     float pad;
@@ -2184,7 +2184,7 @@ struct Brush {
     MTex mask_mtex;
     struct Brush* toggle_brush;
     struct ImBuf* icon_imbuf;
-    PreviewImage* preview;
+    PreviewbImage* preview;
     char icon_filepath[1024];
     float normal_weight;
     short blend;
@@ -2250,7 +2250,7 @@ struct Sculpt {
 struct UvSculpt {
     Paint paint;
 };
-struct ImagePaintSettings {
+struct bImagePaintSettings {
     Paint paint;
     short flag;
     short pad;
@@ -2349,7 +2349,7 @@ struct ToolSettings {
     short pad2;
     short gpencil_flags;
     short autoik_chainlen;
-    ImagePaintSettings imapaint;
+    bImagePaintSettings imapaint;
     ParticleEditSettings particle;
     float proportional_size;
     float select_thresh;
@@ -2421,7 +2421,7 @@ struct ColorManagedViewSettings {
 struct ColorManagedDisplaySettings {
     char display_device[64];
 };
-struct ImageFormatData {
+struct bImageFormatData {
     char imtype;
     char depth;
     char planes;
@@ -2446,7 +2446,7 @@ struct AviCodecData {
     int cbParms;
     int fccType;
     int fccHandler;
-    int dwKeyFrameEvery;
+    int dwbKeyFrameEvery;
     int dwQuality;
     int dwBytesPerSecond;
     int dwFlags;
@@ -2530,7 +2530,7 @@ struct Text {
     double mtime;
 };
 struct RenderData {
-    ImageFormatData im_format;
+    bImageFormatData im_format;
     AviCodecData* avicodecdata;
     QuicktimeCodecData* qtcodecdata;
     QuicktimeCodecSettings qtcodecsettings;
@@ -2802,4 +2802,42 @@ struct Scene {
     ColorManagedDisplaySettings display_settings;
     ColorManagedColorspaceSettings sequencer_colorspace_settings;
     RigidBodyWorld* rigidbody_world;
+};
+struct TexMapping {
+    float loc[3];
+    float rot[3];
+    float size[3];
+    int flag;
+    char projx;
+    char projy;
+    char projz;
+    char mapping;
+    int pad;
+    float mat[16];
+    float min[3];
+    float max[3];
+    Object* ob;
+};
+struct ColorMapping {
+    ColorBand coba;
+    float bright;
+    float contrast;
+    float saturation;
+    int flag;
+    float blend_color[3];
+    float blend_factor;
+    int blend_type;
+    int pad[3];
+};
+struct NodeTexBase {
+    TexMapping tex_mapping;
+    ColorMapping color_mapping;
+};
+struct NodeTexbImage {
+    NodeTexBase base;
+    bImageUser iuser;
+    int color_space;
+    int projection;
+    float projection_blend;
+    int pad;
 };
