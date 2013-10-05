@@ -53,10 +53,11 @@ shadow {
  fragment {
   uniform sampler2DShadow shadowMap;
   float shadowLight = 0;
-  for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
+  /*for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
      shadowLight += shadow2DProj(shadowMap,
      vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
-  shadowLight /= 4;
+  shadowLight /= 4;*/
+  shadowLight = 1;
  }
 }
 
@@ -76,11 +77,15 @@ sky {
  }
 }
 
-out vec4 color;
-color = vec4(1);
-
-diffuse {
- //color.rgb *= diffuseLight;
+fragment {
+ out vec4 color;
+ color = vec4(1);
+ node {
+  color = %;
+ }
+ diffuse {
+  color.rgb *= diffuseLight;
+ }
 }
 
 skymap {

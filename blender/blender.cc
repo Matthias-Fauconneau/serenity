@@ -227,7 +227,7 @@ struct MixShaderNode : Node {
 };
 
 struct BSDFNode : Node {
-    String toGLSL(String& global, string) const override{ return "color="_+inputs[0].toGLSL(global)+";"_; }
+    String toGLSL(String& global, string) const override{ return inputs[0].toGLSL(global); }
     String str() const override { return ::str(inputs[0]); }
 };
 struct BsdfDiffuseNode : BSDFNode {};
@@ -649,8 +649,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     String local = surface->toGLSL(global, "Color"_);
                     //log(name, surface, global, local);
                     static String helpers = readFile("gpu_shader_material.glsl"_,folder);
-                    unique<Shader> shader(name,  GLShader(blender()+"fragment {\n"_+helpers+global+local+"\n}"_,
-                    {"transform normal texCoord diffuse shadow sun sky "_}));
+                    unique<Shader> shader(name,  GLShader(helpers+global+replace(blender(),"%"_,local),
+                    {"transform normal texCoord diffuse shadow sun sky node "_}));
                     shaders.insert(copy(name), move(shader));
                 }
                 Surface surface(shaders.at(name));
@@ -895,7 +895,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 for(const mat4& instance : model.instances.slice(0,1)) {
                     shader["modelViewTransform"_] = view*instance;
                     //shader["normalMatrix"_] = instance.normalMatrix();
-                    shader["shadowTransform"_] = sun*instance;
+                    //shader["shadowTransform"_] = sun*instance;
                     if(shader["modelTransform"_]) shader["modelTransform"_] = instance;
                     surface.indexBuffer.draw();
                 }
