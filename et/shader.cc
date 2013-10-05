@@ -17,7 +17,7 @@ unique<GLTexture> upload(const ref<byte>& file) {
             if(s.a > alphaMax) { alphaMax=s.a; t=byte4(s.b,s.g,s.r, t.a); } // FIXME: alpha-weighted blend of neighbours
         }
     }
-    return unique<GLTexture>(image, (image.alpha?sRGBA:sRGB8)|Mipmap|Bilinear|Anisotropic);
+    return unique<GLTexture>(image, (image.alpha?RGBA:RGB8)|Mipmap|Bilinear|Anisotropic);
 }
 
 FILE(shader)

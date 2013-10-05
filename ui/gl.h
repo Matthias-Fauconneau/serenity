@@ -45,6 +45,21 @@ struct GLShader {
     array<String> source;
 };
 
+struct GLUniformBuffer {
+    GLUniformBuffer(){}
+    default_move(GLUniformBuffer);
+    ~GLUniformBuffer();
+
+    void upload(const ref<byte>& data);
+    template<class T> void upload(const ref<T>& data) { upload(ref<byte>((byte*)data.data,data.size*sizeof(T))); }
+    void bind(GLShader& program, const ref<byte>& name) const;
+
+    operator bool() const { return id; }
+
+    handle<uint> id = 0;
+    int size = 0;
+};
+
 enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
 struct GLVertexBuffer {
     GLVertexBuffer(){}
@@ -77,7 +92,7 @@ struct GLIndexBuffer {
     void unmapIndexBuffer();
     void upload(const ref<uint16>& indices);
     void upload(const ref<uint>& indices);
-    void draw() const;
+    void draw(uint instanceCount=1) const;
 
     operator bool() { return id; }
 
@@ -88,8 +103,8 @@ struct GLIndexBuffer {
     bool primitiveRestart=false;
 };
 
-enum Format { sRGB8=0,sRGBA=1,Depth24=2,RGB16F=3,
-              Mipmap=1<<2, Shadow=1<<3, Bilinear=1<<4, Anisotropic=1<<5, Clamp=1<<6, Multisample=1<<7 };
+enum Format { RGB8=0,RGBA=1,sRGB8=2,sRGBA=3,RGB16F=4,Depth24=5,
+              Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8 };
 struct GLTexture {
     handle<uint> id = 0;
     uint width=0, height=0, depth=0;
@@ -97,8 +112,8 @@ struct GLTexture {
 
     GLTexture(){}
     default_move(GLTexture);
-    GLTexture(uint width, uint height, uint format=sRGB8, const void* data=0);
-    GLTexture(const Image& image, uint format=sRGB8);
+    GLTexture(uint width, uint height, uint format=RGB8, const void* data=0);
+    GLTexture(const Image& image, uint format=RGB8);
     GLTexture(uint width, uint height, uint depth, const ref<byte4>& data);
     ~GLTexture();
 
@@ -113,7 +128,7 @@ struct GLFrameBuffer {
     default_move(GLFrameBuffer);
     GLFrameBuffer(GLTexture&& depth);
     //GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
-    GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=sRGB8);
+    GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=RGB8);
     ~GLFrameBuffer();
 
     void bind(uint clearFlags=0, vec4 color=1);

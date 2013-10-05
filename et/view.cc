@@ -32,9 +32,9 @@ void View::render(int2, int2 size) {
     for(int i=0;i<6;i++) { planes[i]=normalize(planes[i]); signs[i]=sign(planes[i].xyz()); }
 
     if(frameBuffer.size() != size) {
-        //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24|Multisample), GLTexture(w,h, sRGB8|Multisample));
+        //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24|Multisample), GLTexture(w,h, RGB8|Multisample));
         frameBuffer = GLFrameBuffer(w,h,-1);
-        //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, sRGB8));
+        //frameBuffer = GLFrameBuffer(GLTexture(w,h,Depth24), GLTexture(w,h, RGB8));
         resolvedBuffer = GLTexture(w,h);
     }
     frameBuffer.bind(ClearDepth|ClearColor, vec4(scene.fog.xyz(),1.f));

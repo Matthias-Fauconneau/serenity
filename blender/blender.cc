@@ -313,6 +313,7 @@ shared<Node> parse(const bNode& o) {
 }
 
 struct Shader : array<GLTexture> {
+    Shader(){}
     Shader(const string& name, GLShader&& shader):name(name),shader(move(shader)){}
     String name;
     bool blendAlpha = false;
@@ -320,13 +321,21 @@ struct Shader : array<GLTexture> {
 };
 
 struct Surface {
-    Surface(Shader& shader):shader(shader){}
+    Surface(string name):name(name){}
     String name;
-    Shader& shader;
+    String glsl;
+    Shader shader; // Depends on instance count
     array<uint> indices;
     GLIndexBuffer indexBuffer;
     GLVertexBuffer vertexBuffer;
 };
+
+/*struct Instance { // FIXME: use single view+shadow matrices and compress model as (quaternion,position,scale) -> 8 floats instead of 3*16 (6x)
+    mat4 modelViewTransform;
+    mat4 normalMatrix;
+    //mat4 shadowTransform;
+};*/
+const uint instanceMin = 32;
 
 struct Model {
     mat4 transform;
@@ -334,6 +343,7 @@ struct Model {
     array<Vertex> vertices;
     array<Surface> surfaces;
     array<mat4> instances;
+    GLUniformBuffer instanceBuffer;
 
     // Rendering order
     bool operator<(const Model& o) const { return instances.size<o.instances.size; }
@@ -346,7 +356,12 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
     float focalLength = 90; // current focal length (in mm for a 36mm sensor)
     const float zoomSpeed = 10; // in mm/click
-    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 24, 0};
+#define SRGB 1
+#if SRGB
+    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 0, 0};
+#else
+    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 24, 0}; // Freezes r600 a few seconds
+#endif
 
     // Renderer
     GLFrameBuffer framebuffer;
@@ -374,10 +389,13 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     GLVertexBuffer vertexBuffer;
 
     // Shaders
-    map<String, unique<Shader>> shaders;
+    //map<String, unique<Shader>> shaders;
 
     // Geometry
     array<Model> models;
+
+    // Timer
+    Time time; float frameTime = 40./1000; uint frameCount=0;
 
     BlendView() : folder("Island"_,home()) {
         vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
@@ -388,7 +406,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         parse();
 
         // FIXME: get from .blend
-        skymap = GLTexture(decodeImage(readFile(String(sky.sampler2D.first()+".png"_), folder)), Bilinear);
+        skymap = GLTexture(decodeImage(readFile(String(sky.sampler2D.first()+".png"_), folder)), sRGB8|Bilinear);
 
         window.localShortcut(Escape).connect([]{exit();});
         window.clearBackground = false;
@@ -621,7 +639,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             if(!mesh.mvert) continue;
             float scale = norm(vec3(transform(0,0),transform(1,1),transform(2,2)));
             if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
-            log(object.id.name, transform);
 
             ref<MVert> verts(mesh.mvert, mesh.totvert);
             for(uint i: range(verts.size)) {
@@ -650,35 +667,23 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             for(int materialIndex: range(mesh.totcol)) {
                 const bMaterial& material = *mesh.mat[materialIndex];
                 String name = replace(replace(simplify(toLower(str(material.id.name+2)))," "_,"_"),"."_,"_"_);
-                static String helpers = readFile("gpu_shader_material.glsl"_,folder);
-                if(!shaders.contains(name)) {
-                    unique<Shader> shader = 0;
-                    if(!find(blender(), name)) {
-                        if(!material.use_nodes) continue; // Only supports node shaders
-                        assert(material.use_nodes, name);
-                        bNodeTree* tree = material.nodetree;
-                        shared<Node> surface;
-                        for(const bNode& node: tree->nodes) {
-                            if(node.type==SH_NODE_OUTPUT_MATERIAL)
-                                for(const bNodeSocket& socket: node.inputs) {
-                                    if(str(socket.name)=="Surface"_) surface = ::parse(*socket.link->fromnode);
-                                }
-                        }
-                        String global;
-                        String local = surface->toGLSL(global, "Color"_);
-                        log(name);
-                        log(global);
-                        log(local);
-                        shader = unique<Shader>(name,  GLShader(helpers+global+replace(blender(),"%"_,local),
-                                                                {"transform normal texCoord diffuse shadow sun sky node "_}));
-                    } else {
-                        shader = unique<Shader>(name,  GLShader(helpers+blender(),
-                                                                {"transform normal texCoord diffuse shadow sun sky "_+name}));
+                Surface surface(name);
+                if(!find(blender(), surface.name)) { //FIXME: parse known tags once for all
+                    if(!material.use_nodes) continue; // Only supports node shaders
+                    static String helpers = readFile("gpu_shader_material.glsl"_,folder);
+                    assert(material.use_nodes, name);
+                    bNodeTree* tree = material.nodetree;
+                    shared<Node> output;
+                    for(const bNode& node: tree->nodes) {
+                        if(node.type==SH_NODE_OUTPUT_MATERIAL)
+                            for(const bNodeSocket& socket: node.inputs) {
+                                if(str(socket.name)=="Surface"_) output = ::parse(*socket.link->fromnode);
+                            }
                     }
-                    shader->blendAlpha = true; //FIXME
-                    shaders.insert(copy(name), move(shader));
+                    String global;
+                    String local = output->toGLSL(global, "Color"_);
+                    surface.glsl = helpers+global+replace(blender(),"%node"_,local);
                 }
-                Surface surface(shaders.at(name));
 
                 ref<MLoop> indices(mesh.mloop, mesh.totloop);
                 for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
@@ -791,6 +796,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 }
             }
         }
+        quicksort(models); // Sorts by rendering cost (i.e render most instanced object last)
 
         for(uint i=0; i<models.size;) {
             Model& model = models[i];
@@ -817,16 +823,30 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     surface.indexBuffer.upload(indices);
                 }
 
+                // Compiles shader
+                if(surface.glsl) { // Custom node shader
+                    error(surface.name, surface.glsl);
+                    surface.shader = Shader(surface.name,  GLShader(surface.glsl,{"transform normal texCoord diffuse sun node "_}));
+                } else { // Hardcoded override
+                    String glsl = replace(blender(),"%instanceCount"_,str(model.instances.size));
+                    String tags = "transform texCoord "_+surface.name; //normal diffuse sun
+                    if(model.instances.size>=instanceMin) tags << " instance"_;
+                    surface.shader = Shader(surface.name,  GLShader(glsl, {tags}));
+                }
+                if(surface.name=="Land"_) surface.shader.blendAlpha = true; //FIXME
+
                 // Loads textures
                 int unit=1;
                 for(const String& name: surface.shader.shader.sampler2D) {
                     surface.shader.shader[name] = unit++;
                     String file = existsFile(name+".png"_,folder) ? name+".png"_ : name+".jpg"_;
-                    surface.shader<<GLTexture(decodeImage(readFile(file, folder)), Mipmap|Bilinear|Anisotropic);
+                    surface.shader<<GLTexture(decodeImage(readFile(file, folder)), sRGB8|Mipmap|Bilinear|Anisotropic);
                 }
+
+                // Uploads instances
+                if(model.instances.size>=instanceMin) model.instanceBuffer.upload<mat4>(model.instances);
             }
         }
-        //quicksort(models); // Sorts by rendering cost (i.e render most instanced object last)
 
         for(Model& model: models) {
             for(const mat4& instance : model.instances) {
@@ -863,10 +883,9 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
     //profile( map<String, GLTimerQuery> lastProfile; )
     void render(int2 unused position, int2 unused size) override {
-        glCullFace(true);
         // Render sun shadow map
         if(!sunShadow) {
-            sunShadow = GLFrameBuffer(GLTexture(1024,1024,Depth24|Shadow|Bilinear|Clamp));
+            sunShadow = GLFrameBuffer(GLTexture(4096, 4096, Depth24|Shadow|Bilinear|Clamp));
             sunShadow.bind(ClearDepth);
 
             // Normalizes to [-1,1]
@@ -883,7 +902,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 for(const Surface& surface: model.surfaces) {
                     surface.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
                     for(const mat4& instance: model.instances) {
-                        shadow["modelViewTransform"] = sun*instance;
+                        shadow["modelViewProjectionTransform"] = sun*instance;
                         surface.indexBuffer.draw();
                     }
                 }
@@ -895,18 +914,22 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             sampler2D.translate(1);
             sun = sampler2D * sun;
         }
-        GLFrameBuffer::bindWindow(position, size, ClearDepth);
 
         uint width=size.x, height = size.y;
-        /*if(framebuffer.size() != size) {
+#if SRGB
+        if(framebuffer.size() != size) {
             framebuffer=GLFrameBuffer(width,height,-1);
             resolvedBuffer=GLTexture(width,height);
         }
-        framebuffer.bind(ClearDepth);*/
+        framebuffer.bind(ClearDepth);
+#else
+        GLFrameBuffer::bindWindow(position, size, ClearDepth);
+#endif
 
         // Computes view transform
+        mat4 projection;
+        projection.perspective(2*atan(36,2*focalLength), width, height, 1./4, 4);
         mat4 view;
-        view.perspective(2*atan(36,2*focalLength), width, height, 1./4, 4);
         view.scale(1.f/worldRadius); // fit scene (isometric approximation)
         view.translate(vec3(0,0,-worldRadius)); // step back
         view.rotateX(rotation.y); // pitch
@@ -915,14 +938,14 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
         // Sky (TODO: fog)
         sky.bindFragments({"color"_});
-        sky["inverseViewMatrix"_] = view.inverse();
+        sky["inverseViewProjectionMatrix"_] = (projection*view).inverse();
         sky[sky.sampler2D.first()] = 0; skymap.bind(0);
         vertexBuffer.bindAttribute(sky,"position"_,2);
         vertexBuffer.draw(TriangleStrip);
 
         // World-space lighting
-        vec3 sunLightDirection = normalize(sun.normalMatrix()*vec3(0,0,-1));
-        vec3 skyLightDirection = vec3(0,0,1);
+        //vec3 sunLightDirection = normalize(view.normalMatrix()*(sun.inverse().normalMatrix()*vec3(0,0,-1)));
+        //vec3 skyLightDirection = view.normalMatrix()*vec3(0,0,1);
 
         //profile( map<String, GLTimerQuery> profile; )
         for(Model& model: models) {
@@ -931,36 +954,57 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 GLShader& shader = surface.shader.shader;
                 shader.bind();
                 shader.bindFragments({"color"_});
-                shader["shadowScale"_] = 1.f/sunShadow.depthTexture.width;
-                shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
-                shader["sunLightDirection"_] = sunLightDirection;
-                shader["skyLightDirection"_] = skyLightDirection;
+                //shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
+                //shader["sunLightDirection"_] = sunLightDirection;
+                //shader["skyLightDirection"_] = skyLightDirection;
 
                 {int i=1; for(const String& name: shader.sampler2D) shader[name] = i++; }
                 {int i=1; for(const GLTexture& texture : surface.shader) texture.bind(i++); }
 
                 surface.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
                 surface.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
-                if(shader.sampler2D) surface.vertexBuffer.bindAttribute(shader,"aTexCoords",2,__builtin_offsetof(Vertex,texCoord));
+                if(shader["aTexCoords"]) surface.vertexBuffer.bindAttribute(shader,"aTexCoords",2,__builtin_offsetof(Vertex,texCoord));
 
                 //profile( GLTimerQuery timerQuery; timerQuery.start(); )
-                for(const mat4& instance : model.instances) {
-                    shader["modelViewTransform"_] = view*instance;
-                    shader["normalMatrix"_] = instance.normalMatrix();
-                    shader["shadowTransform"_] = sun*instance;
-                    surface.indexBuffer.draw();
-                }
+                 if(model.instances.size<instanceMin) {
+                     for(const mat4& instance : model.instances) {
+                         shader["modelViewProjectionTransform"_] = projection*view*instance;
+                         //shader["normalMatrix"_] = (view*instance).normalMatrix();
+                         //shader["shadowTransform"_] = sun*instance;
+                         surface.indexBuffer.draw();
+                     }
+                 } else {
+                     /*array<Instance> instances (model.instances.size()); //FIXME: map uniform buffer
+                     for(mat4& instance : model.instances) {
+                         Instance glInstance;
+                         glInstance.modelViewTransform = view*instance;
+                         glInstance.normalMatrix = instance.normalMatrix();
+                         glInstance.shadowTransform = sun*instance;
+                         instances << glInstance;
+                     }*/
+                     model.instanceBuffer.bind(shader, "instanceBuffer"_);
+                     surface.indexBuffer.draw(model.instances.size);
+                 }
                 //profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
                 if(surface.shader.blendAlpha) glBlendNone();
             }
         }
 
-        /*framebuffer.blit(resolvedBuffer);
+#if SRGB
+        framebuffer.blit(resolvedBuffer);
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size, 0);
         present["framebuffer"_]=0; resolvedBuffer.bind(0);
         vertexBuffer.bindAttribute(present,"position"_,2);
-        vertexBuffer.draw(TriangleStrip);*/
+        vertexBuffer.draw(TriangleStrip);
+#endif
 
         //profile( log(window.renderTime, lastProfile); lastProfile = move(profile); )
+        frameCount++;
+        const float alpha = 1./60; frameTime = (1-alpha)*frameTime + alpha*(float)time;
+        String status = dec(round(frameTime*1000),3)+"ms "_+ftoa(1/frameTime,1,2)+"fps"_;
+        //if(frameCount%32==0) statusChanged(status);
+        if(isPowerOfTwo(frameCount) && frameCount>1) log(models.last().instances.size, dec(frameCount,4), status);
+        time.reset();
+        window.render();
     }
 } application;

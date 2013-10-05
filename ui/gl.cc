@@ -50,13 +50,15 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
             tags_ << split(tags,' ') << (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
             TextData s (source);
             array<uint> scope;
-            for(uint nest=0;s;) { //for each line             
+            for(uint nest=0;s;) { //for each line (FIXME: line independent)
                 uint start = s.index;
                 s.whileAny(" \t"_);
-                string identifier = s.identifier("_"_);
+                string identifier = s.identifier("_!"_);
                 s.whileAny(" \t"_);
                 if(identifier && identifier!="else"_ && s.match("{"_)) { //scope: "[a-z]+ {"
-                    if(tags_.contains(identifier)) {
+                    bool condition=true;
+                    if(startsWith(identifier,"!"_)) condition=false, identifier=identifier.slice(1);
+                    if(tags_.contains(identifier)==condition) {
                         knownTags += identifier;
                         scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
                     } else { // Skip scope
@@ -68,7 +70,8 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
                         }
                         //if(!s.match('\n')) error("Expecting newline after scope");
                     }
-                    start = s.index;
+                    continue;
+                    //start = s.index;
                 }
                 bool function = false;
                 static array<string> types = split("void float vec2 vec3 vec4"_);
@@ -121,7 +124,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
     if(!status || length>1) {
         ::buffer<byte> buffer(length);
         glGetProgramInfoLog(id, length, 0, buffer.begin());
-        error(stages, "Program failed\n", buffer.slice(0,buffer.size-1));
+        error(this->source, stages, "Program failed\n", buffer.slice(0,buffer.size-1));
     }
     for(string tags: stages) for(string& tag: split(tags,' ')) if(!knownTags.contains(tag)) error("Unknown tag",tag, tags, stages);
 }
@@ -136,6 +139,26 @@ uint GLShader::attribLocation(const string& name) {
     }
     //if(location<0) error("Unknown attribute"_,name);
     return (uint)location;
+}
+
+/// Uniform buffer
+
+GLUniformBuffer::~GLUniformBuffer() { if(id) glDeleteBuffers(1,&id); }
+void GLUniformBuffer::upload(const ref<byte>& data) {
+    assert(data);
+    if(!id) glGenBuffers(1, &id);
+    glBindBuffer(GL_UNIFORM_BUFFER, id);
+    glBufferData(GL_UNIFORM_BUFFER, data.size, data.data, GL_STATIC_DRAW);
+    size=data.size;
+}
+void GLUniformBuffer::bind(GLShader& program, const ref<byte>& name) const {
+    assert(id);
+    int location = glGetUniformBlockIndex(program.id, strz(name));
+    assert(location>=0, name);
+    int size=0; glGetActiveUniformBlockiv(program.id, location, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
+    assert(size == this->size, size, this->size);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, id);
+    glUniformBlockBinding(program.id, location, 0);
 }
 
 /// Vertex buffer
@@ -203,14 +226,15 @@ void GLIndexBuffer::upload(const ref<uint>& indices) {
     indexCount = indices.size;
     indexSize = GL_UNSIGNED_INT;
 }
-void GLIndexBuffer::draw() const {
+void GLIndexBuffer::draw(uint instanceCount) const {
     assert(id);
     if(primitiveRestart) {
         glEnableClientState(GL_PRIMITIVE_RESTART_NV);
         glPrimitiveRestartIndex(indexSize==GL_UNSIGNED_SHORT?0xFFFF:0xFFFFFFFF);
     }
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    glDrawElements(primitiveType, indexCount, indexSize, 0);
+    if(instanceCount==1) glDrawElements(primitiveType, indexCount, indexSize, 0);
+    else glDrawElementsInstanced(primitiveType, indexCount, indexSize, 0, instanceCount);
     if(primitiveRestart) glDisableClientState(GL_PRIMITIVE_RESTART_NV);
 }
 
@@ -222,19 +246,19 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
         int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
         int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
         assert_(colorSamples==depthSamples);
-        /***/ if((format&3)==sRGB8) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
+        /**/  if((format&3)==RGB8) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
         else if((format&3)==Depth24) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
         else error(format);
     } else {
         glBindTexture(GL_TEXTURE_2D, id);
-        if((format&3)==sRGB8)
-            glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8*/GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        if((format&3)==sRGBA)
-            glTexImage2D(GL_TEXTURE_2D, 0, /*GL_SRGB8_ALPHA8*/GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        if((format&3)==Depth24)
+        /**/  if((format&7)==RGB8) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        else if((format&7)==RGBA) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        else if((format&7)==sRGB8) glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        else if((format&7)==sRGBA) glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        else if((format&7)==RGB16F) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+        else if((format&7)==Depth24)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
-        if((format&3)==RGB16F)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+        else error(format);
     }
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);

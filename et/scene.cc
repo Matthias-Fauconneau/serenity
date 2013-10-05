@@ -364,7 +364,7 @@ Scene::Scene(string file, const Folder& data) : data(data) {
             unique<GLTexture> texture;
             if(path=="$whiteimage"_) {
                 byte4 white(0xFF);
-                texture = unique<GLTexture>(1,1,sRGB8,(const void*)&white);
+                texture = unique<GLTexture>(1,1,RGB8,(const void*)&white);
             } else {
                 if(existsFile(path,data)) file=Map(path,data);
                 else if(existsFile(path+".png"_,data)) file=Map(path+".png"_,data);

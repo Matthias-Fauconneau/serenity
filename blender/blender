@@ -1,16 +1,3 @@
-transform {
- varying vec3 vPosition;
- varying vec3 objectPosition;
- vertex {
-  uniform mat4 modelViewTransform;
-  attribute vec3 aPosition;
-  gl_Position = modelViewTransform*vec4(aPosition,1);
-  uniform mat4 modelTransform;
-  vPosition = (modelTransform*vec4(aPosition,1)).xyz;
-  objectPosition = aPosition;
- }
-}
-
 screen {
  varying vec2 texCoords;
  vertex {
@@ -20,14 +7,36 @@ screen {
  }
 }
 
+instance {
+ vertex {
+#extension GL_ARB_uniform_buffer_object : require
+#extension GL_ARB_draw_instanced : require
+  //struct Instance { mat4 modelViewTransform; /*mat3 normalMatrix; mat4 shadowTransform;*/ };
+  uniform instanceBuffer { mat4 instances[%instanceCount]; };
+ }
+}
+
+transform {
+ vertex {
+  !instance {
+         uniform mat4 modelViewProjectionTransform;
+     }
+   instance {
+       mat4 modelViewProjectionTransform = instances[gl_InstanceID];
+   }
+  attribute vec3 aPosition;
+  gl_Position = modelViewProjectionTransform*vec4(aPosition,1);
+  attribute vec3 aNormal;
+ }
+}
+
 normal {
  varying vec3 vNormal;
- varying vec3 nodeNormal;
  vertex {
-  uniform mat3 normalMatrix;
-  attribute vec3 aNormal;
-  vNormal = normalMatrix*aNormal;
-  nodeNormal = aNormal;
+  !instance {
+         uniform mat3 normalMatrix;
+  }
+  vNormal = normalMatrix * aNormal;
  }
  fragment {
   vec3 normal = normalize(vNormal);
@@ -48,38 +57,37 @@ diffuse {
  }
 }
 
-shadow {
- uniform float shadowScale;
+sun {
  varying vec4 shadowPosition;
  vertex {
   uniform mat4 shadowTransform;
-  shadowPosition = shadowTransform*vec4(aPosition,1);
+  shadowPosition = shadowTransform * vec4(aPosition,1);
  }
  fragment {
   uniform sampler2DShadow shadowMap;
-  /*float shadowLight = 0;
-  for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
-     shadowLight += shadow2DProj(shadowMap,
-     vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
-  shadowLight /= 4;*/
-  float shadowLight = shadow2DProj(shadowMap,
-       vec4(shadowPosition.xy*shadowPosition.w,shadowPosition.z-2/1024,shadowPosition.w)).r
- }
-}
-
-sun {
- fragment {
+  swpcf {
+   float shadowLight = 0;
+   for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
+       shadowLight += textureProj(shadowMap,
+                                  vec4(shadowPosition.xy+vec2(i,j)/textureSize(shadowMap, 0), shadowPosition.z-8./4096, shadowPosition.w));
+    shadowLight /= 4;
+  }
+  !softwarePCF {
+   float shadowLight = shadow2DProj(shadowMap, vec4(shadowPosition.xy,shadowPosition.z-16./2048,shadowPosition.w)).r;
+  }
   const vec3 sunColor = vec3(1, 1, 1);
   uniform vec3 sunLightDirection;
   diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
+  diffuseLight += vec3(0.3,0.3,0.4); //skyLightDirection=0,0,1 (or get two lights (sun+sky) from sky background)
  }
 }
 
-sky {
- fragment {
-  const vec3 skyColor = vec3(1, 1, 1);
-  uniform vec3 skyLightDirection;
-  diffuseLight += (1.f+dot(skyLightDirection, normal))/2.f * skyColor;
+land {
+ varying vec3 objectPosition;
+ varying vec3 nodeNormal;
+ vertex {
+  objectPosition = aPosition;
+  nodeNormal = aNormal;
  }
 }
 
@@ -87,7 +95,7 @@ fragment {
  out vec4 color;
  color = vec4(1);
  node {
-  color = %;
+  color = %node;
  }
  sea_surfrace { color.rgb = vec3(0.8); }
  bird { color.rgb = vec3(0.05); }
@@ -102,7 +110,7 @@ fragment {
    mix(
     0.6*(texture(ForestFloor, objectPosition.xy/11.76).rgb-0.05),
     texture(CliffGrassy, objectPosition.xy/11.76).rgb,
-    less(vec4(nodeNormal, 0).z, 0.70)
+    step(nodeNormal.z, 0.70)
    );
   color.a = objectPosition.z;
  }
@@ -121,8 +129,8 @@ skymap {
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0.999,1);
-  uniform mat4 inverseViewMatrix;
-  vec4 viewPos = (inverseViewMatrix * vec4(position.xy,1,1));
+  uniform mat4 inverseViewProjectionMatrix;
+  vec4 viewPos = (inverseViewProjectionMatrix * vec4(position.xy,1,1));
   viewRay = viewPos.xyz/viewPos.w;
  }
  fragment {
