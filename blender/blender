@@ -1,10 +1,13 @@
 transform {
  varying vec3 vPosition;
+ varying vec3 objectPosition;
  vertex {
   uniform mat4 modelViewTransform;
   attribute vec3 aPosition;
   gl_Position = modelViewTransform*vec4(aPosition,1);
-  vPosition = aPosition;
+  uniform mat4 modelTransform;
+  vPosition = (modelTransform*vec4(aPosition,1)).xyz;
+  objectPosition = aPosition;
  }
 }
 
@@ -54,11 +57,13 @@ shadow {
  }
  fragment {
   uniform sampler2DShadow shadowMap;
-  float shadowLight = 0;
+  /*float shadowLight = 0;
   for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
      shadowLight += shadow2DProj(shadowMap,
      vec4((shadowPosition.xy+vec2(i,j)*shadowScale)*shadowPosition.w,shadowPosition.z-0.001,shadowPosition.w)).r;
-  shadowLight /= 4;
+  shadowLight /= 4;*/
+  float shadowLight = shadow2DProj(shadowMap,
+       vec4(shadowPosition.xy*shadowPosition.w,shadowPosition.z-2/1024,shadowPosition.w)).r
  }
 }
 
@@ -84,6 +89,28 @@ fragment {
  node {
   color = %;
  }
+ sea_surfrace { color.rgb = vec3(0.8); }
+ bird { color.rgb = vec3(0.05); }
+ trunkshader_001 {
+  uniform sampler2D bark07_512_1024_r;
+  color.rgb = texture(bark07_512_1024_r, vTexCoords).rgb;
+ }
+ land {
+  uniform sampler2D CliffGrassy;
+  uniform sampler2D ForestFloor;
+  color.rgb =
+   mix(
+    0.6*(texture(ForestFloor, objectPosition.xy/11.76).rgb-0.05),
+    texture(CliffGrassy, objectPosition.xy/11.76).rgb,
+    less(vec4(nodeNormal, 0).z, 0.70)
+   );
+  color.a = objectPosition.z;
+ }
+ trunkshader {
+  uniform sampler2D european_beech_bark_r;
+  color.rgb = texture(european_beech_bark_r, vTexCoords).rgb;
+ }
+ leafs1shader { color.rgb = vec3(0.54, 0.75, 0.24); }
  diffuse {
   color.rgb *= diffuseLight;
  }

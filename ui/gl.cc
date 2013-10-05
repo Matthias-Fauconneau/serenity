@@ -13,7 +13,8 @@ void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisab
 void glPolygonOffsetFill(bool enable) {
     if(enable) { glPolygonOffset(-1,-2); glEnable(GL_POLYGON_OFFSET_FILL); } else glDisable(GL_POLYGON_OFFSET_FILL);
 }
-void glBlendAlpha() { glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
+void glBlendAlpha() { glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
+void glBlendOneAlpha() { glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
 void glBlendColor() { glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
 void glBlendNone() { glDisable(GL_BLEND); }
 

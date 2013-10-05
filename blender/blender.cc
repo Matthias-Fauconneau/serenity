@@ -163,7 +163,8 @@ struct MathNode : Node {
         return operationNames[operation]+"("_+::str(inputs)+")"_;
     }
     String toGLSL(String& global, string) const override {
-        return operationNames[operation]+"("_+inputs[0].toGLSL(global)+(inputs.size==2?", "_+inputs[1].toGLSL(global):String())+")"_;
+        return operationNames[operation]+"("_+(inputs[0].node?inputs[0].toGLSL(global): ::str(inputs[0].value.x))
+                    +(inputs.size==2?", "_+(inputs[1].node?inputs[1].toGLSL(global): ::str(inputs[1].value.x)):String())+")"_;
     }
     Operation operation;
 };
@@ -184,12 +185,15 @@ struct VectorMathNode : Node {
 };
 
 struct MixRGBNode : Node {
-    String toGLSL(String& global, string) const override { return "mix("_+inputs[1].toGLSL(global)+","_+inputs[2].toGLSL(global)+", "_+inputs[0].toGLSL(global)+")"_; }
+    String toGLSL(String& global, string) const override {
+        return "mix("_+inputs[1].toGLSL(global)+","_+inputs[2].toGLSL(global)+", "_+inputs[0].toGLSL(global)+")"_;
+    }
 };
 
 struct GeometryNode : Node {
     String toGLSL(String&, string output) const override{
-        if(output=="Normal"_) return String("vec4(nodeNormal, 0)"_);
+        /**/  if(output=="Position"_) return String("vec4(vPosition, 0)"_);
+        else if(output=="Normal"_) return String("vec4(nodeNormal, 0)"_);
         else error(output);
     }
 };
@@ -202,7 +206,14 @@ struct MappingNode : Node {
     mat4 transform;
 };
 
-struct SeparateRGBNode : Node {};
+struct SeparateRGBNode : Node {
+    String toGLSL(String& global, string output) const override {
+        /**/  if(output=="R"_) return inputs[0].toGLSL(global)+".r"_;
+        else if(output=="G"_) return inputs[0].toGLSL(global)+".g"_;
+        else if(output=="B"_) return inputs[0].toGLSL(global)+".b"_;
+        else error(output);
+    }
+};
 struct BrightContrastNode : Node {
     String toGLSL(String& global, string) const override {
         return "brightness_contrast("_+
@@ -222,22 +233,28 @@ struct HueSaturationNode : Node {
 };
 
 struct MixShaderNode : Node {
-    String toGLSL(String& global, string) const override { return inputs[2].toGLSL(global); } // Stub
-    //String str() const override { return ::str(inputs[2]); } // Stub
+    String toGLSL(String& global, string) const override {
+        if(inputs[1].node->name=="ShaderNodeBsdfTransparent"_) { //HACK
+            return "vec4("_+inputs[2].toGLSL(global)+".rgb, "_+inputs[0].toGLSL(global)+")"_;
+        }
+        return "mix("_+inputs[1].toGLSL(global)+","_+inputs[2].toGLSL(global)+", "_+inputs[0].toGLSL(global)+")"_;
+    }
 };
 
 struct BSDFNode : Node {
     String toGLSL(String& global, string) const override{ return inputs[0].toGLSL(global); }
-    String str() const override { return ::str(inputs[0]); }
+    //String str() const override { return ::str(inputs[0]); }
 };
 struct BsdfDiffuseNode : BSDFNode {};
 struct BsdfTranslucentNode : BSDFNode {};
-struct BsdfTransparentNode : BSDFNode {};
+struct BsdfTransparentNode : BSDFNode {
+    //String toGLSL(String&, string) const override{ return String("vec4(0)"_); }
+};
 struct BsdfGlassNode : BSDFNode {};
 
 struct TexCoordNode : Node {
     String toGLSL(String&, string output) const override{
-        if(output=="Generated"_) return String("vec4(vPosition.x,1-vPosition.y,vPosition.z,1)"_);
+        if(output=="Generated"_) return String("vec4(objectPosition.xyz,1)"_);
         //else if(output=="Normal"_) return String("vNormal"_);
         else if(output=="UV"_) return String("vTexCoords"_);
         else error(output);
@@ -254,7 +271,11 @@ struct TexImageNode : Node {
 
     String name;
 };
-struct TexNoiseNode : Node {};
+struct TexNoiseNode : Node {
+    String toGLSL(String&, string) const override {
+        return String("0"_); // Stub
+    }
+};
 
 /// Parses Blender nodes
 shared<Node> parse(const bNode& o) {
@@ -294,6 +315,7 @@ shared<Node> parse(const bNode& o) {
 struct Shader : array<GLTexture> {
     Shader(const string& name, GLShader&& shader):name(name),shader(move(shader)){}
     String name;
+    bool blendAlpha = false;
     GLShader shader;
 };
 
@@ -324,7 +346,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
     float focalLength = 90; // current focal length (in mm for a 36mm sensor)
     const float zoomSpeed = 10; // in mm/click
-    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 24, 8};
+    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 24, 0};
 
     // Renderer
     GLFrameBuffer framebuffer;
@@ -550,7 +572,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             String header = "#pragma once\n#include \"sdna.h\"\nconst string sdnaVersion = \""_+version+"\"_;\n"_;
             header << DNAtoC(structs[structs.indexOf("Scene"_)], defined, defining, structs);
             header << DNAtoC(structs[structs.indexOf("NodeTexImage"_)], defined, defining, structs);
-            //header << DNAtoC(structs[structs.indexOf("Lamp"_)], defined, defining, structs);
             header = replace(header,"Material"_,"bMaterial"_); //FIXME: whole words only
             header = replace(header,"Image"_,"bImage"_); //FIXME: whole words only
             header = replace(header,"Key"_,"bKey"_); //FIXME: whole words only
@@ -593,7 +614,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 sun.rotateX(object.rot[0]);
                 sun.rotateY(object.rot[1]);
                 sun.rotateZ(object.rot[2]);
-                //sun = transform.normalMatrix();
                 continue;
             }
             if(ObjectType(object.type) != ObjectType::Mesh) continue;
@@ -601,6 +621,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             if(!mesh.mvert) continue;
             float scale = norm(vec3(transform(0,0),transform(1,1),transform(2,2)));
             if(scale>10) continue; // Currently ignoring water plane, TODO: water reflection
+            log(object.id.name, transform);
 
             ref<MVert> verts(mesh.mvert, mesh.totvert);
             for(uint i: range(verts.size)) {
@@ -612,7 +633,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 i++;
             }
 
-            vec3 objectMin=0, objectMax=0;
+            /*vec3 objectMin=0, objectMax=0;
             for(Vertex& vertex: model.vertices) {
                 // Computes object bounds
                 objectMin=min(objectMin, vertex.position);
@@ -623,29 +644,38 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
             }
             transform.translate(objectMin);
-            transform.scale(objectMax-objectMin);
+            transform.scale(objectMax-objectMin);*/
             model.transform = transform; //for emitter and particles
 
             for(int materialIndex: range(mesh.totcol)) {
                 const bMaterial& material = *mesh.mat[materialIndex];
                 String name = replace(replace(simplify(toLower(str(material.id.name+2)))," "_,"_"),"."_,"_"_);
+                static String helpers = readFile("gpu_shader_material.glsl"_,folder);
                 if(!shaders.contains(name)) {
-                    if(!material.use_nodes) continue; // Only supports node shaders
-                    assert(material.use_nodes, name);
-                    bNodeTree* tree = material.nodetree;
-                    shared<Node> surface;
-                    for(const bNode& node: tree->nodes) {
-                        if(node.type==SH_NODE_OUTPUT_MATERIAL)
-                            for(const bNodeSocket& socket: node.inputs) {
-                                if(str(socket.name)=="Surface"_) surface = ::parse(*socket.link->fromnode);
-                            }
+                    unique<Shader> shader = 0;
+                    if(!find(blender(), name)) {
+                        if(!material.use_nodes) continue; // Only supports node shaders
+                        assert(material.use_nodes, name);
+                        bNodeTree* tree = material.nodetree;
+                        shared<Node> surface;
+                        for(const bNode& node: tree->nodes) {
+                            if(node.type==SH_NODE_OUTPUT_MATERIAL)
+                                for(const bNodeSocket& socket: node.inputs) {
+                                    if(str(socket.name)=="Surface"_) surface = ::parse(*socket.link->fromnode);
+                                }
+                        }
+                        String global;
+                        String local = surface->toGLSL(global, "Color"_);
+                        log(name);
+                        log(global);
+                        log(local);
+                        shader = unique<Shader>(name,  GLShader(helpers+global+replace(blender(),"%"_,local),
+                                                                {"transform normal texCoord diffuse shadow sun sky node "_}));
+                    } else {
+                        shader = unique<Shader>(name,  GLShader(helpers+blender(),
+                                                                {"transform normal texCoord diffuse shadow sun sky "_+name}));
                     }
-                    String global;
-                    String local = surface->toGLSL(global, "Color"_);
-                    //log(name, surface, global, local);
-                    static String helpers = readFile("gpu_shader_material.glsl"_,folder);
-                    unique<Shader> shader(name,  GLShader(helpers+global+replace(blender(),"%"_,local),
-                    {"transform normal texCoord diffuse shadow sun sky node "_}));
+                    shader->blendAlpha = true; //FIXME
                     shaders.insert(copy(name), move(shader));
                 }
                 Surface surface(shaders.at(name));
@@ -702,7 +732,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         // Parses particle systems
         for(const Base& base: scene->base) {
             for(const ParticleSystem& particle: base.object->particlesystem) {
-                const Model& model = models[modelIndex.at(base.object)];
+                Model& model = models[modelIndex.at(base.object)];
                 const ParticleSettings& p = *particle.part;
                 if(p.brownfac>10) continue; // FIXME: render birds with brownian dispersion
                 //log("count",particle.totpart*(p.childtype?p.ren_child_nbr:1));
@@ -836,7 +866,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         glCullFace(true);
         // Render sun shadow map
         if(!sunShadow) {
-            sunShadow = GLFrameBuffer(GLTexture(8192,8192,Depth24|Shadow|Bilinear|Clamp)); //FIXME: aspect ratio
+            sunShadow = GLFrameBuffer(GLTexture(1024,1024,Depth24|Shadow|Bilinear|Clamp));
             sunShadow.bind(ClearDepth);
 
             // Normalizes to [-1,1]
@@ -882,7 +912,13 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
-        //view = sun;
+
+        // Sky (TODO: fog)
+        sky.bindFragments({"color"_});
+        sky["inverseViewMatrix"_] = view.inverse();
+        sky[sky.sampler2D.first()] = 0; skymap.bind(0);
+        vertexBuffer.bindAttribute(sky,"position"_,2);
+        vertexBuffer.draw(TriangleStrip);
 
         // World-space lighting
         vec3 sunLightDirection = normalize(sun.normalMatrix()*vec3(0,0,-1));
@@ -891,6 +927,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         //profile( map<String, GLTimerQuery> profile; )
         for(Model& model: models) {
             for(Surface& surface: model.surfaces) {
+                if(surface.shader.blendAlpha) glBlendAlpha();
                 GLShader& shader = surface.shader.shader;
                 shader.bind();
                 shader.bindFragments({"color"_});
@@ -914,15 +951,9 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     surface.indexBuffer.draw();
                 }
                 //profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
+                if(surface.shader.blendAlpha) glBlendNone();
             }
         }
-
-        // Sky (TODO: fog)
-        sky.bindFragments({"color"_});
-        sky["inverseViewMatrix"_] = view.inverse();
-        sky[sky.sampler2D.first()] = 0; skymap.bind(0);
-        vertexBuffer.bindAttribute(sky,"position"_,2);
-        vertexBuffer.draw(TriangleStrip);
 
         /*framebuffer.blit(resolvedBuffer);
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size, 0);

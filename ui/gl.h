@@ -10,6 +10,7 @@ void glCullFace(bool enable);
 void glDepthTest(bool enable);
 void glPolygonOffsetFill(bool enable);
 void glBlendAlpha();
+void glBlendOneAlpha();
 void glBlendColor();
 void glBlendNone();
 
