@@ -335,7 +335,7 @@ struct Surface {
     mat4 normalMatrix;
     //mat4 shadowTransform;
 };*/
-const uint instanceMin = 32;
+const uint instanceMin = -1;
 
 struct Model {
     mat4 transform;
@@ -829,8 +829,9 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     surface.shader = Shader(surface.name,  GLShader(surface.glsl,{"transform normal texCoord diffuse sun node "_}));
                 } else { // Hardcoded override
                     String glsl = replace(blender(),"%instanceCount"_,str(model.instances.size));
-                    String tags = "transform texCoord "_+surface.name; //normal diffuse sun
+                    String tags = "transform texCoord "_+surface.name;
                     if(model.instances.size>=instanceMin) tags << " instance"_;
+                    else tags << " normal diffuse sun"_;
                     surface.shader = Shader(surface.name,  GLShader(glsl, {tags}));
                 }
                 if(surface.name=="Land"_) surface.shader.blendAlpha = true; //FIXME
@@ -842,10 +843,9 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     String file = existsFile(name+".png"_,folder) ? name+".png"_ : name+".jpg"_;
                     surface.shader<<GLTexture(decodeImage(readFile(file, folder)), sRGB8|Mipmap|Bilinear|Anisotropic);
                 }
-
-                // Uploads instances
-                if(model.instances.size>=instanceMin) model.instanceBuffer.upload<mat4>(model.instances);
             }
+            // Uploads instances
+            if(model.instances.size>=instanceMin) model.instanceBuffer.upload<mat4>(model.instances);
         }
 
         for(Model& model: models) {
@@ -944,7 +944,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         vertexBuffer.draw(TriangleStrip);
 
         // World-space lighting
-        //vec3 sunLightDirection = normalize(view.normalMatrix()*(sun.inverse().normalMatrix()*vec3(0,0,-1)));
+        vec3 sunLightDirection = normalize(view.normalMatrix()*(sun.inverse().normalMatrix()*vec3(0,0,-1)));
         //vec3 skyLightDirection = view.normalMatrix()*vec3(0,0,1);
 
         //profile( map<String, GLTimerQuery> profile; )
@@ -954,8 +954,8 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 GLShader& shader = surface.shader.shader;
                 shader.bind();
                 shader.bindFragments({"color"_});
-                //shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
-                //shader["sunLightDirection"_] = sunLightDirection;
+                shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
+                shader["sunLightDirection"_] = sunLightDirection;
                 //shader["skyLightDirection"_] = skyLightDirection;
 
                 {int i=1; for(const String& name: shader.sampler2D) shader[name] = i++; }
@@ -969,21 +969,15 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                  if(model.instances.size<instanceMin) {
                      for(const mat4& instance : model.instances) {
                          shader["modelViewProjectionTransform"_] = projection*view*instance;
-                         //shader["normalMatrix"_] = (view*instance).normalMatrix();
-                         //shader["shadowTransform"_] = sun*instance;
+                         shader["normalMatrix"_] = (view*instance).normalMatrix();
+                         shader["shadowTransform"_] = sun*instance;
                          surface.indexBuffer.draw();
                      }
                  } else {
-                     /*array<Instance> instances (model.instances.size()); //FIXME: map uniform buffer
-                     for(mat4& instance : model.instances) {
-                         Instance glInstance;
-                         glInstance.modelViewTransform = view*instance;
-                         glInstance.normalMatrix = instance.normalMatrix();
-                         glInstance.shadowTransform = sun*instance;
-                         instances << glInstance;
-                     }*/
+                     model.instanceBuffer.upload<mat4>(model.instances); //DEBUG
+                     log(model.instances.size, shader.source);
                      model.instanceBuffer.bind(shader, "instanceBuffer"_);
-                     surface.indexBuffer.draw(model.instances.size);
+                     //surface.indexBuffer.draw(model.instances.size);
                  }
                 //profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
                 if(surface.shader.blendAlpha) glBlendNone();

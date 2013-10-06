@@ -157,8 +157,8 @@ void GLUniformBuffer::bind(GLShader& program, const ref<byte>& name) const {
     assert(location>=0, name);
     int size=0; glGetActiveUniformBlockiv(program.id, location, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
     assert(size == this->size, size, this->size);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, id);
     glUniformBlockBinding(program.id, location, 0);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, id);
 }
 
 /// Vertex buffer
