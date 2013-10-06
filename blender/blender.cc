@@ -100,16 +100,20 @@ enum { SH_NODE_MATERIAL=100, SH_NODE_RGB, SH_NODE_VALUE, SH_NODE_MIX_RGB, SH_NOD
        SH_NODE_WAVELENGTH };
 
 // Renderer definitions
-struct Vertex {
+struct Vertex { // Vertex6
     vec3 position; // World-space position
     vec3 normal; // World-space vertex normals
-    vec2 texCoord; // Texture coordinates
     bool operator==(const Vertex& o){
         const float e = 0x1.0p-16f;
-        return sq(position-o.position)<e && sq(normal-o.normal)<e && sq(texCoord-o.texCoord)<e;
+        return sq(position-o.position)<e && sq(normal-o.normal)<e;
     }
 };
-String str(const Vertex& v) { return "("_+str(v.position, v.normal, v.texCoord)+")"_; }
+String str(const Vertex& v) { return "("_+str(v.position, v.normal)+")"_; }
+
+struct Vertex5 {
+    vec3 position;
+    vec2 texcoords;
+};
 
 struct Node;
 
@@ -255,7 +259,6 @@ struct BsdfGlassNode : BSDFNode {};
 struct TexCoordNode : Node {
     String toGLSL(String&, string output) const override{
         if(output=="Generated"_) return String("vec4(objectPosition.xyz,1)"_);
-        //else if(output=="Normal"_) return String("vNormal"_);
         else if(output=="UV"_) return String("vTexCoords"_);
         else error(output);
     }
@@ -298,11 +301,12 @@ shared<Node> parse(const bNode& o) {
     else if(o.type==SH_NODE_TEX_COORD) node = shared<TexCoordNode>();
     else if(o.type==SH_NODE_TEX_IMAGE) { node = shared<TexImageNode>(str((const char*)(((bImage*)o.id)->name))); }
     else if(o.type==SH_NODE_TEX_NOISE) node = shared<TexNoiseNode>();
-    else error(o.type, o.idname, o.name); //else node = shared<Node>();
+    else error(o.type, o.idname, o.name);
     node->name = section(str(o.idname),'.');
     for(const bNodeSocket& socket: o.inputs) {
-        if(socket.link) { node->inputs << Input(str(socket.name), parse(*socket.link->fromnode), str((const char*)socket.link->fromsock->identifier)); }
-        else {
+        if(socket.link) {
+            node->inputs << Input(str(socket.name), parse(*socket.link->fromnode), str((const char*)socket.link->fromsock->identifier));
+        } else {
             /**/  if(socket.type==SOCK_FLOAT) node->inputs << Input(str(socket.name), socket.ns.vec[0]);
             else if(socket.type==SOCK_VECTOR) node->inputs << Input(str(socket.name), vec4(socket.ns.vec));
             else if(socket.type==SOCK_RGBA) node->inputs << Input(str(socket.name), vec4(socket.ns.vec));
@@ -328,14 +332,8 @@ struct Surface {
     array<uint> indices;
     GLIndexBuffer indexBuffer;
     GLVertexBuffer vertexBuffer;
+    GLTexture impostor;
 };
-
-/*struct Instance { // FIXME: use single view+shadow matrices and compress model as (quaternion,position,scale) -> 8 floats instead of 3*16 (6x)
-    mat4 modelViewTransform;
-    mat4 normalMatrix;
-    //mat4 shadowTransform;
-};*/
-const uint instanceMin = -1;
 
 struct Model {
     mat4 transform;
@@ -343,36 +341,34 @@ struct Model {
     array<Vertex> vertices;
     array<Surface> surfaces;
     array<mat4> instances;
-    GLUniformBuffer instanceBuffer;
+    GLVertexBuffer impostorsVertices;
+    GLIndexBuffer impostorsIndices;
 
     // Rendering order
     bool operator<(const Model& o) const { return instances.size<o.instances.size; }
 };
+const uint impostorMin = 12;
 
 /// Parses a .blend file
 struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender specific) vs View
     // View
     int2 lastPos; // last cursor position to compute relative mouse movements
-    vec2 rotation=vec2(PI/3,-PI/3); // current view angles (yaw,pitch)
-    float focalLength = 90; // current focal length (in mm for a 36mm sensor)
-    const float zoomSpeed = 10; // in mm/click
-#define SRGB 1
-#if SRGB
-    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 0, 0};
-#else
-    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL, 24, 0}; // Freezes r600 a few seconds
-#endif
-
-    // Renderer
-    GLFrameBuffer framebuffer;
-    GLTexture resolvedBuffer;
-    GLShader present {blender(),{"screen present"_}};
-    GLShader shadow {blender(),{"transform"_}};
+    vec2 rotation=vec2(-2*PI/3,-PI/3); // current view angles (yaw,pitch)
+    //float focalLength = 90; // current focal length (in mm for a 36mm sensor)
+    //const float zoomSpeed = 10; // in mm/click
+    float viewScale = 4;
+    const float zoomSpeed = pow(2,1./4); /*/in x/click*/
+    Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL};
 
     // File
     Folder folder;
     Map file;
     const Scene* scene=0; // Blender scene (root handle to access all data)
+
+    // Renderer
+    GLFrameBuffer framebuffer;
+    GLTexture resolvedBuffer;
+    GLShader present {blender(),{"screen present"_}};
 
     // Scene
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
@@ -382,17 +378,17 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
     mat4 sun; // sun light transform
     GLFrameBuffer sunShadow;
+    GLShader shadow {blender(),{"transform"_}};
 
     // Sky
     GLShader sky {blender(),{"skymap"_}};
     GLTexture skymap;
     GLVertexBuffer vertexBuffer;
 
-    // Shaders
-    //map<String, unique<Shader>> shaders;
-
     // Geometry
     array<Model> models;
+    GLShader bake {blender(),{"transform normal bake"_}};
+    GLShader impostor {blender(),{"transform impostor diffuse leafs1shader"_}}; //FIXME
 
     // Timer
     Time time; float frameTime = 40./1000; uint frameCount=0;
@@ -405,13 +401,13 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         load();
         parse();
 
-        // FIXME: get from .blend
+        // FIXME: parse from .blend
         skymap = GLTexture(decodeImage(readFile(String(sky.sampler2D.first()+".png"_), folder)), sRGB8|Bilinear);
 
         window.localShortcut(Escape).connect([]{exit();});
         window.clearBackground = false;
         glDepthTest(true);
-        glCullFace(true);
+        //glCullFace(true);
         window.show();
     }
 
@@ -610,8 +606,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 for(uint unused i: range(header.count)) fix(blocks, type, data.Data::read(type.size));
             }
         }
-        assert(sizeof(ID)==structs[structs.indexOf("ID"_)].size);
-        assert(sizeof(ListBase<>)==structs[structs.indexOf("ListBase"_)].size);
     }
 
     /// Extracts relevant data from Blender structures
@@ -646,22 +640,22 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
 
-                model.vertices << Vertex {position, normal, vec2(0,0)};
+                model.vertices << Vertex {position, normal/*, vec2(0,0)*/};
                 i++;
             }
 
-            /*vec3 objectMin=0, objectMax=0;
+            vec3 objectMin=model.vertices[0].position, objectMax=model.vertices[0].position;
             for(Vertex& vertex: model.vertices) {
                 // Computes object bounds
                 objectMin=min(objectMin, vertex.position);
                 objectMax=max(objectMax, vertex.position);
             }
-            // Scales positions and transforms to keep unit bounding box in object space
+            // Scales positions and translates to keep unit bounding box [-1,1] in object space
             for(Vertex& vertex: model.vertices) {
-                vertex.position = (vertex.position-objectMin)/(objectMax-objectMin);
+                vertex.position = (vertex.position-(objectMin+objectMax)/2.f)/((objectMax-objectMin)/2.f);
             }
-            transform.translate(objectMin);
-            transform.scale(objectMax-objectMin);*/
+            transform.translate((objectMin+objectMax)/2.f);
+            transform.scale((objectMax-objectMin)/2.f);
             model.transform = transform; //for emitter and particles
 
             for(int materialIndex: range(mesh.totcol)) {
@@ -698,32 +692,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 }
                 assert(surface.indices, "Empty surface");
 
-                if(mesh.mloopuv) { // Assigns UV coordinates to vertices
-                    ref<MLoopUV> texCoords(mesh.mloopuv, mesh.totloop);
-                    uint i=0;
-                    for(const MPoly& poly: ref<MPoly>(mesh.mpoly, mesh.totpoly)) {
-                        if(poly.mat_nr!=materialIndex) continue;
-                        {
-                            vec2 texCoord = fract(vec2(texCoords[poly.loopstart].uv));
-                            vec2& a = model.vertices[surface.indices[i]].texCoord;
-                            if(a && sq(a-texCoord)>0.01) error("TODO: duplicate vertex");
-                            a = texCoord;
-                        }{
-                            vec2 texCoord = fract(vec2(texCoords[poly.loopstart+1].uv));
-                            vec2& b = model.vertices[surface.indices[i+1]].texCoord;
-                            if(b && sq(b-texCoord)>0.01) error("TODO: duplicate vertex");
-                            b = texCoord;
-                        }
-                        for(uint index: range(poly.loopstart+2, poly.loopstart+poly.totloop)) {
-                            vec2 texCoord = fract(vec2(texCoords[index].uv));
-                            vec2& c = model.vertices[surface.indices[i+2]].texCoord;
-                            if(c && sq(c-texCoord)>0.01) error("TODO: duplicate vertex");
-                            c = texCoord;
-                            i += 3; // Keep indices counter synchronized with MPoly
-                        }
-                    }
-                }
-
                 model.surfaces << move(surface);
             }
 
@@ -740,11 +708,10 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 Model& model = models[modelIndex.at(base.object)];
                 const ParticleSettings& p = *particle.part;
                 if(p.brownfac>10) continue; // FIXME: render birds with brownian dispersion
-                //log("count",particle.totpart*(p.childtype?p.ren_child_nbr:1));
 
                 // Selects N random faces
                 Random random;
-                for(int n=0; n</*particle.totpart/200*//*256*/64;) {
+                for(int n=0; n</*particle.totpart*/1024;) {
                     assert(model.surfaces.size==1);
                     const array<uint>& indices = model.surfaces[0].indices;
                     uint index = random % (indices.size/3) * 3;
@@ -788,7 +755,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                             i+=w.count;
                         }
                     }
-                    assert(object);
 
                     Model& dupli = models.at(modelIndex.at(object));
                     dupli.instances << transform*dupli.transform;
@@ -826,15 +792,13 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 // Compiles shader
                 if(surface.glsl) { // Custom node shader
                     error(surface.name, surface.glsl);
-                    surface.shader = Shader(surface.name,  GLShader(surface.glsl,{"transform normal texCoord diffuse sun node "_}));
+                    surface.shader = Shader(surface.name,  GLShader(surface.glsl,{"transform normal diffuse light node "_}));
                 } else { // Hardcoded override
                     String glsl = replace(blender(),"%instanceCount"_,str(model.instances.size));
-                    String tags = "transform texCoord "_+surface.name;
-                    if(model.instances.size>=instanceMin) tags << " instance"_;
-                    else tags << " normal diffuse sun"_;
+                    String tags = "transform normal diffuse light "_+surface.name;
                     surface.shader = Shader(surface.name,  GLShader(glsl, {tags}));
                 }
-                if(surface.name=="Land"_) surface.shader.blendAlpha = true; //FIXME
+                if(surface.name=="land"_) surface.shader.blendAlpha = true;
 
                 // Loads textures
                 int unit=1;
@@ -844,14 +808,12 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     surface.shader<<GLTexture(decodeImage(readFile(file, folder)), sRGB8|Mipmap|Bilinear|Anisotropic);
                 }
             }
-            // Uploads instances
-            if(model.instances.size>=instanceMin) model.instanceBuffer.upload<mat4>(model.instances);
         }
 
         for(Model& model: models) {
             for(const mat4& instance : model.instances) {
                 //if(scale>10) continue; // Ignores water plane
-                for(Vertex& vertex: model.vertices) {
+                for(Vertex& vertex: model.vertices) { //TODO: smallest enclosing sphere
                     // Computes scene bounds in world space to fit view
                     vec3 position = instance*vertex.position;
                     worldMin=min(worldMin, position);
@@ -868,21 +830,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         worldCenter = (worldMin+worldMax)/2.f; worldRadius=norm(worldMax.xy()-worldMin.xy())/2.f; //FIXME: compute smallest enclosing sphere
     }
 
-    // Orbital view control
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override {
-        int2 delta = cursor-lastPos; lastPos=cursor;
-        if(event==Motion && button==LeftButton) {
-            rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
-            rotation.y= clip(float(-PI/2),rotation.y,float(0)); // Keep pitch between [-PI/2,0]
-        }
-        else if(event == Press && button == WheelUp) focalLength += zoomSpeed;
-        else if(event == Press && button == WheelDown) focalLength = max(1.f,focalLength-zoomSpeed);
-        else return false;
-        return true;
-    }
-
-    //profile( map<String, GLTimerQuery> lastProfile; )
-    void render(int2 unused position, int2 unused size) override {
+    void render(int2 position, int2 size) override {
         // Render sun shadow map
         if(!sunShadow) {
             sunShadow = GLFrameBuffer(GLTexture(4096, 4096, Depth24|Shadow|Bilinear|Clamp));
@@ -895,12 +843,11 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             normalize.scale(2.f/(lightMax-lightMin)); // -> [0,2]
             normalize.translate(-lightMin); // -> [0,max-min]
             sun = normalize * sun;
-            //log(lightMin, sun*lightMin, lightMax, sun*lightMax);
 
             shadow.bind();
             for(Model& model: models) {
                 for(const Surface& surface: model.surfaces) {
-                    surface.vertexBuffer.bindAttribute(shadow, "aPosition", 3, __builtin_offsetof(Vertex,position));
+                    surface.vertexBuffer.bindAttribute(shadow, "aPosition", 3, offsetof(Vertex,position));
                     for(const mat4& instance: model.instances) {
                         shadow["modelViewProjectionTransform"] = sun*instance;
                         surface.indexBuffer.draw();
@@ -915,26 +862,81 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             sun = sampler2D * sun;
         }
 
+        // Computes view transform
         uint width=size.x, height = size.y;
-#if SRGB
+        mat4 projection;
+        //projection.perspective(2*atan(36,2*focalLength), width, height, 1./4, 4);
+        projection.scale(vec3(height*1./width,1,-1/viewScale));
+        mat4 view;
+        view.scale(viewScale/worldRadius); // fit scene (isometric approximation)
+        //view.scale(1.f/worldRadius); // fit scene (isometric approximation)
+        //view.translate(vec3(0,0,-worldRadius)); // step back
+        view.rotateX(rotation.y); // pitch
+        view.rotateZ(rotation.x); // yaw
+        //view.translate(vec3(0,0,-worldCenter.z));
+
+        // Render impostors (TODO: 60fps limit, update impostors while idle between frames)
+        bake.bind(); bake.bindFragments({"NNNZ"_});
+        for(Model& model: models) {
+            if(model.instances.size<impostorMin) continue;
+            array<Vertex5> vertices;
+            array<uint> indices;
+            static int lastScale = 0;
+            if(viewScale != lastScale ) {
+                //for(Surface& surface: model.surfaces) if(surface.impostor) surface.impostor=GLTexture();
+                lastScale = viewScale;
+            }
+            for(const mat4& instance : model.instances) {
+                // Computes view axis-aligned bounding box of object's oriented bounding box (FIXME: bounding sphere projection might be smaller)
+                mat4 transform = projection*view*instance;
+                vec3 O = transform*vec3(0), min = O, max = O;
+                for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) {
+                    vec3 corner = transform*vec3(i?-1:1,j?-1:1,k?-1:1);
+                    min=::min(min, corner), max=::max(max, corner);
+                }
+                min.x=floor(min.x*width)/width, min.y=floor(min.y*height)/height;
+                max.x=ceil(max.x*width)/width, max.y=ceil(max.y*height)/height;
+                mat4 normalize;
+                normalize.scale(vec3(1,1,-1)); // -> [-1,1]
+                normalize.translate(-1); // -> [-1,1]
+                normalize.scale(2.f/(max-min)); // -> [0,2]
+                normalize.translate(-min); // -> [0,max-min];
+
+                transform = normalize * transform;
+                bake["modelViewProjectionTransform"_] = transform;
+                bake["normalMatrix"_] = instance.normalMatrix();
+
+                for(Surface& surface: model.surfaces) { //FIXME: update furthest one (not first)
+                    if(surface.name!="leafs1shader"_) continue; //FIXME: store material ID and merge surfaces in a single impostor
+                    if(surface.impostor) continue; //FIXME: cache instances.size impostors and update furthest one
+                    surface.vertexBuffer.bindAttribute(bake, "aPosition"_, 3,offsetof(Vertex,position));
+                    surface.vertexBuffer.bindAttribute(bake, "aNormal"_, 2,offsetof(Vertex,normal));
+
+                    int2 size = int3((max-min)*vec3(width,height,1)).xy();
+                    //log(surface.name, size);
+                    if(!size.x || !size.y || size.x>256 || size.y>256) continue; //else VFC will cull most instances
+                    size*=2; // Supersample (preintegrate normal and Z) (not same quality as postintegrating) //FIXME: Multisample
+                    GLFrameBuffer framebuffer(GLTexture(size.x,size.y,Depth24), GLTexture(size.x, size.y,RGBA16F)); //FIXME: merge surfaces
+                    framebuffer.bind(ClearColor|ClearDepth, 0);
+                    surface.indexBuffer.draw();
+                    surface.impostor = move(framebuffer.colorTexture);
+                }
+                mat4 inverse = (projection*view).inverse();
+                uint firstIndex = vertices.size;
+                indices << firstIndex << firstIndex+1 << firstIndex+2 << firstIndex+1 << firstIndex+2 << firstIndex+3;
+                vertices
+                        << Vertex5{inverse*vec3(min.x,min.y,min.z),vec2(0,0)} << Vertex5{inverse*vec3(max.x,min.y,min.z),vec2(1,0)}
+                        << Vertex5{inverse*vec3(min.x,max.y,min.z),vec2(0,1)} << Vertex5{inverse*vec3(max.x,max.y,min.z),vec2(1,1)};
+            }
+            model.impostorsIndices.upload(indices);
+            model.impostorsVertices.upload<Vertex5>(vertices); //FIXME: append impostor
+        }
+
         if(framebuffer.size() != size) {
             framebuffer=GLFrameBuffer(width,height,-1);
             resolvedBuffer=GLTexture(width,height);
         }
         framebuffer.bind(ClearDepth);
-#else
-        GLFrameBuffer::bindWindow(position, size, ClearDepth);
-#endif
-
-        // Computes view transform
-        mat4 projection;
-        projection.perspective(2*atan(36,2*focalLength), width, height, 1./4, 4);
-        mat4 view;
-        view.scale(1.f/worldRadius); // fit scene (isometric approximation)
-        view.translate(vec3(0,0,-worldRadius)); // step back
-        view.rotateX(rotation.y); // pitch
-        view.rotateZ(rotation.x); // yaw
-        view.translate(vec3(0,0,-worldCenter.z));
 
         // Sky (TODO: fog)
         sky.bindFragments({"color"_});
@@ -944,55 +946,57 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         vertexBuffer.draw(TriangleStrip);
 
         // World-space lighting
-        vec3 sunLightDirection = normalize(view.normalMatrix()*(sun.inverse().normalMatrix()*vec3(0,0,-1)));
-        //vec3 skyLightDirection = view.normalMatrix()*vec3(0,0,1);
+        vec3 sunLightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
 
-        //profile( map<String, GLTimerQuery> profile; )
         for(Model& model: models) {
             for(Surface& surface: model.surfaces) {
+                if(surface.impostor) {
+                    glDepthMask(0);
+                    glBlendAlpha();
+                    impostor.bind();
+                    impostor.bindFragments({"color"_});
+                    impostor["modelViewProjectionTransform"_] = projection*view;
+                    impostor["impostor"_] = 0; surface.impostor.bind(0);
+                    impostor["lightDirection"_] = sunLightDirection;
+                    impostor["shadowMap"_] = 1; sunShadow.depthTexture.bind(1);
+                    impostor["shadowTransform"_] = sun;
+                    model.impostorsVertices.bindAttribute(impostor,"aPosition"_, 3, offsetof(Vertex5,position));
+                    model.impostorsVertices.bindAttribute(impostor,"aTexCoords"_, 2, offsetof(Vertex5,texcoords));
+                    model.impostorsIndices.draw();
+                    glBlendNone();
+                    glDepthMask(1);
+                    continue;
+                }
+                if(model.instances.size>impostorMin) continue; //FIXME
                 if(surface.shader.blendAlpha) glBlendAlpha();
                 GLShader& shader = surface.shader.shader;
                 shader.bind();
                 shader.bindFragments({"color"_});
+                shader["lightDirection"_] = sunLightDirection;
                 shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
-                shader["sunLightDirection"_] = sunLightDirection;
-                //shader["skyLightDirection"_] = skyLightDirection;
 
                 {int i=1; for(const String& name: shader.sampler2D) shader[name] = i++; }
                 {int i=1; for(const GLTexture& texture : surface.shader) texture.bind(i++); }
 
-                surface.vertexBuffer.bindAttribute(shader,"aPosition",3,__builtin_offsetof(Vertex,position));
-                surface.vertexBuffer.bindAttribute(shader,"aNormal",3,__builtin_offsetof(Vertex,normal));
-                if(shader["aTexCoords"]) surface.vertexBuffer.bindAttribute(shader,"aTexCoords",2,__builtin_offsetof(Vertex,texCoord));
+                surface.vertexBuffer.bindAttribute(shader,"aPosition"_, 3,offsetof(Vertex,position));
+                surface.vertexBuffer.bindAttribute(shader,"aNormal"_, 3,offsetof(Vertex,normal));
 
-                //profile( GLTimerQuery timerQuery; timerQuery.start(); )
-                 if(model.instances.size<instanceMin) {
-                     for(const mat4& instance : model.instances) {
-                         shader["modelViewProjectionTransform"_] = projection*view*instance;
-                         shader["normalMatrix"_] = (view*instance).normalMatrix();
-                         shader["shadowTransform"_] = sun*instance;
-                         surface.indexBuffer.draw();
-                     }
-                 } else {
-                     model.instanceBuffer.upload<mat4>(model.instances); //DEBUG
-                     log(model.instances.size, shader.source);
-                     model.instanceBuffer.bind(shader, "instanceBuffer"_);
-                     //surface.indexBuffer.draw(model.instances.size);
-                 }
-                //profile( timerQuery.stop(); profile.insert(material.name, move(timerQuery)); )
+                for(const mat4& instance : model.instances) {
+                    shader["modelViewProjectionTransform"_] = projection*view*instance;
+                    shader["normalMatrix"_] = instance.normalMatrix();
+                    shader["shadowTransform"_] = sun*instance;
+                    surface.indexBuffer.draw();
+                }
                 if(surface.shader.blendAlpha) glBlendNone();
             }
         }
 
-#if SRGB
         framebuffer.blit(resolvedBuffer);
         GLFrameBuffer::bindWindow(int2(position.x,window.size.y-height-position.y), size, 0);
         present["framebuffer"_]=0; resolvedBuffer.bind(0);
         vertexBuffer.bindAttribute(present,"position"_,2);
         vertexBuffer.draw(TriangleStrip);
-#endif
 
-        //profile( log(window.renderTime, lastProfile); lastProfile = move(profile); )
         frameCount++;
         const float alpha = 1./60; frameTime = (1-alpha)*frameTime + alpha*(float)time;
         String status = dec(round(frameTime*1000),3)+"ms "_+ftoa(1/frameTime,1,2)+"fps"_;
@@ -1000,5 +1004,20 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         if(isPowerOfTwo(frameCount) && frameCount>1) log(models.last().instances.size, dec(frameCount,4), status);
         time.reset();
         window.render();
+    }
+
+    // Orbital view control
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override {
+        int2 delta = cursor-lastPos; lastPos=cursor;
+        if(event==Motion && button==LeftButton) {
+            rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
+            rotation.y= clip(float(-PI/2),rotation.y,float(0)); // Keep pitch between [-PI/2,0]
+        }
+        /*else if(event == Press && button == WheelUp) focalLength += zoomSpeed;
+        else if(event == Press && button == WheelDown) focalLength = max(1.f,focalLength-zoomSpeed);*/
+        else if(event == Press && button == WheelUp) viewScale *= zoomSpeed;
+        else if(event == Press && button == WheelDown) viewScale /= zoomSpeed;
+        else return false;
+        return true;
     }
 } application;

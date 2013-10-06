@@ -1,126 +1,36 @@
-screen {
- varying vec2 texCoords;
- vertex {
-  attribute vec2 position;
-  gl_Position = vec4(position,0,1);
-  texCoords = (position+1)/2;
- }
-}
-
-instance {
- vertex {
-#extension GL_ARB_uniform_buffer_object : require
-#extension GL_ARB_draw_instanced : require
-  //struct Instance { mat4 modelViewTransform; /*mat3 normalMatrix; mat4 shadowTransform;*/ };
-  uniform instanceBuffer { mat4 instances[%instanceCount]; };
- }
-}
-
 transform {
  vertex {
-  !instance {
-         uniform mat4 modelViewProjectionTransform;
-     }
-   instance {
-       mat4 modelViewProjectionTransform = instances[gl_InstanceID];
-   }
+  uniform mat4 modelViewProjectionTransform;
   attribute vec3 aPosition;
   gl_Position = modelViewProjectionTransform*vec4(aPosition,1);
-  attribute vec3 aNormal;
  }
 }
 
 normal {
  varying vec3 vNormal;
  vertex {
-  !instance {
-         uniform mat3 normalMatrix;
-  }
+  uniform mat3 normalMatrix;
+  attribute vec3 aNormal;
   vNormal = normalMatrix * aNormal;
  }
+ fragment { vec3 normal = normalize(vNormal); }
+}
+
+bake {
+ varying float z;
+ vertex { z = (aPosition.z+1)/2; }
  fragment {
-  vec3 normal = normalize(vNormal);
+  out vec4 NNNZ; // TODO: Compress normal in two channels, Store material ID, Merge trunk/leaf impostors
+  NNNZ = vec4(/*(normal+1)/2*/normal, z);
  }
 }
 
-texCoord {
- varying vec2 vTexCoords;
+screen {
+ varying vec2 texCoords;
  vertex {
-  attribute vec2 aTexCoords;
-  vTexCoords = aTexCoords;
- }
-}
-
-diffuse {
- fragment {
-  vec3 diffuseLight = vec3(0,0,0);
- }
-}
-
-sun {
- varying vec4 shadowPosition;
- vertex {
-  uniform mat4 shadowTransform;
-  shadowPosition = shadowTransform * vec4(aPosition,1);
- }
- fragment {
-  uniform sampler2DShadow shadowMap;
-  swpcf {
-   float shadowLight = 0;
-   for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
-       shadowLight += textureProj(shadowMap,
-                                  vec4(shadowPosition.xy+vec2(i,j)/textureSize(shadowMap, 0), shadowPosition.z-8./4096, shadowPosition.w));
-    shadowLight /= 4;
-  }
-  !softwarePCF {
-   float shadowLight = shadow2DProj(shadowMap, vec4(shadowPosition.xy,shadowPosition.z-16./2048,shadowPosition.w)).r;
-  }
-  const vec3 sunColor = vec3(1, 1, 1);
-  uniform vec3 sunLightDirection;
-  diffuseLight += shadowLight * max(0,dot(sunLightDirection, normal)) * sunColor;
-  diffuseLight += vec3(0.3,0.3,0.4); //skyLightDirection=0,0,1 (or get two lights (sun+sky) from sky background)
- }
-}
-
-land {
- varying vec3 objectPosition;
- varying vec3 nodeNormal;
- vertex {
-  objectPosition = aPosition;
-  nodeNormal = aNormal;
- }
-}
-
-fragment {
- out vec4 color;
- color = vec4(1);
- node {
-  color = %node;
- }
- sea_surfrace { color.rgb = vec3(0.8); }
- bird { color.rgb = vec3(0.05); }
- trunkshader_001 {
-  uniform sampler2D bark07_512_1024_r;
-  color.rgb = texture(bark07_512_1024_r, vTexCoords).rgb;
- }
- land {
-  uniform sampler2D CliffGrassy;
-  uniform sampler2D ForestFloor;
-  color.rgb =
-   mix(
-    0.6*(texture(ForestFloor, objectPosition.xy/11.76).rgb-0.05),
-    texture(CliffGrassy, objectPosition.xy/11.76).rgb,
-    step(nodeNormal.z, 0.70)
-   );
-  color.a = objectPosition.z;
- }
- trunkshader {
-  uniform sampler2D european_beech_bark_r;
-  color.rgb = texture(european_beech_bark_r, vTexCoords).rgb;
- }
- leafs1shader { color.rgb = vec3(0.54, 0.75, 0.24); }
- diffuse {
-  color.rgb *= diffuseLight;
+  attribute vec2 position;
+  gl_Position = vec4(position,0,1);
+  texCoords = (position+1)/2;
  }
 }
 
@@ -138,15 +48,111 @@ skymap {
   const float PI = 3.14159265358979323846;
   vec2 equirectangular = vec2(atan(viewRay.y,viewRay.x)/(2.0*PI), acos(normalize(viewRay).z)/PI);
   equirectangular.x = 0.5-equirectangular.x; // flip x
-  color.rgb = texture2D(Skymap_offworld_gen2, equirectangular).rgb;
+  out vec4 color;
+  color = vec4(texture2D(Skymap_offworld_gen2, equirectangular).rgb, 1);
  }
 }
+
+diffuse {
+ fragment {
+  vec3 diffuseLight = vec3(0.3,0.3,0.4); // Ambient light
+  out vec4 color;
+  color = vec4(1);
+ }
+}
+
+impostor {
+ varying vec2 vTexCoords;
+ vertex {
+   attribute vec2 aTexCoords;
+   vTexCoords = aTexCoords;
+ }
+ varying vec4 shadowPosition;
+ vertex {
+  uniform mat4 shadowTransform;
+  shadowPosition = shadowTransform * vec4(aPosition,1);
+ }
+ fragment {
+  uniform sampler2D impostor;
+  //vec4 nnnz = texture2D(impostor, vTexCoords);
+  //vec3 normal = nnnz.xyz; //normalize(nnnz.xyz*2-1);
+  /*vec4 Nx = textureGather(impostor, vTexCoords, 0); //Unsupported by r600
+  vec4 Ny = textureGather(impostor, vTexCoords, 1);
+  vec4 Nz = textureGather(impostor, vTexCoords, 2);
+  vec4 Z = textureGather(impostor, vTexCoords, 3);*/
+  vec4 nnnz[4];
+  nnnz[0] = textureOffset(impostor, vTexCoords, ivec2(0,0));
+  nnnz[1] = textureOffset(impostor, vTexCoords, ivec2(1,0));
+  nnnz[2] = textureOffset(impostor, vTexCoords, ivec2(0,1));
+  nnnz[3] = textureOffset(impostor, vTexCoords, ivec2(1,1));
+  color.a = (nnnz[0].z != 0 ? 0.25 : 0.0) + (nnnz[1].z != 0 ? 0.25 : 0.0) + (nnnz[2].z != 0 ? 0.25 : 0.0) + (nnnz[3].z != 0 ? 0.25 : 0.0); //FIXME: material ID
+  float lambertLight = 0;
+  for(int i=0;i<4;i++) { // Evaluate lighting for each sample
+   uniform vec3 lightDirection;
+   lambertLight += max(0,dot(lightDirection, nnnz[i].xyz));
+  }
+  lambertLight /= 4;
+  uniform sampler2DShadow shadowMap;
+  float shadowLight = textureProj(shadowMap, vec4(shadowPosition.xy,shadowPosition.z-16./2048,shadowPosition.w));
+  lambertLight *= shadowLight;
+  const vec3 lightColor = vec3(1, 1, 1);
+  diffuseLight += lambertLight * lightColor;
+ }
+}
+
+light {
+ varying vec4 shadowPosition;
+ vertex {
+  uniform mat4 shadowTransform;
+  shadowPosition = shadowTransform * vec4(aPosition,1);
+ }
+ fragment {
+  uniform sampler2DShadow shadowMap;
+  float shadowLight = textureProj(shadowMap, vec4(shadowPosition.xy,shadowPosition.z-16./2048,shadowPosition.w));
+  const vec3 lightColor = vec3(1, 1, 1);
+  uniform vec3 lightDirection;
+  diffuseLight += shadowLight * max(0,dot(lightDirection, normal)) * lightColor; // Sun light
+ }
+}
+
+land {
+ varying vec3 objectPosition;
+ varying float nodeNormal;
+ vertex {
+  objectPosition = aPosition;
+  nodeNormal = aNormal.z;
+ }
+ fragment {
+  uniform sampler2D CliffGrassy;
+  uniform sampler2D ForestFloor;
+  color.rgb =
+   mix(
+    0.6*(texture(ForestFloor, objectPosition.xy*16).rgb-0.05),
+    texture(CliffGrassy, objectPosition.xy*16).rgb,
+    step(nodeNormal, 0.70)
+   );
+  color.a = ((objectPosition.z+1)/2)*76.97-0.93;
+ }
+}
+
+fragment {
+ node { color = %node; }
+ trunkshader { color.rgb = vec3(147, 132, 114)/255; }
+ trunkshader_001 { color.rgb = vec3(124, 125, 123)/255; }
+ leafs1shader { color.rgb = vec3(0.54, 0.75, 0.24); }
+ bird { color.rgb = vec3(0.05); }
+ sea_surfrace { color.rgb = vec3(0.8); }
+}
+
+diffuse { fragment { color.rgb *= diffuseLight; } }
+//diffuse { fragment { color.rgb = 0.001*color.rgb + vec3(diffuseLight); } }
 
 present {
  fragment {
   uniform sampler2D framebuffer;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1.0/2.4)-0.055; else return 12.92*c; }
   vec3 c = texture2D(framebuffer, texCoords).rgb;
-  color.rgb = vec3(sRGB(c.r), sRGB(c.g), sRGB(c.b));
+  out vec4 color;
+  color = vec4(sRGB(c.r), sRGB(c.g), sRGB(c.b), 1);
  }
 }

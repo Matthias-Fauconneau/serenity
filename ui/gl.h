@@ -80,6 +80,7 @@ struct GLVertexBuffer {
     uint vertexCount = 0;
     uint vertexSize = 0;
 };
+#define offsetof __builtin_offsetof
 
 struct GLIndexBuffer {
     GLIndexBuffer(){}
@@ -103,7 +104,7 @@ struct GLIndexBuffer {
     bool primitiveRestart=false;
 };
 
-enum Format { RGB8=0,RGBA=1,sRGB8=2,sRGBA=3,RGB16F=4,Depth24=5,
+enum Format { RGB8=0,RGBA=1,sRGB8=2,sRGBA=3,RGBA16F=4,Depth24=5,
               Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8 };
 struct GLTexture {
     handle<uint> id = 0;
@@ -127,7 +128,7 @@ struct GLFrameBuffer {
     GLFrameBuffer(){}
     default_move(GLFrameBuffer);
     GLFrameBuffer(GLTexture&& depth);
-    //GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
+    GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
     GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=RGB8);
     ~GLFrameBuffer();
 

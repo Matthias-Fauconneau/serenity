@@ -16,7 +16,6 @@ void Surface::addTriangle(int a, int b, int c) {
 void Surface::draw(GLShader& program) {
     if(!vertices.id) vertices.upload(vertices);
     if(!indexBuffer.id) indexBuffer.upload(indices);
-    #define offsetof __builtin_offsetof
     vertices.bindAttribute(program, "position"_, 3, offsetof(Vertex,position));
     vertices.bindAttribute(program, "alpha"_, 1, offsetof(Vertex,alpha));
     vertices.bindAttribute(program, "texcoord"_, 2, offsetof(Vertex,texcoord));

@@ -63,7 +63,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
                         scope<<nest; nest++; // Remember nesting level to remove matching scope closing bracket
                     } else { // Skip scope
                         for(uint nest=1; nest;) {
-                            if(!s) error(source, "Unmatched {"_);
+                            if(!s) error(source.slice(start), "Unmatched {"_);
                             if(s.match('{')) nest++;
                             else if(s.match('}')) nest--;
                             else s.advance(1);
@@ -255,7 +255,7 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
         else if((format&7)==RGBA) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
         else if((format&7)==sRGB8) glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
         else if((format&7)==sRGBA) glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        else if((format&7)==RGB16F) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+        else if((format&7)==RGBA16F) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_FLOAT, data);
         else if((format&7)==Depth24)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
         else error(format);
@@ -308,7 +308,7 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
-/*GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
     assert_(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
@@ -316,7 +316,7 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, target, depthTexture.id, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, colorTexture.id, 0);
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-}*/
+}
 GLFrameBuffer::GLFrameBuffer(uint width, uint height, int sampleCount, uint format):width(width),height(height){
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
 
@@ -330,7 +330,9 @@ GLFrameBuffer::GLFrameBuffer(uint width, uint height, int sampleCount, uint form
 
     glGenRenderbuffers(1, &colorBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format==RGB16F?GL_RGB16F:GL_RGB8, width, height);
+    /**/  if(format==RGBA16F) glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_RGBA16F, width, height);
+    else if(format==RGBA) glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_RGBA8, width, height);
+    else if(format==RGB8) glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_RGB8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);

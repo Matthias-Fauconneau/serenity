@@ -20,7 +20,7 @@ struct Surface {
     /// Intersects the surface with a ray
     bool intersect(vec3 origin, vec3 direction, float& z);
 
-    vec3 bbMin,bbMax;
+    vec3 bbMin,bbMax; //FIXME: normalize to 0-1
     Shader& shader;
     VertexBuffer& vertices;
     array<uint> indices;

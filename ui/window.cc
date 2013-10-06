@@ -58,7 +58,7 @@ void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, Renderer renderer, const int depthSize, const int samples, const string& type, Thread& thread)
+Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, Renderer renderer, const string& type, Thread& thread)
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true), renderer(renderer) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
@@ -124,15 +124,14 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     if(renderer == OpenGL) {
         if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
         if(!glContext) {
-            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, depthSize,
-                                     GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, samples, /*GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB,*/ 0};
+            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, 0};
             int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
             const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
             glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
             assert(glContext);
         }
         glXMakeCurrent(glDisplay, id, glContext);
-        //glXSwapIntervalMESA(1); SGI?
+        //glXSwapIntervalMESA(1); SGI? glXGetProcAddress
     }
 }
 

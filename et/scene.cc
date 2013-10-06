@@ -296,12 +296,12 @@ Scene::Scene(string file, const Folder& data) : data(data) {
         transform.rotateZ(toDecimal(e.value("angle"_,"0"_))*PI/180);
         for(Object object: models.at(name)) {
             object.transform = transform;
-            vec3 A = transform * object.surface.bbMin, B = transform * object.surface.bbMax;
+            vec3 A = object.surface.bbMin, B = object.surface.bbMax;
             // Computes world axis-aligned bounding box of object's oriented bounding box
-            vec3 O = 1.f/2*(A+B), min = O, max = O;
-            for(int i: range(1)) for(int j: range(1)) for(int k: range(1)) {
+            vec3 O = 1.f/2*(transform*A+transform*B), min = O, max = O;
+            for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) {
                 vec3 corner = transform*vec3((i?A:B).x,(j?A:B).y,(k?A:B).z);
-                min=::min(min, corner), max=::max(max, transform*corner);
+                min=::min(min, corner), max=::max(max, corner);
             }
             object.center = 1.f/2*(min+max), object.extent = 1.f/2*abs(max-min);
             Shader& shader = object.surface.shader;
