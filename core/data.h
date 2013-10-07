@@ -38,7 +38,7 @@ struct Data {
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    void advance(uint count) {assert(index+count<=buffer.size,index,count,buffer.size); index+=count; }
+    void advance(uint step) {assert(index+step<=buffer.size,index,step,buffer.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
@@ -110,14 +110,8 @@ struct BinaryData : virtual Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-/*#if __clang__ || __GNUC_MINOR__ < 8
-    TextData(){}
-    default_move(TextData);
-    TextData(buffer<byte>&& array) : Data(move(array)){}
-    explicit TextData(const string& reference):Data(reference){}
-#else*/
     using Data::Data;
-//#endif
+    void advance(uint step) /*override*/;
 
     /// If input match \a key, advances \a pos by \a key size
     bool match(char key);
@@ -172,4 +166,6 @@ struct TextData : virtual Data {
     string whileDecimal();
     /// Reads a decimal number
     double decimal();
+
+    uint lineIndex = 1;
 };

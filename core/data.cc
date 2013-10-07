@@ -13,6 +13,11 @@ bool BinaryData::seekLast(const ref<byte>& key) {
     return false;
 }
 
+void TextData::advance(uint step) {
+    assert(index<buffer.size, index, buffer.size);
+    for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
+}
+
 bool TextData::match(char key) {
     if(available(1) && peek() == key) { advance(1); return true; }
     else return false;
@@ -37,7 +42,7 @@ bool TextData::matchNo(const string& any) {
 }
 
 void TextData::skip(const string& key) {
-    assert_(match(key), "'"_+key+"'"_, "'"_+untilEnd()+"'"_);
+    assert_(match(key), "'"_+key+"'"_, "'"_+line()+"'"_);
 }
 
 string TextData::whileNot(char key) {
@@ -130,6 +135,7 @@ string TextData::whileInteger(bool sign) {
 
 int TextData::integer(bool sign) {
     string s = whileInteger(sign);
+    if(!s) error("Expected integer", line(), lineIndex);
     return toInteger(s, 10);
 }
 

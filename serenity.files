@@ -103,3 +103,5 @@ blender/blender
 blender/blender.cc
 blender/blender.h
 blender/sdna.h
+
+sponza/sponza.cc
