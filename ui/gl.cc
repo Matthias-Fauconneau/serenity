@@ -185,7 +185,7 @@ void GLVertexBuffer::upload(const ref<byte>& vertices) {
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
     assert_(id>0); assert_(elementSize<=4);
     int index = program.attribLocation(name);
-    if(index<0) return;
+    assert(index>=0); //if(index<0) return;
     glBindBuffer(GL_ARRAY_BUFFER, id);
     glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
     //assert_(!glGetError()); //First call to glVertexAttribPointer logs an user error to MESA_DEBUG for some reason :/

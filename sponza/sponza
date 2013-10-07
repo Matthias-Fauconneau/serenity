@@ -1,0 +1,34 @@
+transform {
+ vertex {
+  uniform mat4 viewProjectionTransform;
+  attribute vec3 position;
+  gl_Position = viewProjectionTransform*vec4(position,1);
+ }
+}
+
+white {
+ fragment {
+  uniform vec3 diffuseColor;
+  out vec4 color;
+  color = vec4(diffuseColor, 1);
+ }
+}
+
+screen {
+ varying vec2 texCoords;
+ vertex {
+  attribute vec2 position;
+  gl_Position = vec4(position,0,1);
+  texCoords = (position+1)/2;
+ }
+}
+
+present {
+ fragment {
+  uniform sampler2D framebuffer;
+  float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1.0/2.4)-0.055; else return 12.92*c; }
+  vec3 c = texture2D(framebuffer, texCoords).rgb;
+  out vec4 color;
+  color = vec4(sRGB(c.r), sRGB(c.g), sRGB(c.b), 1);
+ }
+}

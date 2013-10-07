@@ -2,6 +2,7 @@
 #include "image.h"
 //#include "jpeg.h"
 //#include "tga.h"
+FILE(et)
 
 unique<GLTexture> upload(const ref<byte>& file) {
     Image image = decodeImage(file);
@@ -19,8 +20,6 @@ unique<GLTexture> upload(const ref<byte>& file) {
     }
     return unique<GLTexture>(image, (image.alpha?RGBA:RGB8)|Mipmap|Bilinear|Anisotropic);
 }
-
-FILE(shader)
 
 GLShader& Shader::bind() {
     if(!program) {

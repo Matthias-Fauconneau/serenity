@@ -87,7 +87,7 @@ music/flac.h
 et/et.cc
 et/bsp.h
 et/md3.h
-et/shader
+et/et
 et/shader.h
 et/shader.cc
 et/object.h
@@ -105,3 +105,8 @@ blender/blender.h
 blender/sdna.h
 
 sponza/sponza.cc
+sponza/sponza
+sponza/view.h
+sponza/view.cc
+sponza/scene.h
+sponza/scene.cc
