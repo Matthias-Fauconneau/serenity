@@ -45,10 +45,10 @@ template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint hei
 
 Image decodePNG(const ref<byte>& file) {
     BinaryData s(file, true);
-    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
-    array<byte> buffer;
+    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { error("Invalid PNG"); return Image(); }
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
     uint palette[256]; bool alpha=false;
+    array<byte> buffer;
     for(;;) {
         uint32 size = s.read();
         string tag = s.read<byte>(4);
@@ -61,7 +61,8 @@ Image decodePNG(const ref<byte>& file) {
             uint8 unused filter = s.read(); assert(filter==0);
             interlace = s.read();
         } else if(tag == "IDAT"_) {
-            buffer << s.read<byte>(size);
+            /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
+            else*/ buffer << s.read<byte>(size); // Explicitly concatenates chunks (FIXME: stream inflate)
         } else if(tag == "IEND"_) {
             assert(size==0);
             s.advance(4); //CRC
@@ -98,7 +99,7 @@ Image decodePNG(const ref<byte>& file) {
         }
         data = move(bytes);
     }
-    if(data.size < height*(1+width*depth)) { warn("Invalid PNG",data.size,height*(1+width*depth),width,height,depth); return Image(); }
+    if(data.size < height*(1+width*depth)) { warn("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
     Image image(width,height,alpha);
     byte4* dst = image.data;
     int w=width,h=height;
@@ -131,7 +132,8 @@ Image decodePNG(const ref<byte>& file) {
 
 uint32 crc32(const ref<byte>& data) {
     static uint crc_table[256];
-    static bool unused once = ({for(uint n: range(256)){ uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } true;});
+    static bool unused once = ({ for(uint n: range(256)) {
+                                     uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } true;});
     uint crc = 0xFFFFFFFF;
     for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
     return ~crc;

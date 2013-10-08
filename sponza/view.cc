@@ -13,6 +13,7 @@ View::View(Scene& scene) : scene(scene),
     sRGB(sponza(),{"screen sRGB"_}) {
     vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
     position = (scene.worldMin+scene.worldMax)/2.f;
+    sprint = norm(scene.worldMax-scene.worldMin)/(8*60); // Default speed to walk the scene in 8 60fps seconds
     {
         GLFrameBuffer shadow(GLTexture(8192, 8192, Depth|Shadow|Bilinear|Clamp));
         shadow.bind(ClearDepth);
@@ -96,8 +97,8 @@ void View::draw(const ref<Surface> &surfaces) {
         const Material& material = surface.material;
         GLShader& shader = material.normal ? tangent : forward;
         shader["diffuseColor"_] = selected == &surface ? vec3(1,1./2,1./2) : vec3(1);
-        shader["diffuseTexture"_] = 1; material.diffuse.bind(1);
-        if(material.normal) shader["normalTexture"_] = 2; material.normal.bind(2);
+        if(material.diffuse) { shader["diffuseTexture"_] = 1; material.diffuse.bind(1); }
+        if(material.normal) { shader["normalTexture"_] = 2; material.normal.bind(2); }
         surface.vertexBuffer.bindAttribute(shader, "position"_, 3, offsetof(Vertex, position));
         surface.vertexBuffer.bindAttribute(shader, "texCoords"_, 2, offsetof(Vertex, texCoords));
         surface.vertexBuffer.bindAttribute(shader, "normal"_, 3, offsetof(Vertex, normal));
