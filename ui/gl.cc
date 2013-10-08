@@ -10,7 +10,6 @@
 /// Context
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
-void glAlphaTest(bool enable) { if(enable) { glAlphaFunc(GL_GEQUAL, 0.5); glEnable(GL_ALPHA_TEST); } else glDisable(GL_ALPHA_TEST); }
 void glPolygonOffsetFill(bool enable) {
     if(enable) { glPolygonOffset(-1,-2); glEnable(GL_POLYGON_OFFSET_FILL); } else glDisable(GL_POLYGON_OFFSET_FILL);
 }

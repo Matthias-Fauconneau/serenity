@@ -3,7 +3,7 @@
 #include "window.h"
 
 struct Sponza {
-    Window window {0, int2(1050,590), "Sponza"_, Image(), Window::OpenGL};
+    Window window {0, int2(1050,1050), "Sponza"_, Image(), Window::OpenGL};
     Scene scene;
     View view {scene};
     Sponza() {

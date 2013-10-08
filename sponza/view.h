@@ -2,6 +2,7 @@
 #include "function.h"
 #include "widget.h"
 #include "gl.h"
+#include "matrix.h"
 #include "time.h"
 struct Scene;
 struct Surface;
@@ -18,19 +19,27 @@ struct View : Widget {
     signal<> contentChanged;
 
     Scene& scene;
+
     GLFrameBuffer frameBuffer;
     GLTexture resolvedBuffer;
-    GLShader simple;
-    GLShader image; //DEBUG
+    GLShader transform;
+    GLShader mask;
+    GLShader forward;
     GLShader sRGB;
     GLVertexBuffer vertexBuffer;
 
+    mat4 light; // light transform
+    GLTexture shadow; // shadow map (light depth buffer)
+
+
+    // Control
     vec3 position = 0;
     vec3 velocity = 0;
-    float sprint = 1;
+    float sprint = 2;
     int walk=0, strafe=0, jump=0;
     float yaw = 0, pitch=0;
     int2 dragStart = 0; vec2 deltaStart = 0;
+    // Status
     Time time; float frameTime = 0; uint frameCount=0;
     Surface* selected=0;
 };

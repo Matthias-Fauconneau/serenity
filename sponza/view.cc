@@ -6,11 +6,48 @@
 FILE(sponza)
 
 View::View(Scene& scene) : scene(scene),
-    simple(sponza(),{"transform surface"_}),
-    image(sponza(),{"screen image"_}),
+    transform(sponza(),{"transform"_}),
+    mask(sponza(),{"transform mask"_}),
+    forward(sponza(),{"transform forward"_}),
     sRGB(sponza(),{"screen sRGB"_}) {
     vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
     position = (scene.worldMin+scene.worldMax)/2.f;
+    {
+        GLFrameBuffer shadow(GLTexture(8192, 8192, Depth24|Shadow|Bilinear|Clamp));
+        shadow.bind(ClearDepth);
+        glDepthTest(true); glCullFace(true);
+
+        // Normalizes light space to [-1,1]
+        mat4 normalize;
+        normalize.scale(vec3(1,1,-1)); // -> [-1,1]
+        normalize.translate(-1); // -> [-1,1]
+        normalize.scale(2.f/(scene.lightMax-scene.lightMin)); // -> [0,2]
+        normalize.translate(-scene.lightMin); // -> [0,max-min]
+        mat4 light = normalize * scene.light;
+
+        transform.bind();
+        transform["transform"_] = light;
+        for(const Surface& surface: scene.replace) {
+            surface.vertexBuffer.bindAttribute(transform, "position", 3, offsetof(Vertex,position));
+            surface.indexBuffer.draw();
+        }
+        mask.bind();
+        mask["transform"_] = light;
+        mask["maskTexture"_] = 0;
+        for(const Surface& surface: scene.blend) {
+            surface.material->diffuseTexture.bind(0);
+            surface.vertexBuffer.bindAttribute(mask, "position", 3, offsetof(Vertex,position));
+            surface.vertexBuffer.bindAttribute(mask, "texCoords", 2, offsetof(Vertex,texCoords));
+            surface.indexBuffer.draw();
+        }
+
+        // Normalizes from [-1,1] to [0,1] for sampling
+        mat4 sampler2D;
+        sampler2D.scale(1./2);
+        sampler2D.translate(1);
+        this->light = sampler2D * light;
+        this->shadow = move(shadow.depthTexture);
+    }
 }
 
 void View::render(int2, int2 size) {
@@ -28,13 +65,13 @@ void View::render(int2, int2 size) {
     }
     frameBuffer.bind(ClearDepth|ClearColor);
 
-    glDepthTest(true); glCullFace(true);
-    simple.bind();
-    simple.bindFragments({"color"_});
-    simple["viewProjectionTransform"_] = projection*view;
-    simple["lightDirection"_] = vec3(1,1,1);
+    forward.bind();
+    forward["transform"_] = projection*view;
+    forward["lightDirection"_] = normalize(light.inverse().normalMatrix()*vec3(0,0,-1));
+    forward["shadowTransform"_] = light;
+    forward["shadowMap"_] = 2; shadow.bind(2);
     draw(scene.replace);
-    if(scene.blend) { glAlphaTest(true); glBlendAlpha(); draw(scene.blend); glBlendNone(); glAlphaTest(false); }
+    glBlendAlpha(); draw(scene.blend); glBlendNone();
 
     frameBuffer.blit(resolvedBuffer); // Resolves multisample buffer into resolvedBuffer
     GLFrameBuffer::bindWindow(0, size);
@@ -54,11 +91,11 @@ void View::render(int2, int2 size) {
 void View::draw(const ref<Surface> &surfaces) {
     for(const Surface& surface: surfaces) {
         const Material& material = surface.material;
-        simple["diffuseColor"_] = selected == &surface ? vec4(1,1./2,1./2,1) : vec4(1);
-        simple["diffuseTexture"_] = 0; material.diffuseTexture.bind(0);
-        surface.vertexBuffer.bindAttribute(simple, "position"_, 3, offsetof(Vertex, position));
-        surface.vertexBuffer.bindAttribute(simple, "texCoords"_, 2, offsetof(Vertex, texCoords));
-        surface.vertexBuffer.bindAttribute(simple, "normal"_, 3, offsetof(Vertex, normal));
+        forward["diffuseColor"_] = selected == &surface ? vec3(1,1./2,1./2) : vec3(1);
+        forward["diffuseTexture"_] = 0; material.diffuseTexture.bind(0);
+        surface.vertexBuffer.bindAttribute(forward, "position"_, 3, offsetof(Vertex, position));
+        surface.vertexBuffer.bindAttribute(forward, "texCoords"_, 2, offsetof(Vertex, texCoords));
+        surface.vertexBuffer.bindAttribute(forward, "normal"_, 3, offsetof(Vertex, normal));
         surface.indexBuffer.draw();
     }
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "gl.h"
+#include "matrix.h"
 
 struct Vertex {
     Vertex(vec3 position, vec2 texCoords, vec3 normal):position(position),texCoords(texCoords),normal(normal){}
@@ -32,4 +33,7 @@ struct Scene {
 
     array<Surface> replace, blend;
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
+
+    mat4 light; // Light projection transform
+    vec3 lightMin=0, lightMax=0; // Scene bounding box in light space
 };

@@ -1,28 +1,53 @@
 transform {
  vertex {
-  uniform mat4 viewProjectionTransform;
+  uniform mat4 transform;
   attribute vec3 position;
-  gl_Position = viewProjectionTransform*vec4(position,1);
+  gl_Position = transform*vec4(position,1);
  }
 }
 
-surface {
+mask {
+ varying vec2 vTexCoords;
+ vertex {
+  attribute vec2 texCoords;
+  vTexCoords = texCoords;
+ }
+ fragment {
+  uniform sampler2D maskTexture;
+  vec4 diffuseMask = texture(maskTexture, vTexCoords);
+  if(diffuseMask.a < 0.5) discard;
+ }
+}
+
+forward {
  varying vec2 vTexCoords;
  varying vec3 vNormal;
+ varying vec4 shadowPosition;
  vertex {
   attribute vec2 texCoords;
   vTexCoords = texCoords;
   attribute vec3 normal;
   vNormal = normal;
+  uniform mat4 shadowTransform;
+  shadowPosition = shadowTransform * vec4(position,1);
  }
  fragment {
+  uniform sampler2D diffuseTexture;
+  vec4 diffuseMask = texture(diffuseTexture, vTexCoords);
+  if(diffuseMask.a < 0.5) discard;
+  uniform sampler2DShadow shadowMap;
+  const float zBias = 4./8192;
+  float shadowFactor = 0;
+  for(float i=-0.5; i<=0.5; i++) for(float j=-0.5; j<=0.5; j++) //2x2 PCF + 2x2 HW PCF
+       shadowFactor += textureProj(shadowMap,
+                                     vec4(shadowPosition.xy+vec2(i,j)/textureSize(shadowMap, 0), shadowPosition.z-zBias, shadowPosition.w));
+  shadowFactor /= 4;
   uniform vec3 lightDirection;
   vec3 normal = normalize(vNormal);
-  float diffuseLight = 0.5 + max(0,dot(lightDirection, normal));
-  uniform vec4 diffuseColor;
-  uniform sampler2D diffuseTexture;
+  float diffuseLight = shadowFactor * max(0,dot(lightDirection, normal));
+  uniform vec3 diffuseColor;
   out vec4 color;
-  color = diffuseLight * diffuseColor * texture(diffuseTexture, vTexCoords);
+  color = vec4( (0.1+diffuseLight) * diffuseColor * diffuseMask.rgb, diffuseMask.a);
  }
 }
 

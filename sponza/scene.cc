@@ -95,6 +95,9 @@ Scene::Scene() {
             else error(key, s.line());
         }
     }
+
+    light.rotateX(PI/3); // elevation
+    light.rotateY(PI/3); // azimuth
     for(Surface& surface : surfaces) {
         Material& material = surface.material;
         if(!material.diffuseTexture) {
@@ -112,6 +115,8 @@ Scene::Scene() {
         for(const Vertex& vertex: surface.vertices) {
             worldMin = min(worldMin, vertex.position);
             worldMax = max(worldMax, vertex.position);
+            lightMin = min(lightMin, light*vertex.position);
+            lightMax = max(lightMax, light*vertex.position);
         }
         surface.vertexBuffer.upload<Vertex>(surface.vertices);
         assert_(surface.indices.size>=3 && surface.indices.size%3==0);
