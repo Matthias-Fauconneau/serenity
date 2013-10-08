@@ -8,6 +8,7 @@ struct Image;
 extern "C" void glDepthMask(uint8 enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
+void glAlphaTest(bool enable);
 void glPolygonOffsetFill(bool enable);
 void glBlendAlpha();
 void glBlendOneAlpha();
@@ -114,7 +115,7 @@ struct GLTexture {
     GLTexture(){}
     default_move(GLTexture);
     GLTexture(uint width, uint height, uint format=RGB8, const void* data=0);
-    GLTexture(const Image& image, uint format=RGB8);
+    GLTexture(const Image& image, uint format=0);
     GLTexture(uint width, uint height, uint depth, const ref<byte4>& data);
     ~GLTexture();
 

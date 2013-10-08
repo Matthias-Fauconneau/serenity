@@ -11,7 +11,7 @@ struct Vertex {
 struct Material : shareable {
     Material(const string& name):name(name){}
     String name;
-    String diffusePath;//, maskPath, normalPath;
+    String diffusePath, maskPath, normalPath;
     GLTexture diffuseTexture; // + transparency
     //GLTexture normal; // + displacement
 };
@@ -30,6 +30,6 @@ struct Surface {
 struct Scene {
     Scene();
 
-    array<Surface> surfaces;
+    array<Surface> replace, blend;
     vec3 worldMin=0, worldMax=0; // Scene bounding box in world space
 };

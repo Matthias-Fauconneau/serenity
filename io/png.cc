@@ -54,7 +54,7 @@ Image decodePNG(const ref<byte>& file) {
         string tag = s.read<byte>(4);
         if(tag == "IHDR"_) {
             width = s.read(), height = s.read();
-            bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ log("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
+            bitDepth = s.read(); assert(bitDepth==8 || bitDepth == 4 || bitDepth == 1);
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             alpha = depth==2||depth==4;
             uint8 unused compression = s.read(); assert(compression==0);
@@ -82,17 +82,19 @@ Image decodePNG(const ref<byte>& file) {
         assert(s);
     }
     ::buffer<byte> data = inflate(buffer, true);
-    if(bitDepth==4) {
+    if(bitDepth==1 || bitDepth==4) {
+        assert(type==3);
         assert(depth==1,depth);
-        assert(width%2==0);
-        if(data.size != height*(1+width*depth*bitDepth/8)) { warn("Invalid PNG",data.size,height*(1+width*depth)); return Image(); }
+        assert(width%(8/bitDepth)==0);
+        assert(data.size == height*(1+width*depth*bitDepth/8));
         const byte* src = data.data;
         ::buffer<byte> bytes(height*(1+width*depth));
         byte* dst = bytes.begin();
         for(uint y=0;y<height;y++) {
             dst[0] = src[0]; src++; dst++;
-            for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
-            src+=width/2; dst += width;
+            if(bitDepth==1) for(uint x=0;x<width/8;x++) for(uint b: range(8)) dst[8*x+b] = (src[x]&(1<<(7-b))) ? 1 : 0;
+            if(bitDepth==4) for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
+            src+=width/(8/bitDepth); dst += width;
         }
         data = move(bytes);
     }

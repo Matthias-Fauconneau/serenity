@@ -16,10 +16,8 @@ View::View(Scene& scene) : scene(scene),
 void View::render(int2, int2 size) {
     int w = size.x, h = size.y;
 
-    // Updates view
-    mat4 view; view.rotateX(-pitch); view.rotateY(-yaw); // World to view coordinates transform
-    // Assumes constant frame rate (60fps)
-    velocity = (3.f/4)*velocity + view.inverse()*vec3(strafe*sprint,0,-walk*sprint)+vec3(0,jump*sprint,0); // Friction + Impulse
+    mat4 view; view.rotateX(-pitch); view.rotateY(-yaw);
+    velocity = (3.f/4)*velocity + view.inverse()*vec3(strafe*sprint,0,-walk*sprint)+vec3(0,jump*sprint,0); // Assumes constant frame rate (60fps)
     position += velocity;
     view.translate( -position );
     mat4 projection; projection.perspective(PI/4, w, h, 1, 32768);
@@ -28,19 +26,14 @@ void View::render(int2, int2 size) {
         frameBuffer = GLFrameBuffer(w,h,-1);
         resolvedBuffer = GLTexture(w,h);
     }
-    frameBuffer.bind(ClearDepth|ClearColor, 0);
+    frameBuffer.bind(ClearDepth|ClearColor);
 
     glDepthTest(true); glCullFace(true);
     simple.bind();
+    simple.bindFragments({"color"_});
     simple["viewProjectionTransform"_] = projection*view;
-    for(Surface& surface: scene.surfaces) {
-        const Material& material = surface.material;
-        simple["diffuseColor"_] = selected == &surface ? vec4(1,0,0,1) : vec4(1);
-        simple["diffuseTexture"_] = 0; material.diffuseTexture.bind(0);
-        surface.vertexBuffer.bindAttribute(simple, "position"_, 3, offsetof(Vertex, position));
-        surface.vertexBuffer.bindAttribute(simple, "texCoords"_, 3, offsetof(Vertex, texCoords));
-        surface.indexBuffer.draw();
-    }
+    draw(scene.replace);
+    if(scene.blend) { glAlphaTest(true); glBlendAlpha(); draw(scene.blend); glBlendNone(); glAlphaTest(false); }
 
     frameBuffer.blit(resolvedBuffer); // Resolves multisample buffer into resolvedBuffer
     GLFrameBuffer::bindWindow(0, size);
@@ -56,6 +49,16 @@ void View::render(int2, int2 size) {
     //if(frameCount%32==0) statusChanged(status);
     //if(isPowerOfTwo(frameCount) && frameCount>1) log(dec(frameCount,4), status);
     time.reset();
+}
+void View::draw(const ref<Surface> &surfaces) {
+    for(const Surface& surface: surfaces) {
+        const Material& material = surface.material;
+        simple["diffuseColor"_] = selected == &surface ? vec4(1,1./2,1./2,1) : vec4(1);
+        simple["diffuseTexture"_] = 0; material.diffuseTexture.bind(0);
+        surface.vertexBuffer.bindAttribute(simple, "position"_, 3, offsetof(Vertex, position));
+        surface.vertexBuffer.bindAttribute(simple, "texCoords"_, 3, offsetof(Vertex, texCoords));
+        surface.indexBuffer.draw();
+    }
 }
 
 bool View::keyPress(Key key, Modifiers) {
@@ -118,10 +121,11 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
         transform.rotateX(-pitch); transform.rotateY(-yaw);
         vec3 direction = transform.inverse() * normalize(vec3(2.0*cursor.x/size.x-1,1-2.0*cursor.y/size.y,1));
         float minZ=65536; Surface* hit=0;
-        for(Surface& surface: scene.surfaces) if(intersect(surface, position, direction, minZ)) hit = &surface;
+        for(Surface& surface: scene.replace) if(intersect(surface, position, direction, minZ)) hit = &surface;
+        for(Surface& surface: scene.blend) if(intersect(surface, position, direction, minZ)) hit = &surface;
         if(hit) {
             selected=hit;
-            log(selected->name, selected->material->name, selected->material->diffusePath);
+            log(selected->name, selected->material->name, selected->material->diffusePath, selected->material->maskPath);
         }
         return true;
     }

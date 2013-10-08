@@ -10,6 +10,7 @@ struct View : Widget {
     View(Scene& scene);
 
     void render(int2 position, int2 size) override;
+    void draw(const ref<Surface>& surfaces);
     bool keyPress(Key key, Modifiers) override;
     bool keyRelease(Key key, Modifiers) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;

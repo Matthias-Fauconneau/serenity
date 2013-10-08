@@ -30,8 +30,8 @@ map<String, shared<Material> > parseMaterials(string file) {
                 assert(!material->diffusePath || path==material->diffusePath);
                 material->diffusePath = String(path);
             }
-            else if(key=="map_d"_) /*material->maskPath =*/ String(s.identifier("/\\_."));
-            else if(key=="bump"_||key=="map_bump"_) /*material->normalPath =*/ String(s.identifier("/\\_."));
+            else if(key=="map_d"_) material->maskPath = String(section(section(s.identifier("/\\_."), '\\', -2, -1), '.'));
+            else if(key=="bump"_||key=="map_bump"_) material->normalPath = String(section(section(s.identifier("/\\_."), '\\', -2, -1), '.'));
             else error(key, s.line());
         }
     }
@@ -43,7 +43,7 @@ Scene::Scene() {
     Map file("sponza.obj"_,folder);
     map<String, shared<Material>> materials;
     array<vec3> positions (1<<17); array<vec2> textureCoords (1<<17); array<vec3> normals (1<<17);
-    Surface* surface = 0;
+    array<Surface> surfaces; string group; Surface* surface = 0;
     array<array<ptni>> indexMaps; array<ptni>* indexMap = 0; // Remaps position/texCoords/normals indices to indices into surface vertices
     for(TextData s(file);s.skip(), s;) {
         if(s.match('#')) s.line();
@@ -53,12 +53,13 @@ Scene::Scene() {
             else if(key=="v"_) positions << parseVec3(s);
             else if(key=="vn"_) normals << normalize(parseVec3(s));
             else if(key=="vt"_) { vec3 t = parseVec3(s); textureCoords << vec2(t.x,1-t.y); } //E z!=0
-            else if(key=="g"_) {
+            else if(key=="g"_) group = s.identifier("_"_);
+            else if(key=="usemtl"_) {
                 indexMaps.clear();
-                surfaces << Surface(s.identifier("_"_));
+                surfaces << Surface(group);
                 surface = &surfaces.last();
+                surface->material = share(materials.at(s.identifier("_")));
             }
-            else if(key=="usemtl"_) { assert(surface); surface->material = share(materials.at(s.identifier("_"))); }
             else if(key=="s"_) {
                 s.skip();
                 if(s.match("off"_)) indexMap=0;
@@ -94,11 +95,19 @@ Scene::Scene() {
             else error(key, s.line());
         }
     }
-    for(int i=0; i<(int)surfaces.size; i++) { Surface& surface=surfaces[i];
-        if(!surface.material->diffuseTexture /*&& surface.material->colorPath*/) {
-            String path = surface.material->diffusePath+".png"_;
-            if(!existsFile(path,folder)) { surfaces.removeAt(i); i--; continue; }
-            surface.material->diffuseTexture = GLTexture(decodeImage(Map(path, folder)), sRGB8|Bilinear|Mipmap|Anisotropic);
+    for(Surface& surface : surfaces) {
+        Material& material = surface.material;
+        if(!material.diffuseTexture /*&& material.colorPath*/) {
+            String path = material.diffusePath+".png"_;
+            if(!existsFile(path,folder)) continue;
+            Image image = decodeImage(Map(path, folder));
+            if(material.maskPath) {
+                Image mask = decodeImage(Map(material.maskPath+".png"_, folder));
+                assert(image.size()==mask.size() && image.stride == mask.stride);
+                for(uint i : range(image.width*image.height)) image.buffer[i].a = mask.buffer[i].g;
+                image.alpha =true;
+            }
+            material.diffuseTexture = GLTexture(image, Bilinear|Mipmap|Anisotropic);
         }
         for(const Vertex& vertex: surface.vertices) {
             worldMin = min(worldMin, vertex.position);
@@ -107,5 +116,6 @@ Scene::Scene() {
         surface.vertexBuffer.upload<Vertex>(surface.vertices);
         assert_(surface.indices.size>=3 && surface.indices.size%3==0);
         surface.indexBuffer.upload(surface.indices);
+        ((material.diffuseTexture.format&7)==sRGBA ? blend : replace) << move(surface);
     }
 }

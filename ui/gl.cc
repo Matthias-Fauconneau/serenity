@@ -10,13 +10,27 @@
 /// Context
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
+void glAlphaTest(bool enable) { if(enable) { glAlphaFunc(GL_GEQUAL, 0.5); glEnable(GL_ALPHA_TEST); } else glDisable(GL_ALPHA_TEST); }
 void glPolygonOffsetFill(bool enable) {
     if(enable) { glPolygonOffset(-1,-2); glEnable(GL_POLYGON_OFFSET_FILL); } else glDisable(GL_POLYGON_OFFSET_FILL);
 }
-void glBlendAlpha() { glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
-void glBlendOneAlpha() { glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
-void glBlendColor() { glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); glEnable(GL_BLEND); }
-void glBlendNone() { glDisable(GL_BLEND); }
+static int blend = 0;
+void glBlendNone() {
+    if(!blend) return; glDisable(GL_BLEND);
+    blend=0;
+}
+void glBlendAlpha() {
+    if(!blend) glEnable(GL_BLEND);
+    if(blend!=1) glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE); blend=1;
+}
+void glBlendOneAlpha() {
+    if(!blend) glEnable(GL_BLEND);
+    if(blend!=2) glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); blend=2;
+}
+void glBlendColor() {
+    if(!blend) glEnable(GL_BLEND);
+    if(blend!=3) glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); blend=3;
+}
 
 /// Shader
 
