@@ -8,15 +8,21 @@ transform {
 
 surface {
  varying vec2 vTexCoords;
+ varying vec3 vNormal;
  vertex {
   attribute vec2 texCoords;
   vTexCoords = texCoords;
+  attribute vec3 normal;
+  vNormal = normal;
  }
  fragment {
+  uniform vec3 lightDirection;
+  vec3 normal = normalize(vNormal);
+  float diffuseLight = 0.5 + max(0,dot(lightDirection, normal));
   uniform vec4 diffuseColor;
   uniform sampler2D diffuseTexture;
   out vec4 color;
-  color = diffuseColor * texture(diffuseTexture, vTexCoords);
+  color = diffuseLight * diffuseColor * texture(diffuseTexture, vTexCoords);
  }
 }
 

@@ -32,6 +32,7 @@ void View::render(int2, int2 size) {
     simple.bind();
     simple.bindFragments({"color"_});
     simple["viewProjectionTransform"_] = projection*view;
+    simple["lightDirection"_] = vec3(1,1,1);
     draw(scene.replace);
     if(scene.blend) { glAlphaTest(true); glBlendAlpha(); draw(scene.blend); glBlendNone(); glAlphaTest(false); }
 
@@ -56,7 +57,8 @@ void View::draw(const ref<Surface> &surfaces) {
         simple["diffuseColor"_] = selected == &surface ? vec4(1,1./2,1./2,1) : vec4(1);
         simple["diffuseTexture"_] = 0; material.diffuseTexture.bind(0);
         surface.vertexBuffer.bindAttribute(simple, "position"_, 3, offsetof(Vertex, position));
-        surface.vertexBuffer.bindAttribute(simple, "texCoords"_, 3, offsetof(Vertex, texCoords));
+        surface.vertexBuffer.bindAttribute(simple, "texCoords"_, 2, offsetof(Vertex, texCoords));
+        surface.vertexBuffer.bindAttribute(simple, "normal"_, 3, offsetof(Vertex, normal));
         surface.indexBuffer.draw();
     }
 }

@@ -97,7 +97,7 @@ Scene::Scene() {
     }
     for(Surface& surface : surfaces) {
         Material& material = surface.material;
-        if(!material.diffuseTexture /*&& material.colorPath*/) {
+        if(!material.diffuseTexture) {
             String path = material.diffusePath+".png"_;
             if(!existsFile(path,folder)) continue;
             Image image = decodeImage(Map(path, folder));
