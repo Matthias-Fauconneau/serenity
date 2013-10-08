@@ -25,6 +25,7 @@ struct View : Widget {
     GLShader transform;
     GLShader mask;
     GLShader forward;
+    GLShader tangent;
     GLShader sRGB;
     GLVertexBuffer vertexBuffer;
 

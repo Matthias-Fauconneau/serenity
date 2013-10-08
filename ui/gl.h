@@ -105,8 +105,8 @@ struct GLIndexBuffer {
     bool primitiveRestart=false;
 };
 
-enum Format { RGB8=0,RGBA=1,sRGB8=2,sRGBA=3,RGBA16F=4,Depth24=5,
-              Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8 };
+enum Format { Depth=1,
+              Alpha=1<<1, SRGB=1<<2,Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8 };
 struct GLTexture {
     handle<uint> id = 0;
     uint width=0, height=0, depth=0;
@@ -114,7 +114,7 @@ struct GLTexture {
 
     GLTexture(){}
     default_move(GLTexture);
-    GLTexture(uint width, uint height, uint format=RGB8, const void* data=0);
+    GLTexture(uint width, uint height, uint format=0, const void* data=0);
     GLTexture(const Image& image, uint format=0);
     GLTexture(uint width, uint height, uint depth, const ref<byte4>& data);
     ~GLTexture();
@@ -130,7 +130,7 @@ struct GLFrameBuffer {
     default_move(GLFrameBuffer);
     GLFrameBuffer(GLTexture&& depth);
     GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
-    GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=RGB8);
+    GLFrameBuffer(uint width, uint height, int sampleCount=0, uint format=0);
     ~GLFrameBuffer();
 
     void bind(uint clearFlags=0, vec4 color=1);

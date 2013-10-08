@@ -34,7 +34,7 @@ struct ConnectionSetupReply { int8 status,reason; int16 major,minor,additionnal;
 struct XFormat { uint8 depth, bitsPerPixel, scanlinePad; int32 pad; };
 struct Screen { int32 root, colormap, white, black, inputMask; int16 width, height, widthMM, heightMM, minMaps, maxMaps; int32 visual;
                 int8 backingStores, saveUnders, depth, numDepths; };
-struct Depth { int8 depth; int16 numVisualTypes; int32 pad; };
+struct XDepth { int8 depth; int16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
 struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x,y,width,height,border=0,class_=1; uint visual;

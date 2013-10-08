@@ -23,6 +23,10 @@ forward {
  varying vec2 vTexCoords;
  varying vec3 vNormal;
  varying vec4 shadowPosition;
+ tangent {
+  varying vec3 vTangent;
+  varying vec3 vBiTangent;
+ }
  vertex {
   attribute vec2 texCoords;
   vTexCoords = texCoords;
@@ -30,6 +34,12 @@ forward {
   vNormal = normal;
   uniform mat4 shadowTransform;
   shadowPosition = shadowTransform * vec4(position,1);
+  tangent {
+   attribute vec3 tangent;
+   vTangent = tangent;
+   attribute vec3 bitangent;
+   vBiTangent = bitangent;
+  }
  }
  fragment {
   uniform sampler2D diffuseTexture;
@@ -43,7 +53,14 @@ forward {
                                      vec4(shadowPosition.xy+vec2(i,j)/textureSize(shadowMap, 0), shadowPosition.z-zBias, shadowPosition.w));
   shadowFactor /= 4;
   uniform vec3 lightDirection;
-  vec3 normal = normalize(vNormal);
+  !tangent {
+   vec3 normal = normalize(vNormal);
+  }
+  tangent {
+   uniform sampler2D normalTexture;
+   vec3 computeNormal(vec2 xy) { return vec3(xy, sqrt(1.0 - xy.x*xy.x - xy.y*xy.y)); }
+   vec3 normal = normalize(mat3(-vTangent,vBiTangent,vNormal) * computeNormal(2*texture(normalTexture, vTexCoords).xy-1));
+  }
   float diffuseLight = shadowFactor * max(0,dot(lightDirection, normal));
   uniform vec3 diffuseColor;
   out vec4 color;

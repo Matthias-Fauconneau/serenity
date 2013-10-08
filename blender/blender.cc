@@ -916,7 +916,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     //log(surface.name, size);
                     if(!size.x || !size.y || size.x>256 || size.y>256) continue; //else VFC will cull most instances
                     size*=2; // Supersample (preintegrate normal and Z) (not same quality as postintegrating) //FIXME: Multisample
-                    GLFrameBuffer framebuffer(GLTexture(size.x,size.y,Depth24), GLTexture(size.x, size.y,RGBA16F)); //FIXME: merge surfaces
+                    GLFrameBuffer framebuffer(GLTexture(size.x,size.y,Depth24), GLTexture(size.x, size.y,RGBA8)); //FIXME: merge surfaces
                     framebuffer.bind(ClearColor|ClearDepth, 0);
                     surface.indexBuffer.draw();
                     surface.impostor = move(framebuffer.colorTexture);

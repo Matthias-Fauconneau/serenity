@@ -90,6 +90,22 @@ Scene::Scene() {
                         surface->indices << c;
                     }
                     else error(f);
+                    if(f>=2) { // Computes bi/tangent basis for normal mapping
+                        int size = surface->indices.size;
+                        Vertex& v1 = surface->vertices[surface->indices[size-3]];
+                        Vertex& v2 = surface->vertices[surface->indices[size-2]];
+                        Vertex& v3 = surface->vertices[surface->indices[size-1]];
+                        vec2 p[3];
+                        for(int i: range(3)) p[i] = vec2( v2.position[i] - v1.position[i], v3.position[i] - v1.position[i] );
+                        vec2 s( v2.texCoords.x - v1.texCoords.x, v3.texCoords.x - v1.texCoords.x );
+                        vec2 t( v2.texCoords.y - v1.texCoords.y, v3.texCoords.y - v1.texCoords.y );
+                        float sign = cross(s,t)<0?-1:1;
+                        vec3 tangent(  cross(t,p[0]) * sign,  cross(t,p[1]) * sign,  cross(t,p[2]) * sign );
+                        vec3 bitangent( -cross(s,p[0]) * sign, -cross(s,p[1]) * sign, -cross(s,p[2]) * sign );
+
+                        v1.tangent += tangent; v2.tangent += tangent; v3.tangent += tangent;
+                        v1.bitangent += bitangent; v2.bitangent += bitangent; v3.bitangent += bitangent;
+                    }
                 }
             }
             else error(key, s.line());
@@ -100,7 +116,7 @@ Scene::Scene() {
     light.rotateY(PI/3); // azimuth
     for(Surface& surface : surfaces) {
         Material& material = surface.material;
-        if(!material.diffuseTexture) {
+        if(!material.diffuse) {
             String path = material.diffusePath+".png"_;
             if(!existsFile(path,folder)) continue;
             Image image = decodeImage(Map(path, folder));
@@ -110,17 +126,26 @@ Scene::Scene() {
                 for(uint i : range(image.width*image.height)) image.buffer[i].a = mask.buffer[i].g;
                 image.alpha =true;
             }
-            material.diffuseTexture = GLTexture(image, Bilinear|Mipmap|Anisotropic);
+            material.diffuse = GLTexture(image, SRGB|Bilinear|Mipmap|Anisotropic);
         }
-        for(const Vertex& vertex: surface.vertices) {
-            worldMin = min(worldMin, vertex.position);
-            worldMax = max(worldMax, vertex.position);
-            lightMin = min(lightMin, light*vertex.position);
-            lightMax = max(lightMax, light*vertex.position);
+        if(!material.normal && material.normalPath) {
+            String path = material.diffusePath+".png"_;
+            Image image = decodeImage(Map(path, folder));
+            //TODO: interleave specular map in alpha channel
+            material.normal = GLTexture(image, Bilinear|Mipmap|Anisotropic);
+        }
+        for(Vertex& v: surface.vertices) {
+            worldMin = min(worldMin, v.position);
+            worldMax = max(worldMax, v.position);
+            lightMin = min(lightMin, light*v.position);
+            lightMax = max(lightMax, light*v.position);
+            // Projects tangents on normal plane
+            v.tangent = normalize(v.tangent - v.normal * dot(v.normal, v.tangent));
+            v.bitangent = normalize(v.bitangent - v.normal * dot(v.normal, v.bitangent));
         }
         surface.vertexBuffer.upload<Vertex>(surface.vertices);
         assert_(surface.indices.size>=3 && surface.indices.size%3==0);
         surface.indexBuffer.upload(surface.indices);
-        ((material.diffuseTexture.format&7)==sRGBA ? blend : replace) << move(surface);
+        (material.diffuse.format&Alpha ? blend : replace) << move(surface);
     }
 }

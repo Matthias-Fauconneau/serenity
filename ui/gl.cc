@@ -259,19 +259,16 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
         int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
         int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
         assert_(colorSamples==depthSamples);
-        /**/  if((format&3)==RGB8) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
-        else if((format&3)==Depth24) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
-        else error(format);
+        if(format&Depth) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
+        else glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
     } else {
         glBindTexture(GL_TEXTURE_2D, id);
-        /**/  if((format&7)==RGB8) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        else if((format&7)==RGBA) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        else if((format&7)==sRGB8) glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        else if((format&7)==sRGBA) glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        else if((format&7)==RGBA16F) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_FLOAT, data);
-        else if((format&7)==Depth24)
+        /**/  if(format&Depth)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
-        else error(format);
+        else if(format&Alpha)
+            glTexImage2D(GL_TEXTURE_2D, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        else
+            glTexImage2D(GL_TEXTURE_2D, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     }
     if(format&Shadow) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
@@ -293,10 +290,11 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
     if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_2D);
 }
 GLTexture::GLTexture(const Image& image, uint format) //FIXME: -> et/shader.cc ?
-    : GLTexture(image.width, image.height, (image.alpha?sRGBA:sRGB8)|format, image.data) {
+    : GLTexture(image.width, image.height, (image.alpha?Alpha:0)|format, image.data) {
     assert(width==image.stride);
 }
-GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data) : width(width), height(height), depth(depth), format(sRGBA|Bilinear|Clamp) {
+GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data)
+    :  width(width), height(height), depth(depth), format(Alpha|Bilinear|Clamp) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_3D, id);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
@@ -321,7 +319,8 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
-GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color) : width(depth.width),height(depth.height),depthTexture(move(depth)),colorTexture(move(color)) {
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color)
+    : width(depth.width), height(depth.height), depthTexture(move(depth)), colorTexture(move(color)) {
     assert_(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
@@ -343,9 +342,7 @@ GLFrameBuffer::GLFrameBuffer(uint width, uint height, int sampleCount, uint form
 
     glGenRenderbuffers(1, &colorBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-    /**/  if(format==RGBA16F) glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_RGBA16F, width, height);
-    else if(format==RGBA) glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_RGBA8, width, height);
-    else if(format==RGB8) glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, GL_RGB8, width, height);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format&Alpha?GL_RGBA8:GL_RGB8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
     assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);

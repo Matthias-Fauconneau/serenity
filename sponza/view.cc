@@ -9,11 +9,12 @@ View::View(Scene& scene) : scene(scene),
     transform(sponza(),{"transform"_}),
     mask(sponza(),{"transform mask"_}),
     forward(sponza(),{"transform forward"_}),
+    tangent(sponza(),{"transform forward tangent"_}),
     sRGB(sponza(),{"screen sRGB"_}) {
     vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
     position = (scene.worldMin+scene.worldMax)/2.f;
     {
-        GLFrameBuffer shadow(GLTexture(8192, 8192, Depth24|Shadow|Bilinear|Clamp));
+        GLFrameBuffer shadow(GLTexture(8192, 8192, Depth|Shadow|Bilinear|Clamp));
         shadow.bind(ClearDepth);
         glDepthTest(true); glCullFace(true);
 
@@ -35,7 +36,7 @@ View::View(Scene& scene) : scene(scene),
         mask["transform"_] = light;
         mask["maskTexture"_] = 0;
         for(const Surface& surface: scene.blend) {
-            surface.material->diffuseTexture.bind(0);
+            surface.material->diffuse.bind(0);
             surface.vertexBuffer.bindAttribute(mask, "position", 3, offsetof(Vertex,position));
             surface.vertexBuffer.bindAttribute(mask, "texCoords", 2, offsetof(Vertex,texCoords));
             surface.indexBuffer.draw();
@@ -66,10 +67,12 @@ void View::render(int2, int2 size) {
     frameBuffer.bind(ClearDepth|ClearColor);
 
     forward.bind();
-    forward["transform"_] = projection*view;
-    forward["lightDirection"_] = normalize(light.inverse().normalMatrix()*vec3(0,0,-1));
-    forward["shadowTransform"_] = light;
-    forward["shadowMap"_] = 2; shadow.bind(2);
+    for(int i : range(2)) { GLShader& shader = i ? forward : tangent;
+        shader["transform"_] = projection*view;
+        shader["lightDirection"_] = normalize(light.inverse().normalMatrix()*vec3(0,0,-1));
+        shader["shadowTransform"_] = light;
+        shader["shadowMap"_] = 0; shadow.bind(0);
+    }
     draw(scene.replace);
     glBlendAlpha(); draw(scene.blend); glBlendNone();
 
@@ -91,11 +94,15 @@ void View::render(int2, int2 size) {
 void View::draw(const ref<Surface> &surfaces) {
     for(const Surface& surface: surfaces) {
         const Material& material = surface.material;
-        forward["diffuseColor"_] = selected == &surface ? vec3(1,1./2,1./2) : vec3(1);
-        forward["diffuseTexture"_] = 0; material.diffuseTexture.bind(0);
-        surface.vertexBuffer.bindAttribute(forward, "position"_, 3, offsetof(Vertex, position));
-        surface.vertexBuffer.bindAttribute(forward, "texCoords"_, 2, offsetof(Vertex, texCoords));
-        surface.vertexBuffer.bindAttribute(forward, "normal"_, 3, offsetof(Vertex, normal));
+        GLShader& shader = material.normal ? tangent : forward;
+        shader["diffuseColor"_] = selected == &surface ? vec3(1,1./2,1./2) : vec3(1);
+        shader["diffuseTexture"_] = 1; material.diffuse.bind(1);
+        if(material.normal) shader["normalTexture"_] = 2; material.normal.bind(2);
+        surface.vertexBuffer.bindAttribute(shader, "position"_, 3, offsetof(Vertex, position));
+        surface.vertexBuffer.bindAttribute(shader, "texCoords"_, 2, offsetof(Vertex, texCoords));
+        surface.vertexBuffer.bindAttribute(shader, "normal"_, 3, offsetof(Vertex, normal));
+        if(material.normal) surface.vertexBuffer.bindAttribute(shader, "tangent"_, 3, offsetof(Vertex, tangent));
+        if(material.normal) surface.vertexBuffer.bindAttribute(shader, "bitangent"_, 3, offsetof(Vertex, bitangent));
         surface.indexBuffer.draw();
     }
 }

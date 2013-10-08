@@ -12,7 +12,7 @@
 #undef packed
 #define Time XTime
 #define Cursor XCursor
-#define Depth XDepth
+#define Depth XXDepth
 #define Window XWindow
 #define Screen XScreen
 #define XEvent XXEvent
@@ -79,7 +79,7 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>();
-            for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>();
+            for(int i=0;i<screen.numDepths;i++) { XDepth depth = read<XDepth>();
                 if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(depth.numVisualTypes)) {
                     if(!visual && depth.depth==32) { displaySize=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
                 }

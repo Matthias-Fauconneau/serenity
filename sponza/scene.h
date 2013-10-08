@@ -7,14 +7,16 @@ struct Vertex {
     vec3 position;
     vec2 texCoords;
     vec3 normal;
+    vec3 tangent, bitangent;
 };
 
 struct Material : shareable {
     Material(const string& name):name(name){}
     String name;
-    String diffusePath, maskPath, normalPath;
-    GLTexture diffuseTexture; // + transparency
-    //GLTexture normal; // + displacement
+    String diffusePath, maskPath;
+    GLTexture diffuse; // + mask
+    String normalPath, specularPath;
+    GLTexture normal; // + specular (TODO)
 };
 
 struct ptni { int p,t,n,i; };
