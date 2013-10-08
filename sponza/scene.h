@@ -9,17 +9,18 @@ struct Vertex {
 };
 
 struct Material : shareable {
-    vec3 diffuse=1;//, specular=0;
-    //float transparency=1, specularExponent=0;
-    //String colorPath;//, maskPath, normalPath;
-    //GLTexture color; // + transparency
+    Material(const string& name):name(name){}
+    String name;
+    String diffusePath;//, maskPath, normalPath;
+    GLTexture diffuseTexture; // + transparency
     //GLTexture normal; // + displacement
 };
 
 struct ptni { int p,t,n,i; };
 struct Surface {
-    //string name;
-    shared<Material> material;
+    Surface(const string& name):name(name){}
+    String name;
+    shared<Material> material = 0;
     array<Vertex> vertices;
     array<uint> indices;
     GLVertexBuffer vertexBuffer;

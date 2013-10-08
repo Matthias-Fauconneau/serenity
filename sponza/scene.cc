@@ -2,6 +2,7 @@
 #include "thread.h"
 #include "file.h"
 #include "data.h"
+#include "image.h"
 
 vec3 parseVec3(TextData& s) { vec3 v; for(uint i: range(3)) { v[i]=s.decimal(); if(i<2) s.skip(" "_); } return v; }
 
@@ -13,25 +14,21 @@ map<String, shared<Material> > parseMaterials(string file) {
         else {
             string key = s.word("_"); s.whileAny(" \t"_);
             if(key=="newmtl"_) {
-                 string name = s.identifier("_"_);
-                material = materials.insert(name).pointer;
+                string name = s.identifier("_"_);
+                material = materials.insert(String(name), shared<Material>(name)).pointer;
             }
             else if(key=="Ns"_) /*material->specularExponent =*/ s.decimal();
             else if(key=="Ni"_) s.decimal(); // Refraction index ?
             else if(key=="d"_ || key=="Tr"_) /*material->transparency =*/ s.decimal();
             else if(key=="Tf"_) s.line(); // Transmitted color
             else if(key=="illum"_) assert_(s.integer()==2);
-            else if(key=="Ka"_ || key=="Kd"_) {
-                vec3 color = parseVec3(s);
-                assert(material->diffuse==vec3(1) || color==material->diffuse);
-                material->diffuse = color;
-            }
-            else if(key=="Ks"_) /*material->specular =*/ parseVec3(s);
+            else if(key=="Ka"_ || key=="Kd"_) parseVec3(s);
+            else if(key=="Ks"_) parseVec3(s);
             else if(key=="Ke"_) assert_(parseVec3(s)==vec3(0));
             else if(key=="map_Ka"_||key=="map_Kd"_) {
-                /*String path =*/ String(s.identifier("/\\_."));
-                /*assert(!material->colorPath || path==material->colorPath);
-                material->colorPath = String(path);*/
+                string path = section(section(s.identifier("/\\_."), '\\', -2, -1), '.');
+                assert(!material->diffusePath || path==material->diffusePath);
+                material->diffusePath = String(path);
             }
             else if(key=="map_d"_) /*material->maskPath =*/ String(s.identifier("/\\_."));
             else if(key=="bump"_||key=="map_bump"_) /*material->normalPath =*/ String(s.identifier("/\\_."));
@@ -45,7 +42,7 @@ Scene::Scene() {
     Folder folder("Sponza"_,home());
     Map file("sponza.obj"_,folder);
     map<String, shared<Material>> materials;
-    array<vec3> positions; array<vec2> textureCoords; array<vec3> normals; //FIXME: reserve to avoid many copy on realloc
+    array<vec3> positions (1<<17); array<vec2> textureCoords (1<<17); array<vec3> normals (1<<17);
     Surface* surface = 0;
     array<array<ptni>> indexMaps; array<ptni>* indexMap = 0; // Remaps position/texCoords/normals indices to indices into surface vertices
     for(TextData s(file);s.skip(), s;) {
@@ -55,11 +52,10 @@ Scene::Scene() {
             /**/  if(key=="mtllib"_) { materials = parseMaterials(readFile(s.identifier("."_),folder)); }
             else if(key=="v"_) positions << parseVec3(s);
             else if(key=="vn"_) normals << normalize(parseVec3(s));
-            else if(key=="vt"_) textureCoords << parseVec3(s).xy(); //E z!=0
+            else if(key=="vt"_) { vec3 t = parseVec3(s); textureCoords << vec2(t.x,1-t.y); } //E z!=0
             else if(key=="g"_) {
-                s.line();
                 indexMaps.clear();
-                surfaces << Surface();
+                surfaces << Surface(s.identifier("_"_));
                 surface = &surfaces.last();
             }
             else if(key=="usemtl"_) { assert(surface); surface->material = share(materials.at(s.identifier("_"))); }
@@ -86,8 +82,11 @@ Scene::Scene() {
                     break_:;
                     if(f<3) surface->indices << index;
                     else if(f==3) { // Repeats vertices to convert quads into two triangles
-                        int size = surface->indices.size;
-                        surface->indices << surface->indices[size-3] << surface->indices[size-1] << index;
+                        int size = surface->indices.size; assert_(size>=3 && size%3==0);
+                        int a = surface->indices[size-3], b = surface->indices[size-1], c = index;
+                        surface->indices << a;
+                        surface->indices << b;
+                        surface->indices << c;
                     }
                     else error(f);
                 }
@@ -95,12 +94,18 @@ Scene::Scene() {
             else error(key, s.line());
         }
     }
-    for(Surface& surface: surfaces) {
+    for(int i=0; i<(int)surfaces.size; i++) { Surface& surface=surfaces[i];
+        if(!surface.material->diffuseTexture /*&& surface.material->colorPath*/) {
+            String path = surface.material->diffusePath+".png"_;
+            if(!existsFile(path,folder)) { surfaces.removeAt(i); i--; continue; }
+            surface.material->diffuseTexture = GLTexture(decodeImage(Map(path, folder)), sRGB8|Bilinear|Mipmap|Anisotropic);
+        }
         for(const Vertex& vertex: surface.vertices) {
             worldMin = min(worldMin, vertex.position);
             worldMax = max(worldMax, vertex.position);
         }
         surface.vertexBuffer.upload<Vertex>(surface.vertices);
+        assert_(surface.indices.size>=3 && surface.indices.size%3==0);
         surface.indexBuffer.upload(surface.indices);
     }
 }

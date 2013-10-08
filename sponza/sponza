@@ -6,28 +6,42 @@ transform {
  }
 }
 
-white {
+surface {
+ varying vec2 vTexCoords;
+ vertex {
+  attribute vec2 texCoords;
+  vTexCoords = texCoords;
+ }
  fragment {
-  uniform vec3 diffuseColor;
+  uniform vec4 diffuseColor;
+  uniform sampler2D diffuseTexture;
   out vec4 color;
-  color = vec4(diffuseColor, 1);
+  color = diffuseColor * texture(diffuseTexture, vTexCoords);
  }
 }
 
 screen {
- varying vec2 texCoords;
+ varying vec2 vTexCoords;
  vertex {
   attribute vec2 position;
   gl_Position = vec4(position,0,1);
-  texCoords = (position+1)/2;
+  vTexCoords = (position+1)/2;
  }
 }
 
-present {
+image {
+ fragment {
+  uniform sampler2D image;
+  out vec4 color;
+  color =  texture2D(image, vTexCoords);
+ }
+}
+
+sRGB {
  fragment {
   uniform sampler2D framebuffer;
   float sRGB(float c) { if(c>=0.0031308) return 1.055*pow(c,1.0/2.4)-0.055; else return 12.92*c; }
-  vec3 c = texture2D(framebuffer, texCoords).rgb;
+  vec3 c = texture2D(framebuffer, vTexCoords).rgb;
   out vec4 color;
   color = vec4(sRGB(c.r), sRGB(c.g), sRGB(c.b), 1);
  }
