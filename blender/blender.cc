@@ -110,9 +110,10 @@ struct Vertex { // Vertex6
 };
 String str(const Vertex& v) { return "("_+str(v.position, v.normal)+")"_; }
 
-struct Vertex5 {
+struct Vertex7 {
     vec3 position;
     vec2 texcoords;
+    vec3 zVector;
 };
 
 struct Node;
@@ -330,9 +331,11 @@ struct Surface {
     String glsl;
     Shader shader; // Depends on instance count
     array<uint> indices;
+    array<Vertex> vertices;
     GLIndexBuffer indexBuffer;
     GLVertexBuffer vertexBuffer;
     GLTexture impostor;
+    vec3 zVector;
 };
 
 struct Model {
@@ -387,7 +390,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
     // Geometry
     array<Model> models;
-    GLShader bake {blender(),{"transform normal bake"_}};
+    //GLShader bake {blender(),{"transform normal bake"_}};
     GLShader impostor {blender(),{"transform impostor diffuse leafs1shader"_}}; //FIXME
 
     // Timer
@@ -402,7 +405,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         parse();
 
         // FIXME: parse from .blend
-        skymap = GLTexture(decodeImage(readFile(String(sky.sampler2D.first()+".png"_), folder)), sRGB8|Bilinear);
+        skymap = GLTexture(decodeImage(readFile(String(sky.sampler2D.first()+".png"_), folder)), SRGB|Bilinear);
 
         window.localShortcut(Escape).connect([]{exit();});
         window.clearBackground = false;
@@ -769,25 +772,20 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             if(!model.surfaces || !model.instances) { models.removeAt(i); continue; } else i++;
 
             for(Surface& surface : model.surfaces) {
-                // Remap indices
+                // Remap surface indices from shared model vertices to local surface vertices
                 buffer<uint> remap(model.vertices.size, model.vertices.size, -1);
-                array<uint> indices (surface.indices.size);
-                array<Vertex> vertices (model.vertices.size);
-                for(uint index: surface.indices) {
+                array<uint> indices = move(surface.indices);
+                surface.indices = array<uint>(surface.indices.size);
+                surface.vertices = array<Vertex>(model.vertices.size);
+                for(uint index: indices) {
                     uint newIndex = remap[index];
-                    if(newIndex == uint(-1)) { newIndex=remap[index]=vertices.size; vertices << model.vertices[index]; }
-                    indices << newIndex;
+                    if(newIndex == uint(-1)) { newIndex=remap[index]=surface.vertices.size; surface.vertices << model.vertices[index]; }
+                    surface.indices << newIndex;
                 }
 
                 // Uploads geometry
-                surface.vertexBuffer.upload<Vertex>(vertices);
-                if(vertices.size<=0x10000) {
-                    array<uint16> indices16 (indices.size); //16bit indices
-                    for(uint index: indices) { assert(index<0x10000); indices16 << index; }
-                    surface.indexBuffer.upload(indices16);
-                } else {
-                    surface.indexBuffer.upload(indices);
-                }
+                surface.vertexBuffer.upload(surface.vertices);
+                surface.indexBuffer.upload(surface.indices);
 
                 // Compiles shader
                 if(surface.glsl) { // Custom node shader
@@ -805,7 +803,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 for(const String& name: surface.shader.shader.sampler2D) {
                     surface.shader.shader[name] = unit++;
                     String file = existsFile(name+".png"_,folder) ? name+".png"_ : name+".jpg"_;
-                    surface.shader<<GLTexture(decodeImage(readFile(file, folder)), sRGB8|Mipmap|Bilinear|Anisotropic);
+                    surface.shader<<GLTexture(decodeImage(readFile(file, folder)), SRGB|Mipmap|Bilinear|Anisotropic);
                 }
             }
         }
@@ -813,17 +811,19 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         for(Model& model: models) {
             for(const mat4& instance : model.instances) {
                 //if(scale>10) continue; // Ignores water plane
-                for(Vertex& vertex: model.vertices) { //TODO: smallest enclosing sphere
-                    // Computes scene bounds in world space to fit view
-                    vec3 position = instance*vertex.position;
-                    worldMin=min(worldMin, position);
-                    worldMax=max(worldMax, position);
+                for(Surface& surface : model.surfaces) {
+                    for(Vertex& vertex: surface.vertices) { //TODO: smallest enclosing sphere
+                        // Computes scene bounds in world space to fit view
+                        vec3 position = instance*vertex.position;
+                        worldMin=min(worldMin, position);
+                        worldMax=max(worldMax, position);
 
-                    // Compute scene bounds in light space to fit shadow
-                    assert(sun!=mat4());
-                    vec3 P = sun*position;
-                    lightMin=min(lightMin,P);
-                    lightMax=max(lightMax,P);
+                        // Compute scene bounds in light space to fit shadow
+                        assert(sun!=mat4());
+                        vec3 P = sun*position;
+                        lightMin=min(lightMin,P);
+                        lightMax=max(lightMax,P);
+                    }
                 }
             }
         }
@@ -833,7 +833,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     void render(int2 position, int2 size) override {
         // Render sun shadow map
         if(!sunShadow) {
-            sunShadow = GLFrameBuffer(GLTexture(4096, 4096, Depth24|Shadow|Bilinear|Clamp));
+            sunShadow = GLFrameBuffer(GLTexture(4096, 4096, Depth|Shadow|Bilinear|Clamp));
             sunShadow.bind(ClearDepth);
 
             // Normalizes to [-1,1]
@@ -876,60 +876,67 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         //view.translate(vec3(0,0,-worldCenter.z));
 
         // Render impostors (TODO: 60fps limit, update impostors while idle between frames)
-        bake.bind(); bake.bindFragments({"NNNZ"_});
+        //bake.bind(); bake.bindFragments({"NNNZ"_});
         for(Model& model: models) {
             if(model.instances.size<impostorMin) continue;
-            array<Vertex5> vertices;
+            array<Vertex7> vertices;
             array<uint> indices;
             static int lastScale = 0;
             if(viewScale != lastScale ) {
-                //for(Surface& surface: model.surfaces) if(surface.impostor) surface.impostor=GLTexture();
+                for(Surface& surface: model.surfaces) if(surface.impostor) surface.impostor=GLTexture();
                 lastScale = viewScale;
             }
             for(const mat4& instance : model.instances) {
                 // Computes view axis-aligned bounding box of object's oriented bounding box (FIXME: bounding sphere projection might be smaller)
-                mat4 transform = projection*view*instance;
+                mat4 device; device.scale(vec3(width,height,1));
+                mat4 transform = device*projection*view*instance;
                 vec3 O = transform*vec3(0), min = O, max = O;
                 for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) {
                     vec3 corner = transform*vec3(i?-1:1,j?-1:1,k?-1:1);
                     min=::min(min, corner), max=::max(max, corner);
                 }
-                min.x=floor(min.x*width)/width, min.y=floor(min.y*height)/height;
-                max.x=ceil(max.x*width)/width, max.y=ceil(max.y*height)/height;
-                mat4 normalize;
-                normalize.scale(vec3(1,1,-1)); // -> [-1,1]
-                normalize.translate(-1); // -> [-1,1]
-                normalize.scale(2.f/(max-min)); // -> [0,2]
-                normalize.translate(-min); // -> [0,max-min];
+                min.x=floor(min.x), min.y=floor(min.y);
+                max.x=ceil(max.x), max.y=ceil(max.y);
+                {mat4 normalize;
+                    normalize.scale(vec3(1,1,255/(max.z-min.z))); // [0,size] in XY, [1,254] in Z
+                    normalize.translate(-min); // -> [0,max-min] in XY;
+                    transform = normalize * transform;
+                }
 
-                transform = normalize * transform;
-                bake["modelViewProjectionTransform"_] = transform;
-                bake["normalMatrix"_] = instance.normalMatrix();
-
+                mat3 normalMatrix = view.normalMatrix();
                 for(Surface& surface: model.surfaces) { //FIXME: update furthest one (not first)
                     if(surface.name!="leafs1shader"_) continue; //FIXME: store material ID and merge surfaces in a single impostor
                     if(surface.impostor) continue; //FIXME: cache instances.size impostors and update furthest one
-                    surface.vertexBuffer.bindAttribute(bake, "aPosition"_, 3,offsetof(Vertex,position));
-                    surface.vertexBuffer.bindAttribute(bake, "aNormal"_, 2,offsetof(Vertex,normal));
-
-                    int2 size = int3((max-min)*vec3(width,height,1)).xy();
-                    //log(surface.name, size);
-                    if(!size.x || !size.y || size.x>256 || size.y>256) continue; //else VFC will cull most instances
-                    size*=2; // Supersample (preintegrate normal and Z) (not same quality as postintegrating) //FIXME: Multisample
-                    GLFrameBuffer framebuffer(GLTexture(size.x,size.y,Depth24), GLTexture(size.x, size.y,RGBA8)); //FIXME: merge surfaces
-                    framebuffer.bind(ClearColor|ClearDepth, 0);
-                    surface.indexBuffer.draw();
-                    surface.impostor = move(framebuffer.colorTexture);
+                    int2 size = int3(max-min).xy();
+                    if(!size.x || !size.y || size.x>256 || size.y>256) continue; //FIXME: direct render few instances (VFC)
+                    // Approximate rendering by splatting vertices (faster than raycast for less than 2 vertices/pixel)
+                    Image image(size.x, size.y, true);
+                    clear(image.buffer.begin(), image.buffer.size);
+                    for(const Vertex& v: surface.vertices) {
+                        vec3 p = transform * v.position;
+                        uint x = p.x, y=p.y, z=p.z;
+                        assert_(x<image.width && y<image.height && z<0x100);
+                        if(z<image(x,y).r) continue;
+                        vec3 n = normalize(normalMatrix*v.normal);
+                        uint nx = 255*(n.x+1)/2, ny = 255*(n.y+1)/2;
+                        assert_(nx<0x100 && ny<0x100, v.normal, n, normalMatrix);
+                        image(x,y) = byte4(nx,ny,z,1); // normal.xyz, z //FIXME: normal.xy, z, material
+                    }
+                    //FIXME: trim
+                    surface.impostor = GLTexture(image);
                 }
-                mat4 inverse = (projection*view).inverse();
+                mat4 inverse = (device*projection*view).inverse();
+                vec3 zVector = inverse*vec3(0,0,255); // Impostor unit vector in world space //FIXME: projection shifts it at each corner
                 uint firstIndex = vertices.size;
                 indices << firstIndex << firstIndex+1 << firstIndex+2 << firstIndex+1 << firstIndex+2 << firstIndex+3;
                 vertices
-                        << Vertex5{inverse*vec3(min.x,min.y,min.z),vec2(0,0)} << Vertex5{inverse*vec3(max.x,min.y,min.z),vec2(1,0)}
-                        << Vertex5{inverse*vec3(min.x,max.y,min.z),vec2(0,1)} << Vertex5{inverse*vec3(max.x,max.y,min.z),vec2(1,1)};
+                        << Vertex7{inverse*vec3(min.x, min.y, min.z),vec2(0,0),zVector}
+                        << Vertex7{inverse*vec3(max.x,min.y, min.z),vec2(1,0),zVector}
+                        << Vertex7{inverse*vec3(min.x, max.y,min.z),vec2(0,1),zVector}
+                        << Vertex7{inverse*vec3(max.x,max.y,min.z),vec2(1,1),zVector};
             }
             model.impostorsIndices.upload(indices);
-            model.impostorsVertices.upload<Vertex5>(vertices); //FIXME: append impostor
+            model.impostorsVertices.upload(vertices); //FIXME: append impostor
         }
 
         if(framebuffer.size() != size) {
@@ -957,11 +964,13 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     impostor.bindFragments({"color"_});
                     impostor["modelViewProjectionTransform"_] = projection*view;
                     impostor["impostor"_] = 0; surface.impostor.bind(0);
-                    impostor["lightDirection"_] = sunLightDirection;
+                    // Impostor normals are in view space (positive Z) FIXME: should be the view transform used to render the impostor
+                    impostor["lightDirection"_] = normalize(view.normalMatrix()*sunLightDirection);
                     impostor["shadowMap"_] = 1; sunShadow.depthTexture.bind(1);
                     impostor["shadowTransform"_] = sun;
-                    model.impostorsVertices.bindAttribute(impostor,"aPosition"_, 3, offsetof(Vertex5,position));
-                    model.impostorsVertices.bindAttribute(impostor,"aTexCoords"_, 2, offsetof(Vertex5,texcoords));
+                    model.impostorsVertices.bindAttribute(impostor,"aPosition"_, 3, offsetof(Vertex7,position));
+                    model.impostorsVertices.bindAttribute(impostor,"aTexCoords"_, 2, offsetof(Vertex7,texcoords));
+                    //model.impostorsVertices.bindAttribute(impostor,"aZVector"_, 2, offsetof(Vertex7,zVector));
                     model.impostorsIndices.draw();
                     glBlendNone();
                     glDepthMask(1);

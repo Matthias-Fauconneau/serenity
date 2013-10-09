@@ -16,15 +16,6 @@ normal {
  fragment { vec3 normal = normalize(vNormal); }
 }
 
-bake {
- varying float z;
- vertex { z = (aPosition.z+1)/2; }
- fragment {
-  out vec4 NNNZ; // TODO: Compress normal in two channels, Store material ID, Merge trunk/leaf impostors
-  NNNZ = vec4(/*(normal+1)/2*/normal, z);
- }
-}
-
 screen {
  varying vec2 texCoords;
  vertex {
@@ -63,40 +54,28 @@ diffuse {
 
 impostor {
  varying vec2 vTexCoords;
+ varying vec4 shadowPosition;
+ //varying vec3 zVector;
  vertex {
    attribute vec2 aTexCoords;
    vTexCoords = aTexCoords;
- }
- varying vec4 shadowPosition;
- vertex {
-  uniform mat4 shadowTransform;
-  shadowPosition = shadowTransform * vec4(aPosition,1);
+   uniform mat4 shadowTransform;
+   shadowPosition = shadowTransform * vec4(aPosition,1);
+   //attribute vec3 aZVector;
+   //zVector = (shadowTransform * vec4(aZVector,0)).xyz;
  }
  fragment {
   uniform sampler2D impostor;
-  //vec4 nnnz = texture2D(impostor, vTexCoords);
-  //vec3 normal = nnnz.xyz; //normalize(nnnz.xyz*2-1);
-  /*vec4 Nx = textureGather(impostor, vTexCoords, 0); //Unsupported by r600
-  vec4 Ny = textureGather(impostor, vTexCoords, 1);
-  vec4 Nz = textureGather(impostor, vTexCoords, 2);
-  vec4 Z = textureGather(impostor, vTexCoords, 3);*/
-  vec4 nnnz[4];
-  nnnz[0] = textureOffset(impostor, vTexCoords, ivec2(0,0));
-  nnnz[1] = textureOffset(impostor, vTexCoords, ivec2(1,0));
-  nnnz[2] = textureOffset(impostor, vTexCoords, ivec2(0,1));
-  nnnz[3] = textureOffset(impostor, vTexCoords, ivec2(1,1));
-  color.a = (nnnz[0].z != 0 ? 0.25 : 0.0) + (nnnz[1].z != 0 ? 0.25 : 0.0) + (nnnz[2].z != 0 ? 0.25 : 0.0) + (nnnz[3].z != 0 ? 0.25 : 0.0); //FIXME: material ID
-  float lambertLight = 0;
-  for(int i=0;i<4;i++) { // Evaluate lighting for each sample
-   uniform vec3 lightDirection;
-   lambertLight += max(0,dot(lightDirection, nnnz[i].xyz));
-  }
-  lambertLight /= 4;
+  vec4 xyzi = texture2D(impostor, vTexCoords).bgra;
+  vec2 xy = xyzi.xy*2-1;
+  vec3 normal = normalize(vec3(xy, sqrt(1-xy.x*xy.x-xy.y*xy.y)));
+  if(xyzi == vec4(0)) discard;
   uniform sampler2DShadow shadowMap;
-  float shadowLight = textureProj(shadowMap, vec4(shadowPosition.xy,shadowPosition.z-16./2048,shadowPosition.w));
-  lambertLight *= shadowLight;
+  vec4 impostorShadowPosition = shadowPosition;// + xyzi.z*vec4(zVector,0);
+  float shadowLight = textureProj(shadowMap, vec4(impostorShadowPosition.xy,impostorShadowPosition.z-16./2048,impostorShadowPosition.w));
   const vec3 lightColor = vec3(1, 1, 1);
-  diffuseLight += lambertLight * lightColor;
+  uniform vec3 lightDirection;
+  diffuseLight += shadowLight * max(0,dot(lightDirection, normal)) * lightColor; // Sun light
  }
 }
 
@@ -146,6 +125,7 @@ fragment {
 
 diffuse { fragment { color.rgb *= diffuseLight; } }
 //diffuse { fragment { color.rgb = 0.001*color.rgb + vec3(diffuseLight); } }
+//impostor { fragment { color.rgb = vec3(xyzi.z); } }
 
 present {
  fragment {
