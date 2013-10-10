@@ -13,7 +13,8 @@ struct Player {
 // Gapless playback
     static constexpr uint channels = 2;
     AudioFile file;
-    AudioOutput output{{this,&Player::read}, 44100, 8192};
+    const uint periodSize = 8192;
+    AudioOutput output{{this,&Player::read}, 44100, periodSize};
     uint read(int16* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
@@ -113,7 +114,7 @@ struct Player {
         if(output.rate!=file.rate) {
             assert(file.rate, files[index]);
             output.~AudioOutput();
-            new (&output) AudioOutput({this,&Player::read}, file.rate, 8192);
+            new (&output) AudioOutput({this,&Player::read}, file.rate, periodSize);
             output.start();
         }
         setPlaying(true);
@@ -126,7 +127,6 @@ struct Player {
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(play == playButton.enabled) return;
         if(play) { output.start(); window.setIcon(playIcon()); }
         else { output.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play; window.render();

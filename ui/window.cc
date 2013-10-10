@@ -320,8 +320,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
-            signal<>* shortcut = shortcuts.find(Widget::Leave);
-            if(shortcut) (*shortcut)(); // Local window shortcut
+            //signal<>* shortcut = shortcuts.find(Widget::Leave);
+            //if(shortcut) (*shortcut)(); // Local window shortcut
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                    e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
         }
@@ -398,16 +398,16 @@ Key Window::KeySym(uint8 code, uint8 state) {
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
-    for(uint i: range(minKeyCode,maxKeyCode)) if(KeySym(i,0)==sym) { keycode=i; break;  }
-    if(!keycode) return sym; //warn("Unknown KeySym",int(sym));
+    for(uint i: range(minKeyCode,maxKeyCode+1)) if(KeySym(i,0)==sym) { keycode=i; break;  }
+    if(!keycode) { if(sym==0x1008ff14) return 172; /*FIXME*/ log("Unknown KeySym",int(sym)); return sym; }
     return keycode;
 }
 
-signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
+signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint)key); }
 signal<>& Window::globalShortcut(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
-    return shortcuts.insert((uint16)key);
+    return shortcuts.insert((uint)key);
 }
 
 // Properties

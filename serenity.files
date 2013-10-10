@@ -66,8 +66,8 @@ music/sequencer.h
 music/sequencer.cc
 music/sampler.h
 music/sampler.cc
-music/audio.h
-music/audio.cc
+audio/audio.h
+audio/audio.cc
 music/midi.h
 music/midi.cc
 music/pdf.h

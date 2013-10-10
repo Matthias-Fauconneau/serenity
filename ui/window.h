@@ -112,7 +112,7 @@ struct Window : Socket, Poll {
     bool clearBackground = true, featherBorder = false;
 
     /// Shortcuts triggered when a key is pressed
-    map<uint16, signal<>> shortcuts;
+    map<uint, signal<>> shortcuts;
     /// Current widget that has the keyboard input focus
     Widget* focus=0;
     /// Current widget that has the drag focus
