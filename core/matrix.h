@@ -7,10 +7,10 @@ struct mat3x2 {
     float data[3*2];
     mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
     mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
-    mat3x2(float m11, float m12, float m21, float m22, float dx, float dy):data{m11,m12, m21,m22, dx,dy}{}
+    mat3x2(float m11, float m12, float m21, float m22, float dx, float dy):data{m11,m21,m12,m22, dx,dy}{assert(m12==0 && m21==0);}
 
-    float M(int i, int j) const { return data[j*2+i]; }
-    float& M(int i, int j) { return data[j*2+i]; }
+    float M(int i, int j) const {assert(i<2 && j<3); return data[j*2+i]; }
+    float& M(int i, int j) {assert(i<2 && j<3); return data[j*2+i]; }
     float operator()(int i, int j) const { return M(i,j); }
     float& operator()(int i, int j) { return M(i,j); }
 

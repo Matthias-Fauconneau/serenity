@@ -399,7 +399,7 @@ Key Window::KeySym(uint8 code, uint8 state) {
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
     for(uint i: range(minKeyCode,maxKeyCode)) if(KeySym(i,0)==sym) { keycode=i; break;  }
-    if(!keycode) warn("Unknown KeySym",int(sym));
+    if(!keycode) return sym; //warn("Unknown KeySym",int(sym));
     return keycode;
 }
 

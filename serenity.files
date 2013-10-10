@@ -47,6 +47,7 @@ ui/font.h
 ui/gl.cc
 ui/gl.h
 ui/interface.h
+ui/interface.cc
 ui/layout.h
 ui/plot.cc
 ui/plot.h
@@ -110,3 +111,7 @@ sponza/view.h
 sponza/view.cc
 sponza/scene.h
 sponza/scene.cc
+
+player/player.cc
+player/ffmpeg.cc
+player/ffmpeg.h

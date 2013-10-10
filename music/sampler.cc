@@ -141,7 +141,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     // Computes normalization
     float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-    const float scale = 0x1p5f/sqrt(sum); // Normalizes and scales 24->32bit (-3bit head room)
+    const float scale = 0x1p4f/sqrt(sum); // Normalizes and scales 24->32bit (-4bit head room)
 
     // Reverses, scales and deinterleaves filter
     buffer<float> filter[2];
@@ -238,7 +238,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     }
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
-        for(Layer& layer: layers) for(Note& n: layer.notes) { // find least buffered note
+        for(Layer& layer: layers) for(Note& n: layer.notes) { // Finds least buffered note
             if(n.flac.blockSize && n.writeCount>=n.flac.blockSize && n.flac.audio.size<minBufferSize) {
                 note=&n;
                 minBufferSize=n.flac.audio.size;
@@ -280,6 +280,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
     clear(buffer, size*2);
 
     {Locker locker(lock);
+        int notes=0;
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
                 uint inSize=align(2,layer.resampler.need(size));
@@ -290,9 +291,14 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
             } else {
                  for(Note& note: layer.notes) note.read((v4sf*)buffer, size/2);
             }
+            notes+=layer.notes.size;
         }
+        /*if(!notes && !record) { // Stops audio output when all notes are released
+            if(!stopTime) stopTime=time; // First waits for reverb
+            else if(time>stopTime+reverbSize) { stopTime=0; return 0; } // Stops audio output (will be restarted on noteEvent (cf music.cc))
+        } else stopTime=0;*/
 
-        if(enableReverb) { // Convolution reverb
+        //if(enableReverb) { // Convolution reverb
             if(size!=periodSize) error("Expected period size ",periodSize,"got",size);
             // Deinterleaves mixed signal into reverb buffer
             for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c];
@@ -301,7 +307,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
                 // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
                 fftwf_execute(forward[c]);
 
-                for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame
+                for(uint i: range(reverbSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame (FIXME: ring buffer)
 
                 // Complex multiplies input (reverb buffer) with kernel (reverb filter)
                 const float* x = input;
@@ -324,13 +330,13 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
                     buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
                 }
             }
-        } else {
+        /*} else {
             for(uint i: range(2*size)) buffer[i] *= 0x1p5f; // 24bit samples to 32bit output with 3bit head room to add multiple notes
-        }
+        }*/
         // Converts mixing buffer to signed 32bit output
         bool clip=false;
         for(uint i: range(size/2)) {
-            for(uint j: range(4)) { float s=buffer[4*i+j]; if(s<-0x1p31f || s>=(0x1p31f-0.5f)) clip=true; }
+            //for(uint j: range(4)) { float s=buffer[4*i+j]; if(s<-0x1p31f || s>=(0x1p31f-0.5f)) clip=true; }
             ((v4si*)output)[i] = cvtps2dq(((v4sf*)buffer)[i]);
         }
         if(clip) log("Clipping occured: not enough headroom");

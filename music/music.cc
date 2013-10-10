@@ -13,11 +13,11 @@
 #include "pdf.h"
 #include "score.h"
 #include "midiscore.h"
-#include "keyboard.h"
+//include "keyboard.h"
 
 #define RECORD 0
 #if RECORD
-#include "record.h"
+//include "record.h"
 #endif
 
 // Simple human readable/editable format for score synchronization annotations
@@ -99,7 +99,7 @@ struct Music {
     Scroll<PDFScore> pdfScore;
     Scroll<MidiScore> midiScore;
     Score score;
-    Keyboard keyboard;
+    //Keyboard keyboard;
 
     Thread thread{-20};
     Sequencer input{thread};
@@ -122,19 +122,21 @@ struct Music {
         }
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
 #if 1
         input.noteEvent.connect(&score,&Score::noteEvent);
-        input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+        //input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        //midi.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
         midi.noteEvent.connect(&score,&Score::noteEvent);
-        midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
+        //midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
 
-        keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        /*keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
         keyboard.noteEvent.connect(&score,&Score::noteEvent);
         keyboard.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+        keyboard.contentChanged.connect(&window,&Window::render);*/
 
-        keyboard.contentChanged.connect(&window,&Window::render);
         midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
         window.frameReady.connect(this,&Music::smoothScroll);
@@ -152,8 +154,8 @@ struct Music {
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
-        window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
-        window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
+        //window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
+        //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
@@ -179,18 +181,19 @@ struct Music {
 #endif
 #endif
         window.show();
-        audio.start();
         thread.spawn();
         input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
+        audio.start();
     }
 
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float previous /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float unused next /* next bottom*/, float x) {
+    void nextStaff(float /*previous*/ /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float unused next /* next bottom*/, float x) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
             if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
             float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
             // Always set current staff as second staff from bottom edge (allows to repeat page, track scrolling, see keyboard)
-            float t = (x/pdfScore.normalizedScale)/(pdfScore.x2-pdfScore.x1); assert(t>=0 && t<=1);
+            float t = (x/pdfScore.normalizedScale)/(pdfScore.x2-pdfScore.x1);
+            //assert(t>=0 && t<=1);
             //target = vec2(0, -(scale*( (1-t)*bottom + t*next )-pdfScore.ScrollArea::size.y)); // Align bottom edge between current bottom and next bottom
             target = vec2(0, -(scale*( (1-t)*top + t*bottom )-pdfScore.ScrollArea::size.y/2)); // Align center between current top and current bottom
             //target = vec2(0, -scale*( (1-t)*previous + t*top )); // Align top edge between previous top and current top

@@ -20,7 +20,7 @@ inline void pop() { currentClip=clipStack.pop(); }
 
 // Colors
 constexpr vec4 black(0, 0, 0, 1);
-constexpr vec4 darkGray(13./16, 13./16, 13./16, 1);
+constexpr vec4 darkGray(12./16, 12./16, 12./16, 1);
 constexpr vec4 lightGray (15./16, 15./16, 15./16, 1);
 constexpr vec4 white (1, 1, 1, 1);
 constexpr vec4 highlight (8./16, 12./16, 14./16, 1);

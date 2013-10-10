@@ -120,7 +120,7 @@ bool ImageLink::mouseEvent(int2, int2, Event event, Button) {
 //  ToggleButton
 int2 ToggleButton::sizeHint() { return (enabled?disableIcon:enableIcon).size(); }
 void ToggleButton::render(int2 position, int2 size) {
-    Image& image = enabled?disableIcon:enableIcon;
+    const Image& image = enabled?disableIcon:enableIcon;
     if(!image) return;
     int2 pos = position+(size-image.size())/2;
     blit(pos, image);

@@ -351,7 +351,7 @@ void PDF::open(const string& data) {
                     OP2('E','T') ;
                     OP2('g','s') ;
                     OP2('r','e') {
-                        vec2 p1 = p(0,1), p2 = p1 + vec2(f(2)*Cm.m11,f(3)*Cm.m22);
+                        vec2 p1 = p(0,1), p2 = p1 + vec2(f(2)*Cm(0,0),f(3)*Cm(1,1));
                         path << move(array<vec2>() << p1
                                      << vec2(p1.x,p2.y) << vec2(p1.x,p2.y) << vec2(p1.x,p2.y)
                                      << p2 << p2 << p2
@@ -491,9 +491,9 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         if(code==0) continue;
         mat3x2 Trm = Tm*Cm;
         uint16 index = font->font->index(code);
-        vec2 position = vec2(Trm.dx,Trm.dy);
+        vec2 position = vec2(Trm(0,2),Trm(1,2));
         if(position.y<y1) y1=position.y; if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
-        characters << Character{font, Trm.m11*fontSize, index, position, code};
+        characters << Character{font, Trm(0,0)*fontSize, index, position, code};
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size) advance += fontSize*font->widths[code]/1000;
         else advance += font->font->linearAdvance(index);

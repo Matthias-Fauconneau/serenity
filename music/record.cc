@@ -13,7 +13,7 @@ extern "C" {
 #include <libavcodec/avcodec.h> //avcodec
 #include <libavutil/avutil.h> //avutil
 }
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+//#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
 void Record::start(const string& name, bool video, bool audio) {
     av_register_all();

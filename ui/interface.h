@@ -41,11 +41,11 @@ template<class T> struct Scroll : ScrollArea, T {
 /// Displays an image
 struct ImageWidget : virtual Widget {
     /// Displayed image
-    Image image;
+    const Image& image;
 
-    ImageWidget(){}
+    //ImageWidget(){}
     /// Creates a widget displaying \a image
-    ImageWidget(Image&& image):image(move(image)){}
+    ImageWidget(const Image& image):image(move(image)){}
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
@@ -63,8 +63,8 @@ struct ImageLink : ImageWidget {
     /// User clicked on the image
     signal<const string&> linkActivated;
 
-    ImageLink(){}
-    ImageLink(Image&& image):Icon(move(image)){}
+    //ImageLink(){}
+    ImageLink(const Image& image):Icon(move(image)){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 /// \typedef ImageLink TriggerButton
@@ -74,7 +74,7 @@ typedef ImageLink TriggerButton;
 /// Togglable Icon
 struct ToggleButton : Widget {
     /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(Image&& enable, Image&& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
+    ToggleButton(const Image& enable, const Image& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
     signal<bool /*state*/> toggled;
@@ -86,8 +86,8 @@ struct ToggleButton : Widget {
     void render(int2 position, int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
-    Image enableIcon;
-    Image disableIcon;
+    const Image& enableIcon;
+    const Image& disableIcon;
 };
 
 /// Shows a bounded value
@@ -116,7 +116,7 @@ struct Slider : Progress {
 
 /// ::Icon with \ref Text "text"
 struct Item : Linear {
-    Item(){}
+    //Item(){}
     Item(Image&& icon, const string& text, int size=16, bool under=false):icon(move(icon)),text(text,size),under(under){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
@@ -129,7 +129,7 @@ struct Item : Linear {
 
 /// Clickable Item
 struct TriggerItem : Item {
-    TriggerItem(){}
+    //TriggerItem(){}
     TriggerItem(Image&& icon, String&& text, int size=16):Item(move(icon),move(text),size){}
     /// User clicked on the button
     signal<> triggered;
