@@ -61,13 +61,16 @@ ui/window.cc
 ui/window.h
 ui/x.h
 
+audio/audio.h
+audio/audio.cc
+audio/resample.h
+audio/resample.cc
+
 music/music.cc
 music/sequencer.h
 music/sequencer.cc
 music/sampler.h
 music/sampler.cc
-audio/audio.h
-audio/audio.cc
 music/midi.h
 music/midi.cc
 music/pdf.h
@@ -80,10 +83,17 @@ music/keyboard.h
 music/keyboard.cc
 music/record.h
 music/record.cc
-music/resample.h
-music/resample.cc
 music/flac.cc
 music/flac.h
+
+player/player.cc
+player/ffmpeg.cc
+player/ffmpeg.h
+
+blender/blender
+blender/blender.cc
+blender/blender.h
+blender/sdna.h
 
 et/et.cc
 et/bsp.h
@@ -100,18 +110,9 @@ et/view.cc
 et/material.h
 et/material.cc
 
-blender/blender
-blender/blender.cc
-blender/blender.h
-blender/sdna.h
-
 sponza/sponza.cc
 sponza/sponza
 sponza/view.h
 sponza/view.cc
 sponza/scene.h
 sponza/scene.cc
-
-player/player.cc
-player/ffmpeg.cc
-player/ffmpeg.h

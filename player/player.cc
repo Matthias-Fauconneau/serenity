@@ -1,27 +1,39 @@
 /// \file player.cc Music player
 #include "thread.h"
 #include "file.h"
+#include "ffmpeg.h"
+#include "resample.h"
 #include "audio.h"
 #include "interface.h"
 #include "layout.h"
 #include "window.h"
 #include "text.h"
-#include "ffmpeg.h"
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Gapless playback
     static constexpr uint channels = 2;
     AudioFile file;
-    const uint periodSize = 8192;
-    AudioOutput output{{this,&Player::read}, 44100, periodSize};
+    Resampler resampler;
+    AudioOutput output{{this,&Player::read}, 48000, 8192};
     uint read(int16* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
             if(!file) return readSize;
-            uint need = outputSize-readSize;
-            uint read = file.read(output, need);
-            assert(read<=need);
+            int need = outputSize-readSize;
+            int read;
+            if(!resampler) read = file.read(output, need);
+            else {
+                uint sourceNeed = resampler.need(need);
+                float source[sourceNeed*2];
+                uint sourceRead = file.read(source, sourceNeed);
+                resampler.write(source, sourceRead);
+                read = min(need, resampler.available());
+                float target[read*2];
+                resampler.read(target, read);
+                for(uint i: range(read*2)) output[i] = target[i]*0x1.0p15;
+            }
+            assert(read<=need, read, need);
             output += read*channels; readSize += read;
             if(readSize != outputSize) next();
             else {
@@ -111,11 +123,10 @@ struct Player {
         window.setTitle(toUTF8(titles[index].text));
         if(!file.openPath(String("/Music/"_+files[index]))) return;
         assert(output.channels==file.channels);
-        if(output.rate!=file.rate) {
-            assert(file.rate, files[index]);
-            output.~AudioOutput();
-            new (&output) AudioOutput({this,&Player::read}, file.rate, periodSize);
-            output.start();
+        if(output.rate==file.rate) resampler.~Resampler();
+        else if(resampler.sourceRate!=file.rate){
+            resampler.~Resampler();
+            new (&resampler) Resampler(output.channels, file.rate, output.rate, output.periodSize);
         }
         setPlaying(true);
     }
