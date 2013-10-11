@@ -120,7 +120,7 @@ uint AudioFile::read(float* output, uint outputSize) {
     return readSize;
 }
 
-void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, position, 0); }
+void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, (uint64)position*audioStream->time_base.den/(rate*audioStream->time_base.num), 0); }
 
 void AudioFile::close() { if(frame) avcodec_free_frame(&frame); if(file) avformat_close_input(&file); }
 

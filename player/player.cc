@@ -98,6 +98,7 @@ struct Player {
             }
         }
         window.show();
+        mainThread.setPriority(-20);
     }
     void queueFile(const string& file, const string& folder) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
@@ -150,9 +151,7 @@ struct Player {
         remaining.setText(String("00:00"_));
         titles.index=-1;
     }
-    void seek(int position) {
-        if(file) { file.seek(position); update(file.position/file.rate,file.duration/file.rate); }
-    }
+    void seek(int position) { if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); } }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
         writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(position)));

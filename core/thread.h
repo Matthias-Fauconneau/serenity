@@ -101,6 +101,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 
     Thread(int priority=0);
     ~Thread(){Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/}
+    void setPriority(int priority);
     /// Spawns a thread running an event loop with the given \a priority
     void spawn();
     /// Processes all events on \a polls and tasks on \a queue until terminate is set
