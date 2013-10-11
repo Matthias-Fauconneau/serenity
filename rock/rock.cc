@@ -155,7 +155,7 @@ struct Rock : virtual PersistentProcess {
             unique<Window> window(widget, sizeHint, title);
             window->localShortcut(Escape).connect([]{exit();});
             String* name = new String(title+".png"_);
-            window->localShortcut(PrintScreen).connect([=]{writeFile(*name, encodePNG(renderToImage(widget, int2(1920,1080))), home());});
+            window->localShortcut(PrintScreen).connect([=]{writeFile(*name, encodePNG(renderToImage(widget, int2(128,128))), home());});
             window->backgroundColor = 1;
             window->show();
             windows << move(window);

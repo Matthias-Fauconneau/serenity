@@ -12,11 +12,8 @@ extern array<Family> parseFamilies(const string& data);
 void rootIndex(Volume16& target, const ref<Family>& families) {
     uint16* const targetData = target;
     clear(targetData,target.size());
-    target.maximum=0; // 0 = background
-    for(const Family& family: families) {
-        //if(!family.size) continue;
-        target.maximum++;
-    }
+    target.maximum = families.size; // 0 = background
+    //target.maximum=0; for(const Family& family: families) { //if(!family.size) continue; target.maximum++; }
     target.maximum++; // maximum = Multiple family index
     uint i=0; for(const Family& family: families) {
         //if(!family.size) continue;

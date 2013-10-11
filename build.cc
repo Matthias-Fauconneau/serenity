@@ -111,12 +111,12 @@ struct Build {
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
-                while(pids.size>=coreCount) { // Waits for a job to finish before launching a new unit
+                while(pids.size>=coreCount-1) { // Waits for a job to finish before launching a new unit
                     int pid =  wait(); // Waits for any child to terminate
                     if(wait(pid)) fail();
                     pids.remove(pid);
                 }
-                pids << execute("/usr/bin/g++"_,flags+toRefs(args), false); //TODO: limit to 8
+                pids << execute("/usr/bin/g++"_,flags+toRefs(args), false);
             }
         }
         return lastLinkEdit;
