@@ -108,7 +108,7 @@ struct Window : Socket, Poll {
     /// Selects between software or OpenGL rendering
     Renderer renderer;
     /// Window background intensity and opacity
-    float backgroundColor=14./16, backgroundCenter=14./16, backgroundOpacity=1;
+    float backgroundColor=13.5/16, backgroundCenter=13.5/16, backgroundOpacity=1;
     bool clearBackground = true, featherBorder = false;
 
     /// Shortcuts triggered when a key is pressed
