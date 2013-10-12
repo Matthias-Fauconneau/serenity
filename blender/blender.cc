@@ -344,12 +344,14 @@ struct Model {
     array<GLTexture> impostors; //FIXME: share
     GLVertexBuffer impostorsVertices;
     GLIndexBuffer impostorsIndices;
+    array<GLTexture*> impostorTextures; // VFC culled
     uint impostorIndex=0;
 
     // Rendering order
     bool operator<(const Model& o) const { return instances.size<o.instances.size; }
 };
 const uint impostorMin = 12;
+const uint impostorPerFrame=8;
 
 /// Parses a .blend file
 struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender specific) vs View
@@ -397,7 +399,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     GLShader impostor {blender(),{"impostor"_}};
 
     // Timer
-    Time time; float frameTime = 40./1000; uint frameCount=0;
+    Time time; float frameTime = 16./1000; uint frameCount=0;
 
     BlendView() : folder("Island"_,home()) {
         vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
@@ -716,7 +718,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
                 // Selects N random faces
                 Random random;
-                for(int n=0; n</*particle.totpart*/1024;) {
+                for(uint n=0; n<floor(impostorPerFrame, particle.totpart);) {
                     assert(model.surfaces.size==1);
                     const array<uint>& indices = model.surfaces[0].indices;
                     uint index = random % (indices.size/3) * 3;
@@ -894,126 +896,73 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         view.rotateZ(rotation.x); // yaw
         view.translate(vec3(0,0,-worldCenter.z));
 
-        // Render impostors (TODO: 60fps limit, update impostors while idle between frames)
-        //bake.bind(); bake.bindFragments({"NNNZ"_});
         for(Model& model: models) {
             if(model.instances.size<impostorMin) continue;
             array<Vertex5> vertices;
             array<uint> indices;
+            model.impostorTextures.clear();
             if(!model.impostors.size<model.instances.size) model.impostors.grow(model.instances.size);
             for(uint i : range(model.instances.size)) {
                 const mat4& instance = model.instances[i];
                 // Computes view axis-aligned bounding box of object's oriented bounding box (FIXME: bounding sphere projection might be smaller)
-#if SW
-                mat4 device; device.scale(vec3(width,height,1));
-                mat4 transform = device*projection*view*instance;
-#else
                 mat4 transform = projection*view*instance;
-#endif
                 vec3 O = transform*vec3(0), min = O, max = O;
                 for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) {
                     vec3 corner = transform*vec3(i?-1:1,j?-1:1,k?-1:1);
                     min=::min(min, corner), max=::max(max, corner);
                 }
-#if SW
-                min.x=floor(min.x), min.y=floor(min.y);
-                max.x=ceil(max.x), max.y=ceil(max.y);
-#else
+                if(max.x<=-1||max.y<=-1||max.z<=-1||min.x>=1||min.y>=1||min.z>=1) continue; // VFC
                 min.x=floor(min.x*width)/width, min.y=floor(min.y*height)/height;
                 max.x=ceil(max.x*width)/width, max.y=ceil(max.y*height)/height;
-#endif
-                mat4 bake;
-#if !SW
-                bake.scale(vec3(1,1,-1)); // -> [-1,1]
-                bake.translate(-1); // -> [-1,1]
-                bake.scale(2.f/(max-min)); // -> [0,2]
-#endif
-                bake.translate(-min); // -> [0,max-min]
-                bake = bake * transform;
 
-                if(i==model.impostorIndex) {
-                    int2 size = int3(max-min).xy();
+                if(model.impostorIndex <= i && i<model.impostorIndex+impostorPerFrame) { //FIXME: 60fps limit, update while idle
+                    int2 size = int2((max-min).xy()*vec2(width,height));
                     if(!size.x || !size.y) continue;
-                    if(size.x>512 || size.y>512) continue; //FIXME: direct render
+                    size=::min(size,int2(128)); //FIXME: direct render
+                    assert_(size>int2(0));
 
-                    //FIXME: VFC cull impostor updates
                     GLTexture& impostor = model.impostors[i];
                     vec3 lightDirection = normalize((sun*instance).inverse().normalMatrix()*vec3(0,0,-1));
-#if SW
-                    float zBuffer[size.x*size.y];
-                    clear(zBuffer, size.x*size.y, 1.f);
-                    Image image(size.x, size.y, true);
-                    clear(image.buffer.begin(), image.buffer.size);
 
-                    for(const Surface& surface: model.surfaces) {
-                        vec3 surfaceColor = vec3(0xFF,0xFF,0xFF);
-                        if(surface.shader.name=="trunkshader"_) surfaceColor=vec3(147, 132, 114);
-                        if(surface.shader.name=="trunkshader_001"_) surfaceColor=vec3(124, 125, 123);
-                        if(surface.shader.name=="leafs1shader"_) surfaceColor=vec3(138, 191, 61);
-                        for(uint i=0; i<surface.indices.size; i+=3) { // Rasterization, TODO: switch to raycast, faster with grid for high depth complexity
-                            const Vertex& v1 = surface.vertices[surface.indices[i+0]];
-                            const Vertex& v2 = surface.vertices[surface.indices[i+1]];
-                            const Vertex& v3 = surface.vertices[surface.indices[i+2]];
-                            vec3 p1 = bake*v1.position; vec2 a=p1.xy();
-                            vec3 p2 = bake*v2.position; vec2 b=p2.xy();
-                            vec3 p3 = bake*v3.position; vec2 c=p3.xy();
-                            int2 min = int2(::min(::min(a,b),c)); // no need to clip to device as device is fitted to model
-                            int2 max = int2(::max(::max(a,b),c));
-                            for(uint y=min.y; y<=(uint)max.y; y++) {
-                                for(uint x=min.x; x<=(uint)max.x; x++) {
-                                    vec2 p = vec2(x,y);
-                                    if(cross(p-a,b-a)<0) continue; // indirect winding as we reverse Z in projection (FIXME: precompute edges)
-                                    if(cross(p-b,c-b)<0) continue;
-                                    if(cross(p-c,a-c)<0) continue;
-                                    float z= (p1.z+p2.z+p3.z)/3; // Assumes triangle are small enough to spare interpolation
-                                    assert_(x<image.width && y<image.height && z<0x100, (int)x, (int)y, (int)z);
-                                    if(z>=zBuffer[y*size.x+x]) continue; // Depth test (reversed Z in projection -> pass if less)
-                                    vec3 n = normalize((v1.normal+v2.normal+v3.normal)/3.f); // Assumes triangle are small enough to spare interpolation
-                                    //uint nx = 255*(n.x+1)/2, ny = 255*(n.y+1)/2, nz = 255*(n.y+1)/2;
-                                    float diffuseLight = ::max(0.f, dot(n, lightDirection));
-                                    vec3 color = ::min(vec3(255), (vec3(0.3,0.3,0.4) + vec3(diffuseLight))*surfaceColor);
-                                    image(x,y) = byte4(color.z, color.y, color.x, 0xFF);
-                                }
-                            }
-                        }
-                        //FIXME: trim
-                    }
-                    impostor = GLTexture(image, Mipmap|Bilinear|Anisotropic);
-#else
-                    GLFrameBuffer framebuffer(GLTexture(size.x, size.y ,Depth), GLTexture(size.x, size.y, Alpha));
-                    framebuffer.bind(ClearColor|ClearDepth, 1);
+                    GLFrameBuffer framebuffer(size.x,size.y,-1,Alpha);
+                    framebuffer.bind(ClearColor|ClearDepth, 0);
+
+                    mat4 bake;
+                    //bake.scale(vec3(1,1,-1)); // -> [-1,1]
+                    bake.translate(-1); // -> [-1,1]
+                    bake.scale(2.f/(max-min)); // -> [0,2]
+                    bake.translate(-min); // -> [0,max-min]
+                    bake = bake * transform;
+
                     for(Surface& surface: model.surfaces) {
                         GLShader& shader = surface.shader.shader;
                         shader.bind();
                         shader["modelViewProjectionTransform"_] = bake;
                         shader["lightDirection"_] = lightDirection;
-                        //shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
-                        //shader["shadowTransform"_] = sun*instance;
+                        shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
+                        shader["shadowTransform"_] = sun*instance;
+                        surface.vertexBuffer.bindAttribute(shader,"aPosition"_, 3,offsetof(Vertex,position));
+                        surface.vertexBuffer.bindAttribute(shader,"aNormal"_, 3,offsetof(Vertex,normal));
                         surface.indexBuffer.draw();
                     }
-                    impostor = move(framebuffer.colorTexture);
-#endif
+                    impostor = GLTexture(size.x,size.y, Alpha|Bilinear|Mipmap);
+                    framebuffer.blit(impostor);
                 }
+
+                GLTexture& impostor = model.impostors[i];
+                if(!impostor) continue;
+                model.impostorTextures << &impostor; //TODO: texture array
                 uint firstIndex = vertices.size;
                 indices << firstIndex << firstIndex+1 << firstIndex+2 << firstIndex+1 << firstIndex+2 << firstIndex+3;
-#if SW
-                mat4 inverse = device.inverse();
-                vertices
-                        << Vertex5{inverse*vec3(min.x, min.y, min.z),vec2(0,0)}
-                        << Vertex5{inverse*vec3(max.x,min.y, min.z),vec2(1,0)}
-                        << Vertex5{inverse*vec3(min.x, max.y,min.z),vec2(0,1)}
-                        << Vertex5{inverse*vec3(max.x,max.y,min.z),vec2(1,1)};
-#else
                 vertices
                         << Vertex5{vec3(min.x, min.y, min.z),vec2(0,0)}
                         << Vertex5{vec3(max.x,min.y, min.z),vec2(1,0)}
                         << Vertex5{vec3(min.x, max.y,min.z),vec2(0,1)}
                         << Vertex5{vec3(max.x,max.y,min.z),vec2(1,1)};
-#endif
             }
             model.impostorsIndices.upload(indices);
             model.impostorsVertices.upload(vertices); //FIXME: append impostor
-            model.impostorIndex = (model.impostorIndex+1)%model.impostors.size;
+            model.impostorIndex = (model.impostorIndex+impostorPerFrame)%model.impostors.size;
         }
 
         if(framebuffer.size() != size) {
@@ -1032,20 +981,17 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         vec3 lightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
 
         for(Model& model: models) {
-            if(model.impostors) {
-                //glDepthMask(0);
+            if(model.impostorTextures) {
                 glBlendAlpha();
                 impostor.bind();
                 impostor["impostor"_] = 0;
                 model.impostorsVertices.bindAttribute(impostor,"aPosition"_, 3, offsetof(Vertex5,position));
                 model.impostorsVertices.bindAttribute(impostor,"aTexCoords"_, 2, offsetof(Vertex5,texcoords));
-                for(uint i: range(model.impostors.size)) {
-                    if(!model.impostors[i]) continue;
-                    model.impostors[i].bind(0);
+                for(uint i: range(model.impostorTextures.size)) {
+                    model.impostorTextures[i]->bind(0);
                     model.impostorsIndices.draw(i*6, 6);
                 }
                 glBlendNone();
-                //glDepthMask(1);
                 continue;
             }
             for(Surface& surface: model.surfaces) {

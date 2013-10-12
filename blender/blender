@@ -62,7 +62,7 @@ impostor {
  fragment {
   uniform sampler2D impostor;
   vec4 rgba = texture2D(impostor, vTexCoords); //.bgra; ?
-  if(rgba.a < 0.5) discard;
+  if(rgba.a <= 0.5) discard;
   out vec4 color;
   color = rgba;
  }

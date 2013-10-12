@@ -65,6 +65,8 @@ audio/audio.h
 audio/audio.cc
 audio/resample.h
 audio/resample.cc
+audio/ffmpeg.cc
+audio/ffmpeg.h
 
 music/music.cc
 music/sequencer.h
@@ -87,8 +89,6 @@ music/flac.cc
 music/flac.h
 
 player/player.cc
-player/ffmpeg.cc
-player/ffmpeg.h
 
 blender/blender
 blender/blender.cc
@@ -116,3 +116,5 @@ sponza/view.h
 sponza/view.cc
 sponza/scene.h
 sponza/scene.cc
+
+tuner/tuner.cc

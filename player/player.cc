@@ -160,6 +160,7 @@ struct Player {
                 queueFile(folder, file, true);
                 randomIndex++;
             }
+            while(titles.count() > 64 && titles.index > 0) { titles.take(0); files.take(0); titles.index--; } // Limits total size when running for a long time
         }
     }
     void setRandom(bool random) {

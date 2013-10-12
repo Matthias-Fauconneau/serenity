@@ -379,4 +379,5 @@ void GLFrameBuffer::blit(GLTexture& color) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.id, 0);
     blit(target);
     glDeleteFramebuffers(1,&target);
+    if(color.format&Mipmap) { glBindTexture(GL_TEXTURE_2D, color.id); glGenerateMipmap(GL_TEXTURE_2D); }
 }
