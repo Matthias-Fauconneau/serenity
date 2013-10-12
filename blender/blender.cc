@@ -110,10 +110,9 @@ struct Vertex { // Vertex6
 };
 String str(const Vertex& v) { return "("_+str(v.position, v.normal)+")"_; }
 
-struct Vertex7 {
+struct Vertex5 {
     vec3 position;
     vec2 texcoords;
-    vec3 zVector;
 };
 
 struct Node;
@@ -395,7 +394,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     // Geometry
     array<Model> models;
     //GLShader bake {blender(),{"transform normal bake"_}};
-    GLShader impostor {blender(),{"transform impostor diffuse leafs1shader"_}}; //FIXME
+    GLShader impostor {blender(),{"impostor"_}};
 
     // Timer
     Time time; float frameTime = 40./1000; uint frameCount=0;
@@ -899,26 +898,38 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         //bake.bind(); bake.bindFragments({"NNNZ"_});
         for(Model& model: models) {
             if(model.instances.size<impostorMin) continue;
-            array<Vertex7> vertices;
+            array<Vertex5> vertices;
             array<uint> indices;
             if(!model.impostors.size<model.instances.size) model.impostors.grow(model.instances.size);
             for(uint i : range(model.instances.size)) {
                 const mat4& instance = model.instances[i];
                 // Computes view axis-aligned bounding box of object's oriented bounding box (FIXME: bounding sphere projection might be smaller)
+#if SW
                 mat4 device; device.scale(vec3(width,height,1));
                 mat4 transform = device*projection*view*instance;
+#else
+                mat4 transform = projection*view*instance;
+#endif
                 vec3 O = transform*vec3(0), min = O, max = O;
                 for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) {
                     vec3 corner = transform*vec3(i?-1:1,j?-1:1,k?-1:1);
                     min=::min(min, corner), max=::max(max, corner);
                 }
+#if SW
                 min.x=floor(min.x), min.y=floor(min.y);
                 max.x=ceil(max.x), max.y=ceil(max.y);
-                {mat4 normalize;
-                    normalize.scale(vec3(1,1,255/(max.z-min.z))); // [0,size] in XY, [1,254] in Z
-                    normalize.translate(-min); // -> [0,max-min] in XY;
-                    transform = normalize * transform;
-                }
+#else
+                min.x=floor(min.x*width)/width, min.y=floor(min.y*height)/height;
+                max.x=ceil(max.x*width)/width, max.y=ceil(max.y*height)/height;
+#endif
+                mat4 bake;
+#if !SW
+                bake.scale(vec3(1,1,-1)); // -> [-1,1]
+                bake.translate(-1); // -> [-1,1]
+                bake.scale(2.f/(max-min)); // -> [0,2]
+#endif
+                bake.translate(-min); // -> [0,max-min]
+                bake = bake * transform;
 
                 if(i==model.impostorIndex) {
                     int2 size = int3(max-min).xy();
@@ -927,54 +938,78 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
                     //FIXME: VFC cull impostor updates
                     GLTexture& impostor = model.impostors[i];
-                    mat3 normalMatrix = (view*instance).normalMatrix();
-
+                    vec3 lightDirection = normalize((sun*instance).inverse().normalMatrix()*vec3(0,0,-1));
+#if SW
+                    float zBuffer[size.x*size.y];
+                    clear(zBuffer, size.x*size.y, 1.f);
                     Image image(size.x, size.y, true);
-                    clear(image.buffer.begin(), image.buffer.size, byte4(0,0,0xFF,0));
+                    clear(image.buffer.begin(), image.buffer.size);
 
-                    for(uint i: range(model.surfaces.size)) {
-                        Surface& surface = model.surfaces[i];
+                    for(const Surface& surface: model.surfaces) {
+                        vec3 surfaceColor = vec3(0xFF,0xFF,0xFF);
+                        if(surface.shader.name=="trunkshader"_) surfaceColor=vec3(147, 132, 114);
+                        if(surface.shader.name=="trunkshader_001"_) surfaceColor=vec3(124, 125, 123);
+                        if(surface.shader.name=="leafs1shader"_) surfaceColor=vec3(138, 191, 61);
                         for(uint i=0; i<surface.indices.size; i+=3) { // Rasterization, TODO: switch to raycast, faster with grid for high depth complexity
                             const Vertex& v1 = surface.vertices[surface.indices[i+0]];
                             const Vertex& v2 = surface.vertices[surface.indices[i+1]];
                             const Vertex& v3 = surface.vertices[surface.indices[i+2]];
-                            vec3 p1 = transform*v1.position; vec2 a=p1.xy();
-                            vec3 p2 = transform*v2.position; vec2 b=p2.xy();
-                            vec3 p3 = transform*v3.position; vec2 c=p3.xy();
+                            vec3 p1 = bake*v1.position; vec2 a=p1.xy();
+                            vec3 p2 = bake*v2.position; vec2 b=p2.xy();
+                            vec3 p3 = bake*v3.position; vec2 c=p3.xy();
                             int2 min = int2(::min(::min(a,b),c)); // no need to clip to device as device is fitted to model
                             int2 max = int2(::max(::max(a,b),c));
                             for(uint y=min.y; y<=(uint)max.y; y++) {
                                 for(uint x=min.x; x<=(uint)max.x; x++) {
                                     vec2 p = vec2(x,y);
-                                    if(cross(p-a,b-a)<0) continue; // FIXME: indirect winding as we reverse Z in projection (FIXME: precompute edges)
+                                    if(cross(p-a,b-a)<0) continue; // indirect winding as we reverse Z in projection (FIXME: precompute edges)
                                     if(cross(p-b,c-b)<0) continue;
                                     if(cross(p-c,a-c)<0) continue;
-                                    uint z = round((p1.z+p2.z+p3.z)/3); // Assumes triangle are small enough to spare interpolation
+                                    float z= (p1.z+p2.z+p3.z)/3; // Assumes triangle are small enough to spare interpolation
                                     assert_(x<image.width && y<image.height && z<0x100, (int)x, (int)y, (int)z);
-                                    if(z>=image(x,y).r) continue; // Depth test (reversed Z in projection -> pass if less)
-                                    vec3 n = round((v1.normal+v2.normal+v3.normal)/3.f); // Assumes triangle are small enough to spare interpolation
-                                    n = normalize(normalMatrix*n);
-                                    //if(n.z < 0) n=-n; Double sided ? If it is the case, FIXME: as we assume direct winding
-                                    uint nx = 255*(n.x+1)/2, ny = 255*(n.y+1)/2;
-                                    assert_(nx<0x100 && ny<0x100, n);
-                                    image(x,y) = byte4(nx, ny, z, 1+i);
+                                    if(z>=zBuffer[y*size.x+x]) continue; // Depth test (reversed Z in projection -> pass if less)
+                                    vec3 n = normalize((v1.normal+v2.normal+v3.normal)/3.f); // Assumes triangle are small enough to spare interpolation
+                                    //uint nx = 255*(n.x+1)/2, ny = 255*(n.y+1)/2, nz = 255*(n.y+1)/2;
+                                    float diffuseLight = ::max(0.f, dot(n, lightDirection));
+                                    vec3 color = ::min(vec3(255), (vec3(0.3,0.3,0.4) + vec3(diffuseLight))*surfaceColor);
+                                    image(x,y) = byte4(color.z, color.y, color.x, 0xFF);
                                 }
                             }
                         }
                         //FIXME: trim
                     }
-                    impostor = GLTexture(image);
+                    impostor = GLTexture(image, Mipmap|Bilinear|Anisotropic);
+#else
+                    GLFrameBuffer framebuffer(GLTexture(size.x, size.y ,Depth), GLTexture(size.x, size.y, Alpha));
+                    framebuffer.bind(ClearColor|ClearDepth, 1);
+                    for(Surface& surface: model.surfaces) {
+                        GLShader& shader = surface.shader.shader;
+                        shader.bind();
+                        shader["modelViewProjectionTransform"_] = bake;
+                        shader["lightDirection"_] = lightDirection;
+                        //shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
+                        //shader["shadowTransform"_] = sun*instance;
+                        surface.indexBuffer.draw();
+                    }
+                    impostor = move(framebuffer.colorTexture);
+#endif
                 }
-
-                mat4 inverse = (device*projection*view).inverse();
-                vec3 zVector = inverse*vec3(0,0,255); // Impostor unit vector in world space //FIXME: projection shifts it at each corner
                 uint firstIndex = vertices.size;
                 indices << firstIndex << firstIndex+1 << firstIndex+2 << firstIndex+1 << firstIndex+2 << firstIndex+3;
+#if SW
+                mat4 inverse = device.inverse();
                 vertices
-                        << Vertex7{inverse*vec3(min.x, min.y, min.z),vec2(0,0),zVector}
-                        << Vertex7{inverse*vec3(max.x,min.y, min.z),vec2(1,0),zVector}
-                        << Vertex7{inverse*vec3(min.x, max.y,min.z),vec2(0,1),zVector}
-                        << Vertex7{inverse*vec3(max.x,max.y,min.z),vec2(1,1),zVector};
+                        << Vertex5{inverse*vec3(min.x, min.y, min.z),vec2(0,0)}
+                        << Vertex5{inverse*vec3(max.x,min.y, min.z),vec2(1,0)}
+                        << Vertex5{inverse*vec3(min.x, max.y,min.z),vec2(0,1)}
+                        << Vertex5{inverse*vec3(max.x,max.y,min.z),vec2(1,1)};
+#else
+                vertices
+                        << Vertex5{vec3(min.x, min.y, min.z),vec2(0,0)}
+                        << Vertex5{vec3(max.x,min.y, min.z),vec2(1,0)}
+                        << Vertex5{vec3(min.x, max.y,min.z),vec2(0,1)}
+                        << Vertex5{vec3(max.x,max.y,min.z),vec2(1,1)};
+#endif
             }
             model.impostorsIndices.upload(indices);
             model.impostorsVertices.upload(vertices); //FIXME: append impostor
@@ -988,37 +1023,29 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
         framebuffer.bind(ClearDepth);
 
         // Sky (TODO: fog)
-        sky.bindFragments({"color"_});
         sky["inverseViewProjectionMatrix"_] = (projection*view).inverse();
         sky[sky.sampler2D.first()] = 0; skymap.bind(0);
         vertexBuffer.bindAttribute(sky,"position"_,2);
         vertexBuffer.draw(TriangleStrip);
 
         // World-space lighting
-        vec3 sunLightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
+        vec3 lightDirection = normalize(sun.inverse().normalMatrix()*vec3(0,0,-1));
 
         for(Model& model: models) {
             if(model.impostors) {
-                glDepthMask(0);
+                //glDepthMask(0);
                 glBlendAlpha();
                 impostor.bind();
-                impostor.bindFragments({"color"_});
-                impostor["modelViewProjectionTransform"_] = projection*view;
                 impostor["impostor"_] = 0;
-                // Impostor normals are in view space (positive Z) FIXME: should be the view transform used to render the impostor
-                impostor["lightDirection"_] = normalize(view.normalMatrix()*sunLightDirection);
-                impostor["shadowMap"_] = 1; sunShadow.depthTexture.bind(1);
-                impostor["shadowTransform"_] = sun;
-                model.impostorsVertices.bindAttribute(impostor,"aPosition"_, 3, offsetof(Vertex7,position));
-                model.impostorsVertices.bindAttribute(impostor,"aTexCoords"_, 2, offsetof(Vertex7,texcoords));
-                //model.impostorsVertices.bindAttribute(impostor,"aZVector"_, 2, offsetof(Vertex7,zVector));
+                model.impostorsVertices.bindAttribute(impostor,"aPosition"_, 3, offsetof(Vertex5,position));
+                model.impostorsVertices.bindAttribute(impostor,"aTexCoords"_, 2, offsetof(Vertex5,texcoords));
                 for(uint i: range(model.impostors.size)) {
                     if(!model.impostors[i]) continue;
                     model.impostors[i].bind(0);
                     model.impostorsIndices.draw(i*6, 6);
                 }
                 glBlendNone();
-                glDepthMask(1);
+                //glDepthMask(1);
                 continue;
             }
             for(Surface& surface: model.surfaces) {
@@ -1026,8 +1053,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 if(surface.shader.blendAlpha) glBlendAlpha();
                 GLShader& shader = surface.shader.shader;
                 shader.bind();
-                shader.bindFragments({"color"_});
-                shader["lightDirection"_] = sunLightDirection;
                 shader["shadowMap"_] = 0; sunShadow.depthTexture.bind(0);
 
                 {int i=1; for(const String& name: shader.sampler2D) shader[name] = i++; }
@@ -1038,7 +1063,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
                 for(const mat4& instance : model.instances) {
                     shader["modelViewProjectionTransform"_] = projection*view*instance;
-                    shader["normalMatrix"_] = instance.normalMatrix();
+                    shader["lightDirection"_] = normalize(instance.inverse().normalMatrix()*lightDirection);
                     shader["shadowTransform"_] = sun*instance;
                     surface.indexBuffer.draw();
                 }

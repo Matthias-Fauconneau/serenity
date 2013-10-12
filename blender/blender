@@ -9,9 +9,8 @@ transform {
 normal {
  varying vec3 vNormal;
  vertex {
-  uniform mat3 normalMatrix;
   attribute vec3 aNormal;
-  vNormal = normalMatrix * aNormal;
+  vNormal = aNormal;
  }
  fragment { vec3 normal = normalize(vNormal); }
 }
@@ -54,28 +53,18 @@ diffuse {
 
 impostor {
  varying vec2 vTexCoords;
- varying vec4 shadowPosition;
- //varying vec3 zVector;
  vertex {
+   attribute vec3 aPosition;
+   gl_Position = vec4(aPosition,1);
    attribute vec2 aTexCoords;
    vTexCoords = aTexCoords;
-   uniform mat4 shadowTransform;
-   shadowPosition = shadowTransform * vec4(aPosition,1);
-   //attribute vec3 aZVector;
-   //zVector = (shadowTransform * vec4(aZVector,0)).xyz;
  }
  fragment {
   uniform sampler2D impostor;
-  vec4 xyzi = texture2D(impostor, vTexCoords).bgra;
-  vec2 xy = xyzi.xy*2-1;
-  vec3 normal = normalize(vec3(xy, sqrt(1-xy.x*xy.x-xy.y*xy.y)));
-  if(xyzi.a == 0) discard;
-  uniform sampler2DShadow shadowMap;
-  vec4 impostorShadowPosition = shadowPosition;// + xyzi.z*vec4(zVector,0);
-  float shadowLight = textureProj(shadowMap, vec4(impostorShadowPosition.xy,impostorShadowPosition.z-16./2048,impostorShadowPosition.w));
-  const vec3 lightColor = vec3(1, 1, 1);
-  uniform vec3 lightDirection;
-  diffuseLight += shadowLight * max(0,dot(lightDirection, normal)) * lightColor; // Sun light
+  vec4 rgba = texture2D(impostor, vTexCoords); //.bgra; ?
+  if(rgba.a < 0.5) discard;
+  out vec4 color;
+  color = rgba;
  }
 }
 
