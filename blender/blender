@@ -69,7 +69,7 @@ impostor {
   vec4 xyzi = texture2D(impostor, vTexCoords).bgra;
   vec2 xy = xyzi.xy*2-1;
   vec3 normal = normalize(vec3(xy, sqrt(1-xy.x*xy.x-xy.y*xy.y)));
-  if(xyzi == vec4(0)) discard;
+  if(xyzi.a == 0) discard;
   uniform sampler2DShadow shadowMap;
   vec4 impostorShadowPosition = shadowPosition;// + xyzi.z*vec4(zVector,0);
   float shadowLight = textureProj(shadowMap, vec4(impostorShadowPosition.xy,impostorShadowPosition.z-16./2048,impostorShadowPosition.w));

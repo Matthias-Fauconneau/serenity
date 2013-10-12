@@ -94,7 +94,7 @@ struct GLIndexBuffer {
     void unmapIndexBuffer();
     void upload(const ref<uint16>& indices);
     void upload(const ref<uint>& indices);
-    void draw(uint instanceCount=1) const;
+    void draw(uint start=0, uint count=-1) const;
 
     operator bool() { return id; }
 

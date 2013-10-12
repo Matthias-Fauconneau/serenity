@@ -239,15 +239,14 @@ void GLIndexBuffer::upload(const ref<uint>& indices) {
     indexCount = indices.size;
     indexSize = GL_UNSIGNED_INT;
 }
-void GLIndexBuffer::draw(uint instanceCount) const {
+void GLIndexBuffer::draw(uint start, uint count) const {
     assert(id);
     if(primitiveRestart) {
         glEnableClientState(GL_PRIMITIVE_RESTART_NV);
         glPrimitiveRestartIndex(indexSize==GL_UNSIGNED_SHORT?0xFFFF:0xFFFFFFFF);
     }
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    if(instanceCount==1) glDrawElements(primitiveType, indexCount, indexSize, 0);
-    else glDrawElementsInstanced(primitiveType, indexCount, indexSize, 0, instanceCount);
+    glDrawElements(primitiveType, count==uint(-1)?indexCount:count, indexSize, (void*)uint64(start*(indexSize==GL_UNSIGNED_SHORT?2:4)));
     if(primitiveRestart) glDisableClientState(GL_PRIMITIVE_RESTART_NV);
 }
 
