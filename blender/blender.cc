@@ -357,10 +357,14 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     // View
     int2 lastPos; // last cursor position to compute relative mouse movements
     vec2 rotation=vec2(-2*PI/3,-PI/3); // current view angles (yaw,pitch)
-    //float focalLength = 90; // current focal length (in mm for a 36mm sensor)
-    //const float zoomSpeed = 10; // in mm/click
+#define PERSPECTIVE 1
+#if PERSPECTIVE
+    float focalLength = 90; // current focal length (in mm for a 36mm sensor)
+    const float zoomSpeed = 10; // in mm/click
+#else
     float viewScale = 4;
     const float zoomSpeed = pow(2,1./4); /*/in x/click*/
+#endif
     Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL};
 
     // File
@@ -878,17 +882,18 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
 
         // Computes view transform
         uint width=size.x, height = size.y;
-        mat4 projection;
-        //projection.perspective(2*atan(36,2*focalLength), width, height, 1./4, 4);
+        mat4 projection, view;
+#if PERSPECTIVE
+        projection.perspective(2*atan(36,2*focalLength), width, height, 1./4, 4);
+        view.scale(1.f/worldRadius); // fit scene (isometric approximation)
+#else
         projection.scale(vec3(height*1./width,1,-1/viewScale));
-        mat4 view;
         view.scale(viewScale/worldRadius); // fit scene (isometric approximation)
-        //view.scale(1.f/worldRadius); // fit scene (isometric approximation)
-        //view.translate(vec3(0,0,-worldRadius)); // step back
+#endif
+        view.translate(vec3(0,0,-worldRadius)); // step back
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
-        //view.translate(vec3(0,0,-worldCenter.z));
-        static mat4 debugInstance; view.translate(-debugInstance[3].xyz());
+        view.translate(vec3(0,0,-worldCenter.z));
 
         // Render impostors (TODO: 60fps limit, update impostors while idle between frames)
         //bake.bind(); bake.bindFragments({"NNNZ"_});
@@ -896,11 +901,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             if(model.instances.size<impostorMin) continue;
             array<Vertex7> vertices;
             array<uint> indices;
-            //static int lastScale = 0;
-            //if(viewScale != lastScale ) {
-                //for(Surface& surface: model.surfaces) if(surface.impostor) surface.impostor=GLTexture();
-                //lastScale = viewScale;
-            //}
             if(!model.impostors.size<model.instances.size) model.impostors.grow(model.instances.size);
             for(uint i : range(model.instances.size)) {
                 const mat4& instance = model.instances[i];
@@ -921,19 +921,19 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 }
 
                 if(i==model.impostorIndex) {
+                    int2 size = int3(max-min).xy();
+                    if(!size.x || !size.y) continue;
+                    if(size.x>512 || size.y>512) continue; //FIXME: direct render
+
                     //FIXME: VFC cull impostor updates
                     GLTexture& impostor = model.impostors[i];
                     mat3 normalMatrix = (view*instance).normalMatrix();
 
-                    int2 size = int3(max-min).xy();
-                    //if(!size.x || !size.y || size.x>512 || size.y>512) continue; //FIXME: direct render few instances (VFC)
                     Image image(size.x, size.y, true);
                     clear(image.buffer.begin(), image.buffer.size, byte4(0,0,0xFF,0));
 
                     for(uint i: range(model.surfaces.size)) {
                         Surface& surface = model.surfaces[i];
-                        //if(surface.name!="leafs1shader"_) continue; //FIXME: store material ID and merge surfaces in a single impostor
-                        //if(impostor) continue; //FIXME: cache instances.size impostors and update furthest one
                         for(uint i=0; i<surface.indices.size; i+=3) { // Rasterization, TODO: switch to raycast, faster with grid for high depth complexity
                             const Vertex& v1 = surface.vertices[surface.indices[i+0]];
                             const Vertex& v2 = surface.vertices[surface.indices[i+1]];
@@ -950,7 +950,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                                     if(cross(p-b,c-b)<0) continue;
                                     if(cross(p-c,a-c)<0) continue;
                                     uint z = round((p1.z+p2.z+p3.z)/3); // Assumes triangle are small enough to spare interpolation
-                                    assert_(x<image.width && y<image.height && z<0x100);
+                                    assert_(x<image.width && y<image.height && z<0x100, (int)x, (int)y, (int)z);
                                     if(z>=image(x,y).r) continue; // Depth test (reversed Z in projection -> pass if less)
                                     vec3 n = round((v1.normal+v2.normal+v3.normal)/3.f); // Assumes triangle are small enough to spare interpolation
                                     n = normalize(normalMatrix*n);
@@ -975,7 +975,6 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                         << Vertex7{inverse*vec3(max.x,min.y, min.z),vec2(1,0),zVector}
                         << Vertex7{inverse*vec3(min.x, max.y,min.z),vec2(0,1),zVector}
                         << Vertex7{inverse*vec3(max.x,max.y,min.z),vec2(1,1),zVector};
-                //debugInstance = instance; break;
             }
             model.impostorsIndices.upload(indices);
             model.impostorsVertices.upload(vertices); //FIXME: append impostor
@@ -1069,10 +1068,13 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
             rotation += float(2.f*PI)*vec2(delta)/vec2(size); //TODO: warp
             rotation.y= clip(float(-PI/2),rotation.y,float(0)); // Keep pitch between [-PI/2,0]
         }
-        /*else if(event == Press && button == WheelUp) focalLength += zoomSpeed;
-        else if(event == Press && button == WheelDown) focalLength = max(1.f,focalLength-zoomSpeed);*/
+#if PERSPECTIVE
+        else if(event == Press && button == WheelUp) focalLength += zoomSpeed;
+        else if(event == Press && button == WheelDown) focalLength = max(1.f,focalLength-zoomSpeed);
+#else
         else if(event == Press && button == WheelUp) viewScale *= zoomSpeed;
         else if(event == Press && button == WheelDown) viewScale /= zoomSpeed;
+#endif
         else return false;
         return true;
     }
