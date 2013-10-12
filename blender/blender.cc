@@ -642,8 +642,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 const MVert& vert = verts[i];
                 vec3 position = vec3(vert.co);
                 vec3 normal = normalize(vec3(vert.no[0],vert.no[1],vert.no[2]));
-
-                model.vertices << Vertex {position, normal/*, vec2(0,0)*/};
+                model.vertices << Vertex {position, normal};
                 i++;
             }
 
@@ -777,11 +776,26 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                 array<uint> indices = move(surface.indices);
                 surface.indices = array<uint>(surface.indices.size);
                 surface.vertices = array<Vertex>(model.vertices.size);
+                uint duplicates=0;
                 for(uint index: indices) {
-                    uint newIndex = remap[index];
-                    if(newIndex == uint(-1)) { newIndex=remap[index]=surface.vertices.size; surface.vertices << model.vertices[index]; }
+                    uint& newIndex = remap[index];
+                    if(newIndex == uint(-1)) {
+                        Vertex v = model.vertices[index];
+                        /*for(uint i: range(surface.vertices.size)) { const Vertex& o = surface.vertices[i]; // 6% duplicates on tree (FIXME: grid)
+                            if(sq(v.position-o.position)<0x1.0p-16 && sq(v.normal-o.normal)<0x1.0p-16) {
+                                duplicates++;
+                                newIndex = i;
+                                goto break_;
+                            }
+                        }*/ /*else*/ {
+                            newIndex = surface.vertices.size;
+                            surface.vertices << v;
+                        }
+                        //break_:;
+                    }
                     surface.indices << newIndex;
                 }
+                log(model.vertices.size, surface.vertices.size, duplicates);
 
                 // Uploads geometry
                 surface.vertexBuffer.upload(surface.vertices);
@@ -909,18 +923,46 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
                     if(surface.impostor) continue; //FIXME: cache instances.size impostors and update furthest one
                     int2 size = int3(max-min).xy();
                     if(!size.x || !size.y || size.x>256 || size.y>256) continue; //FIXME: direct render few instances (VFC)
-                    // Approximate rendering by splatting vertices (faster than raycast for less than 2 vertices/pixel)
                     Image image(size.x, size.y, true);
                     clear(image.buffer.begin(), image.buffer.size);
-                    for(const Vertex& v: surface.vertices) {
+                    // Approximate rendering by splatting vertices (awful quality)
+                    /*for(const Vertex& v: surface.vertices) {
                         vec3 p = transform * v.position;
                         uint x = p.x, y=p.y, z=p.z;
                         assert_(x<image.width && y<image.height && z<0x100);
                         if(z<image(x,y).r) continue;
                         vec3 n = normalize(normalMatrix*v.normal);
+                        if(n.z < 0) n=-n;
                         uint nx = 255*(n.x+1)/2, ny = 255*(n.y+1)/2;
                         assert_(nx<0x100 && ny<0x100, v.normal, n, normalMatrix);
                         image(x,y) = byte4(nx,ny,z,1); // normal.xyz, z //FIXME: normal.xy, z, material
+                    }*/
+                    for(uint i=0; i<surface.indices.size; i+=3) { // Rasterization, TODO: switch to raycast, faster with grid for high depth complexity
+                        const Vertex& v1 = surface.vertices[surface.indices[i+0]];
+                        const Vertex& v2 = surface.vertices[surface.indices[i+1]];
+                        const Vertex& v3 = surface.vertices[surface.indices[i+2]];
+                        vec3 p1 = transform*v1.position; vec2 a=p1.xy();
+                        vec3 p2 = transform*v2.position; vec2 b=p2.xy();
+                        vec3 p3 = transform*v3.position; vec2 c=p3.xy();
+                        int2 min = int2(::min(::min(a,b),c)); // no need to clip to device as device is fitted to model
+                        int2 max = int2(::max(::max(a,b),c)); //ceil
+                        for(uint y=min.y; y<=(uint)max.y; y++) {
+                            for(uint x=min.x; x<=(uint)max.x; x++) {
+                                vec2 p = vec2(x,y);
+                                if(cross(p-a,b-a)<0) continue; //FIXME: precompute edges
+                                if(cross(p-b,c-b)<0) continue;
+                                if(cross(p-c,a-c)<0) continue;
+                                uint z = (p1.z+p2.z+p3.z)/3; //round, Assumes triangle are small enough to spare interpolation
+                                assert_(x<image.width && y<image.height && z<0x100);
+                                if(z<image(x,y).r) continue; // Depth test
+                                vec3 n = (v1.normal+v2.normal+v3.normal)/3.f; //round, Assumes triangle are small enough to spare interpolation
+                                n = normalize(normalMatrix*n);
+                                //if(n.z < 0) n=-n; Double sided ? If it is the case, FIXME: as we assume direct winding
+                                uint nx = 255*(n.x+1)/2, ny = 255*(n.y+1)/2;
+                                assert_(nx<0x100 && ny<0x100, n);
+                                image(x,y) = byte4(nx,ny,z,1);
+                            }
+                        }
                     }
                     //FIXME: trim
                     surface.impostor = GLTexture(image);

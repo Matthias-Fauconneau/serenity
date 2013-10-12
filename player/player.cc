@@ -33,7 +33,7 @@ struct Player {
                 float target[read*2];
                 resampler.read(target, read);
                 for(uint i: range(read*2)) {
-                    int s = target[i]*(32768-1024 /*Headroom as rounding while resampling might add up*/);
+                    int s = target[i]*(32768-4096 /*Headroom as rounding while resampling might add up*/);
                     if(s<-32768 || s > 32767) error("Clip", target[i], s,32768*(1-1./s));
                     output[i] = s;
                 }
@@ -111,6 +111,7 @@ struct Player {
         window.show();
         mainThread.setPriority(-20);
     }
+    ~Player() { writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate))); }
     void queueFile(const string& folder, const string& file, bool withAlbumName=true) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
@@ -179,6 +180,7 @@ struct Player {
         else { output.stop(); window.setIcon(pauseIcon()); }
         playButton.enabled=play;
         window.render();
+        writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate)));
     }
     void stop() {
         setPlaying(false);
@@ -196,6 +198,5 @@ struct Player {
         elapsed.setText(String(dec(position/60,2)+":"_+dec(position%60,2)));
         remaining.setText(String(dec((duration-position)/60,2)+":"_+dec((duration-position)%60,2)));
         window.render();
-        if(position%30==0) writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(position)));
     }
 } application;
