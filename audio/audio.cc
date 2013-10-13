@@ -46,15 +46,17 @@ typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
 
-Device getPCMDevice() {
+Device getPlaybackDevice() {
     Folder snd("/dev/snd");
-    for(const String& device: snd.list(Devices)) if(startsWith(device, "pcm"_) && endsWith(device,"D0p"_)) return Device(device, snd, ReadWrite);
-    for(const String& device: snd.list(Devices)) if(startsWith(device, "pcm"_) && endsWith(device,"p"_)) return Device(device, snd, ReadWrite);
+    for(const String& device: snd.list(Devices))
+        if(startsWith(device, "pcm"_) && endsWith(device,"D0p"_)) return Device(device, snd, ReadWrite);
+    for(const String& device: snd.list(Devices))
+        if(startsWith(device, "pcm"_) && endsWith(device,"p"_)) return Device(device, snd, ReadWrite);
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
 AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
-    : Device(getPCMDevice()), Poll(Device::fd,POLLOUT,thread) { //FIXME: list devices
+    : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread) { //FIXME: list devices
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
@@ -90,4 +92,50 @@ void AudioOutput::event() {
         if(readSize<periodSize) { stop(); return; }
     }
     if(status->state == Prepared) io<START>();
+}
+
+Device getCaptureDevice() {
+    Folder snd("/dev/snd");
+    for(const String& device: snd.list(Devices))
+        if(startsWith(device, "pcm"_) && endsWith(device,"D0c"_)) return Device(device, snd, ReadWrite);
+    for(const String& device: snd.list(Devices))
+        if(startsWith(device, "pcm"_) && endsWith(device,"c"_)) return Device(device, snd, ReadWrite);
+    error("No PCM playback device found"); //FIXME: Block and watch folder until connected
+}
+
+AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
+    HWParams hparams;
+    hparams.mask(Access).set(MMapInterleaved);
+    hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
+    hparams.mask(SubFormat).set(Standard);
+    hparams.interval(SampleBits) = sampleBits;
+    hparams.interval(FrameBits) = sampleBits*channels;
+    hparams.interval(Channels) = channels;
+    hparams.interval(Rate) = rate; assert(rate);
+    hparams.interval(Periods) = 2;
+    hparams.interval(PeriodSize) = periodSize;
+    iowr<HW_PARAMS>(hparams);
+    this->sampleBits = hparams.interval(SampleBits);
+    this->rate = hparams.interval(Rate);
+    this->periodSize = hparams.interval(PeriodSize);
+    assert_(hparams.interval(Channels)==2);
+    bufferSize = hparams.interval(Periods) * this->periodSize;
+    buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
+    status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
+    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+}
+void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
+void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
+void AudioInput::event() {
+    if(status->state == XRun) { log("Overrun"_); io<START>(); }
+    int available = status->hwPointer + bufferSize - control->swPointer;
+    if(available>=(int)periodSize) {
+        uint readSize;
+        if(sampleBits==16) readSize=write16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        //else if(sampleBits==32) readSize=write32(((int32*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        else error(sampleBits);
+        assert(readSize<=periodSize);
+        control->swPointer += readSize;
+        if(readSize<periodSize) { stop(); return; }
+    }
 }

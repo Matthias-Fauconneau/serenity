@@ -55,12 +55,12 @@ struct Player {
     Text elapsed = "00:00"_;
     Slider slider;
     Text remaining = "00:00"_;
-    HBox toolbar;//{&playButton, &nextButton, &elapsed, &slider, &remaining};
+    HBox toolbar {{&playButton, &nextButton, &elapsed, &slider, &remaining}};
     Scroll< List<Text>> albums;
     Scroll< List<Text>> titles;
-    HBox main;//{ &albums.area(), &titles.area() };
-    VBox layout;//{ &toolbar, &main };
-    Window window {&layout, int2(-1050/2,-1050/2), "Player"_, pauseIcon()};
+    HBox main {{ &albums.area(), &titles.area() }};
+    VBox layout {{ &toolbar, &main }};
+    Window window {&layout, int2(-600,-1024), "Player"_, pauseIcon()};
 
 // Content
     array<String> folders;
@@ -70,9 +70,6 @@ struct Player {
     Player() {
         albums.always=titles.always=true;
         elapsed.minSize.x=remaining.minSize.x=64;
-        toolbar<<&playButton<<&nextButton<<&elapsed<<&slider<<&remaining;
-        main<<&albums.area()<<&titles.area();
-        layout<<&toolbar<<&main;
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.localShortcut(Escape).connect([]{exit();});

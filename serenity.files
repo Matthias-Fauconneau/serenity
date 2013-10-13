@@ -119,5 +119,5 @@ sponza/view.cc
 sponza/scene.h
 sponza/scene.cc
 
+tuner/tuner.h
 tuner/tuner.cc
-nki.cc
