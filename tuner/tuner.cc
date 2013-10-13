@@ -41,8 +41,8 @@ inline float key(float pitch) { return 69+log2(pitch/440)*12; }
 void Spectrum::render(int2, int2 size) {
     if(!dts) return;
     float max=0;
-    int shift = (88*12-size.x);
-    for(uint x: range(size.x)) {
+    int shift = 88*12-size.x;
+    /*for(uint x: range(size.x)) { // Integrate bands over single pixels
         int f = shift + x; // Align right
         if(f<0) continue; // size.x > 88·12px
         uint n0 = floor(pitch(21+(f-6)/12.0)/sampleRate*N);
@@ -59,12 +59,40 @@ void Spectrum::render(int2, int2 size) {
         float h = sum*(size.y-1)/maximumBandPower;
         int y0 = min(int(h), size.y-1); // Clips as spectrum is normalized for unit area (not top peak)
         for(int y: range(size.y-1-y0+1,size.y)) framebuffer(x, y) = 0xFF; //byte4(0,0,0,0xFF);
-        if(h<size.y-1) framebuffer(x, size.y-1-y0) = clip(0,(int)round((/*1-*/(h-y0))*0xFF),0xFF);
+        if(h<size.y-1) framebuffer(x, size.y-1-y0) = sRGB[clip(0,(int)round(((h-y0))*0xFF),0xFF)];
+    }*/
+    for(uint k: range(88)) { // Integrate bands over single keys
+        int x0 = k*12-6-shift; // Key start
+        if(x0+12<0 || x0>size.x) continue;
+        const float offset = 0.5; // FIXME
+        uint n0 = floor(pitch(21+k-0.5+offset)/sampleRate*N);
+        uint n1 = ceil(pitch(21+k+0.5+offset)/sampleRate*N);
+        assert(n1>n0);
+        float sum=0;
+        for(uint n=n0; n<n1; n++) sum += spectrum[n]; //FIXME: Weight n0 and n1 with overlap
+        sum /= (n1-n0);
+        max = ::max(max, sum);
+        float h = sum*(size.y-1)/maximumBandPower;
+        int y0 = min(int(h), size.y-1); // Clips as maximum is smoothed
+        for(int y: range(size.y-1-y0+1,size.y)) {
+            for(int x: range(x0,x0+12)) {
+                if(x<0 || x>=size.x) continue;
+                framebuffer(x, y) = 0xFF;
+            }
+        }
+        if(h<size.y-1) {
+            int y = size.y-1-y0;
+            int v = sRGB(h-y0);
+            for(int x: range(x0,x0+12)) {
+                if(x<0 || x>=size.x) continue;
+                framebuffer(x, y) = v;
+            }
+        }
     }
     const float alpha = 1./(sampleRate/periodSize); maximumBandPower = (1-alpha)*maximumBandPower + alpha*max;
     for(uint k: range(1,88)) {
-        int x = k*12+6-shift;
-        if(x<0 || x>size.x) continue;
+        int x = k*12-6-shift; // Key start
+        if(x<0 || x>=size.x) continue;
         /*if(k%12==3||k%12==8) line; // B/C, E/F
         else if(x%12==1||x%12==4||x%12==6||x%12==9||x%12==11) fill; // black*/
         for(uint y: range(size.y)) framebuffer(x, y).g = 0xFF;
