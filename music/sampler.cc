@@ -183,9 +183,10 @@ void Sampler::noteEvent(uint key, uint velocity) {
     if(velocity==0) {
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
             current=&note; //schedule release sample
-            //release fade out current note
-            float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
-            note.step=(v4sf){step,step,step,step};
+            if(note.releaseTime) {//release fade out current note
+                float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
+                note.step=(v4sf){step,step,step,step};
+            }
         }
         if(!current) return; //already fully decayed
         velocity=current->velocity;
@@ -223,6 +224,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
         }
     }
     if(current) return; //release samples are not mandatory
+    if(key<=30 || key>=90) return; // Harpsichord don't have the lowest/highest piano notes
     log("Missing sample"_,key);
     log(samples);
 }

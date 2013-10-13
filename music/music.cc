@@ -115,10 +115,10 @@ struct Music {
         window.localShortcut(Escape).connect([]{exit();});
 
         if(arguments() && endsWith(arguments()[0],".sfz"_))
-            sampler.open(audio.rate, arguments()[0], root);
+            sampler.open(audio.rate, arguments()[0], Folder("Samples"_,root));
         else {
-            //sampler.open(audio.rate, "Boesendorfer.sfz"_,Folder("Samples"_,root)); //FIXME
-            sampler.open(audio.rate, "Salamander.sfz"_,Folder("Samples"_,root));
+            sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_,root));
+            //sampler.open(audio.rate, "Blanchet-Jeu 1.sfz"_,Folder("Samples"_,root));
         }
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);

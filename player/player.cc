@@ -33,7 +33,7 @@ struct Player {
                 float target[read*2];
                 resampler.read(target, read);
                 for(uint i: range(read*2)) {
-                    int s = target[i]*(32768-4096 /*Headroom as rounding while resampling might add up*/);
+                    int s = target[i]*(32768-8192 /*25% headroom as rounding while resampling might add up*/);
                     if(s<-32768 || s > 32767) error("Clip", target[i], s,32768*(1-1./s));
                     output[i] = s;
                 }
@@ -107,6 +107,9 @@ struct Player {
                     seek(toInteger(section(mark,0,1,2)));
                 }
             }
+        } else {
+            updatePlaylist();
+            next();
         }
         window.show();
         mainThread.setPriority(-20);
@@ -150,18 +153,7 @@ struct Player {
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
         else { window.setTitle("Player"_); stop(); return; }
-        if(randomSequence) {
-            uint randomIndex = 0, listIndex = 0;
-            if(titles.index < files.size) { listIndex=titles.index;  for(uint i: range(randomSequence.size)) if(randomSequence[i]==files[titles.index]) { randomIndex=i; break; } }
-            randomIndex += files.size-listIndex; // Assumes already queued tracks are from randomSequence
-            while(titles.count() < listIndex + 16) { // Schedules at least 16 tracks drawing from random sequence as needed (FIXME: show previous on startup)
-                string path = randomSequence[randomIndex];
-                string folder = section(path,'/',0,1), file = section(path,'/',1,-1);
-                queueFile(folder, file, true);
-                randomIndex++;
-            }
-            while(titles.count() > 64 && titles.index > 0) { titles.take(0); files.take(0); titles.index--; } // Limits total size when running for a long time
-        }
+        updatePlaylist();
     }
     void setRandom(bool random) {
         main.clear();
@@ -174,6 +166,22 @@ struct Player {
             Random random; // Unseeded so that the random sequence only depends on collection
             while(files) randomSequence << files.take(random%files.size);
         } else main<<&albums.area()<<&titles.area(); // Show albums
+    }
+    void updatePlaylist() {
+        if(!randomSequence) return;
+        uint randomIndex = 0, listIndex = 0;
+        if(titles.index < files.size) {
+            listIndex=titles.index;
+            for(uint i: range(randomSequence.size)) if(randomSequence[i]==files[titles.index]) { randomIndex=i; break; }
+        }
+        randomIndex += files.size-listIndex; // Assumes already queued tracks are from randomSequence
+        while(titles.count() < listIndex + 16) { // Schedules at least 16 tracks drawing from random sequence as needed
+            string path = randomSequence[randomIndex];
+            string folder = section(path,'/',0,1), file = section(path,'/',1,-1);
+            queueFile(folder, file, true);
+            randomIndex++;
+        }
+        while(titles.count() > 64 && titles.index > 0) { titles.take(0); files.take(0); titles.index--; } // Limits total size
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {

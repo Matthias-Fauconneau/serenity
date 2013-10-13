@@ -111,7 +111,7 @@ struct Build {
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
-                while(pids.size>=coreCount-1) { // Waits for a job to finish before launching a new unit
+                while(pids.size>=4) { // Waits for a job to finish before launching a new unit
                     int pid =  wait(); // Waits for any child to terminate
                     if(wait(pid)) fail();
                     pids.remove(pid);

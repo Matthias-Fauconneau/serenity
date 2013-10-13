@@ -39,6 +39,7 @@ struct Tuner {
     Timer timer;
     Tuner() {
         file.openPath("test.ogg"_);
+        update();
     }
     void update() {
         float buffer[spectrum.periodSize];

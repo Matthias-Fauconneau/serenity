@@ -39,6 +39,8 @@ io/png.h
 io/tga.cc
 io/tiff.cc
 io/tiff.h
+io/xml.h
+io/xml.cc
 
 ui/display.cc
 ui/display.h
@@ -118,3 +120,4 @@ sponza/scene.h
 sponza/scene.cc
 
 tuner/tuner.cc
+nki.cc
