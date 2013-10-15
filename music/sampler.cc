@@ -300,7 +300,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
             else if(time>stopTime+reverbSize) { stopTime=0; return 0; } // Stops audio output (will be restarted on noteEvent (cf music.cc))
         } else stopTime=0;*/
 
-        //if(enableReverb) { // Convolution reverb
+        if(enableReverb) { // Convolution reverb
             if(size!=periodSize) error("Expected period size ",periodSize,"got",size);
             // Deinterleaves mixed signal into reverb buffer
             for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][reverbSize+i] = buffer[2*i+c];
@@ -332,9 +332,9 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
                     buffer[2*i+c] = (1.f/N)*input[reverbSize+i];
                 }
             }
-        /*} else {
+        } else {
             for(uint i: range(2*size)) buffer[i] *= 0x1p5f; // 24bit samples to 32bit output with 3bit head room to add multiple notes
-        }*/
+        }
         // Converts mixing buffer to signed 32bit output
         bool clip=false;
         for(uint i: range(size/2)) {

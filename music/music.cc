@@ -83,8 +83,7 @@ struct PDFScore : PDF {
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder root = "/"_;
-    Folder folder{"Sheets"_,root};
+    Folder folder{"Sheets"_};
     ICON(music)
     VBox layout;
 #if RECORD
@@ -115,10 +114,10 @@ struct Music {
         window.localShortcut(Escape).connect([]{exit();});
 
         if(arguments() && endsWith(arguments()[0],".sfz"_))
-            sampler.open(audio.rate, arguments()[0], Folder("Samples"_,root));
+            sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
         else {
-            sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_,root));
-            //sampler.open(audio.rate, "Blanchet-Jeu 1.sfz"_,Folder("Samples"_,root));
+            sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
+            //sampler.open(audio.rate, "Blanchet.sfz"_,Folder("Samples"_));
         }
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);

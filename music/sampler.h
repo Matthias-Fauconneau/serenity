@@ -56,7 +56,7 @@ struct Sampler : Poll {
     //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
 
     /// Convolution reverb
-    const bool enableReverb=true; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
+    bool enableReverb=true; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
