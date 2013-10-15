@@ -7,7 +7,7 @@ generic struct mref : ref<T> {
     /// Default constructs an empty reference
     mref(){}
     /// References \a size elements from \a data pointer
-    mref(T* data, size_t size) : ref<T>(data,size){}
+    mref(T* data, size_t size) : ref<T>(data,size) {}
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }

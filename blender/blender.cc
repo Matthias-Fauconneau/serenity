@@ -11,7 +11,7 @@
 FILE(blender)
 
 // Quicksort
-generic uint partition(array<T>& at, int left, int right, int pivotIndex) {
+generic uint partition(mref<T>& at, int left, int right, int pivotIndex) {
     swap(at[pivotIndex], at[right]);
     const T& pivot = at[right];
     uint storeIndex = left;
@@ -24,7 +24,7 @@ generic uint partition(array<T>& at, int left, int right, int pivotIndex) {
     swap(at[storeIndex], at[right]);
     return storeIndex;
 }
-generic void quicksort(array<T>& at, int left, int right) {
+generic void quicksort(mref<T>& at, int left, int right) {
     if(left < right) { // If the list has 2 or more items
         int pivotIndex = partition(at, left, right, (left + right)/2);
         if(pivotIndex) quicksort(at, left, pivotIndex-1);
@@ -32,7 +32,7 @@ generic void quicksort(array<T>& at, int left, int right) {
     }
 }
 /// Quicksorts the array in-place
-generic void quicksort(array<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }
+generic void quicksort(mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }
 
 /// Used to fix pointers in .blend file-block sections
 struct Block {
