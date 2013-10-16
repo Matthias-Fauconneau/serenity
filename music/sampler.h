@@ -31,7 +31,7 @@ struct Note {
 };
 
 struct Sample {
-    Map map; FLAC flac; array<float> envelope; //Sample data
+    Map data; FLAC flac; array<float> envelope; //Sample data
     int16 trigger=0; uint16 lovel=0; uint16 hivel=127; uint16 lokey=0; uint16 hikey=127; //Input controls
     int16 pitch_keycenter=60; uint16 releaseTime=0; int16 amp_veltrack=/*100*/0; float volume=1; //Performance parameters
 };

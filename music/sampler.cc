@@ -56,7 +56,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
         s.whileAny(" \n\r"_);
         if(!s) break;
         if(s.match("<group>"_)) { group=Sample(); sample = &group; }
-        else if(s.match("<region>"_)) { assert(!group.map.data); samples<<move(group); sample = &samples.last();  }
+        else if(s.match("<region>"_)) { assert(!group.data.data); samples<<move(group); sample = &samples.last();  }
         else if(s.match("//"_)) {
             s.untilAny("\n\r"_);
             s.whileAny("\n\r"_);
@@ -66,10 +66,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 String path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
-                sample->map = Map(path,folder);
-                sample->flac = FLAC(sample->map);
+                sample->data = Map(path,folder);
+                sample->flac = FLAC(sample->data);
                 if(!existsFile(String(path+".env"_),folder)) {
-                    FLAC flac(sample->map);
+                    FLAC flac(sample->data);
                     array<float> envelope; uint size=0;
                     while(flac.blockSize!=0) {
                         const uint period=1<<8;
@@ -109,7 +109,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     for(Sample& s: samples) {
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
-        s.map.lock(); // Locks compressed samples in memory
+        s.data.lock(); // Locks compressed samples in memory
 
         for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
             float shift = key-s.pitch_keycenter; //TODO: tune

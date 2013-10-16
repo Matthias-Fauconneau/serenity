@@ -159,7 +159,7 @@ void Window::destroy() {
 // Render
 void Window::event() {
     window=this;
-    for(;;) { // Always try to process some X input events before rendering (even when not waked up by an X input event)
+    for(;;) { // Always process any pending X input events before rendering
         readLock.lock();
         if(!poll()) { readLock.unlock(); break; }
         uint8 type = read<uint8>();
@@ -167,8 +167,9 @@ void Window::event() {
         readLock.unlock();
         processEvent(type, e);
         while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
-    };
+    }
     if(revents==IDLE) {
+        needUpdate = false;
         if(autoResize) {
             int2 hint = widget->sizeHint();
             if(hint != size) { setSize(hint); return; }
@@ -327,7 +328,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==Expose) { if(!e.expose.count) render(); }
         else if(type==UnmapNotify) mapped=false;
-        else if(type==MapNotify) mapped=true;
+        else if(type==MapNotify) { mapped=true; if(needUpdate) render(); }
         else if(type==ReparentNotify) {}
         else if(type==ConfigureNotify) {
             position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
@@ -355,7 +356,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
     }
 }
-void Window::render() { /*if(mapped)*/ queue(); }
+void Window::render() { if(mapped) queue(); else needUpdate=true; }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }

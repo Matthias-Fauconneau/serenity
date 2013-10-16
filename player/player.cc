@@ -199,7 +199,6 @@ struct Player {
     void seek(int position) { if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); } }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
-        if(!window.mapped) return;
         slider.value = position; slider.maximum=duration;
         elapsed.setText(String(dec(position/60,2)+":"_+dec(position%60,2)));
         remaining.setText(String(dec((duration-position)/60,2)+":"_+dec((duration-position)%60,2)));

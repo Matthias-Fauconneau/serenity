@@ -64,7 +64,7 @@ generic struct buffer : mref<T> {
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
-    ~buffer(){ if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
+    ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
 
     // Overrides mref const operators
     T* begin() { return (T*)data; }

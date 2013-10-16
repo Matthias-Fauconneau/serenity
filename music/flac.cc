@@ -247,7 +247,7 @@ void FLAC::decodeFrame() {
     setRoundMode(Even);
     index=align(8,index);
     skip(16);
-    assert(blockSize<=readIndex+audio.capacity-writeIndex,blockSize,readIndex,audio.capacity,writeIndex);
+    assert(align(4,blockSize)<=readIndex+audio.capacity-writeIndex,blockSize,align(4,blockSize),align(4,blockSize)+writeIndex,audio.capacity);
     audio.size+=blockSize;
     uint beforeWrap=audio.capacity-writeIndex;
     if(blockSize>beforeWrap) {
@@ -275,4 +275,12 @@ uint FLAC::read(float2 *out, uint size) {
     }
     audio.size-=size; position+=size;
     return size;
+}
+
+buffer<float2> decodeAudio(const ref<byte>& data, uint duration) {
+    FLAC flac(data);
+    duration = ::min(duration, flac.duration);
+    flac.audio = buffer<float2>(duration+4,0);
+    while(flac.audio.size<duration) flac.decodeFrame();
+    return move(flac.audio);
 }
