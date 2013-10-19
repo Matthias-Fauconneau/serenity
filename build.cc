@@ -39,7 +39,7 @@ struct Build {
     string install = arguments().size>=3?arguments()[2]:""_;
     bool graph = build=="graph"_, compile = !graph;
     const Folder& folder = currentWorkingDirectory();
-    const string tmp = "/var/tmp/"_;
+    const string tmp = "/var/tmp/rock_build/"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -125,6 +125,7 @@ struct Build {
     void fail() { log("Build failed"_); exit(-1); exit_thread(-1); }
 
     Build() {
+        Folder(tmp, root(), true);
         Folder(tmp+build, root(), true);
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+build+"/"_+subfolder, root(), true);
         int64 lastEdit = processModule( find(target+".cc"_) );
@@ -139,7 +140,7 @@ struct Build {
                     String object = tmp+"files/"_+name+".o"_;
                     int64 lastFileEdit = File(name, subfolder).modifiedTime();
                     if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-                        if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
+                        if(execute("ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
                         lastEdit = max(lastEdit, lastFileEdit);
                     }
                     file = move(object);
@@ -153,7 +154,7 @@ struct Build {
                 args << copy(files);
                 args << apply(libraries, [this](const String& library){ return "-l"_+library; });
                 for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-                if(execute("/usr/bin/g++"_,toRefs(args))) fail();
+                if(execute("g++"_,toRefs(args))) fail();
             }
             if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
         }

@@ -171,8 +171,14 @@ void exit(int status) {
 }
 
 // Environment
-int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
-    if(!existsFile(path)) { warn("Executable not found",path); return -1; }
+int execute(const string& name, const ref<string>& args, bool wait, const Folder& workingDirectory) {
+    String path (name);
+    if(!existsFile(path,currentWorkingDirectory())) {
+        static array<string> PATH = split(getenv("PATH")?getenv("PATH"):":/bin:/usr/bin", ':');
+        for(string folder: PATH) if(existsFile(folder+"/"_+name,currentWorkingDirectory())) { path=folder+"/"_+name; goto found_; }
+        /*else*/ warn("Executable not found",path); return -1;
+        found_:;
+    }
 
     array<String> args0(1+args.size);
     args0 << strz(path);
