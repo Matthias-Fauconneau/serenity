@@ -79,6 +79,7 @@ music/sampler.h
 music/sampler.cc
 music/midi.h
 music/midi.cc
+music/pdf
 music/pdf.h
 music/pdf.cc
 music/score.h

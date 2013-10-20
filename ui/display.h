@@ -15,6 +15,10 @@ extern int resolution; /// Device resolution in dots per inch (dpi)
 #define GL 1
 #if GL
 extern int2 viewportSize;
+vec2 vertex(float x, float y);
+vec2 vertex(vec2 v);
+struct Vertex { vec2 position, texCoord; };
+Vertex vertex(Rect r, float x, float y);
 #endif
 
 // Clip

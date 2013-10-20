@@ -1,0 +1,23 @@
+vertex {
+ attribute vec2 position;
+ uniform vec2 offset;
+ gl_Position = vec4(offset+position,0,1);
+}
+
+fragment {
+ uniform vec4 color;
+ out vec4 fragmentColor;
+ fragmentColor = color;
+}
+
+blit {
+ varying vec2 _texCoord;
+ vertex {
+  attribute vec2 texCoord;
+  _texCoord = texCoord;
+ }
+ fragment {
+  uniform sampler2D sampler;
+  fragmentColor = color * texture2D(sampler, _texCoord);
+ }
+}

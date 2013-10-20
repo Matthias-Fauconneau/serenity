@@ -104,7 +104,7 @@ struct Music {
     Sequencer input{thread};
 
     Sampler sampler;
-    //AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
+    AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #if RECORD
     Record record;
 #endif
@@ -115,10 +115,9 @@ struct Music {
         window.localShortcut(Escape).connect([]{exit();});
 
         if(arguments() && endsWith(arguments()[0],".sfz"_)) {
-            //sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
+            sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
         } else {
-            //sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
-            //sampler.open(audio.rate, "Blanchet.sfz"_,Folder("Samples"_));
+            sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
         }
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
@@ -184,7 +183,7 @@ struct Music {
         window.show();
         thread.spawn();
         input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
-        //audio.start();
+        audio.start();
     }
 
     /// Called by score to scroll PDF as needed when playing

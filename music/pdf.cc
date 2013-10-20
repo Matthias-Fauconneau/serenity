@@ -4,6 +4,9 @@
 #include "deflate.h"
 #include "display.h"
 #include "text.h" //annotations
+#if GL
+FILE(pdf)
+#endif
 
 struct Variant { //TODO: union
     enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
@@ -396,6 +399,7 @@ void PDF::open(const string& data) {
         for(uint i: range(pageFirstPolygon,polygons.size)) {
             polygons[i].min+=offset; polygons[i].max+=offset;
             for(Line& l: polygons[i].edges) l.a += offset, l.b += offset;
+            for(vec2& pos: polygons[i].vertices) pos += offset;
         }
         // add any children
         pages << move(dict["Kids"_].list);
@@ -411,6 +415,7 @@ void PDF::open(const string& data) {
         polygon.min.x-=x1, polygon.min.y=-polygon.max.y;
         polygon.max.x-=x1, polygon.max.y=-t;
         for(Line& l: polygon.edges) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; }
+        for(vec2& pos: polygon.vertices) pos = vec2(pos.x-x1, -pos.y);
     }
 
     // insertion sorts blits for culling
@@ -465,6 +470,7 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
         /*if(flags&Stroke)*/ this->lines << lines;
         if(flags&Fill) {
             Polygon polygon;
+            // Software rendering (FIXME: precompute line equations)
             polygon.min=path.first(), polygon.max=path.first();
             for(vec2 p : path) {
                 polygon.min=min(polygon.min,p);
@@ -476,6 +482,7 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
                 area += cross(polyline[(i+1)%polyline.size]-polyline[i], polyline[(i+2)%polyline.size]-polyline[i]);
             }
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b);
+            polygon.vertices = move(polyline); // GL
             polygons << move(polygon);
         }
         if(flags&Trace) this->paths << move(path);
@@ -503,42 +510,78 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 
 int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
-#if GL && 0
+#if GL
     if(!softwareRendering) {
         float newScale = size.x/(x2-x1); // Fit width
         if(newScale != scale) {
-            glblits.clear();
             scale = newScale;
-        }
-
-        // Upload stroke paths
-        /*for(int i=0;i<lines.size; i+=2) { //hint axis-aligned lines
-                vec2& a = lines[i]; vec2& b = lines[i+1];
-                if(a.x == b.x) a.x = b.x = round(a.x*scale);
-                if(a.y == b.y) a.y = b.y = round(a.y*scale);
+            glLines = GLVertexBuffer();
+            array<vec2> lineVertices;
+            for(const Line& l: lines) {
+                vec2 a = scale*l.a, b = scale*l.b;
+                if(a.x==b.x) a.x=b.x=floor(a.x)+0.5; if(a.y==b.y) a.y=b.y=floor(a.y)+0.5;
+                lineVertices << vertex(a) << vertex(b);
             }
-        for(vec2& v: lines) { v.x=round(scale*(v.x-x1)), v.y=round(-scale*v.y); } //scale all lines
-        stroke.primitiveType = Line;
-        stroke.upload(lines); lines.clear();
+            glLines.upload(lineVertices);
 
-        // Upload fill paths
-        //fill.primitiveType = 3;
-        //fill.upload(vertices); vertices.clear();
-        //fill.upload(indices); indices.clear();*/
+            array<vec2> vertices;
+            for(const Polygon& polygon: polygons) {
+                const array<vec2>& p = polygon.vertices;
+                if(p.size > 4) continue; //FIXME: triangulate concave polygons
+                vec2 p0 = vertex(scale*p[0]);
+                for(uint i: range(1,p.size-1))
+                    vertices << p0 << vertex(scale*p[i]) << vertex(scale*p[i+1]);
+            }
+            glTriangles.upload(vertices);
 
-        // Render glyphs, TODO: texture array + VBO
-        if(!glblits) {
-            glblits.reserve(characters.size);
+            for(Font& font: fonts.values) font.cache.clear();
+            glBlits.clear();
+            glBlits.reserve(characters.size);
             for(Character& c: characters) {
-                GLTexture& texture = c.font->cache[c.index];
+                GLTexture& texture = c.font->cache[scale*c.size][c.index];
                 c.font->font->setSize(scale*c.size);
                 const Glyph& glyph = c.font->font->glyph(c.index);
                 if(!glyph.image) continue;
                 if(!texture) texture = GLTexture(glyph.image);
-                vec2 min = vec2(round(scale*(c.position.x-x1)), round(-scale*c.position.y))+vec2(glyph.offset);
-                vec2 max = min+vec2(texture.width, texture.height);
-                GLBlit blit = { min, max, texture.id }; glblits << blit;
+                vec2 min = round(vec2(scale*c.position)+vec2(glyph.offset));
+                vec2 max = min+vec2(texture.size());
+                glBlits << GLBlit{vertex(min), vertex(max), texture};
             }
+        }
+        //FIXME: clip, VFC
+        assert(!blits); //FIXME
+
+        glBlendSubstract(); // Assumes black on white render
+
+        // Render lines
+        GLShader fill (pdf());
+        vec2 offset = vec2(2.*position.x/viewportSize.x,-2.*position.y/viewportSize.y);
+        fill["offset"_] = offset;
+        fill["color"] = vec4(1);
+        glLines.bindAttribute(fill, "position"_, 2);
+        glLines.draw(Lines); // No VFC cull
+
+        // Render triangles
+        glTriangles.bindAttribute(fill, "position"_, 2);
+        glTriangles.draw(Triangles);  // No VFC cull
+
+        // Render glyphs, TODO: texture array + VBO
+        GLShader blit (pdf(), {"blit"_});
+        blit["offset"_] = offset;
+        blit["sampler"_] = 0;
+        int i = 0; for(GLBlit b: glBlits) { // No VFC vcull
+            blit["color"_] = vec4(1)-colors.value(i,black);
+            b.texture.bind(0);
+            GLVertexBuffer vertexBuffer;
+            vec2 min = b.min, max = b.max;
+            vertexBuffer.upload<Vertex>({{vec2(min.x,min.y),vec2(0,0)}, {vec2(max.x,min.y),vec2(1,0)},
+                                         {vec2(min.x,max.y),vec2(0,1)}, {vec2(max.x,max.y),vec2(1,1)}});
+            //vertexBuffer.upload<vec2>({vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)});
+            vertexBuffer.bindAttribute(blit, "position"_, 2, offsetof(Vertex, position));
+            vertexBuffer.bindAttribute(blit, "texCoord"_, 2, offsetof(Vertex, texCoord));
+            //vertexBuffer.bindAttribute(fill, "position"_, 2, offsetof(Vertex, position));
+            vertexBuffer.draw(TriangleStrip);
+            i++;
         }
 
         return;
@@ -563,7 +606,7 @@ void PDF::render(int2 position, int2 size) {
         line(a,b);
     }
 
-    if(softwareRendering) for(const Polygon& polygon: polygons) {
+    for(const Polygon& polygon: polygons) {
         int2 min=position+int2(scale*polygon.min), max=position+int2(scale*polygon.max);
         Rect rect = Rect(min,max) & currentClip;
         for(int y=rect.min.y; y<=::min<int>(framebuffer.height-1,rect.max.y); y++) {
@@ -581,7 +624,7 @@ outside:;
 
     int i = characters.binarySearch(Character{0,0,0,vec2(-position-int2(0,100))/scale,0});
     for(const Character& c: characters.slice(i)) {
-        int2 pos = position+int2(round(scale*c.position.x), round(scale*c.position.y));
+        int2 pos = position+int2(round(scale*c.position));
         if(pos.y<=currentClip.min.y-100) { i++; continue; }
         if(pos.y>=currentClip.max.y+100) break;
         c.font->font->setSize(scale*c.size);

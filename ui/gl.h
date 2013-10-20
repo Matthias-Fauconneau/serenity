@@ -8,12 +8,12 @@ struct Image;
 extern "C" void glDepthMask(uint8 enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
-void glAlphaTest(bool enable);
 void glPolygonOffsetFill(bool enable);
+void glBlendNone();
 void glBlendAlpha();
 void glBlendOneAlpha();
 void glBlendColor();
-void glBlendNone();
+void glBlendSubstract();
 
 struct GLUniform {
     GLUniform(int program, int location) : program(program), location(location) {}
@@ -61,7 +61,7 @@ struct GLUniformBuffer {
     int size = 0;
 };
 
-enum PrimitiveType { Point, Line, LineLoop, LineStrip, Triangle, TriangleStrip, TriangleFan, Quad };
+enum PrimitiveType { Point, Lines, LineLoop, LineStrip, Triangles, TriangleStrip };
 struct GLVertexBuffer {
     GLVertexBuffer(){}
     default_move(GLVertexBuffer);
@@ -98,7 +98,7 @@ struct GLIndexBuffer {
 
     operator bool() { return id; }
 
-    PrimitiveType primitiveType=Triangle;
+    PrimitiveType primitiveType=Triangles;
     handle<uint> id = 0;
     uint indexCount=0;
     uint indexSize=0;

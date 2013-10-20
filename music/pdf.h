@@ -49,7 +49,7 @@ struct PDF : Widget {
         String name;
         unique< ::Font> font;
         array<float> widths;
-        map<uint16, GLTexture> cache;
+        map<uint, map<uint16, unique<GLTexture>>> cache;
     };
     map<string, Font> fonts;
     struct Character {
@@ -66,11 +66,13 @@ struct PDF : Widget {
     };
     array<Blit> blits;
 
-    struct Polygon { vec2 min,max; array<Line> edges; };
+    struct Polygon { vec2 min,max; array<Line> edges; array<vec2> vertices;/*GL*/ };
     array<Polygon> polygons;
 
-    struct GLBlit { vec2 min,max; uint texture; };
-    array<GLBlit> glblits;
+    GLVertexBuffer glLines;
+    GLVertexBuffer glTriangles;
+    struct GLBlit { vec2 min,max; const GLTexture& texture; };
+    array<GLBlit> glBlits;
 
     /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
     signal<int /*index*/, vec2 /*position*/, float /*size*/,const string& /*font*/, int /*code*/, int /*fontIndex*/> onGlyph;

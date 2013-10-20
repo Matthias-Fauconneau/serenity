@@ -8,27 +8,40 @@
 #include <GL/gl.h> //GL
 
 /// Context
-void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
-void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
+void glCullFace(bool enable) {
+    if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+}
+void glDepthTest(bool enable) {
+    if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+}
 void glPolygonOffsetFill(bool enable) {
     if(enable) { glPolygonOffset(-1,-2); glEnable(GL_POLYGON_OFFSET_FILL); } else glDisable(GL_POLYGON_OFFSET_FILL);
 }
 static int blend = 0;
 void glBlendNone() {
-    if(!blend) return; glDisable(GL_BLEND);
+    if(!blend) return;
+    glDisable(GL_BLEND);
     blend=0;
 }
 void glBlendAlpha() {
     if(!blend) glEnable(GL_BLEND);
-    if(blend!=1) glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE); blend=1;
+    if(blend!=1) { glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE); }
+    blend=1;
 }
 void glBlendOneAlpha() {
     if(!blend) glEnable(GL_BLEND);
-    if(blend!=2) glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); blend=2;
+    if(blend!=2) { glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); }
+    blend=2;
 }
 void glBlendColor() {
     if(!blend) glEnable(GL_BLEND);
-    if(blend!=3) glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); blend=3;
+    if(blend!=3) { glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); }
+    blend=3;
+}
+void glBlendSubstract() {
+    if(!blend) glEnable(GL_BLEND);
+    if(blend!=4) { glBlendEquation(GL_FUNC_REVERSE_SUBTRACT); glBlendFuncSeparate(GL_SRC_COLOR, GL_ONE, GL_ZERO, GL_ONE); }
+    blend=4;
 }
 
 /// Shader
@@ -207,7 +220,7 @@ void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int el
 void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, id);
-    if(primitiveType==Line) {
+    if(primitiveType==Lines) {
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
         glEnable(GL_LINE_SMOOTH);
         glLineWidth(1);
@@ -293,7 +306,7 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
     }
     if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_2D);
 }
-GLTexture::GLTexture(const Image& image, uint format) //FIXME: -> et/shader.cc ?
+GLTexture::GLTexture(const Image& image, uint format)
     : GLTexture(image.width, image.height, (image.alpha?Alpha:0)|format, image.data) {
     assert(width==image.stride);
 }

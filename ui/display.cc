@@ -17,19 +17,24 @@ Rect currentClip=Rect(0);
 #if GL
 int2 viewportSize;
 vec2 vertex(float x, float y) { return vec2(2.*x/viewportSize.x-1,1-2.*y/viewportSize.y); }
-struct Vertex { vec2 position, texCoord; };
+vec2 vertex(vec2 v) { return vertex(v.x, v.y); }
 Vertex vertex(Rect r, float x, float y) {
-    return {vec2(2.*x/viewportSize.x-1,1-2.*y/viewportSize.y), vec2(int2(x,y)-r.min)/vec2(r.size())};
+    return {vertex(x,y), vec2(int2(x,y)-r.min)/vec2(r.size())};
 }
+GLShader& fillShader() { static GLShader shader(display()); return shader; }
+GLShader& blitShader() { static GLShader shader(display(), {"blit"_}); return shader; }
 #endif
 
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;
 #if GL
     if(!softwareRendering) {
-        //glBlend(color.w!=1, true);
-        static GLShader fill (display());
-        fill["color"] = color;
+        //if(color.w!=1) glBlendAlpha(); else glBlendNone();
+        glBlendSubstract();
+        GLShader& fill = fillShader();
+        //fill["color"_] = color;
+        //fill["color"_] = vec4(1)-color; //color;
+        fill["color"] = vec4(vec3(1)-color.xyz(),1.f);
         GLVertexBuffer vertexBuffer;
         vertexBuffer.upload<vec2>({vertex(rect.min.x,rect.min.y),vertex(rect.max.x,rect.min.y),
                                    vertex(rect.min.x,rect.max.y),vertex(rect.max.x,rect.max.y)});
@@ -54,11 +59,11 @@ void blit(int2 target, const Image& source, vec4 color) {
     Rect rect = (target+Rect(source.size())) & currentClip;
 #if GL
     if(!softwareRendering) {
-        glBlendAlpha();
-        static GLShader blit(display(), {"blit"_});
-        blit["color"_] = color;
-        GLTexture texture (source, SRGB); //FIXME
-        blit["sampler"]=0; texture.bind(0);
+        glBlendSubstract(); //if(source.alpha) glBlendSubstract(); /*FIXME*/ else glBlendNone();
+        GLShader& blit = blitShader();
+        blit["color"_] = vec4(1)-color;
+        GLTexture texture (source/*, SRGB*/); //FIXME
+        blit["sampler"_]=0; texture.bind(0);
         GLVertexBuffer vertexBuffer;
         Rect texRect = target+Rect(source.size());
         vertexBuffer.upload<Vertex>({vertex(texRect, rect.min.x,rect.min.y),vertex(texRect, rect.max.x,rect.min.y),
@@ -113,15 +118,15 @@ inline float rfpart(float x) { return 1 - fpart(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
 #if GL
     if(!softwareRendering) {
-        //glBlend(true, false); glBlendSubstract
-        static GLShader fill(display());
-        //fill["color"] = vec4(vec3(1)-color.xyz(),1.f);
-        fill["color"] = vec4(color.xyz(),1.f);
+        glBlendSubstract();
+        GLShader& fill = fillShader();
+        fill["color"] = vec4(vec3(1)-color.xyz(),1.f);
+        //fill["color"_] = //vec4(color.xyz(),1.f);
         //glDrawLine(fill, p1, p2);
         GLVertexBuffer vertexBuffer;
         vertexBuffer.upload<vec2>({vertex(p1.x, p1.y),vertex(p2.x, p2.y)});
         vertexBuffer.bindAttribute(fill, "position"_, 2);
-        vertexBuffer.draw(Line);
+        vertexBuffer.draw(Lines);
         return;
     }
 #endif
