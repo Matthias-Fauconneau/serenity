@@ -1,3 +1,4 @@
+serenity.files
 README.md
 TODO
 build.sh
@@ -44,6 +45,7 @@ io/xml.cc
 
 ui/display.cc
 ui/display.h
+ui/display
 ui/font.cc
 ui/font.h
 ui/gl.cc

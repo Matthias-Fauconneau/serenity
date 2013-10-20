@@ -6,7 +6,9 @@
 #include "font.h"
 #include "widget.h"
 #include "function.h"
-//#include "matrix.h"
+//include "matrix.h" FIXME
+#include "time.h"
+#include "gl.h"
 
 /// 2D affine transformation (FIXME: use matrix:mat3x2)
 struct mat3x2 {
@@ -26,7 +28,10 @@ struct mat3x2 {
 
 /// Portable Document Format renderer
 struct PDF : Widget {
-    void clear() { images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
+    void clear() {
+        images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear();
+        annotations.clear();
+    }
     void open(const ref<byte>& data);
     int2 sizeHint() override;
     void render(int2 position, int2 size) override;
@@ -44,18 +49,28 @@ struct PDF : Widget {
         String name;
         unique< ::Font> font;
         array<float> widths;
+        map<uint16, GLTexture> cache;
     };
     map<string, Font> fonts;
-    struct Character { Font* font; float size; uint16 index; vec2 pos; uint16 code; bool operator <(const Character& o) const{return pos.y<o.pos.y;}};
+    struct Character {
+        Font* font; float size; uint16 index; vec2 position; uint16 code;
+        bool operator <(const Character& o) const{return position.y<o.position.y;}
+    };
     array<Character> characters;
     void drawText(Font* font, int fontSize, float spacing, float wordSpacing, const string& data);
 
     map<String, Image> images;
-    struct Blit { vec2 pos,size; Image image; Image resized; bool operator <(const Blit& o) const{return pos.y<o.pos.y;}};
+    struct Blit {
+        vec2 position, size; Image image; Image resized;
+        bool operator <(const Blit& o) const{return position.y<o.position.y;}
+    };
     array<Blit> blits;
 
     struct Polygon { vec2 min,max; array<Line> edges; };
     array<Polygon> polygons;
+
+    struct GLBlit { vec2 min,max; uint texture; };
+    array<GLBlit> glblits;
 
     /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
     signal<int /*index*/, vec2 /*position*/, float /*size*/,const string& /*font*/, int /*code*/, int /*fontIndex*/> onGlyph;

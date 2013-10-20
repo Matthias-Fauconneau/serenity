@@ -207,6 +207,11 @@ void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int el
 void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, id);
+    if(primitiveType==Line) {
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+        glEnable(GL_LINE_SMOOTH);
+        glLineWidth(1);
+    }
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 /// Index buffer

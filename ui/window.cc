@@ -122,14 +122,13 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     setIcon(icon);
     setType(type);
     if(renderer == OpenGL) {
-        if(!glDisplay) glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_))); assert(glDisplay);
-        if(!glContext) {
-            const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, 0};
-            int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
-            const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
-            glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
-            assert(glContext);
-        }
+        if(glDisplay || glContext) { assert(glDisplay && glContext); return; }
+        glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert(glDisplay);
+        const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1, 0};
+        int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
+        const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
+        glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
+        assert(glContext);
         glXMakeCurrent(glDisplay, id, glContext);
         //glXSwapIntervalMESA(1); SGI? glXGetProcAddress
     }
@@ -159,7 +158,7 @@ void Window::destroy() {
 // Render
 void Window::event() {
     window=this;
-    for(;;) { // Always process any pending X input events before rendering
+    if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
         readLock.lock();
         if(!poll()) { readLock.unlock(); break; }
         uint8 type = read<uint8>();
@@ -228,10 +227,14 @@ void Window::event() {
         } else {
             ::softwareRendering=false;
             glXMakeCurrent(glDisplay, id, glContext);
+            viewportSize = size;
             if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
             currentClip=Rect(size);
+            static bool test=false; test=!test; if(test) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
+            log(test);
             widget->render(0,size);
             assert(!clipStack);
+            viewportSize = 0;
             glFlush();
         }
         frameReady();

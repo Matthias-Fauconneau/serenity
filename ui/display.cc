@@ -1,17 +1,43 @@
 #include "display.h"
 #include "math.h"
+#if GL
+#include "gl.h"
+FILE(display);
+#endif
 
-bool softwareRendering;
+typedef vector<bgra,int,4> int4;
+
+bool softwareRendering = true;
 int resolution = 96;
 Image framebuffer;
 Lock framebufferLock;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 
-typedef vector<bgra,int,4> int4;
+#if GL
+int2 viewportSize;
+vec2 vertex(float x, float y) { return vec2(2.*x/viewportSize.x-1,1-2.*y/viewportSize.y); }
+struct Vertex { vec2 position, texCoord; };
+Vertex vertex(Rect r, float x, float y) {
+    return {vec2(2.*x/viewportSize.x-1,1-2.*y/viewportSize.y), vec2(int2(x,y)-r.min)/vec2(r.size())};
+}
+#endif
 
 void fill(Rect rect, vec4 color) {
     rect = rect & currentClip;
+#if GL
+    if(!softwareRendering) {
+        //glBlend(color.w!=1, true);
+        static GLShader fill (display());
+        fill["color"] = color;
+        GLVertexBuffer vertexBuffer;
+        vertexBuffer.upload<vec2>({vertex(rect.min.x,rect.min.y),vertex(rect.max.x,rect.min.y),
+                                   vertex(rect.min.x,rect.max.y),vertex(rect.max.x,rect.max.y)});
+        vertexBuffer.bindAttribute(fill, "position"_, 2);
+        vertexBuffer.draw(TriangleStrip);
+        return;
+    }
+#endif
     int4 color8 (color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
     if(color8.a == 0xFF) {
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = byte4(color8);
@@ -24,8 +50,25 @@ void fill(Rect rect, vec4 color) {
     }
 }
 
-void blit(int2 target, const Image& source, vec4 unused color) {
+void blit(int2 target, const Image& source, vec4 color) {
     Rect rect = (target+Rect(source.size())) & currentClip;
+#if GL
+    if(!softwareRendering) {
+        glBlendAlpha();
+        static GLShader blit(display(), {"blit"_});
+        blit["color"_] = color;
+        GLTexture texture (source, SRGB); //FIXME
+        blit["sampler"]=0; texture.bind(0);
+        GLVertexBuffer vertexBuffer;
+        Rect texRect = target+Rect(source.size());
+        vertexBuffer.upload<Vertex>({vertex(texRect, rect.min.x,rect.min.y),vertex(texRect, rect.max.x,rect.min.y),
+                                     vertex(texRect, rect.min.x,rect.max.y),vertex(texRect, rect.max.x,rect.max.y)});
+        vertexBuffer.bindAttribute(blit, "position"_, 2, offsetof(Vertex, position));
+        vertexBuffer.bindAttribute(blit, "texCoord"_, 2, offsetof(Vertex, texCoord));
+        vertexBuffer.draw(TriangleStrip);
+        return;
+    }
+#endif
     if(source.alpha) {
         int4 color8 = int4(color.z*0xFF,color.y*0xFF,color.x*0xFF,color.w*0xFF);
         if(color==white) {
@@ -68,6 +111,20 @@ inline void plot(int x, int y, float alpha, bool transpose, int4 color) {
 inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
 void line(vec2 p1, vec2 p2, vec4 color) {
+#if GL
+    if(!softwareRendering) {
+        //glBlend(true, false); glBlendSubstract
+        static GLShader fill(display());
+        //fill["color"] = vec4(vec3(1)-color.xyz(),1.f);
+        fill["color"] = vec4(color.xyz(),1.f);
+        //glDrawLine(fill, p1, p2);
+        GLVertexBuffer vertexBuffer;
+        vertexBuffer.upload<vec2>({vertex(p1.x, p1.y),vertex(p2.x, p2.y)});
+        vertexBuffer.bindAttribute(fill, "position"_, 2);
+        vertexBuffer.draw(Line);
+        return;
+    }
+#endif
     float x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
     assert(vec4(0) <= color && color <= vec4(1));
     int4 color8 = int4(0xFF*color.z,0xFF*color.y,0xFF*color.x,0xFF*color.w);

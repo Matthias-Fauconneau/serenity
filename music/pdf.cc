@@ -32,7 +32,7 @@ String str(const Variant& o) {
     error("Invalid Variant"_,int(o.type));
 }
 
-static Variant parse(TextData& s) {
+static Variant parseVariant(TextData& s) {
     s.skip();
     if("0123456789.-"_.contains(s.peek())) {
         string number = s.whileDecimal();
@@ -48,7 +48,7 @@ static Variant parse(TextData& s) {
     if(s.match('[')) {
         array<Variant> list;
         s.skip();
-        while(s && !s.match(']')) { list << parse(s); s.skip(); }
+        while(s && !s.match(']')) { list << parseVariant(s); s.skip(); }
         return move(list);
     }
     if(s.match("<<"_)) {
@@ -56,7 +56,7 @@ static Variant parse(TextData& s) {
         for(;;) {
             for(;!s.match('/');s.advance(1)) if(s.match(">>"_)) goto dictionaryEnd;
             string key = s.identifier("."_);
-            dict.insert(key, parse(s));
+            dict.insert(key, parseVariant(s));
         }
         dictionaryEnd: s.skip();
         Variant v = move(dict);
@@ -117,8 +117,8 @@ static Variant parse(TextData& s) {
     error("Unknown type"_,s.index,s.slice(s.index>32?s.index-32:0,32),"|"_,s.slice(s.index,32));
     return Variant();
 }
-static Variant parse(const string& buffer) { TextData s(buffer); return parse(s); }
-static map<string,Variant> toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parse(xref[object.integer()]).dict; }
+static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
+static map<string,Variant> toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
 
 void PDF::open(const string& data) {
     clear();
@@ -152,7 +152,7 @@ void PDF::open(const string& data) {
                 if(xref.size<=i) xref.grow(i+1);
                 xref[i]=String(s.slice(s.index));
             }
-            Variant object = parse(s);
+            Variant object = parseVariant(s);
             map<string,Variant>& dict = object.dict;
             if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
@@ -192,9 +192,9 @@ void PDF::open(const string& data) {
             if(!dict.contains("Prev"_)) break;
             s.index=dict.at("Prev"_).integer();
         }
-        catalog = parse(xref[root]).dict;
+        catalog = parseVariant(xref[root]).dict;
         for(CompressedXRef ref: compressedXRefs) {
-            Variant stream = parse(xref[ref.object]);
+            Variant stream = parseVariant(xref[ref.object]);
             TextData s(stream.data);
             uint objectNumber=-1,offset=-1;
             for(uint i=0;i<=ref.index;i++) {
@@ -205,27 +205,27 @@ void PDF::open(const string& data) {
         }
     }
     x1 = +__FLT_MAX__, x2 = -__FLT_MAX__; vec2 pageOffset=0;
-    Variant kids = move(parse(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
-    array<Variant> pages = kids.list ? move(kids.list) : parse(xref[kids.integer()]).list;
+    Variant kids = move(parseVariant(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
+    array<Variant> pages = kids.list ? move(kids.list) : parseVariant(xref[kids.integer()]).list;
     y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
     for(uint i=0; i<pages.size; i++) {
         const Variant& page = pages[i];
         uint pageFirstBlit = blits.size, pageFirstLine = lines.size, pageFirstCharacter = characters.size, pageFirstPath=paths.size,
                 pageFirstPolygon=polygons.size;
-        auto dict = parse(xref[page.integer()]).dict;
+        auto dict = parseVariant(xref[page.integer()]).dict;
         if(dict.contains("Resources"_)) {
             auto resources = toDict(xref,move(dict.at("Resources"_)));
             if(resources.contains("Font"_)) for(auto e : toDict(xref,move(resources.at("Font"_)))) {
                 if(fonts.contains(e.key)) continue;
-                map<string,Variant> fontDict = parse(xref[e.value.integer()]).dict;
+                map<string,Variant> fontDict = parseVariant(xref[e.value.integer()]).dict;
                 Variant* descendant = fontDict.find("DescendantFonts"_);
-                if(descendant) fontDict = parse(xref[descendant->type==Variant::Integer?descendant->integer():descendant->list[0].integer()]).dict;
+                if(descendant) fontDict = parseVariant(xref[descendant->type==Variant::Integer?descendant->integer():descendant->list[0].integer()]).dict;
                 if(!fontDict.contains("FontDescriptor"_)) continue;
                 String name = move(fontDict.at("BaseFont"_).data);
-                auto descriptor = parse(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
+                auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
                 Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
                 if(!fontFile) continue;
-                Font& font = fonts.insert(e.key, Font{move(name), unique<::Font>(parse(xref[fontFile->integer()]).data), {}});
+                Font& font = fonts.insert(e.key, Font{move(name), unique<::Font>(parseVariant(xref[fontFile->integer()]).data), {}, {}});
                 Variant* firstChar = fontDict.find("FirstChar"_);
                 if(firstChar) font.widths.grow(firstChar->integer());
                 Variant* widths = fontDict.find("Widths"_);
@@ -233,17 +233,17 @@ void PDF::open(const string& data) {
             }
             if(resources.contains("XObject"_)) {
                 Variant& object = resources.at("XObject"_);
-                map<string,Variant> dict = object.type==Variant::Integer ? parse(xref[object.integer()]).dict : move(object.dict);
+                map<string,Variant> dict = object.type==Variant::Integer ? parseVariant(xref[object.integer()]).dict : move(object.dict);
                 for(auto e: dict) {
                     if(images.contains(String(e.key))) continue;
-                    Variant object = parse(xref[e.value.integer()]);
+                    Variant object = parseVariant(xref[e.value.integer()]);
                     Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
                     int depth=object.dict.at("BitsPerComponent"_).integer();
                     assert(depth, object.dict.at("BitsPerComponent"_).integer());
                     byte4 palette[256]; bool indexed=false;
                     if(depth==8 && object.dict.contains("ColorSpace"_)) {
                         Variant cs = object.dict.at("ColorSpace"_).data ? move(object.dict.at("ColorSpace"_).data) :
-                                                                          parse(xref[object.dict.at("ColorSpace"_).integer()]);
+                                                                          parseVariant(xref[object.dict.at("ColorSpace"_).integer()]);
                         if(cs.data=="DeviceGray"_ || cs.data=="DeviceRGB"_) {}
                         else {
                             if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
@@ -251,12 +251,12 @@ void PDF::open(const string& data) {
                                 for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
                                 indexed=true;
                             } else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceRGB"_ && cs.list[2].integer()==255) {
-                                Data s = cs.list[3].integer()?parse(xref[cs.list[3].integer()]).data:move(cs.list[3].data);
+                                Data s = cs.list[3].integer()?parseVariant(xref[cs.list[3].integer()]).data:move(cs.list[3].data);
                                 for(int i=0;i<256;i++) {
                                     byte r=s.next(), g=s.next(), b=s.next();
                                     palette[i]=byte4(b,g,r,0xFF); }
                                 indexed=true;
-                            } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parse(xref[cs.list[1].integer()]).data:""_); continue; }
+                            } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parseVariant(xref[cs.list[1].integer()]).data:""_); continue; }
                         }
                     }
                     const uint8* src = (uint8*)object.data.data; assert(object.data.size==image.height*image.width*depth/8);
@@ -284,9 +284,9 @@ void PDF::open(const string& data) {
             if(contents->type==Variant::Integer) contents->list << contents->integer();
             array<byte> data;
             for(const auto& contentRef : contents->list) {
-                Variant content = parse(xref[contentRef.integer()]);
+                Variant content = parseVariant(xref[contentRef.integer()]);
                 assert(content.data, content);
-                //for(const Variant& dataRef : content.list) data << parse(xref[dataRef.integer()]).data;
+                //for(const Variant& dataRef : content.list) data << parseVariant(xref[dataRef.integer()]).data;
                 data << content.data;
             }
             TextData s = move(data);
@@ -299,7 +299,7 @@ void PDF::open(const string& data) {
                 string id = s.word("'*"_);
                 if(!id) {
                     assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16ul,s.buffer.size-s.index)));
-                    args << parse(s);
+                    args << parseVariant(s);
                     continue;
                 }
                 uint op = id[0]; if(id.size>1) { op|=id[1]<<8; if(id.size>2) op|=id[2]<<16; }
@@ -389,9 +389,9 @@ void PDF::open(const string& data) {
         // translate from page to document
         //const array<Variant>& cropBox = (dict.value("CropBox"_)?:dict.at("MediaBox"_)).list; pageOffset += vec2(0,-cropBox[3].real()); vec2 offset = pageOffset;
         pageOffset += vec2(0,y1-y2-16); vec2 offset = pageOffset+vec2(0,-y1);
-        for(uint i: range(pageFirstBlit,blits.size)) blits[i].pos += offset;
+        for(uint i: range(pageFirstBlit,blits.size)) blits[i].position += offset;
         for(uint i: range(pageFirstLine,lines.size)) lines[i].a += offset, lines[i].b += offset;
-        for(uint i: range(pageFirstCharacter,characters.size)) characters[i].pos += offset;
+        for(uint i: range(pageFirstCharacter,characters.size)) characters[i].position += offset;
         for(uint i: range(pageFirstPath,paths.size)) for(vec2& pos: paths[i]) pos += offset;
         for(uint i: range(pageFirstPolygon,polygons.size)) {
             polygons[i].min+=offset; polygons[i].max+=offset;
@@ -402,9 +402,9 @@ void PDF::open(const string& data) {
     }
     y2=pageOffset.y;
 
-    for(Blit& b: blits) b.pos.x-=x1, b.pos.y=-b.pos.y;
+    for(Blit& b: blits) b.position.x-=x1, b.position.y=-b.position.y;
     for(Line& l: lines) { l.a.x-=x1, l.a.y=-l.a.y; l.b.x-=x1, l.b.y=-l.b.y; }
-    for(Character& c: characters) c.pos.x-=x1, c.pos.y=-c.pos.y;
+    for(Character& c: characters) c.position.x-=x1, c.position.y=-c.position.y;
     for(array<vec2>& path: paths) for(vec2& pos: path) pos.x-=x1, pos.y=-pos.y;
     for(Polygon& polygon: polygons) {
         float t = polygon.min.y;
@@ -436,8 +436,8 @@ void PDF::open(const string& data) {
 
     scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
     for(const array<vec2>& path : paths) { array<vec2> scaled; for(vec2 pos : path) scaled<<scale*pos; onPath(scaled); }
-    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code, c.index); }
-    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, scale*c.pos, scale*c.size, c.font->name, c.code, c.index); }
+    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, scale*c.position, scale*c.size, c.font->name, c.code, c.index); }
+    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, scale*c.position, scale*c.size, c.font->name, c.code, c.index); }
     paths.clear();
 }
 
@@ -503,13 +503,54 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 
 int2 PDF::sizeHint() { return int2(-scale*(x2-x1),scale*(y2-y1)); }
 void PDF::render(int2 position, int2 size) {
+#if GL && 0
+    if(!softwareRendering) {
+        float newScale = size.x/(x2-x1); // Fit width
+        if(newScale != scale) {
+            glblits.clear();
+            scale = newScale;
+        }
+
+        // Upload stroke paths
+        /*for(int i=0;i<lines.size; i+=2) { //hint axis-aligned lines
+                vec2& a = lines[i]; vec2& b = lines[i+1];
+                if(a.x == b.x) a.x = b.x = round(a.x*scale);
+                if(a.y == b.y) a.y = b.y = round(a.y*scale);
+            }
+        for(vec2& v: lines) { v.x=round(scale*(v.x-x1)), v.y=round(-scale*v.y); } //scale all lines
+        stroke.primitiveType = Line;
+        stroke.upload(lines); lines.clear();
+
+        // Upload fill paths
+        //fill.primitiveType = 3;
+        //fill.upload(vertices); vertices.clear();
+        //fill.upload(indices); indices.clear();*/
+
+        // Render glyphs, TODO: texture array + VBO
+        if(!glblits) {
+            glblits.reserve(characters.size);
+            for(Character& c: characters) {
+                GLTexture& texture = c.font->cache[c.index];
+                c.font->font->setSize(scale*c.size);
+                const Glyph& glyph = c.font->font->glyph(c.index);
+                if(!glyph.image) continue;
+                if(!texture) texture = GLTexture(glyph.image);
+                vec2 min = vec2(round(scale*(c.position.x-x1)), round(-scale*c.position.y))+vec2(glyph.offset);
+                vec2 max = min+vec2(texture.width, texture.height);
+                GLBlit blit = { min, max, texture.id }; glblits << blit;
+            }
+        }
+
+        return;
+    }
+#endif
     scale = size.x/(x2-x1); // Fit width
 
     for(Blit& blit: blits) {
-        if(position.y+scale*(blit.pos.y+blit.size.y) < currentClip.min.y) continue;
-        if(position.y+scale*blit.pos.y > currentClip.max.y) break;
+        if(position.y+scale*(blit.position.y+blit.size.y) < currentClip.min.y) continue;
+        if(position.y+scale*blit.position.y > currentClip.max.y) break;
         if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
-        ::blit(position+int2(scale*blit.pos),blit.resized);
+        ::blit(position+int2(scale*blit.position),blit.resized);
     }
 
     for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale}))) {
@@ -517,11 +558,12 @@ void PDF::render(int2 position, int2 size) {
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
         if(a.y > currentClip.max.y+200 && b.y > currentClip.max.y+200) break;
-        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
+        //if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
+        if(a.x==b.x) a.x=b.x=floor(a.x)+0.5; if(a.y==b.y) a.y=b.y=floor(a.y)+0.5;
         line(a,b);
     }
 
-    for(const Polygon& polygon: polygons) {
+    if(softwareRendering) for(const Polygon& polygon: polygons) {
         int2 min=position+int2(scale*polygon.min), max=position+int2(scale*polygon.max);
         Rect rect = Rect(min,max) & currentClip;
         for(int y=rect.min.y; y<=::min<int>(framebuffer.height-1,rect.max.y); y++) {
@@ -532,14 +574,14 @@ void PDF::render(int2 position, int2 size) {
                     if(cross(p-a,b-a)>0) goto outside;
                 }
                 /*else*/ framebuffer(x,y) = byte4(0,0,0,0xFF);
-                outside:;
+outside:;
             }
         }
     }
 
     int i = characters.binarySearch(Character{0,0,0,vec2(-position-int2(0,100))/scale,0});
     for(const Character& c: characters.slice(i)) {
-        int2 pos = position+int2(round(scale*c.pos.x), round(scale*c.pos.y));
+        int2 pos = position+int2(round(scale*c.position.x), round(scale*c.position.y));
         if(pos.y<=currentClip.min.y-100) { i++; continue; }
         if(pos.y>=currentClip.max.y+100) break;
         c.font->font->setSize(scale*c.size);

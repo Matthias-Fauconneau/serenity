@@ -89,7 +89,7 @@ struct Music {
 #if RECORD
     Window window {&layout,int2(1280,720),"Piano"_,musicIcon()};
 #else
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
+    Window window {&layout,int2(0,0),"Piano"_,musicIcon(), Window::OpenGL};
 #endif
     List<Text> sheets;
 
@@ -104,19 +104,20 @@ struct Music {
     Sequencer input{thread};
 
     Sampler sampler;
-    AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
+    //AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #if RECORD
     Record record;
 #endif
     vec2 position=0, target=0, speed=0; //smooth scroll
+    bool freeLook=false; // Unlock view from smooth scroll practice/playback
 
     Music() {
         window.localShortcut(Escape).connect([]{exit();});
 
-        if(arguments() && endsWith(arguments()[0],".sfz"_))
-            sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
-        else {
-            sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
+        if(arguments() && endsWith(arguments()[0],".sfz"_)) {
+            //sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
+        } else {
+            //sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
             //sampler.open(audio.rate, "Blanchet.sfz"_,Folder("Samples"_));
         }
 
@@ -153,7 +154,8 @@ struct Music {
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
-        //window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
+        window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
+        window.localShortcut(Key('t')).connect([this]{ freeLook=!freeLook; });
         //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
@@ -182,7 +184,7 @@ struct Music {
         window.show();
         thread.spawn();
         input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
-        audio.start();
+        //audio.start();
     }
 
     /// Called by score to scroll PDF as needed when playing
@@ -203,7 +205,7 @@ struct Music {
     }
     /// Smoothly scrolls towards target
     void smoothScroll() {
-        if(pdfScore.annotations) return;
+        if(pdfScore.annotations || freeLook) return;
         const float k=1./60, b=1./60; //stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration

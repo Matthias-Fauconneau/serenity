@@ -341,7 +341,7 @@ uint Sampler::read(int32* output, uint size) { // Audio thread
             //for(uint j: range(4)) { float s=buffer[4*i+j]; if(s<-0x1p31f || s>=(0x1p31f-0.5f)) clip=true; }
             ((v4si*)output)[i] = cvtps2dq(((v4sf*)buffer)[i]);
         }
-        if(clip) log("Clipping occured: not enough headroom");
+        if(clip) error("Clipping occured: not enough headroom");
     }
 
     time+=size;

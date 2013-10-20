@@ -12,6 +12,11 @@ extern Image framebuffer;
 extern Lock framebufferLock;
 extern int resolution; /// Device resolution in dots per inch (dpi)
 
+#define GL 1
+#if GL
+extern int2 viewportSize;
+#endif
+
 // Clip
 extern array<Rect> clipStack;
 extern Rect currentClip;

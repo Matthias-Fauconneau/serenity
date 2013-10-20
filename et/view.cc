@@ -49,7 +49,6 @@ void View::render(int2, int2 size) {
     frameBuffer.blit(resolvedBuffer); // Resolves multisample buffer into resolvedBuffer
     GLFrameBuffer::bindWindow(0, size, 0);
     {GLShader& program = gamma.bind();
-        program.bindFragments({"color"_});
         program.bindSamplers({"tex"_}); resolvedBuffer.bind(0); //frameBuffer.colorTexture.bind(0);
         vertexBuffer.bindAttribute(program,"position"_,2);
         vertexBuffer.draw(TriangleStrip);
