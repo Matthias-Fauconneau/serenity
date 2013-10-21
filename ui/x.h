@@ -131,5 +131,15 @@ constexpr string errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, 
 constexpr int errorCount = sizeof(errors)/sizeof(*errors);
 }
 
+namespace GLX {
+enum { CONTEXT_MAJOR_VERSION=0x2091, CONTEXT_MINOR_VERSION=0x2092 };
+extern int EXT, event, errorBase;
+
+struct GetFBConfigs { int8 ext=EXT, req=21; uint16 size=10; uint screen=0; };
+struct GetFBConfigsReply { int8 pad; uint16 seq; uint length; uint numFBConfigs, numProperties; uint pad2[4]; } fixed(GetFBConfigsReply);
+struct CreateContextAttribs { int8 ext=EXT, req=34; uint16 size=10; uint context, fbconfig, screen=0, share_list=0, direct=1,
+                              num_attribs=4, attribs[4]={CONTEXT_MAJOR_VERSION, 3, CONTEXT_MINOR_VERSION, 0}; };
+}
+
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width
 inline ref<byte> pad(uint width, uint size){ static byte zero[4]={}; assert(width<=sizeof(zero)); return ref<byte>(zero,align(width,size)-size); }

@@ -570,16 +570,15 @@ void PDF::render(int2 position, int2 size) {
         blit["offset"_] = offset;
         blit["sampler"_] = 0;
         int i = 0; for(GLBlit b: glBlits) { // No VFC vcull
+            vec2 min = b.min, max = b.max;
+            if(offset.x+max.x <= -1 || offset.y+min.y <=-1 || offset.x+min.x >= 1 || offset.y+max.y >= 1) { i++; continue; }
             blit["color"_] = vec4(1)-colors.value(i,black);
             b.texture.bind(0);
             GLVertexBuffer vertexBuffer;
-            vec2 min = b.min, max = b.max;
             vertexBuffer.upload<Vertex>({{vec2(min.x,min.y),vec2(0,0)}, {vec2(max.x,min.y),vec2(1,0)},
                                          {vec2(min.x,max.y),vec2(0,1)}, {vec2(max.x,max.y),vec2(1,1)}});
-            //vertexBuffer.upload<vec2>({vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)});
             vertexBuffer.bindAttribute(blit, "position"_, 2, offsetof(Vertex, position));
             vertexBuffer.bindAttribute(blit, "texCoord"_, 2, offsetof(Vertex, texCoord));
-            //vertexBuffer.bindAttribute(fill, "position"_, 2, offsetof(Vertex, position));
             vertexBuffer.draw(TriangleStrip);
             i++;
         }
@@ -601,8 +600,7 @@ void PDF::render(int2 position, int2 size) {
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
         if(a.y > currentClip.max.y+200 && b.y > currentClip.max.y+200) break;
-        //if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
-        if(a.x==b.x) a.x=b.x=floor(a.x)+0.5; if(a.y==b.y) a.y=b.y=floor(a.y)+0.5;
+        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
         line(a,b);
     }
 

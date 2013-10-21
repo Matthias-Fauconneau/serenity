@@ -100,10 +100,11 @@ struct PitchEstimation {
             float expectedF0 = keyToPitch(expectedKey);
             //log("key "_+str(key)+", f0="_+pad(ftoa(expectedF0,1),6)+" Hz, vel=["_+str(sample.lovel)+", "_+str(sample.hivel)+"]"_);
 
-            assert(32768<=sample.flac.duration);
-            buffer<float2> stereo = decodeAudio(sample.data, 32768);
-            float signal[32768];
-            for(uint i: range(32768)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
+            const uint period = 32768;
+            assert(period<=sample.flac.duration);
+            buffer<float2> stereo = decodeAudio(sample.data, period);
+            float signal[period];
+            for(uint i: range(period)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
 #if 0 // 20/30
             for(uint period: range(periodMax)) {
                 static FFT ffts[2] = {/*8192,*/16384,32768};
@@ -158,14 +159,14 @@ struct PitchEstimation {
                     }
                 }
             }
-#else // 21/30 ~ 70%
+#else // 4: 24, 8: 21, 16: 24, 32: 25/30 ~ 83%, 64: 25
             // Exhaustive normalized cross correlation search
             const uint kMin = 11; // ~4364 Hz ~ floor(rate/C7)
             const uint kMax = 1792; // ~27 Hz ~ A-1 · 2­^(-1/2/12)
-            const uint N = 32768; // kMax*2; ?
+            const uint N = period; // kMax*2; ?
             float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
             //float maximum=0; uint bestK=0;
-            list<int, 7> candidates;
+            list<uint, 7> candidates;
             float NCC[2]={0,0};
             for(uint k=kMax; k>=kMin; k--) { // Search periods from long to short
                 float ek=0; float ec=0;
@@ -177,20 +178,26 @@ struct PitchEstimation {
                 if((ec <= NCC[0] && NCC[0] >= NCC[1]) || (k<=kMin+3)) // Local maximum
                     candidates.insert(NCC[0], k+1);
                 //if(ec > maximum) maximum=ec, bestK=k;
-                //if(ec > 0.88) break; // Prevents low (long) notes to match better with very short (high) k (breaks all other)
+                if(k==2*kMin && candidates.last().key > 1./2 && candidates.last().value > kMax/2) goto done; // Skips short periods which would replace a good long period match
                 NCC[1] = NCC[0];
                 NCC[0] = ec;
             }
             if(NCC[0]>=NCC[1]) candidates.insert(NCC[0], kMin);
-            //log(candidates);
-            //uint bestK = candidates.last().value;
-            log("?", expectedKey, sampleRate/expectedF0);
+            done:;
             for(uint rank: range(candidates.size)) {
                 uint k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
                 if(!k) continue; // Less local maximum than candidates
                 int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
-                log("!", v, k, key);
                 if(key==expectedKey && result[0][0][0][testIndex]==-1) result[0][0][0][testIndex] = rank;
+            }
+            if(result[0][0][0][testIndex] != 0) {
+                log(">", expectedKey, sampleRate/expectedF0);
+                for(uint rank: range(candidates.size)) {
+                    uint k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
+                    if(!k) continue; // Less local maximum than candidates
+                    int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
+                    log(key==expectedKey?'!':'?', v, k, key);
+                }
             }
 #endif
             testIndex++;

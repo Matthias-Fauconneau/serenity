@@ -89,7 +89,7 @@ struct Music {
 #if RECORD
     Window window {&layout,int2(1280,720),"Piano"_,musicIcon()};
 #else
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon(), Window::OpenGL};
+    Window window {&layout,int2(0,0),"Piano"_,musicIcon()/*, Window::OpenGL*/};
 #endif
     List<Text> sheets;
 
@@ -104,7 +104,10 @@ struct Music {
     Sequencer input{thread};
 
     Sampler sampler;
+#define AUDIO 1
+#if AUDIO
     AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
+#endif
 #if RECORD
     Record record;
 #endif
@@ -114,11 +117,13 @@ struct Music {
     Music() {
         window.localShortcut(Escape).connect([]{exit();});
 
+#if AUDIO
         if(arguments() && endsWith(arguments()[0],".sfz"_)) {
             sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
         } else {
             sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
         }
+#endif
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
@@ -183,7 +188,9 @@ struct Music {
         window.show();
         thread.spawn();
         input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
+#if AUDIO
         audio.start();
+#endif
     }
 
     /// Called by score to scroll PDF as needed when playing

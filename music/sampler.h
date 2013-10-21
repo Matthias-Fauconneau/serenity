@@ -50,13 +50,13 @@ struct Sampler : Poll {
 
     uint rate = 0;
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
-    //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
+    static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
-    static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
+    //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
     //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
 
     /// Convolution reverb
-    bool enableReverb=true; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
+    bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
