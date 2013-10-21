@@ -100,90 +100,30 @@ struct PitchEstimation {
             buffer<float2> stereo = decodeAudio(sample.data, N);
             float signal[N];
             for(uint i: range(N)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
-#if 1 // 1: 21/30 (smooth: 2->1), 2: 26/30 (fmax/2 4X->2), 3: 28/30 ((fmax+1)/3: 2X->3), 4: 29/30 ((fmax+1)/3: 2X->3)
             ref<float> halfcomplex = fft.transform(signal);
             buffer<float> spectrum (N/2);
             for(int i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
-
-            // Estimates fundamental frequency using highest peak (best correlation with sin, FIXME: harmonic/autocorrelation)
+            // Estimates candidates using maximum peak
             const uint fMin = 18; // ~27 Hz ~ semi pitch under A-1
             const uint fMax = 2941; // ~4186 Hz ~ semi pitch over C7
-            int bestF=0; float maximum=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>maximum) maximum=spectrum[i], bestF=i;
-#if 0
-            list<float, 4> candidates;
-            /*candidates.insert(maximum, bestF);
-            candidates.insert(maximum, round((bestF+1)/2.));
-            candidates.insert(maximum, round((bestF+1)/3.));
-            candidates.insert(maximum, round((bestF+1)/4.));*/
-            candidates.insert(maximum, 1.*N/bestF);
-            candidates.insert(maximum, 2.*N/bestF);
-            candidates.insert(maximum, 3.*N/bestF);
-            candidates.insert(maximum, 4.*N/bestF);
-#else // 1: 24, 2:26, 3:27, 4:28
-            // Use normalized cross correlation to find best match between f, f/2, f/3, f/4. 1: 24
-            list<uint, 4> candidates;
-            /*int bestK = 0;*/ {
-                const int radius=0;
-                const int kMax = round((float)4*N/bestF)+radius;
-                float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
-                //float maximum=0;
-                for(uint i=1; i<=4; i++) { // TODO: search around target
-                    int k0 = round((float)i*N/bestF);
-                    int bestK = 0; float maximum=0;
-                    for(int k=k0-radius; k<=k0+radius; k++) {
-                        float ek=0; float ec=0;
-                        for(uint i: range(N-kMax)) {
-                            ec += signal[i]*signal[k+i]; // Correlation
-                            ek += sq(signal[k+i]); // Total energy
-                        }
-                        ec /= sqrt(e0*ek); // Normalizes
-                        if(ec > maximum) maximum = ec, bestK = k;
-                    }
-                    candidates.insert(maximum, bestK);
+            int peak=0; float peakMax=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>peakMax) peakMax=spectrum[i], peak=i;
+            // Use autocorrelation to find best match between f, f/2, f/3, f/4
+            float ncc = peak;
+            const int kMax = round(4.*N/peak);
+            float nccMax=0;
+            if(peak < N/32.) { // High pitches don't work well with autocorrelation
+                for(uint i=1; i<=4; i++) {
+                    int k = round((float)i*N/peak);
+                    float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[k+i]; // Correlation
+                    if(ec > nccMax) nccMax = ec, ncc = ncc/i;
                 }
             }
-            //int key = min((int)round(pitchToKey((float)sampleRate/bestK)), 108); // 11 samples rounds to #C7
-            //if(key==expectedKey) result[testIndex] = 0;
-#endif
-#else // 1: 25/30 (top 5), 2: 27/30
-            // Exhaustive normalized cross correlation search
-            const uint kMin = 11; // ~4364 Hz ~ floor(rate/C7)
-            const uint kMax = 1792; // ~27 Hz ~ A-1 · 2^(-1/2/12)
-            float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
-            list<uint, 8> candidates;
-            float NCC[2]={0,0};
-            for(uint k=kMax; k>=kMin; k--) { // Search periods from long to short
-                float ek=0; float ec=0;
-                for(uint i: range(N-kMax)) {
-                    ec += signal[i]*signal[k+i]; // Correlation
-                    ek += sq(signal[k+i]); // Total energy
-                }
-                ec /= sqrt(e0*ek); // Normalizes
-                if((ec <= NCC[0] && NCC[0] >= NCC[1]) || (k<=kMin+3)) // Local maximum
-                    candidates.insert(NCC[0], k+1);
-                if(k==2*kMin && candidates.last().key > 1./2 && candidates.last().value > kMax/2) goto done; // Skips short periods which would replace a good long period match
-                NCC[1] = NCC[0];
-                NCC[0] = ec;
+            int key = round(pitchToKey((float)sampleRate*ncc/N)); // 11 samples rounds to #C7
+            if(key==expectedKey) result[testIndex] = 0;
+            else {
+                log(">", expectedKey, keyToPitch(expectedKey)/sampleRate*N);
+                log("?", peakMax, peak, nccMax, ncc, key);
             }
-            if(NCC[0]>=NCC[1]) candidates.insert(NCC[0], kMin);
-            done:;
-#endif
-            for(uint rank: range(candidates.size)) {
-                float k = candidates[candidates.size-1-rank].value;
-                if(!k) continue; // Less local maximum than candidates
-                int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
-                if(key==expectedKey && rank<result[testIndex]) result[testIndex] = rank;
-            }
-            if(result[testIndex] != 0) {
-                log(">", expectedKey, sampleRate/keyToPitch(expectedKey));
-                for(uint rank: range(candidates.size)) {
-                    float k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
-                    if(!k) continue; // Less local maximum than candidates
-                    int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
-                    log(key==expectedKey?'!':'?', v, k, key);
-                }
-            }
-
             testIndex++;
         }
         int success[4] = {};
