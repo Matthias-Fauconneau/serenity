@@ -24,7 +24,7 @@ template<Type V, uint N> struct list { // Small sorted list
     static constexpr uint size = N;
     struct element { float key; V value; element(float key=0, V value=0):key(key),value(value){} } elements[N];
     void insert(float key, V value) {
-        int i=0; while(i<N && elements[i].key<=key) i++; i--;
+        int i=0; while(i<N && elements[i].key<key) i++; i--;
         if(i<0) return; // New candidate would be lower than current
         for(uint j: range(i)) elements[j]=elements[j+1]; // Shifts left
         elements[i] = element(key, value); // Inserts new candidate
@@ -81,7 +81,7 @@ struct PitchEstimation {
         FFT fft (N);
 
         const bool singleVelocity = true; // Tests 30 samples or 30x16 samples (TODO: fix failing low/high velocities)
-        int tests = 0;
+        uint tests = 0;
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
             if(singleVelocity && (sample.lovel > 64 || 64 > sample.hivel)) continue;
@@ -102,16 +102,27 @@ struct PitchEstimation {
             buffer<float2> stereo = decodeAudio(sample.data, N);
             float signal[N];
             for(uint i: range(N)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
-#if 1 // 20/30 ~ 67%
+#if 1 // 1: 21/30 (smooth: 2->1), 2: 26/30 (fmax/2 4X->2), 3: 28/30 ((fmax+1)/3: 2X->3), 4: 29/30 ((fmax+1)/3: 2X->3)
             ref<float> halfcomplex = fft.transform(signal);
             buffer<float> spectrum (N/2);
             for(int i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
 
-            // Estimates fundamental frequency using highest peak (best correlation with e^(ift), FIXME: harmonic/autocorrelation)
-            list<uint, 7> candidates;
-            for(int i: range(0,N/2)) {
-                candidates.insert(spectrum[i], i); //FIXME: only local maximums
+            // Estimates fundamental frequency using highest peak (best correlation with sin, FIXME: harmonic/autocorrelation)
+            const uint fMin = 18; // ~27 Hz ~ semi pitch under A-1
+            const uint fMax = 2941; // ~4186 Hz ~ semi pitch over C7
+            list<uint, 8> candidates;
+            float maximum=0;
+            for(uint i=fMin; i<=fMax; i++) {
+                if(spectrum[i-1] <= spectrum[i] && spectrum[i] >= spectrum[i+1]) {
+                    float merit = 0;
+                    {const int smooth=1; for(int di=-smooth; di<=smooth; di++) merit += spectrum[i+di];}
+                    maximum = max(maximum, merit);
+                    candidates.insert(merit, i);
+                }
             }
+            candidates.insert(maximum, candidates.last().value/2);
+            candidates.insert(maximum, round((candidates.last().value+1)/3.));
+            candidates.insert(maximum, round((candidates.last().value+1)/4.));
 
             for(uint rank: range(candidates.size)) {
                 uint i = candidates[candidates.size-1-rank].value;
@@ -120,21 +131,21 @@ struct PitchEstimation {
                 if(key==expectedKey && rank<result[testIndex]) result[testIndex] = rank;
             }
             if(result[testIndex] != 0) {
-                log(">", expectedKey, sampleRate/expectedF0);
+                log(">", expectedKey, expectedF0*N/sampleRate);
                 for(uint rank: range(candidates.size)) {
-                    uint i = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
+                    uint i = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key/maximum;
                     if(!i) continue; // Less local maximum than candidates
                     int key = min((int)round(pitchToKey((float)i*sampleRate/N)), 108);
                     log(key==expectedKey?'!':'?', v, i, key);
                 }
             }
-#else // 25/30 ~ 83%
+#else // 1: 25/30 (top 5), 2: 27/30
             // Exhaustive normalized cross correlation search
             const uint kMin = 11; // ~4364 Hz ~ floor(rate/C7)
-            const uint kMax = 1792; // ~27 Hz ~ A-1 · 2­^(-1/2/12)
+            const uint kMax = 1792; // ~27 Hz ~ A-1 · 2^(-1/2/12)
             float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
             //float maximum=0; uint bestK=0;
-            list<uint, 7> candidates;
+            list<uint, 8> candidates;
             float NCC[2]={0,0};
             for(uint k=kMax; k>=kMin; k--) { // Search periods from long to short
                 float ek=0; float ec=0;
@@ -145,7 +156,6 @@ struct PitchEstimation {
                 ec /= sqrt(e0*ek); // Normalizes
                 if((ec <= NCC[0] && NCC[0] >= NCC[1]) || (k<=kMin+3)) // Local maximum
                     candidates.insert(NCC[0], k+1);
-                //if(ec > maximum) maximum=ec, bestK=k;
                 if(k==2*kMin && candidates.last().key > 1./2 && candidates.last().value > kMax/2) goto done; // Skips short periods which would replace a good long period match
                 NCC[1] = NCC[0];
                 NCC[0] = ec;
@@ -170,14 +180,16 @@ struct PitchEstimation {
 #endif
             testIndex++;
         }
-        int success=0;
+        int success[8] = {};
         buffer<char> detail(tests);
         for(int i : range(tests)) {
             int rank = result[i];
-            success += rank==0;
+            for(uint j: range(8)) success[j] += uint(rank)<j+1;
             assert_(rank>=-1 && rank<16, rank);
-            detail[i] = "X0123456789ABCDEF"[rank+1];
+            detail[i] = "X123456789ABCDEF"[rank+1];
         }
-        log(success,"/",tests,"~",str((int)round(100.*success/tests))+"%"_,"\t", detail);
+        String s;
+        for(uint j: range(8)) if(j==0 || success[j-1]<success[j]) s<<str(j+1)+": "_<<str(success[j])<<", "_; s.pop(); s.pop();
+        log(detail, "("_+s+")"_);
     }
 } test;
