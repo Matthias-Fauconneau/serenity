@@ -12,13 +12,11 @@ struct FFT {
     buffer<float> halfcomplex {N};
     FFTW fftw = fftwf_plan_r2r_1d(N, windowed.begin(), halfcomplex.begin(), FFTW_R2HC, FFTW_ESTIMATE);
     FFT(uint N) : N(N) { for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2; }
-    buffer<float> transform(const ref<float>& signal) {
+    ref<float> transform(const ref<float>& signal) {
         assert(N <= signal.size);
         for(uint i: range(N)) windowed[i] = hann[i]*signal[i]; // Multiplies window
         fftwf_execute(fftw); // Transforms (FIXME: use execute_r2r and free windowed/transform buffers between runs)
-        buffer<float> spectrum {N/2};
-        for(int i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
-        return spectrum;
+        return halfcomplex;
     }
 };
 
@@ -79,6 +77,9 @@ struct PitchEstimation {
         const uint sampleRate = 48000;
         sampler.open(sampleRate, "Salamander.sfz"_, Folder("Samples"_,root()));
 
+        const uint N = 32768; // Analysis window size (16 periods of A-1)
+        FFT fft (N);
+
         const bool singleVelocity = true; // Tests 30 samples or 30x16 samples (TODO: fix failing low/high velocities)
         int tests = 0;
         for(const Sample& sample: sampler.samples) {
@@ -87,11 +88,8 @@ struct PitchEstimation {
             tests++;
         }
 
-        const int periodMax = 1; //2; // 16,32 K
-        const int smoothMax = 0; //3; // 0,2,4 Hz
-        const int octaveMax = 1; // 1,2,3 octaves
-        int result[periodMax][octaveMax][smoothMax+1][tests]; // Rank of actual pitch within estimated candidates
-        clear((int*)result, periodMax*octaveMax*(smoothMax+1)*tests, -1);
+        uint result[tests]; // Rank of actual pitch within estimated candidates
+        clear(result, tests, uint(~0));
         uint testIndex=0;
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
@@ -100,70 +98,40 @@ struct PitchEstimation {
             float expectedF0 = keyToPitch(expectedKey);
             //log("key "_+str(key)+", f0="_+pad(ftoa(expectedF0,1),6)+" Hz, vel=["_+str(sample.lovel)+", "_+str(sample.hivel)+"]"_);
 
-            const uint period = 32768;
-            assert(period<=sample.flac.duration);
-            buffer<float2> stereo = decodeAudio(sample.data, period);
-            float signal[period];
-            for(uint i: range(period)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
-#if 0 // 20/30
-            for(uint period: range(periodMax)) {
-                static FFT ffts[2] = {/*8192,*/16384,32768};
-                FFT& fft = ffts[period];
-                uint N = fft.N;
-                buffer<float> spectrum = fft.transform(signal);
+            assert(N<=sample.flac.duration);
+            buffer<float2> stereo = decodeAudio(sample.data, N);
+            float signal[N];
+            for(uint i: range(N)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
+#if 1 // 20/30 ~ 67%
+            ref<float> halfcomplex = fft.transform(signal);
+            buffer<float> spectrum (N/2);
+            for(int i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
 
-                // Estimates fundamental frequency using spectral harmonic correlation
-                for(uint octaveCount=1; octaveCount<=octaveMax; octaveCount++) {
-                    for(int smoothRadius=0; smoothRadius<=smoothMax; smoothRadius++) {
-                        list<int, 6> candidates;
-                        for(int i: range(smoothRadius,N/2/octaveCount-smoothRadius)) {
-                            float s=0;
-                            for(int di=-smoothRadius; di<=smoothRadius; di++) {
-                                float p=1;
-                                for(uint r=1; r<=octaveCount; r++) p *= spectrum[r*i+di];
-                                s += p;
-                            }
-                            candidates.insert(s, i); //FIXME: only local maximums
-                        }
-                        candidates.insert(candidates.last().key/4, candidates.last().value/2); // Inserts half frequency candidate
-                        log(candidates);
-                        //TODO: Double frequence, median of last 7 ? FIXME: average/deviation in frequence or period ?
-                        //float mean=0; for(Element e: candidates) mean += e.value; mean /= candidates.size;
-                        //float deviation=0; for(Element e: candidates) deviation += sq(e.value-mean); deviation /= candidates.size;
-                        // Normalized cross correlation function
-                        array<range> ranges; // Search ranges
-                        {int min=N,max=0;
-                            for(auto e: candidates) { assert(e.value); min=::min(min, e.value), max=::max(max, e.value); }
-                            assert(min);
-                            ranges << range(min, max); //FIXME: search around 2sigma of each candidates (within [A-1, C7])
-                        }
-                        int last=ranges.first().stop; int total=0;
-                        for(range r: ranges.slice(1)) { assert_(last < r.start); total+=r.stop-r.start; last=r.stop; }
-                        int min=ranges.first().start, max=ranges.last().stop;
-                        log(octaveCount, "min",min,"max", max,"size", max-min);
-                        float e0=0; for(uint i: range(N-max)) e0 += sq(signal[i]); // Total energy
-                        float maximum=0; uint bestK=0;
-                        for(range r: reverse<range>(ranges)) for(uint k: reverse_range(r)) { // Search periods from long to short
-                            float ek=0; float ec=0;
-                            for(uint i: range(N-max)) {
-                                ec += signal[i]*signal[k+i]; // Correlation
-                                ek += sq(signal[k+i]); // Total energy
-                            }
-                            ec /= sqrt(e0*ek); // Normalizes
-                            if(ec > maximum) maximum=ec, bestK=k;
-                            if(ec > 0.85) goto done; // Prevents halving
-                        }
-                        done:;
-                        log(bestK);
-                        if(bestK) result[period][octaveCount-1][smoothRadius][testIndex] = round(pitchToKey(sampleRate/bestK))==key;
-                    }
+            // Estimates fundamental frequency using highest peak (best correlation with e^(ift), FIXME: harmonic/autocorrelation)
+            list<uint, 7> candidates;
+            for(int i: range(0,N/2)) {
+                candidates.insert(spectrum[i], i); //FIXME: only local maximums
+            }
+
+            for(uint rank: range(candidates.size)) {
+                uint i = candidates[candidates.size-1-rank].value;
+                if(!i) continue; // Less local maximum than candidates
+                int key = min((int)round(pitchToKey((float)i*sampleRate/N)), 108);
+                if(key==expectedKey && rank<result[testIndex]) result[testIndex] = rank;
+            }
+            if(result[testIndex] != 0) {
+                log(">", expectedKey, sampleRate/expectedF0);
+                for(uint rank: range(candidates.size)) {
+                    uint i = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
+                    if(!i) continue; // Less local maximum than candidates
+                    int key = min((int)round(pitchToKey((float)i*sampleRate/N)), 108);
+                    log(key==expectedKey?'!':'?', v, i, key);
                 }
             }
-#else // 4: 24, 8: 21, 16: 24, 32: 25/30 ~ 83%, 64: 25
+#else // 25/30 ~ 83%
             // Exhaustive normalized cross correlation search
             const uint kMin = 11; // ~4364 Hz ~ floor(rate/C7)
             const uint kMax = 1792; // ~27 Hz ~ A-1 · 2­^(-1/2/12)
-            const uint N = period; // kMax*2; ?
             float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
             //float maximum=0; uint bestK=0;
             list<uint, 7> candidates;
@@ -185,12 +153,12 @@ struct PitchEstimation {
             if(NCC[0]>=NCC[1]) candidates.insert(NCC[0], kMin);
             done:;
             for(uint rank: range(candidates.size)) {
-                uint k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
+                uint k = candidates[candidates.size-1-rank].value;
                 if(!k) continue; // Less local maximum than candidates
                 int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
-                if(key==expectedKey && result[0][0][0][testIndex]==-1) result[0][0][0][testIndex] = rank;
+                if(key==expectedKey && rank<result[testIndex]) result[testIndex] = rank;
             }
-            if(result[0][0][0][testIndex] != 0) {
+            if(result[testIndex] != 0) {
                 log(">", expectedKey, sampleRate/expectedF0);
                 for(uint rank: range(candidates.size)) {
                     uint k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
@@ -202,30 +170,14 @@ struct PitchEstimation {
 #endif
             testIndex++;
         }
-        int bestScore=0;
-        for(uint period: range(periodMax)) {
-            for(uint octaveCount=1; octaveCount<=octaveMax; octaveCount++) { // 1: Estimates directly from intensity
-                for(int smoothRadius=0; smoothRadius<=smoothMax; smoothRadius++) {
-                    int success=0; for(int i : range(tests)) success += (result[period][octaveCount-1][smoothRadius][i]==0);
-                    bestScore = max(bestScore, success);
-                }
-            }
+        int success=0;
+        buffer<char> detail(tests);
+        for(int i : range(tests)) {
+            int rank = result[i];
+            success += rank==0;
+            assert_(rank>=-1 && rank<16, rank);
+            detail[i] = "X0123456789ABCDEF"[rank+1];
         }
-        for(uint period: range(periodMax)) {
-            for(uint octaveCount=1; octaveCount<=octaveMax; octaveCount++) { // 1: Estimates directly from intensity
-                for(int smoothRadius=0; smoothRadius<=smoothMax; smoothRadius++) {
-                    int success=0; buffer<char> detail(tests);
-                    for(int i : range(tests)) {
-                        int rank = result[period][octaveCount-1][smoothRadius][i];
-                        success += rank==0;
-                        assert_(rank>=-1 && rank<16, rank);
-                        detail[i] = "X0123456789ABCDEF"[rank+1];
-                    }
-                    if(success >= bestScore*14/15)
-                        log(/*"N",16384*pow(2,period), "\tO",octaveCount, "\tR",smoothRadius, "\t->", success, "\t",*/ detail);
-                }
-            }
-        }
-        log(bestScore,"/",tests,"~",str((int)round(100.*bestScore/tests))+"%"_);
+        log(success,"/",tests,"~",str((int)round(100.*success/tests))+"%"_,"\t", detail);
     }
 } test;
