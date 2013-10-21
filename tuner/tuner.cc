@@ -95,8 +95,6 @@ struct PitchEstimation {
             if(sample.trigger!=0) continue;
             if(singleVelocity && (sample.lovel > 64 || 64 > sample.hivel)) continue;
             int expectedKey = sample.pitch_keycenter;
-            float expectedF0 = keyToPitch(expectedKey);
-            //log("key "_+str(key)+", f0="_+pad(ftoa(expectedF0,1),6)+" Hz, vel=["_+str(sample.lovel)+", "_+str(sample.hivel)+"]"_);
 
             assert(N<=sample.flac.duration);
             buffer<float2> stereo = decodeAudio(sample.data, N);
@@ -110,41 +108,48 @@ struct PitchEstimation {
             // Estimates fundamental frequency using highest peak (best correlation with sin, FIXME: harmonic/autocorrelation)
             const uint fMin = 18; // ~27 Hz ~ semi pitch under A-1
             const uint fMax = 2941; // ~4186 Hz ~ semi pitch over C7
-            list<uint, 8> candidates;
-            float maximum=0;
-            for(uint i=fMin; i<=fMax; i++) {
-                if(spectrum[i-1] <= spectrum[i] && spectrum[i] >= spectrum[i+1]) {
-                    float merit = 0;
-                    {const int smooth=1; for(int di=-smooth; di<=smooth; di++) merit += spectrum[i+di];}
-                    maximum = max(maximum, merit);
-                    candidates.insert(merit, i);
+            int bestF=0; float maximum=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>maximum) maximum=spectrum[i], bestF=i;
+#if 0
+            list<float, 4> candidates;
+            /*candidates.insert(maximum, bestF);
+            candidates.insert(maximum, round((bestF+1)/2.));
+            candidates.insert(maximum, round((bestF+1)/3.));
+            candidates.insert(maximum, round((bestF+1)/4.));*/
+            candidates.insert(maximum, 1.*N/bestF);
+            candidates.insert(maximum, 2.*N/bestF);
+            candidates.insert(maximum, 3.*N/bestF);
+            candidates.insert(maximum, 4.*N/bestF);
+#else // 1: 24, 2:26, 3:27, 4:28
+            // Use normalized cross correlation to find best match between f, f/2, f/3, f/4. 1: 24
+            list<uint, 4> candidates;
+            /*int bestK = 0;*/ {
+                const int radius=0;
+                const int kMax = round((float)4*N/bestF)+radius;
+                float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
+                //float maximum=0;
+                for(uint i=1; i<=4; i++) { // TODO: search around target
+                    int k0 = round((float)i*N/bestF);
+                    int bestK = 0; float maximum=0;
+                    for(int k=k0-radius; k<=k0+radius; k++) {
+                        float ek=0; float ec=0;
+                        for(uint i: range(N-kMax)) {
+                            ec += signal[i]*signal[k+i]; // Correlation
+                            ek += sq(signal[k+i]); // Total energy
+                        }
+                        ec /= sqrt(e0*ek); // Normalizes
+                        if(ec > maximum) maximum = ec, bestK = k;
+                    }
+                    candidates.insert(maximum, bestK);
                 }
             }
-            candidates.insert(maximum, candidates.last().value/2);
-            candidates.insert(maximum, round((candidates.last().value+1)/3.));
-            candidates.insert(maximum, round((candidates.last().value+1)/4.));
-
-            for(uint rank: range(candidates.size)) {
-                uint i = candidates[candidates.size-1-rank].value;
-                if(!i) continue; // Less local maximum than candidates
-                int key = min((int)round(pitchToKey((float)i*sampleRate/N)), 108);
-                if(key==expectedKey && rank<result[testIndex]) result[testIndex] = rank;
-            }
-            if(result[testIndex] != 0) {
-                log(">", expectedKey, expectedF0*N/sampleRate);
-                for(uint rank: range(candidates.size)) {
-                    uint i = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key/maximum;
-                    if(!i) continue; // Less local maximum than candidates
-                    int key = min((int)round(pitchToKey((float)i*sampleRate/N)), 108);
-                    log(key==expectedKey?'!':'?', v, i, key);
-                }
-            }
+            //int key = min((int)round(pitchToKey((float)sampleRate/bestK)), 108); // 11 samples rounds to #C7
+            //if(key==expectedKey) result[testIndex] = 0;
+#endif
 #else // 1: 25/30 (top 5), 2: 27/30
             // Exhaustive normalized cross correlation search
             const uint kMin = 11; // ~4364 Hz ~ floor(rate/C7)
             const uint kMax = 1792; // ~27 Hz ~ A-1 · 2^(-1/2/12)
             float e0=0; for(uint i: range(N-kMax)) e0 += sq(signal[i]); // Total energy
-            //float maximum=0; uint bestK=0;
             list<uint, 8> candidates;
             float NCC[2]={0,0};
             for(uint k=kMax; k>=kMin; k--) { // Search periods from long to short
@@ -162,34 +167,35 @@ struct PitchEstimation {
             }
             if(NCC[0]>=NCC[1]) candidates.insert(NCC[0], kMin);
             done:;
+#endif
             for(uint rank: range(candidates.size)) {
-                uint k = candidates[candidates.size-1-rank].value;
+                float k = candidates[candidates.size-1-rank].value;
                 if(!k) continue; // Less local maximum than candidates
                 int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
                 if(key==expectedKey && rank<result[testIndex]) result[testIndex] = rank;
             }
             if(result[testIndex] != 0) {
-                log(">", expectedKey, sampleRate/expectedF0);
+                log(">", expectedKey, sampleRate/keyToPitch(expectedKey));
                 for(uint rank: range(candidates.size)) {
-                    uint k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
+                    float k = candidates[candidates.size-1-rank].value; float v=candidates[candidates.size-1-rank].key;
                     if(!k) continue; // Less local maximum than candidates
                     int key = min((int)round(pitchToKey((float)sampleRate/k)), 108); // 11 samples rounds to #C7
                     log(key==expectedKey?'!':'?', v, k, key);
                 }
             }
-#endif
+
             testIndex++;
         }
-        int success[8] = {};
+        int success[4] = {};
         buffer<char> detail(tests);
         for(int i : range(tests)) {
             int rank = result[i];
-            for(uint j: range(8)) success[j] += uint(rank)<j+1;
-            assert_(rank>=-1 && rank<16, rank);
-            detail[i] = "X123456789ABCDEF"[rank+1];
+            for(uint j: range(4)) success[j] += uint(rank)<j+1;
+            assert_(rank>=-1 && rank<8, rank);
+            detail[i] = "X12345678"[rank+1];
         }
         String s;
-        for(uint j: range(8)) if(j==0 || success[j-1]<success[j]) s<<str(j+1)+": "_<<str(success[j])<<", "_; s.pop(); s.pop();
+        for(uint j: range(4)) if(j==0 || success[j-1]<success[j]) s<<str(j+1)+": "_<<str(success[j])<<", "_; s.pop(); s.pop();
         log(detail, "("_+s+")"_);
     }
 } test;
