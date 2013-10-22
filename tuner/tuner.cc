@@ -114,33 +114,21 @@ struct PitchEstimation {
             const int kMax = round(4*kPeak);
             float kNCC = kPeak;
             float maxNCC=0;
+            int iNCC=1;
             if(kPeak > 32) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves)
                 for(uint i=1; i<=4; i++) {
-                    float k = i*kPeak;
-                    int k0 = round(k);
-                    float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[k0+i];
-#if 1
-                    // Estimates subkey pitch (for each f/i candidates, could be done only for maximum f/i winner)
-                    // Scans backward (decreasing k) until local maximum
-                    float backward=ec; int kb=k0-1;
-                    for(;;kb--) {
-                        float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[kb+i];
-                        if(ec > backward) backward = ec;
+                    float k0 = i*kPeak;
+                    float max = 0;
+#if 1 // Estimates subkey pitch (for each f/i candidates, could be done only for maximum f/i winner)
+                    for(int k=round(k0);;k--) { // Scans backward (decreasing k) until local maximum
+                        float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
+                        if(sum > max) k0 = k, max = sum;
                         else break;
                     }
-                    // Scans forward (increasing k) until local maximum
-                    float forward=ec; int kf=k0+1;
-                    for(;;kf++) {
-                        float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[kf+i];
-                        if(ec > forward) forward = ec;
-                        else break;
-                    }
-
-                    if(backward > forward) ec=backward, k = kb;
-                    if(forward > backward) ec=forward,  k = kf;
-                    // forward == backward => (backward < center > forward)
 #endif
-                    if(ec > maxNCC) maxNCC = ec, kNCC = i*kPeak;
+#if 1
+#endif
+                    if(max > maxNCC) maxNCC = max, kNCC = k0, iNCC=i;
                 }
             }
             float expectedK = sampleRate/keyToPitch(expectedKey);
@@ -148,6 +136,7 @@ struct PitchEstimation {
             if(key==expectedKey) {
                 result[testIndex] = 0;
                 offsets.insertMulti(key, 100*12*log2(expectedK/kNCC));
+                if(iNCC) log(iNCC, kNCC-int(iNCC*kPeak), kNCC/(iNCC*kPeak));
             } else {
                 log(">", expectedKey, expectedK);
                 log("?", maxPeak, kPeak, maxNCC, kNCC, key);
