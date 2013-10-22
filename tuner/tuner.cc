@@ -106,23 +106,48 @@ struct PitchEstimation {
             // Estimates candidates using maximum peak
             const uint fMin = 18; // ~27 Hz ~ semi pitch under A-1
             const uint fMax = 2941; // ~4186 Hz ~ semi pitch over C7
-            int peak=0; float peakMax=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>peakMax) peakMax=spectrum[i], peak=i;
+            int fPeak=0; float maxPeak=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>maxPeak) maxPeak=spectrum[i], fPeak=i;
             // Use autocorrelation to find best match between f, f/2, f/3, f/4
-            float ncc = peak;
-            const int kMax = round(4.*N/peak);
-            float nccMax=0;
-            if(peak < N/32.) { // High pitches don't work well with autocorrelation
+            const float kPeak = (float)N/fPeak;
+            const int kMax = round(4*kPeak);
+            float kNCC = kPeak;
+            float maxNCC=0;
+            if(kPeak > 32) { // High pitches don't work well with autocorrelation
                 for(uint i=1; i<=4; i++) {
-                    int k = round((float)i*N/peak);
-                    float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[k+i]; // Correlation
-                    if(ec > nccMax) nccMax = ec, ncc = ncc/i;
+                    float k = i*kPeak;
+                    int k0 = round(k);
+                    float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[k0+i];
+#if 0
+                    // Estimates subkey pitch (for each f/i candidates, could be done only for maximum f/i winner)
+                    // Scans backward (decreasing k) until local maximum
+                    float backward=ec; int kb=k0-1;
+                    for(;;kb--) {
+                        float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[kb+i];
+                        if(ec > backward) backward = ec;
+                        else break;
+                    }
+                    // Scans forward (increasing k) until local maximum
+                    float forward=ec; int kf=k0+1;
+                    for(;;kf++) {
+                        float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[kf+i];
+                        if(ec > forward) forward = ec;
+                        else break;
+                    }
+
+                    if(backward > forward) ec=backward, k = kb;
+                    if(forward > backward) ec=forward,  k = kf;
+                    // forward == backward => (backward < center > forward)
+#endif
+                    if(ec > maxNCC) maxNCC = ec, kNCC = i*kPeak;
                 }
             }
-            int key = round(pitchToKey((float)sampleRate*ncc/N)); // 11 samples rounds to #C7
-            if(key==expectedKey) result[testIndex] = 0;
-            else {
-                log(">", expectedKey, keyToPitch(expectedKey)/sampleRate*N);
-                log("?", peakMax, peak, nccMax, ncc, key);
+
+            int key = round(pitchToKey(sampleRate/kNCC));
+            if(key==expectedKey) {
+                result[testIndex] = 0;
+            } else {
+                log(">", expectedKey, sampleRate/keyToPitch(expectedKey));
+                log("?", maxPeak, kPeak, maxNCC, kNCC, key);
             }
             testIndex++;
         }
