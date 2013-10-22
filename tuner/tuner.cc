@@ -1,6 +1,7 @@
 #include "thread.h"
 #include "sampler.h"
 #include "math.h"
+#include "plot.h"
 #include <fftw3.h> //fftw3f
 typedef struct fftwf_plan_s* fftwf_plan;
 struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
@@ -91,6 +92,7 @@ struct PitchEstimation {
         uint result[tests]; // Rank of actual pitch within estimated candidates
         clear(result, tests, uint(~0));
         uint testIndex=0;
+        map<float, float> offsets; // For each note (in MIDI key), pitch offset (in cents) to equal temperament (A440)
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
             if(singleVelocity && (sample.lovel > 64 || 64 > sample.hivel)) continue;
@@ -112,12 +114,12 @@ struct PitchEstimation {
             const int kMax = round(4*kPeak);
             float kNCC = kPeak;
             float maxNCC=0;
-            if(kPeak > 32) { // High pitches don't work well with autocorrelation
+            if(kPeak > 32) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves)
                 for(uint i=1; i<=4; i++) {
                     float k = i*kPeak;
                     int k0 = round(k);
                     float ec=0; for(uint i: range(N-kMax)) ec += signal[i]*signal[k0+i];
-#if 0
+#if 1
                     // Estimates subkey pitch (for each f/i candidates, could be done only for maximum f/i winner)
                     // Scans backward (decreasing k) until local maximum
                     float backward=ec; int kb=k0-1;
@@ -141,12 +143,13 @@ struct PitchEstimation {
                     if(ec > maxNCC) maxNCC = ec, kNCC = i*kPeak;
                 }
             }
-
+            float expectedK = sampleRate/keyToPitch(expectedKey);
             int key = round(pitchToKey(sampleRate/kNCC));
             if(key==expectedKey) {
                 result[testIndex] = 0;
+                offsets.insertMulti(key, 100*12*log2(expectedK/kNCC));
             } else {
-                log(">", expectedKey, sampleRate/keyToPitch(expectedKey));
+                log(">", expectedKey, expectedK);
                 log("?", maxPeak, kPeak, maxNCC, kNCC, key);
             }
             testIndex++;
@@ -162,5 +165,6 @@ struct PitchEstimation {
         String s;
         for(uint j: range(4)) if(j==0 || success[j-1]<success[j]) s<<str(j+1)+": "_<<str(success[j])<<", "_; s.pop(); s.pop();
         log(detail, "("_+s+")"_);
+        log(offsets);
     }
 } test;

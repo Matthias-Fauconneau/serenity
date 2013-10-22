@@ -1,6 +1,6 @@
 #pragma once
 #include "widget.h"
-#include "sample.h"
+#include "map.h"
 
 struct Plot : virtual Widget {
     int2 sizeHint() override;
@@ -9,6 +9,6 @@ struct Plot : virtual Widget {
     String title, xlabel, ylabel;
     bool logx=false, logy=false;
     array<String> legends;
-    array<NonUniformSample> dataSets;
+    array<map<float,float>> dataSets;
 };
 
