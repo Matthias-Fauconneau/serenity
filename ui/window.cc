@@ -32,7 +32,7 @@ int2 displaySize;
 Display* glDisplay;
 GLXContext glContext;
 
-Image renderToImage(Widget* widget, int2 size, int imageResolution) {
+Image renderToImage(Widget& widget, int2 size, int imageResolution) {
     Image framebuffer = move(::framebuffer);
     array<Rect> clipStack = move(::clipStack);
     Rect currentClip = move(::currentClip);
@@ -41,8 +41,8 @@ Image renderToImage(Widget* widget, int2 size, int imageResolution) {
     ::currentClip = Rect(::framebuffer.size());
     ::resolution = imageResolution;
     fill(Rect(::framebuffer.size()),1);
-    assert(widget);
-    widget->render(0,::framebuffer.size());
+    assert(&widget);
+    widget.render(0,::framebuffer.size());
     Image image = move(::framebuffer);
     ::framebuffer = move(framebuffer);
     ::clipStack = move(clipStack);

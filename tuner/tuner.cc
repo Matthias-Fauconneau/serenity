@@ -2,6 +2,8 @@
 #include "sampler.h"
 #include "math.h"
 #include "plot.h"
+#include "window.h"
+#include "png.h"
 #include <fftw3.h> //fftw3f
 typedef struct fftwf_plan_s* fftwf_plan;
 struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
@@ -73,6 +75,8 @@ inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 
 /// Estimates fundamental frequency (~pitch) of test samples
 struct PitchEstimation {
+    Plot plot;
+    Window window {&plot, int2(1024,768), "Pitch"};
     PitchEstimation() {
         Sampler sampler;
         const uint sampleRate = 48000;
@@ -81,7 +85,7 @@ struct PitchEstimation {
         const uint N = 32768; // Analysis window size (16 periods of A-1)
         FFT fft (N);
 
-        const bool singleVelocity = true; // Tests 30 samples or 30x16 samples (TODO: fix failing low/high velocities)
+        const bool singleVelocity = false; // Tests 30 samples or 30x16 samples
         uint tests = 0;
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
@@ -132,7 +136,7 @@ struct PitchEstimation {
             if(key==expectedKey) {
                 result[testIndex] = 0;
                 offsets.insertMulti(key, 100*12*log2(expectedK/kNCC));
-                if(iNCC) log(iNCC, kNCC-int(iNCC*kPeak), kNCC/(iNCC*kPeak));
+                //if(iNCC) log(iNCC, kNCC-int(iNCC*kPeak), kNCC/(iNCC*kPeak));
             } else {
                 log(">", expectedKey, expectedK);
                 log("?", maxPeak, kPeak, maxNCC, kNCC, key);
@@ -149,7 +153,14 @@ struct PitchEstimation {
         }
         String s;
         for(uint j: range(4)) if(j==0 || success[j-1]<success[j]) s<<str(j+1)+": "_<<str(success[j])<<", "_; s.pop(); s.pop();
-        log(detail, "("_+s+")"_);
-        log(offsets);
+        log(detail, "("_+s+")/"_,tests);
+        assert(tests==30 && success[0]==29 || tests==480 && success[0]==455);
+        plot.title = String("Pitch offset (in cents) to equal temperament (A440)"_);
+        plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_); //
+        plot.dataSets << move(offsets);
+        window.backgroundColor=window.backgroundCenter=1;
+        window.show();
+        window.localShortcut(Escape).connect([]{exit();});
+        window.localShortcut(PrintScreen).connect([=]{writeFile("plot.png", encodePNG(renderToImage(plot, int2(1024,768))), home());});
     }
 } test;

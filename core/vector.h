@@ -67,7 +67,6 @@ generic bool operator >=(const vector& u, const vector& v) { for(uint i=0;i<N;i+
 generic bool operator >(const vector& u, const vector& v) { for(uint i=0;i<N;i++) if(u[i]<=v[i]) return false; return true; }
 
 generic vector abs(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=abs(v[i]); return r;  }
-generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
 generic vector sign(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=ceil(v[i]); return r;  }
 generic vector floor(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=floor(v[i]); return r;  }
 generic vector fract(const vector& v){ vector r; for(uint i=0;i<N;i++) r[i]=mod(v[i],1); return r;  }

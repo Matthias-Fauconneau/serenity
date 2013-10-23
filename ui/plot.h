@@ -10,5 +10,6 @@ struct Plot : virtual Widget {
     bool logx=false, logy=false;
     array<String> legends;
     array<map<float,float>> dataSets;
+    bool plotPoints = true, plotLines = false;
 };
 

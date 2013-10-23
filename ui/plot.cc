@@ -3,6 +3,14 @@
 #include "display.h"
 #include "text.h"
 
+struct Ticks { float max; uint tickCount; };
+uint subExponent(float& value) {
+    real subExponent = log10(abs(value)) - floor(log10(abs(value)));
+    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,6}, {4,8}, {5,5}, {6,6}, {8,8}, {10,5}})
+        if(log10(a[0]) >= subExponent) { value=sign(value)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
+    error("No matching subexponent for"_, value);
+}
+
 int2 Plot::sizeHint() { return int2(-1080*4/3/2, -1080/2); }
 void Plot::render(int2 position, int2 size) {
     int resolution = ::resolution; ::resolution = 1.5*96; // Scales the size of all text labels
@@ -18,9 +26,12 @@ void Plot::render(int2 position, int2 size) {
 
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
-        real subExponent = log10(max[axis]) - floor(log10(max[axis]));
-        for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, /*{1.5,6},*/ {1.6,8}, {2,10}, {2.5,5}, {3,6}, {4,8}, {5,5}, {6,6}, {8,8}, {10,5}})
-            if(log10(a[0]) >= subExponent) { max[axis] = a[0]*exp10(floor(log10(max[axis]))); tickCount[axis] = a[1]; break; }
+        tickCount[axis] = subExponent(max[axis]);
+        if(min[axis] < 0) {
+            float tickWidth = max[axis]/tickCount[axis];
+            min[axis] = floor(min[axis]/tickWidth)*tickWidth;
+            tickCount[axis] += -min[axis]/tickWidth;
+        }
     }
 
     // Configures ticks
@@ -28,7 +39,8 @@ void Plot::render(int2 position, int2 size) {
     for(uint axis: range(2)) {
         int precision = ::max(0., ceil(-log10(max[axis]/tickCount[axis])));
         for(uint i: range(tickCount[axis]+1)) {
-            real value = /*min[axis]+*/(max[axis]/*-min[axis]*/)*i/tickCount[axis];
+            real value = min[axis]+(max[axis]-min[axis])*i/tickCount[axis];
+            if(axis==0 && value==0) { ticks[axis] << Text(); continue; } // Skips X origin tick (overlaps)
             String label = ftoa(value, precision, 0, value>=10e5 ? 3 : 0);
             assert(label);
             ticks[axis] << Text(label);
@@ -84,7 +96,13 @@ void Plot::render(int2 position, int2 size) {
         const auto& data = dataSets[i];
         vec2 points[data.size()];
         for(uint i: range(data.size())) points[i] = point( vec2(data.keys[i],data.values[i]) );
-        for(uint i: range(data.size()-1)) line(points[i], points[i+1], color);
+        if(plotPoints) for(uint i: range(data.size()-1)) {
+            vec2 p = round(points[i]);
+            const int pointRadius = 4;
+            line(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
+            line(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
+        }
+        if(plotLines) for(uint i: range(data.size()-1)) line(points[i], points[i+1], color);
     }
     ::resolution = resolution;
 }

@@ -53,6 +53,7 @@ generic T min(T a, T b) { return a<b ? a : b; }
 generic T max(T a, T b) { return a<b ? b : a; }
 generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
 generic T abs(T x) { return x>=0 ? x : -x; }
+generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
 generic inline constexpr T sq(const T& x) { return x*x; }
 generic inline constexpr T cb(const T& x) { return x*x*x; }
 
