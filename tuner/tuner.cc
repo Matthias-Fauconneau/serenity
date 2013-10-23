@@ -116,19 +116,15 @@ struct PitchEstimation {
             float maxNCC=0;
             int iNCC=1;
             if(kPeak > 32) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves)
-                for(uint i=1; i<=4; i++) {
-                    float k0 = i*kPeak;
-                    float max = 0;
-#if 1 // Estimates subkey pitch (for each f/i candidates, could be done only for maximum f/i winner)
-                    for(int k=round(k0);;k--) { // Scans backward (decreasing k) until local maximum
-                        float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
-                        if(sum > max) k0 = k, max = sum;
-                        else break;
-                    }
-#endif
-#if 1
-#endif
-                    if(max > maxNCC) maxNCC = max, kNCC = k0, iNCC=i;
+                for(uint i=1; i<=4; i++) { // Search lower octaves for best correlation
+                    int k = round(i*kPeak);
+                    float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
+                    if(sum > maxNCC) maxNCC = sum, kNCC = i*kPeak, iNCC=i;
+                }
+                for(int k=round(kNCC)-1;;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch
+                    float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
+                    if(sum > maxNCC) maxNCC = sum, kNCC = k;
+                    else break;
                 }
             }
             float expectedK = sampleRate/keyToPitch(expectedKey);
