@@ -156,7 +156,7 @@ buffer<byte> filter(const Image& image) {
     byte* dst = data.begin(); const byte* src = (byte*)image.data;
     for(uint unused y: range(h)) {
         *dst++ = 0;
-        for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]);
+        for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],image.alpha?src[x*4+3]:0xFF);
         dst+=w*4, src+=image.stride*4;
     }
     return data;
@@ -182,7 +182,7 @@ buffer<byte> encodePNG(const Image& image) {
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
 
-    array<byte> IDAT = "IDAT"_+deflate(filter(image));
+    array<byte> IDAT = "IDAT"_+deflate(filter(image),true);
     file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
 
     file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));

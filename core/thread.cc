@@ -24,8 +24,8 @@ template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 void Poll::registerPoll() {
     Locker lock(thread.lock);
     if(thread.unregistered.contains(this)) { thread.unregistered.removeAll(this); }
-    else { assert(!thread.contains(this)); thread<<this; }
-    thread.post();
+    else if(!thread.contains(this)) thread<<this;
+    thread.post(); // Reset poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}

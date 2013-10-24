@@ -5,9 +5,9 @@
 
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
-    real subExponent = log10(abs(value)) - floor(log10(abs(value)));
-    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,6}, {4,8}, {5,5}, {6,6}, {8,8}, {10,5}})
-        if(log10(a[0]) >= subExponent) { value=sign(value)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
+    real subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
+    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {10,5}})
+        if(a[0] >= subExponent) { value=sign(value)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
     error("No matching subexponent for"_, value);
 }
 
@@ -18,19 +18,28 @@ void Plot::render(int2 position, int2 size) {
     vec2 min=0, max=0;
     for(const auto& data: dataSets) for(auto point: data) {
         vec2 p(point.key,point.value);
+        assert(isNumber(p.x) && isNumber(p.y), p);
         min=::min(min,p);
         max=::max(max,p);
     }
     if(!logx && min.x>0) min.x = 0;
-    //if(min.y<0) { assert(!logy); min.y=-(max.y=::max(-min.y,max.y)); } else if(!logy) min.y = 0;
 
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
-        tickCount[axis] = subExponent(max[axis]);
-        if(min[axis] < 0) {
-            float tickWidth = max[axis]/tickCount[axis];
-            min[axis] = floor(min[axis]/tickWidth)*tickWidth;
-            tickCount[axis] += -min[axis]/tickWidth;
+        if(max[axis]>-min[axis]) {
+            tickCount[axis] = subExponent(max[axis]);
+            if(min[axis] < 0) {
+                float tickWidth = max[axis]/tickCount[axis];
+                min[axis] = floor(min[axis]/tickWidth)*tickWidth;
+                tickCount[axis] += -min[axis]/tickWidth;
+            }
+        } else {
+            tickCount[axis] = subExponent(min[axis]);
+            if(max[axis] > 0) {
+                float tickWidth = -min[axis]/tickCount[axis];
+                max[axis] = ceil(max[axis]/tickWidth)*tickWidth;
+                tickCount[axis] += max[axis]/tickWidth;
+            }
         }
     }
 
@@ -47,7 +56,7 @@ void Plot::render(int2 position, int2 size) {
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
     }
-    int left=tickLabelSize.x, top=tickLabelSize.y, bottom=tickLabelSize.y;
+    int left=tickLabelSize.x*3./2, top=tickLabelSize.y, bottom=tickLabelSize.y;
     int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
 
     // Colors
@@ -58,13 +67,25 @@ void Plot::render(int2 position, int2 size) {
 
     int2 pen=position;
     {Text text(format(Bold)+title); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
-    for(uint i: range(legends.size)) {Text text(legends[i], 16, colors[i]); text.render(pen+int2(size.x-right-text.sizeHint().x,top)); pen.y+=text.sizeHint().y; } // Legend
+    assert(legends.size==0 || legends.size == dataSets.size);
+    if(legendPosition&1) pen.x += size.x-right;
+    if(legendPosition&2) {
+        pen.y += size.y-bottom-tickLabelSize.y/2;
+        for(uint i: range(legends.size)) pen.y -= Text(legends[i], 16, colors[i]).sizeHint().y;
+    } else {
+        pen.y += top;
+    }
+    for(uint i: range(legends.size)) { // Legend
+        Text text(legends[i], 16, colors[i]); text.render(pen+int2(-text.sizeHint().x,0)); pen.y+=text.sizeHint().y;
+    }
 
     // Transforms data positions to render positions
     auto point = [&](vec2 p)->vec2{
         p = (p-min)/(max-min);
-        if(logx) p.x = ln(1+(e-1)*p.x);
-        if(logy) p.y = ln(1+(e-1)*p.y);
+        /*if(logx) p.x = ln(1+(e-1)*p.x);
+        if(logy) p.y = ln(1+(e-1)*p.y);*/
+        if(logx) p.x = log10(1+(10-1)*p.x);
+        if(logy) p.y = log10(1+(10-1)*p.y);
         return vec2(position.x+left+p.x*(size.x-left-right),position.y+2*top+(1-p.y)*(size.y-2*top-bottom));
     };
 
@@ -85,9 +106,10 @@ void Plot::render(int2 position, int2 size) {
             int2 p (point(O+(i/float(tickCount[1]))*(end-O)));
             line(p, p+int2(4,0));
             Text& tick = ticks[1][i];
-            tick.render(p + int2(-tick.textSize.x, -tick.textSize.y/2) );
+            tick.render(p + int2(-tick.textSize.x-left/6, -tick.textSize.y/2) );
         }
-        {Text text(format(Bold)+ylabel); text.render(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y/2));}
+        {Text text(format(Bold)+ylabel);
+            text.render(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y/2));}
     }
 
     // Plots data points
@@ -96,7 +118,7 @@ void Plot::render(int2 position, int2 size) {
         const auto& data = dataSets[i];
         vec2 points[data.size()];
         for(uint i: range(data.size())) points[i] = point( vec2(data.keys[i],data.values[i]) );
-        if(plotPoints) for(uint i: range(data.size()-1)) {
+        if(plotPoints) for(uint i: range(data.size())) {
             vec2 p = round(points[i]);
             const int pointRadius = 4;
             line(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);

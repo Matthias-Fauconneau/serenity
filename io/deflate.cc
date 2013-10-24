@@ -1,4 +1,5 @@
 #include "deflate.h"
+#include "string.h"
 
 // ------------------- zlib-style API Definitions.
 
@@ -239,7 +240,6 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
 tdefl_status tdefl_compress_buffer(tdefl_compressor *d, const void *pIn_buf, size_t in_buf_size, tdefl_flush flush);
 
 #include <string.h>
-#include <assert.h>
 
 #define MZ_MAX(a,b) (((a)>(b))?(a):(b))
 #define MZ_MIN(a,b) (((a)<(b))?(a):(b))
@@ -1289,7 +1289,7 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
   {
     if (pIn_buf_size) *pIn_buf_size = 0;
     if (pOut_buf_size) *pOut_buf_size = 0;
-    return TDEFL_STATUS_BAD_PARAM;
+    error("TDEFL_STATUS_BAD_PARAM");
   }
 
   d->m_pIn_buf = pIn_buf; d->m_pIn_buf_size = pIn_buf_size;
@@ -1303,7 +1303,7 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
   {
     if (pIn_buf_size) *pIn_buf_size = 0;
     if (pOut_buf_size) *pOut_buf_size = 0;
-    return (d->m_prev_return_status = TDEFL_STATUS_BAD_PARAM);
+    error("TDEFL_STATUS_BAD_PARAM");
   }
   d->m_wants_to_finish |= (flush == TDEFL_FINISH);
 
@@ -1314,27 +1314,28 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
       ((d->m_flags & TDEFL_GREEDY_PARSING_FLAG) != 0) &&
       ((d->m_flags & (TDEFL_FILTER_MATCHES | TDEFL_FORCE_ALL_RAW_BLOCKS | TDEFL_RLE_MATCHES)) == 0))
   {
-    if (!tdefl_compress_fast(d))
-      return d->m_prev_return_status;
+    assert(tdefl_compress_fast(d));
   }
+  else error(d->m_flags);
 
   if ((d->m_flags & (TDEFL_WRITE_ZLIB_HEADER | TDEFL_COMPUTE_ADLER32)) && (pIn_buf))
     d->m_adler32 = (mz_uint32)mz_adler32(d->m_adler32, (const mz_uint8 *)pIn_buf, d->m_pSrc - (const mz_uint8 *)pIn_buf);
 
   if ((flush) && (!d->m_lookahead_size) && (!d->m_src_buf_left) && (!d->m_output_flush_remaining))
   {
-    if (tdefl_flush_block(d, flush) < 0)
-      return d->m_prev_return_status;
+    assert(tdefl_flush_block(d, flush) >= 0);
     d->m_finished = (flush == TDEFL_FINISH);
     if (flush == TDEFL_FULL_FLUSH) { MZ_CLEAR_OBJ(d->m_hash); MZ_CLEAR_OBJ(d->m_next); d->m_dict_size = 0; }
   }
 
-  return (d->m_prev_return_status = tdefl_flush_output_buffer(d));
+  assert(tdefl_flush_output_buffer(d) == TDEFL_STATUS_DONE, d->m_finished, d->m_lookahead_size, d->m_src_buf_left, d->m_output_flush_remaining);
+  return TDEFL_STATUS_DONE;
 }
 
 tdefl_status tdefl_compress_buffer(tdefl_compressor *d, const void *pIn_buf, size_t in_buf_size, tdefl_flush flush)
 {
-  assert(d->m_pPut_buf_func); return tdefl_compress(d, pIn_buf, &in_buf_size, NULL, NULL, flush);
+  assert(d->m_pPut_buf_func); assert(tdefl_compress(d, pIn_buf, &in_buf_size, NULL, NULL, flush) == TDEFL_STATUS_DONE);
+  return TDEFL_STATUS_DONE;
 }
 
 tdefl_status tdefl_init(tdefl_compressor *d, tdefl_put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
@@ -1358,11 +1359,11 @@ tdefl_status tdefl_init(tdefl_compressor *d, tdefl_put_buf_func_ptr pPut_buf_fun
 
 mz_bool tdefl_compress_mem_to_output(const void *pBuf, size_t buf_len, tdefl_put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
 {
-  tdefl_compressor *pComp; mz_bool succeeded; if (((buf_len) && (!pBuf)) || (!pPut_buf_func)) return MZ_FALSE;
-  pComp = (tdefl_compressor*)malloc(sizeof(tdefl_compressor)); if (!pComp) return MZ_FALSE;
-  succeeded = (tdefl_init(pComp, pPut_buf_func, pPut_buf_user, flags) == TDEFL_STATUS_OKAY);
-  succeeded = succeeded && (tdefl_compress_buffer(pComp, pBuf, buf_len, TDEFL_FINISH) == TDEFL_STATUS_DONE);
-  free(pComp); return succeeded;
+  tdefl_compressor *pComp; mz_bool succeeded; assert(!(((buf_len) && (!pBuf)) || (!pPut_buf_func)));
+  pComp = (tdefl_compressor*)malloc(sizeof(tdefl_compressor)); assert(pComp);
+  assert(tdefl_init(pComp, pPut_buf_func, pPut_buf_user, flags) == TDEFL_STATUS_OKAY);
+  assert(tdefl_compress_buffer(pComp, pBuf, buf_len, TDEFL_FINISH) == TDEFL_STATUS_DONE);
+  free(pComp); return true;
 }
 
 typedef struct
@@ -1392,7 +1393,7 @@ void *tdefl_compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_
   tdefl_output_buffer out_buf; MZ_CLEAR_OBJ(out_buf);
   if (!pOut_len) return MZ_FALSE; else *pOut_len = 0;
   out_buf.m_expandable = MZ_TRUE;
-  if (!tdefl_compress_mem_to_output(pSrc_buf, src_buf_len, tdefl_output_buffer_putter, &out_buf, flags)) return NULL;
+  assert(tdefl_compress_mem_to_output(pSrc_buf, src_buf_len, tdefl_output_buffer_putter, &out_buf, flags));
   *pOut_len = out_buf.m_size; return out_buf.m_pBuf;
 }
 
@@ -1413,8 +1414,10 @@ buffer<byte> inflate(const ref<byte>& source, bool zlib) {
 }
 
 buffer<byte> deflate(const ref<byte>& source, bool zlib) {
-    buffer<byte> data; size_t size;
-    data.data = (byte*)tdefl_compress_mem_to_heap(source.data, source.size, &size, zlib?TDEFL_WRITE_ZLIB_HEADER:0);
+    buffer<byte> data; size_t size=0;
+    assert(source.data && source.size);
+    data.data = (byte*)tdefl_compress_mem_to_heap(source.data, source.size, &size, 1|(zlib?TDEFL_WRITE_ZLIB_HEADER:0)|TDEFL_GREEDY_PARSING_FLAG);
     data.capacity=data.size=size;
+    assert(data, data.size, data.data, data.capacity, size);
     return data;
 }

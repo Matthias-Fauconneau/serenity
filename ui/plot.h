@@ -11,5 +11,6 @@ struct Plot : virtual Widget {
     array<String> legends;
     array<map<float,float>> dataSets;
     bool plotPoints = true, plotLines = false;
+    enum { TopLeft, TopRight, BottomLeft, BottomRight } legendPosition = TopRight;
 };
 

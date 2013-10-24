@@ -2,6 +2,7 @@
 #include "sampler.h"
 #include "math.h"
 #include "plot.h"
+#include "layout.h"
 #include "window.h"
 #include "png.h"
 #include <fftw3.h> //fftw3f
@@ -72,35 +73,54 @@ generic struct reverse {
 
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
+inline float loudnessWeight(float f) {
+    const float a = sq(20.6), b=sq(107.7), c=sq(737.9), d=sq(12200);
+    float f2 = f*f;
+    return d*f2*f2 / ((f2 + a) * sqrt((f2+b)*(f2+c)) * (f2+d));
+}
 
 /// Estimates fundamental frequency (~pitch) of test samples
 struct PitchEstimation {
-    Plot plot;
-    Window window {&plot, int2(1024,768), "Pitch"};
+    VList<Plot> plots;
+    Window window {&plots, int2(1024, 2*768), "Pitch, Loudness"};
     PitchEstimation() {
         Sampler sampler;
         const uint sampleRate = 48000;
         sampler.open(sampleRate, "Salamander.sfz"_, Folder("Samples"_,root()));
 
-        const uint N = 32768; // Analysis window size (16 periods of A-1)
+        const uint N = 16384; // Analysis window size (~0.7s, ~16 periods of A-1)
         FFT fft (N);
 
         const bool singleVelocity = false; // Tests 30 samples or 30x16 samples
+        const bool skipHighest = true; // FIXME: Highest sample is quite atonal
         uint tests = 0;
+        array<uint> velocityLayers;
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
-            if(singleVelocity && (sample.lovel > 64 || 64 > sample.hivel)) continue;
+            if(skipHighest && sample.pitch_keycenter >= 108) continue;
+            if(singleVelocity) { if(sample.lovel > 64 || 64 > sample.hivel) continue; }
+            //else { if(sample.hivel <= 33) continue; }
+            int velocity = (sample.lovel+sample.hivel)/2;
+            if(!velocityLayers.contains(velocity)) velocityLayers.insertSorted(velocity);
             tests++;
         }
 
         uint result[tests]; // Rank of actual pitch within estimated candidates
         clear(result, tests, uint(~0));
         uint testIndex=0;
-        map<float, float> offsets; // For each note (in MIDI key), pitch offset (in cents) to equal temperament (A440)
+        array<map<float,float>> energy; // For each note (in MIDI key), energy relative to average
+        energy.grow(velocityLayers.size);
+        array<map<float,float>> loudness; // For each note (in MIDI key), loudness relative to average
+        loudness.grow(velocityLayers.size);
+        array<map<float,float>> offsets; // For each note (in MIDI key), pitch offset (in cents) to equal temperament (A440)
+        offsets.grow(velocityLayers.size);
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
-            if(singleVelocity && (sample.lovel > 64 || 64 > sample.hivel)) continue;
+            if(skipHighest && sample.pitch_keycenter >= 108) continue;
+            if(singleVelocity) { if(sample.lovel > 64 || 64 > sample.hivel) continue; }
+            //else { if(sample.hivel <= 33) continue; }
             int expectedKey = sample.pitch_keycenter;
+            int velocity = (sample.lovel+sample.hivel)/2;
 
             assert(N<=sample.flac.duration);
             buffer<float2> stereo = decodeAudio(sample.data, N);
@@ -108,26 +128,38 @@ struct PitchEstimation {
             for(uint i: range(N)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
             ref<float> halfcomplex = fft.transform(signal);
             buffer<float> spectrum (N/2);
-            for(int i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
+            for(int i: range(N/2)) {
+                spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
+
+            }
+            float e0=0; for(uint i: range(N/2)) e0 += spectrum[i];
+            float l0=0; for(uint i: range(N/2)) l0 += loudnessWeight(i)*spectrum[i];
             // Estimates candidates using maximum peak
-            const uint fMin = 18; // ~27 Hz ~ semi pitch under A-1
-            const uint fMax = 2941; // ~4186 Hz ~ semi pitch over C7
+            const uint fMin = N*440*pow(2, -4 - 0./12 - (1./2 / 12))/sampleRate; // ~27 Hz ~ half pitch under A-1
+            const uint fMax = N*440*pow(2,  3 + 3./12 + (1./2 / 12))/sampleRate; // ~4308 Hz ~ half pitch over C7
             int fPeak=0; float maxPeak=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>maxPeak) maxPeak=spectrum[i], fPeak=i;
             // Use autocorrelation to find best match between f, f/2, f/3, f/4
-            const float kPeak = (float)N/fPeak;
+            const float kPeak = (float)N/fPeak; // k represents periods here (and not 1/wavelength­)
             const int kMax = round(4*kPeak);
             float kNCC = kPeak;
             float maxNCC=0;
             int iNCC=1;
             if(kPeak > 32) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves)
                 for(uint i=1; i<=4; i++) { // Search lower octaves for best correlation
-                    int k = round(i*kPeak);
-                    float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
-                    if(sum > maxNCC) maxNCC = sum, kNCC = i*kPeak, iNCC=i;
+                    float bestK = i*kPeak;
+                    int k0 = round(bestK);
+                    float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k0+i];
+                    float max = sum;
+                    if(max > maxNCC) maxNCC = max, kNCC = bestK, iNCC=i;
                 }
-                for(int k=round(kNCC)-1;;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch
+                for(int k=round(iNCC*kPeak)-1;;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch
                     float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
                     if(sum > maxNCC) maxNCC = sum, kNCC = k;
+                    else break;
+                }
+                for(int k=round(iNCC*kPeak)+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch
+                    float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
+                    if(sum > maxNCC) { /*log("+",sum, maxNCC, iNCC*kPeak, kNCC, k);*/ maxNCC = sum, kNCC = k; } // 7 / 464
                     else break;
                 }
             }
@@ -135,15 +167,23 @@ struct PitchEstimation {
             int key = round(pitchToKey(sampleRate/kNCC));
             if(key==expectedKey) {
                 result[testIndex] = 0;
-                offsets.insertMulti(key, 100*12*log2(expectedK/kNCC));
+                offsets[velocityLayers.indexOf(velocity)].insert(key, 100*12*log2(expectedK/kNCC));
+                energy[velocityLayers.indexOf(velocity)].insert(key, e0);
+                loudness[velocityLayers.indexOf(velocity)].insert(key, l0);
                 //if(iNCC) log(iNCC, kNCC-int(iNCC*kPeak), kNCC/(iNCC*kPeak));
             } else {
-                log(">", expectedKey, expectedK);
-                log("?", maxPeak, kPeak, maxNCC, kNCC, key);
+                log(">", expectedKey, expectedK, sample.lovel, sample.hivel);
+                log("?", iNCC, maxPeak, kPeak, iNCC*kPeak, maxNCC, kNCC, key);
             }
             testIndex++;
         }
-        int success[4] = {};
+        {float sum=0, count=0;
+        for(const auto& e: energy) for(float e0: e.values) sum+=e0, count++;
+        for(auto& e: energy) for(float& e0: e.values) e0 = 10*log10(e0/(sum/count));}
+        {float sum=0, count=0;
+        for(const auto& e: loudness) for(float e0: e.values) sum+=e0, count++;
+        for(auto& e: loudness) for(float& e0: e.values) e0 = 10*log10(e0/(sum/count));}
+        uint success[4] = {};
         buffer<char> detail(tests);
         for(int i : range(tests)) {
             int rank = result[i];
@@ -154,13 +194,38 @@ struct PitchEstimation {
         String s;
         for(uint j: range(4)) if(j==0 || success[j-1]<success[j]) s<<str(j+1)+": "_<<str(success[j])<<", "_; s.pop(); s.pop();
         log(detail, "("_+s+")/"_,tests);
-        assert(tests==30 && success[0]==29 || tests==480 && success[0]==455);
-        plot.title = String("Pitch offset (in cents) to equal temperament (A440)"_);
-        plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_); //
-        plot.dataSets << move(offsets);
+        // 16K: 453; 32K: 455 / 464
+        {Plot plot;
+            plot.title = String("Pitch ratio (in cents) to equal temperament (A440)"_);
+            plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_);
+            plot.legends = apply(velocityLayers, [](uint velocity){return str(velocity);});
+            plot.dataSets = move(offsets);
+            plots << move(plot);
+        }
+        {Plot plot;
+            plot.title = String("Energy ratio (in decibels) to average energy over all samples"_);
+            plot.xlabel = String("Key"_), plot.ylabel = String("Decibels"_);
+            plot.legends = apply(velocityLayers, [](uint velocity){return str(velocity);});
+            plot.dataSets = move(energy);
+            plot.legendPosition = Plot::BottomRight;
+            plots << move(plot);
+        }
+        /*{Plot plot;
+            plot.title = String("Loudness ratio (in decibels) to average loudness over all samples"_);
+            plot.xlabel = String("Key"_), plot.ylabel = String("Decibels"_);
+            plot.legends = apply(velocityLayers, [](uint velocity){return str(velocity);});
+            plot.dataSets = move(loudness);
+            plot.legendPosition = Plot::BottomRight;
+            plots << move(plot);
+        }*/
         window.backgroundColor=window.backgroundCenter=1;
         window.show();
         window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(PrintScreen).connect([=]{writeFile("plot.png", encodePNG(renderToImage(plot, int2(1024,768))), home());});
+        window.localShortcut(PrintScreen).connect([=]{
+            writeFile("pitch.png"_, encodePNG(renderToImage(plots[0], int2(1024,768))), home());
+            writeFile("energy.png"_, encodePNG(renderToImage(plots[1], int2(1024,768))), home());
+            writeFile("loudness.png"_, encodePNG(renderToImage(plots[2], int2(1024,768))), home());
+        });
+        //window.localShortcut(PrintScreen)();
     }
 } test;

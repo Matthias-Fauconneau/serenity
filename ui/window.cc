@@ -154,7 +154,6 @@ void Window::create() {
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     created = true;
-    registerPoll();
 }
 Window::~Window() { destroy(); }
 void Window::destroy() {
@@ -376,7 +375,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
 }
 void Window::render() { if(mapped) queue(); else needUpdate=true; }
 
-void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
+void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} registerPoll(); }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {
@@ -424,7 +423,7 @@ uint Window::KeyCode(Key sym) {
     return keycode;
 }
 
-signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint)key); }
+signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
 signal<>& Window::globalShortcut(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
