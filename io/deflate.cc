@@ -1314,7 +1314,7 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
       ((d->m_flags & TDEFL_GREEDY_PARSING_FLAG) != 0) &&
       ((d->m_flags & (TDEFL_FILTER_MATCHES | TDEFL_FORCE_ALL_RAW_BLOCKS | TDEFL_RLE_MATCHES)) == 0))
   {
-    assert(tdefl_compress_fast(d));
+    assert_(tdefl_compress_fast(d));
   }
   else error(d->m_flags);
 
@@ -1334,8 +1334,8 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
 
 tdefl_status tdefl_compress_buffer(tdefl_compressor *d, const void *pIn_buf, size_t in_buf_size, tdefl_flush flush)
 {
-  assert(d->m_pPut_buf_func); assert(tdefl_compress(d, pIn_buf, &in_buf_size, NULL, NULL, flush) == TDEFL_STATUS_DONE);
-  return TDEFL_STATUS_DONE;
+  assert(d->m_pPut_buf_func);
+  return tdefl_compress(d, pIn_buf, &in_buf_size, NULL, NULL, flush);
 }
 
 tdefl_status tdefl_init(tdefl_compressor *d, tdefl_put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
@@ -1359,10 +1359,10 @@ tdefl_status tdefl_init(tdefl_compressor *d, tdefl_put_buf_func_ptr pPut_buf_fun
 
 mz_bool tdefl_compress_mem_to_output(const void *pBuf, size_t buf_len, tdefl_put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
 {
-  tdefl_compressor *pComp; mz_bool succeeded; assert(!(((buf_len) && (!pBuf)) || (!pPut_buf_func)));
+  tdefl_compressor *pComp; assert(!(((buf_len) && (!pBuf)) || (!pPut_buf_func)));
   pComp = (tdefl_compressor*)malloc(sizeof(tdefl_compressor)); assert(pComp);
-  assert(tdefl_init(pComp, pPut_buf_func, pPut_buf_user, flags) == TDEFL_STATUS_OKAY);
-  assert(tdefl_compress_buffer(pComp, pBuf, buf_len, TDEFL_FINISH) == TDEFL_STATUS_DONE);
+  assert_(tdefl_init(pComp, pPut_buf_func, pPut_buf_user, flags) == TDEFL_STATUS_OKAY);
+  assert_(tdefl_compress_buffer(pComp, pBuf, buf_len, TDEFL_FINISH) == TDEFL_STATUS_DONE);
   free(pComp); return true;
 }
 
@@ -1393,7 +1393,7 @@ void *tdefl_compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_
   tdefl_output_buffer out_buf; MZ_CLEAR_OBJ(out_buf);
   if (!pOut_len) return MZ_FALSE; else *pOut_len = 0;
   out_buf.m_expandable = MZ_TRUE;
-  assert(tdefl_compress_mem_to_output(pSrc_buf, src_buf_len, tdefl_output_buffer_putter, &out_buf, flags));
+  assert_(tdefl_compress_mem_to_output(pSrc_buf, src_buf_len, tdefl_output_buffer_putter, &out_buf, flags));
   *pOut_len = out_buf.m_size; return out_buf.m_pBuf;
 }
 

@@ -60,7 +60,7 @@ struct Player {
     Scroll< List<Text>> titles;
     HBox main {{ &albums.area(), &titles.area() }};
     VBox layout {{ &toolbar, &main }};
-    Window window {&layout, int2(-600,-1050), "Player"_, pauseIcon()};
+    Window window {&layout, int2(-600,-1120), "Player"_, pauseIcon()};
 
 // Content
     array<String> folders;

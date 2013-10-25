@@ -66,6 +66,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 String path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
+                sample->name = value;
                 sample->data = Map(path,folder);
                 sample->flac = FLAC(sample->data);
                 if(!existsFile(String(path+".env"_),folder)) {
@@ -94,8 +95,8 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             else if(key=="hikey"_) sample->hikey=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
-            else if(key=="ampeg_release"_) sample->releaseTime=toDecimal(value);
-            else if(key=="amp_veltrack"_) sample->amp_veltrack=toInteger(value);
+            else if(key=="ampeg_release"_) {} /*sample->releaseTime=toDecimal(value);*/
+            else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=toDecimal(value)/100;*/
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
             else if(key=="volume"_) sample->volume= exp10(toDecimal(value)/20.0);
             else if(key=="tune"_) {} //FIXME
@@ -208,7 +209,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                     level = current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11); //341ms/21ms
                     if(level>8) level=8;
                 } else {
-                    level=(1-(s.amp_veltrack/100.0*(1-(velocity*velocity)/(127.0*127.0)))) * s.volume;
+                    level = pow(sq(velocity)/sq(127.), s.amp_veltrack) * s.volume;
                 }
                 if(level<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
 
