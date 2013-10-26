@@ -55,6 +55,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     TextData s = readFile(file, root);
     Folder folder (section((file),'.',0,1), root); // Samples must be in a subfolder with the same name as the .sfz file
     Sample* sample=&group;
+    bool release=false;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
@@ -72,26 +73,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                 sample->name = copy(path);
                 sample->data = Map(path,folder);
                 sample->flac = FLAC(sample->data);
-                if(!existsFile(String(path+".env"_),folder)) {
-                    FLAC flac(sample->data);
-                    array<float> envelope; uint size=0;
-                    while(flac.blockSize!=0) {
-                        const uint period=1<<8;
-                        while(flac.blockSize!=0 && size<period) { size+=flac.blockSize; flac.decodeFrame(); }
-                        if(size>=period) {
-                            envelope << sumOfSquares(flac, period);
-                            flac.readIndex=(flac.readIndex+period)%flac.audio.capacity;
-                            size-=period;
-                        }
-                    }
-                    log(path+".env"_,envelope.size);
-                    writeFile(path+".env"_,cast<byte,float>(envelope),folder);
-                }
-                sample->envelope = array<float>(cast<float,byte>(readFile(String(path+".env"_),folder)));
                 if(!rate) rate=sample->flac.rate;
                 else if(rate!=sample->flac.rate) error("Sample rate mismatch",rate,sample->flac.rate);
             }
-            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else warn("unknown trigger",value); }
+            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, release=true; else warn("unknown trigger",value); }
             else if(key=="lovel"_) sample->lovel=toInteger(value);
             else if(key=="hivel"_) sample->hivel=toInteger(value);
             else if(key=="lokey"_) sample->lokey=isInteger(value)?toInteger(value):noteToMIDI(value);
@@ -101,7 +86,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             else if(key=="ampeg_release"_) {} /*sample->releaseTime=toDecimal(value);*/
             else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=toDecimal(value)/100;*/
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
-            else if(key=="volume"_) sample->volume= exp10(toDecimal(value)/20.0);
+            else if(key=="volume"_) sample->volume = exp10(toDecimal(value)/20.0); // 20 to go from dB (energy) to amplitide
             else if(key=="tune"_) {} //FIXME
             else if(key=="ampeg_attack"_) {} //FIXME
             else if(key=="ampeg_vel2attack"_) {} //FIXME
@@ -112,6 +97,25 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     }
 
     for(Sample& s: samples) {
+        if(release) {
+            if(!existsFile(String(s.name+".env"_),folder)) {
+                FLAC flac(s.data);
+                array<float> envelope; uint size=0;
+                while(flac.blockSize!=0) {
+                    const uint period=1<<8;
+                    while(flac.blockSize!=0 && size<period) { size+=flac.blockSize; flac.decodeFrame(); }
+                    if(size>=period) {
+                        envelope << sumOfSquares(flac, period);
+                        flac.readIndex=(flac.readIndex+period)%flac.audio.capacity;
+                        size-=period;
+                    }
+                }
+                log(s.name+".env"_,envelope.size);
+                writeFile(s.name+".env"_,cast<byte,float>(envelope),folder);
+            }
+            s.envelope = array<float>(cast<float,byte>(readFile(String(s.name+".env"_),folder)));
+        }
+
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
         s.data.lock(); // Locks compressed samples in memory
 
@@ -190,6 +194,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
             if(note.releaseTime) {//release fade out current note
                 float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
                 note.step=(v4sf){step,step,step,step};
+                note.level=(v4sf){note.level[0],note.level[0],note.level[0]*step,note.level[0]*step}; // Pedantic
             }
         }
         if(!current) return; //already fully decayed
@@ -209,10 +214,10 @@ void Sampler::noteEvent(uint key, uint velocity) {
 
                 float level;
                 if(current) { //rt_decay is unreliable, matching levels works better
-                    level = current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11); //341ms/21ms
+                    level = current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11/*12 might be better*/); //341ms/21ms
                     if(level>8) level=8;
                 } else {
-                    level = pow(sq(velocity)/sq(127.), s.amp_veltrack) * s.volume;
+                    level = velocity/127. * s.volume; // E ~ A^2 ~ v^2 => A ~ v
                 }
                 if(level<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
 
@@ -259,7 +264,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
 
 /// Audio mixer (realtime thread)
 inline void mix(v4sf& level, v4sf step, v4sf* out, v4sf* in, uint size) {
-    for(uint i: range(size)) { out[i] += level * in[i]; level*=step; }
+    for(uint i: range(size)) { out[i] += level * in[i]; level *= step; }
 }
 void Note::read(v4sf* out, uint size) {
     if(flac.blockSize==0 && readCount<int(size*2)) { readCount.counter=0; return; } // end of stream
