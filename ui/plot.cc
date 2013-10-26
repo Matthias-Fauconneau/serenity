@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
     real subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
-    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {10,5}})
+    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}})
         if(a[0] >= subExponent) { value=sign(value)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
     error("No matching subexponent for"_, value);
 }
@@ -15,7 +15,7 @@ int2 Plot::sizeHint() { return int2(-1080*4/3/2, -1080/2); }
 void Plot::render(int2 position, int2 size) {
     int resolution = ::resolution; ::resolution = 1.5*96; // Scales the size of all text labels
     // Computes axis scales
-    vec2 min=0, max=0;
+    vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
     for(const auto& data: dataSets) for(auto point: data) {
         vec2 p(point.key,point.value);
         assert(isNumber(p.x) && isNumber(p.y), p);
@@ -23,6 +23,8 @@ void Plot::render(int2 position, int2 size) {
         max=::max(max,p);
     }
     if(!logx && min.x>0) min.x = 0;
+    if(!logy && min.y>0) min.y = 0;
+    min.y = -39, max.y = 10;//FIXME: custom range
 
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
@@ -56,6 +58,8 @@ void Plot::render(int2 position, int2 size) {
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
     }
+
+    // Margins
     int left=tickLabelSize.x*3./2, top=tickLabelSize.y, bottom=tickLabelSize.y;
     int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
 
@@ -81,18 +85,19 @@ void Plot::render(int2 position, int2 size) {
 
     // Transforms data positions to render positions
     auto point = [&](vec2 p)->vec2{
-        p = (p-min)/(max-min);
-        /*if(logx) p.x = ln(1+(e-1)*p.x);
-        if(logy) p.y = ln(1+(e-1)*p.y);*/
-        if(logx) p.x = log10(1+(10-1)*p.x);
-        if(logy) p.y = log10(1+(10-1)*p.y);
+        // Converts min/max to log (for point(vec2)->vec2)
+        vec2 lmin = vec2(logx ? log2(min.x) : min.x, logy ? log2(min.y) : min.y);
+        vec2 lmax = vec2(logx ? log2(max.x) : max.x, logy ? log2(max.y) : max.y);
+        if(logx) { assert(p.x>0, p.x); p.x = log2(p.x); }
+        if(logy) { assert(p.y>0, p.y); p.y = log2(p.y); }
+        p = (p-lmin)/(lmax-lmin);
         return vec2(position.x+left+p.x*(size.x-left-right),position.y+2*top+(1-p.y)*(size.y-2*top-bottom));
     };
 
     // Draws axis and ticks
-    {vec2 O=vec2(min.x, 0), end = vec2(max.x, 0); // X
+    {vec2 O=min, end = vec2(max.x, min.y); // X
         line(point(O), point(end));
-        for(uint i: range(tickCount[0]+1)) {
+        for(uint i: range(logx, tickCount[0]+1)) {
             int2 p (point(O+(i/float(tickCount[0]))*(end-O)));
             line(p, p+int2(0,-4));
             Text& tick = ticks[0][i];
@@ -100,9 +105,9 @@ void Plot::render(int2 position, int2 size) {
         }
         {Text text(format(Bold)+xlabel); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
     }
-    {vec2 O=vec2(0, min.y), end = vec2(0, max.y); // Y (FIXME: factor)
+    {vec2 O=min, end = vec2(min.x, max.y); // Y (FIXME: factor)
         line(point(O), point(end));
-        for(uint i: range(tickCount[1]+1)) {
+        for(uint i: range(logy, tickCount[1]+1)) {
             int2 p (point(O+(i/float(tickCount[1]))*(end-O)));
             line(p, p+int2(4,0));
             Text& tick = ticks[1][i];

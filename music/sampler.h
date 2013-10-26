@@ -31,12 +31,13 @@ struct Note {
 };
 
 struct Sample {
-    string name;
+    String name;
     Map data; FLAC flac; array<float> envelope; //Sample data
     int16 trigger=0; uint16 lovel=0; uint16 hivel=127; uint16 lokey=0; uint16 hikey=127; //Input controls
     int16 pitch_keycenter=60; float releaseTime=/*0*/1; float amp_veltrack=1; float volume=1; //Performance parameters
 };
 inline String str(const Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
+inline bool operator <(const Sample& a, const Sample& b) { return a.pitch_keycenter<b.pitch_keycenter; }
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {

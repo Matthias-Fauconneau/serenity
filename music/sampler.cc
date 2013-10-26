@@ -47,16 +47,19 @@ float sumOfSquares(const FLAC& flac, uint size) {
 }
 
 void Sampler::open(uint outputRate, const string& file, const Folder& root) {
+    Locker locker(lock);
+    layers.clear();
+    samples.clear();
     // parse sfz and map samples
     Sample group;
     TextData s = readFile(file, root);
-    Folder folder (section((file),'.',0,-2), root); // Samples must be in a subfolder with the same name as the .sfz file
+    Folder folder (section((file),'.',0,1), root); // Samples must be in a subfolder with the same name as the .sfz file
     Sample* sample=&group;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
         if(s.match("<group>"_)) { group=Sample(); sample = &group; }
-        else if(s.match("<region>"_)) { assert(!group.data.data); samples<<move(group); sample = &samples.last();  }
+        else if(s.match("<region>"_)) { assert(!group.data.data); sample = &samples[samples.insertSorted(move(group))]; }
         else if(s.match("//"_)) {
             s.untilAny("\n\r"_);
             s.whileAny("\n\r"_);
@@ -66,7 +69,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 String path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
-                sample->name = value;
+                sample->name = copy(path);
                 sample->data = Map(path,folder);
                 sample->flac = FLAC(sample->data);
                 if(!existsFile(String(path+".env"_),folder)) {
@@ -142,7 +145,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
 
     // Computes normalization
     float sum=0; for(uint i: range(2*reverbSize)) sum += stereoFilter[i]*stereoFilter[i];
-    const float scale = 0x1p4f/sqrt(sum); // Normalizes and scales 24->32bit (-4bit head room)
+    const float scale = 0x1p5f/sqrt(sum); // Normalizes and scales 24->32bit (-4bit head room)
 
     // Reverses, scales and deinterleaves filter
     buffer<float> filter[2];

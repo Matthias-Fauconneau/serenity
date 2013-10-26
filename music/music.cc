@@ -160,6 +160,22 @@ struct Music {
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
         window.localShortcut(Key('t')).connect([this]{ freeLook=!freeLook; });
+        window.localShortcut(Key('1')).connect([this]{
+            sampler.open(audio.rate, "Salamander.original.sfz"_, Folder("Samples"_));
+            window.setTitle("Original");
+        });
+        window.localShortcut(Key('2')).connect([this]{
+            sampler.open(audio.rate, "Salamander.4096.sfz"_, Folder("Samples"_));
+            window.setTitle("4K");
+        });
+        window.localShortcut(Key('3')).connect([this]{
+            sampler.open(audio.rate, "Salamander.8192.sfz"_, Folder("Samples"_));
+            window.setTitle("8K");
+        });
+        window.localShortcut(Key('4')).connect([this]{
+            sampler.open(audio.rate, "Salamander.16384.sfz"_, Folder("Samples"_));
+            window.setTitle("16K");
+        });
         //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
