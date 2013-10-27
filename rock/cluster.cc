@@ -106,7 +106,7 @@ array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<
                                 parentSet.unions.insert(otherIndex, unionIndex);
                                 otherSet.unions.insert(parentIndex, unionIndex);
 
-                                // Creates both relative complements sets (not commutative) to lookup the set of families to append new elements to.
+                                // Creates both relative complements sets (not commutative) to lookup the set of families to append new elements to
                                 { // Relative complement of parent in other (other \ parent)
                                     uint complementIndex = 0;
                                     for(Family* family: otherSet.families) {

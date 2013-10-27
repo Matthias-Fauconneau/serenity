@@ -121,13 +121,13 @@ family-skeleton = RootIndex connected-skeleton maximum-balls-families
 
 # Rasterizes skeleton voxel as maximum spheres (with family index attribute)
 family-sphere-bins = Bin connected-skeleton family-skeleton
-family-maximum = Rasterize family-sphere-bins
+family-maximum = RasterizeAttribute family-sphere-bins
 
 # Colorizes each pore in a different color
 colored-families = ColorizeIndex family-maximum
 
 # Rasterizes skeleton voxel as maximum spheres
-sphere-bins = Bin connected-skeleton connected-skeleton
+sphere-bins = Bin connected-skeleton
 maximum = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii

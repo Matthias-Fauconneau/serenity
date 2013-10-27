@@ -106,24 +106,10 @@ void rasterize(Volume16& target, const Volume& source) {
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         struct Block { uint16 min=0, max=0; } blocks[blockCount*blockCount*blockCount]; // min/max values for each block (for hierarchical culling) (ala Hi-Z) [256B]
         uint16 tileR[tileSize] = {}; // Half-tiled 'R'-buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
-        uint16 tile[tileSize] = {}; // Target buffer for fragment output (attribute)
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];
-            int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius, attribute=ball.attribute;
-#if 0 // Full 60s
-            for(int dz=0; dz<tileSide; dz++) for(int dy=0; dy<tileSide; dy++) for(int dx=0; dx<tileSide; dx++) {
-                uint16* const voxel = tileR + offsetX[dx] + offsetY[dy] + offsetZ[dz];
-                if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
-            }
-#elif 0 // Clip 18s
-            int radius = ceil(sqrt((real)sqRadius));
-            for(int dz=max(0,cz-radius); dz<min(tileSide,cz+radius); dz++)
-                for(int dy=max(0,cy-radius); dy<min(tileSide,cy+radius); dy++)
-                    for(int dx=max(0,cx-radius); dx<min(tileSide,cx+radius); dx++) {
-                        uint16* const voxel = target + offsetX[dx] + offsetY[dy] + offsetZ[dz];
-                        if(sqRadius>voxel[0] && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) voxel[0] = sqRadius;
-                    }
-#else // Recursive 12s (TODO: SIMD)
+            int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
+            // Recursive 12s (TODO: SIMD)
             for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
                 Block& HiZ = blocks[dz*blockCount*blockCount+dy*blockCount+dx];
                 if(sqRadius <= HiZ.min) continue; // Rejects whole block if all voxels are already larger
@@ -132,13 +118,11 @@ void rasterize(Volume16& target, const Volume& source) {
                 int dmin = ::dmin(blockSide, blockBallX, blockBallY, blockBallZ);
                 if(dmin >= sqRadius)  continue; // Rejects whole block if fully outside
                 uint16* const blockR = tileR + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
-                uint16* const block = tile + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
                 const int blockSqRadius = 3*(blockSide-1)*(blockSide-1);
                 if(sqRadius>=HiZ.max) {
                     if(dmin == 0 && sqRadius>blockSqRadius) { // Accepts whole block
                         for(uint i=0; i<blockSize; i++) {
                             blockR[i]=sqRadius;
-                            block[i]=attribute;
                         }
                         HiZ.min = sqRadius, HiZ.max = sqRadius;
                         continue;
@@ -148,19 +132,17 @@ void rasterize(Volume16& target, const Volume& source) {
                 uint min=-1;
                 for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
                     uint16& R = blockR[dz*blockSide*blockSide + dy*blockSide + dx];
-                    uint16& D = block[dz*blockSide*blockSide + dy*blockSide + dx];
-                    if(sqRadius>R && sq(blockBallX-dx)+sq(blockBallY-dy)+sq(blockBallZ-dz)<sqRadius) { R = sqRadius; D = attribute; }
+                    if(sqRadius>R && sq(blockBallX-dx)+sq(blockBallY-dy)+sq(blockBallZ-dz)<sqRadius) R = sqRadius;
                     if(R<min) min = R; // FIXME: skip when possible
                 }
                 HiZ.min=min;
             }
-#endif
         }
         // Writes out fully interleaved target for compatibility (metadata tiled flags currently only define untiled or fully tiled (Z-order) volumes)
         uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
         for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
             int blockX = dx*blockSide, blockY = dy*blockSide, blockZ = dz*blockSide;
-            const uint16* const block = tile + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
+            const uint16* const block = tileR + (dz*blockCount*blockCount + dy*blockCount + dx)*blockSize;
             uint16* const targetBlock = targetTile + offsetX[blockX] + offsetY[blockY] + offsetZ[blockZ];
             for(int dz=0; dz<blockSide; dz++) for(int dy=0; dy<blockSide; dy++) for(int dx=0; dx<blockSide; dx++) {
                 targetBlock[offsetX[dx] + offsetY[dy] + offsetZ[dz]] = block[dz*blockSide*blockSide + dy*blockSide + dx];
@@ -171,3 +153,47 @@ void rasterize(Volume16& target, const Volume& source) {
     assert_(target.maximum == source.maximum);
 }
 defineVolumePass(Rasterize, uint16, rasterize);
+
+/// Rasterizes each skeleton voxel as a ball (with maximum blending and maximum attribute override)
+void rasterizeAttribute(Volume16& target, const Volume& source) {
+    const Tile* const sourceData = (Tile*)source.data.data;
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    uint tileCount = X/tileSide*Y/tileSide*Z/tileSide;
+
+    uint16* const targetData = target;
+    assert_(target.tiled());
+    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+
+    Time time; Time report;
+    parallel(tileCount, [&](uint id, uint i) {
+        if(id==0 && report/1000>=7) log(i,"/", tileCount, (i*tileSize/1024./1024.)/(time/1000.), "MS/s"), report.reset();
+        int z = (i/(X/tileSide*Y/tileSide))%(Z/tileSide), y=(i/(X/tileSide))%(Y/tileSide), x=i%(X/tileSide); // Extracts tile coordinates back from index
+        int tileX = x*tileSide, tileY = y*tileSide, tileZ = z*tileSide; // first voxel coordinates
+        const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
+        uint16 tileR[tileSize] = {}; // Half-tiled 'R'-buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
+        uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
+        clear(targetTile, tileSize);
+        for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
+            const Ball& ball = balls.balls[i];
+            int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
+            uint attribute=ball.attribute;
+            // Clip 18s
+            int radius = ceil(sqrt((real)sqRadius));
+            for(int dz=max(0,tileBallZ-radius); dz<min(tileSide,tileBallZ+radius); dz++) {
+                for(int dy=max(0,tileBallY-radius); dy<min(tileSide,tileBallY+radius); dy++) {
+                    for(int dx=max(0,tileBallX-radius); dx<min(tileSide,tileBallX+radius); dx++) {
+                        uint16& R = tileR[dz*tileSide*tileSide + dy*tileSide + dx];
+                        if((attribute==target.maximum || (sqRadius>R && targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]] != target.maximum))
+                                && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) {
+                            R = sqRadius;
+                            targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]] = attribute;
+                        }
+                    }
+                }
+            }
+        }
+    } );
+    target.squared = true;
+    assert_(target.maximum == source.maximum);
+}
+defineVolumePass(RasterizeAttribute, uint16, rasterizeAttribute);
