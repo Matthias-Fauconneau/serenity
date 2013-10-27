@@ -174,7 +174,7 @@ void exit(int status) {
 int execute(const string& name, const ref<string>& args, bool wait, const Folder& workingDirectory) {
     String path (name);
     if(!existsFile(path,currentWorkingDirectory())) {
-        static array<string> PATH = split(getenv("PATH")?getenv("PATH"):":/bin:/usr/bin", ':');
+        static array<string> PATH = split(getenv("PATH"_)?getenv("PATH"_):":/bin:/usr/bin"_, ':');
         for(string folder: PATH) if(existsFile(folder+"/"_+name,currentWorkingDirectory())) { path=folder+"/"_+name; goto found_; }
         /*else*/ warn("Executable not found",path); return -1;
         found_:;
@@ -188,7 +188,7 @@ int execute(const string& name, const ref<string>& args, bool wait, const Folder
     argv[args0.size]=0;
 
     array<string> env0;
-    static String environ = File("proc/self/environ"_).readUpTo(4096);
+    static String environ = File("proc/self/environ"_).readUpTo(8192);
     for(TextData s(environ);s;) env0 << s.until('\0');
 
     const char* envp[env0.size+1];

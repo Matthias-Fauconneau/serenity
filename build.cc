@@ -30,7 +30,7 @@ void generateSVG(const Node& root, const string& folder){
     s << "}"_;
     String path = "/var/tmp/"_+name+".dot"_;
     writeFile(path, s);
-    ::execute("/usr/bin/dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
+    ::execute("dot"_,{path,"-Tsvg"_,"-o"_+folder+"/"_+name+".svg"_});
 }
 
 struct Build {
@@ -39,7 +39,7 @@ struct Build {
     string install = arguments().size>=3?arguments()[2]:""_;
     bool graph = build=="graph"_, compile = !graph;
     const Folder& folder = currentWorkingDirectory();
-    const string tmp = "/var/tmp/rock_build/"_;
+    const string tmp = "/var/tmp/build-rock/"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -116,7 +116,7 @@ struct Build {
                     if(wait(pid)) fail();
                     pids.remove(pid);
                 }
-                pids << execute("/usr/bin/g++"_,flags+toRefs(args), false);
+                pids << execute("g++"_,flags+toRefs(args), false);
             }
         }
         return lastLinkEdit;
