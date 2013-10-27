@@ -44,7 +44,8 @@ class(Synthetic, Operation), virtual VolumeOperation {
                         vec3 P = vec3(x,y,z);
                         float t = dot(B-A, P-A)/sq(B-A);
                         if(t<=0 || t>=1) continue;
-                        if(sq(P - (A+t*(B-A))) < sq(tubeRadius)) target(x,y,z) = 0;
+                        //if(sq(P - (A+t*(B-A))) < sq((1-2*t*(1-t))*tubeRadius)) target(x,y,z) = 0; // Tapered cylinder
+                        if(sq(P - (A+t*(B-A))) < sq(tubeRadius)) target(x,y,z) = 0; // Straight cylinder
                     }
                     tubes << Tube{A, B, tubeRadius};
                 }
