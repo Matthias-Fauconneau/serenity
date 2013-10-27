@@ -24,7 +24,6 @@ void Plot::render(int2 position, int2 size) {
     }
     if(!logx && min.x>0) min.x = 0;
     if(!logy && min.y>0) min.y = 0;
-    min.y = -39, max.y = 10;//FIXME: custom range
 
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
@@ -95,7 +94,7 @@ void Plot::render(int2 position, int2 size) {
     };
 
     // Draws axis and ticks
-    {vec2 O=min, end = vec2(max.x, min.y); // X
+    {vec2 O=vec2(min.x, logy?min.y:0), end = vec2(max.x, logy?min.y:0); // X
         line(point(O), point(end));
         for(uint i: range(logx, tickCount[0]+1)) {
             int2 p (point(O+(i/float(tickCount[0]))*(end-O)));
@@ -105,7 +104,7 @@ void Plot::render(int2 position, int2 size) {
         }
         {Text text(format(Bold)+xlabel); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
     }
-    {vec2 O=min, end = vec2(min.x, max.y); // Y (FIXME: factor)
+    {vec2 O=vec2(logx?min.x:0, min.y), end = vec2(logx?min.x:0, max.y); // Y (FIXME: factor)
         line(point(O), point(end));
         for(uint i: range(logy, tickCount[1]+1)) {
             int2 p (point(O+(i/float(tickCount[1]))*(end-O)));

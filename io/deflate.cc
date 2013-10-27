@@ -1323,12 +1323,12 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
 
   if ((flush) && (!d->m_lookahead_size) && (!d->m_src_buf_left) && (!d->m_output_flush_remaining))
   {
-    assert(tdefl_flush_block(d, flush) >= 0);
+    assert_(tdefl_flush_block(d, flush) >= 0);
     d->m_finished = (flush == TDEFL_FINISH);
     if (flush == TDEFL_FULL_FLUSH) { MZ_CLEAR_OBJ(d->m_hash); MZ_CLEAR_OBJ(d->m_next); d->m_dict_size = 0; }
   }
 
-  assert(tdefl_flush_output_buffer(d) == TDEFL_STATUS_DONE, d->m_finished, d->m_lookahead_size, d->m_src_buf_left, d->m_output_flush_remaining);
+  assert_(tdefl_flush_output_buffer(d) == TDEFL_STATUS_DONE);
   return TDEFL_STATUS_DONE;
 }
 
