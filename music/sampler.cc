@@ -58,7 +58,11 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
-        if(s.match("<group>"_)) { group=Sample(); sample = &group; }
+        if(s.match("<group>"_)) {
+            assert(!group.data);
+            if(sample==&region) samples.insertSorted(move(region));
+            group=Sample(); sample = &group;
+        }
         else if(s.match("<region>"_)) {
             assert(!group.data);
             if(sample==&region) samples.insertSorted(move(region));

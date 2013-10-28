@@ -65,7 +65,7 @@ uint AudioFile::read(int32* output, uint outputSize) {
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
                     intBuffer = buffer<int>(bufferSize*channels);
-                    for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int16*)frame->data[0])[i]<<8;
+                    for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int16*)frame->data[0])[i]<<16;
                 } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
                     intBuffer = buffer<int>(bufferSize*channels);
                     for(uint i : range(bufferSize)) for(uint j : range(2)) {
