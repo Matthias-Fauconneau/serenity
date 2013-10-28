@@ -79,6 +79,7 @@ struct PitchEstimation {
         array<map<float,float>> offsets; offsets.grow(velocityLayers.size); // For each note (in MIDI key), pitch offset (in cents) to equal temperament
         uint success = 0, total = 0;
         String results;
+        map<float, float> spectrumPlot;
         for(int velocityLayer: range(velocityLayers.size)) {
             String layerResults;
             for(int keyIndex: range(keys.size)) {
@@ -96,6 +97,7 @@ struct PitchEstimation {
                           });
 
                 int expectedKey = sample.pitch_keycenter;
+                if(expectedKey==108) continue;
                 float expectedF = N*keyToPitch(expectedKey)/rate;
                 float expectedK = rate/keyToPitch(expectedKey);
 
@@ -116,6 +118,10 @@ struct PitchEstimation {
                 for(uint i=fMin; i<=fMax; i++) {
                     if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i;
                     if(spectrum[i] > firstPeak/8) highF = i; // Highest pitch peak > 1./8 maximum firstPeak
+                    if(expectedKey==108 && velocityLayer==15)
+                        if(i>=fMin && i<=fMax)
+                            if(spectrum[i-1] <= spectrum[i] && spectrum[i] >= spectrum[i+1])
+                                spectrumPlot.insert(i) = spectrum[i];
                 }
                 if(16*highF > N) fPeak = highF; // Selects highest pitch peak if it is over 3000Hz
 
@@ -126,12 +132,13 @@ struct PitchEstimation {
                 float maxNCC=0;
                 int iNCC=1;
 
+                list<uint,4> octaves;
                 if(32*highF < N) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves under 1500Hz)
-                    for(uint i=1; i <= 4; i++) { // Search lower octaves for best correlation (only first peak) (-3+2)
+                    for(uint i=1; i <= ((64*highF < N) ? 4 : 2); i++) { // Search lower octaves for best correlation (only first peak) (-3+2)
                         float bestK = i*kPeak;
                         int k = round(bestK);
                         float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
-                        sum *= 1-float(i)/kPeak; // Penalizes longer periods to avoid octave doubling errors (+6)
+                        octaves.insert(sum, i);
                         if(sum > maxNCC) maxNCC = sum, kNCC = bestK, iNCC=i;
                     }
                 }
@@ -139,44 +146,42 @@ struct PitchEstimation {
                 int key = round(pitchToKey(rate/kNCC));
                 char result = key==expectedKey ? str(iNCC)[0] : '0';
 
-                String refine;
                 if(kNCC > 32) { // (+54)
                     int k0 = round(kNCC);
                     for(int k=k0-1;k>0;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch (+19)
                         float sum=0; for(uint i: range(N-k0)) sum += signal[i]*signal[k+i];
-                        if(sum > maxNCC) {
-                            if(k<round(kNCC)-1) refine = str("-", "sum:", sum, "max:", maxNCC, "k0:", k0, "kNCC:", kNCC, "k:", k);
-                            maxNCC = sum, kNCC = k;
-                        }
-                        else if(k<k0*63/64) // +3
+                        if(sum > maxNCC) maxNCC = sum, kNCC = k;
+                        else if(k<k0*63/64) // (16K: +3, 8K: +55)
                             break;
                     }
                     // As backward will search regardless of local maximum (if(k<k0*63/64) break; -> +3), compensate with forward local search (+32)
                     for(int k=k0+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch
                         float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
-                        if(sum > maxNCC) {
-                            if(k>kNCC+1) refine = str("+", "sum:", sum, "max:", maxNCC, "k0:", k0, "kNCC:", kNCC, "k:", k);
-                            maxNCC = sum, kNCC = k;
-                        }
+                        if(sum > maxNCC) maxNCC = sum, kNCC = k;
                         else break;
                     }
-                    key = round(pitchToKey(rate/kNCC));
+                    int refinedKey = round(pitchToKey(rate/kNCC));
+                    if(key!=expectedKey && refinedKey==expectedKey) {  result = 'R'; }
+                    if(key==expectedKey && refinedKey!=expectedKey) error("Q");
+                    key=refinedKey;
                 }
 
                 energy[velocityLayer].insert(expectedKey, e);
-                if(key==expectedKey || abs(log2(expectedK/kNCC))<1./(2*12)) offsets[velocityLayer].insert(expectedKey, 100*12*log2(expectedK/kNCC));
-                if(key!=expectedKey /*|| refine*/ /*|| iNCC>1*/)
+                if(key==expectedKey) offsets[velocityLayer].insert(expectedKey, 100*12*log2(expectedK/kNCC));
+                else {
                     log(hex(velocityLayer)+">"_, expectedKey, "["_+strKey(expectedKey)+"]"_, "~ f:", expectedF, "k:", expectedK);
-                if(key!=expectedKey) log("?", "fPeak", fPeak, "iNCC", iNCC, "maxNCC", maxNCC, "kNCC", kNCC, "key", key, "highF", highF);
-                if(refine && key!=expectedKey) log(refine);
+                    log("?", "fPeak", fPeak, "iNCC", iNCC, "maxNCC", maxNCC, "kNCC", kNCC, "key", key, "highK", N/highF);
+                    if(39*highF < N) log(octaves, /*1/(octaves[3].key/octaves[2].key-1),*/
+                        1./((octaves[3].key-octaves[2].key)/(octaves[3].key*octaves[3].value-octaves[2].key*octaves[2].value)));
+                }
                 layerResults << result;
                 total++; if(key==expectedKey) success++;
             }
             log(layerResults);
             results << layerResults<<'\n';
         }
-        //log("------------------------------------");
-        log(/*results,*/ success,"/",total); // 463 / 480 (16K)
+        log(success,"/",total); // 464 / 480 (16K), 440 / 464 (8K)
+
         /*const float e0 = mean(energy.last().values); // Computes mean energy of highest velocity layer
         for(auto& layer: energy) for(float& e: layer.values) e /= e0; // Normalizes all energy values
         {// Flattens all samples to same level using SFZ "volume" attribute
@@ -227,6 +232,13 @@ struct PitchEstimation {
             }
         }*/
         /*{Plot plot;
+            plot.title = String("Pitch ratio (in cents) to equal temperament (A440)"_);
+            plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_);
+            plot.legends = apply(velocityLayers, [](range velocity){return str(velocity.stop);});
+            plot.dataSets = move(offsets);
+            plots << move(plot);
+        }*/
+        if(spectrumPlot) {Plot plot;
             plot.title = String("Spectrum of A6 "_);
             plot.xlabel = String("Frequency"_), plot.ylabel = String("Energy"_);
             plot.dataSets << copy(spectrumPlot);
@@ -234,30 +246,15 @@ struct PitchEstimation {
             plot.logx=true; // plot.logy=true;
             plots << move(plot);
         }
-        {Plot plot;
-            plot.title = String("Spectrum of A6 x f"_);
-            plot.xlabel = String("Frequency"_), plot.ylabel = String("Energy"_);
-            for(auto p: spectrumPlot) p.value *= sqrt(p.key);
-            plot.dataSets << copy(spectrumPlot);
-            //plot.legendPosition = Plot::BottomRight;
-            plot.logx=true; // plot.logy=true;
-            plots << move(plot);
-        }*/
-        /*{Plot plot;
-            plot.title = String("Pitch ratio (in cents) to equal temperament (A440)"_);
-            plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_);
-            plot.legends = apply(velocityLayers, [](range velocity){return str(velocity.stop);});
-            plot.dataSets = move(offsets);
-            plots << move(plot);
-        }*/
-        /*window.backgroundColor=window.backgroundCenter=1;
-        window.show();
-        window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(PrintScreen).connect([=]{
-            writeFile("energy.png"_, encodePNG(renderToImage(plots[0], int2(1024,768))), home());
-            writeFile("output.png"_, encodePNG(renderToImage(plots[1], int2(1024,768))), home());
-            writeFile("offset.png"_, encodePNG(renderToImage(plots[2], int2(1024,768))), home());
-        });*/
-        //window.localShortcut(PrintScreen)();
+        if(plots) {
+            window.backgroundColor=window.backgroundCenter=1;
+            window.show();
+            window.localShortcut(Escape).connect([]{exit();});
+            window.localShortcut(PrintScreen).connect([=]{
+                writeFile("energy.png"_, encodePNG(renderToImage(plots[0], int2(1024,768))), home());
+                writeFile("output.png"_, encodePNG(renderToImage(plots[1], int2(1024,768))), home());
+                writeFile("offset.png"_, encodePNG(renderToImage(plots[2], int2(1024,768))), home());
+            });
+        }
     }
 } test;
