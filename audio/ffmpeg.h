@@ -13,7 +13,7 @@ struct AudioFile {
     struct AVCodecContext* audio=0;
     struct AVFrame* frame=0;
 
-    buffer<int16> shortBuffer;
+    buffer<int> intBuffer;
     buffer<float> floatBuffer;
     uint bufferIndex=0, bufferSize=0;
 
@@ -27,7 +27,7 @@ struct AudioFile {
     void close();
 
     // \note As \a buffer type depends on previous usages of \a read, switching between overloads may only happen when no data is buffered
-    uint read(int16* output, uint outputSize);
+    uint read(int32* output, uint outputSize);
     uint read(float* output, uint outputSize);
 
     void seek(uint position);

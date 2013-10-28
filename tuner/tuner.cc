@@ -61,25 +61,30 @@ struct PitchEstimation {
     PitchEstimation() {
         Sampler sampler;
         const uint rate = 48000;
-        sampler.open(rate, "Salamander.sfz"_, Folder("Samples"_,root()));
+        sampler.open(rate, "Salamander.original.sfz"_, Folder("Samples"_,root()));
 
         array<range> velocityLayers;
         for(const Sample& sample: sampler.samples) {
             if(sample.trigger!=0) continue;
             if(!velocityLayers.contains(range(sample.lovel,sample.hivel+1))) velocityLayers << range(sample.lovel,sample.hivel+1);
         }
-        const uint N = 32768; // Analysis window size (A-1 (27Hz~2K))
+        const uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
         FFT fft (N);
 
         array<map<float,float>> energy; energy.grow(velocityLayers.size); // For each note (in MIDI key), energy relative to average
         array<map<float,float>> offsets; offsets.grow(velocityLayers.size); // For each note (in MIDI key), pitch offset (in cents) to equal temperament
         uint success = 0, total = 0;
         String results;
+        float octaveRange[4][4]={{1,1,0,0},{1,1,0,0},{1,1,0,0},{1,1,0,0}}; // {min true (require), min false, max false, max true (doesn't need))
         for(int velocityLayer: range(velocityLayers.size)) {
             String layerResults;
             for(const Sample& sample: sampler.samples) {
                 if(sample.trigger!=0) continue;
                 if(velocityLayers[velocityLayer] != range(sample.lovel,sample.hivel+1)) continue;
+
+                int expectedKey = sample.pitch_keycenter;
+                float expectedF = N*keyToPitch(expectedKey)/rate;
+                float expectedK = rate/keyToPitch(expectedKey);
 
                 assert(N<=sample.flac.duration);
                 buffer<float2> stereo = decodeAudio(sample.data, N);
@@ -96,8 +101,9 @@ struct PitchEstimation {
                 const uint fMax = N*440*pow(2,  3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7
                 // Estimates candidates using maximum peak
                 //float maxPeak=0; uint fPeak=0; for(uint i=fMin; i<=fMax; i++) if(spectrum[i]>maxPeak) maxPeak=spectrum[i], fPeak=i;
-                list<uint,16> peaks;
-                for(uint i=fMin; i<=fMax; i++) if(spectrum[i-1] <= spectrum[i] && spectrum[i] >= spectrum[i+1]) peaks.insert(spectrum[i], i);
+                list<uint,8> peaks;
+                float eb=0; for(uint i=fMin; i<=fMax; i++) eb += spectrum[i];
+                for(uint i=fMin; i<=fMax; i++) if(spectrum[i-1] <= spectrum[i] && spectrum[i] >= spectrum[i+1]) peaks.insert(spectrum[i]/eb, i);
                 float maxPeak = peaks.last().key; uint fPeak = peaks.last().value;
                 // Use autocorrelation to find best match between f, f/2, f/3, f/4
                 const float kPeak = (float)N/fPeak; // k represents periods here (and not 1/wavelength­)
@@ -105,23 +111,22 @@ struct PitchEstimation {
                 float kNCC = kPeak;
                 float maxNCC=0;
                 int iNCC=1;
+                list<uint,4> octaves;
                 if(kPeak > 32) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves)
                     for(uint i=1; i<=4; i++) { // Search lower octaves for best correlation
                         float bestK = i*kPeak;
-                        if(round(pitchToKey(rate/bestK))<20) break; // Would match pitches lower than possible keys
-                        int k0 = round(bestK);
-                        float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k0+i];
-                        float max = sum;
-                        if(max > maxNCC) maxNCC = max, kNCC = bestK, iNCC=i;
+                        //if(round(pitchToKey(rate/bestK))<20) break; // Would match pitches lower than possible keys
+                        int k = round(bestK);
+                        float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
+                        sum /= 1+i/512.; // Penalizes longer periods to avoid very slightly higher correlation to trigger spurious octave shifts
+                        octaves.insert(sum, i);
+                        if(sum > maxNCC) maxNCC = sum, kNCC = bestK, iNCC=i;
                     }
                 }
 
-                int expectedKey = sample.pitch_keycenter;
-                float expectedK = rate/keyToPitch(expectedKey);
                 int key = round(pitchToKey(rate/kNCC));
-
+                char result = key==expectedKey ? str(iNCC)[0] : '0';
                 String refine;
-                char result = key==expectedKey ? '.' : '|';
                 if(kPeak > 32) {
                     for(int k=round(iNCC*kPeak)-1;k>=8;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch
                         float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
@@ -129,11 +134,12 @@ struct PitchEstimation {
                             if(k<round(kNCC)-1) refine = str("-", "sum:", sum, "max:", maxNCC, "ikPeak:", iNCC*kPeak, "kNCC:", kNCC, "k:", k);
                             maxNCC = sum, kNCC = k;
                         }
-                        else break;
+                        else if(k<round(iNCC*kPeak)-32) // Exhaustive local search (Fix accuracy of low pitches) (+2)
+                            break;
                     }
                     for(int k=round(iNCC*kPeak)+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch
                         float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
-                        if(sum > maxNCC) { // 7 / 464
+                        if(sum > maxNCC) {
                             if(k>kNCC+1) refine = str("+", "sum:", sum, "max:", maxNCC, "ikPeak:", iNCC*kPeak, "kNCC:", kNCC, "k:", k);
                             maxNCC = sum, kNCC = k;
                         }
@@ -142,25 +148,40 @@ struct PitchEstimation {
                     bool before = key==expectedKey;
                     key = round(pitchToKey(rate/kNCC));
                     if(before) assert_(key==expectedKey);
-                    if(!before && key == expectedKey) result = 'Q';
+                    if(!before && key == expectedKey) result = 'R';
                 }
 
                 energy[velocityLayer].insert(expectedKey, e);
                 if(key==expectedKey || abs(log2(expectedK/kNCC))<1./(2*12)) offsets[velocityLayer].insert(expectedKey, 100*12*log2(expectedK/kNCC));
-                if(key!=expectedKey || refine) log(">", "key:", expectedKey, "k:", expectedK, "lovel:", sample.lovel, "hivel:", sample.hivel, strKey(expectedKey));
-                if(key!=expectedKey) {
+                if(key!=expectedKey || refine /*|| iNCC>1*/)
+                    log(hex(velocityLayer)+">"_, expectedKey, "["_+strKey(expectedKey)+"]"_, "~ f:", expectedF, "k:", expectedK);
+                //if(key==expectedKey && iNCC>1) log("i", iNCC, kNCC-int(iNCC*kPeak), kNCC/(iNCC*kPeak));
+                if(key!=expectedKey)
                     log("?", "iNCC", iNCC, "maxPeak", maxPeak, "kPeak", kPeak, "ikPeak", iNCC*kPeak, "maxNCC", maxNCC, "kNCC", kNCC, "key", key);
-                    log(peaks);
-                }
+                if(key!=expectedKey /*|| iNCC>1*/) log(octaves, 100*octaves[3].key/octaves[2].key);
+                if(key!=expectedKey /*|| iNCC>1*/) log(peaks);
                 if(refine) log(refine);
                 layerResults << result;
                 total++; if(key==expectedKey) success++;
+
+                if(key==expectedKey) {
+                    for(int i: range(4)) {
+                        if(round(pitchToKey((float)rate*fPeak/N/(i+1)))==expectedKey) octaveRange[i][0] = ::min(octaveRange[i][0], maxPeak);
+                        if(round(pitchToKey((float)rate*fPeak/N/(i+1)))!=expectedKey) octaveRange[i][1] = ::min(octaveRange[i][1], maxPeak);
+                        if(round(pitchToKey((float)rate*fPeak/N/(i+1)))!=expectedKey) octaveRange[i][2] = ::max(octaveRange[i][2], maxPeak);
+                        if(round(pitchToKey((float)rate*fPeak/N/(i+1)))==expectedKey) octaveRange[i][3] = ::max(octaveRange[i][3], maxPeak);
+                    }
+                }
             }
             log(layerResults);
             results << layerResults<<'\n';
         }
         log("------------------------------------");
-        log(results, success,"/",total); // 16K: 453; 32K: 455 / 464
+        log(results, success,"/",total); // 16K: 457; 32K: 455 / 464
+        log(octaveRange[0]);
+        log(octaveRange[1]);
+        log(octaveRange[2]);
+        log(octaveRange[3]);
 
         /*const float e0 = mean(energy.last().values); // Computes mean energy of highest velocity layer
         for(auto& layer: energy) for(float& e: layer.values) e /= e0; // Normalizes all energy values

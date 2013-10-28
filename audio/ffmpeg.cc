@@ -52,7 +52,7 @@ bool AudioFile::open() {
     return true;
 }
 
-uint AudioFile::read(int16* output, uint outputSize) {
+uint AudioFile::read(int32* output, uint outputSize) {
     uint readSize = 0;
     while(readSize<outputSize) {
         if(!bufferSize) {
@@ -64,12 +64,14 @@ uint AudioFile::read(int16* output, uint outputSize) {
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    shortBuffer = buffer<int16>((int16*)frame->data[0], bufferSize*channels);
+                    intBuffer = buffer<int>(bufferSize*channels);
+                    for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int16*)frame->data[0])[i]<<8;
                 } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
-                    shortBuffer = buffer<int16>(bufferSize*channels);
-                    for(uint i : range(bufferSize)) {
-                        shortBuffer[2*i+0] = ((float*)frame->data[0])[i]*0x1.0p15f;
-                        shortBuffer[2*i+1] = ((float*)frame->data[1])[i]*0x1.0p15f;
+                    intBuffer = buffer<int>(bufferSize*channels);
+                    for(uint i : range(bufferSize)) for(uint j : range(2)) {
+                        int s = ((float*)frame->data[j])[i]*(1<<29);
+                        if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
+                        intBuffer[2*i+j] = s;
                     }
                 } else error("Unknown format");
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
@@ -77,7 +79,7 @@ uint AudioFile::read(int16* output, uint outputSize) {
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, outputSize-readSize);
-        rawCopy(output, shortBuffer+bufferIndex, size*channels);
+        rawCopy(output, intBuffer+bufferIndex, size*channels);
         bufferSize -= size; bufferIndex += size*channels;
         readSize += size; output+= size*channels;
     }

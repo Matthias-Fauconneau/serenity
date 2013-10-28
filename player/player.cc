@@ -17,7 +17,7 @@ struct Player {
     AudioFile file;
     Resampler resampler;
     AudioOutput output{{this,&Player::read}, 48000, 8192};
-    uint read(int16* output, uint outputSize) {
+    uint read(int32* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
             if(!file) return readSize;
@@ -33,8 +33,8 @@ struct Player {
                 float target[read*2];
                 resampler.read(target, read);
                 for(uint i: range(read*2)) {
-                    int s = target[i]*(32768-8192 /*25% headroom as rounding while resampling might add up*/);
-                    if(s<-32768 || s > 32767) error("Clip", target[i], s,32768*(1-1./s));
+                    int64 s = target[i]*(1<<29); // 3dB headroom
+                    if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
                     output[i] = s;
                 }
             }

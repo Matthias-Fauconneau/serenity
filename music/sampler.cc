@@ -51,16 +51,19 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     layers.clear();
     samples.clear();
     // parse sfz and map samples
-    Sample group;
     TextData s = readFile(file, root);
     Folder folder (section((file),'.',0,1), root); // Samples must be in a subfolder with the same name as the .sfz file
-    Sample* sample=&group;
+    Sample group, region; Sample* sample=&group;
     bool release=false;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
         if(s.match("<group>"_)) { group=Sample(); sample = &group; }
-        else if(s.match("<region>"_)) { assert(!group.data.data); sample = &samples[samples.insertSorted(move(group))]; }
+        else if(s.match("<region>"_)) {
+            assert(!group.data);
+            if(sample==&region) samples.insertSorted(move(region));
+            region=move(group); sample = &region;
+        }
         else if(s.match("//"_)) {
             s.untilAny("\n\r"_);
             s.whileAny("\n\r"_);
