@@ -139,7 +139,7 @@ struct Player {
         if(!file.openPath(String("/Music/"_+files[index]))) return;
         assert(output.channels==file.channels);
         if(output.rate==file.rate) resampler.~Resampler();
-        else if(resampler.sourceRate!=file.rate){
+        else if(!resampler.targetRate || resampler.sourceRate*output.rate!=file.rate*resampler.targetRate) { // source/target != file/output
             resampler.~Resampler();
             new (&resampler) Resampler(output.channels, file.rate, output.rate, output.periodSize);
         }
