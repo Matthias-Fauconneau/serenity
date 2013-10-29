@@ -70,7 +70,7 @@ struct PitchEstimation {
             if(!keys.contains(sample.pitch_keycenter)) keys << sample.pitch_keycenter;
         }
 
-        const uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
+        const uint N = 8192; // Analysis window size (A-1 (27Hz~2K))
         FFT fft (N);
         const uint fMin = N*440*pow(2, -4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half pitch under A-1
         const uint fMax = N*440*pow(2,  3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7
@@ -127,31 +127,34 @@ struct PitchEstimation {
 
                 // Use autocorrelation to find best match between f, f/2, f/3, f/4
                 const float kPeak = (float)N/fPeak; // k represents periods here (and not 1/wavelength­)
-                const int kMax = round(4.*kPeak);
                 float kNCC = kPeak;
                 float maxNCC=0;
                 int iNCC=1;
 
-                list<uint,4> octaves;
+                float octaves[5] = {};
                 if(32*highF < N) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves under 1500Hz)
-                    for(uint i=1; i <= ((64*highF < N) ? 4 : 2); i++) { // Search lower octaves for best correlation (only first peak) (-3+2)
+                    for(uint i=1; i <= ((64*highF < N) ? 5 : 2); i++) { // Search lower octaves for best correlation (only first peak) (-3+2), 8K: 5th (+1)
                         float bestK = i*kPeak;
-                        int k = round(bestK);
-                        float sum=0; for(uint i: range(N-kMax)) sum += signal[i]*signal[k+i];
-                        octaves.insert(sum, i);
-                        if(sum > maxNCC) maxNCC = sum, kNCC = bestK, iNCC=i;
+                        int k0 = round(bestK);
+                        for(int k=k0;k>0;k--) { // Scans backward (decreasing k) until local maximum
+                            float sum=0; for(uint i: range(N-k0)) sum += signal[i]*signal[k+i]; // N-k0 instead of N-kMax to avoid some doubling
+                            sum *= 1 - i/96.; // Penalizes to avoid some doubling (overly sensitive) (8K: +2)
+                            if(sum > maxNCC) maxNCC = sum, kNCC = k, iNCC=i, octaves[i-1] = sum;
+                            else if(k<k0*31/32) // 8K: +20
+                                break;
+                        }
                     }
                 }
 
-                int key = round(pitchToKey(rate/kNCC));
+                int key = floor(pitchToKey(rate/kNCC)); // 8K: floor: +1
                 char result = key==expectedKey ? str(iNCC)[0] : '0';
 
                 if(kNCC > 32) { // (+54)
                     int k0 = round(kNCC);
                     for(int k=k0-1;k>0;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch (+19)
-                        float sum=0; for(uint i: range(N-k0)) sum += signal[i]*signal[k+i];
+                        float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
                         if(sum > maxNCC) maxNCC = sum, kNCC = k;
-                        else if(k<k0*63/64) // (16K: +3, 8K: +55)
+                        else if(k<k0*63/64) // (16K: +3)
                             break;
                     }
                     // As backward will search regardless of local maximum (if(k<k0*63/64) break; -> +3), compensate with forward local search (+32)
@@ -161,7 +164,7 @@ struct PitchEstimation {
                         else break;
                     }
                     int refinedKey = round(pitchToKey(rate/kNCC));
-                    if(key!=expectedKey && refinedKey==expectedKey) {  result = 'R'; }
+                    if(key!=expectedKey && refinedKey==expectedKey) result = 'R';
                     if(key==expectedKey && refinedKey!=expectedKey) error("Q");
                     key=refinedKey;
                 }
@@ -169,10 +172,16 @@ struct PitchEstimation {
                 energy[velocityLayer].insert(expectedKey, e);
                 if(key==expectedKey) offsets[velocityLayer].insert(expectedKey, 100*12*log2(expectedK/kNCC));
                 else {
-                    log(hex(velocityLayer)+">"_, expectedKey, "["_+strKey(expectedKey)+"]"_, "~ f:", expectedF, "k:", expectedK);
-                    log("?", "fPeak", fPeak, "iNCC", iNCC, "maxNCC", maxNCC, "kNCC", kNCC, "key", key, "highK", N/highF);
-                    if(39*highF < N) log(octaves, /*1/(octaves[3].key/octaves[2].key-1),*/
-                        1./((octaves[3].key-octaves[2].key)/(octaves[3].key*octaves[3].value-octaves[2].key*octaves[2].value)));
+                    //log(hex(velocityLayer)+">"_, expectedKey, "["_+strKey(expectedKey)+"]"_, "~ f:", expectedF, "k:", expectedK);
+                    //log("?", "fPeak", fPeak, "iNCC", iNCC, "maxNCC", maxNCC, "kNCC", kNCC, "key", key, "highK", N/highF);
+                    /*if(32*highF < N) {
+                        log("i", iNCC, "eI", fPeak/expectedF);
+                        if((int)round(fPeak/expectedF-1)<4) log("i/eI", octaves[iNCC-1]/octaves[(int)round(fPeak/expectedF-1)]);
+                    }*/
+                    log(expectedKey, key, fPeak, fPeak/expectedF, iNCC, octaves[iNCC-1]/octaves[(int)round(fPeak/expectedF-1)], N/highF, kNCC);
+                    int iA = round(fPeak/expectedF-1), iB = iNCC-1;
+                    float a = octaves[iA], b = octaves[iB];
+                    log(1/((a-b)/(iB*b - iA*a)));
                 }
                 layerResults << result;
                 total++; if(key==expectedKey) success++;
@@ -180,7 +189,7 @@ struct PitchEstimation {
             log(layerResults);
             results << layerResults<<'\n';
         }
-        log(success,"/",total); // 464 / 480 (16K), 440 / 464 (8K)
+        log(success,"/",total); // 464 / 480 (16K), 462 / 464 (8K)
 
         /*const float e0 = mean(energy.last().values); // Computes mean energy of highest velocity layer
         for(auto& layer: energy) for(float& e: layer.values) e /= e0; // Normalizes all energy values
