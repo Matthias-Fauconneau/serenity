@@ -97,7 +97,7 @@ struct PitchEstimation {
                           });
 
                 int expectedKey = sample.pitch_keycenter;
-                if(expectedKey==108) continue;
+                //if(expectedKey==108) continue;
                 float expectedF = N*keyToPitch(expectedKey)/rate;
                 float expectedK = rate/keyToPitch(expectedKey);
 
@@ -131,17 +131,26 @@ struct PitchEstimation {
                 float maxNCC=0;
                 int iNCC=1;
 
-                float octaves[5] = {};
+                String debug;
                 if(32*highF < N) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves under 1500Hz)
                     for(uint i=1; i <= ((64*highF < N) ? 5 : 2); i++) { // Search lower octaves for best correlation (only first peak) (-3+2), 8K: 5th (+1)
                         float bestK = i*kPeak;
                         int k0 = round(bestK);
                         for(int k=k0;k>0;k--) { // Scans backward (decreasing k) until local maximum
                             float sum=0; for(uint i: range(N-k0)) sum += signal[i]*signal[k+i]; // N-k0 instead of N-kMax to avoid some doubling
-                            sum *= 1 - i/96.; // Penalizes to avoid some doubling (overly sensitive) (8K: +2)
-                            if(sum > maxNCC) maxNCC = sum, kNCC = k, iNCC=i, octaves[i-1] = sum;
+                            sum *= 1 - i*(N/8192)/96.; // Penalizes to avoid some period doubling (overly sensitive) (8K: +2)
+                            if(sum > maxNCC) maxNCC = sum, kNCC = k, iNCC=i;
                             else if(k<k0*31/32) // 8K: +20
                                 break;
+                        }
+                    }
+                    if(64*highF > N) { // Exhaustive search starting from highK/3 to match C7
+                        float bestK = N/(highF*3);
+                        int k0 = round(bestK);
+                        for(int k=k0;k>=min(k0,11);k--) { // Scans backward (decreasing k) until local maximum
+                            float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i]; // N-k0 instead of N-kMax to avoid some doubling
+                            debug << str(k, 100*sum)<<", "_;
+                            if(sum > maxNCC) maxNCC = sum, kNCC = k, iNCC=6;
                         }
                     }
                 }
@@ -172,16 +181,9 @@ struct PitchEstimation {
                 energy[velocityLayer].insert(expectedKey, e);
                 if(key==expectedKey) offsets[velocityLayer].insert(expectedKey, 100*12*log2(expectedK/kNCC));
                 else {
-                    //log(hex(velocityLayer)+">"_, expectedKey, "["_+strKey(expectedKey)+"]"_, "~ f:", expectedF, "k:", expectedK);
-                    //log("?", "fPeak", fPeak, "iNCC", iNCC, "maxNCC", maxNCC, "kNCC", kNCC, "key", key, "highK", N/highF);
-                    /*if(32*highF < N) {
-                        log("i", iNCC, "eI", fPeak/expectedF);
-                        if((int)round(fPeak/expectedF-1)<4) log("i/eI", octaves[iNCC-1]/octaves[(int)round(fPeak/expectedF-1)]);
-                    }*/
-                    log(expectedKey, key, fPeak, fPeak/expectedF, iNCC, octaves[iNCC-1]/octaves[(int)round(fPeak/expectedF-1)], N/highF, kNCC);
-                    int iA = round(fPeak/expectedF-1), iB = iNCC-1;
-                    float a = octaves[iA], b = octaves[iB];
-                    log(1/((a-b)/(iB*b - iA*a)));
+                    log(expectedK, "kPeak", N/fPeak, "highK", N/highF, "i", iNCC, "k", kNCC,
+                        "f/fPeak", expectedF/fPeak, "f/highF", expectedF/highF, "kNCC/k", (float)kNCC/expectedK);
+                    if(iNCC==6 && debug) log(debug, 100*maxNCC);
                 }
                 layerResults << result;
                 total++; if(key==expectedKey) success++;
@@ -189,7 +191,7 @@ struct PitchEstimation {
             log(layerResults);
             results << layerResults<<'\n';
         }
-        log(success,"/",total); // 464 / 480 (16K), 462 / 464 (8K)
+        log(success,"/",total); // 16K: 465 / 480, 8K: 472 , 4K: 412 / 464
 
         /*const float e0 = mean(energy.last().values); // Computes mean energy of highest velocity layer
         for(auto& layer: energy) for(float& e: layer.values) e /= e0; // Normalizes all energy values
@@ -247,14 +249,14 @@ struct PitchEstimation {
             plot.dataSets = move(offsets);
             plots << move(plot);
         }*/
-        if(spectrumPlot) {Plot plot;
+        /*if(spectrumPlot) {Plot plot;
             plot.title = String("Spectrum of A6 "_);
             plot.xlabel = String("Frequency"_), plot.ylabel = String("Energy"_);
             plot.dataSets << copy(spectrumPlot);
             //plot.legendPosition = Plot::BottomRight;
             plot.logx=true; // plot.logy=true;
             plots << move(plot);
-        }
+        }*/
         if(plots) {
             window.backgroundColor=window.backgroundCenter=1;
             window.show();
