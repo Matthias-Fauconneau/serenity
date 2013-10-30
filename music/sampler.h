@@ -90,6 +90,7 @@ struct Sampler : Poll {
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     uint read(int32* output, uint size);
+    uint read(float* output, uint size);
 
     /// Records performance to WAV file
     void startRecord(const string& path);

@@ -1,4 +1,5 @@
 #include "thread.h"
+#include "pitch.h"
 #include "sampler.h"
 #include "math.h"
 #include "time.h"
@@ -9,43 +10,6 @@
 
 bool operator ==(range a, range b) { return a.start==b.start && a.stop==b.stop; }
 
-template<Type V, uint N> struct list { // Small sorted list
-    static constexpr uint size = N;
-    struct element { float key; V value; element(float key=0, V value=0):key(key),value(value){} } elements[N];
-    void insert(float key, V value) {
-        int i=0; while(i<N && elements[i].key<key) i++; i--;
-        if(i<0) return; // New candidate would be lower than current
-        for(uint j: range(i)) elements[j]=elements[j+1]; // Shifts left
-        elements[i] = element(key, value); // Inserts new candidate
-    }
-    const element& operator[](uint i) { assert(i<N); return elements[i]; }
-    const element& last() { return elements[N-1]; }
-    const element* begin() { return elements; }
-    const element* end() { return elements+N; }
-};
-template<Type V, uint N> String str(const list<V,N>& a) {
-    String s; for(uint i: range(a.size)) { s<<str(a.elements[i].key, a.elements[i].value); if(i<a.size-1) s<<", "_;} return s;
-}
-
-#include <fftw3.h> //fftw3f
-typedef struct fftwf_plan_s* fftwf_plan;
-struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
-FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
-struct FFT {
-    uint N;
-    buffer<float> hann {N};
-    buffer<float> windowed {N};
-    buffer<float> halfcomplex {N};
-    FFTW fftw = fftwf_plan_r2r_1d(N, windowed.begin(), halfcomplex.begin(), FFTW_R2HC, FFTW_ESTIMATE);
-    FFT(uint N) : N(N) { for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2; }
-    ref<float> transform(const ref<float>& signal) {
-        assert(N <= signal.size);
-        for(uint i: range(N)) windowed[i] = hann[i]*signal[i]; // Multiplies window
-        fftwf_execute(fftw); // Transforms (FIXME: use execute_r2r and free windowed/transform buffers between runs)
-        return halfcomplex;
-    }
-};
-
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 inline float loudnessWeight(float f) {
@@ -55,11 +19,11 @@ inline float loudnessWeight(float f) {
 }
 String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"_,"D#"_,"E"_,"F"_,"F#"_,"G"_,"G#"_}[(key+3)%12]+str((key-33)/12); }
 
-/// Estimates fundamental frequency (~pitch) of test samples
-struct PitchEstimation {
+/// Estimates loudness fundamental frequency (~pitch) of samples. Estimates pitch shifts to minimize total entropy.
+struct Tuner {
     VList<Plot> plots;
     Window window {&plots, int2(1024, 768), "Tuner"};
-    PitchEstimation() {
+    Tuner() {
         Sampler sampler;
         const uint rate = 48000;
         sampler.open(rate, "Salamander.original.sfz"_, Folder("Samples"_,root()));
@@ -74,7 +38,7 @@ struct PitchEstimation {
 
         const uint N = 8192; // Analysis window size (A-1 (27Hz~2K))
         const int M = 8*12*100; //N;//log2(N/2)*256; // 12 octaves * 1024 bins/octaves (=85 bins / key (1.2 cents resolution))
-        FFT fft (N);
+        PitchEstimator pitchEstimator (N);
 
         Random random;
         map<float, float> spectrumPlot;
@@ -82,7 +46,8 @@ struct PitchEstimation {
         int tune[keys.size]; clear(tune, keys.size);
         array<map<float,float>> offsets; offsets.grow(velocityLayers.size); // For each note (in MIDI key), pitch offset (in cents) to equal temperament
         array<map<float,float>> energy; energy.grow(velocityLayers.size); // For each note (in MIDI key), energy relative to average
-#if 0
+#define BENCHMARK 1 // Benchmarks pitch estimation or compute log spectrums for entropy tuning
+#if BENCHMARK
         uint success = 0, total = 0;
         String results;
         for(int velocityLayer: range(velocityLayers.size)) {
@@ -106,90 +71,23 @@ struct PitchEstimation {
 
             assert(N<=sample.flac.duration);
             buffer<float2> stereo = decodeAudio(sample.data, N);
-            float signal[N];
-            for(uint i: range(N)) signal[i] = (stereo[i][0]+stereo[i][1])/(2<<(24+1));
-            ref<float> halfcomplex = fft.transform(signal);
-            buffer<float> spectrum (N/2);
-            float e = 0;
-            for(uint i: range(N/2)) {
-                spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
-                e += spectrum[i];
-            }
-
-            // Selects maximum and highest peak
-            float firstPeak = 0; uint fPeak = 0; uint highF = 0;
-            const uint fMin = N*440*pow(2, -4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half pitch under A-1
-            const uint fMax = N*440*pow(2,  3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7
-            for(uint i=fMin; i<=fMax; i++) {
-                if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i;
-                if(spectrum[i] > firstPeak/8) highF = i; // Highest pitch peak > 1./8 maximum firstPeak
-            }
-            if(16*highF > N) fPeak = highF; // Selects highest pitch peak if it is over 3000Hz
-
-            // Use autocorrelation to find best match between f, f/2, f/3, f/4
-            const float kPeak = (float)N/fPeak; // k represents periods here (and not 1/wavelength­)
-            float kNCC = kPeak;
-            float maxNCC=0;
-            int iNCC=1;
-
-            if(32*highF < N) { // High pitches are accurately found by spectrum peak picker (autocorrelation will match lower octaves under 1500Hz)
-                for(uint i=1; i <= ((64*highF < N) ? 5 : 2); i++) { // Search lower octaves for best correlation (only first peak) (-3+2), 8K: 5th (+1)
-                    float bestK = i*kPeak;
-                    int k0 = round(bestK);
-                    for(int k=k0;k>0;k--) { // Scans backward (decreasing k) until local maximum
-                        float sum=0; for(uint i: range(N-k0)) sum += signal[i]*signal[k+i]; // N-k0 instead of N-kMax to avoid some doubling
-                        sum *= 1 - i*(N/8192)/96.; // Penalizes to avoid some period doubling (overly sensitive) (8K: +2)
-                        if(sum > maxNCC) maxNCC = sum, kNCC = k, iNCC=i;
-                        else if(k<k0*31/32) // 8K: +20
-                            break;
-                    }
-                }
-                if(64*highF > N) { // Exhaustive search starting from highK/3 to match C7
-                    float bestK = N/(highF*3);
-                    int k0 = round(bestK);
-                    for(int k=k0;k>=min(k0,11);k--) { // Scans backward (decreasing k) until local maximum
-                        float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i]; // N-k0 instead of N-kMax to avoid some doubling
-                        if(sum > maxNCC) maxNCC = sum, kNCC = k, iNCC=6;
-                    }
-                }
-            }
-
-            int key = floor(pitchToKey(rate/kNCC)); // 8K: floor: +1
+            float signal[N]; for(uint i: range(N)) signal[i] = (stereo[i][0]+stereo[i][1]) * 0x1p-25f;
+            float k = pitchEstimator.estimate(signal);
+            int key = round(pitchToKey(rate/k));
             int expectedKey = sample.pitch_keycenter;
             float expectedK = rate/keyToPitch(expectedKey);
-            char result = key==expectedKey ? str(iNCC)[0] : '0';
 
-            if(kNCC > 32) { // (+54)
-                int k0 = round(kNCC);
-                for(int k=k0-1;k>0;k--) { // Scans backward (decreasing k) until local maximum to estimate subkey pitch (+19)
-                    float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
-                    if(sum > maxNCC) maxNCC = sum, kNCC = k;
-                    else if(k<k0*63/64) // (16K: +3)
-                        break;
-                }
-                // As backward will search regardless of local maximum (if(k<k0*63/64) break; -> +3), compensate with forward local search (+32)
-                for(int k=k0+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch
-                    float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
-                    if(sum > maxNCC) maxNCC = sum, kNCC = k;
-                    else break;
-                }
-                int refinedKey = round(pitchToKey(rate/kNCC));
-                if(key!=expectedKey && refinedKey==expectedKey) result = 'R';
-                if(key==expectedKey && refinedKey!=expectedKey) error("Q");
-                key=refinedKey;
-            }
-
-            if(key==expectedKey) offsets[velocityLayer].insert(keyIndex, 100*12*log2(expectedK/kNCC));
-#if 0
-            energy[velocityLayer].insert(expectedKey, e);
-            //else log(expectedK,"highK", N/highF, "k", kNCC, "f/highF", expectedF/highF, "kNCC/k", (float)kNCC/expectedK);
-            layerResults << result;
+            //energy[velocityLayer].insert(expectedKey, e); FIXME
+            if(key==expectedKey) offsets[velocityLayer].insert(keyIndex, 100*12*log2(expectedK/k));
+#if BENCHMARK
+            else log(expectedK, "k",k, "e", k/expectedK);
+            layerResults << (key==expectedKey ? '0' : 'X');
             total++; if(key==expectedKey) success++;
         }
         log(layerResults);
         results << layerResults<<'\n';
     }
-    log(success,"/",total); // 8K: 472 / 480
+    log(success,"/",total); // 8K: 464 / 464, 472 / 480
 #else
             (void)result;
             if(key==expectedKey) {// Computes logarithmic spectrum
@@ -209,10 +107,6 @@ struct PitchEstimation {
                     assert(sum >= 0);
                     if(m+offset>=0 && m+offset<M) logSpectrum[m+offset] = sum;
                 }
-                /*if(keyIndex==keys.size/2)
-                    for(int m: range(1,M-1))
-                        //if(logSpectrum[m-1]<logSpectrum[m]&&logSpectrum[m]>logSpectrum[m+1])
-                        spectrumPlot.insert(m, logSpectrum[m]);*/
                 logSpectrums << move(logSpectrum);
             }
         }
@@ -255,7 +149,7 @@ struct PitchEstimation {
             writeFile("Salamander."_+str(N)+".sfz"_,sfz,Folder("Samples"_));
         }*/
 
-        {// Entropy-based tuning (for efficiency, spectrums are not reweighted with the correct loudness on each shift)
+        if(logSpectrums) { // Entropy-based tuning (for efficiency, spectrums are not reweighted with the correct loudness on each shift)
             assert_(logSpectrums.size == keys.size);
             const int keyCents = (M/log2(N/2))/12; // Number of bins ("cents") for a tone (key)
             log((float)(M/8)/12, (float)(M-2*keyCents)/M);
@@ -280,7 +174,7 @@ struct PitchEstimation {
                 real* s = logSpectrums[key].begin();
                 for(int m: range(M)) s[m] /= totalEnergy; // Normalizes shifts operators also
             }
-            int offsets[keys.size]; clear(offsets, keys.size); // Pitch offsets in logSpectrums units (~1.2 cents) (positive offset is lower pitch (left shift count))
+            int shiftCount[keys.size]; clear(shiftCount, keys.size); // Positive offset is lower pitch (left shifts)
             //Random random;
             real entropy = 0;
             for(int m: range(M)) if(total[m]>0) entropy += total[m] * log2(total[m]); entropy=-entropy;
@@ -288,7 +182,7 @@ struct PitchEstimation {
                 int key = random%keys.size; // or in order ?
                 int delta = random%2 ? 1 : -1; // and try both
                 //TODO: record all candidate configurations to avoid testing same configuration twice (and search diamond exhaustively)
-                int offset = offsets[key]; // Value
+                int offset = shiftCount[key]; // Value
                 real currentEnergy = 0; real candidateEntropy = 0;
                 if(delta>0) offset++;
                 assert_(offset < keyCents, offset, keyCents); // Prevents windowing effects
@@ -310,7 +204,7 @@ struct PitchEstimation {
                 assert_(abs(1-currentEnergy) < 0x1p-26, log2(abs(1-currentEnergy))); // No need to renormalize as there is no windowing
                 candidateEntropy = -candidateEntropy;
                 if(candidateEntropy < entropy/**(1-0x1p-13)*/) { // Commits the change
-                    int& offset = offsets[key]; // Reference this time
+                    int& offset = shiftCount[key]; // Reference this time
                     if(delta>0) offset++;
                     const real* shift = logSpectrums[key] + offset;
                     for(int m: range(max(0,-offset), M+min(0,-offset))) total[m] += delta * shift[m];
@@ -322,10 +216,10 @@ struct PitchEstimation {
                 } //else if(entropy<candidateEntropy) log(log2(1-entropy/candidateEntropy));
                 assert(entropy);
             }
+            for(int key: range(keys.size)) offsets[0].insert(key, offsets[8].at(key)-tune[key]);
         }
 
-        for(int key: range(keys.size)) offsets[0].insert(key, offsets[velocityLayer].at(key)-tune[key]);
-        {Plot plot;
+        if(0) {Plot plot;
             plot.title = String("Pitch ratio (in cents) to equal temperament (A440)"_);
             plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_);
             plot.legends = apply(velocityLayers, [](range velocity){return str(velocity.stop);});

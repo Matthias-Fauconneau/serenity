@@ -124,3 +124,5 @@ sponza/scene.cc
 
 tuner/tuner.h
 tuner/tuner.cc
+tuner/recorder.cc
+tuner/pitch.h

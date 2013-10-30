@@ -98,7 +98,6 @@ struct Music {
     Scroll<PDFScore> pdfScore;
     Scroll<MidiScore> midiScore;
     Score score;
-    //Keyboard keyboard;
 
     Thread thread{-20};
     Sequencer input{thread};
@@ -127,19 +126,11 @@ struct Music {
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
-#if 1
         input.noteEvent.connect(&score,&Score::noteEvent);
-        //input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         //midi.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
         midi.noteEvent.connect(&score,&Score::noteEvent);
-        //midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
-
-        /*keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
-        keyboard.noteEvent.connect(&score,&Score::noteEvent);
-        keyboard.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
-        keyboard.contentChanged.connect(&window,&Window::render);*/
 
         midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
@@ -199,7 +190,6 @@ struct Music {
         window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
         layout<<&keyboard;
-#endif
 #endif
         window.show();
         thread.spawn();
