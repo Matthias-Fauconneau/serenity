@@ -107,7 +107,7 @@ struct Build {
                 if(::find(build,"debug"_)) args << String("-g"_) << String("-fno-omit-frame-pointer") << String("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << String("-march=native"_) << String("-O3"_) << String("-g"_);
                 else if(::find(build,"release"_)) args << String("-march=native"_) << String("-O3"_);
-                else if(::find(build,"32"_)) args << String("-m32"_) << String("-O3"_) << String("-g"_);
+                else if(::find(build,"32"_)) args << String("-m32"_) << String("-O3"_);
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);

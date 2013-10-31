@@ -25,14 +25,11 @@ struct FFT {
 struct PitchEstimator : FFT {
     using FFT::FFT;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
-    float estimate(const ref<float>& signal) {
+    float estimate(const ref<float>& signal, uint fMin=1, uint fMax=0) {
+        if(!fMax) fMax = N/2;
         ref<float> halfcomplex = transform(signal);
         buffer<float> spectrum (N/2);
-        float e = 0;
-        for(uint i: range(N/2)) {
-            spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
-            e += spectrum[i];
-        }
+        for(uint i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
 
         assert_(N==8192);
         /// Estimator parameters
@@ -47,7 +44,8 @@ struct PitchEstimator : FFT {
 
         uint fPeak = 0;
         {float firstPeak = 0;
-            for(uint i=0; i<highPeakFrequency; i++) if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i; // Selects maximum peak
+            uint i=fMin; for(; i<highPeakFrequency; i++) if(spectrum[i] > spectrum[i-1]) break; // Descends any ignored peak
+            for(; i<highPeakFrequency; i++) if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i; // Selects maximum peak
             for(uint i=highPeakFrequency; i<N/2; i++) if(spectrum[i] > highPeakRatio*firstPeak) { // Selects highest peak [+23]
                 fPeak = i;
                 if(spectrum[i] > firstPeak) firstPeak = spectrum[i];
@@ -58,11 +56,13 @@ struct PitchEstimator : FFT {
         float bestK = (float)N/fPeak;
         if(fPeak < autocorrelationFrequency) { // High pitches are accurately found by spectrum peak picker [+58]
             float max=0;
-            const uint maximumPeriods = fPeak < highPartialFrequency ? highPartialMaximumPeriods : lowPartialMaximumPeriods; // [f<N/64: +4, 5th: +3]
+            uint maximumPeriods = fPeak < highPartialFrequency ? highPartialMaximumPeriods : lowPartialMaximumPeriods; // [f<N/64: +4, 5th: +3]
+            maximumPeriods = min(maximumPeriods, fPeak/fMin);
             for(uint i=1; i <= maximumPeriods; i++) { // Search multiple periods
                 int k0 = i*N/fPeak;
                 int octaveBestK = k0;
-                for(int k=k0;;k--) { // Evaluates slightly smaller periods [+22]
+                const uint kMin = N/fMax;
+                for(uint k=k0;k>kMin;k--) { // Evaluates slightly smaller periods [+22]
                     float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
                     sum *= 1 - i*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
                     if(sum > max) max = sum, octaveBestK = k, bestK = k;

@@ -229,7 +229,6 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 if(level<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
 
                 if(!current) note.key=key, note.velocity=velocity;
-                log(hex((uint64)(void*)&layer->notes.first()), hex((uint64)(byte*)&note), hex((uint64)(byte*)&note.step), hex((uint64)((byte*)&note.step-(byte*)&note)), hex(sizeof(Note)));
                 note.step=(v4sf){1,1,1,1};
                 note.releaseTime=s.releaseTime;
                 note.envelope=s.envelope;

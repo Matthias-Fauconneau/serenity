@@ -122,7 +122,7 @@ sponza/view.cc
 sponza/scene.h
 sponza/scene.cc
 
-tuner/tuner.h
-tuner/tuner.cc
-tuner/recorder.cc
 tuner/pitch.h
+tuner/tuner.cc
+tuner/split.cc
+tuner/entropy.cc
