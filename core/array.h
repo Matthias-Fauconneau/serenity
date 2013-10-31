@@ -25,8 +25,10 @@ generic struct array : buffer<T> {
     void reserve(size_t capacity) {
         if(capacity>this->capacity) {
             assert(capacity>=size);
-            if(this->capacity) data=(T*)realloc((T*)data, capacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
-            else data=(T*)malloc(capacity*sizeof(T));
+            if(this->capacity) {
+                data=(T*)realloc((T*)data, capacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+                assert_(size_t(data)%alignof(T)==0, alignof(T));
+            } else if(posix_memalign((void**)&data,16,capacity*sizeof(T))) error("");
             this->capacity=capacity;
         }
     }

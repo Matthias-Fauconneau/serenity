@@ -37,9 +37,9 @@ void MidiFile::read(Track& track, uint64 time, State state) {
             enum { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
                    EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
             ref<byte> data = s.read<byte>(len);
-            if(key==TimeSignature) timeSignature[0]=data[0], timeSignature[1]=1<<data[1];
-            else if(key==Tempo) tempo=((data[0]<<16)|(data[1]<<8)|data[2])/1000;
-            else if(key==KeySignature) this->key=(int8)data[0], scale=data[1]?Minor:Major;
+            if(key==TimeSignature) timeSignature[0u]=data[0u], timeSignature[1u]=1<<data[1u];
+            else if(key==Tempo) tempo=((data[0u]<<16)|(data[1u]<<8)|data[2u])/1000;
+            else if(key==KeySignature) this->key=(int8)data[0u], scale=data[1u]?Minor:Major;
         }
 
         if((type==NoteOff || type==NoteOn) && active.contains(key)) {

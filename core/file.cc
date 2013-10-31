@@ -35,7 +35,7 @@ array<String> Folder::list(uint flags) const {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
             string name = str(entry.name);
             assert(name);
-            if(!(flags&Hidden) && name[0]=='.') continue;
+            if(!(flags&Hidden) && name[0u]=='.') continue;
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
             //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)

@@ -58,7 +58,7 @@ bool operator==(const ID& a, const ID& b) { return a.texture==b.texture && a.lig
 string str(const ID& o) { return str(o.texture, o.lightmap); }
 
 Vertex bezier(const Vertex& a, const Vertex& b, const Vertex& c, float t) {
-    size_t N = sizeof(Vertex)/sizeof(float);
+    uint N = sizeof(Vertex)/sizeof(float);
     const float* A = (const float*)&a; const float* B = (const float*)&b; const float* C = (const float*)&c; float V[N];
     for(int i: range(N)) V[i] = (1-t)*(1-t)*A[i] + 2*(1-t)*t*B[i] + t*t*C[i];
     return (Vertex)(*(Vertex*)V);

@@ -48,8 +48,8 @@ string section(const string& s, byte separator, int begin, int end) {
 
 string trim(const string& s) {
     int begin=0,end=s.size;
-    for(;begin<end;begin++) { byte c=s[begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
-    for(;end>begin;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
+    for(;begin<end;begin++) { byte c=s[(uint)begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
+    for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
     return s.slice(begin, end-begin);
 }
 
@@ -170,7 +170,7 @@ String repeat(const string& s, uint times) {
     String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
 }
 
-String pad(const string& s, uint length, const string& pad) { return repeat(pad, max(0ul,length-s.size/pad.size))+s; }
+String pad(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
 
 stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
 
@@ -239,11 +239,4 @@ String ftoa(double n, int precision, int pad, int exponent, bool inf) {
     else if(exponent==3 && e==9) s<<'G';
     else if(e) s<<'e'<<itoa<10>(e);
     return move(s);
-}
-
-String binaryPrefix(size_t value, string unit) {
-    if(value < 1u<<10) return str(value, unit);
-    if(value < 10u<<20) return str(value/1024.0,"ki"_+unit);
-    if(value < 10u<<30) return str(value/1024.0/1024.0,"Mi"_+unit);
-    return str(value/1024.0/1024.0/1024.0,"Gi"_+unit);
 }

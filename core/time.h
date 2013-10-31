@@ -10,7 +10,7 @@ long currentTime();
 /// Returns Unix real-time in nanoseconds
 int64 realTime();
 
-#if __x86_64__
+#if __x86_64__ || __i386__
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })

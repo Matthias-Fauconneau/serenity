@@ -17,8 +17,8 @@ struct Note {
     v4sf step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
     Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
     Semaphore writeCount; //audio thread release free samples, decoder thread acquires
-    uint16 releaseTime; //to compute step
-    uint8 key=0, velocity=0; //to match release sample
+    uint releaseTime; //to compute step
+    uint key=0, velocity=0; //to match release sample
     ref<float> envelope; //to level release sample
     /// Decodes frames until \a available samples is over \a need
     void decode(uint need);

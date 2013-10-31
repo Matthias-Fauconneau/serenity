@@ -8,11 +8,11 @@
 #include "string.h"
 #include "math.h"
 #include <fftw3.h> //fftw3f
-#include <fftw3.h> //fftw3f_threads
+//include <fftw3.h> //fftw3f_threads
 
 int noteToMIDI(const string& value) {
     int note=24;
-    int i=0;
+    uint i=0;
     assert(value[i]>='a' && value[i]<='g');
     note += "c#d#ef#g#a#b"_.indexOf(value[i]);
     i++;
@@ -163,8 +163,8 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     for(int c=0;c<2;c++) filter[c] = buffer<float>(N,N,0.f);
     for(uint i: range(reverbSize)) for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
 
-    fftwf_init_threads();
-    fftwf_plan_with_nthreads(4);
+    //fftwf_init_threads();
+    //fftwf_plan_with_nthreads(4);
 
     // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
@@ -229,6 +229,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 if(level<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
 
                 if(!current) note.key=key, note.velocity=velocity;
+                log(hex((uint64)(void*)&layer->notes.first()), hex((uint64)(byte*)&note), hex((uint64)(byte*)&note.step), hex((uint64)((byte*)&note.step-(byte*)&note)), hex(sizeof(Note)));
                 note.step=(v4sf){1,1,1,1};
                 note.releaseTime=s.releaseTime;
                 note.envelope=s.envelope;
@@ -335,7 +336,7 @@ uint Sampler::read(float* output, uint size) {
             // Complex multiplies input (reverb buffer) with kernel (reverb filter)
             const float* x = input;
             const float* y = reverbFilter[c];
-            product[0] = x[0] * y[0];
+            product[0u] = x[0] * y[0];
             for(uint j = 1; j < N/2; j++) {
                 float a = x[j];
                 float b = x[N - j];

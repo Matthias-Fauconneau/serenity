@@ -102,9 +102,6 @@ String ftoa(double number, int precision=2, int pad=0, int exponent=0, bool inf=
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 
-/// Formats value using best binary prefix
-String binaryPrefix(size_t value, string unit="B"_);
-
 /// Converts arrays
 generic String str(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
 generic String str(const mref<T>& a, char separator=' ') { return str((const ref<T>&)a, separator); }
