@@ -45,18 +45,20 @@ struct PitchEstimator : FFT {
         const float extendedSearch = 32; // Extends search to all k closer than (maximum / extendedSearch) from maximum
 
         fPeak=0;
-        {float firstPeak = 0; float e=0;
+        {float firstPeak = 0; float energy=0;
             uint i=fMin; for(; i<highPeakFrequency; i++) if(spectrum[i] > spectrum[i-1]) break; // Descends to first local minimum
-            for(; i<highPeakFrequency; i++) { e+=spectrum[i]; if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i; } // Selects maximum peak
+            for(; i<highPeakFrequency; i++) { // Selects maximum peak
+                energy+=spectrum[i];
+                if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i;
+            }
             for(uint i=highPeakFrequency; i<N/2; i++) {
-                e+=spectrum[i];
+                energy+=spectrum[i];
                 if(spectrum[i] > highPeakRatio*firstPeak) {
                     if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i;
                     if(i<fMax) fPeak = i;  // Selects highest peak [+23]
                 }
             }
-            //e /= sqrt((float)N); // FFTW doesn't normalize
-            power = e/(N/2); // Converts frame energy to average power
+            power = energy / N;
         }
         if(fPeak==0) return nan;
 

@@ -54,43 +54,30 @@ struct PitchEstimation {
             const float2* period = stereo + t;
             float signal[N]; for(uint i: range(N)) signal[i] = notch0(notch1( (period[i][0]+period[i][1]) * 0x1p-25f ));
 
-            int expectedKey = 42+12 - t/rate/5; // Benchmark is one key every 5 seconds descending from D#5 to C2
+            int expectedKey = 75 - t/rate/5; // Benchmark is one key every 5 seconds descending from D#5 to C2
 
-            const uint fMin = 50*N/rate;
-            //const uint fMin = N*440*exp2(-4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half pitch under A-1
-            //const uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7
-            const uint fMax = N*440*exp2(7./12)/rate; // E4
+            const uint fMin = N*440*exp2(-4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half pitch under A-1
+            const uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7
             float k = pitchEstimator.estimate(signal, fMin, fMax);
-            float expectedK = rate/keyToPitch(expectedKey+21);
+            float expectedK = rate/keyToPitch(expectedKey);
             const float kOffset = 12*log2(expectedK/k);
             const float kError = 12*log2((expectedK+1)/expectedK);
 
-            float expectedF = keyToPitch(expectedKey+21)*N/rate;
-            float f = pitchEstimator.fPeak;
+            float expectedF = keyToPitch(expectedKey)*N/rate;
+            float f = pitchEstimator.fPeak / pitchEstimator.period;
             const float fOffset =  12*log2(f/expectedF);
             const float fError =  12*log2((expectedF+1)/expectedF);
 
             float power = pitchEstimator.power;
-            int key = round(pitchToKey(rate/k))-21;
+            int key = round(pitchToKey(rate/k));
 
-            if(
-                    log2(power) > -7 //16K
-                    //log2(power) > -11 //8K
-                    && previousPowers[1] > power // decay
-                    //&& previousPowers[1] < power*4 // but not release
-                    && previousPowers[0] > previousPowers[1]/2 // just to be sure !
-                    /*&& 42-15 <= key && key <= 42+12*/) {
-                log(strKey(expectedKey+21)+"\t"_+strKey(max(0,key+21))+"\t"_ +str(round(rate/k))+" Hz\t"_
+            if(log2(power) > -8 && previousPowers[1] > power && previousPowers[0] > previousPowers[1]/2) {
+                log(strKey(expectedKey)+"\t"_+strKey(max(0,key))+"\t"_ +str(round(rate/k))+" Hz\t"_
                     +dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_
                     +dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_
                     +dec(log2(previousPowers[0]))+"\t"_+dec(log2(previousPowers[1]))+"\t"_+dec(log2(power))+"\t"_
-                    +(expectedKey==key && (key==lastKey || key+1==lastKey)?
-                         (log2(power) > -10 || key==lastKey?""_:"."_) // Flags low notes to show if threshold is near limit
-                        :("X\t"_+dec(pitchEstimator.fPeak*rate/N))));
-                //if(!offsets.contains(key) || abs(offsets.at(key))>abs(100*offset)) offsets[key]=100*offset;
-                /*if(offsets.contains(key) && abs(offsets.at(key))>=abs(2*100*offset)) offsets[key] = 100*offset; // Previous offset was captured on onset (FIXME: detect onset and estimate pitch right after maximum)
-                else if(offsets.contains(key) && abs(offsets.at(key))<=abs(2*100*offset)) {} // How could this happen ?
-                else*/ //offsets.insertMulti(key-42, 100*min(kOffset, fOffset));
+                    +(expectedKey==key && (key==lastKey || key+1==lastKey) ? ""_ :"X"_));
+                offsets.insertMulti(key-42, 100*(fError<kError ? fOffset : kOffset));
                 if(expectedKey!=key && !spectrumPlot) for(uint i: range(16, 4096*N/rate)) {
                     float e = pitchEstimator.spectrum[i];
                     if(e>1./16) spectrumPlot.insert(i*rate/N, e);
@@ -103,7 +90,6 @@ struct PitchEstimation {
         }
 
         if(offsets) {Plot plot;
-            plot.title = String("Pitch ratio (in cents) to equal temperament (A440)"_);
             plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_);
             plot.dataSets << move(offsets);
             plots << move(plot);
