@@ -14,9 +14,11 @@ struct FFT {
     buffer<float> halfcomplex {N};
     FFTW fftw = fftwf_plan_r2r_1d(N, windowed.begin(), halfcomplex.begin(), FFTW_R2HC, FFTW_ESTIMATE);
     FFT(uint N) : N(N) { assert(isPowerOfTwo(N)); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2; }
-    ref<float> transform(const ref<float>& signal) {
-        assert(N == signal.size);
-        for(uint i: range(N)) windowed[i] = hann[i]*signal[i]; // Multiplies window
+    ref<float> transform(const ref<float>& signal={}) {
+        if(signal) {
+            assert(N == signal.size);
+            for(uint i: range(N)) windowed[i] = hann[i]*signal[i]; // Multiplies window
+        } // else directly copied and windowed by user into windowed buffer
         fftwf_execute(fftw); // Transforms (FIXME: use execute_r2r and free windowed/transform buffers between runs)
         return halfcomplex;
     }
@@ -29,7 +31,7 @@ struct PitchEstimator : FFT {
     float power;
     uint period;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
-    float estimate(const ref<float>& signal, uint fMin=1, uint fMax=0) {
+    float estimate(const ref<float>& signal={}, uint fMin=1, uint fMax=0) {
         if(!fMax) fMax = N/2;
         ref<float> halfcomplex = transform(signal);
         for(uint i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum

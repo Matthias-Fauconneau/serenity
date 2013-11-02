@@ -16,7 +16,7 @@ struct Player {
     static constexpr uint channels = 2;
     AudioFile file;
     Resampler resampler;
-    AudioOutput output{{this,&Player::read}, 48000, 8192};
+    AudioOutput output{{this,&Player::read}}; // Maximum rate and latency
     uint read(int32* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {
@@ -49,7 +49,6 @@ struct Player {
     }
 
 // Interface
-    ICON(random) ICON(random2) ToggleButton randomButton{randomIcon(),random2Icon()};
     ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
     ICON(next) TriggerButton nextButton{nextIcon()};
     Text elapsed = "00:00"_;
@@ -75,7 +74,7 @@ struct Player {
         window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         window.globalShortcut(Play).connect(this, &Player::togglePlay);
-        randomButton.toggled.connect(this, &Player::setRandom);
+        //randomButton.toggled.connect(this, &Player::setRandom);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
         slider.valueChanged.connect(this, &Player::seek);

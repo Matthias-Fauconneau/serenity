@@ -12,12 +12,15 @@ enum PCMFlags { NoResample=1, ExportBuffer=2, NoPeriodWakeUp=4 };
 struct Interval {
     uint min, max; uint openmin:1, openmax:1, integer:1, empty:1, pad:28;
     Interval():min(0),max(-1),openmin(0),openmax(0),integer(0),empty(0),pad(0){}
-    Interval(uint exact):min(exact),max(exact),openmin(0),openmax(0),integer(1),empty(0),pad(0){}
+    /// \note Negative values means are minimum up to driver capabilities
+    Interval(int value):min(value<0?0:value),max(value<0?-1:value),openmin(0),openmax(0),integer(1),empty(0),pad(0){}
     operator uint() { assert(integer); assert(min==max); return max; }
 };
 struct Mask {
-    int bits[8] = {~0,~0,0,0,0,0,0,0};
-    Mask& set(uint bit) { assert(bit < 256); bits[0] = bits[1] = 0; bits[bit >> 5] |= (1 << (bit & 31)); return *this; }
+    int bits[8] = {0,0,0,0,0,0,0,0};
+    bool get(uint bit) { assert(bit < 256); return bits[bit >> 5] & (1 << (bit & 31)); }
+    Mask& set(uint bit) { assert(bit < 256); bits[bit >> 5] |= (1 << (bit & 31)); return *this; }
+    Mask& clear(uint bit) { assert(bit < 256); bits[bit >> 5] &= ~(1 << (bit & 31)); return *this; }
 };
 struct HWParams {
     uint flags = NoResample;
@@ -25,7 +28,7 @@ struct HWParams {
     Mask mres[5];
     Interval intervals[12];
     Interval ires[9];
-    uint rmask=0, cmask=0, info=0, msbits=0, rate_num=0, rate_den=0;
+    uint rmask=~0, cmask=0, info=0, msbits=0, rate_num=0, rate_den=0;
     long fifo_size=0;
     byte reserved[64]={};
     Interval& interval(int i) { assert(i<12); return intervals[i]; }
@@ -40,6 +43,7 @@ struct SWParams {
 struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
 
+typedef IOWR<'A', 0x10,HWParams> HW_REFINE;
 typedef IOWR<'A', 0x11,HWParams> HW_PARAMS;
 typedef IOWR<'A', 0x13,SWParams> SW_PARAMS;
 typedef IO<'A', 0x40> PREPARE;
@@ -55,11 +59,12 @@ Device getPlaybackDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
+AudioOutput::AudioOutput(int sampleBits, int rate, int periodSize, Thread& thread)
     : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread) { //FIXME: list devices
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
-    hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
+    if(sampleBits<0) hparams.mask(Format).set(S16_LE).set(S32_LE);
+    else hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
     hparams.mask(SubFormat).set(Standard);
     hparams.interval(SampleBits) = sampleBits;
     hparams.interval(FrameBits) = sampleBits*channels;
@@ -67,6 +72,11 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     hparams.interval(Rate) = rate; assert(rate);
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize) = periodSize;
+    if(rate<0 || periodSize<0) {
+        iowr<HW_REFINE>(hparams);
+        hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
+        hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
+    }
     iowr<HW_PARAMS>(hparams);
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
@@ -103,17 +113,32 @@ Device getCaptureDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
+AudioInput::AudioInput(int sampleBits, int rate, int periodSize, Thread& thread) : Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
-    hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
+    if(sampleBits<0) hparams.mask(Format).set(S16_LE).set(S32_LE);
+    else hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
     hparams.mask(SubFormat).set(Standard);
     hparams.interval(SampleBits) = sampleBits;
     hparams.interval(FrameBits) = sampleBits*channels;
     hparams.interval(Channels) = channels;
     hparams.interval(Rate) = rate; assert(rate);
     hparams.interval(Periods) = 2;
-    hparams.interval(PeriodSize) = periodSize;
+    hparams.interval(PeriodSize).max = periodSize;
+    iowr<HW_REFINE>(hparams);
+    if(sampleBits<0) {
+        if(hparams.mask(Format).get(S32_LE)) {
+            hparams.mask(Format).clear(S16_LE);
+            hparams.interval(SampleBits) = 32;
+            hparams.interval(FrameBits) = 32*channels;
+        } else {
+            hparams.interval(SampleBits) = 16;
+            hparams.interval(FrameBits) = 16*channels;
+        }
+        iowr<HW_REFINE>(hparams);
+    }
+    hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
+    hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
     iowr<HW_PARAMS>(hparams);
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
