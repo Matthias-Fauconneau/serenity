@@ -33,6 +33,7 @@ inline real sin(real t) { return __builtin_sin(t); }
 inline real asin(real t) { return __builtin_asin(t); }
 inline real tan(real t) { return __builtin_tan(t); }
 inline real atan(real y, real x) { return __builtin_atan2(y, x); }
+inline real sinh(real x) { return __builtin_sinh(x); }
 
 const real PI = 3.14159265358979323846;
 inline real rad(real t) { return t/180*PI; }

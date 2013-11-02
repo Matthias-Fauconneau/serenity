@@ -6,33 +6,47 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
     real subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
-    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}})
-        if(a[0] >= subExponent) { value=sign(value)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
+    for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}}) {
+        if(a[0] >= subExponent-0x1p-52) { value=sign(value)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
+    }
     error("No matching subexponent for"_, value);
 }
 
 int2 Plot::sizeHint() { return int2(-1080*4/3/2, -1080/2); }
 void Plot::render(int2 position, int2 size) {
     int resolution = ::resolution; ::resolution = 1.5*96; // Scales the size of all text labels
-    // Computes axis scales
     vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
-    for(const auto& data: dataSets) for(auto point: data) {
-        vec2 p(point.key,point.value);
-        assert(isNumber(p.x) && isNumber(p.y), p);
-        min=::min(min,p);
-        max=::max(max,p);
+    if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
+    else {  // Computes axis scales
+        assert_(dataSets);
+        for(const auto& data: dataSets) {
+            assert_(data);
+            for(auto point: data) {
+                vec2 p(point.key,point.value);
+                assert_(isNumber(p.x) && isNumber(p.y), p);
+                min=::min(min,p);
+                max=::max(max,p);
+            }
+        }
+        if(!log[0] && min.x>0) min.x = 0;
+        if(!log[1] && min.y>0) min.y = 0;
     }
-    if(!logx && min.x>0) min.x = 0;
-    if(!logy && min.y>0) min.y = 0;
+    assert(min.x < max.x && min.y < max.y, min, max);
 
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
         if(max[axis]>-min[axis]) {
-            tickCount[axis] = subExponent(max[axis]);
-            if(min[axis] < 0) {
-                float tickWidth = max[axis]/tickCount[axis];
-                min[axis] = floor(min[axis]/tickWidth)*tickWidth;
-                tickCount[axis] += -min[axis]/tickWidth;
+            if(log[axis]) { //FIXME
+                max[axis] = exp2(ceil(log2(max[axis])));
+                tickCount[axis] = ceil(log2(max[axis]/min[axis]));
+                min[axis] = max[axis]*exp2( -tickCount[axis] );
+            } else {
+                tickCount[axis] = subExponent(max[axis]);
+                if(min[axis] < 0) {
+                    float tickWidth = max[axis]/tickCount[axis];
+                    min[axis] = floor(min[axis]/tickWidth)*tickWidth;
+                    tickCount[axis] += -min[axis]/tickWidth;
+                }
             }
         } else {
             tickCount[axis] = subExponent(min[axis]);
@@ -45,15 +59,19 @@ void Plot::render(int2 position, int2 size) {
     }
 
     // Configures ticks
-    array<Text> ticks[2]; int2 tickLabelSize = 0;
+    struct Tick : Text { float value; Tick(float value, const string& label):Text(label), value(value) {} };
+    array<Tick> ticks[2]; int2 tickLabelSize = 0;
     for(uint axis: range(2)) {
         int precision = ::max(0., ceil(-log10(max[axis]/tickCount[axis])));
         for(uint i: range(tickCount[axis]+1)) {
-            real value = min[axis]+(max[axis]-min[axis])*i/tickCount[axis];
-            if(axis==0 && value==0) { ticks[axis] << Text(); continue; } // Skips X origin tick (overlaps)
+            float lmin = log[axis] ? log2(min[axis]) : min[axis];
+            float lmax = log[axis] ? log2(max[axis]) : max[axis];
+            real value = lmin+(lmax-lmin)*i/tickCount[axis];
+            if(log[axis]) value = exp2(value);
+            //if(axis==0 && value==0) { ticks[axis] << Tick(0,""_); continue; } // Skips X origin tick (overlaps)
             String label = ftoa(value, precision, 0, value>=10e5 ? 3 : 0);
-            assert(label);
-            ticks[axis] << Text(label);
+            assert_(label);
+            ticks[axis] <<Tick(value, label);
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
     }
@@ -85,28 +103,29 @@ void Plot::render(int2 position, int2 size) {
     // Transforms data positions to render positions
     auto point = [&](vec2 p)->vec2{
         // Converts min/max to log (for point(vec2)->vec2)
-        vec2 lmin = vec2(logx ? log2(min.x) : min.x, logy ? log2(min.y) : min.y);
-        vec2 lmax = vec2(logx ? log2(max.x) : max.x, logy ? log2(max.y) : max.y);
-        if(logx) { assert(p.x>0, p.x); p.x = log2(p.x); }
-        if(logy) { assert(p.y>0, p.y); p.y = log2(p.y); }
-        p = (p-lmin)/(lmax-lmin);
+        for(int axis: range(2)) {
+            float lmin = log[axis] ? log2(min[axis]) : min[axis];
+            float lmax = log[axis] ? log2(max[axis]) : max[axis];
+            if(log[axis]) p[axis] = log2(p[axis]);
+            p[axis] = (p[axis]-lmin)/(lmax-lmin);
+        }
         return vec2(position.x+left+p.x*(size.x-left-right),position.y+2*top+(1-p.y)*(size.y-2*top-bottom));
     };
 
     // Draws axis and ticks
-    {vec2 O=vec2(min.x, logy?min.y:0), end = vec2(max.x, logy?min.y:0); // X
+    {vec2 O=vec2(min.x, min.y>0 ? min.y : max.y<0 ? max.y : 0), end = vec2(max.x, O.y); // X
         line(point(O), point(end));
-        for(uint i: range(logx, tickCount[0]+1)) {
-            int2 p (point(O+(i/float(tickCount[0]))*(end-O)));
+        for(uint i: range(tickCount[0]+1)) {
+            Tick& tick = ticks[0][i];
+            int2 p(point(vec2(tick.value, O.y)));
             line(p, p+int2(0,-4));
-            Text& tick = ticks[0][i];
             tick.render(p + int2(-tick.textSize.x/2, 0) );
         }
         {Text text(format(Bold)+xlabel); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
     }
-    {vec2 O=vec2(logx?min.x:0, min.y), end = vec2(logx?min.x:0, max.y); // Y (FIXME: factor)
+    {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
         line(point(O), point(end));
-        for(uint i: range(logy, tickCount[1]+1)) {
+        for(uint i: range(tickCount[1]+1)) {
             int2 p (point(O+(i/float(tickCount[1]))*(end-O)));
             line(p, p+int2(4,0));
             Text& tick = ticks[1][i];

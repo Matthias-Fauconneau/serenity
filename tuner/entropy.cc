@@ -95,8 +95,8 @@ struct Tuner {
                 buffer<real> logSpectrum(M); clear(logSpectrum.begin(), M);
                 int offset = round(100*12*log2(expectedK/kNCC)); tune[keyIndex] = offset;
                 for(int m: range(M)) {
-                    real n0 = fMin*pow(2, (real)m/M*log2(fMax/fMin));
-                    real n1 = fMin*pow(2, (real)(m+1)/M*log2(fMax/fMin));
+                    real n0 = fMin*exp2((real)m/M*log2(fMax/fMin));
+                    real n1 = fMin*exp2((real)(m+1)/M*log2(fMax/fMin));
                     assert_(floor(n0)<ceil(n1));
                     real sum = 0;
                     //for(uint n: range(floor(n0),ceil(n1))) sum += loudnessWeight((float)n*rate/N) * spectrum[n];

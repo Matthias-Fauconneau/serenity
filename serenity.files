@@ -124,5 +124,6 @@ sponza/scene.cc
 
 tuner/pitch.h
 tuner/tuner.cc
-tuner/split.cc
+tuner/test.cc
 tuner/entropy.cc
+plotter.cc

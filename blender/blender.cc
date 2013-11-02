@@ -364,7 +364,7 @@ struct BlendView : Widget { //FIXME: split Scene (+split generic vs blender spec
     const float zoomSpeed = 10; // in mm/click
 #else
     float viewScale = 4;
-    const float zoomSpeed = pow(2,1./4); /*/in x/click*/
+    const float zoomSpeed = exp2(1./4); /*/in x/click*/
 #endif
     Window window {this, int2(1050,590), "BlendView"_,  Image(), Window::OpenGL};
 

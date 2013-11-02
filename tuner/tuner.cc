@@ -13,7 +13,7 @@ String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"_,"D#"_
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner {
     const uint rate = 48000;
-    static constexpr uint N = 8192; // Analysis window size (A-1 (27Hz~2K))
+    static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
 
     PitchEstimator pitchEstimator {N};
     Timer timer;
@@ -25,7 +25,14 @@ struct Tuner {
 #define CAPTURE 1
 #if CAPTURE
     AudioInput input{{this,&Tuner::write}, rate, N}; //CA0110 driver doesn't work
-    Tuner() { input.start(); }
+    float noiseThreshold = 1./4; // Mean relative to full scale
+    uint fMin = N*50/rate, fMax = N/2; // Unamplified microphone recording has very strong peak at 50Hz (utility frequency) and odd harmonics
+    Tuner() {
+        if(arguments().size>0) { noiseThreshold=exp2(toDecimal(arguments()[0])); log("Noise threshold: ",log2(noiseThreshold),"dB2FS"); }
+        if(arguments().size>1) { fMin = toInteger(arguments()[1])*N/rate; log("Minimum frequency"_, fMin, "~"_, fMin*rate/N, "Hz"_); }
+        if(arguments().size>2) { fMax = toInteger(arguments()[2])*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
+        input.start();
+    }
 #else
     Thread thread{-20};
     Sequencer input{thread};
@@ -54,24 +61,17 @@ struct Tuner {
     }
 #endif
     uint write(int16* output, uint size) {
-        buffer<int16> frame {N*2};
-        float signal[N]; float e=0;
-        for(uint i: range(N)) {
-            frame[i*2+0] = output[i*2+0];
-            frame[i*2+1] = output[i*2+1];
-            signal[i] = (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-17f;
-            e += sq(signal[i]);
-        }
-        float k = pitchEstimator.estimate(signal);
+        float signal[N]; for(uint i: range(N)) signal[i] = (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-17f;
+        float k = pitchEstimator.estimate(signal, fMin, fMax);
+        float power = pitchEstimator.power;
         int key = 0;
         if(k > rate/keyToPitch(21+88+1) && k < rate/keyToPitch(21-1)) {
             key = round(pitchToKey(rate/k))-21;
-            float expectedK = rate/keyToPitch(key+21);
-            const float offset = 12*log2(expectedK/k);
-            const float error = 12*log2((max(expectedK,k)+1)/max(expectedK,k));
-            if(e > N/64) { // -6 dB2FS
+            float f0 = keyToPitch(key+21)*N/rate;
+            float k0 = N/f0;
+            if(power > noiseThreshold) {
 #if RECORD
-                if(abs(offset) < 1 && key==lastKey && previousEnergies[0]<previousEnergies[1] && previousEnergies[1]>e) {
+                if(key==lastKey && previousEnergies[0]<previousEnergies[1] && previousEnergies[1]>e) {
                     Folder samples("samples"_, home(), true);
                     int velocity = round(0x100*sqrt(previousEnergies[1]/N));
                     int maxVelocity = 0;
@@ -88,8 +88,11 @@ struct Tuner {
                     log(apply(keys,[](int v){ return "0123456789ABCDF"_[(uint)v/0x10]; }));
                 }
 #endif
-                int velocity = round(0x100*sqrt(e/N));
-                log(str(rate/k)+" Hz\t"_+strKey(max(0,key+21))+" \t"_+str(100*offset)+" \t+/-"_+str(100*error)+" cents\t"_+str(velocity)+" "_+str(e));
+                int velocity = round(0x100*sqrt(power));
+                log(strKey(max(0,key+21))+"\t"_+str(velocity));
+                log(str(rate/k)+" Hz\t"_+str(100*12*log2(k0/k))+" \t+/-"_+str(100*12*log2((k0+1)/k0))+" cents"_);
+                float f = pitchEstimator.fPeak;
+                if(abs(12*log2(f/f0)) < 0.5) log(str(rate*f/N)+" Hz\t"_+str(100*12*log2(f/f0))+" \t+/-"_+str(100*12*log2((f0+1)/f0))+" cents"_);
             }
         }
 #if RECORD

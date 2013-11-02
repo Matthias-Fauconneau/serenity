@@ -16,7 +16,7 @@ struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(const string& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0);
     // Resolves cat overloading
-    Text(const String& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((string)text,size,color,wrap){}
+    //Text(const String& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((string)text,size,color,wrap){}
 
     void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
