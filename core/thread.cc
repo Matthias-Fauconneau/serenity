@@ -57,7 +57,7 @@ void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 
 void Thread::run() {
     tid=gettid();
-    if(priority) check_(setpriority(0,0,priority));
+    if(priority) setpriority(0,0,priority); // No check_ as this is not critical
     while(!terminate) {
         uint size=this->size;
         if(size==1) break; // Terminates when no Poll objects are registered

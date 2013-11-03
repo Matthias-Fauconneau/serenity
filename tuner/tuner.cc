@@ -10,14 +10,14 @@
 #include "layout.h"
 #include "window.h"
 #define TEST 1
-//TODO: Profile and optimize to run without overflow on Atom
 
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Widget, Poll {
     static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
+    const uint overlap = 2; // 50% overlap to compensate time resolution lost by Hann window (which improves frequency resolution)
     PitchEstimator pitchEstimator {N};
-    Thread thread {-20}; // Audio thread to buffer periods (when kernel driver buffer was configured too low)
-    AudioInput input{{this,&Tuner::write16}, {this,&Tuner::write32}, -1, N, thread};
+    Thread thread; // Audio thread to buffer periods (when kernel driver buffer was configured too low)
+    AudioInput input{{this,&Tuner::write16}, {this,&Tuner::write32}, 0, N/overlap, thread};
     const uint rate = input.rate;
 
 #if TEST
@@ -50,18 +50,20 @@ struct Tuner : Widget, Poll {
 
     Tuner() {
         log(input.sampleBits, input.rate, input.periodSize);
+        thread.spawn();
+
         info << Text(str(input.sampleBits)) << Text(str(input.rate)) << Text(str(input.periodSize))
              << Text("correlation"_) << Text("reference"_) << Text("peak"_);
         if(arguments().size>0) { noiseThreshold=exp2(toDecimal(arguments()[0])); log("Noise threshold: ",log2(noiseThreshold),"dB2FS"); }
         if(arguments().size>1) { fMin = toInteger(arguments()[1])*N/rate; log("Minimum frequency"_, fMin, "~"_, fMin*rate/N, "Hz"_); }
         if(arguments().size>2) { fMax = toInteger(arguments()[2])*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
         window.backgroundColor=window.backgroundCenter=0;
-        window.localShortcut(Escape).connect([]{exit();});
+        window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
+
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
-        thread.spawn();
 #else
         input.start();
 #endif
@@ -69,8 +71,7 @@ struct Tuner : Widget, Poll {
 #if TEST
     uint t =0;
     void feed() {
-        log("feed");
-        const uint size = 4096;
+        const uint size = input.periodSize;
         if(t+size > stereo.size) { exit(); return; }
         const float2* period = stereo + t;
         int16 buffer[size*2];
@@ -80,10 +81,9 @@ struct Tuner : Widget, Poll {
         }
         t += size;
         write16(buffer, size);
-        //timer.setRelative(size*1000/rate);
         float time = ((float)size/rate) / (float)realTime; // Instant playback rate
         const float alpha = 1./16; frameTime = (1-alpha)*frameTime + alpha*(float)time; // IIR Smoother
-        //if(isPowerOfTwo(t) && t>1) log(dec( ((float)t/rate) / (float)totalTime));
+        //if((t/size)%(rate/size)==0) log(dec( ((float)t/rate) / (float)totalTime));
         realTime.reset();
         timer.setRelative(1);
     }
@@ -98,32 +98,30 @@ struct Tuner : Widget, Poll {
         return size;
     }
     uint write32(const int32* output, uint size) {
-        log("write ?",writeCount);
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
-        log("write ok",writeCount);
         assert(writeIndex+size<=signal.size);
         for(uint i: range(size)) signal[writeIndex+i] = notch0(notch1( (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-33f ));
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
-        log("readCount was", readCount);
         readCount.release(size); // Releases new samples
-        log("readCount <-", readCount);
         queue(); // Queues processing thread
         return size;
     }
     void event() {
-        const uint overlap = 1; // Limits to 0% overlap
         const uint size = N/overlap;
-        log("readCount ?", readCount);
+        int skippedFrames = 0;
+        while(readCount>size) { // Skips frames if necessary
+            readCount.acquire(size);
+            readIndex = (readIndex+size)%signal.size; // Updates ring buffer pointer
+            skippedFrames++;
+        }
+        if(skippedFrames) log("Skipped",skippedFrames,"frame"_+(skippedFrames?"s"_:""_));
         readCount.acquire(size);
-        log("readCount OK", readCount);
         buffer<float> frame {N}; // Need a linear buffer for autocorrelation (FIXME: mmap ring buffer)
         assert(readIndex+size<=N);
         for(uint i: range(signal.size-readIndex)) frame[i] = signal[readIndex+i]; // Copies head into ring buffer
         for(uint i: range(readIndex)) frame[signal.size-readIndex+i] = signal[i]; // Copies tail into ring buffer
         readIndex = (readIndex+size)%signal.size; // Updates ring buffer pointer
-        log("writeCount was", writeCount);
         writeCount.release(size); // Releases free samples
-        log("writeCount <-", writeCount);
 
         float k = pitchEstimator.estimate(frame, fMin, fMax);
         float power = pitchEstimator.power;
