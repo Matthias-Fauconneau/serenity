@@ -3,6 +3,7 @@
 #include "array.h"
 #include "file.h"
 #include "function.h"
+#include "string.h"
 #include <pthread.h>
 
 /// Logical cores count
@@ -41,7 +42,7 @@ struct Semaphore {
     Condition condition;
     int64 counter;
     /// Creates a semaphore with \a count initial ressources
-    Semaphore(int64 count=0) : counter(count) {}
+    explicit Semaphore(int64 count=0) : counter(count) {}
     /// Acquires \a count ressources
     inline void acquire(int64 count) {
         while(counter<count) pthread_cond_wait(&condition,&mutex);
@@ -62,6 +63,7 @@ struct Semaphore {
     /// Returns available ressources \a count
     operator int() const { return counter; }
 };
+inline String str(const Semaphore& o) { return str(o.counter); }
 
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {

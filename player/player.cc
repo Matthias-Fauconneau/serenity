@@ -16,7 +16,7 @@ struct Player {
     static constexpr uint channels = 2;
     AudioFile file;
     Resampler resampler;
-    AudioOutput output{{this,&Player::read}}; // Maximum rate and latency
+    AudioOutput output{{this,&Player::read}, 96000, 96000}; // FIXME: implement drop support to use maximum latency without pause delay
     uint read(int32* output, uint outputSize) {
         uint readSize = 0;
         for(;;) {

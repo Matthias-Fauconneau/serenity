@@ -107,7 +107,7 @@ struct Build {
                 if(::find(build,"debug"_)) args << String("-g"_) << String("-fno-omit-frame-pointer") << String("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << String("-march=native"_) << String("-O3"_) << String("-g"_);
                 else if(::find(build,"release"_)) args << String("-march=native"_) << String("-O3"_);
-                else if(::find(build,"32"_)) args << String("-m32"_) << String("-O3"_);
+                else if(::find(build,"32"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_) << String("-O3"_);
                 else error("Unknown build",build);
                 args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
                 log(target);
@@ -130,17 +130,17 @@ struct Build {
         int64 lastEdit = processModule( find(target+".cc"_) );
         if(compile) {
             if(files) {
-                Folder(tmp+"files"_, root(), true);
+                Folder(tmp+"files"_+(build=="32"_?"32"_:""_), root(), true);
                 for(String& file: files) {
                     String path = find(replace(file,"_"_,"/"_));
                     assert_(path, "No such file to embed", file);
                     Folder subfolder = Folder(section(path,'/',0,-2), folder);
                     string name = section(path,'/',-2,-1);
-                    String object = tmp+"files/"_+name+".o"_;
+                    String object = tmp+"files"_+(build=="32"_?"32"_:""_)+"/"_+name+".o"_;
                     int64 lastFileEdit = File(name, subfolder).modifiedTime();
                     if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
                         log(name);
-                        if(execute("/usr/bin/ld"_,split("-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
+                        if(execute("/usr/bin/ld"_,split((build=="32"_?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<name, true, subfolder)) fail();
                     }
                     lastEdit = max(lastEdit, lastFileEdit);
                     file = move(object);

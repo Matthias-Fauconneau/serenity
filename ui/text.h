@@ -12,7 +12,7 @@ inline String format(TextFormat f) { String s; s << (char)f; return s; }
 inline TextFormat format(uint f) { assert(f<32); return TextFormat(f); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
-struct Text : virtual Widget {
+struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(const string& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0);
     // Resolves cat overloading

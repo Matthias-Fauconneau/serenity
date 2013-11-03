@@ -96,7 +96,7 @@ inline String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"
 // Biquad notch filter
 struct Notch {
     float a1,a2,b0,b1,b2;
-    Notch(float f, float bw) {
+    Notch(real f, real bw) {
         real w0 = 2*PI*f;
         real alpha = sin(w0)*sinh(ln(2)/2*bw*w0/sin(w0));
         real a0 = 1 + alpha;

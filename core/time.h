@@ -66,7 +66,7 @@ Date parseDate(TextData& s);
 inline Date parseDate(const string& s) { TextData t(s); return parseDate(t); }
 
 struct Timer : Poll {
-    Timer();
+    Timer(Thread& thread=mainThread);
     ~Timer();
     void setAbsolute(long sec, long nsec=0);
     void setRelative(long msec);

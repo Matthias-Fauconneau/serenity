@@ -8,7 +8,8 @@
 #include "png.h"
 #include "linux.h"
 #include "x.h"
-#include "gl.h"
+#if GL
+//include "gl.h"
 #undef packed
 #define Time XTime
 #define Cursor XCursor
@@ -24,13 +25,16 @@
 #undef Screen
 #undef XEvent
 #undef None
+#endif
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 int2 displaySize;
+#if GL
 Display* glDisplay;
 GLXContext glContext;
+#endif
 
 Image renderToImage(Widget& widget, int2 size, int imageResolution) {
     Image framebuffer = move(::framebuffer);
@@ -128,6 +132,7 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     setIcon(icon);
     setType(type);
     if(renderer == OpenGL) {
+#if GL
         if(glDisplay || glContext) { assert(glDisplay && glContext); return; }
         glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert(glDisplay);
         const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1, 0};
@@ -139,6 +144,9 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
         glXMakeCurrent(glDisplay, id, glContext);
         glEnable(GL_FRAMEBUFFER_SRGB);
         ((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
+#else
+        error("Unsupported: OpenGL was not configured at compile-time");
+#endif
     }
 }
 
@@ -236,6 +244,7 @@ void Window::event() {
             state=Server;
             //framebuffer=Image(); // Leave for capture
         } else {
+#if GL
             ::softwareRendering=false;
             glXMakeCurrent(glDisplay, id, glContext);
             viewportSize = size;
@@ -245,6 +254,9 @@ void Window::event() {
             assert(!clipStack);
             viewportSize = 0;
             glFlush();
+#else
+            error("Unsupported: OpenGL was not configured at compile-time");
+#endif
         }
         frameReady();
     }

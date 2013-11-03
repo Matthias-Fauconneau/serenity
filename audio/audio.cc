@@ -153,7 +153,7 @@ AudioInput::AudioInput(int sampleBits, int rate, int periodSize, Thread& thread)
 void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
 void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioInput::event() {
-    if(status->state == XRun) { log("Overrun"_); io<START>(); }
+    if(status->state == XRun) { log("Overrun"_); io<PREPARE>(); io<START>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
