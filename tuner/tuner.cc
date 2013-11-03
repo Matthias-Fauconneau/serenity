@@ -17,8 +17,7 @@
 struct Tuner : Widget, Poll {
     // Static parameters
     static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
-    const uint maximumOverlap = 4; // Overlaps to compensate time resolution lost by Hann window (which improves frequency resolution)
-    const uint periodSize = N/maximumOverlap;
+    const uint periodSize = 4096; // Overlaps to increase time resolution (compensates loss from Hann window (which improves frequency resolution))
 
     // Input
     Thread thread; // Audio thread to buffer periods (when kernel driver buffer was configured too low)
@@ -40,18 +39,19 @@ struct Tuner : Widget, Poll {
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
     // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
+    buffer<int32> raw {2*2*N}; // Ring buffer storing unfiltered stereo samples to be recorded
     buffer<float> signal {2*N}; // Ring buffer
     uint writeIndex = 0, readIndex = 0;
     Semaphore readCount {0}; // Audio thread releases input samples, processing thread acquires
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
-    uint periods=0, frames=0; Time lastReport; // For average overlap statistics report
+    uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     Notch notch1 {1*50./rate, 1./2}; // Notch filter to remove 50Hz noise
     Notch notch3 {3*50./rate, 1./3}; // Cascaded to remove the first odd harmonic (3rd partial)
 
     PitchEstimator pitchEstimator {N};
 
-    float previousPowers[2] = {0,0}; // Power history to trigger estimation only on decay
+    float previousPowers[3] = {0,0,0}; // Power history to trigger estimation only on decay
     int currentKey = 0;
     struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
     array<Estimation> estimations;
@@ -103,7 +103,9 @@ struct Tuner : Widget, Poll {
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
         assert(writeIndex+size<=signal.size);
         for(uint i: range(size)) {
-            real x = (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-33f;
+            raw[2*(writeIndex+i)+0] = output[i*2+0];
+            raw[2*(writeIndex+i)+1] = output[i*2+1];
+            real x = (output[i*2+0]+output[i*2+1]) * 0x1p-33f;
             //FIXME the notches also affects nearby keys
             if(currentKey != int(round(pitchToKey(notch1.frequency*rate)))) x = notch1(x);
             if(currentKey != int(round(pitchToKey(notch3.frequency*rate)))) x = notch3(x);
@@ -116,22 +118,21 @@ struct Tuner : Widget, Poll {
     }
     void event() {
         if(readCount>2*periodSize) { // Skips frames (reduces overlap) when lagging too far behind input
-            readCount.acquire(periodSize); periods++;
+            readCount.acquire(periodSize); periods++; skipped++;
             readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
             writeCount.release(periodSize); // Releases free samples
-            if((float)lastReport > 10) { // Limits reports to every 10 seconds
-                log(1 - (float) frames / periods * periodSize / N);
-                lastReport.reset();
+            if((float)lastReport > 1) { // Limits report rate
+                log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
+                lastReport.reset(); skipped=0;
             }
+            shiftPeriods(previousPowers[0]); // Shifts in a dummy period for decay detection purposes
         }
         readCount.acquire(periodSize); periods++;
-        frames ++;
+        frames++;
         buffer<float> frame {N}; // Need a linear buffer for autocorrelation (FIXME: mmap ring buffer)
         assert(readIndex+periodSize<=N);
-        for(uint i: range(min<int>(N,signal.size-readIndex))) frame[i] = signal[readIndex+i]; // Copies head into ring buffer
-        for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies tail into ring buffer
-        readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
-        writeCount.release(periodSize); // Releases free samples
+        for(uint i: range(min<int>(N,signal.size-readIndex))) frame[i] = signal[readIndex+i]; // Copies ring buffer head into linear frame buffer
+        for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies ring buffer tail into linear frame buffer
 
         float k = pitchEstimator.estimate(frame, fMin, fMax);
         float power = pitchEstimator.power;
@@ -146,10 +147,7 @@ struct Tuner : Widget, Poll {
         const float fOffset =  12*log2(f/expectedF);
         const float fError =  12*log2((expectedF+1)/expectedF);
 
-        if(power > noiseThreshold && previousPowers[1] > power && previousPowers[0] > previousPowers[1]/2) {
-            /*log(strKey(max(0,key))+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power)));
-            log("k\t"_+dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_);
-            log("f\t"_+dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_);*/
+        if(power > noiseThreshold && previousPowers[1] > previousPowers[0]/2 && previousPowers[0] > power) {
             const uint textSize = 64;
             info[0] = Text(dec(round(100*kOffset)), textSize, white);
             info[3] = Text(dec(round(100*kError)), textSize, white);
@@ -157,27 +155,44 @@ struct Tuner : Widget, Poll {
             info[4] = Text(dec(round(fError<kError ? f*rate/N : rate/k)), textSize, white);
             info[2] = Text(dec(round(100*fOffset)), textSize, white);
             info[5] = Text(dec(round(100*fError)), textSize, white);
-            //if(currentKey != key) estimations.clear();
             currentKey = key;
+            if(previousPowers[2] < previousPowers[1] && key>=21 && key<21+88) { // t-2 is the attack
+                Folder folder("samples"_, home(), true);
+                uint velocity = round(0x100*sqrt(power)); // Decay power is most stable (FIXME: automatic velocity normalization)
+                uint velocities[88] = {};
+                for(string name: folder.list(Files)) {
+                    TextData s (name); uint fKey = s.integer(); if(fKey>=88 || !s.match('-')) continue; uint fVelocity = s.hexadecimal();
+                    if(fVelocity > velocities[fKey]) velocities[fKey] = fVelocity;
+                }
+                if(velocity >= velocities[key-21]) { // Records new sample only if higher velocity than existing sample for this key
+                    velocities[key-21] = velocity;
+                    File record(dec(key-21,2)+"-"_+hex(velocity,2), folder, Flags(WriteOnly|Create|Truncate));
+                    record.write(cast<byte>(raw.slice(readIndex*2,raw.size))); // Copies ring buffer head into file
+                    record.write(cast<byte>(raw.slice(0,readIndex*2))); // Copies ring buffer tail into file
+                }
+                log(apply(ref<uint>(velocities),[](uint v){ return "0123456789ABCDF"_[min(0xFFu,v/0x10)]; }));
+                log(strKey(max(0,key))+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power))+"\t"_+dec(velocity));
+                log("k\t"_+dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_);
+                log("f\t"_+dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_);
+            }
         }
+        readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
+        writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
+        shiftPeriods(power);
 
-        //if(estimations.size > 2) estimations.take(0); // Prevents clutter from outdated estimations when tuning a single key
-        /*if(key == currentKey) { // Only shows estimation for the current key
-            if(kError<fError*2) estimations << Estimation{rate/(k+1), rate/k, rate/(k-1), power, vec3(0,kError<fError,1)};
-            if(fError<kError*2) estimations << Estimation{(f-1)*rate/N, f*rate/N, (f+1)*rate/N, power, vec3(1,fError<kError,0)};
-            window.render();
-        }*/
         // Always add estimations so that they always fade out at the same speed
-        while(estimations.size > 16) estimations.take(0);
-        /*if(kError<fError*2)*/ estimations << Estimation{rate/(k+1), rate/k, rate/(k-1), power, vec3(0,kError<fError,1)};
-        /*if(fError<kError*2)*/ estimations << Estimation{(f-1)*rate/N, f*rate/N, (f+1)*rate/N, power, vec3(1,fError<kError,0)};
+        while(estimations.size > 16) estimations.take(0); //FIXME: ring buffer
+        estimations << Estimation{rate/(k+1), rate/k, rate/(k-1), power, vec3(0,kError<fError,1)};
+        estimations << Estimation{(f-1)*rate/N, f*rate/N, (f+1)*rate/N, power, vec3(1,fError<kError,0)};
         window.render();
-
-        previousPowers[0] = previousPowers[1];
-        previousPowers[1] = power;
+    }
+    void shiftPeriods(float power) {
+        previousPowers[2] = previousPowers[1];
+        previousPowers[1] = previousPowers[0];
+        previousPowers[0] = power;
     }
     void render(int2 position, int2 size) {
-        auto x = [&](float f)->float{ // Maps frequency (Hz) to position on X axis (log scale)
+        auto x = [&](float f)->float { // Maps frequency (Hz) to position on X axis (log scale)
             float min = log2(keyToPitch(currentKey-1)), max = log2(keyToPitch(currentKey+1));
             return (log2(f)-min)/(max-min) * size.x;
         };
@@ -189,7 +204,7 @@ struct Tuner : Widget, Poll {
             float xMin = x(e.fMin), x0=x(e.f0), xMax = x(e.fMax);
             float a0 = 1;
             a0 *= e.confidence / maxConfidence; // Power
-            a0 *= (float) (i+1) / estimations.size; // Time (also makes k always slightly more transparent)
+            a0 *= (float) (i/2+1) / (estimations.size/2); // Time
             for(uint x: range(max<int>(0,xMin+1), min<int>(size.x,x0+1))) {
                 float a = a0 * (1-(x0-x)/(x0-xMin));
                 assert(a>=0 && a<=1, a, xMin, x, x0);
