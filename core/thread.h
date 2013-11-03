@@ -45,14 +45,18 @@ struct Semaphore {
     explicit Semaphore(int64 count=0) : counter(count) {}
     /// Acquires \a count ressources
     inline void acquire(int64 count) {
+        mutex.lock();
         while(counter<count) pthread_cond_wait(&condition,&mutex);
         __sync_sub_and_fetch(&counter,count); assert(counter>=0);
         mutex.unlock();
     }
     /// Atomically tries to acquires \a count ressources only if available
     inline bool tryAcquire(int64 count) {
-        if(counter<count) return false;
+        mutex.lock();
+        if(counter<count) { mutex.unlock(); return false; }
+        assert(count>0);
         __sync_sub_and_fetch(&counter,count);
+        mutex.unlock();
         return true;
     }
     /// Releases \a count ressources

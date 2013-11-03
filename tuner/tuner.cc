@@ -9,37 +9,49 @@
 #include "text.h"
 #include "layout.h"
 #include "window.h"
+#if __x86_64
 #define TEST 1
+#endif
 
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Widget, Poll {
+    // Static parameters
     static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
-    const uint overlap = 2; // 50% overlap to compensate time resolution lost by Hann window (which improves frequency resolution)
-    PitchEstimator pitchEstimator {N};
+    const uint maximumOverlap = 4; // Overlaps to compensate time resolution lost by Hann window (which improves frequency resolution)
+    const uint periodSize = N/maximumOverlap;
+
+    // Input
     Thread thread; // Audio thread to buffer periods (when kernel driver buffer was configured too low)
-    AudioInput input{{this,&Tuner::write16}, {this,&Tuner::write32}, 0, N/overlap, thread};
+    AudioInput input{{this,&Tuner::write}, 96000, periodSize, thread};
     const uint rate = input.rate;
 
 #if TEST
-    buffer<float2> stereo = decodeAudio(Map("Samples/3.flac"_));
+    buffer<float2> stereo = decodeAudio(Map("Samples/3.flac"_)); //FIXME: record 96000KHz sample
     Timer timer {thread};
     Time realTime;
     Time totalTime;
     float frameTime = 0;
 #endif
 
+    // Input-dependent parameters
     float noiseThreshold = exp2(-8); // Power relative to full scale
     uint fMin = N*440*exp2(-4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half semitone under A-1
     uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half semitone over C7
 
-    float previousPowers[2] = {0,0}; // Power history to trigger estimation only on decay
-    buffer<float> signal {N}; // Ring buffer (may be larger to allow some lag instead of overflow)
+    // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
+    // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
+    buffer<float> signal {2*N}; // Ring buffer
     uint writeIndex = 0, readIndex = 0;
     Semaphore readCount {0}; // Audio thread releases input samples, processing thread acquires
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
-    Notch notch0 {50./rate, 1}; // Notch filter to remove 50Hz noise
-    Notch notch1 {150./rate, 1}; // Cascaded to remove the first odd harmonic (3rd partial)
+    uint periods=0, frames=0; Time lastReport; // For average overlap statistics report
 
+    Notch notch1 {1*50./rate, 1./2}; // Notch filter to remove 50Hz noise
+    Notch notch3 {3*50./rate, 1./3}; // Cascaded to remove the first odd harmonic (3rd partial)
+
+    PitchEstimator pitchEstimator {N};
+
+    float previousPowers[2] = {0,0}; // Power history to trigger estimation only on decay
     int currentKey = 0;
     struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
     array<Estimation> estimations;
@@ -50,16 +62,14 @@ struct Tuner : Widget, Poll {
 
     Tuner() {
         log(input.sampleBits, input.rate, input.periodSize);
-        thread.spawn();
 
-        info << Text(str(input.sampleBits)) << Text(str(input.rate)) << Text(str(input.periodSize))
-             << Text("correlation"_) << Text("reference"_) << Text("peak"_);
         if(arguments().size>0) { noiseThreshold=exp2(toDecimal(arguments()[0])); log("Noise threshold: ",log2(noiseThreshold),"dB2FS"); }
         if(arguments().size>1) { fMin = toInteger(arguments()[1])*N/rate; log("Minimum frequency"_, fMin, "~"_, fMin*rate/N, "Hz"_); }
         if(arguments().size>2) { fMax = toInteger(arguments()[2])*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
-
+        info << Text(str(input.sampleBits)) << Text(str(input.rate)) << Text(str(input.periodSize))
+             << Text("correlation"_) << Text("reference"_) << Text("peak"_);
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
@@ -67,6 +77,7 @@ struct Tuner : Widget, Poll {
 #else
         input.start();
 #endif
+        thread.spawn();
     }
 #if TEST
     uint t =0;
@@ -74,54 +85,53 @@ struct Tuner : Widget, Poll {
         const uint size = input.periodSize;
         if(t+size > stereo.size) { exit(); return; }
         const float2* period = stereo + t;
-        int16 buffer[size*2];
+        int32 buffer[size*2];
         for(uint i: range(size)) {
-            buffer[i*2+0] = period[i][0] * 0x1p-8f; // 24->16
-            buffer[i*2+1] = period[i][1] * 0x1p-8f; // 24->16
+            buffer[i*2+0] = period[i][0] * 0x1p8f; // 24->32
+            buffer[i*2+1] = period[i][1] * 0x1p8f; // 24->32
         }
         t += size;
-        write16(buffer, size);
+        write(buffer, size);
         float time = ((float)size/rate) / (float)realTime; // Instant playback rate
         const float alpha = 1./16; frameTime = (1-alpha)*frameTime + alpha*(float)time; // IIR Smoother
         //if((t/size)%(rate/size)==0) log(dec( ((float)t/rate) / (float)totalTime));
         realTime.reset();
-        timer.setRelative(1);
+        timer.setRelative(size*1000/rate/8); // 8xRT
     }
 #endif
-    uint write16(const int16* output, uint size) {
+    uint write(const int32* output, uint size) {
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
         assert(writeIndex+size<=signal.size);
-        for(uint i: range(size)) signal[writeIndex+i] = notch0(notch1( (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-17f ));
-        writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
-        readCount.release(size); // Releases new samples
-        queue(); // Queues processing thread
-        return size;
-    }
-    uint write32(const int32* output, uint size) {
-        writeCount.acquire(size); // Will overflow if processing thread doesn't follow
-        assert(writeIndex+size<=signal.size);
-        for(uint i: range(size)) signal[writeIndex+i] = notch0(notch1( (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-33f ));
+        for(uint i: range(size)) {
+            real x = (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-33f;
+            //FIXME the notches also affects nearby keys
+            if(currentKey != int(round(pitchToKey(notch1.frequency*rate)))) x = notch1(x);
+            if(currentKey != int(round(pitchToKey(notch3.frequency*rate)))) x = notch3(x);
+            signal[writeIndex+i] = x;
+        }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
         readCount.release(size); // Releases new samples
         queue(); // Queues processing thread
         return size;
     }
     void event() {
-        const uint size = N/overlap;
-        int skippedFrames = 0;
-        while(readCount>size) { // Skips frames if necessary
-            readCount.acquire(size);
-            readIndex = (readIndex+size)%signal.size; // Updates ring buffer pointer
-            skippedFrames++;
+        if(readCount>2*periodSize) { // Skips frames (reduces overlap) when lagging too far behind input
+            readCount.acquire(periodSize); periods++;
+            readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
+            writeCount.release(periodSize); // Releases free samples
+            if((float)lastReport > 10) { // Limits reports to every 10 seconds
+                log(1 - (float) frames / periods * periodSize / N);
+                lastReport.reset();
+            }
         }
-        if(skippedFrames) log("Skipped",skippedFrames,"frame"_+(skippedFrames?"s"_:""_));
-        readCount.acquire(size);
+        readCount.acquire(periodSize); periods++;
+        frames ++;
         buffer<float> frame {N}; // Need a linear buffer for autocorrelation (FIXME: mmap ring buffer)
-        assert(readIndex+size<=N);
-        for(uint i: range(signal.size-readIndex)) frame[i] = signal[readIndex+i]; // Copies head into ring buffer
-        for(uint i: range(readIndex)) frame[signal.size-readIndex+i] = signal[i]; // Copies tail into ring buffer
-        readIndex = (readIndex+size)%signal.size; // Updates ring buffer pointer
-        writeCount.release(size); // Releases free samples
+        assert(readIndex+periodSize<=N);
+        for(uint i: range(min<int>(N,signal.size-readIndex))) frame[i] = signal[readIndex+i]; // Copies head into ring buffer
+        for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies tail into ring buffer
+        readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
+        writeCount.release(periodSize); // Releases free samples
 
         float k = pitchEstimator.estimate(frame, fMin, fMax);
         float power = pitchEstimator.power;

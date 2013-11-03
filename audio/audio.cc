@@ -165,7 +165,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
 void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
 void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioInput::event() {
-    if(status->state == XRun) { log("Overrun"_); io<PREPARE>(); io<START>(); }
+    if(status->state == XRun) { overruns++; log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns); io<PREPARE>(); io<START>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
@@ -175,5 +175,6 @@ void AudioInput::event() {
         assert(readSize<=periodSize);
         control->swPointer += readSize;
         if(readSize<periodSize) { stop(); return; }
+        periods++;
     }
 }
