@@ -6,15 +6,12 @@
 #include "sequencer.h"
 #include "audio.h"
 
-inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
-inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
-String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"_,"D#"_,"E"_,"F"_,"F#"_,"G"_,"G#"_}[(key+3)%12]+str(key/12-2); }
-
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner {
     static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
     PitchEstimator pitchEstimator {N};
-    AudioInput input{{this,&Tuner::write16}, {this,&Tuner::write32}, 48000, 16384}; // Maximum rate and latency
+    AudioInput input{{this,&Tuner::write16}, {this,&Tuner::write32}, 48000, N};
+
     const uint rate = input.rate;
     float noiseThreshold = exp2(-8); // Power relative to full scale
     uint fMin = N*440*exp2(-4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half semitone under A-1
@@ -22,8 +19,10 @@ struct Tuner {
     float previousPowers[2] = {0,0};
     buffer<float> signal {N}; // Ring buffer
     uint index = 0, unprocessedSize=0;
+    Notch notch0 {50./48000, 1}; // Notch filter to remove 50Hz noise
+    Notch notch1 {150./48000, 1}; // Cascaded to remove the first odd harmonic (3rd partial)
     Tuner() {
-        log(rate,"Hz");
+        log(input.sampleBits, input.rate, input.periodSize);
         if(arguments().size>0) { noiseThreshold=exp2(toDecimal(arguments()[0])); log("Noise threshold: ",log2(noiseThreshold),"dB2FS"); }
         if(arguments().size>1) { fMin = toInteger(arguments()[1])*N/rate; log("Minimum frequency"_, fMin, "~"_, fMin*rate/N, "Hz"_); }
         if(arguments().size>2) { fMax = toInteger(arguments()[2])*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
@@ -31,12 +30,12 @@ struct Tuner {
     }
     uint write16(const int16* output, uint size) {
         assert(index+size<=N);
-        for(uint i: range(size)) signal[index+i] = (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-17f;  // Replaces oldest period with newest period
+        for(uint i: range(size)) signal[index+i] = notch0(notch1( (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-17f ));
         return write(size);
     }
     uint write32(const int32* output, uint size) {
         assert(index+size<=N);
-        for(uint i: range(size)) signal[index+i] = (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-33f;  // Replaces oldest period with newest period
+        for(uint i: range(size)) signal[index+i] = notch0(notch1( (int(output[i*2+0])+int(output[i*2+1])) * 0x1p-33f ));
         return write(size);
     }
     uint write(uint size) {
@@ -44,11 +43,10 @@ struct Tuner {
         unprocessedSize += size;
         //if(unprocessedSize<N/2) return size; // Limits to 50% overlap
         unprocessedSize = 0;
-        buffer<float>& target = pitchEstimator.windowed;
-        buffer<float>& window = pitchEstimator.hann;
-        for(uint i: range(N-index)) target[i] = window[i]*signal[index+i]; // Direct from ring buffer into window buffer
-        for(uint i: range(index)) target[N-index+i] = window[N-index+i]*signal[i]; // idem for tail
-        float k = pitchEstimator.estimate({}, fMin, fMax);
+        buffer<float> buffer {N}; // Need a linear buffer for autocorrelation (FIXME: mmap ring buffer)
+        for(uint i: range(N-index)) buffer[i] = signal[index+i]; // Copies head into ring buffer
+        for(uint i: range(index)) buffer[N-index+i] = signal[i]; // Copies tail into ring buffer
+        float k = pitchEstimator.estimate(buffer, fMin, fMax);
         float power = pitchEstimator.power;
         int key = round(pitchToKey(rate/k));
 
@@ -62,7 +60,7 @@ struct Tuner {
         const float fError =  12*log2((expectedF+1)/expectedF);
 
         if(power > noiseThreshold && previousPowers[1] > power && previousPowers[0] > previousPowers[1]/2) {
-            log(strKey(max(0,key+21))+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power)));
+            log(strKey(max(0,key))+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power)));
             log("k\t"_+dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_);
             log("f\t"_+dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_);
         }

@@ -15,10 +15,8 @@ struct FFT {
     FFTW fftw = fftwf_plan_r2r_1d(N, windowed.begin(), halfcomplex.begin(), FFTW_R2HC, FFTW_ESTIMATE);
     FFT(uint N) : N(N) { assert(isPowerOfTwo(N)); for(uint i: range(N)) hann[i] = (1-cos(2*PI*i/(N-1)))/2; }
     ref<float> transform(const ref<float>& signal={}) {
-        if(signal) {
-            assert(N == signal.size);
-            for(uint i: range(N)) windowed[i] = hann[i]*signal[i]; // Multiplies window
-        } // else directly copied and windowed by user into windowed buffer
+        assert(N == signal.size);
+        for(uint i: range(N)) windowed[i] = hann[i]*signal[i]; // Multiplies window
         fftwf_execute(fftw); // Transforms (FIXME: use execute_r2r and free windowed/transform buffers between runs)
         return halfcomplex;
     }
@@ -31,7 +29,7 @@ struct PitchEstimator : FFT {
     float power;
     uint period;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
-    float estimate(const ref<float>& signal={}, uint fMin=1, uint fMax=0) {
+    float estimate(const ref<float>& signal, uint fMin=1, uint fMax=0) {
         if(!fMax) fMax = N/2;
         ref<float> halfcomplex = transform(signal);
         for(uint i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
@@ -87,5 +85,28 @@ struct PitchEstimator : FFT {
             }
         }
         return bestK;
+    }
+};
+
+inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
+inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
+inline String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"_,"D#"_,"E"_,"F"_,"F#"_,"G"_,"G#"_}[(key+3)%12]+str(key/12-2); }
+
+// H(s) = (s^2 + 1) / (s^2 + s/Q + 1)
+// Biquad notch filter
+struct Notch {
+    float a1,a2,b0,b1,b2;
+    Notch(float f, float bw) {
+        real w0 = 2*PI*f;
+        real alpha = sin(w0)*sinh(ln(2)/2*bw*w0/sin(w0));
+        real a0 = 1 + alpha;
+        a1 = -2*cos(w0)/a0, a2 = (1 - alpha)/a0;
+        b0 = 1/a0, b1 = -2*cos(w0)/a0, b2 = 1/a0;
+    }
+    float x1=0, x2=0, y1=0, y2=0;
+    float operator ()(float x) {
+        float y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+        x2=x1, x1=x, y2=y1, y1=y;
+        return y;
     }
 };

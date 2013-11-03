@@ -126,7 +126,7 @@ AudioInput::AudioInput(int sampleBits, int rate, int periodSize, Thread& thread)
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize).max = periodSize;
     iowr<HW_REFINE>(hparams);
-    if(sampleBits<0) {
+    /*if(sampleBits<0) {
         if(hparams.mask(Format).get(S32_LE)) {
             hparams.mask(Format).clear(S16_LE);
             hparams.interval(SampleBits) = 32;
@@ -135,8 +135,9 @@ AudioInput::AudioInput(int sampleBits, int rate, int periodSize, Thread& thread)
             hparams.interval(SampleBits) = 16;
             hparams.interval(FrameBits) = 16*channels;
         }
+        hparams.rmask=~0;
         iowr<HW_REFINE>(hparams);
-    }
+    }*/
     hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
     hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
     iowr<HW_PARAMS>(hparams);
