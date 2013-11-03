@@ -47,8 +47,9 @@ void fill(Rect rect, vec4 color) {
     if(color8.a == 0xFF) {
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = byte4(color8);
     } else {
+        int a=color8.a; assert(a);
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
-            byte4& d = framebuffer(x,y); int a=color8.a;
+            byte4& d = framebuffer(x,y);
             d = byte4((int4(d)*(0xFF-a) + color8*a)/0xFF);
         }
     }

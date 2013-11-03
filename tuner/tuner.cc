@@ -13,6 +13,28 @@
 #define TEST 1
 #endif
 
+struct OffsetPlot : Widget {
+    float offsets[88] = {};
+    float powers[88] = {};
+    int2 sizeHint() { return int2(88*12, 128); }
+    void render(int2 position, int2 size) {
+        float maximumPower = max(ref<float>(powers));
+        float minimumOffset = min(ref<float>(offsets));
+        float maximumOffset = max(ref<float>(offsets));
+        if(!maximumPower) return;
+        for(int key: range(88)) {
+            if(!offsets[key]) continue;
+            int x0 = position.x + key * size.x / 88;
+            int x1 = position.x + (key+1) * size.x / 88;
+            int y0 = position.y + size.y * maximumOffset / (maximumOffset-minimumOffset);
+            int y1 = position.y + size.y * (maximumOffset-offsets[key]) / (maximumOffset-minimumOffset);
+            vec4 color = vec4(0,0,/*powers[key] / maximumPower*/1,1);
+            if(y0>y1) swap(y0,y1), swap(color.x, color.z);
+            fill(x0,y0,x1,y1,color);
+        }
+    }
+};
+
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Widget, Poll {
     // Static parameters
@@ -46,8 +68,8 @@ struct Tuner : Widget, Poll {
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
-    Notch notch1 {1*50./rate, 1./2}; // Notch filter to remove 50Hz noise
-    Notch notch3 {3*50./rate, 1./3}; // Cascaded to remove the first odd harmonic (3rd partial)
+    Notch notch1 {1*50./rate, 1./4}; // Notch filter to remove 50Hz noise
+    Notch notch3 {3*50./rate, 1./6}; // Cascaded to remove the first odd harmonic (3rd partial)
 
     PitchEstimator pitchEstimator {N};
 
@@ -57,11 +79,13 @@ struct Tuner : Widget, Poll {
     array<Estimation> estimations;
 
     UniformGrid<Text> info {3,2};
-    VBox layout {{this, &info}};
+    OffsetPlot offsets;
+    VBox layout {{this, &info, &offsets}};
     Window window{&layout, int2(1024,600), "Tuner"};
 
     Tuner() {
-        log(input.sampleBits, input.rate, input.periodSize);
+        log(input.sampleBits, input.rate, input.periodSize,
+            strKey(round(pitchToKey(notch1.frequency*rate))), strKey(round(pitchToKey(notch3.frequency*rate))));
 
         if(arguments().size>0) { noiseThreshold=exp2(toDecimal(arguments()[0])); log("Noise threshold: ",log2(noiseThreshold),"dB2FS"); }
         if(arguments().size>1) { fMin = toInteger(arguments()[1])*N/rate; log("Minimum frequency"_, fMin, "~"_, fMin*rate/N, "Hz"_); }
@@ -148,6 +172,8 @@ struct Tuner : Widget, Poll {
         const float fError =  12*log2((expectedF+1)/expectedF);
 
         if(power > noiseThreshold && previousPowers[1] > previousPowers[0]/2 && previousPowers[0] > power) {
+            currentKey = key;
+
             const uint textSize = 64;
             info[0] = Text(dec(round(100*kOffset)), textSize, white);
             info[3] = Text(dec(round(100*kError)), textSize, white);
@@ -155,7 +181,16 @@ struct Tuner : Widget, Poll {
             info[4] = Text(dec(round(fError<kError ? f*rate/N : rate/k)), textSize, white);
             info[2] = Text(dec(round(100*fOffset)), textSize, white);
             info[5] = Text(dec(round(100*fError)), textSize, white);
-            currentKey = key;
+
+            if(key>=21 && key<21+88) {
+                float offset = kError<fError ? kOffset : fOffset;
+                float& keyOffset = offsets.offsets[key-21];
+                float& keyPower = offsets.powers[key-21];
+                {const float alpha = 1/(1+keyPower/power); keyOffset = (1-alpha)*keyOffset + alpha*offset;} // IIR Smoother (power weight)
+                {const float alpha = 1./16; keyPower = (1-alpha)*keyPower + alpha*power;} // IIR Smoother (constant weight)
+            }
+
+#if !TEST
             if(previousPowers[2] < previousPowers[1] && key>=21 && key<21+88) { // t-2 is the attack
                 Folder folder("samples"_, home(), true);
                 uint velocity = round(0x100*sqrt(power)); // Decay power is most stable (FIXME: automatic velocity normalization)
@@ -175,6 +210,7 @@ struct Tuner : Widget, Poll {
                 log("k\t"_+dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_);
                 log("f\t"_+dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_);
             }
+#endif
         }
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
