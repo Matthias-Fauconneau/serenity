@@ -16,10 +16,9 @@ struct Player {
     static constexpr uint channels = 2;
     AudioFile file;
     Resampler resampler;
-    AudioOutput output{{this,&Player::read}, 96000, 0};
+    AudioOutput output{{this,&Player::read}, 96000, 65536};
     int32* lastPeriod = 0, lastPeriodSize = 0;
     uint read(int32* output, uint outputSize) {
-        lastPeriod = output; lastPeriodSize = outputSize;
         uint readSize = 0;
         for(;;) {
             if(!file) return readSize;
@@ -44,7 +43,14 @@ struct Player {
             output += read*channels; readSize += read;
             if(readSize != outputSize) next();
             else {
+                output -= outputSize*2;
+                if(!lastPeriod) for(uint i: range(outputSize)) { // Fades in
+                    float level = exp(8. * ((float) i / outputSize - 1) ); // Linear perceived sound level
+                    output[i*2] *= level;
+                    output[i*2+1] *= level;
+                }
                 update(file.position/file.rate,file.duration/file.rate);
+                lastPeriod = output; lastPeriodSize = outputSize;
                 return readSize;
             }
         }
@@ -150,7 +156,7 @@ struct Player {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
-        else { window.setTitle("Player"_); stop(); return; }
+        else { setPlaying(false); file.close(); return; }
         updatePlaylist();
     }
     void setRandom(bool random) {
@@ -185,25 +191,20 @@ struct Player {
     void setPlaying(bool play) {
         if(play) { output.start(); window.setIcon(playIcon()); }
         else {
-            // Fade out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
+            // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
             for(uint i: range(lastPeriodSize)) {
-                lastPeriod[i*2] = (lastPeriodSize - i) * lastPeriod[i*2] / lastPeriodSize;
-                lastPeriod[i*2+1] = (lastPeriodSize - i) * lastPeriod[i*2+1] / lastPeriodSize;
+                float level = exp2(-8. * i / lastPeriodSize); // Linear perceived sound level
+                lastPeriod[i*2] *= level;
+                lastPeriod[i*2+1] *= level;
             }
+            lastPeriod=0, lastPeriodSize=0;
             output.stop();
             window.setIcon(pauseIcon());
+            file.seek(max(0, (int)file.position-lastPeriodSize));
         }
         playButton.enabled=play;
         window.render();
         writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate)));
-    }
-    void stop() {
-        setPlaying(false);
-        file.close();
-        elapsed.setText(String("00:00"_));
-        slider.value = -1;
-        remaining.setText(String("00:00"_));
-        titles.index=-1;
     }
     void seek(int position) { if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); } }
     void update(uint position, uint duration) {
