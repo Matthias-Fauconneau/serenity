@@ -23,11 +23,11 @@ struct Resampler {
 
     explicit operator bool() const { return kernel; }
 
-    static constexpr uint channelCount=2;
-    uint sourceRate=0,targetRate=0;
+    static constexpr uint channels=2;
+    uint sourceRate=1,targetRate=1;
 
     buffer<float> kernel; uint N=0;
-    buffer<float> signal[channelCount]; uint bufferSize=0;
+    buffer<float> signal[channels]; uint bufferSize=0;
 
     uint writeIndex=0;
     uint integerAdvance=0, fractionalAdvance=0;

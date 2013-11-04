@@ -123,13 +123,13 @@ struct Tuner : Widget, Poll {
         timer.setRelative(size*1000/rate/8); // 8xRT
     }
 #endif
-    uint write(const int32* output, uint size) {
+    uint write(const int32* input, uint size) {
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
         assert(writeIndex+size<=signal.size);
         for(uint i: range(size)) {
-            raw[2*(writeIndex+i)+0] = output[i*2+0];
-            raw[2*(writeIndex+i)+1] = output[i*2+1];
-            real x = (output[i*2+0]+output[i*2+1]) * 0x1p-33f;
+            raw[2*(writeIndex+i)+0] = input[i*2+0];
+            raw[2*(writeIndex+i)+1] = input[i*2+1];
+            real x = (input[i*2+0]+input[i*2+1]) * 0x1p-33f;
             //FIXME the notches also affects nearby keys
             if(currentKey != int(round(pitchToKey(notch1.frequency*rate)))) x = notch1(x);
             if(currentKey != int(round(pitchToKey(notch3.frequency*rate)))) x = notch3(x);

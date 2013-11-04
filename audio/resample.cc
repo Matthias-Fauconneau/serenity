@@ -60,8 +60,8 @@ static double sinc(double cutoff, double x, int N) {
 /// Returns the largest positive integer that divides the numbers without a remainder
 inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
-Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint bufferSize) {
-    assert(channelCount==this->channelCount);
+Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize) {
+    assert(channels==this->channels);
     // Factorize rates if possible to reduce filter bank size
     int factor = gcd(sourceRate,targetRate);
     sourceRate /= factor; targetRate /= factor;
@@ -82,7 +82,7 @@ Resampler::Resampler(uint channelCount, uint sourceRate, uint targetRate, uint b
 
     // Allocates and clears aligned planar signal buffers
     this->bufferSize = bufferSize = max(bufferSize,sourceRate)+N-1;
-    for(uint i: range(channelCount)) signal[i] = buffer<float>(bufferSize,bufferSize,0.f);
+    for(uint i: range(channels)) signal[i] = buffer<float>(bufferSize,bufferSize,0.f);
 
     // Generates an N tap filter for each fractionnal position
     kernel = buffer<float>(targetRate*N);
@@ -108,14 +108,14 @@ void Resampler::write(const float* source, uint size) {
     if(writeIndex+size>bufferSize-N-1) { // Wraps buffer (FIXME: map ring buffer)
         writeIndex -= integerIndex;
         assert(writeIndex+size<bufferSize-N-1);
-        for(uint channel=0;channel<channelCount;channel++) {
+        for(uint channel=0;channel<channels;channel++) {
             for(uint i: range(N-1+writeIndex)) signal[channel][i] = signal[channel][integerIndex+i];
         }
         integerIndex = 0;
     }
     for(uint i: range(size)) { // Deinterleaves source to buffers
-        signal[0][N-1+writeIndex+i]=source[i*channelCount+0];
-        signal[1][N-1+writeIndex+i]=source[i*channelCount+1];
+        signal[0][N-1+writeIndex+i]=source[i*channels+0];
+        signal[1][N-1+writeIndex+i]=source[i*channels+1];
     }
      writeIndex+=size;
      assert(writeIndex<bufferSize);
@@ -126,9 +126,9 @@ int Resampler::available() { return ((writeIndex-integerIndex)*targetRate-fracti
 template<bool mix> void Resampler::read(float* target, uint size) {
     assert(size<=available());
     for(uint i: range(size)) {
-        for(uint channel=0;channel<channelCount;channel++) {
-            if(mix) target[i*channelCount+channel] += product(kernel+fractionalIndex*N, signal[channel]+integerIndex, N);
-            else    target[i*channelCount+channel]    = product(kernel+fractionalIndex*N, signal[channel]+integerIndex, N);
+        for(uint channel=0;channel<channels;channel++) {
+            if(mix) target[i*channels+channel] += product(kernel+fractionalIndex*N, signal[channel]+integerIndex, N);
+            else    target[i*channels+channel]    = product(kernel+fractionalIndex*N, signal[channel]+integerIndex, N);
         }
         integerIndex += integerAdvance;
         fractionalIndex += fractionalAdvance;

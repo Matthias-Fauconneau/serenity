@@ -16,44 +16,64 @@ struct Player {
     static constexpr uint channels = 2;
     AudioFile file;
     Resampler resampler;
-    AudioOutput output{{this,&Player::read}, 96000, 65536};
+    bool resamplerFlushed = false;
+    Resampler nextResampler;
+    AudioOutput audio{{this,&Player::read}, 96000, 65536};
     int32* lastPeriod = 0, lastPeriodSize = 0;
     uint read(int32* output, uint outputSize) {
         uint readSize = 0;
-        for(;;) {
-            if(!file) return readSize;
+        for(int32* chunk=output;;) {
+            if(!file) break;
             int need = outputSize-readSize;
-            int read;
-            if(!resampler) read = file.read(output, need);
-            else {
-                uint sourceNeed = resampler.need(need);
-                float source[sourceNeed*2];
-                uint sourceRead = file.read(source, sourceNeed);
-                resampler.write(source, sourceRead);
+            int read = 0;
+            if(resampler.sourceRate*audio.rate != file.rate*resampler.targetRate && !resamplerFlushed) {
+                if(file.rate != audio.rate) new (&nextResampler) Resampler(audio.channels, file.rate, audio.rate, audio.periodSize);
+                if(resampler) { // Flushes previous resampler using start of next file
+                    uint previousNeed = resampler.need(resampler.N/2*resampler.sourceRate/resampler.targetRate);
+                    Resampler nextToPrevious(resampler.channels, file.rate, resampler.sourceRate, previousNeed);
+                    uint sourceNeed = nextToPrevious.need(previousNeed);
+                    {float source[sourceNeed*2];
+                        uint sourceRead = file.read(source, sourceNeed); // Ignores the corner case of file smaller than a resampler half filter size
+                        nextToPrevious.write(source, sourceRead);
+                        if(nextResampler) nextResampler.write(source, sourceRead);} // Also writes into next resampler
+                    uint read = nextToPrevious.available();
+                    float nextToPreviousBuffer[read*2];
+                    nextToPrevious.read(nextToPreviousBuffer, read); // Resamples file rate to previous resampler source rate
+                    resampler.write(nextToPreviousBuffer, read); // And feeds to the previous resampler in order to flush it
+                }
+                resamplerFlushed = true;
+            }
+            if(resampler) {
+                if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) {
+                    uint sourceNeed = resampler.need(need);
+                    float source[sourceNeed*2];
+                    uint sourceRead = file.read(source, sourceNeed);
+                    resampler.write(source, sourceRead);
+                }
                 read = min(need, resampler.available());
-                float target[read*2];
-                resampler.read(target, read);
-                for(uint i: range(read*2)) {
-                    int64 s = target[i]*(1<<29); // 3dB headroom
-                    if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
-                    output[i] = s;
+                if(read) {
+                    float target[read*2];
+                    resampler.read(target, read);
+                    for(uint i: range(read*2)) {
+                        int64 s = target[i]*(1<<29); // 3dB headroom
+                        if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
+                        chunk[i] = s;
+                    }
                 }
-            }
+            } else if(!nextResampler) read = file.read(chunk, need);
             assert(read<=need, read, need);
-            output += read*channels; readSize += read;
-            if(readSize != outputSize) next();
-            else {
-                output -= outputSize*2;
-                if(!lastPeriod) for(uint i: range(outputSize)) { // Fades in
-                    float level = exp(8. * ((float) i / outputSize - 1) ); // Linear perceived sound level
-                    output[i*2] *= level;
-                    output[i*2+1] *= level;
-                }
-                update(file.position/file.rate,file.duration/file.rate);
-                lastPeriod = output; lastPeriodSize = outputSize;
-                return readSize;
-            }
+            chunk += read*channels; readSize += read;
+            if(readSize == outputSize) { update(file.position/file.rate,file.duration/file.rate); break; } // Complete chunk
+            else if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) next(); // End of file
+            else { resampler = move(nextResampler); resamplerFlushed=false; }  // Previous resampler can be replaced once properly flushed
         }
+        if(!lastPeriod) for(uint i: range(outputSize)) { // Fades in
+            float level = exp(12. * ((float) i / outputSize - 1) ); // Linear perceived sound level
+            output[i*2] *= level;
+            output[i*2+1] *= level;
+        }
+        lastPeriod = output; lastPeriodSize = outputSize;
+        return readSize;
     }
 
 // Interface
@@ -144,12 +164,7 @@ struct Player {
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
         if(!file.openPath(String("/Music/"_+files[index]))) return;
-        assert(output.channels==file.channels);
-        if(output.rate==file.rate) resampler.~Resampler();
-        else if(!resampler.targetRate || resampler.sourceRate*output.rate!=file.rate*resampler.targetRate) { // source/target != file/output
-            resampler.~Resampler();
-            new (&resampler) Resampler(output.channels, file.rate, output.rate, output.periodSize);
-        }
+        assert(audio.channels==file.channels);
         setPlaying(true);
     }
     void next() {
@@ -189,16 +204,16 @@ struct Player {
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(play) { output.start(); window.setIcon(playIcon()); }
+        if(play) { audio.start(); window.setIcon(playIcon()); }
         else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
             for(uint i: range(lastPeriodSize)) {
-                float level = exp2(-8. * i / lastPeriodSize); // Linear perceived sound level
+                float level = exp2(-12. * i / lastPeriodSize); // Linear perceived sound level
                 lastPeriod[i*2] *= level;
                 lastPeriod[i*2+1] *= level;
             }
             lastPeriod=0, lastPeriodSize=0;
-            output.stop();
+            audio.stop();
             window.setIcon(pauseIcon());
             file.seek(max(0, (int)file.position-lastPeriodSize));
         }
@@ -207,7 +222,7 @@ struct Player {
         writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate)));
     }
     void seek(int position) {
-        if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); resampler.clear(); output.cancel(); }
+        if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); resampler.clear(); audio.cancel(); }
     }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
