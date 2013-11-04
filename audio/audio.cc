@@ -115,6 +115,7 @@ void AudioOutput::event() {
     }
     if(status->state == Prepared) io<START>();
 }
+void AudioOutput::cancel() { if(status->state == Running) { control->swPointer -= periodSize; event(); } }
 
 Device getCaptureDevice() {
     Folder snd("/dev/snd");

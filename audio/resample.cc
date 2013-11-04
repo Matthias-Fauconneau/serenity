@@ -143,3 +143,5 @@ template<bool mix> void Resampler::read(float* target, uint size) {
 }
 template void Resampler::read<false>(float* target, uint size);
 template void Resampler::read<true>(float* target, uint size);
+
+void Resampler::clear() { writeIndex=0, integerIndex=0, fractionalIndex=0; }

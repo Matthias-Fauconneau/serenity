@@ -34,6 +34,8 @@ struct AudioOutput : Device, Poll {
     void stop();
     /// Callback for poll events
     void event();
+    /// Cancels last period, event() will be called again to replace the period
+    void cancel();
 
     function<uint(int16* output, uint size)> read16 = [](int16*,uint){return 0;};
     function<uint(int32* output, uint size)> read32 = [](int32*,uint){return 0;};

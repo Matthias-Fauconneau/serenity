@@ -18,6 +18,8 @@ struct Resampler {
     /// Resamples \a sourceSize samples from \a source to \a targetSize samples in \a target
     /// \note If mix is true, samples are mixed with \a target (instead of overwriting the \a target buffer).
     template<bool mix=false> void filter(const float* source, uint sourceSize, float* target, uint targetSize);
+    /// Clears input (buffer pointers)
+    void clear();
 
     explicit operator bool() const { return kernel; }
 

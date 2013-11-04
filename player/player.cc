@@ -206,7 +206,9 @@ struct Player {
         window.render();
         writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate)));
     }
-    void seek(int position) { if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); } }
+    void seek(int position) {
+        if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); resampler.clear(); output.cancel(); }
+    }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
         slider.value = position; slider.maximum=duration;
