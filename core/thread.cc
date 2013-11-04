@@ -58,7 +58,7 @@ void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority); // No check_ as this is not critical
-    assert_(this->size>1 && !queue, "Thread spawned with no associated poll descriptors");
+    assert_(this->size>1 || queue, "Thread spawned with no associated poll descriptors");
     while(!terminate) {
         uint size=this->size;
         if(size==1 && !queue) break; // Terminates when no Poll objects are registered
@@ -174,7 +174,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
 static int exitStatus;
 // Entry point
 int main() {
-    mainThread.run();
+    if(mainThread.size>1 || mainThread.queue) mainThread.run();
     exit(0); // Signals all threads to terminate
     for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group

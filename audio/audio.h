@@ -35,7 +35,6 @@ struct AudioOutput : Device, Poll {
     /// Callback for poll events
     void event();
 
-private:
     function<uint(int16* output, uint size)> read16 = [](int16*,uint){return 0;};
     function<uint(int32* output, uint size)> read32 = [](int32*,uint){return 0;};
 

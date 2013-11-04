@@ -16,8 +16,10 @@ struct Player {
     static constexpr uint channels = 2;
     AudioFile file;
     Resampler resampler;
-    AudioOutput output{{this,&Player::read}, 96000, 96000}; // FIXME: implement drop support to use maximum latency without pause delay
+    AudioOutput output{{this,&Player::read}, 96000, 0};
+    int32* lastPeriod = 0, lastPeriodSize = 0;
     uint read(int32* output, uint outputSize) {
+        lastPeriod = output; lastPeriodSize = outputSize;
         uint readSize = 0;
         for(;;) {
             if(!file) return readSize;
@@ -182,7 +184,15 @@ struct Player {
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
         if(play) { output.start(); window.setIcon(playIcon()); }
-        else { output.stop(); window.setIcon(pauseIcon()); }
+        else {
+            // Fade out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
+            for(uint i: range(lastPeriodSize)) {
+                lastPeriod[i*2] = (lastPeriodSize - i) * lastPeriod[i*2] / lastPeriodSize;
+                lastPeriod[i*2+1] = (lastPeriodSize - i) * lastPeriod[i*2+1] / lastPeriodSize;
+            }
+            output.stop();
+            window.setIcon(pauseIcon());
+        }
         playButton.enabled=play;
         window.render();
         writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate)));
