@@ -21,8 +21,8 @@ struct AudioFile {
     ~AudioFile() { close(); }
 
     operator bool() { return file; }
-    bool openPath(const ref<byte>& path);
-    bool openData(array<byte>&& data);
+    bool openPath(const string& path);
+    //bool openData(buffer<byte>&& data);
     bool open();
     void close();
 
@@ -33,11 +33,10 @@ struct AudioFile {
     void seek(uint position);
 };
 
-/// Generic audio data type
-template<Type T> struct Audio {
+struct Audio {
     uint channels;
     uint rate;
-    buffer<T> data;
+    buffer<int32> data;
 };
-
-template<Type T> Audio<T> decodeAudio(array<byte>&& data);
+Audio decodeAudio(const string& path);
+//Audio decodeAudio(buffer<byte>&& data);

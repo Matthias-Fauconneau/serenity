@@ -148,6 +148,8 @@ String replace(const string& s, const string& before, const string& after) {
     return r;
 }
 
+char toLower(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
+
 String toLower(const string& s) {
     String lower;
     for(char c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
@@ -204,6 +206,7 @@ template<uint base> String utoa(uint64 n, int pad) {
     while(64-i<pad) buf[--i] = '0';
     return String(string(buf+i,64-i));
 }
+template String utoa<2>(uint64,int);
 template String utoa<16>(uint64,int);
 
 template<uint base> String itoa(int64 number, int pad) {

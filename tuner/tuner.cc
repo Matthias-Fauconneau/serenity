@@ -1,7 +1,7 @@
 #include "thread.h"
 #include "math.h"
-#include "sampler.h"
 #include "time.h"
+#include <fftw3.h> //fftw3f
 #include "pitch.h"
 #include "sequencer.h"
 #include "audio.h"
@@ -11,26 +11,45 @@
 #include "window.h"
 #if __x86_64
 #define TEST 1
+#include "ffmpeg.h"
 #endif
 
+const uint keyCount = 85;
+
 struct OffsetPlot : Widget {
-    float offsets[88] = {};
-    float powers[88] = {};
-    int2 sizeHint() { return int2(88*12, 128); }
+    float offsets[keyCount] = {};
+    float variances[keyCount] = {};
+    int2 sizeHint() { return int2(keyCount*12, 192); }
     void render(int2 position, int2 size) {
-        float maximumPower = max(ref<float>(powers));
-        float minimumOffset = min(ref<float>(offsets));
-        float maximumOffset = max(ref<float>(offsets));
-        if(!maximumPower) return;
-        for(int key: range(88)) {
-            if(!offsets[key]) continue;
-            int x0 = position.x + key * size.x / 88;
-            int x1 = position.x + (key+1) * size.x / 88;
+        float minimumOffset = -1./4;
+        float maximumOffset = 1./4;
+        for(int key: range(keyCount)) {
+            int x0 = position.x + key * size.x / keyCount;
+            int x1 = position.x + (key+1) * size.x / keyCount;
             int y0 = position.y + size.y * maximumOffset / (maximumOffset-minimumOffset);
-            int y1 = position.y + size.y * (maximumOffset-offsets[key]) / (maximumOffset-minimumOffset);
-            vec4 color = vec4(0,0,/*powers[key] / maximumPower*/1,1);
-            if(y0>y1) swap(y0,y1), swap(color.x, color.z);
-            fill(x0,y0,x1,y1,color);
+            float offset = offsets[key];
+            float deviation = sqrt(variances[key]);
+            float sign = ::sign(offset) ? : 1;
+
+            // High confidence between zero and max(0, |offset|-deviation)
+            float p1 = max(0.f, abs(offset)-deviation);
+            int y1 = position.y + size.y * (maximumOffset-sign*p1) / (maximumOffset-minimumOffset);
+            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, sign*p1>0 ? vec4(1,0,0,1) : vec4(0,0,1,1));
+
+            // Mid confidence between max(0,|offset|-deviation) and |offset|
+            float p2 = abs(offset);
+            int y2 = position.y + size.y * (maximumOffset-sign*p2) / (maximumOffset-minimumOffset);
+            fill(x0,y1<y2?y1:y2,x1,y1<y2?y2:y1, sign*p2>0 ? vec4(3./4,0,0,1) : vec4(0,0,3./4,1));
+
+            // Low confidence between |offset| and |offset|+deviation
+            float p3 = abs(offset)+deviation;
+            int y3 = position.y + size.y * (maximumOffset-sign*p3) / (maximumOffset-minimumOffset);
+            fill(x0,y2<y3?y2:y3,x1,y2<y3?y3:y2, sign*p3>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
+
+            // Low confidence between min(|offset|-deviation, 0) and zero
+            float p4 = min(0.f, abs(offset)-deviation);
+            int y4 = position.y + size.y * (maximumOffset-sign*p4) / (maximumOffset-minimumOffset);
+            fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
         }
     }
 };
@@ -47,7 +66,7 @@ struct Tuner : Widget, Poll {
     const uint rate = input.rate;
 
 #if TEST
-    buffer<float2> stereo = decodeAudio(Map("Samples/3.flac"_)); //FIXME: record 96000KHz sample
+    Audio audio = decodeAudio("/Samples/A0-C3.flac"_);
     Timer timer {thread};
     Time realTime;
     Time totalTime;
@@ -55,8 +74,8 @@ struct Tuner : Widget, Poll {
 #endif
 
     // Input-dependent parameters
-    float noiseThreshold = exp2(-8); // Power relative to full scale
-    uint fMin = N*440*exp2(-4 - 0./12 - (1./2 / 12))/rate; // ~27 Hz ~ half semitone under A-1
+    float noiseFloor = exp2(-15); // Power relative to full scale
+    uint kMax = rate / (440*exp2(-4 - 0./12 - (1./2 / 12))); // ~27 Hz ~ half pitch under A-1 (k ~ 3593 samples at 96 kHz)
     uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half semitone over C7
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
@@ -68,54 +87,65 @@ struct Tuner : Widget, Poll {
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
-    Notch notch1 {1*50./rate, 1./4}; // Notch filter to remove 50Hz noise
-    Notch notch3 {3*50./rate, 1./6}; // Cascaded to remove the first odd harmonic (3rd partial)
+    Notch notch1 {1*50./rate, 1./12}; // Notch filter to remove 50Hz noise
+    Notch notch3 {3*50./rate, 1./12}; // Cascaded to remove the first odd harmonic (3rd partial)
 
     PitchEstimator pitchEstimator {N};
 
     float previousPowers[3] = {0,0,0}; // Power history to trigger estimation only on decay
-    int currentKey = 0;
+    array<int> keyEstimations;
+    uint instantKey = 0, currentKey = 0;
     struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
     array<Estimation> estimations;
 
+    map<string,string> args;
     UniformGrid<Text> info {3,2};
     OffsetPlot offsets;
     VBox layout {{this, &info, &offsets}};
     Window window{&layout, int2(1024,600), "Tuner"};
-
     Tuner() {
+        log(__TIME__);
         log(input.sampleBits, input.rate, input.periodSize,
             strKey(round(pitchToKey(notch1.frequency*rate))), strKey(round(pitchToKey(notch3.frequency*rate))));
-
-        if(arguments().size>0) { noiseThreshold=exp2(toDecimal(arguments()[0])); log("Noise threshold: ",log2(noiseThreshold),"dB2FS"); }
-        if(arguments().size>1) { fMin = toInteger(arguments()[1])*N/rate; log("Minimum frequency"_, fMin, "~"_, fMin*rate/N, "Hz"_); }
-        if(arguments().size>2) { fMax = toInteger(arguments()[2])*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
+        for(string arg: arguments()) { string key=section(arg,'='), value=section(arg,'=',1); if(key) args.insert(key, value); }
+        if(args.contains("floor"_)) { noiseFloor=exp2(toDecimal(args.at("floor"_))); log("Noise floor: ",log2(noiseFloor),"dB2FS"); }
+        if(args.contains("min"_)) { kMax = rate/toInteger(args.at("min"_)); log("Maximum period"_, kMax, "~"_, rate/kMax, "Hz"_); }
+        if(args.contains("max"_)) { fMax = toInteger(args.at("max"_))*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
-        info << Text(str(input.sampleBits)) << Text(str(input.rate)) << Text(str(input.periodSize))
-             << Text("correlation"_) << Text("reference"_) << Text("peak"_);
+        info.grow(6);
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
+        assert_(audio.rate == input.rate, audio.rate, input.rate);
 #else
         input.start();
 #endif
-        thread.spawn();
+        //thread.spawn(); //DEBUG
+        offsets.offsets[keyCount/2-3]=-1./8;
+        offsets.variances[keyCount/2-3]=1./256;
+        offsets.offsets[keyCount/2-2]=-1./16;
+        offsets.variances[keyCount/2-2]=1./256;
+        offsets.offsets[keyCount/2-1]=-1./32;
+        offsets.variances[keyCount/2-1]=1./256;
+        offsets.offsets[keyCount/2]=0;
+        offsets.variances[keyCount/2]=1./256;
+        offsets.offsets[keyCount/2+3]=+1./8;
+        offsets.variances[keyCount/2+3]=1./256;
+        offsets.offsets[keyCount/2+2]=+1./16;
+        offsets.variances[keyCount/2+2]=1./256;
+        offsets.offsets[keyCount/2+1]=+1./32;
+        offsets.variances[keyCount/2+1]=1./256;
     }
 #if TEST
     uint t =0;
     void feed() {
-        const uint size = input.periodSize;
-        if(t+size > stereo.size) { exit(); return; }
-        const float2* period = stereo + t;
-        int32 buffer[size*2];
-        for(uint i: range(size)) {
-            buffer[i*2+0] = period[i][0] * 0x1p8f; // 24->32
-            buffer[i*2+1] = period[i][1] * 0x1p8f; // 24->32
-        }
+        const uint size = periodSize;
+        if(t+size > audio.data.size/2) { exit(); return; }
+        const int32* period = audio.data + t*2;
+        write(period, size);
         t += size;
-        write(buffer, size);
         float time = ((float)size/rate) / (float)realTime; // Instant playback rate
         const float alpha = 1./16; frameTime = (1-alpha)*frameTime + alpha*(float)time; // IIR Smoother
         //if((t/size)%(rate/size)==0) log(dec( ((float)t/rate) / (float)totalTime));
@@ -129,10 +159,10 @@ struct Tuner : Widget, Poll {
         for(uint i: range(size)) {
             raw[2*(writeIndex+i)+0] = input[i*2+0];
             raw[2*(writeIndex+i)+1] = input[i*2+1];
-            real x = (input[i*2+0]+input[i*2+1]) * 0x1p-33f;
-            //FIXME the notches also affects nearby keys
-            if(currentKey != int(round(pitchToKey(notch1.frequency*rate)))) x = notch1(x);
-            if(currentKey != int(round(pitchToKey(notch3.frequency*rate)))) x = notch3(x);
+            real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
+            //FIXME: the notches might also affects nearby keys
+            if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<exp2(-15)) x = notch1(x);
+            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]>exp2(-15)) x = notch3(x);
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -149,18 +179,18 @@ struct Tuner : Widget, Poll {
                 log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
                 lastReport.reset(); skipped=0;
             }
-            shiftPeriods(previousPowers[0]); // Shifts in a dummy period for decay detection purposes
+            //shiftPeriods(previousPowers[0]); // Shifts in a dummy period for decay detection purposes
         }
         readCount.acquire(periodSize); periods++;
         frames++;
         buffer<float> frame {N}; // Need a linear buffer for autocorrelation (FIXME: mmap ring buffer)
-        assert(readIndex+periodSize<=N);
+        assert(readIndex+periodSize<=signal.size);
         for(uint i: range(min<int>(N,signal.size-readIndex))) frame[i] = signal[readIndex+i]; // Copies ring buffer head into linear frame buffer
         for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies ring buffer tail into linear frame buffer
 
-        float k = pitchEstimator.estimate(frame, fMin, fMax);
+        float k = pitchEstimator.estimate(frame, kMax, fMax);
         float power = pitchEstimator.power;
-        int key = round(pitchToKey(rate/k));
+        uint key = round(pitchToKey(rate/k));
 
         float expectedK = rate/keyToPitch(key);
         const float kOffset = 12*log2(expectedK/k);
@@ -171,32 +201,45 @@ struct Tuner : Widget, Poll {
         const float fOffset =  12*log2(f/expectedF);
         const float fError =  12*log2((expectedF+1)/expectedF);
 
-        if(power > noiseThreshold && previousPowers[1] > previousPowers[0]/2 && previousPowers[0] > power) {
-            currentKey = key;
+        if(power > noiseFloor && previousPowers[0] > power/16) {
+            instantKey = key;
+            if(keyEstimations.size>=3) keyEstimations.take(0);
+            keyEstimations << key;
+            map<int,int> count; int maxCount=0;
+            for(int key: keyEstimations) { count[key]++; maxCount = max(maxCount, count[key]); }
+            array<int> maxKeys; for(int key: keyEstimations) if(count[key]==maxCount) maxKeys << key; // Keeps most frequent keys
+            currentKey = maxKeys.last(); // Resolve ties by taking last (most recent)
 
             const uint textSize = 64;
             info[0] = Text(dec(round(100*kOffset)), textSize, white);
             info[3] = Text(dec(round(100*kError)), textSize, white);
-            info[1] = Text(strKey(max(0,key)), textSize, white);
+            info[1] = Text(strKey(key), textSize, white);
             info[4] = Text(dec(round(fError<kError ? f*rate/N : rate/k)), textSize, white);
             info[2] = Text(dec(round(100*fOffset)), textSize, white);
             info[5] = Text(dec(round(100*fError)), textSize, white);
-
-            if(key>=21 && key<21+88) {
-                float offset = kError<fError ? kOffset : fOffset;
-                float& keyOffset = offsets.offsets[key-21];
-                float& keyPower = offsets.powers[key-21];
-                {const float alpha = 1/(1+keyPower/power); keyOffset = (1-alpha)*keyOffset + alpha*offset;} // IIR Smoother (power weight)
-                {const float alpha = 1./16; keyPower = (1-alpha)*keyPower + alpha*power;} // IIR Smoother (constant weight)
+            if(args.contains("gate"_)) { // DEBUG: Shows notch states
+                info.grow(8);
+                info[6] = Text(dec(notch1.frequency*rate)+": "_+(abs(currentKey-pitchToKey(notch1.frequency*rate)) > 1?"ON"_:"OFF"_), textSize, white);
+                info[7] = Text(dec(notch3.frequency*rate)+": "_+(abs(currentKey-pitchToKey(notch3.frequency*rate)) > 1?"ON"_:"OFF"_), textSize, white);
             }
 
-#if !TEST
-            if(previousPowers[2] < previousPowers[1] && key>=21 && key<21+88) { // t-2 is the attack
+            if(key>=21 && key<21+keyCount && key==currentKey && maxCount>=2) {
+                float offset = kError<fError ? kOffset : fOffset;
+                float& keyOffset = offsets.offsets[key-21];
+                {const float alpha = 1./8; keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes (~1sec)
+                float variance = sq(offset - keyOffset);
+                float& keyVariance = offsets.variances[key-21];
+                {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
+            }
+
+#if 0
+            if(previousPowers[1] > previousPowers[0]/2 && previousPowers[0] > power &&
+                    previousPowers[2] < previousPowers[1] && key>=21 && key<21+keyCount) { // t-2 is the attack
                 Folder folder("samples"_, home(), true);
                 uint velocity = round(0x100*sqrt(power)); // Decay power is most stable (FIXME: automatic velocity normalization)
-                uint velocities[88] = {};
+                uint velocities[keyCount] = {};
                 for(string name: folder.list(Files)) {
-                    TextData s (name); uint fKey = s.integer(); if(fKey>=88 || !s.match('-')) continue; uint fVelocity = s.hexadecimal();
+                    TextData s (name); uint fKey = s.integer(); if(fKey>=keyCount || !s.match('-')) continue; uint fVelocity = s.hexadecimal();
                     if(fVelocity > velocities[fKey]) velocities[fKey] = fVelocity;
                 }
                 if(velocity >= velocities[key-21]) { // Records new sample only if higher velocity than existing sample for this key
@@ -206,12 +249,13 @@ struct Tuner : Widget, Poll {
                     record.write(cast<byte>(raw.slice(0,readIndex*2))); // Copies ring buffer tail into file
                 }
                 log(apply(ref<uint>(velocities),[](uint v){ return "0123456789ABCDF"_[min(0xFFu,v/0x10)]; }));
-                log(strKey(max(0,key))+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power))+"\t"_+dec(velocity));
+                log(strKey(key)+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power))+"\t"_+dec(velocity));
                 log("k\t"_+dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_);
                 log("f\t"_+dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_);
             }
 #endif
-        }
+        } else if(keyEstimations.size) keyEstimations.take(0);
+
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
         shiftPeriods(power);
@@ -229,7 +273,7 @@ struct Tuner : Widget, Poll {
     }
     void render(int2 position, int2 size) {
         auto x = [&](float f)->float { // Maps frequency (Hz) to position on X axis (log scale)
-            float min = log2(keyToPitch(currentKey-1)), max = log2(keyToPitch(currentKey+1));
+            float min = log2(keyToPitch(instantKey-1)), max = log2(keyToPitch(instantKey+1));
             return (log2(f)-min)/(max-min) * size.x;
         };
 

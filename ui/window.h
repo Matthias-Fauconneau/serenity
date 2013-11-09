@@ -95,7 +95,7 @@ struct Window : Socket, Poll {
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
     /// Whether a render request was skipped while unmapped
-    bool needUpdate = false;
+    bool needUpdate = true;
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
     /// If set, this window will not be managed by the session window manager

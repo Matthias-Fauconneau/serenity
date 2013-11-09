@@ -30,8 +30,8 @@ struct FLAC : BitReader {
     buffer<float2> audio {1<<16,0};
     uint writeIndex = 0;
     uint readIndex = 0;
-    uint16 blockSize = 0, rate = 0;
-    uint16 channelMode = 0, sampleSize = 0;
+    uint blockSize = 0, rate = 0;
+    uint channelMode = 0, sampleSize = 0;
     uint position = 0, duration = 0;
 
     FLAC(){}
@@ -46,5 +46,6 @@ struct FLAC : BitReader {
 };
 inline FLAC copy(const FLAC& o) { FLAC t; t.data=o.data, t.bsize=o.bsize, t.index=o.index, t.audio=copy(o.audio), t.writeIndex=o.writeIndex, t.readIndex=o.readIndex, t.blockSize=o.blockSize, t.rate=o.rate, t.channelMode=o.channelMode, t.sampleSize=o.sampleSize, t.position=o.position, t.duration=o.duration; return t; }
 
+struct Audio { buffer<float2> data; uint rate; };
 /// Decodes a full audio file
-buffer<float2> decodeAudio(const ref<byte>& data, uint duration=-1);
+Audio decodeAudio(const ref<byte>& data, uint duration=-1);

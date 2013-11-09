@@ -12,9 +12,9 @@ uint BitReader::bit() { uint8 bit = uint8(data[index/8]<<(index&7))>>7; index++;
 uint BitReader::binary(int size) {
     assert(size<=32);//48
     assert(index<bsize);
-    uint64 word = swap64(*(uint64*)(data+index/8)) << (index&7);
+    uint value = (swap64(*(uint64*)(data+index/8)) << (index&7)) >> int8(64-size);
     index += size;
-    return word>>int8(64-size);
+    return value;
 }
 
 int BitReader::sbinary(int size) {
@@ -71,11 +71,11 @@ FLAC::FLAC(const ref<byte>& data) {
         uint blockType = binary(7); assert(blockType<=PICTURE, blockType);
         int size = binary(24);
         if(blockType==STREAMINFO) {
-            assert(size=0x22);
+            assert(size==0x22);
             uint unused minBlockSize = binary(16); assert(minBlockSize>=16);
             uint unused maxBlockSize = binary(16); assert(minBlockSize<=maxBlockSize && maxBlockSize<=32768);
             int unused minFrameSize = binary(24), unused maxFrameSize = binary(24);
-            rate = binary(20); assert(rate == 44100 || rate==48000,rate);
+            rate = binary(20); assert(rate == 44100 || rate==48000 || rate==96000, rate);
             uint unused channels = binary(3)+1; assert(channels==2);
             uint unused sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
             duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
@@ -96,7 +96,7 @@ void FLAC::parseFrame() {
     uint unused rate = sampleRate_[binary(4)]; assert(rate==this->rate);
     channelMode = binary(4); assert(channelMode==Independent||channelMode==LeftSide||channelMode==MidSide||channelMode==RightSide,channelMode);
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
-    sampleSize = sampleSize_[binary(3)]; assert(sampleSize==16 || sampleSize==24);
+    sampleSize = sampleSize_[binary(3)]; assert_(sampleSize==16 || sampleSize==24, binary(3));
     int unused zero = bit(); assert(zero==0);
     uint unused frameNumber = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;
@@ -162,7 +162,7 @@ void FLAC::decodeFrame() {
         int unused wasted = bit(); assert(wasted==0,type);
         if (type == 0) { //constant
             int constant = sbinary(rawSampleSize); //sbinary?
-            for(int i = 0;i<blockSize;i++) block[channel][i] = constant;
+            for(uint i : range(blockSize)) block[channel][i] = constant;
             continue;
         } else if (type == 1) { //verbatim
             error("TODO");
@@ -277,10 +277,10 @@ uint FLAC::read(float2 *out, uint size) {
     return size;
 }
 
-buffer<float2> decodeAudio(const ref<byte>& data, uint duration) {
+Audio decodeAudio(const ref<byte>& data, uint duration) {
     FLAC flac(data);
     duration = ::min(duration, flac.duration);
     flac.audio = buffer<float2>(max(32768u,duration+4),0);
     while(flac.audio.size<duration) flac.decodeFrame();
-    return move(flac.audio);
+    return {move(flac.audio), flac.rate};
 }

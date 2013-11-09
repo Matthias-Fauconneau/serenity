@@ -58,6 +58,8 @@ String join(const ref<String>& list, const string& separator);
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string& s, const string& before, const string& after);
 /// Lowers case
+char toLower(char c);
+/// Lowers case
 String toLower(const string& s);
 /// Removes duplicate whitespace
 String simplify(String&& s);
