@@ -9,7 +9,7 @@
 #include "linux.h"
 #include "x.h"
 #if GL
-//include "gl.h"
+#include "gl.h"
 #undef packed
 #define Time XTime
 #define Cursor XCursor

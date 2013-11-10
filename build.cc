@@ -91,6 +91,11 @@ struct Build {
                     }
                 }
             }
+            if(s.match("#if "_)) {
+                string id = s.identifier("_"_);
+                if(id=="__x86_64"_ && build != "32"_) {}
+                else s.until("#endif"_); // FIXME: Nesting unsupported
+            }
             if(s.match("FILE("_) || s.match("ICON("_)) {
                 string file = s.identifier("_-"_);
                 assert_(file && !files.contains(file), file);

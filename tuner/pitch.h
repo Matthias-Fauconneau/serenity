@@ -28,7 +28,6 @@ struct PitchEstimator : FFT {
     uint fPeak;
     float power;
     uint period;
-    tsc localTime, extendedTime, forwardTime, totalTime;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
     float estimate(const ref<float>& signal, uint kMax=0, uint fMax=0) {
         if(!kMax) kMax=N/2; // Needs at least two periods for autocorrelation
@@ -45,7 +44,7 @@ struct PitchEstimator : FFT {
         const uint highPartialMaximumPeriods = 24; // Maximum peak period multiple to search when peak is under high partial frequency
         const uint lowPartialMaximumPeriods = 15; // Maximum peak period multiple to search when peak is over high partial frequency
         const float multiplePeriodPenalty = 0/*1./128*/; // Penalty coefficient to avoid multiple periods when less periods match nearly as well
-        const float extendedSearch = 128; // Extends search to all k closer than (maximum / extendedSearch) from maximum (intensive)
+        const float extendedSearch = 32; // Extends search to all k closer than (maximum / extendedSearch) from maximum (intensive)
 
         fPeak=0;
         {float firstPeak = 0; float energy=0;
@@ -68,13 +67,11 @@ struct PitchEstimator : FFT {
 
         float bestK = (float)N/fPeak;
         if(fPeak < autocorrelationFrequency) { // High pitches are accurately found by spectrum peak picker [+58]
-            totalTime.start();
             float max=0;
             uint maximumPeriods = fPeak < highPartialFrequency ? highPartialMaximumPeriods : lowPartialMaximumPeriods; // [f<N/64: +4, 5th: +3]
             maximumPeriods = min(maximumPeriods, fPeak*kMax/N);
             period = 1;
             for(uint i=1; i <= maximumPeriods; i++) { // Search multiple periods
-                localTime.start();
                 int k0 = i*N/fPeak;
                 int octaveBestK = k0;
                 for(uint k=k0;k>N/fMax;k--) { // Evaluates slightly smaller periods [+22]
@@ -82,19 +79,15 @@ struct PitchEstimator : FFT {
                     sum *= 1 - i*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
                     if(sum > max) max = sum, octaveBestK = k, bestK = k, period=i;
                     else if(k*extendedSearch<octaveBestK*(extendedSearch-1)) break; // Search beyond local minimums to match lowest notes [+22]
-                    else localTime.stop(), extendedTime.start();
+                    else k--; // Double k step to speed up extended search (TODO: binary search optimization)
                 }
-                extendedTime.stop();
             }
-            forwardTime.start();
             for(int k=bestK+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch (+3)
                 float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
                 sum *= 1 - period*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
                 if(sum > max) max = sum, bestK = k;
                 else break;
             }
-            forwardTime.stop();
-            totalTime.stop();
         }
         return bestK;
     }

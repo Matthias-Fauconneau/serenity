@@ -19,6 +19,16 @@ const uint keyCount = 85;
 struct OffsetPlot : Widget {
     float offsets[keyCount] = {};
     float variances[keyCount] = {};
+    OffsetPlot() {
+      if(!existsFile("offsets.profile"_,config())) return;
+      TextData s = readFile("offsets.profile"_,config());
+      for(uint i: range(keyCount)) { offsets[i] = s.decimal()/100; s.skip(" "_); variances[i] = sq(s.decimal()/100); s.skip("\n"_); }
+    }
+    ~OffsetPlot() {
+        String s;
+        for(uint i: range(keyCount)) s << str(offsets[i]*100) << " "_ << str(sqrt(variances[i])*100) << "\n"_;
+        writeFile("offsets.profile"_, s, config());
+    }
     int2 sizeHint() { return int2(keyCount*12, 192); }
     void render(int2 position, int2 size) {
         float minimumOffset = -1./4;
@@ -26,10 +36,14 @@ struct OffsetPlot : Widget {
         for(int key: range(keyCount)) {
             int x0 = position.x + key * size.x / keyCount;
             int x1 = position.x + (key+1) * size.x / keyCount;
-            int y0 = position.y + size.y * maximumOffset / (maximumOffset-minimumOffset);
+
+            // TODO: Offset reference according to inharmonicty (~railsback curve)
+            float p0 = 0;
+            int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
+
             float offset = offsets[key];
             float deviation = sqrt(variances[key]);
-            float sign = ::sign(offset) ? : 1;
+            float sign = ::sign(offset-p0) ? : 1;
 
             // High confidence between zero and max(0, |offset|-deviation)
             float p1 = max(0.f, abs(offset)-deviation);
@@ -122,21 +136,7 @@ struct Tuner : Widget, Poll {
 #else
         input.start();
 #endif
-        //thread.spawn(); //DEBUG
-        offsets.offsets[keyCount/2-3]=-1./8;
-        offsets.variances[keyCount/2-3]=1./256;
-        offsets.offsets[keyCount/2-2]=-1./16;
-        offsets.variances[keyCount/2-2]=1./256;
-        offsets.offsets[keyCount/2-1]=-1./32;
-        offsets.variances[keyCount/2-1]=1./256;
-        offsets.offsets[keyCount/2]=0;
-        offsets.variances[keyCount/2]=1./256;
-        offsets.offsets[keyCount/2+3]=+1./8;
-        offsets.variances[keyCount/2+3]=1./256;
-        offsets.offsets[keyCount/2+2]=+1./16;
-        offsets.variances[keyCount/2+2]=1./256;
-        offsets.offsets[keyCount/2+1]=+1./32;
-        offsets.variances[keyCount/2+1]=1./256;
+        thread.spawn();
     }
 #if TEST
     uint t =0;
@@ -179,7 +179,7 @@ struct Tuner : Widget, Poll {
                 log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
                 lastReport.reset(); skipped=0;
             }
-            //shiftPeriods(previousPowers[0]); // Shifts in a dummy period for decay detection purposes
+            shiftPeriods(previousPowers[0]); // Shifts in a dummy period for decay detection purposes
         }
         readCount.acquire(periodSize); periods++;
         frames++;
@@ -231,29 +231,6 @@ struct Tuner : Widget, Poll {
                 float& keyVariance = offsets.variances[key-21];
                 {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
             }
-
-#if 0
-            if(previousPowers[1] > previousPowers[0]/2 && previousPowers[0] > power &&
-                    previousPowers[2] < previousPowers[1] && key>=21 && key<21+keyCount) { // t-2 is the attack
-                Folder folder("samples"_, home(), true);
-                uint velocity = round(0x100*sqrt(power)); // Decay power is most stable (FIXME: automatic velocity normalization)
-                uint velocities[keyCount] = {};
-                for(string name: folder.list(Files)) {
-                    TextData s (name); uint fKey = s.integer(); if(fKey>=keyCount || !s.match('-')) continue; uint fVelocity = s.hexadecimal();
-                    if(fVelocity > velocities[fKey]) velocities[fKey] = fVelocity;
-                }
-                if(velocity >= velocities[key-21]) { // Records new sample only if higher velocity than existing sample for this key
-                    velocities[key-21] = velocity;
-                    File record(dec(key-21,2)+"-"_+hex(velocity,2), folder, Flags(WriteOnly|Create|Truncate));
-                    record.write(cast<byte>(raw.slice(readIndex*2,raw.size))); // Copies ring buffer head into file
-                    record.write(cast<byte>(raw.slice(0,readIndex*2))); // Copies ring buffer tail into file
-                }
-                log(apply(ref<uint>(velocities),[](uint v){ return "0123456789ABCDF"_[min(0xFFu,v/0x10)]; }));
-                log(strKey(key)+"\t"_ +str(round(rate/k))+" Hz\t"_+dec(log2(power))+"\t"_+dec(velocity));
-                log("k\t"_+dec(round(100*kOffset))+" \t+/-"_+dec(round(100*kError))+" cents\t"_);
-                log("f\t"_+dec(round(100*fOffset))+" \t+/-"_+dec(round(100*fError))+" cents\t"_);
-            }
-#endif
         } else if(keyEstimations.size) keyEstimations.take(0);
 
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
