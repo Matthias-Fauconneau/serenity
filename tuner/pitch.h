@@ -54,7 +54,7 @@ struct PitchEstimator : FFT {
         const uint highPartialMaximumPeriods = 24; // Maximum peak period multiple to search when peak is under high partial frequency
         const uint lowPartialMaximumPeriods = 15; // Maximum peak period multiple to search when peak is over high partial frequency
         const float multiplePeriodPenalty = 0/*1./128*/; // Penalty coefficient to avoid multiple periods when less periods match nearly as well
-        const float extendedSearch = 32; // Extends search to all k closer than (maximum / extendedSearch) from maximum (intensive)
+        const float extendedSearch = 256; // Extends search to all k closer than (maximum / extendedSearch) from maximum (intensive)
 
         fPeak=0;
         {float firstPeak = 0; float energy=0;

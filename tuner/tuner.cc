@@ -201,7 +201,7 @@ struct Tuner : Poll {
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     Notch notch1 {1*50./rate, 1./12}; // Notch filter to remove 50Hz noise
-    Notch notch3 {3*50./rate, 1./12}; // Cascaded to remove the first odd harmonic (3rd partial)
+    //Notch notch3 {3*50./rate, 1./12}; // Cascaded to remove the first odd harmonic (3rd partial)
 
     PitchEstimator pitchEstimator {N};
 
@@ -233,9 +233,7 @@ struct Tuner : Poll {
     VBox layout {{&estimations, &grid, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
     Tuner() {
-        log(__TIME__);
-        log(input.sampleBits, input.rate, input.periodSize,
-            strKey(round(pitchToKey(notch1.frequency*rate))), strKey(round(pitchToKey(notch3.frequency*rate))));
+        log(__TIME__, input.sampleBits, input.rate, input.periodSize);
         for(string arg: arguments()) { string key=section(arg,'='), value=section(arg,'=',1); if(key) args.insert(key, value); }
         if(args.contains("floor"_)) { noiseFloor=exp2(-toInteger(args.at("floor"_))); log("Noise floor: ",log2(noiseFloor),"dB2FS"); }
         if(args.contains("min"_)) { kMax = rate/toInteger(args.at("min"_)); log("Maximum period"_, kMax, "~"_, rate/kMax, "Hz"_); }
@@ -276,7 +274,7 @@ struct Tuner : Poll {
             real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
             //FIXME: the notches might also affects nearby keys
             /*if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor)*/ x = notch1(x);
-            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor) x = notch3(x);
+            //if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor) x = notch3(x);
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -338,11 +336,12 @@ struct Tuner : Poll {
                 float variance = sq(offset - keyOffset);
                 float& keyVariance = profile.variances[key-21];
                 {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
-                uint worstKey = this->worstKey;
-                for(uint i: range(2, keyCount-2))
-                    if(abs(profile.offsets[i])+sqrt(profile.variances[i]) > abs(profile.offsets[worstKey])+sqrt(profile.variances[worstKey]))
-                        worstKey = i;
-                if(worstKey != this->worstKey) { this->worstKey=worstKey; window.setTitle(strKey(21+worstKey)); }
+                {uint k = this->worstKey;
+                    for(uint i: range(8,keyCount-8)) //FIXME: quadratic, cubic, exp curve ?
+                        if(  min(abs(profile.offsets[i ]), abs(profile.offsets[i ] - 1.f/8 * (float)(i -keyCount/2)/(keyCount/2))) + sqrt(profile.variances[i ]) >
+                             min(abs(profile.offsets[k]), abs(profile.offsets[k] - 1.f/8 * (float)(k-keyCount/2)/(keyCount/2))) + sqrt(profile.variances[k]) ) k = i;
+                    if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
+                }
             }
         } else if(keyEstimations.size) keyEstimations.take(0);
 
