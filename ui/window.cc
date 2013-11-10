@@ -176,13 +176,13 @@ void Window::destroy() {
 void Window::event() {
     window=this;
     if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
-        readLock.lock();
-        if(!poll()) { readLock.unlock(); break; }
+        lock.lock();
+        if(!poll()) { lock.unlock(); break; }
         uint8 type = read<uint8>();
         XEvent e = read<XEvent>();
-        readLock.unlock();
+        lock.unlock();
         processEvent(type, e);
-        while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
+        while(eventQueue) { lock.lock(); QEvent e=eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     }
     if(revents==IDLE) {
         needUpdate = false;
@@ -373,9 +373,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
 }
-void Window::send(const ref<byte>& request) { write(request); sequence++; }
+void Window::send(const ref<byte>& request) { writeLock.lock(); write(request); writeLock.unlock(); /*necessary?*/ sequence++; }
 template<class T> T Window::readReply(const ref<byte>& request) {
-    Locker lock(readLock);
+    Locker lock(this->lock);
     send(request);
     for(;;) { uint8 type = read<uint8>();
         if(type==0) {
@@ -475,11 +475,11 @@ String Window::getSelection(bool clipboard) {
     if(!owner) return String();
     {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
     for(;;) {
-        readLock.lock();
+        lock.lock();
         uint8 type = read<uint8>();
-        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); readLock.unlock(); return getProperty<byte>(id,"UTF8_STRING"_); }
-        else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
-        readLock.unlock();
+        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); lock.unlock(); return getProperty<byte>(id,"UTF8_STRING"_); }
+        eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())};
+        lock.unlock();
     }
 }
 

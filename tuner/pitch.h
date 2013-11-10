@@ -93,10 +93,9 @@ struct PitchEstimator : FFT {
                     sum *= 1 - i*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
                     if(sum > max) max = sum, octaveBestK = k, bestK = k, period=i;
                     else if(k*extendedSearch<octaveBestK*(extendedSearch-1)) break; // Search beyond local minimums to match lowest notes [+22]
-                    else k--; // Double k step to speed up extended search (TODO: binary search optimization)
                 }
             }
-            for(int k=bestK+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch (+3)
+            for(uint k=bestK+1; k<kMax; k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch (+3)
                 float sum = autocorrelation(signal, k, N);
                 autocorrelations[k] = sum;
                 sum *= 1 - period*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]

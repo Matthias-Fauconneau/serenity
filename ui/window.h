@@ -139,8 +139,9 @@ struct Window : Socket, Poll {
     /// This window base resource id
     uint id = 0;
 
-    /// Synchronize reading from event and readReply
-    Lock readLock;
+    /// Synchronizes access to connection and event queue
+    Lock lock;
+    Lock writeLock; // Necessary ?
 
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;

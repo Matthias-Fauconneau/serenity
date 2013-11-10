@@ -68,6 +68,10 @@ struct PitchEstimation {
         Notch notch1(1*50./rate, 1./12); // Notch filter to remove 50Hz noise
         Notch notch3(3*50./rate, 1./12); // Cascaded to remove the first odd harmonic (3rd partial)
 
+        const uint kMax = rate / (440*exp2(-4 - 0./12 - (1./2 / 12))); // ~27 Hz ~ half pitch under A-1 (k ~ 3593 samples at 96 kHz)
+        const uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7 (k ~ 22 at 96 kHz)
+        log(kMax, fMax);
+
         uint lastKey = highKey;
         array<String> results; int lastLog=0; uint lastFail=0; uint success = 0, fail=0, tries = 0, total=0;
         Time totalTime;
@@ -76,15 +80,12 @@ struct PitchEstimation {
             float signal[N];
             for(uint i: range(N)) {
                 float x = (period[i*2+0]+period[i*2+1]) * 0x1p-32f; // 32 + 1 (stereo) - 1 (sign)
-                if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<exp2(-15)) x = notch1(x);
-                if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]>exp2(-15)) x = notch3(x);
+                if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<2*exp2(-15)) x = notch1(x);
+                if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<2*exp2(-15)) x = notch3(x);
                 signal[i] = x;
             }
 
             uint expectedKey = highKey - t/rate/5; // Recorded one key every 5 seconds from high key to low key
-
-            const uint kMax = rate / (440*exp2(-4 - 0./12 - (1./2 / 12))); // ~27 Hz ~ half pitch under A-1 (k ~ 3593 samples at 96 kHz)
-            const uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half pitch over C7 (k ~ 22 at 96 kHz)
 
             float k = pitchEstimator.estimate(signal, kMax, fMax);
             float power = pitchEstimator.power;
@@ -152,10 +153,7 @@ struct PitchEstimation {
         }
         log("-", fail, "~", success,"["_+dec(round(100.*success/tries))+"%]"_,"/",tries, "["_+dec(round(100.*tries/total))+"%]"_, "/"_,total,
             "~", "["_+dec(round(100.*success/total))+"%]\t"_+
-            dec(round((float)totalTime))+"s "_+str(round(stereo.size/2./rate))+"s "_+str((stereo.size/2*1000/rate)/((uint64)totalTime))+" xRT"_,
-            dec(round(100.*pitchEstimator.localTime/pitchEstimator.totalTime)),
-            dec(round(100.*pitchEstimator.extendedTime/pitchEstimator.totalTime)),
-            dec(round(100.*pitchEstimator.forwardTime/pitchEstimator.totalTime))
+            dec(round((float)totalTime))+"s "_+str(round(stereo.size/2./rate))+"s "_+str((stereo.size/2*1000/rate)/((uint64)totalTime))+" xRT"_
             );
         /*if(offsets) {Plot plot;
             plot.xlabel = String("Key"_), plot.ylabel = String("Cents"_);

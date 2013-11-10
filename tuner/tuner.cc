@@ -17,7 +17,7 @@
 
 // Maps frequency (Hz) to position on X axis (log scale)
 float x(float f, int key, int2 size) {
-    float min = log2(keyToPitch(key-1)), max = log2(keyToPitch(key+1));
+    float min = log2(keyToPitch(key-1./2)), max = log2(keyToPitch(key+1./2));
     return (log2(f)-min)/(max-min) * size.x;
 }
 
@@ -26,9 +26,9 @@ struct EstimationPlot : Widget {
     struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
     array<Estimation> estimations;
 
-    int2 sizeHint() { return int2(-1024/3, -280); }
+    int2 sizeHint() { return int2(-1024/3, -236); }
     void render(int2 position, int2 size) {
-        log("EstimationPlot", position, size);
+        if(!key) return;
         float maxConfidence = 0; for(Estimation e: estimations) maxConfidence=max(maxConfidence, e.confidence);
         buffer<vec3> target (size.x); clear(target.begin(), size.x, vec3(0));
         for(uint i: range(estimations.size)) { // Fills with an asymetric tent gradient (linear approximation of confidence in log space)
@@ -66,15 +66,17 @@ struct PeriodPlot : Widget {
     const uint rate;
 
     PeriodPlot(uint rate) : rate(rate) {}
-    int2 sizeHint() { return int2(-1024/3, -280); }
+    int2 sizeHint() { return int2(-1024/3, -236); }
     void render(int2 position, int2 size) {
-        log("PeriodPlot", position, size);
+        if(!key) return;
         float y0 = position.y+size.y;
-        float fMin = keyToPitch(key-1), fMax = keyToPitch(key-1);
+        float fMin = keyToPitch(key-1./2), fMax = keyToPitch(key+1./2);
         int kMin = rate/fMax, kMax = ceil(rate/fMin);
+        kMin = max(kMin, 1);
         kMax = min<uint>(kMax, data.size);
         float sMax = 0;
         for(uint k: range(kMin, kMax)) sMax = max(sMax, data[k]);
+        if(!sMax) return;
         for(uint k: range(kMin, kMax)) {
             float f0 = (float)rate/(k+1), f1 = (float)rate/k;
             float x0 = x(f0, key, size), x1 = x(f1, key, size);
@@ -91,14 +93,17 @@ struct FrequencyPlot : Widget {
     const uint rate;
 
     FrequencyPlot(uint rate) : rate(rate) {}
-    int2 sizeHint() { return int2(-1024/3, -280); }
+    int2 sizeHint() { return int2(-1024/3, -236); }
     void render(int2 position, int2 size) {
+        if(!key) return;
         float y0 = position.y+size.y;
         const uint N = data.size*2;
-        float fMin = keyToPitch(key-1), fMax = keyToPitch(key-1);
-        int iMin = fMin*N/rate, iMax = ceil(fMax*N/rate);
+        float fMin = keyToPitch(key-1), fMax = keyToPitch(key+1);
+        uint iMin = fMin*N/rate, iMax = ceil(fMax*N/rate);
+        iMax = min(iMax, N/2);
         float sMax = 0;
         for(uint i: range(iMin, iMax)) sMax = max(sMax, data[i]);
+        if(!sMax) return;
         for(uint i: range(iMin, iMax)) {
             float f0 = (float)i*rate/N, f1 = (float)(i+1)*rate/N;
             float x0 = x(f0, key, size), x1 = x(f1, key, size);
@@ -123,10 +128,10 @@ struct OffsetPlot : Widget {
         for(uint i: range(keyCount)) s << str(offsets[i]*100) << " "_ << str(sqrt(variances[i])*100) << "\n"_;
         writeFile("offsets.profile"_, s, config());
     }
-    int2 sizeHint() { return int2(keyCount*12, 192); }
+    int2 sizeHint() { return int2(keyCount*12, -236); }
     void render(int2 position, int2 size) {
-        float minimumOffset = -1./4;
-        float maximumOffset = 1./4;
+        float minimumOffset = -1./8;
+        float maximumOffset = 1./8;
         for(int key: range(keyCount)) {
             int x0 = position.x + key * size.x / keyCount;
             int x1 = position.x + (key+1) * size.x / keyCount;
@@ -182,7 +187,7 @@ struct Tuner : Poll {
 #endif
 
     // Input-dependent parameters
-    float noiseFloor = exp2(-15); // Power relative to full scale
+    float noiseFloor = exp2(-8); // Power relative to full scale
     uint kMax = rate / (440*exp2(-4 - 0./12 - (1./2 / 12))); // ~27 Hz ~ half pitch under A-1 (k ~ 3593 samples at 96 kHz)
     uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half semitone over C7
 
@@ -202,14 +207,14 @@ struct Tuner : Poll {
 
     float previousPowers[3] = {0,0,0}; // Power history to trigger estimation only on decay
     array<int> keyEstimations;
-    uint instantKey = 0, currentKey = 0;
+    uint instantKey = 0, currentKey = 0, worstKey = 0;
 
 
     map<string,string> args;
     PeriodPlot autocorrelation {rate};
     EstimationPlot estimations;
     FrequencyPlot spectrum {rate};
-    const uint textSize = 32;
+    const uint textSize = 64;
     Text kOffset {""_, textSize, white};
     Text kError {""_, textSize, white};
     Text key {""_, textSize, white};
@@ -217,18 +222,22 @@ struct Tuner : Poll {
     Text fOffset {""_, textSize, white};
     Text fError {""_, textSize, white};
     OffsetPlot profile;
-    WidgetGrid grid {{
-        &autocorrelation, &estimations, &spectrum,
-                &kOffset, &key, &fOffset,
-                &kError, &pitch, &fError }};
-    VBox layout {{&grid, &profile}};
+    /*HList<VBox> grid {
+        move(array<VBox>()
+                << VBox({&autocorrelation, &kOffset, &kError})
+                << VBox({&estimations,  &key, &fOffset})
+                << VBox({&spectrum, &pitch, &fError })
+             )};
+    VBox layout {{&grid, &profile}};*/
+    WidgetGrid grid {{&kOffset,&key,&fOffset,&kError,&pitch,&fError}};
+    VBox layout {{&estimations, &grid, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
     Tuner() {
         log(__TIME__);
         log(input.sampleBits, input.rate, input.periodSize,
             strKey(round(pitchToKey(notch1.frequency*rate))), strKey(round(pitchToKey(notch3.frequency*rate))));
         for(string arg: arguments()) { string key=section(arg,'='), value=section(arg,'=',1); if(key) args.insert(key, value); }
-        if(args.contains("floor"_)) { noiseFloor=exp2(toDecimal(args.at("floor"_))); log("Noise floor: ",log2(noiseFloor),"dB2FS"); }
+        if(args.contains("floor"_)) { noiseFloor=exp2(-toInteger(args.at("floor"_))); log("Noise floor: ",log2(noiseFloor),"dB2FS"); }
         if(args.contains("min"_)) { kMax = rate/toInteger(args.at("min"_)); log("Maximum period"_, kMax, "~"_, rate/kMax, "Hz"_); }
         if(args.contains("max"_)) { fMax = toInteger(args.at("max"_))*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
         window.backgroundColor=window.backgroundCenter=0;
@@ -265,8 +274,8 @@ struct Tuner : Poll {
             raw[2*(writeIndex+i)+1] = input[i*2+1];
             real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
             //FIXME: the notches might also affects nearby keys
-            if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<exp2(-15)) x = notch1(x);
-            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<exp2(-15)) x = notch3(x);
+            /*if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor)*/ x = notch1(x);
+            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<noiseFloor) x = notch3(x);
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -328,6 +337,11 @@ struct Tuner : Poll {
                 float variance = sq(offset - keyOffset);
                 float& keyVariance = profile.variances[key-21];
                 {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
+                uint worstKey = this->worstKey;
+                for(uint i: range(2, keyCount-2))
+                    if(abs(profile.offsets[i])+sqrt(profile.variances[i]) > abs(profile.offsets[worstKey])+sqrt(profile.variances[worstKey]))
+                        worstKey = i;
+                if(worstKey != this->worstKey) { this->worstKey=worstKey; window.setTitle(strKey(21+worstKey)); }
             }
         } else if(keyEstimations.size) keyEstimations.take(0);
 
