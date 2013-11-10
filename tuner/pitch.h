@@ -22,9 +22,19 @@ struct FFT {
     }
 };
 
+#include "simd.h"
+float correlation(const float* a, const float* b, uint N) {
+    v4sf sum = {0,0,0,0};
+    for(uint i=0; i<N; i+=4) sum += loadu(a+i) * loadu(b+i); // FIXME: align one, align both when possible
+    return sum[0]+sum[1]+sum[2]+sum[3];
+}
+
+float autocorrelation(const float* x, uint k, uint N) { return correlation(x,x+k,N-k); }
+
 struct PitchEstimator : FFT {
     using FFT::FFT;
     buffer<float> spectrum {N/2};
+    buffer<float> autocorrelations;
     uint fPeak;
     float power;
     uint period;
@@ -67,6 +77,9 @@ struct PitchEstimator : FFT {
 
         float bestK = (float)N/fPeak;
         if(fPeak < autocorrelationFrequency) { // High pitches are accurately found by spectrum peak picker [+58]
+            autocorrelations = buffer<float>(kMax);
+            clear(autocorrelations.begin(), kMax);
+
             float max=0;
             uint maximumPeriods = fPeak < highPartialFrequency ? highPartialMaximumPeriods : lowPartialMaximumPeriods; // [f<N/64: +4, 5th: +3]
             maximumPeriods = min(maximumPeriods, fPeak*kMax/N);
@@ -75,7 +88,8 @@ struct PitchEstimator : FFT {
                 int k0 = i*N/fPeak;
                 int octaveBestK = k0;
                 for(uint k=k0;k>N/fMax;k--) { // Evaluates slightly smaller periods [+22]
-                    float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
+                    float sum = autocorrelation(signal, k, N);
+                    autocorrelations[k] = sum;
                     sum *= 1 - i*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
                     if(sum > max) max = sum, octaveBestK = k, bestK = k, period=i;
                     else if(k*extendedSearch<octaveBestK*(extendedSearch-1)) break; // Search beyond local minimums to match lowest notes [+22]
@@ -83,7 +97,8 @@ struct PitchEstimator : FFT {
                 }
             }
             for(int k=bestK+1;;k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch (+3)
-                float sum=0; for(uint i: range(N-k)) sum += signal[i]*signal[k+i];
+                float sum = autocorrelation(signal, k, N);
+                autocorrelations[k] = sum;
                 sum *= 1 - period*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
                 if(sum > max) max = sum, bestK = k;
                 else break;

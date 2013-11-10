@@ -30,7 +30,7 @@
 #include "simd.h"
 #include "resample.h"
 
-inline float product(const float* kernel, const float* signal, int len) {
+static float product(const float* kernel, const float* signal, int len) {
     v4sf sum = {0,0,0,0};
     for(int i=0;i<len;i+=4) sum += loada(kernel+i) * loadu(signal+i);
     return sum[0]+sum[1]+sum[2]+sum[3];
@@ -58,7 +58,7 @@ static double sinc(double cutoff, double x, int N) {
 }
 
 /// Returns the largest positive integer that divides the numbers without a remainder
-inline int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
+int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
 Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize) {
     assert(channels==this->channels);

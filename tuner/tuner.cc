@@ -14,6 +14,100 @@
 #include "ffmpeg.h"
 #endif
 
+
+// Maps frequency (Hz) to position on X axis (log scale)
+float x(float f, int key, int2 size) {
+    float min = log2(keyToPitch(key-1)), max = log2(keyToPitch(key+1));
+    return (log2(f)-min)/(max-min) * size.x;
+}
+
+struct EstimationPlot : Widget {
+    uint key = 0;
+    struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
+    array<Estimation> estimations;
+
+    int2 sizeHint() { return int2(-1024/3, -280); }
+    void render(int2 position, int2 size) {
+        log("EstimationPlot", position, size);
+        float maxConfidence = 0; for(Estimation e: estimations) maxConfidence=max(maxConfidence, e.confidence);
+        buffer<vec3> target (size.x); clear(target.begin(), size.x, vec3(0));
+        for(uint i: range(estimations.size)) { // Fills with an asymetric tent gradient (linear approximation of confidence in log space)
+            Estimation e = estimations[i];
+            float xMin = x(e.fMin, key, size), x0=x(e.f0, key, size), xMax = x(e.fMax, key, size);
+            float a0 = 1;
+            a0 *= e.confidence / maxConfidence; // Power
+            a0 *= (float) (i/2+1) / (estimations.size/2); // Time
+            for(uint x: range(max<int>(0,xMin+1), min<int>(size.x,x0+1))) {
+                float a = a0 * (1-(x0-x)/(x0-xMin));
+                assert(a>=0 && a<=1, a, xMin, x, x0);
+                target[x] = (1-a)*target[x] + a*e.color; // Blend
+            }
+            for(uint x: range(max<int>(0,x0+1), min<int>(size.x,xMax))) {
+                float a = a0 * (1-(x-x0)/(xMax-x0));
+                assert(a>=0 && a<=1, a, x0, x, xMax);
+                target[x] = (1-a)*target[x] + a*e.color; // Blend
+            }
+        }
+        for(uint x: range(size.x)) {
+            byte4 value (sRGB(target[x].x), sRGB(target[x].y), sRGB(target[x].z), 0xFF);  // Converts to sRGB
+            byte4* target = &framebuffer(position.x+x,position.y);
+            uint stride = framebuffer.stride;
+            //TODO: take inharmonicity into account to widen reference (physical explicit (Railsback) and/or statistical implicit (entropy))
+            if(x==(uint)size.x/2) value = 0xFF;
+            for(uint y=0; y<size.y*stride; y+=stride) target[y] = value; // Copies along the whole columns
+        }
+    }
+};
+
+//FIXME: factorize with FrequencyPlot?
+struct PeriodPlot : Widget {
+    uint key = 0;
+    ref<float> data;
+    const uint rate;
+
+    PeriodPlot(uint rate) : rate(rate) {}
+    int2 sizeHint() { return int2(-1024/3, -280); }
+    void render(int2 position, int2 size) {
+        log("PeriodPlot", position, size);
+        float y0 = position.y+size.y;
+        float fMin = keyToPitch(key-1), fMax = keyToPitch(key-1);
+        int kMin = rate/fMax, kMax = ceil(rate/fMin);
+        kMax = min<uint>(kMax, data.size);
+        float sMax = 0;
+        for(uint k: range(kMin, kMax)) sMax = max(sMax, data[k]);
+        for(uint k: range(kMin, kMax)) {
+            float f0 = (float)rate/(k+1), f1 = (float)rate/k;
+            float x0 = x(f0, key, size), x1 = x(f1, key, size);
+            float y = data[k] / sMax * size.y;
+            fill(position.x+x0,y0-y,position.x+x1,y0,white);
+        }
+    }
+};
+
+//FIXME: factorize with PeriodPlot?
+struct FrequencyPlot : Widget {
+    uint key = 0;
+    ref<float> data; //N/2
+    const uint rate;
+
+    FrequencyPlot(uint rate) : rate(rate) {}
+    int2 sizeHint() { return int2(-1024/3, -280); }
+    void render(int2 position, int2 size) {
+        float y0 = position.y+size.y;
+        const uint N = data.size*2;
+        float fMin = keyToPitch(key-1), fMax = keyToPitch(key-1);
+        int iMin = fMin*N/rate, iMax = ceil(fMax*N/rate);
+        float sMax = 0;
+        for(uint i: range(iMin, iMax)) sMax = max(sMax, data[i]);
+        for(uint i: range(iMin, iMax)) {
+            float f0 = (float)i*rate/N, f1 = (float)(i+1)*rate/N;
+            float x0 = x(f0, key, size), x1 = x(f1, key, size);
+            float y = data[i] / sMax * size.y;
+            fill(position.x+x0,y0-y,position.x+x1,y0,white);
+        }
+    }
+};
+
 const uint keyCount = 85;
 
 struct OffsetPlot : Widget {
@@ -69,7 +163,7 @@ struct OffsetPlot : Widget {
 };
 
 /// Estimates fundamental frequency (~pitch) of audio input
-struct Tuner : Widget, Poll {
+struct Tuner : Poll {
     // Static parameters
     static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
     const uint periodSize = 4096; // Overlaps to increase time resolution (compensates loss from Hann window (which improves frequency resolution))
@@ -109,13 +203,25 @@ struct Tuner : Widget, Poll {
     float previousPowers[3] = {0,0,0}; // Power history to trigger estimation only on decay
     array<int> keyEstimations;
     uint instantKey = 0, currentKey = 0;
-    struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
-    array<Estimation> estimations;
+
 
     map<string,string> args;
-    UniformGrid<Text> info {3,2};
-    OffsetPlot offsets;
-    VBox layout {{this, &info, &offsets}};
+    PeriodPlot autocorrelation {rate};
+    EstimationPlot estimations;
+    FrequencyPlot spectrum {rate};
+    const uint textSize = 32;
+    Text kOffset {""_, textSize, white};
+    Text kError {""_, textSize, white};
+    Text key {""_, textSize, white};
+    Text pitch {""_, textSize, white};
+    Text fOffset {""_, textSize, white};
+    Text fError {""_, textSize, white};
+    OffsetPlot profile;
+    WidgetGrid grid {{
+        &autocorrelation, &estimations, &spectrum,
+                &kOffset, &key, &fOffset,
+                &kError, &pitch, &fError }};
+    VBox layout {{&grid, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
     Tuner() {
         log(__TIME__);
@@ -127,7 +233,6 @@ struct Tuner : Widget, Poll {
         if(args.contains("max"_)) { fMax = toInteger(args.at("max"_))*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
-        info.grow(6);
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
@@ -148,7 +253,6 @@ struct Tuner : Widget, Poll {
         t += size;
         float time = ((float)size/rate) / (float)realTime; // Instant playback rate
         const float alpha = 1./16; frameTime = (1-alpha)*frameTime + alpha*(float)time; // IIR Smoother
-        //if((t/size)%(rate/size)==0) log(dec( ((float)t/rate) / (float)totalTime));
         realTime.reset();
         timer.setRelative(size*1000/rate/8); // 8xRT
     }
@@ -162,7 +266,7 @@ struct Tuner : Widget, Poll {
             real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
             //FIXME: the notches might also affects nearby keys
             if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<exp2(-15)) x = notch1(x);
-            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]>exp2(-15)) x = notch3(x);
+            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<exp2(-15)) x = notch3(x);
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -210,25 +314,19 @@ struct Tuner : Widget, Poll {
             array<int> maxKeys; for(int key: keyEstimations) if(count[key]==maxCount) maxKeys << key; // Keeps most frequent keys
             currentKey = maxKeys.last(); // Resolve ties by taking last (most recent)
 
-            const uint textSize = 64;
-            info[0] = Text(dec(round(100*kOffset)), textSize, white);
-            info[3] = Text(dec(round(100*kError)), textSize, white);
-            info[1] = Text(strKey(key), textSize, white);
-            info[4] = Text(dec(round(fError<kError ? f*rate/N : rate/k)), textSize, white);
-            info[2] = Text(dec(round(100*fOffset)), textSize, white);
-            info[5] = Text(dec(round(100*fError)), textSize, white);
-            if(args.contains("gate"_)) { // DEBUG: Shows notch states
-                info.grow(8);
-                info[6] = Text(dec(notch1.frequency*rate)+": "_+(abs(currentKey-pitchToKey(notch1.frequency*rate)) > 1?"ON"_:"OFF"_), textSize, white);
-                info[7] = Text(dec(notch3.frequency*rate)+": "_+(abs(currentKey-pitchToKey(notch3.frequency*rate)) > 1?"ON"_:"OFF"_), textSize, white);
-            }
+            this->kOffset.setText(dec(round(100*kOffset)));
+            this->kError.setText(dec(round(100*kError)));
+            this->key.setText(strKey(key));
+            this->pitch.setText(dec(round(fError<kError ? f*rate/N : rate/k)));
+            this->fOffset.setText(dec(round(100*fOffset)));
+            this->fError.setText(dec(round(100*fError)));
 
             if(key>=21 && key<21+keyCount && key==currentKey && maxCount>=2) {
                 float offset = kError<fError ? kOffset : fOffset;
-                float& keyOffset = offsets.offsets[key-21];
+                float& keyOffset = profile.offsets[key-21];
                 {const float alpha = 1./8; keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes (~1sec)
                 float variance = sq(offset - keyOffset);
-                float& keyVariance = offsets.variances[key-21];
+                float& keyVariance = profile.variances[key-21];
                 {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
             }
         } else if(keyEstimations.size) keyEstimations.take(0);
@@ -237,50 +335,26 @@ struct Tuner : Widget, Poll {
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
         shiftPeriods(power);
 
+        // Autocorrelation
+        autocorrelation.key = instantKey;
+        autocorrelation.data = pitchEstimator.autocorrelations;
+
+        // Spectrum
+        spectrum.key = instantKey;
+        spectrum.data = pitchEstimator.spectrum;
+
+        // FIXME: -> EstimationPlot
         // Always add estimations so that they always fade out at the same speed
-        while(estimations.size > 16) estimations.take(0); //FIXME: ring buffer
-        estimations << Estimation{rate/(k+1), rate/k, rate/(k-1), power, vec3(0,kError<fError,1)};
-        estimations << Estimation{(f-1)*rate/N, f*rate/N, (f+1)*rate/N, power, vec3(1,fError<kError,0)};
+        while(estimations.estimations.size > 16) estimations.estimations.take(0); //FIXME: ring buffer
+        estimations.estimations << EstimationPlot::Estimation{rate/(k+1), rate/k, rate/(k-1), power, vec3(0,kError<fError,1)};
+        estimations.estimations << EstimationPlot::Estimation{(f-1)*rate/N, f*rate/N, (f+1)*rate/N, power, vec3(1,fError<kError,0)};
+        estimations.key = instantKey;
         window.render();
     }
     void shiftPeriods(float power) {
         previousPowers[2] = previousPowers[1];
         previousPowers[1] = previousPowers[0];
         previousPowers[0] = power;
-    }
-    void render(int2 position, int2 size) {
-        auto x = [&](float f)->float { // Maps frequency (Hz) to position on X axis (log scale)
-            float min = log2(keyToPitch(instantKey-1)), max = log2(keyToPitch(instantKey+1));
-            return (log2(f)-min)/(max-min) * size.x;
-        };
-
-        float maxConfidence = 0; for(Estimation e: estimations) maxConfidence=max(maxConfidence, e.confidence);
-        buffer<vec3> target (size.x); clear(target.begin(), size.x, vec3(0));
-        for(uint i: range(estimations.size)) { // Fills with an asymetric tent gradient (linear approximation of confidence in log space)
-            Estimation e = estimations[i];
-            float xMin = x(e.fMin), x0=x(e.f0), xMax = x(e.fMax);
-            float a0 = 1;
-            a0 *= e.confidence / maxConfidence; // Power
-            a0 *= (float) (i/2+1) / (estimations.size/2); // Time
-            for(uint x: range(max<int>(0,xMin+1), min<int>(size.x,x0+1))) {
-                float a = a0 * (1-(x0-x)/(x0-xMin));
-                assert(a>=0 && a<=1, a, xMin, x, x0);
-                target[x] = (1-a)*target[x] + a*e.color; // Blend
-            }
-            for(uint x: range(max<int>(0,x0+1), min<int>(size.x,xMax))) {
-                float a = a0 * (1-(x-x0)/(xMax-x0));
-                assert(a>=0 && a<=1, a, x0, x, xMax);
-                target[x] = (1-a)*target[x] + a*e.color; // Blend
-            }
-        }
-        for(uint x: range(size.x)) {
-            byte4 value (sRGB(target[x].x), sRGB(target[x].y), sRGB(target[x].z), 0xFF);  // Converts to sRGB
-            byte4* target = &framebuffer(x,position.y);
-            uint stride = framebuffer.stride;
-            //TODO: take inharmonicity into account to widen reference (physical explicit (Railsback) and/or statistical implicit (entropy))
-            if(x==(uint)size.x/2) value = 0xFF;
-            for(uint y=0; y<size.y*stride; y+=stride) target[y] = value; // Copies along the whole columns
-        }
     }
 } app;
 

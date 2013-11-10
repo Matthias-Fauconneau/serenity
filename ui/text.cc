@@ -125,7 +125,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, int size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
+Text::Text(const string& text, uint size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
 void Text::layout() {
     textSize=int2(0,size*resolution/96);
     TextLayout layout(text, size*resolution/96, wrap);
