@@ -141,7 +141,6 @@ struct Window : Socket, Poll {
 
     /// Synchronizes access to connection and event queue
     Lock lock;
-    Lock writeLock; // Necessary ?
 
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;
@@ -159,7 +158,7 @@ struct Window : Socket, Poll {
     uint format=0;
 
     uint16 sequence=-1;
-    void send(const ref<byte>& request);
+    uint send(const ref<byte>& request);
 
     struct QEvent { uint8 type; unique<XEvent> event; };
     array<QEvent> eventQueue;

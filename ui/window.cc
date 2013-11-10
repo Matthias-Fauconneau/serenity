@@ -182,9 +182,9 @@ void Window::event() {
         XEvent e = read<XEvent>();
         lock.unlock();
         processEvent(type, e);
-        while(eventQueue) { lock.lock(); QEvent e=eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     }
-    if(revents==IDLE) {
+    while(eventQueue) { lock.lock(); QEvent e=eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
+    if(revents==IDLE && needUpdate) {
         needUpdate = false;
         if(autoResize) {
             int2 hint = widget->sizeHint();
@@ -295,34 +295,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         /**/ if(type==MotionNotify) {
             cursorPosition = int2(e.x,e.y);
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton))
-                render();
-            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None))
-                render();
-            /*else if(anchor==Float) {
-                if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; }
-                bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
-                bool left = dragStart.x<dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-1;
-                if(e.state&Button1Mask) {
-                    int2 position=dragPosition, size=dragSize, delta=int2(e.rootX,e.rootY)-dragStart;
-                    if(top && left) position+=delta, size-=delta;
-                    else if(top && right) position.y+=delta.y, size+=int2(delta.x,-delta.y);
-                    else if(bottom && left) position.x+=delta.x, size+=int2(-delta.x,delta.y);
-                    else if(bottom && right) size+=delta;
-                    else if(top) position.y+=delta.y, size.y-=delta.y;
-                    else if(bottom) size.y+=delta.y;
-                    else if(left) position.x+=delta.x, size.x-=delta.x;
-                    else if(right) size.x+=delta.x;
-                    else position+=delta;
-                    position=clip(int2(0,16),position,displaySize), size=clip(int2(16,16),size,displaySize-int2(0,16));
-                    setGeometry(position,size);
-                } else {
-                    if((top && left)||(bottom && right)) cursor=Cursor::FDiagonal;
-                    else if((top && right)||(bottom && left)) cursor=Cursor::BDiagonal;
-                    else if(top || bottom) cursor=Cursor::Vertical;
-                    else if(left || right) cursor=Cursor::Horizontal;
-                }
-            }*/
+            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
+            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
             if(cursor!=lastCursor) setCursor(cursor);
         }
         else if(type==ButtonPress) {
@@ -332,8 +306,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==ButtonRelease) {
             drag=0;
-            if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key))
-                render();
+            if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
         } else if(type==KeyPress) {
             Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
             if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); // Normal keyPress event
@@ -348,14 +321,12 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
-            //signal<>* shortcut = shortcuts.find(Widget::Leave);
-            //if(shortcut) (*shortcut)(); // Local window shortcut
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                    e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
         }
         else if(type==Expose) { if(!e.expose.count) render(); }
         else if(type==UnmapNotify) mapped=false;
-        else if(type==MapNotify) { mapped=true; if(needUpdate) render(); }
+        else if(type==MapNotify) { mapped=true; if(needUpdate) queue(); }
         else if(type==ReparentNotify) {}
         else if(type==ConfigureNotify) {
             position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
@@ -373,19 +344,26 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
 }
-void Window::send(const ref<byte>& request) { writeLock.lock(); write(request); writeLock.unlock(); /*necessary?*/ sequence++; }
+uint Window::send(const ref<byte>& request) { write(request); return ++sequence; }
 template<class T> T Window::readReply(const ref<byte>& request) {
-    Locker lock(this->lock);
-    send(request);
+    Locker lock(this->lock); // Prevents a concurrent thread from reading the reply
+    uint sequence = send(request);
+    bool pendingEvents = false;
     for(;;) { uint8 type = read<uint8>();
         if(type==0) {
-            XError e=read<XError>(); processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }
+            XError e=read<XError>(); processEvent(0,(XEvent&)e);
+            if(e.seq==sequence) { if(pendingEvents) queue(); T t; clear((byte*)&t,sizeof(T)); return t; }
         }
-        else if(type==1) return read<T>();
-        else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
+        else if(type==1) {
+            T reply = read<T>();
+            assert(reply.seq==sequence);
+            if(pendingEvents) queue();
+            return reply;
+        }
+        else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::render() { if(mapped) queue(); else needUpdate=true; }
+void Window::render() { needUpdate=true; if(mapped) queue(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} registerPoll(); }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
@@ -422,6 +400,7 @@ void Window::setGeometry(int2 position, int2 size) {
 
 // Keyboard
 Key Window::KeySym(uint8 code, uint8 state) {
+    //FIXME: not atomic
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
     array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
     if(!keysyms) error(code,state); //return (Key)0;
@@ -448,10 +427,9 @@ uint Window::Atom(const string& name) {
     return readReply<InternAtomReply>(String(raw(r)+name+pad(4,r.length))).atom;
 }
 template<class T> array<T> Window::getProperty(uint window, const string& name, uint size) {
-    GetProperty r;
-    GetPropertyReply reply=readReply<GetPropertyReply>(({r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
-    {uint size=reply.length*reply.format/8;
-        array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
+    //FIXME: not atomic
+    GetProperty r; GetPropertyReply reply=readReply<GetPropertyReply>(({r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
+    {uint size=reply.length*reply.format/8;  array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
 }
 template array<uint> Window::getProperty(uint window, const string& name, uint size);
 template array<byte> Window::getProperty(uint window, const string& name, uint size);
@@ -474,13 +452,15 @@ String Window::getSelection(bool clipboard) {
     uint owner = readReply<GetSelectionOwnerReply>(({ if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
     if(!owner) return String();
     {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
-    for(;;) {
-        lock.lock();
+    bool pendingEvents = false;
+    for(Locker lock(this->lock);;) { // Lock prevents a concurrent thread from reading the SelectionNotify
         uint8 type = read<uint8>();
-        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); lock.unlock(); return getProperty<byte>(id,"UTF8_STRING"_); }
+        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); break; }
         eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())};
-        lock.unlock();
+        pendingEvents = true;
     }
+    if(pendingEvents) queue();
+    return getProperty<byte>(id,"UTF8_STRING"_);
 }
 
 // Cursor
@@ -518,8 +498,7 @@ Image Window::getSnapshot() {
     int shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
     buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
     {Shm::Attach r; r.seg=id+SnapshotSegment; r.shm=shm; send(raw(r));}
-    {Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment;
-        readReply<Shm::GetImageReply>(raw(r));}
+    {Shm::GetImage r; r.window=root; r.w=buffer.width, r.h=buffer.height; r.seg=id+SnapshotSegment; readReply<Shm::GetImageReply>(raw(r));}
     {Shm::Detach r; r.seg=id+SnapshotSegment; send(raw(r));}
     Image image = copy(buffer);
     for(uint y: range(image.height)) for(uint x: range(image.width)) {byte4& p=image(x,y); p.a=0xFF;}

@@ -247,6 +247,7 @@ struct Tuner : Poll {
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
         assert_(audio.rate == input.rate, audio.rate, input.rate);
+        noiseFloor = exp2(-16);
 #else
         input.start();
 #endif
@@ -275,7 +276,7 @@ struct Tuner : Poll {
             real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
             //FIXME: the notches might also affects nearby keys
             /*if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor)*/ x = notch1(x);
-            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<noiseFloor) x = notch3(x);
+            if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor) x = notch3(x);
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -330,7 +331,7 @@ struct Tuner : Poll {
             this->fOffset.setText(dec(round(100*fOffset)));
             this->fError.setText(dec(round(100*fError)));
 
-            if(key>=21 && key<21+keyCount && key==currentKey && maxCount>=2) {
+            if(/*power > 2*noiseFloor &&*/ key>=21 && key<21+keyCount && key==currentKey && maxCount>=2) {
                 float offset = kError<fError ? kOffset : fOffset;
                 float& keyOffset = profile.offsets[key-21];
                 {const float alpha = 1./8; keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes (~1sec)
