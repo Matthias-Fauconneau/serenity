@@ -25,46 +25,44 @@ struct FFT {
 #include "simd.h"
 float correlation(const float* a, const float* b, uint N) {
     v4sf sum = {0,0,0,0};
-    for(uint i=0; i<N; i+=4) sum += loadu(a+i) * loadu(b+i); // FIXME: align one, align both when possible
+    for(uint i=0; i<=N-4; i+=4) sum += loadu(a+i) * loadu(b+i); // FIXME: align one, align both when possible
     return sum[0]+sum[1]+sum[2]+sum[3];
 }
 
-float autocorrelation(const float* x, uint k, uint N) { return correlation(x,x+k,N-k); }
+float autocorrelation(const float* x, uint k, uint N) { return correlation(x,x+k,N-k) / (N-k); }
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
     buffer<float> spectrum {N/2};
     buffer<float> autocorrelations;
+    buffer<float> harmonicProducts;
     uint fPeak;
     float power;
     uint period;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
-    float estimate(const ref<float>& signal, uint kMax=0, uint fMax=0) {
-        if(!kMax) kMax=N/2; // Needs at least two periods for autocorrelation
-        if(!fMax) fMax = N/2; // Up to the critical frequency
-        assert_(kMax <= N/2 && fMax <= N/2, kMax, fMax);
+    /// \a fMin Minimum frequency for maximum peak selection (autocorrelation is still allowed to match lower pitches)
+    /// \a fMax Maximum frequency for highest peak selection (maximum peak is still allowed to select higher pitches)
+    float estimate(const ref<float>& signal, uint fMin, uint fMax, uint kMax) {
+        //if(!kMax) kMax=N/2; // Needs at least two periods for autocorrelation
+        //if(!fMax) fMax = N/2; // Up to the critical frequency
+        //assert_(kMax <= N/2 && fMax <= N/2, kMax, fMax);
         ref<float> halfcomplex = transform(signal);
         for(uint i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
-
+#if 0
         /// Estimator parameters
         const uint highPeakFrequency = min(fMax, N/16); // Minimum frequency to switch from global maximum to highest frequency selection
         const float highPeakRatio = 1./6; // Minimum energy (compared to global maximum) to be selected as an highest frequency peak
         const uint autocorrelationFrequency = N/8; // Maximum frequency to use autocorrelation optimization
-        const uint highPartialFrequency = N/32; // Maximum frequency to consider peak being over 15th partial and search until 24x the peak period
-        const uint highPartialMaximumPeriods = 24; // Maximum peak period multiple to search when peak is under high partial frequency
-        const uint lowPartialMaximumPeriods = 15; // Maximum peak period multiple to search when peak is over high partial frequency
-        const float multiplePeriodPenalty = 0/*1./128*/; // Penalty coefficient to avoid multiple periods when less periods match nearly as well
-        const float extendedSearch = 256; // Extends search to all k closer than (maximum / extendedSearch) from maximum (intensive)
+        const uint maximumPeriods = 23; // Maximum peak period multiple to search
 
         fPeak=0;
         {float firstPeak = 0; float energy=0;
-            const uint fMin = N/kMax;
-            uint i=fMin; //for(; i<highPeakFrequency; i++) if(spectrum[i] > spectrum[i-1]) break; // Descends to first local minimum
+            uint i = fMin; for(; i<highPeakFrequency; i++) if(spectrum[i-1] < spectrum[i]) break; // Descends to first local minimum
             for(; i<highPeakFrequency; i++) { // Selects maximum peak
                 energy+=spectrum[i];
                 if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i;
             }
-            for(uint i=highPeakFrequency; i<N/2; i++) {
+            for(uint i : range(highPeakFrequency, N/2)) {
                 energy+=spectrum[i];
                 if(spectrum[i] > highPeakRatio*firstPeak) {
                     if(spectrum[i] > firstPeak) firstPeak = spectrum[i], fPeak = i;
@@ -75,35 +73,73 @@ struct PitchEstimator : FFT {
         }
         if(fPeak==0) return nan;
 
-        float bestK = (float)N/fPeak;
+        float globalK = (float)N/fPeak;
         if(fPeak < autocorrelationFrequency) { // High pitches are accurately found by spectrum peak picker [+58]
             autocorrelations = buffer<float>(kMax);
             clear(autocorrelations.begin(), kMax);
 
-            float max=0;
-            uint maximumPeriods = fPeak < highPartialFrequency ? highPartialMaximumPeriods : lowPartialMaximumPeriods; // [f<N/64: +4, 5th: +3]
-            maximumPeriods = min(maximumPeriods, fPeak*kMax/N);
-            period = 1;
-            for(uint i=1; i <= maximumPeriods; i++) { // Search multiple periods
-                int k0 = i*N/fPeak;
-                int octaveBestK = k0;
-                for(uint k=k0;k>N/fMax;k--) { // Evaluates slightly smaller periods [+22]
+            harmonicProducts = buffer<float>(12*fMax);
+            clear(harmonicProducts.begin(), 12*fMax);
+
+            float globalMax=0;
+            for(uint i=1; i <= min(maximumPeriods, fPeak*kMax/N); i++) { // Evaluate multiple periods
+                float localMax = 0;
+                /*uint k0 = i*N/fPeak; //round(i*N/(fPeak+0.5));
+                const uint kMin = N/fMax;
+                // Autocorrelation optimization
+                uint localK = k0;
+                for(uint k=k0; k > kMin; k--) {  // Scans backward (increasing frequency) until local maximum
                     float sum = autocorrelation(signal, k, N);
                     autocorrelations[k] = sum;
-                    sum *= 1 - i*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
-                    if(sum > max) max = sum, octaveBestK = k, bestK = k, period=i;
-                    else if(k*extendedSearch<octaveBestK*(extendedSearch-1)) break; // Search beyond local minimums to match lowest notes [+22]
+                    if(sum > localMax) localMax=sum, localK=k;
+                    else break;
                 }
+                for(uint k=k0+1; k < kMax; k++) { // Scans forward (decreasing frequency) until local maximum
+                    float sum = autocorrelation(signal, k, N);
+                    autocorrelations[k] = sum;
+                    if(sum > localMax) localMax=sum, localK=k;
+                    else break;
+                }
+                if(localMax > globalMax) globalMax=localMax, globalK=localK, period=i;
+                // Harmonic product spectrum weight
+                for(uint n : range(2,12)) { uint i = n*N/localK; localMax *= spectrum[i]; }
+                //for(uint n : range(2,12)) { uint i = n*N/localK; localMax *= spectrum[i-1]+spectrum[i]+spectrum[i+1]; }*/
+
+                // Direct harmonic product spectrum optimization
+                uint localF = fPeak;
+                for(uint f=fPeak; f > fMin; f--) { // Scans backward (decreasing frequency) until local maximum
+                    float product=1; for(uint n : range(2,12)) product *= spectrum[n*f/i];
+                    harmonicProducts[12*f/i] = product;
+                    if(product > localMax) localMax=product, localF=f;
+                    else break;
+                }
+                for(uint f=fPeak; f < fMax; f++) { // Scans forward (increasing frequency) until local maximum
+                    float product=1; for(uint n : range(2,12)) product *= spectrum[n*f/i];
+                    harmonicProducts[12*f/i] = product;
+                    if(product > localMax) localMax=product, localF=f;
+                    else break;
+                }
+                if(localMax > globalMax) globalMax=localMax, globalK=i*N/localF, period=i;
             }
-            for(uint k=bestK+1; k<kMax; k++) { // Scans forward (increasing k) until local maximum to estimate subkey pitch (+3)
-                float sum = autocorrelation(signal, k, N);
-                autocorrelations[k] = sum;
-                sum *= 1 - period*multiplePeriodPenalty; // Penalizes to avoid some period doubling (overly sensitive) [+2]
-                if(sum > max) max = sum, bestK = k;
-                else break;
-            }
+
         }
-        return bestK;
+        return globalK;
+#else
+        float energy=0; //TODO: harmonic energy
+        for(uint i: range(fMin, N/2)) energy+=spectrum[i];
+        power = energy / sq(N/2-fMin);
+
+        harmonicProducts = buffer<float>(12*fMax);
+        clear(harmonicProducts.begin(), 12*fMax);
+        float max=0; uint hpsPeak=0;
+        for(uint i: range(fMin*12, min(12*fMax,N/2))) {
+            float product=1; for(uint n : range(2,12)) product *= spectrum[n*i/12];
+            harmonicProducts[i] = product;
+            if(product > max) max=product, hpsPeak = i;
+        }
+        period = 1;
+        return 12.*N/hpsPeak;
+#endif
     }
 };
 

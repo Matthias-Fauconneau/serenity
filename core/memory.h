@@ -88,6 +88,8 @@ generic struct buffer : mref<T> {
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
+/// Initializes a new buffer with the content of \a o
+generic buffer<T> copy(const ref<T>& o){ buffer<T> t(o.size, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
 generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.size); }
 

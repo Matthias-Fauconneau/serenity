@@ -14,7 +14,6 @@
 #include "ffmpeg.h"
 #endif
 
-
 // Maps frequency (Hz) to position on X axis (log scale)
 float x(float f, int key, int2 size) {
     float min = log2(keyToPitch(key-1./2)), max = log2(keyToPitch(key+1./2));
