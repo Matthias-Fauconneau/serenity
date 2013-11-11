@@ -41,84 +41,43 @@ void writeWaveFile(const string& path, const ref<int32>& data, int32 rate, int c
     file.write(cast<byte>(data));
 }
 
-// Maps frequency (Hz) with [fMin, fMax] to [0, 1] with a log scale
-float log(float f, float fMin, float fMax) { return (log2(f)-log2(fMin))/(log2(fMax)-log2(fMin)); }
-
-struct SpectrumPlot : Widget {
-    uint rate = 0;
-    ref<float> spectrum; //N/2
-    uint key = 0;
-    float f = 0;
-
-    void render(int2 position, int2 size) {
-        const uint N = spectrum.size*2;
-        const int minKey = min(key, (uint)floor(pitchToKey(rate*f/N)));
-        const int maxKey = max(key, (uint)ceil(pitchToKey(rate*f/N)))+3*12;
-        float fMin = keyToPitch(minKey), fMax = keyToPitch(maxKey);
-        const uint iMin = fMin*N/rate, iMax = fMax*N/rate;
-        float sMax = 0;
-        for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
-        if(!sMax) return;
-        for(uint i: range(iMin, iMax)) {
-            float x0 = log((float)i*rate/N, fMin, fMax) * size.x;
-            float x1 = log((float)(i+1)*rate/N, fMin, fMax) * size.x;
-            float y = spectrum[i] / sMax * (size.y-16);
-            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,white);
-            if(spectrum[i-1] < spectrum[i] && spectrum[i] > spectrum[i+1] && spectrum[i] > sMax/16) {
-                Text label(dec(round((float)i*rate/N)),16,white);
-                int2 labelSize = label.sizeHint();
-                float x = position.x+(x0+x1)/2;
-                label.render(int2(x-labelSize.x/2,position.y+size.y-y-labelSize.y),labelSize);
-            }
-        }
-    }
-};
-
 struct HarmonicPlot : Widget {
     static constexpr uint harmonics = PitchEstimator::harmonics;
     uint rate = 0;
     ref<real> harmonic;
-    uint key = 0;
-    float f = 0;
+    float fMin, fMax;
+    float log(float f) { return (log2(f)-log2(fMin))/(log2(fMax)-log2(fMin)); }
     void render(int2 position, int2 size) {
-        if(!key) return;
         const uint N = harmonic.size*2;
-        const int minKey = min(key, (uint)floor(pitchToKey(rate*f/N)))-12;
-        const int maxKey = max(key, (uint)ceil(pitchToKey(rate*f/N)))+12;
-        float fMin = keyToPitch(minKey), fMax = keyToPitch(maxKey);
         real sMax = 0;
-        const uint iMin = fMin*N/rate, iMax = fMax*N/rate;
-        for(uint i: range(iMin*harmonics, iMax*harmonics)) sMax = max(sMax, harmonic[i]);
+        const uint iMin = fMin*N*harmonics/rate, iMax = ceil(fMax*N*harmonics/rate);
+        for(uint i: range(iMin, iMax)) sMax = max(sMax, harmonic[i]);
         if(!sMax) return;
         real sMin = sMax;
-        for(uint i: range(iMin*harmonics*2, iMax*harmonics/2)) if(harmonic[i]) sMin = min(sMin, harmonic[i]);
-        for(uint i: range(harmonics*iMin, harmonics*iMax)) {
-            float x0 = log((float)i*rate/N/harmonics, fMin, fMax) * size.x;
-            float x1 = log((float)(i+1)*rate/N/harmonics, fMin, fMax) * size.x;
-            //float s = (log2(harmonic[i]) - log2(sMin)) / (log2(sMax)-log2(sMin));
+        for(uint i: range(iMin, iMax)) if(harmonic[i]) sMin = min(sMin, harmonic[i]);
+        for(uint i: range(iMin, iMax)) {
+            float x0 = log((float)i*rate/N/harmonics) * size.x;
+            float x1 = log((float)(i+1)*rate/N/harmonics) * size.x;
             float s =  (harmonic[i] - sMin) / (sMax-sMin);
             float y = s * (size.y-16);
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,white);
-            if(harmonic[i-1] < harmonic[i] && harmonic[i] > harmonic[i+1] && s > 1./2) {
+            /*if(harmonic[i-1] < harmonic[i] && harmonic[i] > harmonic[i+1] && s > 1./2) {
                 Text label(dec(round((float)i*rate/N/harmonics)),16,white);
                 int2 labelSize = label.sizeHint();
                 float x = position.x+(x0+x1)/2;
                 label.render(int2(x-labelSize.x/2,position.y+size.y-y-labelSize.y),labelSize);
-            }
+            }*/
         }
-        {float x = log(keyToPitch(key), fMin, fMax)*size.x;
+        {float x = log((fMin+fMax)/2)*size.x;
             fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(0,1,0,1));}
-        {float x = log(rate*f/N, fMin, fMax)*size.x;
-            fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(1,0,0,1));}
     }
 };
 
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
-    SpectrumPlot spectrum;
     HarmonicPlot harmonic;
     OffsetPlot profile;
-    VBox plots {{&spectrum, &harmonic, &profile}};
+    VBox plots {{&harmonic, &profile}};
     Window window {&plots, int2(1050, 1680/2), "Test"_};
 
     map<float,float> offsets;
@@ -187,15 +146,10 @@ struct PitchEstimation {
             float f = pitchEstimator.estimate(signal, fMin);
             uint key = round(pitchToKey(f*rate/N));
 
-            spectrum.rate = rate;
-            spectrum.spectrum = pitchEstimator.spectrum;
-            spectrum.key = expectedKey;
-            spectrum.f = f;
-
             harmonic.rate = rate;
-            harmonic.key = expectedKey;
             harmonic.harmonic = pitchEstimator.harmonic;
-            harmonic.f = f;
+            harmonic.fMin  = keyToPitch(key-0.5);
+            harmonic.fMax = keyToPitch(key+0.5);
 
             const float ratioThreshold = 0.21;
             const float maxThreshold = 11;
@@ -254,7 +208,7 @@ struct PitchEstimation {
 
             break;
         }
-        if(spectrum.spectrum || harmonic.harmonic) {
+        if(harmonic.harmonic) {
             window.setTitle(strKey(expectedKey));
             window.render();
         }

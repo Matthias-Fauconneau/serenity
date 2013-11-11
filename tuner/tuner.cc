@@ -20,38 +20,25 @@ struct HarmonicPlot : Widget {
     static constexpr uint harmonics = PitchEstimator::harmonics;
     uint rate = 0;
     ref<real> harmonic;
-    uint key = 0;
-    float f = 0;
+    float fMin, fMax;
+    float log(float f) { return (log2(f)-log2(fMin))/(log2(fMax)-log2(fMin)); }
     void render(int2 position, int2 size) {
-        if(!key) return;
         const uint N = harmonic.size*2;
-        const int minKey = min(key, (uint)floor(pitchToKey(rate*f/N)))-12;
-        const int maxKey = max(key, (uint)ceil(pitchToKey(rate*f/N)))+12;
-        float fMin = keyToPitch(minKey), fMax = keyToPitch(maxKey);
         real sMax = 0;
-        const uint iMin = fMin*N/rate, iMax = fMax*N/rate;
-        for(uint i: range(iMin*harmonics, iMax*harmonics)) sMax = max(sMax, harmonic[i]);
+        const uint iMin = fMin*N*harmonics/rate, iMax = ceil(fMax*N*harmonics/rate);
+        for(uint i: range(iMin, iMax)) sMax = max(sMax, harmonic[i]);
         if(!sMax) return;
         real sMin = sMax;
-        for(uint i: range(iMin*harmonics*2, iMax*harmonics/2)) if(harmonic[i]) sMin = min(sMin, harmonic[i]);
-        for(uint i: range(harmonics*iMin, harmonics*iMax)) {
-            float x0 = log((float)i*rate/N/harmonics, fMin, fMax) * size.x;
-            float x1 = log((float)(i+1)*rate/N/harmonics, fMin, fMax) * size.x;
-            //float s = (log2(harmonic[i]) - log2(sMin)) / (log2(sMax)-log2(sMin));
+        for(uint i: range(iMin, iMax)) if(harmonic[i]) sMin = min(sMin, harmonic[i]);
+        for(uint i: range(iMin, iMax)) {
+            float x0 = log((float)i*rate/N/harmonics) * size.x;
+            float x1 = log((float)(i+1)*rate/N/harmonics) * size.x;
             float s =  (harmonic[i] - sMin) / (sMax-sMin);
             float y = s * (size.y-16);
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,white);
-            if(harmonic[i-1] < harmonic[i] && harmonic[i] > harmonic[i+1] && s > 1./2) {
-                Text label(dec(round((float)i*rate/N/harmonics)),16,white);
-                int2 labelSize = label.sizeHint();
-                float x = position.x+(x0+x1)/2;
-                label.render(int2(x-labelSize.x/2,position.y+size.y-y-labelSize.y),labelSize);
-            }
         }
-        {float x = log(keyToPitch(key), fMin, fMax)*size.x;
+        {float x = log((fMin+fMax)/2)*size.x;
             fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(0,1,0,1));}
-        {float x = log(rate*f/N, fMin, fMax)*size.x;
-            fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(1,0,0,1));}
     }
 };
 
@@ -77,7 +64,7 @@ struct Tuner : Poll {
     // Input-dependent parameters
     const uint fMin  = N*440*exp2(-4)/rate; // ~27 Hz ~ A-1
     float ratioThreshold = 0.21;
-    float maxThreshold = 11;
+    float powerThreshold = 11;
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
     // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
@@ -99,23 +86,24 @@ struct Tuner : Poll {
     uint worstKey = 0;
 
     // UI
+    HarmonicPlot harmonic;
     const uint textSize = 64;
     Text key {""_, textSize, white};
     Text pitch {""_, textSize, white};
-    Text offset {""_, textSize, white};
-    Text error {""_, textSize, white};
-    HBox status {{&key,&pitch,&offset,&error}};
+    Text fOffset {""_, textSize, white};
+    Text fError {""_, textSize, white};
+    HBox status {{&key,&pitch,&fOffset,&fError}};
     OffsetPlot profile;
-    VBox layout {{&estimations, &status, &profile}};
+    VBox layout {{&harmonic, &status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
         map<string,string> args;
         for(string arg: arguments()) { string key=section(arg,'='), value=section(arg,'=',1); if(key) args.insert(key, value); }
-        if(args.contains("floor"_)) { noiseFloor=exp2(-toInteger(args.at("floor"_))); log("Noise floor: ",log2(noiseFloor),"dB2FS"); }
-        if(args.contains("min"_)) { kMax = rate/toInteger(args.at("min"_)); log("Maximum period"_, kMax, "~"_, rate/kMax, "Hz"_); }
-        if(args.contains("max"_)) { fMax = toInteger(args.at("max"_))*N/rate; log("Maximum frequency"_, fMax, "~"_, fMax*rate/N, "Hz"_); }
+        if(args.contains("ratio"_)) { ratioThreshold=toInteger(args.at("ratio"_))/100.; log("Ratio threshold: ", ratioThreshold); }
+        if(args.contains("power"_)) { powerThreshold=toInteger(args.at("power"_)); log("Power threshold: ", powerThreshold); }
+
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
         window.show();
@@ -123,7 +111,6 @@ struct Tuner : Poll {
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
         assert_(audio.rate == input.rate, audio.rate, input.rate);
-        noiseFloor = exp2(-16);
 #else
         input.start();
 #endif
@@ -168,7 +155,6 @@ struct Tuner : Poll {
                 log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
                 lastReport.reset(); skipped=0;
             }
-            shiftPeriods(previousPowers[0]); // Shifts in a dummy period for decay detection purposes
         }
         readCount.acquire(periodSize); periods++;
         frames++;
@@ -178,11 +164,15 @@ struct Tuner : Poll {
         for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies ring buffer tail into linear frame buffer
 
         float f = pitchEstimator.estimate(frame, fMin);
+        uint key = round(pitchToKey(f*rate/N));
 
-        if( pitchEstimator.harmonicMax > maxThreshold /*Harmonic content*/
+        harmonic.rate = rate;
+        harmonic.harmonic = pitchEstimator.harmonic;
+        harmonic.fMin  = keyToPitch(key-0.5);
+        harmonic.fMax = keyToPitch(key+0.5);
+
+        if( pitchEstimator.harmonicMax > powerThreshold /*Harmonic content*/
                 && pitchEstimator.harmonicMax / pitchEstimator.harmonicPower > ratioThreshold /*Single pitch*/ ) {
-
-            uint key = round(pitchToKey(rate/k));
 
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
@@ -190,8 +180,8 @@ struct Tuner : Poll {
 
             this->key.setText(strKey(key));
             this->pitch.setText(dec(round(f*rate/N )));
-            this->offset.setText(dec(round(100*offset)));
-            this->error.setText(dec(round(100*error)));
+            this->fOffset.setText(dec(round(100*offset)));
+            this->fError.setText(dec(round(100*error)));
 
             if(key>=21 && key<21+keyCount) {
                 float& keyOffset = profile.offsets[key-21];

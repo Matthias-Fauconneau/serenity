@@ -22,15 +22,6 @@ struct FFT {
     }
 };
 
-#include "simd.h"
-float correlation(const float* a, const float* b, uint N) {
-    v4sf sum = {0,0,0,0};
-    for(uint i=0; i<=N-4; i+=4) sum += loadu(a+i) * loadu(b+i); // FIXME: align one, align both when possible
-    return sum[0]+sum[1]+sum[2]+sum[3];
-}
-
-float autocorrelation(const float* x, uint k, uint N) { return correlation(x,x+k,N-k) / (N-k); }
-
 struct PitchEstimator : FFT {
     using FFT::FFT;
     static constexpr uint harmonics = 15;
