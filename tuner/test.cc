@@ -47,14 +47,14 @@ struct FrequencyPlot : Widget {
     uint key = 0;
     buffer<float> data; //N/2
     uint rate;
-    uint k = 0;
+    float f = 0;
 
     void render(int2 position, int2 size) {
         float y0 = position.y+size.y;
         const uint N = data.size*2;
         int minKey = key-12, maxKey = key+4*12;
-        minKey = min(minKey, (int)floor(pitchToKey(rate/k)));
-        maxKey = max(maxKey, (int)ceil(pitchToKey(rate/k)));
+        minKey = min(minKey, (int)floor(pitchToKey(rate*f/N)));
+        maxKey = max(maxKey, (int)ceil(pitchToKey(rate*f/N)));
         float fMin = keyToPitch(minKey), fMax = keyToPitch(maxKey);
         const uint iMin = fMin*N/rate, iMax = fMax*N/rate;
         assert(iMax < N/2);
@@ -82,15 +82,15 @@ struct PeriodPlot : Widget {
     buffer<float> data;
     buffer<float> spectrum;
     uint rate;
-    uint k = 0;
-    uint fPeak = 0;
+    uint f = 0;
+    //uint fPeak = 0;
     uint N = 0;
     void render(int2 position, int2 size) {
         if(!key) return;
         float y0 = position.y+size.y;
         int minKey = key-12, maxKey = key+4*12;
-        minKey = min(minKey, (int)floor(pitchToKey(rate/k)));
-        maxKey = max(maxKey, (int)ceil(pitchToKey(rate/k)));
+        minKey = min(minKey, (int)floor(pitchToKey(rate*f/N)));
+        maxKey = max(maxKey, (int)ceil(pitchToKey(rate*f/N)));
         float fMin = keyToPitch(minKey), fMax = keyToPitch(maxKey);
         int kMin = rate/fMax, kMax = rate/fMin;
         kMin = max(kMin, 1);
@@ -124,13 +124,13 @@ struct PeriodPlot : Widget {
             float y = (log2(data[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) * (size.y-16);
             fill(position.x+x0,y0-y,position.x+x1,y0,white);
         }
-        for(uint i: range(23)) {
+        /*for(uint i: range(23)) {
             uint k0 = round(i*N/(fPeak+0.5));
             float f0 = (float)rate/(k0+1), f1 = (float)rate/k0;
             float x0 = log(f0, fMin, fMax)*size.x, x1 = log(f1, fMin, fMax)*size.x;
             float y1 = position.y;
             fill(position.x+x0,y1,position.x+max(x0+1,x1),y0,blue);
-        }
+        }*/
         for(int i: range(0,2)) {
             uint k = rate/keyToPitch(key) * exp2(-i);
             float f0 = (float)rate/(k+1), f1 = (float)rate/k;
@@ -139,8 +139,8 @@ struct PeriodPlot : Widget {
             fill(position.x+x0,y1,position.x+max(x0+1,x1),y0, vec4(0,exp2(-abs(i)),0,1));
         }
         for(int i: range(0,2)) {
-            uint k = this->k * exp2(-i) ;
-            float f0 = (float)rate/(k+1), f1 = (float)rate/k;
+            float f = this->f * exp2(-i);
+            float f0 = rate*(f-1./24)/N, f1 = rate*(f+1./24)/N;
             float x0 = log(f0, fMin, fMax)*size.x, x1 = log(f1, fMin, fMax)*size.x;
             float y1 = position.y;
             fill(position.x+x0,y1,position.x+max(x0+1,x1),y0, vec4(exp2(-abs(i)),0,0,1));
@@ -200,8 +200,8 @@ struct PitchEstimation {
     //VList<Plot> plots;
     FrequencyPlot frequency;
     PeriodPlot period;
-    HarmonicProductPlot harmonic[5];
-    VBox plots {{&frequency, &period, &harmonic[0], &harmonic[1], &harmonic[2], &harmonic[3], &harmonic[4]}};
+    //HarmonicProductPlot harmonic[5];
+    VBox plots {{&frequency, &period/*, &harmonic[0], &harmonic[1], &harmonic[2], &harmonic[3], &harmonic[4]*/}};
     Window window {&plots, int2(1050, 1680/2), "Test"_};
 
     map<float,float> offsets;
@@ -239,7 +239,7 @@ struct PitchEstimation {
         assert_(((stereo.size/2+rate/2)/rate+3)/5==uint(highKey-lowKey+1));
         //writeWaveFile("all.wav"_,stereo, audio.rate, audio.channels);
 
-        this->harmonic[0].first = 1;
+        /*this->harmonic[0].first = 1;
         this->harmonic[0].last = 11;
         this->harmonic[0].smooth = -1;
         this->harmonic[1].first = 2;
@@ -253,7 +253,7 @@ struct PitchEstimation {
         this->harmonic[3].smooth = -1;
         this->harmonic[4].first = 3;
         this->harmonic[4].last = 10;
-        this->harmonic[4].smooth = -1;
+        this->harmonic[4].smooth = -1;*/
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();});
@@ -289,17 +289,18 @@ struct PitchEstimation {
                 break;
             }
 
-            float k = pitchEstimator.estimate(signal, fMin, fMax, kMax);
+            float f = pitchEstimator.estimate(signal, fMin, fMax);
             float power = pitchEstimator.power;
             assert_(power<1, power);
-            uint key = round(pitchToKey(rate/k));
+            //uint key = round(pitchToKey(rate/k));
+            uint key = round(pitchToKey(f*rate/N));
 
-            float expectedK = rate/keyToPitch(key);
+            /*float expectedK = rate/keyToPitch(key);
             const float kOffset = 12*log2(expectedK/k);
-            const float kError = 12*log2((expectedK+1)/expectedK);
+            const float kError = 12*log2((expectedK+1)/expectedK);*/
 
             float expectedF = keyToPitch(key)*N/rate;
-            float f = pitchEstimator.fPeak / pitchEstimator.period;
+            //float f = pitchEstimator.fPeak / pitchEstimator.period;
             const float fOffset =  12*log2(f/expectedF);
             const float fError =  12*log2((expectedF+1)/expectedF);
 
@@ -313,10 +314,11 @@ struct PitchEstimation {
             currentKey = maxKeys.last(); // Resolve ties by taking last (most recent)
 
             results << dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2)+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_
-                       +str(round(rate/k))+" Hz\t"_
-                       +str(k)+" (k)\t"_
-                       +str(round((float)pitchEstimator.fPeak*rate/N))+"/"_+str(pitchEstimator.period)+" Hz\t"_
-                       +(kError<1./8 ? dec(round(100*kOffset))+"  ("_+dec(round(100*kError))+")\t"_ : ""_)
+                       //+str(round(rate/k))+" Hz\t"_
+                       +str(round(f*rate/N))+" Hz\t"_
+                       //+str(k)+" (k)\t"_
+                       //+str(round((float)pitchEstimator.fPeak*rate/N))+"/"_+str(pitchEstimator.period)+" Hz\t"_
+                       //+(kError<1./8 ? dec(round(100*kOffset))+"  ("_+dec(round(100*kError))+")\t"_ : ""_)
                        +(fError<1./8 ? dec(round(100*fOffset))+"  ("_+dec(round(100*fError))+")\t"_ : ""_)
                        +dec(log2(previousPowers[1]))+" "_+dec(log2(previousPowers[0]))+" "_+dec(log2(power))+"\t"_
                        +dec(round(100*previousPowers[2]/previousPowers[1]),3)+" "_
@@ -337,25 +339,25 @@ struct PitchEstimation {
                 else {
                     //lastFail = results.size, fail++;
                     this->frequency.key = expectedKey;
-                    this->frequency.k = k;
+                    this->frequency.f = f;
                     this->frequency.rate = rate;
                     this->frequency.data = copy(pitchEstimator.spectrum);
                     this->period.key = expectedKey;
                     this->period.rate = rate;
                     //this->period.data = copy(pitchEstimator.autocorrelations);
                     this->period.data = copy(pitchEstimator.harmonicProducts);
-                    this->period.k = k;
+                    this->period.f = f;
                     this->period.N = pitchEstimator.N;
-                    this->period.fPeak = pitchEstimator.fPeak;
+                    //this->period.fPeak = pitchEstimator.fPeak;
                     this->period.signal = copy(ref<float>(signal));
                     this->period.spectrum = copy(pitchEstimator.spectrum);
-                    for(int i: range(5)) {
+                    /*for(int i: range(5)) {
                         this->harmonic[i].key = expectedKey;
                         this->harmonic[i].rate = rate;
                         this->harmonic[i].N = N;
-                        this->harmonic[i].k = k;
+                        this->harmonic[i].f = f;
                         this->harmonic[i].data = copy(pitchEstimator.spectrum);
-                    }
+                    }*/
                     for(string result: results.slice(max<int>(lastLog,results.size-256))) log(result);
                     /*{uint k=expectedKey;
                         log(strKey(k)+"\t"_+dec(round(keyToPitch(k)))+" Hz\t"_+
@@ -374,7 +376,7 @@ struct PitchEstimation {
                 }
                 if(fail > 16) break;*/
 
-                offsets.insertMulti(key-42, 100*(fError<kError ? fOffset : kOffset));
+                //offsets.insertMulti(key-42, 100*(fError<kError ? fOffset : kOffset));
             }
             total++;
 
