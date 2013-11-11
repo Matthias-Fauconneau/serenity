@@ -15,51 +15,45 @@
 #endif
 #include "profile.h"
 
-// Maps frequency (Hz) to position on X axis (log scale)
-float x(float f, int key, int2 size) {
-    float min = log2(keyToPitch(key-1./2)), max = log2(keyToPitch(key+1./2));
-    return (log2(f)-min)/(max-min) * size.x;
-}
-
-struct EstimationPlot : Widget {
+//FIXME: Share with test (or merge test and tuner?)
+struct HarmonicPlot : Widget {
+    static constexpr uint harmonics = PitchEstimator::harmonics;
+    uint rate = 0;
+    ref<real> harmonic;
     uint key = 0;
-    struct Estimation { float fMin, f0, fMax; float confidence; vec3 color; };
-    array<Estimation> estimations;
-
-    int2 sizeHint() { return int2(-1024/3, -236); }
+    float f = 0;
     void render(int2 position, int2 size) {
         if(!key) return;
-        float maxConfidence = 0; for(Estimation e: estimations) maxConfidence=max(maxConfidence, e.confidence);
-        buffer<vec3> target (size.x); clear(target.begin(), size.x, vec3(0));
-        for(uint i: range(estimations.size)) { // Fills with an asymetric tent gradient (linear approximation of confidence in log space)
-            Estimation e = estimations[i];
-            float xMin = x(e.fMin, key, size), x0=x(e.f0, key, size), xMax = x(e.fMax, key, size);
-            float a0 = 1;
-            a0 *= e.confidence / maxConfidence; // Power
-            a0 *= (float) i / estimations.size; // Time
-            for(uint x: range(max<int>(0,xMin+1), min<int>(size.x,x0+1))) {
-                float a = a0 * (1-(x0-x)/(x0-xMin));
-                assert(a>=0 && a<=1, a, xMin, x, x0);
-                target[x] = (1-a)*target[x] + a*e.color; // Blend
-            }
-            for(uint x: range(max<int>(0,x0+1), min<int>(size.x,xMax))) {
-                float a = a0 * (1-(x-x0)/(xMax-x0));
-                assert(a>=0 && a<=1, a, x0, x, xMax);
-                target[x] = (1-a)*target[x] + a*e.color; // Blend
+        const uint N = harmonic.size*2;
+        const int minKey = min(key, (uint)floor(pitchToKey(rate*f/N)))-12;
+        const int maxKey = max(key, (uint)ceil(pitchToKey(rate*f/N)))+12;
+        float fMin = keyToPitch(minKey), fMax = keyToPitch(maxKey);
+        real sMax = 0;
+        const uint iMin = fMin*N/rate, iMax = fMax*N/rate;
+        for(uint i: range(iMin*harmonics, iMax*harmonics)) sMax = max(sMax, harmonic[i]);
+        if(!sMax) return;
+        real sMin = sMax;
+        for(uint i: range(iMin*harmonics*2, iMax*harmonics/2)) if(harmonic[i]) sMin = min(sMin, harmonic[i]);
+        for(uint i: range(harmonics*iMin, harmonics*iMax)) {
+            float x0 = log((float)i*rate/N/harmonics, fMin, fMax) * size.x;
+            float x1 = log((float)(i+1)*rate/N/harmonics, fMin, fMax) * size.x;
+            //float s = (log2(harmonic[i]) - log2(sMin)) / (log2(sMax)-log2(sMin));
+            float s =  (harmonic[i] - sMin) / (sMax-sMin);
+            float y = s * (size.y-16);
+            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,white);
+            if(harmonic[i-1] < harmonic[i] && harmonic[i] > harmonic[i+1] && s > 1./2) {
+                Text label(dec(round((float)i*rate/N/harmonics)),16,white);
+                int2 labelSize = label.sizeHint();
+                float x = position.x+(x0+x1)/2;
+                label.render(int2(x-labelSize.x/2,position.y+size.y-y-labelSize.y),labelSize);
             }
         }
-        for(uint x: range(size.x)) {
-            byte4 value (sRGB(target[x].x), sRGB(target[x].y), sRGB(target[x].z), 0xFF);  // Converts to sRGB
-            byte4* target = &framebuffer(position.x+x,position.y);
-            uint stride = framebuffer.stride;
-            //TODO: take inharmonicity into account to widen reference (physical explicit (Railsback) and/or statistical implicit (entropy))
-            if(x==(uint)size.x/2) value = 0xFF;
-            for(uint y=0; y<size.y*stride; y+=stride) target[y] = value; // Copies along the whole columns
-        }
+        {float x = log(keyToPitch(key), fMin, fMax)*size.x;
+            fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(0,1,0,1));}
+        {float x = log(rate*f/N, fMin, fMax)*size.x;
+            fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(1,0,0,1));}
     }
 };
-
-
 
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
@@ -81,9 +75,9 @@ struct Tuner : Poll {
 #endif
 
     // Input-dependent parameters
-    float noiseFloor = exp2(-8); // Power relative to full scale
-    uint kMax = rate / (440*exp2(-4 - 0./12 - (1./2 / 12))); // ~27 Hz ~ half pitch under A-1 (k ~ 3593 samples at 96 kHz)
-    uint fMax = N*440*exp2(3 + 3./12 + (1./2 / 12))/rate; // ~4308 Hz ~ half semitone over C7
+    const uint fMin  = N*440*exp2(-4)/rate; // ~27 Hz ~ A-1
+    float ratioThreshold = 0.21;
+    float maxThreshold = 11;
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
     // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
@@ -94,18 +88,17 @@ struct Tuner : Poll {
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
+    // Filter
     Notch notch1 {1*50./rate, 1./12}; // Notch filter to remove 50Hz noise
-    //Notch notch3 {3*50./rate, 1./12}; // Cascaded to remove the first odd harmonic (3rd partial)
+    Notch notch3 {3*50./rate, 1./12}; // Cascaded to remove the first odd harmonic (3rd partial)
 
+    // Analysis
     PitchEstimator pitchEstimator {N};
 
-    float previousPowers[3] = {0,0,0}; // Power history to trigger estimation only on decay
-    array<int> keyEstimations;
-    uint instantKey = 0, currentKey = 0, worstKey = 0;
+    // Result
+    uint worstKey = 0;
 
-
-    map<string,string> args;
-    EstimationPlot estimations;
+    // UI
     const uint textSize = 64;
     Text key {""_, textSize, white};
     Text pitch {""_, textSize, white};
@@ -115,8 +108,10 @@ struct Tuner : Poll {
     OffsetPlot profile;
     VBox layout {{&estimations, &status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
+
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
+        map<string,string> args;
         for(string arg: arguments()) { string key=section(arg,'='), value=section(arg,'=',1); if(key) args.insert(key, value); }
         if(args.contains("floor"_)) { noiseFloor=exp2(-toInteger(args.at("floor"_))); log("Noise floor: ",log2(noiseFloor),"dB2FS"); }
         if(args.contains("min"_)) { kMax = rate/toInteger(args.at("min"_)); log("Maximum period"_, kMax, "~"_, rate/kMax, "Hz"_); }
@@ -155,9 +150,8 @@ struct Tuner : Poll {
             raw[2*(writeIndex+i)+0] = input[i*2+0];
             raw[2*(writeIndex+i)+1] = input[i*2+1];
             real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
-            //FIXME: the notches might also affects nearby keys
-            /*if(abs(instantKey-pitchToKey(notch1.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor)*/ x = notch1(x);
-            //if(abs(instantKey-pitchToKey(notch3.frequency*rate)) > 1 || previousPowers[0]<2*noiseFloor) x = notch3(x);
+            x = notch1(x);
+            x = notch3(x);
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -183,37 +177,23 @@ struct Tuner : Poll {
         for(uint i: range(min<int>(N,signal.size-readIndex))) frame[i] = signal[readIndex+i]; // Copies ring buffer head into linear frame buffer
         for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies ring buffer tail into linear frame buffer
 
-        float k = pitchEstimator.estimate(frame, kMax, fMax);
-        float power = pitchEstimator.power;
-        uint key = round(pitchToKey(rate/k));
+        float f = pitchEstimator.estimate(frame, fMin);
 
-        float expectedK = rate/keyToPitch(key);
-        const float kOffset = 12*log2(expectedK/k);
-        const float kError = 12*log2((expectedK+1)/expectedK);
+        if( pitchEstimator.harmonicMax > maxThreshold /*Harmonic content*/
+                && pitchEstimator.harmonicMax / pitchEstimator.harmonicPower > ratioThreshold /*Single pitch*/ ) {
 
-        float expectedF = keyToPitch(key)*N/rate;
-        float f = pitchEstimator.period ? pitchEstimator.fPeak / pitchEstimator.period : 0;
-        const float fOffset =  12*log2(f/expectedF);
-        const float fError =  12*log2((expectedF+1)/expectedF);
+            uint key = round(pitchToKey(rate/k));
 
-        if(power > noiseFloor && previousPowers[0] > power/16) {
-            instantKey = key;
-            if(keyEstimations.size>=3) keyEstimations.take(0);
-            keyEstimations << key;
-            map<int,int> count; int maxCount=0;
-            for(int key: keyEstimations) { count[key]++; maxCount = max(maxCount, count[key]); }
-            array<int> maxKeys; for(int key: keyEstimations) if(count[key]==maxCount) maxKeys << key; // Keeps most frequent keys
-            currentKey = maxKeys.last(); // Resolve ties by taking last (most recent)
+            float expectedF = keyToPitch(key)*N/rate;
+            const float offset =  12*log2(f/expectedF);
+            const float error =  12*log2((expectedF+1)/expectedF);
 
-            this->kOffset.setText(dec(round(100*kOffset)));
-            this->kError.setText(dec(round(100*kError)));
             this->key.setText(strKey(key));
-            this->pitch.setText(dec(round(fError<kError ? f*rate/N : rate/k)));
-            this->fOffset.setText(dec(round(100*fOffset)));
-            this->fError.setText(dec(round(100*fError)));
+            this->pitch.setText(dec(round(f*rate/N )));
+            this->offset.setText(dec(round(100*offset)));
+            this->error.setText(dec(round(100*error)));
 
-            if(/*power > 2*noiseFloor &&*/ key>=21 && key<21+keyCount && key==currentKey && maxCount>=2) {
-                float offset = kError<fError ? kOffset : fOffset;
+            if(key>=21 && key<21+keyCount) {
                 float& keyOffset = profile.offsets[key-21];
                 {const float alpha = 1./8; keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes (~1sec)
                 float variance = sq(offset - keyOffset);
@@ -226,32 +206,11 @@ struct Tuner : Poll {
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
             }
-        } else if(keyEstimations.size) keyEstimations.take(0);
+        }
 
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
-        shiftPeriods(power);
-
-        // Autocorrelation
-        autocorrelation.key = instantKey;
-        autocorrelation.data = pitchEstimator.autocorrelations;
-
-        // Spectrum
-        spectrum.key = instantKey;
-        spectrum.data = pitchEstimator.spectrum;
-
-        // FIXME: -> EstimationPlot
-        // Always add estimations so that they always fade out at the same speed
-        while(estimations.estimations.size > 16) estimations.estimations.take(0); //FIXME: ring buffer
-        estimations.estimations << EstimationPlot::Estimation{rate/(k+1), rate/k, rate/(k-1), power, vec3(0,kError<fError,1)};
-        estimations.estimations << EstimationPlot::Estimation{(f-1)*rate/N, f*rate/N, (f+1)*rate/N, power, vec3(1,fError<kError,0)};
-        estimations.key = instantKey;
         window.render();
-    }
-    void shiftPeriods(float power) {
-        previousPowers[2] = previousPowers[1];
-        previousPowers[1] = previousPowers[0];
-        previousPowers[0] = power;
     }
 } app;
 
