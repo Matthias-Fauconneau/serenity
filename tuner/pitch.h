@@ -33,9 +33,11 @@ float autocorrelation(const float* x, uint k, uint N) { return correlation(x,x+k
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
+    static constexpr uint harmonics = 15;
     buffer<float> spectrum {N/2};
-    buffer<float> harmonic {N/2};
-    float power;
+    buffer<real> harmonic {N/2};
+    real harmonicMax;
+    real harmonicPower;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
     /// \a fMin Minimum frequency for maximum peak selection (autocorrelation is still allowed to match lower pitches)
     /// \a fMax Maximum frequency for highest peak selection (maximum peak is still allowed to select higher pitches)
@@ -43,18 +45,17 @@ struct PitchEstimator : FFT {
         ref<float> halfcomplex = transform(signal);
         for(uint i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
 
-        float energy=0; //TODO: harmonic energy ?
-        for(uint i: range(fMin, N/2)) energy+=spectrum[i];
-        power = energy / sq(N/2-fMin);
-
         clear(harmonic.begin(), N/2);
-        float max=0; uint hpsPeak=0;
-        for(uint i: range(fMin*12, N/2)) {
-            float product=1; for(uint n : range(1,12)) product *= spectrum[n*i/12];
+        harmonicMax = 0; uint hpsPeak=0; float harmonicEnergy=0;
+        for(uint i: range(fMin*harmonics, N/2)) {
+            real product=1; for(uint n : range(1, harmonics)) product *= spectrum[n*i/harmonics];
+            product = log2(product);
             harmonic[i] = product;
-            if(product > max) max=product, hpsPeak = i;
+            if(product > harmonicMax) harmonicMax=product, hpsPeak = i;
+            if(product > 0) harmonicEnergy += product;
         }
-        return hpsPeak/12.;
+        harmonicPower = harmonicEnergy; // / (N/2 - fMin*harmonics);
+        return (hpsPeak+0.5)/harmonics;
     }
 };
 

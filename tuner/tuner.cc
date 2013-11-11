@@ -58,60 +58,6 @@ struct EstimationPlot : Widget {
     }
 };
 
-//FIXME: factorize with FrequencyPlot?
-struct PeriodPlot : Widget {
-    uint key = 0;
-    ref<float> data;
-    const uint rate;
-
-    PeriodPlot(uint rate) : rate(rate) {}
-    int2 sizeHint() { return int2(-1024/3, -236); }
-    void render(int2 position, int2 size) {
-        if(!key) return;
-        float y0 = position.y+size.y;
-        float fMin = keyToPitch(key-1./2), fMax = keyToPitch(key+1./2);
-        int kMin = rate/fMax, kMax = ceil(rate/fMin);
-        kMin = max(kMin, 1);
-        kMax = min<uint>(kMax, data.size);
-        float sMax = 0;
-        for(uint k: range(kMin, kMax)) sMax = max(sMax, data[k]);
-        if(!sMax) return;
-        for(uint k: range(kMin, kMax)) {
-            float f0 = (float)rate/(k+1), f1 = (float)rate/k;
-            float x0 = x(f0, key, size), x1 = x(f1, key, size);
-            float y = data[k] / sMax * size.y;
-            fill(position.x+x0,y0-y,position.x+x1,y0,white);
-        }
-    }
-};
-
-//FIXME: factorize with PeriodPlot?
-struct FrequencyPlot : Widget {
-    uint key = 0;
-    ref<float> data; //N/2
-    const uint rate;
-
-    FrequencyPlot(uint rate) : rate(rate) {}
-    int2 sizeHint() { return int2(-1024/3, -236); }
-    void render(int2 position, int2 size) {
-        if(!key) return;
-        float y0 = position.y+size.y;
-        const uint N = data.size*2;
-        float fMin = keyToPitch(key-1), fMax = keyToPitch(key+1);
-        uint iMin = fMin*N/rate, iMax = ceil(fMax*N/rate);
-        iMax = min(iMax, N/2);
-        float sMax = 0;
-        for(uint i: range(iMin, iMax)) sMax = max(sMax, data[i]);
-        if(!sMax) return;
-        for(uint i: range(iMin, iMax)) {
-            float f0 = (float)i*rate/N, f1 = (float)(i+1)*rate/N;
-            float x0 = x(f0, key, size), x1 = x(f1, key, size);
-            float y = data[i] / sMax * size.y;
-            fill(position.x+x0,y0-y,position.x+x1,y0,white);
-        }
-    }
-};
-
 const uint keyCount = 85;
 
 struct OffsetPlot : Widget {
@@ -210,9 +156,7 @@ struct Tuner : Poll {
 
 
     map<string,string> args;
-    PeriodPlot autocorrelation {rate};
     EstimationPlot estimations;
-    FrequencyPlot spectrum {rate};
     const uint textSize = 64;
     Text kOffset {""_, textSize, white};
     Text kError {""_, textSize, white};
