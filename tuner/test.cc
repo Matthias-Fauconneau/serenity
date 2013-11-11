@@ -10,6 +10,7 @@
 #include "window.h"
 #include "display.h"
 #include "text.h"
+#include "profile.h"
 
 uint parseKey(const string& value) {
     int note=24;
@@ -116,7 +117,8 @@ struct HarmonicPlot : Widget {
 struct PitchEstimation {
     SpectrumPlot spectrum;
     HarmonicPlot harmonic;
-    VBox plots {{&spectrum, &harmonic}};
+    OffsetPlot profile;
+    VBox plots {{&spectrum, &harmonic, &profile}};
     Window window {&plots, int2(1050, 1680/2), "Test"_};
 
     map<float,float> offsets;
@@ -135,6 +137,7 @@ struct PitchEstimation {
 
     const uint fMin  = N*440*exp2(-4)/rate; // ~27 Hz ~ A-1
 
+    uint expectedKey = highKey;
     uint lastKey = highKey;
     uint success = 0, fail=0, tries = 0, total=0;
     real minAllowMax = 0, minAllowRatio = 0;
@@ -143,6 +146,7 @@ struct PitchEstimation {
     Time totalTime;
 
     uint t=0;
+    float signal[N];
 
     PitchEstimation() {
         assert_(rate==96000, audio.rate);
@@ -151,12 +155,14 @@ struct PitchEstimation {
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
+        //window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
+        window.frameReady.connect(this, &PitchEstimation::next);
 
+        window.show();
+        profile.reset();
         next();
     }
 
-    float signal[N];
     void next() {
         t+=periodSize;
         for(; t<=stereo.size/2-N; t+=periodSize) {
@@ -169,11 +175,27 @@ struct PitchEstimation {
                 signal[N-periodSize+i] = x;
             }
 
-            uint expectedKey = highKey - t/rate/5; // Recorded one key every 5 seconds from high key to low key
-            if(expectedKey == parseKey("A#0"_)-12) {  log("Success"); break; }
+            expectedKey = highKey - t/rate/5; // Recorded one key every 5 seconds from high key to low key
+            if(expectedKey == parseKey("A#0"_)-12) {
+                log("-", fail, "~", success,"["_+dec(round(100.*success/tries))+"%]"_,"/",tries, "["_+dec(round(100.*tries/total))+"%]"_, "/"_,total,
+                    "~", "["_+dec(round(100.*success/total))+"%]\t"_+
+                    dec(round((float)totalTime))+"s "_+str(round(stereo.size/2./rate))+"s "_+str((stereo.size/2*1000/rate)/((uint64)totalTime))+" xRT"_
+                    );
+                return;
+            }
 
             float f = pitchEstimator.estimate(signal, fMin);
             uint key = round(pitchToKey(f*rate/N));
+
+            spectrum.rate = rate;
+            spectrum.spectrum = pitchEstimator.spectrum;
+            spectrum.key = expectedKey;
+            spectrum.f = f;
+
+            harmonic.rate = rate;
+            harmonic.key = expectedKey;
+            harmonic.harmonic = pitchEstimator.harmonic;
+            harmonic.f = f;
 
             const float ratioThreshold = 0.21;
             const float maxThreshold = 11;
@@ -194,31 +216,27 @@ struct PitchEstimation {
                     && pitchEstimator.harmonicMax / pitchEstimator.harmonicPower > ratioThreshold /*Single pitch*/ ) {
 
                 float expectedF = keyToPitch(key)*N/rate;
-                const float fOffset = 12*log2(f/expectedF);
-                const float fError = 12*log2((expectedF+1./PitchEstimator::harmonics)/expectedF);
+                const float offset = 12*log2(f/expectedF);
+                const float error = 12*log2((expectedF+1./PitchEstimator::harmonics)/expectedF);
 
                 log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2)+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_
-                    +str(round(f*rate/N))+" Hz\t"_ +dec(round(100*fOffset))+"  ("_+dec(round(100*fError))+")\t"_
+                    +str(round(f*rate/N))+" Hz\t"_ +dec(round(100*offset))+"  ("_+dec(round(100*error))+")\t"_
                     /*+(expectedKey == key ? "O"_ : "X"_)*/);
                 lastKey = key;
                 if(expectedKey==key) success++;
                 else {
-                    spectrum.rate = rate;
-                    spectrum.spectrum = pitchEstimator.spectrum;
-                    spectrum.key = expectedKey;
-                    spectrum.f = f;
-
-                    harmonic.rate = rate;
-                    harmonic.key = expectedKey;
-                    harmonic.harmonic = pitchEstimator.harmonic;
-                    harmonic.f = f;
                     log(str(minAllowMax)+" "_+str(globalMaxDenyMax)+" "_+str(minAllowRatio)+" "_+str(globalMaxDenyRatio));
                     log("False positive");
                     break;
                 }
                 tries++;
 
-                //offsets.insertMulti(key-42, 100*(fError<kError ? fOffset : kOffset));
+                assert(key>=21 && key<21+keyCount);
+                float& keyOffset = profile.offsets[key-21];
+                {const float alpha = 1./8; keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes (~1sec)
+                float variance = sq(offset - keyOffset);
+                float& keyVariance = profile.variances[key-21];
+                {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
             }
             total++;
 
@@ -233,15 +251,12 @@ struct PitchEstimation {
                     break;
                 }
             }
+
+            break;
         }
-        log("-", fail, "~", success,"["_+dec(round(100.*success/tries))+"%]"_,"/",tries, "["_+dec(round(100.*tries/total))+"%]"_, "/"_,total,
-            "~", "["_+dec(round(100.*success/total))+"%]\t"_+
-            dec(round((float)totalTime))+"s "_+str(round(stereo.size/2./rate))+"s "_+str((stereo.size/2*1000/rate)/((uint64)totalTime))+" xRT"_
-            );
-        /*if(spectrum.spectrum || harmonic.harmonic) {
-            window.setTitle(strKey(harmonic.key));
-            window.show();
+        if(spectrum.spectrum || harmonic.harmonic) {
+            window.setTitle(strKey(expectedKey));
             window.render();
-        }*/
+        }
     }
 } app;

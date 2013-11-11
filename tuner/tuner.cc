@@ -13,6 +13,7 @@
 #define TEST 1
 #include "ffmpeg.h"
 #endif
+#include "profile.h"
 
 // Maps frequency (Hz) to position on X axis (log scale)
 float x(float f, int key, int2 size) {
@@ -35,7 +36,7 @@ struct EstimationPlot : Widget {
             float xMin = x(e.fMin, key, size), x0=x(e.f0, key, size), xMax = x(e.fMax, key, size);
             float a0 = 1;
             a0 *= e.confidence / maxConfidence; // Power
-            a0 *= (float) (i/2+1) / (estimations.size/2); // Time
+            a0 *= (float) i / estimations.size; // Time
             for(uint x: range(max<int>(0,xMin+1), min<int>(size.x,x0+1))) {
                 float a = a0 * (1-(x0-x)/(x0-xMin));
                 assert(a>=0 && a<=1, a, xMin, x, x0);
@@ -58,59 +59,7 @@ struct EstimationPlot : Widget {
     }
 };
 
-const uint keyCount = 85;
 
-struct OffsetPlot : Widget {
-    float offsets[keyCount] = {};
-    float variances[keyCount] = {};
-    OffsetPlot() {
-      if(!existsFile("offsets.profile"_,config())) return;
-      TextData s = readFile("offsets.profile"_,config());
-      for(uint i: range(keyCount)) { offsets[i] = s.decimal()/100; s.skip(" "_); variances[i] = sq(s.decimal()/100); s.skip("\n"_); }
-    }
-    ~OffsetPlot() {
-        String s;
-        for(uint i: range(keyCount)) s << str(offsets[i]*100) << " "_ << str(sqrt(variances[i])*100) << "\n"_;
-        writeFile("offsets.profile"_, s, config());
-    }
-    int2 sizeHint() { return int2(keyCount*12, -236); }
-    void render(int2 position, int2 size) {
-        float minimumOffset = -1./8;
-        float maximumOffset = 1./8;
-        for(int key: range(keyCount)) {
-            int x0 = position.x + key * size.x / keyCount;
-            int x1 = position.x + (key+1) * size.x / keyCount;
-
-            // TODO: Offset reference according to inharmonicty (~railsback curve)
-            float p0 = 0;
-            int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
-
-            float offset = offsets[key];
-            float deviation = sqrt(variances[key]);
-            float sign = ::sign(offset-p0) ? : 1;
-
-            // High confidence between zero and max(0, |offset|-deviation)
-            float p1 = max(0.f, abs(offset)-deviation);
-            int y1 = position.y + size.y * (maximumOffset-sign*p1) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, sign*p1>0 ? vec4(1,0,0,1) : vec4(0,0,1,1));
-
-            // Mid confidence between max(0,|offset|-deviation) and |offset|
-            float p2 = abs(offset);
-            int y2 = position.y + size.y * (maximumOffset-sign*p2) / (maximumOffset-minimumOffset);
-            fill(x0,y1<y2?y1:y2,x1,y1<y2?y2:y1, sign*p2>0 ? vec4(3./4,0,0,1) : vec4(0,0,3./4,1));
-
-            // Low confidence between |offset| and |offset|+deviation
-            float p3 = abs(offset)+deviation;
-            int y3 = position.y + size.y * (maximumOffset-sign*p3) / (maximumOffset-minimumOffset);
-            fill(x0,y2<y3?y2:y3,x1,y2<y3?y3:y2, sign*p3>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
-
-            // Low confidence between min(|offset|-deviation, 0) and zero
-            float p4 = min(0.f, abs(offset)-deviation);
-            int y4 = position.y + size.y * (maximumOffset-sign*p4) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
-        }
-    }
-};
 
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
@@ -158,22 +107,13 @@ struct Tuner : Poll {
     map<string,string> args;
     EstimationPlot estimations;
     const uint textSize = 64;
-    Text kOffset {""_, textSize, white};
-    Text kError {""_, textSize, white};
     Text key {""_, textSize, white};
     Text pitch {""_, textSize, white};
-    Text fOffset {""_, textSize, white};
-    Text fError {""_, textSize, white};
+    Text offset {""_, textSize, white};
+    Text error {""_, textSize, white};
+    HBox status {{&key,&pitch,&offset,&error}};
     OffsetPlot profile;
-    /*HList<VBox> grid {
-        move(array<VBox>()
-                << VBox({&autocorrelation, &kOffset, &kError})
-                << VBox({&estimations,  &key, &fOffset})
-                << VBox({&spectrum, &pitch, &fError })
-             )};
-    VBox layout {{&grid, &profile}};*/
-    WidgetGrid grid {{&kOffset,&key,&fOffset,&kError,&pitch,&fError}};
-    VBox layout {{&estimations, &grid, &profile}};
+    VBox layout {{&estimations, &status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
