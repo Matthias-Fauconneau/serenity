@@ -83,6 +83,7 @@ struct Tuner : Poll {
     PitchEstimator pitchEstimator {N};
 
     // Result
+    int32 signalMaximum = 0;
     uint worstKey = 0;
 
     // UI
@@ -106,6 +107,7 @@ struct Tuner : Poll {
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
+        window.localShortcut(Key(' ')).connect(this, &Tuner::showStatus);
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
@@ -136,6 +138,7 @@ struct Tuner : Poll {
         for(uint i: range(size)) {
             raw[2*(writeIndex+i)+0] = input[i*2+0];
             raw[2*(writeIndex+i)+1] = input[i*2+1];
+            signalMaximum = max(signalMaximum, max(abs(input[i*2+0]), abs(input[i*2+1])));
             real x = (input[i*2+0]+input[i*2+1]) * 0x1p-32f;
             x = notch1(x);
             x = notch3(x);
@@ -201,6 +204,16 @@ struct Tuner : Poll {
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
         window.render();
+    }
+    void showStatus() {
+        String status = str(
+                    log2((real)signalMaximum),
+                    pitchEstimator.harmonicMax, pitchEstimator.harmonicPower,
+                    pitchEstimator.harmonicMax/pitchEstimator.harmonicPower
+                    );
+        key.setText(status);
+        pitch.setText(str(1 - (float) (periods * periodSize) / (frames * N), powerThreshold, ratioThreshold));
+        log(status);
     }
 } app;
 

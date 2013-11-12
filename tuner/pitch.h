@@ -8,7 +8,7 @@ typedef struct fftwf_plan_s* fftwf_plan;
 struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
 FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
 struct FFT {
-    uint N;
+    const uint N;
     buffer<float> hann {N};
     buffer<float> windowed {N};
     buffer<float> halfcomplex {N};
@@ -24,28 +24,39 @@ struct FFT {
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
-    static constexpr uint harmonics = 15;
+    static constexpr uint harmonics = 12;
     buffer<float> spectrum {N/2};
-    buffer<real> harmonic {N/2};
-    real harmonicMax;
-    real harmonicPower;
+    buffer<float> harmonic {N/2};
+    float harmonicMax;
+    float harmonicPower;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
     /// \a fMin Minimum frequency for maximum peak selection (autocorrelation is still allowed to match lower pitches)
     /// \a fMax Maximum frequency for highest peak selection (maximum peak is still allowed to select higher pitches)
-    float estimate(const ref<float>& signal, uint fMin) {
+    float estimate(const ref<float>& signal, float fMin) {
         ref<float> halfcomplex = transform(signal);
-        for(uint i: range(N/2)) spectrum[i] = sq(halfcomplex[i]) + sq(halfcomplex[N-1-i]); // Converts to intensity spectrum
+        for(uint i: range(N/2)) spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts to intensity spectrum
 
         clear(harmonic.begin(), N/2);
-        harmonicMax = 0; uint hpsPeak=0; float harmonicEnergy=0;
-        for(uint i: range(fMin*harmonics, N/2)) {
-            real product=1; for(uint n : range(1, harmonics)) product *= spectrum[n*i/harmonics];
-            product = log2(product);
+#if 0
+        float max = -__builtin_inf(); uint hpsPeak=0; float harmonicEnergy=0;
+        for(uint i: range(ceil(fMin*harmonics), N/2)) {
+            float product=0; for(uint n : range(1, harmonics)) product += log2(spectrum[n*i/harmonics]);
             harmonic[i] = product;
-            if(product > harmonicMax) harmonicMax=product, hpsPeak = i;
-            if(product > 0) harmonicEnergy += product;
+            if(product > max) max=product, hpsPeak = i;
+            if(product>-__builtin_inf()) harmonicEnergy += product; // Accumulating in the exponent would be unstable
         }
-        harmonicPower = harmonicEnergy; // / (N/2 - fMin*harmonics);
+        harmonicMax = max / harmonics;
+#else
+        float max = 0; uint hpsPeak=0; float harmonicEnergy=0;
+        for(uint i: range(ceil(fMin*harmonics), N/2)) {
+            float product=1; for(uint n : range(1, harmonics)) product *= spectrum[n*i/harmonics];
+            harmonic[i] = product;
+            if(product > max) max=product, hpsPeak = i;
+            if(product > 0) harmonicEnergy += log2(product); // Accumulating in the exponent would be unstable
+        }
+        harmonicMax = log2(max) / harmonics;
+#endif
+        harmonicPower = harmonicEnergy / harmonics / (N/2 - ceil(fMin*harmonics));
         return (hpsPeak+0.5)/harmonics;
     }
 };
@@ -58,7 +69,7 @@ inline String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"
 // Biquad notch filter
 struct Notch {
     real frequency, bandwidth;
-    real a1,a2,b0,b1,b2;
+    float a1,a2,b0,b1,b2;
     Notch(real f, real bw) : frequency(f), bandwidth(bw) {
         real w0 = 2*PI*f;
         real alpha = sin(w0)*sinh(ln(2)/2*bw*w0/sin(w0));
@@ -66,9 +77,9 @@ struct Notch {
         a1 = -2*cos(w0)/a0, a2 = (1 - alpha)/a0;
         b0 = 1/a0, b1 = -2*cos(w0)/a0, b2 = 1/a0;
     }
-    real x1=0, x2=0, y1=0, y2=0;
-    real operator ()(real x) {
-        real y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+    float x1=0, x2=0, y1=0, y2=0;
+    float operator ()(float x) {
+        float y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
         x2=x1, x1=x, y2=y1, y1=y;
         return y;
     }
