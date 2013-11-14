@@ -41,73 +41,94 @@ void writeWaveFile(const string& path, const ref<int32>& data, int32 rate, int c
 }
 
 struct Plot : Widget {
-    ref<float> spectrum; // also harmonic product spectrum
+    const PitchEstimator& estimator;
+    const bool logx;
+    const bool logy;
+    const float scale;
     uint iMin = 0, iMax = 0;
-    float logx(float f) { return (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)); }
-    const bool logy = true;
+    ref<float> data;
+    float expectedF = 0, estimatedF = 0;
+
+    Plot(const PitchEstimator& estimator, bool logx, bool logy, float scale):estimator(estimator),logx(logx),logy(logy),scale(scale){}
+    float x(float f) { return (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)); }
     void render(int2 position, int2 size) {
-        assert_(iMin <= iMax && iMax <= spectrum.size, iMin, iMax, spectrum.size);
+        assert_(iMin <= iMax && iMax <= data.size, iMin, iMax, data.size);
         float sMin=__builtin_inf(), sMax = -__builtin_inf();
         for(uint i: range(iMin, iMax)) {
-            if(!logy || spectrum[i]>0) sMin = min(sMin, spectrum[i]);
-            sMax = max(sMax, spectrum[i]);
+            if(!logy || data[i]>0) sMin = min(sMin, data[i]);
+            sMax = max(sMax, data[i]);
         }
-        log("min", sMin, "max", sMax);
         for(uint i: range(iMin, iMax)) {
-            float x0 = logx(i) * size.x;
-            float x1 = logx(i+1) * size.x;
-            float s = logy ? (log2(spectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (spectrum[i] - sMin) / (sMax-sMin);
+            float x0 = x(i) * size.x;
+            float x1 = x(i+1) * size.x;
+            float s = logy ? (data[i] ? (log2(data[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (data[i] - sMin) / (sMax-sMin);
             float y = s * (size.y-16);
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,white);
+            if(scale && data[i-1] < data[i] && data[i] > data[i+1] && data[i]-sMin > (sMax-sMin)/2) {
+                Text label(dec(round(scale*i)),16,white);
+                int2 labelSize = label.sizeHint();
+                float x = position.x+(x0+x1)/2;
+                label.render(int2(x-labelSize.x/2,position.y+size.y-y-labelSize.y),labelSize);
+            }
         }
-        {float x = logx((iMin+iMax)/2.)*size.x;
-            fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(0,1,0,1));}
+        for(uint i=estimator.harmonics; i>=1; i--) {
+            {float x = this->x(expectedF*i*sqrt(1+estimator.B(expectedF)*sq(i)))*size.x;
+                fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(0,1,0,0.5));}
+            {float x = this->x(estimatedF*i*sqrt(1+estimator.B(estimatedF)*sq(i)))*size.x;
+                fill(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(1,0,0,0.5));}
+        }
     }
 };
 
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
-    Plot spectrum;
-    //Plot harmonic;
-    OffsetPlot profile;
-    VBox plots {{&spectrum/*, &harmonic*//*, &profile*/}};
-    Window window {&plots, int2(1050, 1680/2), "Test"_};
-
-    map<float,float> offsets;
-
-    const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12; // FIXME: wait 5sec before recording
+    // Input
+    //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B2"_)-12;
+    const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
 
-    static constexpr uint N = 16384; // Analysis window size (A-1 (27Hz~2K))
+    // Signal
+    uint t=0;
+    float signalMaximum = 0;
+    buffer<float> signal {N};
+
+    // Analysis
+    static constexpr uint N = 16384; // Analysis window size (A0 (27Hz~2K))
     const uint periodSize = 4096;
     PitchEstimator pitchEstimator {N};
-
+    const float fMin  = N*440*exp2(-4)/rate; // A0
+    const float fMax = N*440*exp2(3)/rate; // A7
     Notch notch1 {1*50./rate, 1./12}; // Notch filter to remove 50Hz noise
     Notch notch3 {3*50./rate, 1./12}; // Notch filter to remove 150Hz noise
 
-    const float fMin  = N*440*exp2(-4)/rate; // ~27 Hz ~ A-1
+    // UI
+    Plot spectrum {pitchEstimator, false, true, (float)rate/N};
+    Plot harmonic {pitchEstimator, false, true, (float)rate/N/PitchEstimator::harmonics};
+    OffsetPlot profile;
+    VBox plots {{&spectrum, &harmonic, &profile}};
+    Window window {&plots, int2(1050, 1680/2), "Test"_};
 
+    // Results
     uint expectedKey = highKey+1;
     uint lastKey = highKey+1;
     uint success = 0, fail=0, tries = 0, total=0;
-    float minAllowMax = -__builtin_inf(), maxDenyMax = -__builtin_inf(), globalMaxDenyMax = __builtin_inf();
-    float minAllowRatio = -__builtin_inf(), maxDenyRatio = -__builtin_inf(), globalMaxDenyRatio = __builtin_inf();
+    real minAllowMax = -__builtin_inf(), maxDenyMax = -__builtin_inf(), globalMaxDenyMax = __builtin_inf();
+    real minAllowRatio = -__builtin_inf(), maxDenyRatio = -__builtin_inf(), globalMaxDenyRatio = __builtin_inf();
+    real maxMax = -__builtin_inf(), maxRatio= -__builtin_inf();
     Time totalTime;
-
-    uint t=0;
-    int32 signalMaximum = 1;
-    buffer<float> signal {N};
 
     PitchEstimation() {
         assert_(rate==96000, audio.rate);
         assert_(audio.channels==2, audio.channels);
         assert_(((stereo.size/2+rate/2)/rate+3)/5==uint(1+(highKey+1)-lowKey));
+        for(int i: range(stereo.size/2)) signalMaximum=::max(signalMaximum, float(stereo[i*2+0])+float(stereo[i*2+1]));
+        log(log2(signalMaximum));
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();});
-        //window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
+        window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
         window.frameReady.connect(this, &PitchEstimation::next);
 
         profile.reset();
@@ -118,61 +139,80 @@ struct PitchEstimation {
         if(fail) return;
         t+=periodSize;
         for(; t<=stereo.size/2-N; t+=periodSize) {
+            // Checks for missed note
+            if((t+periodSize)/rate/5 != t/rate/5) {
+                globalMaxDenyMax = min(globalMaxDenyMax, maxDenyMax); maxDenyMax = -__builtin_inf();
+                globalMaxDenyRatio = min(globalMaxDenyRatio, maxDenyRatio); maxDenyRatio = -__builtin_inf();
+                if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; }
+                maxMax=-__builtin_inf(), maxRatio=-__builtin_inf();
+            }
+
+            // Prepares new period
             const int32* period = stereo + t*2;
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
             for(uint i: range(periodSize)) {
-                signalMaximum = max(abs(period[i*2+0]), abs(period[i*2+1]));
-                float x = (float) (period[i*2+0]+period[i*2+1]) / (2.f*signalMaximum); // FIXME
+                float L = period[i*2+0], R = period[i*2+1];
+                float x = (L+R) / signalMaximum;
                 x = notch1(x);
                 x = notch3(x);
-                signal[N-periodSize-1+i] = x;
+                signal[N-periodSize+i] = x;
             }
-            if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)
 
+            // Benchmark
+            if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)
+            if(t%(5*rate) > 4.5*rate) continue; // Transitions between notes may not be clean (affects false negative)
             expectedKey = highKey+1 - t/rate/5; // Recorded one key every 5 seconds from high key to low key
-            if(expectedKey == parseKey("A#0"_)-12) {
+            /*if(expectedKey == parseKey("A#0"_)-12) {
                 log("-", fail, "~", success,"["_+dec(round(100.*success/tries))+"%]"_,"/",tries, "["_+dec(round(100.*tries/total))+"%]"_, "/"_,total,
                     "~", "["_+dec(round(100.*success/total))+"%]\t"_+
                     dec(round((float)totalTime))+"s "_+str(round(stereo.size/2./rate))+"s "_+str((stereo.size/2*1000/rate)/((uint64)totalTime))+" xRT"_
                     );
                 return;
-            }
+            }*/
 
-            float f = pitchEstimator.estimate(signal, fMin);
+            float f = pitchEstimator.estimate(signal, fMin, fMax);
             uint key = round(pitchToKey(f*rate/N));
-            assert_(key>=20 && key<21+keyCount, key, f, fMin, pitchToKey(fMin*rate/N));
+            assert_(key>=20 && key<21+keyCount, f);
 
-            /*harmonic.spectrum = pitchEstimator.harmonic;
-            harmonic.iMin  = keyToPitch(key-0.5)*N*pitchEstimator.harmonics/rate;
-            harmonic.iMax = keyToPitch(key+0.5)*N*pitchEstimator.harmonics/rate;*/
+            const real maxThreshold = -6;
+            const real ratioThreshold = 3;
+            real max = pitchEstimator.harmonicMax;
+            real power = pitchEstimator.harmonicPower;
+            real ratio = max - power;
 
-            const float maxThreshold = 1.2;
-            const float ratioThreshold = 7.46;
-            float max = pitchEstimator.harmonicMax;
-            float power = pitchEstimator.harmonicPower;
-            float ratio = max - power;
-            if(expectedKey==key) {
-                if(ratio > ratioThreshold) maxDenyMax = ::max(maxDenyMax, max);
-                if(max > maxThreshold) maxDenyRatio = ::max(maxDenyRatio, ratio);
-            } else {
-                if(ratio > ratioThreshold) minAllowMax = ::max(minAllowMax, max);
-                if(max > maxThreshold) minAllowRatio = ::max(minAllowRatio, ratio);
-            }
-
-            float expectedF = keyToPitch(key)*N/rate;
-            const float fOffset = 12*log2(f/expectedF);
-            const float fError = 12*log2((expectedF+1./PitchEstimator::harmonics)/expectedF);
+            float keyF = keyToPitch(key)*N/rate;
+            const float fOffset = 12*log2(f/keyF);
+            const float fError = 12*log2((keyF+1./PitchEstimator::harmonics)/keyF);
 
             log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2)+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_
                 +str(round(f*rate/N))+" Hz\t"_ +dec(round(100*fOffset))+"  ("_+dec(round(100*fError))+")\t"_
-                +str(max)+"\t"_+str(power)+"\t"_+/*str(max/power)+"\t"_+*/str(max-power)+"\t"_
+                +str(max)+"\t"_+str(max-power)+"\t"_
                 +(expectedKey == key ? "O"_ : "X"_));
 
-            if(max > maxThreshold /*Harmonic content*/
+            if( max > maxThreshold /*Harmonic content*/
                     && ratio > ratioThreshold /*Single pitch*/ ) {
 
                 lastKey = key;
-                if(expectedKey==key) success++; else { log("False positive"); fail++; break; }
+                if(expectedKey==key) success++;
+                else {
+                    fail++;
+
+                    const float expectedF = keyToPitch(expectedKey)*N/rate;
+                    spectrum.data = pitchEstimator.spectrum;
+                    spectrum.iMin = min(f, expectedF);
+                    spectrum.estimatedF = f;
+                    spectrum.expectedF = expectedF;
+                    spectrum.iMax = ::max(f,expectedF)*(pitchEstimator.harmonics+1);
+
+                    harmonic.data = pitchEstimator.harmonic;
+                    harmonic.iMin  = keyToPitch(min(key,expectedKey)-0.5)*N*pitchEstimator.harmonics/rate;
+                    harmonic.estimatedF = f*pitchEstimator.harmonics;
+                    harmonic.expectedF = expectedF*pitchEstimator.harmonics;
+                    harmonic.iMax = keyToPitch(::max(key,expectedKey)+0.5)*N*pitchEstimator.harmonics/rate;
+
+                    log("False positive");
+                    break;
+                }
                 tries++;
 
                 assert_(key>=21 && key<21+keyCount);
@@ -184,23 +224,25 @@ struct PitchEstimation {
             }
             total++;
 
-            uint nextKey = highKey+1 - (t+periodSize)/rate/5;
-            if(nextKey != expectedKey) {
-                globalMaxDenyMax = min(globalMaxDenyMax, maxDenyMax); maxDenyMax = 0;
-                globalMaxDenyRatio = min(globalMaxDenyRatio, maxDenyRatio); maxDenyRatio = 0;
-                if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; }
+            if(expectedKey==key) {
+                maxMax = ::max(maxMax, max); if(ratio > ratioThreshold) maxDenyMax = ::max(maxDenyMax, max);
+                maxRatio = ::max(maxRatio, ratio); if(max > maxThreshold) maxDenyRatio = ::max(maxDenyRatio, ratio);
+            } else {
+                if(ratio > ratioThreshold) minAllowMax = ::max(minAllowMax, max);
+                if(max > maxThreshold) minAllowRatio = ::max(minAllowRatio, ratio);
             }
 
             //break;
         }
         if(fail) {
-            log(str(minAllowMax)+" "_+str(globalMaxDenyMax)+" "_+str(minAllowRatio)+" "_+str(globalMaxDenyRatio));
-            log(log2((float)signalMaximum));
+            log(str(minAllowMax)+" "_+str(globalMaxDenyMax)+" "_+str(maxDenyMax)+" "_+str(maxMax));
+            log(str(minAllowRatio)+" "_+str(globalMaxDenyRatio)+" "_+str(maxDenyRatio)+" "_+str(maxRatio));
+            assert_(log2((float)signalMaximum)<32);
         }
-        /*if(harmonic.harmonic) {
+        if(harmonic.data) {
             window.setTitle(strKey(expectedKey));
             window.render();
             window.show();
-        }*/
+        }
     }
 } app;

@@ -24,38 +24,32 @@ struct FFT {
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
-    static constexpr uint harmonics = 12;
+    static constexpr uint harmonics = 8; /*8-15*/
+    float B(float i) const  { return i/(N*64); }
     buffer<float> spectrum {N/2};
     buffer<float> harmonic {N/2};
-    float harmonicMax;
-    float harmonicPower;
+    real harmonicMax;
+    real harmonicPower;
     /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
     /// \a fMin Minimum frequency for maximum peak selection (autocorrelation is still allowed to match lower pitches)
     /// \a fMax Maximum frequency for highest peak selection (maximum peak is still allowed to select higher pitches)
-    float estimate(const ref<float>& signal, float fMin) {
+    real estimate(const ref<float>& signal, float fMin, float fMax) {
         ref<float> halfcomplex = transform(signal);
         for(uint i: range(N/2)) spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts to intensity spectrum
 
         clear(harmonic.begin(), N/2);
-#if 0
-        float max = -__builtin_inf(); uint hpsPeak=0; float harmonicEnergy=0;
-        for(uint i: range(ceil(fMin*harmonics), N/2)) {
-            float product=0; for(uint n : range(1, harmonics)) product += log2(spectrum[n*i/harmonics]);
-            harmonic[i] = product;
-            if(product > max) max=product, hpsPeak = i;
-            if(product>-__builtin_inf()) harmonicEnergy += product; // Accumulating in the exponent would be unstable
-        }
-        harmonicMax = max / harmonics;
-#else
-        float max = 0; uint hpsPeak=0; float harmonicEnergy=0;
-        for(uint i: range(ceil(fMin*harmonics), N/2)) {
-            float product=1; for(uint n : range(1, harmonics)) product *= spectrum[n*i/harmonics];
-            harmonic[i] = product;
-            if(product > max) max=product, hpsPeak = i;
-            if(product > 0) harmonicEnergy += log2(product); // Accumulating in the exponent would be unstable
+        real max = 0; uint hpsPeak=0; real harmonicEnergy=0;
+        const uint iMin = ceil(fMin*harmonics), iMax = min(N/2, (uint)floor(fMax*harmonics));
+        for(uint i0: range(iMin, iMax)) {
+            real product=1; for(uint n : range(1, harmonics+1)) {
+                const uint i = n*sqrt(1+B(i0)*sq(n))*i0/harmonics;
+                product *= spectrum[i] * i; // Corrects spectrum power for accoustic attenuation (E~f^-0.5)
+            }
+            harmonic[i0] = product;
+            if(product > max) max=product, hpsPeak = i0;
+            if(product > 0) harmonicEnergy += log2(product); // Accumulating in the exponent would not be stable
         }
         harmonicMax = log2(max) / harmonics;
-#endif
         harmonicPower = harmonicEnergy / harmonics / (N/2 - ceil(fMin*harmonics));
         return (hpsPeak+0.5)/harmonics;
     }
@@ -77,9 +71,9 @@ struct Notch {
         a1 = -2*cos(w0)/a0, a2 = (1 - alpha)/a0;
         b0 = 1/a0, b1 = -2*cos(w0)/a0, b2 = 1/a0;
     }
-    float x1=0, x2=0, y1=0, y2=0;
-    float operator ()(float x) {
-        float y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+    real x1=0, x2=0, y1=0, y2=0;
+    real operator ()(real x) {
+        real y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
         x2=x1, x1=x, y2=y1, y1=y;
         return y;
     }
