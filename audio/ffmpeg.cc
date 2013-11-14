@@ -17,27 +17,18 @@ AudioFile::AudioFile() { static int unused once=(av_register_all(), 0); }
 
 bool AudioFile::openPath(const string& path) {
     close();
-    if(avformat_open_input(&file, strz(path), 0, 0)) { file=0; return false; }
+    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path);  file=0; return false; }
     return open();
 }
 
-/*bool AudioFile::openData(buffer<byte>&& data) {
-    close();
-    file = avformat_alloc_context();
-    file->pb = avio_alloc_context((uint8*)data.data, data.size, 0, 0, 0, 0, 0);
-    data.data=0; data.capacity=data.size=0; // data is now owned by ffmpeg
-    if(avformat_open_input(&file, 0, 0, 0)) { file=0; return false; }
-    return open();
-}*/
-
 bool AudioFile::open() {
     avformat_find_stream_info(file, 0);
-    if(file->duration <= 0) { file=0; return false; }
+    if(file->duration <= 0) { file=0; log("Invalid file"_); return false; }
     for(uint i=0; i<file->nb_streams; i++) {
         if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
             audioStream = file->streams[i];
             audio = audioStream->codec;
-            audio->request_sample_fmt = AV_SAMPLE_FMT_S32;
+            audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
                 rate = audio->sample_rate;
@@ -129,7 +120,12 @@ uint AudioFile::read(float* output, uint outputSize) {
 
 void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, (uint64)position*audioStream->time_base.den/(rate*audioStream->time_base.num), 0); }
 
-void AudioFile::close() { if(frame) avcodec_free_frame(&frame); if(file) avformat_close_input(&file); }
+void AudioFile::close() {
+    if(frame) avcodec_free_frame(&frame);
+    rate=0, position=0, duration=0; audioStream = 0; audio=0;
+    intBuffer=buffer<int32>(); floatBuffer=buffer<float>(); bufferIndex=0, bufferSize=0;
+    if(file) avformat_close_input(&file);
+}
 
 Audio decodeAudio(const string& path) {
     AudioFile file; file.openPath(path);
@@ -138,11 +134,3 @@ Audio decodeAudio(const string& path) {
     audio.data.size = file.read(audio.data.begin(), size) * file.channels;
     return audio;
 }
-
-/*Audio decodeAudio(buffer<byte>&& data) {
-    AudioFile file; file.openData(move(data));
-    uint size = file.duration*file.channels;
-    Audio audio {file.channels, file.rate, buffer<int32>(size)};
-    audio.data.size = file.read(audio.data.begin(), size);
-    return audio;
-}*/

@@ -47,10 +47,11 @@ void fill(Rect rect, vec4 color) {
     if(color8.a == 0xFF) {
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = byte4(color8);
     } else {
-        int a=color8.a; assert(a);
+        //int a=color8.a; assert(a);
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
             byte4& d = framebuffer(x,y);
-            int4 t = int4(d)*(0xFF-a)/0xFF + color8;
+            //int4 t = int4(d)*(0xFF-a)/0xFF + color8;
+            int4 t = min(int4(0xFF), int4(d) + color8);
             d = byte4(t.b, t.g, t.r, 0xFF);
         }
     }

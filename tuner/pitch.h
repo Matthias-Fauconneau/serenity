@@ -1,5 +1,4 @@
 #pragma once
-#include "memory.h"
 #include "math.h"
 #include "time.h"
 /// Convenient interface to the FFTW library
@@ -22,36 +21,78 @@ struct FFT {
     }
 };
 
+template<Type V, uint N> struct list { // Small sorted list
+    static constexpr uint size = N;
+    struct element : V { float key; element(float key=0, V value=V()):V(value),key(key){} } elements[N];
+    void clear() { ::clear(elements, N); }
+    void insert(float key, V value) {
+        int i=0; while(i<N && elements[i].key<key) i++; i--;
+        if(i<0) return; // New candidate would be lower than current
+        for(uint j: range(i)) elements[j]=elements[j+1]; // Shifts left
+        elements[i] = element(key, value); // Inserts new candidate
+    }
+    const element& operator[](uint i) const { assert(i<N); return elements[i]; }
+    const element& last() const { return elements[N-1]; }
+    const element* begin() const { return elements; }
+    const element* end() const { return elements+N; }
+};
+
 struct PitchEstimator : FFT {
     using FFT::FFT;
-    static constexpr uint harmonics = 8; /*8-15*/
-    float B(float i) const  { return i/(N*64); }
+    const uint H = 16; //9 // Maximum harmonic count for A7 (TODO: increase as needed for bass tones)
     buffer<float> spectrum {N/2};
-    buffer<float> harmonic {N/2};
-    real harmonicMax;
-    real harmonicPower;
-    /// Returns fundamental period (non-integer when estimated without optimizing autocorrelation)
+    buffer<float> smooth {N/2};
+    struct Candidate { float f0; float B; Candidate(float f0=0, float B=0):f0(f0),B(B){} };
+    list<Candidate, 2> candidates;
+    float harmonicMax;
+    float harmonicPower;
+    float inharmonicity;
+    /// Returns first partial (f1=f0*sqrt(1+B))
     /// \a fMin Minimum frequency for maximum peak selection (autocorrelation is still allowed to match lower pitches)
     /// \a fMax Maximum frequency for highest peak selection (maximum peak is still allowed to select higher pitches)
-    real estimate(const ref<float>& signal, float fMin, float fMax) {
-        ref<float> halfcomplex = transform(signal);
-        for(uint i: range(N/2)) spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts to intensity spectrum
+    float estimate(const ref<float>& signal, uint fMin, uint fMax) {
+        candidates.clear();
 
-        clear(harmonic.begin(), N/2);
-        real max = 0; uint hpsPeak=0; real harmonicEnergy=0;
-        const uint iMin = ceil(fMin*harmonics), iMax = min(N/2, (uint)floor(fMax*harmonics));
-        for(uint i0: range(iMin, iMax)) {
-            real product=1; for(uint n : range(1, harmonics+1)) {
-                const uint i = n*sqrt(1+B(i0)*sq(n))*i0/harmonics;
-                product *= spectrum[i] * i; // Corrects spectrum power for accoustic attenuation (E~f^-0.5)
-            }
-            harmonic[i0] = product;
-            if(product > max) max=product, hpsPeak = i0;
-            if(product > 0) harmonicEnergy += log2(product); // Accumulating in the exponent would not be stable
+        ref<float> halfcomplex = transform(signal);
+        float maxPeak=0; uint F=0;
+        for(uint i: range(N/2)) spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts to intensity spectrum
+        const uint smoothRadius = 3;
+        for(uint i: range(smoothRadius, N/2-smoothRadius)) { // Smooth (FIXME: Gaussian)
+            float sum = 0; for(int di: range(-smoothRadius,smoothRadius+1)) sum+=spectrum[i+di];
+            smooth[i] = sum/(smoothRadius+1+smoothRadius);
         }
-        harmonicMax = log2(max) / harmonics;
-        harmonicPower = harmonicEnergy / harmonics / (N/2 - ceil(fMin*harmonics));
-        return (hpsPeak+0.5)/harmonics;
+        swap(spectrum, smooth);
+        const uint peakAccuracy = 2;
+        for(uint i: range(smoothRadius+peakAccuracy, N/2)) if(spectrum[i] > maxPeak) maxPeak=spectrum[i], F=i; // Selects maximum peak
+        const float Bmax = 1./512; //(fMin*H*H);
+        const uint nMin = ::max((F+peakAccuracy+smoothRadius)/fMax, (uint)ceil(F*H*sqrt(1+Bmax*sq(H))/(N/2-1)));
+        const uint nMax = min((F-peakAccuracy-smoothRadius)/fMin, H);
+        float max = 0, bestF0=0, bestB = 0; float harmonicEnergy = 0;
+        for(uint n0: range(nMin, nMax+1)) { // F rank hypothesis
+            float rankMax=0, rankF0=0, rankB=0;
+            for(int df: range(-peakAccuracy, peakAccuracy+1)) { // peak offset
+                for(int b: range(F*H*H*Bmax+1)) { // Inharmonicity hypothesis (negative?)
+                    const float B = (float)b/(F*H*H);
+                    const float F0 = (F+df)/(n0*sqrt(1+B*sq(n0))); // f0 under current rank and inharmonicity hypotheses
+                    float HPS=1; // Harmonic product (~ sum of logarithm of harmonic frequency powers) (vs direct sum: allows for missing peaks)
+                    for(uint n : range(1, H+1)) {
+                        const uint f = round(F0*n*sqrt(1+B*sq(n)));
+                        assert_(n!=n0 || f==(F+df));
+                        assert_(f>smoothRadius && f<N/2-smoothRadius, f, b, B, F0, n);
+                        HPS += spectrum[f] * f; // Corrects spectrum power for accoustic attenuation (A~f^-1)
+                    }
+                    //candidates.insert(HPS, Candidate{rankF0, B});
+                    if(HPS > rankMax) rankMax=HPS, rankF0 = F0, rankB=B;
+                }
+            }
+            candidates.insert(rankMax, Candidate{rankF0, rankB});
+            if(rankMax > max) max=rankMax, bestF0=rankF0, bestB = rankB;
+            assert_(rankMax > 0); harmonicEnergy += rankMax; // Accumulating in the exponent would not be stable ?
+        }
+        harmonicMax = (max) / H;
+        if(nMin<nMax+1) harmonicPower = (harmonicEnergy) / H / (nMax+1-nMin);
+        inharmonicity = bestB;
+        return bestF0*sqrt(1+bestB);
     }
 };
 
@@ -71,9 +112,9 @@ struct Notch {
         a1 = -2*cos(w0)/a0, a2 = (1 - alpha)/a0;
         b0 = 1/a0, b1 = -2*cos(w0)/a0, b2 = 1/a0;
     }
-    real x1=0, x2=0, y1=0, y2=0;
-    real operator ()(real x) {
-        real y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+    float x1=0, x2=0, y1=0, y2=0;
+    float operator ()(float x) {
+        float y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
         x2=x1, x1=x, y2=y1, y1=y;
         return y;
     }

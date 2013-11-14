@@ -8,7 +8,8 @@ typedef double real;
 constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }
-inline bool isNumber(float x) { return !isNaN(x) && x !=__builtin_inff() && x !=-__builtin_inff(); }
+const float inf = __builtin_inff();
+inline bool isNumber(float x) { return !isNaN(x) && x !=inf && x !=-inf; }
 
 inline float floor(float x) { return __builtin_floorf(x); }
 inline real floor(real x) { return __builtin_floor(x); }
