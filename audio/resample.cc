@@ -29,6 +29,7 @@
 #include "math.h"
 #include "simd.h"
 #include "resample.h"
+#include "string.h"
 
 static float product(const float* kernel, const float* signal, int len) {
     v4sf sum = {0,0,0,0};
@@ -101,7 +102,7 @@ template void Resampler::filter<false>(const float* source, uint sourceSize, flo
 template void Resampler::filter<true>(const float* source, uint sourceSize, float* target, uint targetSize);
 
 int Resampler::need(uint targetSize) {
-    return (targetSize*integerAdvance+(fractionalIndex+targetSize*fractionalAdvance)/targetRate)+1-(writeIndex-integerIndex);
+    return (integerIndex+targetSize*integerAdvance+int(fractionalIndex+targetSize*fractionalAdvance+targetRate-1)/targetRate)-writeIndex;
 }
 
 void Resampler::write(const float* source, uint size) {
@@ -121,10 +122,14 @@ void Resampler::write(const float* source, uint size) {
      assert(writeIndex<bufferSize);
 }
 
-int Resampler::available() { return ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate; }
+int Resampler::available() {
+    uint available = ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate;
+    assert_(need(available)==0, sourceRate, targetRate, integerIndex, fractionalIndex, writeIndex, available, need(available));
+    return available;
+}
 
 template<bool mix> void Resampler::read(float* target, uint size) {
-    assert(size<=available());
+    assert_(size<=available());
     for(uint i: range(size)) {
         for(uint channel=0;channel<channels;channel++) {
             if(mix) target[i*channels+channel] += product(kernel+fractionalIndex*N, signal[channel]+integerIndex, N);
@@ -136,7 +141,7 @@ template<bool mix> void Resampler::read(float* target, uint size) {
             fractionalIndex -= targetRate;
             integerIndex++;
         }
-        assert(integerIndex<writeIndex);
+        assert(integerIndex<writeIndex || (integerIndex==writeIndex && fractionalIndex==0), integerIndex, writeIndex, fractionalIndex);
         assert(fractionalIndex<targetRate);
     }
     assert(integerIndex>=writeIndex-2);

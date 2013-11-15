@@ -156,6 +156,7 @@ template<> void warn(const string& message) {
 }
 
 template<> void __attribute((noreturn)) error(const string& message) {
+    log(message); // In case, tracing crashes
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;

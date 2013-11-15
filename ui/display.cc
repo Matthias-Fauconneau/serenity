@@ -111,13 +111,16 @@ inline void plot(int x, int y, float alpha, bool transpose, int4 color) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
         byte4& d = framebuffer(x,y);
-        d=byte4(round((1-alpha)*d.b+alpha*color.b),round((1-alpha)*d.g+alpha*color.g),round((1-alpha)*d.r+alpha*color.r),0xFF);
+        //d=byte4(round((1-alpha)*d.b+alpha*color.b),round((1-alpha)*d.g+alpha*color.g),round((1-alpha)*d.r+alpha*color.r),0xFF);
+        //int4 t = int4(d)*(0xFF-a)/0xFF + color8; // Transparency
+        int4 t = min(int4(0xFF), int4(d) + color); // Additive
+        d = byte4(t.b, t.g, t.r, 0xFF);
     }
 }
 
 inline float fpart(float x) { return x-int(x); }
 inline float rfpart(float x) { return 1 - fpart(x); }
-void line(vec2 p1, vec2 p2, vec4 color) {
+void line(float x1, float y1, float x2, float y2, vec4 color) {
 #if GL
     if(!softwareRendering) {
         glBlendSubstract();
@@ -126,15 +129,14 @@ void line(vec2 p1, vec2 p2, vec4 color) {
         //fill["color"_] = //vec4(color.xyz(),1.f);
         //glDrawLine(fill, p1, p2);
         GLVertexBuffer vertexBuffer;
-        vertexBuffer.upload<vec2>({vertex(p1.x, p1.y),vertex(p2.x, p2.y)});
+        vertexBuffer.upload<vec2>({vertex(x1, y1),vertex(x2, y2)});
         vertexBuffer.bindAttribute(fill, "position"_, 2);
         vertexBuffer.draw(Lines);
         return;
     }
 #endif
-    float x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
     assert(vec4(0) <= color && color <= vec4(1));
-    int4 color8 = int4(0xFF*color.z,0xFF*color.y,0xFF*color.x,0xFF*color.w);
+    int4 color8 (color.z*color.w*0xFF,color.y*color.w*0xFF,color.x*color.w*0xFF,color.w*0xFF); // Premultiply source alpha
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
     if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;

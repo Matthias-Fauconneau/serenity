@@ -52,9 +52,9 @@ void blit(int2 target, const Image& source, vec4 color=white);
 void blit(int2 target, const Image& source, int2 size);
 
 /// Draws a thin antialiased line from p1 to p2
-void line(vec2 p1, vec2 p2, vec4 color=black);
-inline void line(int2 p1, int2 p2, vec4 color=black) { line(vec2(p1),vec2(p2),color); }
-inline void line(int x1, int y1, int x2, int y2, vec4 color=black) { line(vec2(x1,y1),vec2(x2,y2),color); }
+void line(float x1, float y1, float x2, float y2, vec4 color=black);
+inline void line(vec2 p1, vec2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
+inline void line(int2 p1, int2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
 
 /// Converts linear float in [0,1] to sRGB
 inline uint sRGB(float x) { extern uint8 sRGB_lookup[256]; return sRGB_lookup[ clip<int>(0, round(0xFF*x), 0xFF) ]; }
