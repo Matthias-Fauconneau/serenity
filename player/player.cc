@@ -18,7 +18,7 @@ struct Player {
     Resampler resampler;
     bool resamplerFlushed = false;
     Resampler nextResampler;
-    AudioOutput audio{{this,&Player::read}, 96000, 65536};
+    AudioOutput audio{{this,&Player::read}, 48000, 32768};
     int32* lastPeriod = 0, lastPeriodSize = 0;
     uint read(int32* output, uint outputSize) {
         uint readSize = 0;

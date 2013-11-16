@@ -1,7 +1,7 @@
 #include "file.h"
 #include "widget.h"
 
-const uint keyCount = 85;
+const int keyCount = 85;
 
 struct OffsetPlot : Widget {
     float offsets[keyCount] = {};
