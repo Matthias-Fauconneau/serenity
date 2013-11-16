@@ -43,62 +43,64 @@ template<Type V, uint N> struct list { // Small sorted list
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
-    const uint H = 33; //FIXME: 12-24
     buffer<float> spectrum {N/2};
-    //buffer<float> smooth {N/2};
-    struct Candidate { float f0; float B; int df; Candidate(float f0=0, float B=0, int df=0):f0(f0),B(B),df(df){} };
+    struct Candidate { float f0; float B; uint H; Candidate(float f0=0, float B=0, uint H=0):f0(f0),B(B),H(H){} };
     list<Candidate, 2> candidates;
-    float harmonicMax;
+    float totalPower;
+    uint fPeak;
     float harmonicPower;
     float inharmonicity;
-    float fPeak;
     /// Returns first partial (f1=f0*sqrt(1+B))
-    /// \a fMin Minimum frequency for maximum peak selection (autocorrelation is still allowed to match lower pitches)
-    /// \a fMax Maximum frequency for highest peak selection (maximum peak is still allowed to select higher pitches)
-    float estimate(const ref<float>& signal, uint fMin, uint fMax) {
+    /// \a fMin Minimum fundamental frequency for harmonic evaluation
+    float estimate(const ref<float>& signal, uint fMin) {
         candidates.clear();
 
         ref<float> halfcomplex = transform(signal);
-        //float sum = 0;
-        for(uint i: range(N/2)) {
+        float power=0;
+        const uint fMax = N/2;
+        for(uint i: range(fMax)) {
             spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts to power spectrum
-            //sum += spectrum[i];
+            power += spectrum[i];
         }
-        //float scale = (N/2) / sum;
-        //for(uint i: range(N/2)) spectrum[i] *= average; // Normalizes
+        totalPower = power;
 
         float maxPeak=0; uint F=0;
-        for(uint i: range(fMin, N/2)) if(spectrum[i] > maxPeak) maxPeak=spectrum[i], F=i; // Selects maximum peak
-        const uint nMin = ::max(F/fMax, (uint)ceil((F+2)*H*sqrt(2.)/(N/2)));
-        const uint nMax = min(F/fMin, H);
-        float maxEnergy = 0, bestF0=0, bestB = 0; float harmonicEnergy = 0;
-        for(uint n0: range(nMin, nMax+1)) { // F rank hypothesis
-            float rankMax=0, rankF0=0, rankB=0; int rankDf=0;
-            for(int df: range(/*-1*/0,1)) {
-                for(int b: range(F)) { // Inharmonicity hypothesis (negative?)
-                    const float B = (float)b/(F*H*H);
-                    const float F0 = (F+df)/(n0*sqrt(1+B*sq(n0))); // f0 under current rank and inharmonicity hypotheses
-                    float energy=1;
-                    for(uint n : range(1, H+1)) {
-                        const uint f = round(F0*n*sqrt(1+B*sq(n)));
-                        assert_(f<N/2);
-                        energy += spectrum[f];
-                    }
-                    //candidates.insert(energy, Candidate{rankF0, B});
-                    if(energy > rankMax) rankMax=energy, rankF0 = F0, rankB=B, rankDf=df;
+        for(uint i: range(fMin, fMax)) if(spectrum[i] > maxPeak) maxPeak=spectrum[i], F=i; // Selects maximum peak
+
+        float bestPower = 0, bestF0 = 0, bestB = 0; float totalHarmonicEnergy = 0;
+        for(uint n0: range(1, F/fMin)) { // F rank hypothesis
+            float rankPower=0, rankF0=0, rankB=0; uint rankH=0;
+            const float f0 = (float)F/n0;
+            const uint H = min(62, int(fMax/f0)); // Highest harmonic
+            const float dB = 2 / (f0*cb(H)); // B offset to step highest harmonic
+            //const float B1 = 2 / (n0*F); // B offset to step first partial
+            const uint bMax = cb(H) / sq(n0); // B1 / dB
+            log(bMax);
+            for(int b: range(bMax+1)) { // Inharmonicity hypothesis (Number of bins the highest harmonic may move)
+                const float B = b * dB;
+                const float F0 = F/(n0*sqrt(1+B*sq(n0))); // f0 under current rank and inharmonicity hypotheses
+                float energy=0;
+                //for(uint n : range(1, H+1)) {
+                uint n=1; for(;n<=H; n++) {
+                    const uint f = round(F0*n*sqrt(1+B*sq(n)));
+                    assert_(uint(round(F0*n*sqrt(1+B*sq(n)))) < uint(round(F0*(n+1)*sqrt(1+B*sq(n+1)))));
+                    if(f<fMax) energy += spectrum[f];
+                    else break;
                 }
+                //candidates.insert(energy, Candidate{rankF0, B});
+                if(energy > rankPower) rankPower=energy, rankF0 = F0, rankB=B, rankH=n-1;
             }
             const float octaveThreshold = 1+1./16; // Threshold to avoid octave errors by matching exact same harmonics
-            if(rankMax > octaveThreshold*maxEnergy) {
-                maxEnergy=rankMax, bestF0=rankF0, bestB = rankB;
-                candidates.insert(rankMax, Candidate{rankF0, rankB, rankDf});
+            if(rankPower > octaveThreshold*bestPower) {
+                bestPower=rankPower, bestF0=rankF0, bestB = rankB;
+                candidates.insert(rankPower, Candidate{rankF0, rankB, rankH});
             }
-            assert_(rankMax > 0); harmonicEnergy += rankMax;
+            assert_(rankPower > 0); totalHarmonicEnergy += rankPower;
         }
-        harmonicMax = maxEnergy;
-        if(nMin<nMax+1) harmonicPower = harmonicEnergy / (nMax+1-nMin);
-        inharmonicity = bestB;
         fPeak = F;
+        harmonicPower = bestPower;
+        inharmonicity = bestB;
+        assert_(harmonicPower < totalPower, totalPower, harmonicPower, F, bestB, bestF0*sqrt(1+bestB));
         return bestF0*sqrt(1+bestB);
     }
 };

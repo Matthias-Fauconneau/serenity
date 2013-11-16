@@ -107,13 +107,13 @@ void blit(int2 target, const Image& source, int2 size) {
     bilinear(region, source);
 }
 
-inline void plot(int x, int y, float alpha, bool transpose, int4 color) {
+inline void plot(int x, int y, float alpha, bool transpose, vec4 color) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
         byte4& d = framebuffer(x,y);
         //d=byte4(round((1-alpha)*d.b+alpha*color.b),round((1-alpha)*d.g+alpha*color.g),round((1-alpha)*d.r+alpha*color.r),0xFF);
         //int4 t = int4(d)*(0xFF-a)/0xFF + color8; // Transparency
-        int4 t = min(int4(0xFF), int4(d) + color); // Additive
+        int4 t = min(int4(0xFF), int4(d) + int4(alpha*color)); // Additive
         d = byte4(t.b, t.g, t.r, 0xFF);
     }
 }
@@ -136,7 +136,7 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
     }
 #endif
     assert(vec4(0) <= color && color <= vec4(1));
-    int4 color8 (color.z*color.w*0xFF,color.y*color.w*0xFF,color.x*color.w*0xFF,color.w*0xFF); // Premultiply source alpha
+    vec4 color8 (color.z*color.w*0xFF,color.y*color.w*0xFF,color.x*color.w*0xFF,0xFF); // Premultiply source alpha
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
     if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
