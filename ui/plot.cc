@@ -82,12 +82,12 @@ void Plot::render(int2 position, int2 size) {
 
     // Colors
     buffer<vec4> colors(dataSets.size);
-    if(colors.size==1) colors[0] = black;
+    if(colors.size==1) colors[0] = white; //black;
     else if(colors.size==2) colors[0] = red, colors[1] = blue;
     else for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(2*PI*i/colors.size,1,1),1.f); //FIXME: constant intensity
 
     int2 pen=position;
-    {Text text(format(Bold)+title); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
+    {Text text(format(Bold)+title,16,white); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
     assert(legends.size==0 || legends.size == dataSets.size);
     if(legendPosition&1) pen.x += size.x-right;
     if(legendPosition&2) {
@@ -121,7 +121,7 @@ void Plot::render(int2 position, int2 size) {
             line(p, p+int2(0,-4));
             tick.render(p + int2(-tick.textSize.x/2, 0) );
         }
-        {Text text(format(Bold)+xlabel); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
+        {Text text(format(Bold)+xlabel,16,white); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
     }
     {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
         line(point(O), point(end));
@@ -131,7 +131,7 @@ void Plot::render(int2 position, int2 size) {
             Text& tick = ticks[1][i];
             tick.render(p + int2(-tick.textSize.x-left/6, -tick.textSize.y/2) );
         }
-        {Text text(format(Bold)+ylabel);
+        {Text text(format(Bold)+ylabel,16,white);
             text.render(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y/2));}
     }
 

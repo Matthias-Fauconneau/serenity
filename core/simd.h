@@ -6,7 +6,7 @@
 typedef long long v2di __attribute((__vector_size__ (16)));
 typedef int v4si __attribute((__vector_size__ (16)));
 typedef short v8hi __attribute((__vector_size__ (16)));
-typedef char v16q  __attribute((__vector_size__ (16)));
+typedef byte v16q  __attribute((__vector_size__ (16)));
 typedef float v4sf __attribute((__vector_size__ (16)));
 //typedef double v4di __attribute((__vector_size__ (32)));
 //typedef float v8sf __attribute((__vector_size__ (32)));
@@ -40,15 +40,15 @@ inline void sfence() { __builtin_ia32_sfence(); }
 
 // v2di
 
-//inline void storeu(long long* const ptr, v2di a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
+//inline void storeu(long long* const ptr, v2di a) { __builtin_ia32_storedqu((byte*)ptr, (v16qi)a); }
 
 // v4si
 
 inline v4si set1(int i) { return (v4si){i,i,i,i}; }
 inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
-inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_loaddqu((char*)ptr); }
+inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_loaddqu((byte*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
-//inline void storeu(uint32* const ptr, v4si a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
+//inline void storeu(uint32* const ptr, v4si a) { __builtin_ia32_storedqu((byte*)ptr, (v16q)a); }
 //inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxud128(a,b); }
 //inline v8hi packus(v4si a, v4si b) { return __builtin_ia32_packusdw128(a,b); }
 
@@ -56,9 +56,9 @@ inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 inline v8hi short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
 inline v8hi loada(const uint16* const ptr) { return *(v8hi*)ptr; }
-inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_loaddqu((char*)ptr); }
+inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_loaddqu((byte*)ptr); }
 inline void storea(uint16* const ptr, v8hi a) { *(v8hi*)ptr = a; }
-//inline void storeu(uint16* const ptr, v8hi a) { __builtin_ia32_storedqu((char*)ptr, (v16qi)a); }
+//inline void storeu(uint16* const ptr, v8hi a) { __builtin_ia32_storedqu((byte*)ptr, (v16qi)a); }
 
 inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, imm); }
 
@@ -104,13 +104,15 @@ inline void transpose8(uint16* out, uint stride, v8hi a, v8hi b, v8hi c, v8hi d,
 
 // v16qi
 
-//inline v16qi set1(char i) { return (v16qi){i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i}; }
+//inline v16qi set1(byte i) { return (v16qi){i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i}; }
 //inline v16qi packus(v8hi a, v8hi b) { return __builtin_ia32_packuswb128(a,b); }
+inline v16q loadu(const byte* const ptr) { return __builtin_ia32_loaddqu(ptr); }
+inline void storeu(byte* const ptr, v16q a) { __builtin_ia32_storedqu(ptr, a); }
 
 // v4sf
 
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
-inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_loaddqu((char*)ptr); }
+inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_loaddqu((byte*)ptr); }
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }

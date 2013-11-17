@@ -1,6 +1,7 @@
 #pragma once
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
+#include "simd.h"
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
@@ -8,6 +9,8 @@ generic struct mref : ref<T> {
     mref(){}
     /// References \a size elements from \a data pointer
     mref(T* data, size_t size) : ref<T>(data,size) {}
+    /// Converts an std::initializer_list to mref
+    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.data, list.size) {}
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
@@ -26,7 +29,18 @@ inline void* operator new(size_t, void* p) { return p; }
 /// Initializes raw memory to zero
 inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer[i]=0; }
 /// Copies raw memory from \a src to \a dst
-inline void copy(byte* dst, const byte* src, size_t size) { for(size_t i: range(size)) dst[i]=src[i]; }
+inline void copy(byte* dst, const byte* src, size_t size) {
+    if(size<32) { for(size_t i: range(size)) dst[i] = src[i]; return; }
+    size_t size16 = size/16;
+    if(ptr(src)%16==0) {
+        if(ptr(dst)%16==0) for(size_t i: range(size16)) ((v16q*)dst)[i]=((v16q*)src)[i];
+        else for(size_t i: range(size16)) storeu(dst+i*16, ((v16q*)src)[i]);
+    } else {
+        if(ptr(dst)%16==0) for(size_t i: range(size16)) ((v16q*)dst)[i]=loadu(src+i*16);
+        else error("FIXME", ptr(dst)%16, ptr(src)%16);
+    }
+    for(size_t i: range(size16*16,size)) dst[i]=src[i];
+}
 /// Initializes buffer to \a value
 generic inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \a dst

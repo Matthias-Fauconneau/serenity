@@ -1,1 +1,1 @@
-./build.sh $1 release /usr/local/bin
+./build.sh $1 fast /usr/local/bin

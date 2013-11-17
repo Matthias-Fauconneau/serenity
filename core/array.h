@@ -10,6 +10,8 @@ generic struct array : buffer<T> {
     array() {}
     /// Allocates an uninitialized buffer for \a capacity elements
     explicit array(size_t capacity/*, size_t size=0*/) : buffer<T>(capacity, /*size*/0) {}
+    /// Moves elements from a reference
+    explicit array(mref<T>&& ref) : buffer<T>(ref.size) { for(size_t i: range(ref.size)) new (&at(i)) T(move(ref[i])); }
     /// Copies elements from a reference
     explicit array(const ref<T>& ref) : buffer<T>(ref.size) { for(size_t i: range(ref.size)) new (&at(i)) T(copy(ref[i])); }
     /// Converts a buffer to an array

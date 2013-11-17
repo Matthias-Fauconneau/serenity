@@ -126,5 +126,6 @@ tuner/pitch.h
 tuner/tuner.cc
 tuner/test.cc
 tuner/entropy.cc
-plotter.cc
 tuner/profile.h
+dsp.cc
+tuner/biquad.h

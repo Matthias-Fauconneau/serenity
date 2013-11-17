@@ -28,7 +28,7 @@ bool AudioFile::open() {
         if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
             audioStream = file->streams[i];
             audio = audioStream->codec;
-            audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
+            audio->request_sample_fmt = AV_SAMPLE_FMT_S32;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
                 rate = audio->sample_rate;
@@ -37,11 +37,11 @@ bool AudioFile::open() {
             }
         }
     }
-    assert(audio);
-    assert(audio->sample_rate);
-    assert((uint)audio->channels == channels);
-    assert(audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S32
-           || audio->sample_fmt == AV_SAMPLE_FMT_FLTP, (int)audio->sample_fmt);
+    assert_(audio);
+    assert_(audio->sample_rate);
+    assert_((uint)audio->channels == channels);
+    assert_(audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S16P
+            || audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32, (int)audio->sample_fmt);
     return true;
 }
 
@@ -52,32 +52,43 @@ uint AudioFile::read(int32* output, uint outputSize) {
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
+                intBuffer = buffer<int32>();
                 if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
-                    intBuffer = buffer<int>(bufferSize*channels);
-                    for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int32*)frame->data[0])[i]; // FIXME: reference instead of copy ?
-                } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                    intBuffer = unsafeReference(ref<int32>((int32*)frame->data[0], bufferSize*channels)); // Valid until next frame
+                }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                    error("AV_SAMPLE_FMT_FLTP"_);
                     intBuffer = buffer<int>(bufferSize*channels);
                     for(uint i : range(bufferSize)) for(uint j : range(2)) {
                         int s = ((float*)frame->data[j])[i]*(1<<29);
                         if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
                         intBuffer[2*i+j] = s;
                     }
-                } else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16P) {
+                    intBuffer = buffer<int>(bufferSize*channels);
+                    for(uint i : range(bufferSize)) {
+                        intBuffer[2*i+0] = ((int16*)frame->data[0])[i]<<16;
+                        intBuffer[2*i+1] = ((int16*)frame->data[1])[i]<<16;
+                    }
+                }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    error("AV_SAMPLE_FMT_S16"_);
                     intBuffer = buffer<int>(bufferSize*channels);
                     for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int16*)frame->data[0])[i]<<16;
-                } else error("Unknown format");
+                }
+                else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, outputSize-readSize);
-        rawCopy(output, intBuffer+bufferIndex, size*channels);
-        bufferSize -= size; bufferIndex += size*channels;
-        readSize += size; output+= size*channels;
+        rawCopy(output+readSize*channels, intBuffer+bufferIndex*channels, size*channels);
+        bufferSize -= size; bufferIndex += size; readSize += size;
     }
     assert(readSize == outputSize);
     return readSize;
@@ -95,24 +106,31 @@ uint AudioFile::read(float* output, uint outputSize) {
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 floatBuffer = buffer<float>(bufferSize*channels);
-                if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    for(uint i : range(bufferSize*channels)) {
-                        floatBuffer[i] = ((int16*)frame->data[0])[i]*0x1.0p-15;
-                    }
-                } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
                     for(uint i : range(bufferSize)) {
                         floatBuffer[2*i+0] = ((float*)frame->data[0])[i];
                         floatBuffer[2*i+1] = ((float*)frame->data[1])[i];
                     }
-                } else error("Unknown format");
+                }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16P) {
+                    for(uint i : range(bufferSize)) {
+                        floatBuffer[2*i+0] = ((int16*)frame->data[0])[i]*0x1.0p-15;
+                        floatBuffer[2*i+1] = ((int16*)frame->data[1])[i]*0x1.0p-15;
+                    }
+                }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    for(uint i : range(bufferSize*channels)) {
+                        floatBuffer[i] = ((int16*)frame->data[0])[i]*0x1.0p-15;
+                    }
+                }
+                else error("Unimplemented conversion to float32 from", (int)audio->sample_fmt);
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, outputSize-readSize);
-        rawCopy(output, floatBuffer+bufferIndex, size*channels);
-        bufferSize -= size; bufferIndex += size*channels;
-        readSize += size; output+= size*channels;
+        rawCopy(output+readSize*channels, floatBuffer+bufferIndex*channels, size*channels);
+        bufferSize -= size; bufferIndex += size; readSize += size;
     }
     assert(readSize == outputSize);
     return readSize;
@@ -127,10 +145,11 @@ void AudioFile::close() {
     if(file) avformat_close_input(&file);
 }
 
-Audio decodeAudio(const string& path) {
+Audio decodeAudio(const string& path, uint duration) {
     AudioFile file; file.openPath(path);
-    uint size = file.duration*file.channels;
+    duration = min(duration, file.duration);
+    uint size = duration*file.channels;
     Audio audio {file.channels, file.rate, buffer<int32>(size)};
-    audio.data.size = file.read(audio.data.begin(), size) * file.channels;
+    audio.data.size = file.read(audio.data.begin(), duration) * file.channels;
     return audio;
 }

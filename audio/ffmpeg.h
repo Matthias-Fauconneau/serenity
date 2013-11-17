@@ -38,5 +38,5 @@ struct Audio {
     uint rate;
     buffer<int32> data;
 };
-Audio decodeAudio(const string& path);
+Audio decodeAudio(const string& path, uint duration=-1);
 //Audio decodeAudio(buffer<byte>&& data);

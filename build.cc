@@ -109,7 +109,7 @@ struct Build {
                 static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -o"_);
                 array<String> args;
                 args << copy(object) << target+".cc"_ << "-DBUILD=\""_+build+"\""_;
-                if(::find(build,"debug"_)) args << String("-g"_) << String("-fno-omit-frame-pointer") << String("-DASSERT"_);
+                if(::find(build,"debug"_)) args << String("-march=native"_) << String("-g"_) << String("-fno-omit-frame-pointer") << String("-DASSERT"_);
                 else if(::find(build,"fast"_)) args << String("-march=native"_) << String("-O3"_) << String("-g"_);
                 else if(::find(build,"release"_)) args << String("-march=native"_) << String("-O3"_);
                 else if(::find(build,"32"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_) << String("-O3"_);

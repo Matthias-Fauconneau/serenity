@@ -31,6 +31,7 @@ struct Widgets : virtual Layout, array<Widget*> {
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
 template<class T> struct Array : virtual Layout, array<T> {
     Array(){}
+    Array(mref<T>&& items) : array<T>(move(items)){}
     Array(array<T>&& items) : array<T>(move(items)){}
     uint count() const { return array<T>::size; }
     Widget& at(int i) { return array<T>::at(i); }
@@ -91,6 +92,7 @@ template<class T> struct HList : Horizontal, Array<T> {
 };
 /// Vertical layout of homogenous items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
+    VList(mref<T>&& widgets):Array<T>(move(widgets)){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
