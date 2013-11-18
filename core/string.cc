@@ -218,7 +218,7 @@ template<uint base> String itoa(int64 number, int pad) {
         n /= base;
     } while( n!=0 );
     if(number<0) buf[--i]='-';
-    while(64-i<pad) buf[--i] = '0';
+    while(64-i<pad) buf[--i] = ' ';
     return String(string(buf+i,64-i));
 }
 template String itoa<10>(int64,int);

@@ -18,6 +18,7 @@ AudioFile::AudioFile() { static int unused once=(av_register_all(), 0); }
 bool AudioFile::openPath(const string& path) {
     close();
     if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path);  file=0; return false; }
+    log(path);
     return open();
 }
 
@@ -28,7 +29,7 @@ bool AudioFile::open() {
         if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
             audioStream = file->streams[i];
             audio = audioStream->codec;
-            audio->request_sample_fmt = AV_SAMPLE_FMT_S32;
+            //audio->request_sample_fmt = AV_SAMPLE_FMT_S32;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
                 rate = audio->sample_rate;
@@ -42,6 +43,8 @@ bool AudioFile::open() {
     assert_((uint)audio->channels == channels);
     assert_(audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S16P
             || audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32, (int)audio->sample_fmt);
+    ref<const char*> sampleFormats = {"8bit","16bit","32bit","24bit float","48bit float","8bit planar","16bit planar","32bit planar","24bit float planar"};
+    log(audio->sample_rate,"Hz", channels==2?"stereo"_:""_,sampleFormats[(int)audio->sample_fmt]);
     return true;
 }
 
@@ -106,7 +109,12 @@ uint AudioFile::read(float* output, uint outputSize) {
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 floatBuffer = buffer<float>(bufferSize*channels);
-                if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
+                    for(uint i : range(bufferSize*channels)) {
+                        floatBuffer[i] = ((int32*)frame->data[0])[i]*0x1.0p-31;
+                    }
+                }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
                     for(uint i : range(bufferSize)) {
                         floatBuffer[2*i+0] = ((float*)frame->data[0])[i];
                         floatBuffer[2*i+1] = ((float*)frame->data[1])[i];

@@ -18,7 +18,8 @@ struct Player {
     Resampler resampler;
     bool resamplerFlushed = false;
     Resampler nextResampler;
-    AudioOutput audio{{this,&Player::read}, 48000, 32768};
+    const uint rate = 96000;
+    AudioOutput audio{{this,&Player::read}, rate, nextPowerOfTwo(rate/2)};
     int32* lastPeriod = 0, lastPeriodSize = 0;
     uint read(int32* output, uint outputSize) {
         uint readSize = 0;
@@ -136,7 +137,6 @@ struct Player {
             next();
         }
         window.show();
-        mainThread.setPriority(-20);
     }
     ~Player() { writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate))); }
     void queueFile(const string& folder, const string& file, bool withAlbumName=true) {
@@ -213,8 +213,8 @@ struct Player {
                 lastPeriod[i*2+1] *= level;
             }
             lastPeriod=0, lastPeriodSize=0;
-            audio.stop();
             window.setIcon(pauseIcon());
+            audio.stop();
             file.seek(max(0, (int)file.position-lastPeriodSize));
         }
         playButton.enabled=play;
