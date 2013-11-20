@@ -170,23 +170,49 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
         int z = (i/(X/tileSide*Y/tileSide))%(Z/tileSide), y=(i/(X/tileSide))%(Y/tileSide), x=i%(X/tileSide); // Extracts tile coordinates back from index
         int tileX = x*tileSide, tileY = y*tileSide, tileZ = z*tileSide; // first voxel coordinates
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
-        uint16 tileR[tileSize] = {}; // Half-tiled 'R'-buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
+        uint16 tileR[tileSize] = {}; // Untiled 'R'-buffer
+        int3 tileP[tileSize] = {}; // Untiled 'P'-buffer
+        clear(tileP, tileSize, int3(0));
         uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
         clear(targetTile, tileSize);
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];
             int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
+            int3 tileBall = int3(tileBallX, tileBallY, tileBallZ);
             uint attribute=ball.attribute;
             // Clip 18s
             int radius = ceil(sqrt((real)sqRadius));
             for(int dz=max(0,tileBallZ-radius); dz<min(tileSide,tileBallZ+radius); dz++) {
                 for(int dy=max(0,tileBallY-radius); dy<min(tileSide,tileBallY+radius); dy++) {
                     for(int dx=max(0,tileBallX-radius); dx<min(tileSide,tileBallX+radius); dx++) {
-                        uint16& R = tileR[dz*tileSide*tileSide + dy*tileSide + dx];
-                        if((attribute==target.maximum || (sqRadius>R && targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]] != target.maximum))
-                                && sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) {
-                            R = sqRadius;
-                            targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]] = attribute;
+                        if(sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) {
+                            uint tileIndex = dz*tileSide*tileSide + dy*tileSide + dx;
+                            uint16& R = tileR[tileIndex];
+                            uint16& A =  targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]]; // Might be faster to use an untiled buffer here
+                            int3 voxel = int3(dx,dy,dz);
+                            int3& p = tileP[tileIndex];
+                            if(attribute==target.maximum) {
+                                if(!p || sq(voxel-tileBall)<sq(voxel-p)) { // Records closest throat
+                                    R = sqRadius;
+                                    A = attribute;
+                                    p = tileBall;
+                                }
+                            }
+                            else if(sqRadius > R) {
+                                if(p) { // Resolve pore throats collision by taking relative nearest (flat section border)
+                                    uint16 throatR = R;
+                                    uint throatD = sq(voxel-p);
+                                    uint16 poreR = sqRadius;
+                                    uint poreD = sq(voxel-tileBall);
+                                    if(poreD < throatD) { // Pore is nearest
+                                        R = sqRadius;
+                                        A = attribute;
+                                    } //else throat is nearest
+                                } else { // Normal maximum output
+                                    R = sqRadius;
+                                    A = attribute;
+                                }
+                            }
                         }
                     }
                 }
