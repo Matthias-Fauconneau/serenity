@@ -18,7 +18,7 @@ struct Player {
     Resampler resampler;
     bool resamplerFlushed = false;
     Resampler nextResampler;
-    const uint rate = 96000;
+    const uint rate = 48000;
     AudioOutput audio{{this,&Player::read}, rate, nextPowerOfTwo(rate/2)};
     int32* lastPeriod = 0, lastPeriodSize = 0;
     uint read(int32* output, uint outputSize) {
@@ -36,7 +36,7 @@ struct Player {
                     {float source[sourceNeed*2];
                         uint sourceRead = file.read(source, sourceNeed); // Ignores the corner case of file smaller than a resampler half filter size
                         nextToPrevious.write(source, sourceRead);
-                        if(nextResampler) nextResampler.write(source, sourceRead);} // Also writes into next resampler
+                        if(nextResampler) nextResampler.write(source, sourceRead);} // Also writes into next resampler (FIXME: skipped if no next resampler)
                     uint read = nextToPrevious.available();
                     float nextToPreviousBuffer[read*2];
                     nextToPrevious.read(nextToPreviousBuffer, read); // Resamples file rate to previous resampler source rate
@@ -66,7 +66,10 @@ struct Player {
             chunk += read*channels; readSize += read;
             if(readSize == outputSize) { update(file.position/file.rate,file.duration/file.rate); break; } // Complete chunk
             else if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) next(); // End of file
-            else { resampler = move(nextResampler); resamplerFlushed=false; }  // Previous resampler can be replaced once properly flushed
+            else { // Previous resampler can be replaced once properly flushed
+                resampler = move(nextResampler);  nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
+                assert_(resampler);
+            }
         }
         if(!lastPeriod) for(uint i: range(outputSize)) { // Fades in
             float level = exp(12. * ((float) i / outputSize - 1) ); // Linear perceived sound level
@@ -227,8 +230,8 @@ struct Player {
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.setText(String(dec(position/60,2)+":"_+dec(position%60,2)));
-        remaining.setText(String(dec((duration-position)/60,2)+":"_+dec((duration-position)%60,2)));
+        elapsed.setText(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
+        remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         window.render();
     }
 } application;

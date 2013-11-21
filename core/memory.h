@@ -33,11 +33,18 @@ inline void copy(byte* dst, const byte* src, size_t size) {
     if(size<32) { for(size_t i: range(size)) dst[i] = src[i]; return; }
     size_t size16 = size/16;
     if(ptr(src)%16==0) {
-        if(ptr(dst)%16==0) for(size_t i: range(size16)) ((v16q*)dst)[i]=((v16q*)src)[i];
-        else for(size_t i: range(size16)) storeu(dst+i*16, ((v16q*)src)[i]);
+        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16q*)(dst+i*16) = *(v16q*)(src+i*16);
+        else for(size_t i: range(size16)) storeu(dst+i*16, *(v16q*)(src+i*16));
     } else {
-        if(ptr(dst)%16==0) for(size_t i: range(size16)) ((v16q*)dst)[i]=loadu(src+i*16);
-        else error("FIXME", ptr(dst)%16, ptr(src)%16);
+        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16q*)(dst+i*16) =loadu(src+i*16);
+        else {
+            if(ptr(dst)%16==ptr(src)%16) {
+                size_t align = 16-ptr(dst)%16;
+                for(size_t i: range(0, align)) dst[i]=src[i];
+                for(size_t i: range(0, size16-16)) *(v16q*)(dst+align+i*16) = *(v16q*)(src+align+i*16);
+            }
+            else error("FIXME", ptr(dst)%16, ptr(src)%16);
+        }
     }
     for(size_t i: range(size16*16,size)) dst[i]=src[i];
 }

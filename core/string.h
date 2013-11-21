@@ -80,8 +80,8 @@ array<string> split(const string& str, byte separator=' ');
 
 /// Converts integers
 template<uint base=10> String utoa(uint64 number, int pad=0);
-template<uint base=10> String itoa(int64 number, int pad=0);
-inline String dec(int64 n, int pad=0) { return itoa<10>(n,pad); }
+template<uint base=10> String itoa(int64 number, int pad=0, char padChar=' ');
+inline String dec(int64 n, int pad=0, char padChar=' ') { return itoa<10>(n,pad,padChar); }
 inline String str(const uint8& n) { return dec(n); }
 inline String str(const int8& n) { return dec(n); }
 inline String str(const uint16& n) { return dec(n); }

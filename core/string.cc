@@ -209,7 +209,7 @@ template<uint base> String utoa(uint64 n, int pad) {
 template String utoa<2>(uint64,int);
 template String utoa<16>(uint64,int);
 
-template<uint base> String itoa(int64 number, int pad) {
+template<uint base> String itoa(int64 number, int pad, char padChar=' ') {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);
@@ -218,10 +218,10 @@ template<uint base> String itoa(int64 number, int pad) {
         n /= base;
     } while( n!=0 );
     if(number<0) buf[--i]='-';
-    while(64-i<pad) buf[--i] = ' ';
+    while(64-i<pad) buf[--i] = padChar;
     return String(string(buf+i,64-i));
 }
-template String itoa<10>(int64,int);
+template String itoa<10>(int64,int,char);
 
 String ftoa(double n, int precision, int pad, int exponent, bool inf) {
     bool sign = n<0; n=abs(n);
