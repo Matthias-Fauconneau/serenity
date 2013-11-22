@@ -126,9 +126,9 @@ struct Plot : Widget {
             const auto& candidate = estimator.candidates[i];
             bool best = i==estimator.candidates.size-1; //estimator.leastSquareF0[i]==estimator.bestF0;
             vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
-            float d = estimator.candidates.last().energy-candidate.energy;
-            float energyWeight = d?1./d:0;
-            Text label(dec(candidate.peakCount)+" "_+ftoa(candidate.key)+" "_+ftoa(candidate.HPS)+" "_+ftoa(energyWeight), 16,  vec4(color.xyz(),1.f));
+            //float d = estimator.candidates.last().energy-candidate.energy;
+            //float energyWeight = d?1./d:0; //ftoa(candidate.HPS)+" "_+ftoa(energyWeight)
+            Text label(dec(candidate.peakCount)+" "_+ftoa(candidate.key)+" "_+ftoa(candidate.B?1./candidate.B:0), 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*32));
             for(uint n: range(candidate.peaks.size)) {
                 {uint f0 = candidate.peaks0[n];
@@ -252,7 +252,7 @@ struct PitchEstimation {
     buffer<float> signal {N};
 
     // Analysis
-    static constexpr uint N = 16384; // Analysis window size (A0 (27Hz~2K))
+    static constexpr uint N = 32768 /*16384*/; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 periods)
     const uint periodSize = 4096;
     PitchEstimator estimator {N};
     const float fMin  = N*440*exp2(-4)/rate; // A0
@@ -327,12 +327,12 @@ struct PitchEstimation {
             //assert_(f0==0 || pitchToKey(f0*rate/N)>-7, fMin, pitchToKey(f0*rate/N), 1./estimator.inharmonicity);
             int key = f0 ? round(pitchToKey(f0*rate/N)) : 0; //FIXME: stretched reference
 
-            const float absoluteThreshold = 1./8; // Absolute harmonic energy in the current period (i.e over mean period energy)
+            const float absoluteThreshold = 1./2/*4*/; // Absolute harmonic energy in the current period (i.e over mean period energy)
             //float meanPeriodEnergy = estimator.meanPeriodEnergy; // Stabilizes around 4 (depends on FFT size, energy, range)
             float meanPeriodEnergy = 4; // Using constant to benchmark before mean energy converges
             float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
 
-            const float relativeThreshold = 1./12; // Relative harmonic energy (i.e over current period energy)
+            const float relativeThreshold = 1./7/*6*/; // Relative harmonic energy (i.e over current period energy)
             float periodEnergy = estimator.periodEnergy;
             float relative = estimator.harmonicEnergy  / periodEnergy;
 
@@ -364,7 +364,7 @@ struct PitchEstimation {
                 +dec(round(absolute?1./(absolute):0),2)+" "_+dec(round(relative?1./relative:0),2)+"\t"_//+dec(estimator.peaks.size)+"\t"_
                 //+dec(estimator.peakCount,2)+" / "_+dec(estimator.lastHarmonicRank,2)+"\t"_
                 //+dec(bestPeakCount,2)+" / "_+dec(bestH,2)+"\t"_
-                //+"B~"_+dec(estimator.inharmonicity?1./estimator.inharmonicity:0,3)+"\t"_
+                +"B~"_+dec(estimator.B?1./estimator.B:0,3)+"\t"_
                 //+"1st: "_+str(first)+" 2nd: "_+str(second)+"\t"_
                 +(expectedKey == key ? (f0 > fMin && absolute > absoluteThreshold && relative > relativeThreshold ? "O"_ : "~"_) : "X"_));
 
@@ -392,7 +392,7 @@ struct PitchEstimation {
                     //spectrum.iMax = max(f0,expectedF)*max(estimator.lastHarmonicRank,bestH);
                     //spectrum.iMax = max(uint(16*max(f0,expectedF)), estimator.bestPeaks.last()+1);
                     //spectrum.iMax = max(f0,expectedF)*estimator.lastHarmonicRank;
-                    spectrum.iMax = estimator.lastPeak+12*estimator.bestF0;
+                    spectrum.iMax = estimator.lastPeak+8*f0;
 
                     // Relax for hard cases
                     if(     relative<1./2 &&
@@ -405,17 +405,27 @@ struct PitchEstimation {
                                  && expectedKey<=parseKey("A#0"_))
                              || (t%(5*rate)<2*rate && previousKey==expectedKey && relative<1./3 /*&& key==expectedKey-12*/))) {
                         if(0) {}
-                        else if(offsetF0>3./8 && key==expectedKey-1 && apply(split("A2 B1 A#1 A1 A0 G0 F#0"_), parseKey).contains(expectedKey)) {
+                        else if(offsetF0>3./8 && key==expectedKey-1 && apply(split("A2 B1 A#1 A1 F1 E1"_), parseKey).contains(expectedKey)) {
+                            log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
+                        }
+                        else if(offsetF0>3./8 && key==expectedKey-1 && expectedKey<=parseKey("D1"_)) {
+                            log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
+                        }
+                        else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("C#1 C1 B0 A#0 G0 F0"_), parseKey).contains(expectedKey)) {
+                            log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
+                        }
+                        else if(offsetF0>0 && key==expectedKey-1 && expectedKey<=parseKey("A#0"_)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
                         else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("G#1"_), parseKey).contains(expectedKey)) log("-"_);
                         else if(offsetF0>1./8 && key==expectedKey-1 && apply(split("G1 F#1"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(offsetF0>0 && key==expectedKey-1 && apply(split("F1 E1 D#1 D1 C#1 C1"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(key==expectedKey-1 && apply(split("B0 A#0 G0 F#0"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(offsetF0>0 && key==expectedKey-1 && apply(split("F1 E1 D#1 D1 C#1"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(key==expectedKey-1 && expectedKey<=parseKey("C1"_)) log("-"_);
                         else if(t%(5*rate) < 2*rate && relative<1./3 && apply(split("C4 A3"_), parseKey).contains(expectedKey)) log("/"_);
                         else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2)) log("!"_); // Attack
                         else if(t%(5*rate)>4*rate && key<=expectedKey) log("."_); // Release
-                        //else if(expectedKey<=parseKey("A0"_)) log("_"_); // Bass strings
+                        else if(expectedKey<=parseKey("A#0"_) && key==expectedKey+1) log("~"_); // Bass strings swings
+                        else if(expectedKey<=parseKey("F#0"_) && key==expectedKey-2) log("_"_); // Bass strings swings
                         else { log("Corner case"); break; }
                     } else { log("FIXME",relative<1./2, key==expectedKey-1, expectedKey<=parseKey("D#0"_) ); break; }
                 }
@@ -435,8 +445,8 @@ struct PitchEstimation {
             //break;
         }
         if(fail) {
-            log(str(minAbsolute)+" "_+str(minAllowAbsolute)+" "_+str(globalMaxDenyAbsolute)+" "_+str(maxDenyAbsolute)+" "_+str(maxAbsolute));
-            log(str(minRelative)+" "_+str(minAllowRelative)+" "_+str(globalMaxDenyRelative)+" "_+str(maxDenyRelative)+" "_+str(maxRelative));
+            log(str(1./minAbsolute)+" "_+str(1./minAllowAbsolute)+" "_+str(1./globalMaxDenyAbsolute)+" "_+str(1./maxDenyAbsolute)+" "_+str(1./maxAbsolute));
+            log(str(1./minRelative)+" "_+str(1./minAllowRelative)+" "_+str(1./globalMaxDenyRelative)+" "_+str(1./maxDenyRelative)+" "_+str(1./maxRelative));
         } else {
             log("Maximum inharmonicity", maxB?1./maxB:0);
             log("Mean period energy", log2(estimator.meanPeriodEnergy));
