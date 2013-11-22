@@ -101,23 +101,41 @@ struct Plot : Widget {
         }
 #else
         //{ uint t = estimator.peaks.size/2-1;
-        for(uint t: range(estimator.peaks.size/2)) {
+        /*for(uint t: range(estimator.peaks.size/2)) {
             for(uint r: range(2)) {
-                uint i = r*estimator.maxRanks.size+t;
+                uint i = r*estimator.maxRanks.size+t;*/
                 //uint last = estimator.peaks.size-1;
-                for(uint n: range(estimator.peaks[i].size)) {
-                    bool best = estimator.leastSquareF0[i]==estimator.bestF0;
-                    vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
-                    uint f0 = estimator.peaks0[i][n];
-                    float x0 = this->x(f0+0.5)*size.x;
-                    line(position.x+x0,position.y,position.x+x0,position.y+size.y, color);
+        /*for(uint i: range(estimator.peaks.size)) {
+            for(uint n: range(estimator.peaks[i].size)) {
+                bool best = estimator.leastSquareF0[i]==estimator.bestF0;
+                vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
+                uint f0 = estimator.peaks0[i][n];
+                float x0 = this->x(f0+0.5)*size.x;
+                line(position.x+x0,position.y,position.x+x0,position.y+size.y, color);
 
-                    uint f = estimator.peaks[i][n];
-                    float x = this->x(f+0.5)*size.x;
-                    line(position.x+x,position.y,position.x+x,position.y+size.y, color);
-                    Text label(dec(n+1)+" "_+ftoa(f/estimator.leastSquareF0[i],1),16, vec4(color.xyz(),1.f));
-                    label.render(int2(position.x+x,position.y+16+(i)*32+(n%2)*16));
-                }
+                uint f = estimator.peaks[i][n];
+                float x = this->x(f+0.5)*size.x;
+                line(position.x+x,position.y,position.x+x,position.y+size.y, color);
+                Text label(dec(n+1)+" "_+ftoa(f/estimator.leastSquareF0[i],1),16, vec4(color.xyz(),1.f));
+                label.render(int2(position.x+x,position.y+16+(i)*32+(n%2)*16));
+            }
+        }*/
+        for(uint i: range(estimator.candidates.size)) {
+            if(i!=0 && i!=estimator.candidates.size-1) continue; // Only shows first and last
+            ref<uint> peaks0 = estimator.candidates[i].peaks0;
+            ref<uint> peaks = estimator.candidates[i].peaks;
+            for(uint n: range(peaks.size)) {
+                bool best = i==estimator.candidates.size-1; //estimator.leastSquareF0[i]==estimator.bestF0;
+                vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
+                uint f0 = peaks0[n];
+                float x0 = this->x(f0+0.5)*size.x;
+                line(position.x+x0,position.y,position.x+x0,position.y+size.y, color);
+
+                uint f = peaks[n];
+                float x = this->x(f+0.5)*size.x;
+                line(position.x+x,position.y,position.x+x,position.y+size.y, color);
+                Text label(dec(n+1)+" "_+ftoa(f/estimator.leastSquareF0[i],1),16, vec4(color.xyz(),1.f));
+                label.render(int2(position.x+x,position.y+16+(i)*32+(n%2)*16));
             }
         }
 #endif
@@ -378,17 +396,17 @@ struct PitchEstimation {
                                  && expectedKey<=parseKey("A#0"_))
                              || (t%(5*rate)<2*rate && previousKey==expectedKey && relative<1./3 /*&& key==expectedKey-12*/))) {
                         if(0) {}
-                        else if(offsetF0>3./8 && key==expectedKey-1 && apply(split("A2 B1 A#1 A1 F#0"_), parseKey).contains(expectedKey)) {
+                        else if(offsetF0>3./8 && key==expectedKey-1 && apply(split("A2 B1 A#1 A1 A0 G0 F#0"_), parseKey).contains(expectedKey)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
                         else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("G#1"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(offsetF0>1./8 && key==expectedKey-1 && apply(split("G1 F#1"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(offsetF0>1./8 && key==expectedKey-1 && apply(split("G1 F#1 F#0"_), parseKey).contains(expectedKey)) log("-"_);
                         else if(offsetF0>0 && key==expectedKey-1 && apply(split("F1 E1 D#1 D1 C#1 C1"_), parseKey).contains(expectedKey)) log("-"_);
                         else if(key==expectedKey-1 && apply(split("B0 A#0"_), parseKey).contains(expectedKey)) log("-"_);
                         else if(t%(5*rate) < 2*rate && relative<1./3 && apply(split("C4 A3"_), parseKey).contains(expectedKey)) log("/"_);
                         else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2)) log("!"_); // Attack
                         else if(t%(5*rate)>4*rate && key<=expectedKey) log("."_); // Release
-                        else if(expectedKey<=parseKey("A0"_)) log("_"_); // Bass strings
+                        //else if(expectedKey<=parseKey("A0"_)) log("_"_); // Bass strings
                         else { log("Corner case"); break; }
                     } else { log("FIXME",relative<1./2, key==expectedKey-1, expectedKey<=parseKey("D#0"_) ); break; }
                 }

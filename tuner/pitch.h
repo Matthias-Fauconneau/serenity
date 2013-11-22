@@ -41,14 +41,14 @@ struct FFT {
 
 template<Type V, uint N> struct list { // Small sorted list
     static constexpr uint size = N;
-    struct element : V { float key; element(float key=0, V value=V()):V(value),key(key){} } elements[N];
-    void clear() { ::clear(elements, N); }
-    void insert(float key, V value) {
+    struct element : V { float key; element(float key=0, V&& value=V()):V(move(value)),key(key){} } elements[N];
+    void clear() { for(size_t i: range(size)) elements[i]=element(); }
+    void insert(float key, V&& value) {
         int i=0; while(i<N && elements[i].key<=key) i++; i--;
         //if(key==elements[0].key) return;
         if(i<0) return; // New candidate would be lower than current
-        for(uint j: range(i)) elements[j]=elements[j+1]; // Shifts left
-        elements[i] = element(key, value); // Inserts new candidate
+        for(uint j: range(i)) elements[j]=move(elements[j+1]); // Shifts left
+        elements[i] = element(key, move(value)); // Inserts new candidate
     }
     const element& operator[](uint i) const { assert(i<N); return elements[i]; }
     const element& last() const { return elements[N-1]; }
@@ -110,6 +110,12 @@ struct PitchEstimator : FFT {
     const ref<uint> maxRanks = {1};
     uint lastHarmonicRank;
     uint lastPeak;
+
+    struct Candidate {
+        float f0; array<uint> peaks0, peaks;
+        Candidate(float f0=0, array<uint>&& peaks0={}, array<uint>&& peaks={}):f0(f0),peaks0(move(peaks0)),peaks(move(peaks)){}
+    };
+    list<Candidate, 5> candidates;
 #else
     struct Candidate {
         float f0, B; uint H; uint peakCount;
@@ -154,13 +160,18 @@ struct PitchEstimator : FFT {
 
 #if 1 // Least square fuzzy energy optimization
         lastHarmonicRank = 0; lastPeak=0;
+        peaks0.reserve(256); peaks.reserve(256);
         peaks0.clear(); peaks.clear(); leastSquareF0.clear();
+        candidates.clear();
         float bestEnergy = 0; //, bestPeakCount=0;
         // Always tests both nearest rank (to F1) to avoid getting stuck in local minimum (rank shift)
 #if 1
-        uint nLow = max(1,int(F1/F0)), nHigh = nLow+1;
+        //uint nLow = max(1,int(F1/F0)), nHigh = nLow+1;
         //float f0Low = (float) F1 / (+1);
-        for(uint n1: range(nLow, nHigh+2)) {
+        //for(uint n1: range(nLow, nHigh+2)) {
+        //for(uint n1: range(max(1, int(round(F1/F0)-1)), round(F1/F0)+1 +1)) {
+        //for(uint n1: range(max(1, int(F1/F0)), max(1, int(F1/F0)*7/6)+1+1 +1)) {
+        for(uint n1: range(max(1, int(F1/F0)), max(1, int(round(F1/F0*6/5))) +1)) {
             float f0 = (float) F1 / n1;
             for(uint maxRank unused: maxRanks) { //for(uint maxRank: maxRanks) { //TODO: until convergence
 #else
@@ -172,7 +183,7 @@ struct PitchEstimator : FFT {
 #endif
                 // Least square optimization of linear fit: n.f0 = f[n] <=> Xb = y (X=n, b=f0, y=f[n])
                 float n2=0, nf=0; // Least square X'X and X'y coefficients
-                array<uint> peaks0, peaks;
+                array<uint> peaks0, peaks; peaks0.reserve(N/2); peaks.reserve(N/2);
                 float totalEnergy = 0; float merit=0; //uint peakCount=0; float HPS=0;
                 for(uint n=1; n<=/*maxRank*/ maxRank*n1; n++) {
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
@@ -209,6 +220,7 @@ struct PitchEstimator : FFT {
                 assert_(n2); float f0Fit = nf / n2; // Least square fit X'X b = X' y
                 leastSquareF0 << f0Fit;
                 this->peaks0 << copy(peaks0); this->peaks << copy(peaks); // DEBUG
+                candidates.insert(totalEnergy, Candidate(f0Fit, copy(peaks0), copy(peaks)));
                 //if(peakCount > bestPeakCount) { // Optimal peak energy
                 if(totalEnergy > bestEnergy) { // Optimal peak energy
                     //bestHPS = HPS;
