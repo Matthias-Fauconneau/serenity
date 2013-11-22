@@ -121,20 +121,29 @@ struct Plot : Widget {
             }
         }*/
         for(uint i: range(estimator.candidates.size)) {
-            if(i!=0 && i!=estimator.candidates.size-1) continue; // Only shows first and last
-            ref<uint> peaks0 = estimator.candidates[i].peaks0;
-            ref<uint> peaks = estimator.candidates[i].peaks;
-            for(uint n: range(peaks.size)) {
-                bool best = i==estimator.candidates.size-1; //estimator.leastSquareF0[i]==estimator.bestF0;
-                vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
-                uint f0 = peaks0[n];
+            //if(i!=0 && i!=estimator.candidates.size-1) continue; // Only shows first and last
+            if(i<estimator.candidates.size-2) continue; // Only shows bests
+            const auto& candidate = estimator.candidates[i];
+            bool best = i==estimator.candidates.size-1; //estimator.leastSquareF0[i]==estimator.bestF0;
+            vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
+            float d = estimator.candidates.last().energy-candidate.energy;
+            float energyWeight = d?1./d:0;
+            Text label(dec(candidate.peakCount)+" "_+ftoa(candidate.key)+" "_+ftoa(candidate.HPS)+" "_+ftoa(energyWeight), 16,  vec4(color.xyz(),1.f));
+            label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*32));
+            for(uint n: range(candidate.peaks.size)) {
+                {uint f0 = candidate.peaks0[n];
                 float x0 = this->x(f0+0.5)*size.x;
-                line(position.x+x0,position.y,position.x+x0,position.y+size.y, color);
+                line(position.x+x0,position.y,position.x+x0,position.y+size.y, vec4(color.xyz(),1.f/3));}
 
-                uint f = peaks[n];
+                uint f = candidate.peaks[n];
                 float x = this->x(f+0.5)*size.x;
-                line(position.x+x,position.y,position.x+x,position.y+size.y, color);
-                Text label(dec(n+1)+" "_+ftoa(f/estimator.leastSquareF0[i],1),16, vec4(color.xyz(),1.f));
+                line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
+
+                {uint fLS = candidate.peaksLS[n];
+                float x = this->x(fLS+0.5)*size.x;
+                line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));}
+
+                Text label(dec(n+1)+" "_+ftoa(f/candidate.f0,1),16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*32+(n%2)*16));
             }
         }
@@ -318,7 +327,7 @@ struct PitchEstimation {
             //assert_(f0==0 || pitchToKey(f0*rate/N)>-7, fMin, pitchToKey(f0*rate/N), 1./estimator.inharmonicity);
             int key = f0 ? round(pitchToKey(f0*rate/N)) : 0; //FIXME: stretched reference
 
-            const float absoluteThreshold = 1./16; // Absolute harmonic energy in the current period (i.e over mean period energy)
+            const float absoluteThreshold = 1./8; // Absolute harmonic energy in the current period (i.e over mean period energy)
             //float meanPeriodEnergy = estimator.meanPeriodEnergy; // Stabilizes around 4 (depends on FFT size, energy, range)
             float meanPeriodEnergy = 4; // Using constant to benchmark before mean energy converges
             float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
@@ -383,7 +392,7 @@ struct PitchEstimation {
                     //spectrum.iMax = max(f0,expectedF)*max(estimator.lastHarmonicRank,bestH);
                     //spectrum.iMax = max(uint(16*max(f0,expectedF)), estimator.bestPeaks.last()+1);
                     //spectrum.iMax = max(f0,expectedF)*estimator.lastHarmonicRank;
-                    spectrum.iMax = estimator.lastPeak+estimator.bestF0;
+                    spectrum.iMax = estimator.lastPeak+12*estimator.bestF0;
 
                     // Relax for hard cases
                     if(     relative<1./2 &&
@@ -400,9 +409,9 @@ struct PitchEstimation {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
                         else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("G#1"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(offsetF0>1./8 && key==expectedKey-1 && apply(split("G1 F#1 F#0"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(offsetF0>1./8 && key==expectedKey-1 && apply(split("G1 F#1"_), parseKey).contains(expectedKey)) log("-"_);
                         else if(offsetF0>0 && key==expectedKey-1 && apply(split("F1 E1 D#1 D1 C#1 C1"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(key==expectedKey-1 && apply(split("B0 A#0"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(key==expectedKey-1 && apply(split("B0 A#0 G0 F#0"_), parseKey).contains(expectedKey)) log("-"_);
                         else if(t%(5*rate) < 2*rate && relative<1./3 && apply(split("C4 A3"_), parseKey).contains(expectedKey)) log("/"_);
                         else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2)) log("!"_); // Attack
                         else if(t%(5*rate)>4*rate && key<=expectedKey) log("."_); // Release

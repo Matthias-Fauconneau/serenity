@@ -45,7 +45,7 @@ template<Type V, uint N> struct list { // Small sorted list
     void clear() { for(size_t i: range(size)) elements[i]=element(); }
     void insert(float key, V&& value) {
         int i=0; while(i<N && elements[i].key<=key) i++; i--;
-        //if(key==elements[0].key) return;
+        if(key==elements[0].key) return;
         if(i<0) return; // New candidate would be lower than current
         for(uint j: range(i)) elements[j]=move(elements[j+1]); // Shifts left
         elements[i] = element(key, move(value)); // Inserts new candidate
@@ -107,13 +107,14 @@ struct PitchEstimator : FFT {
 #if 1
     array<float> leastSquareF0; array<array<uint>> peaks0, peaks;
     float bestF0; array<uint> bestPeaks0, bestPeaks;
-    const ref<uint> maxRanks = {1};
+    const ref<uint> maxRanks = {1,1};
     uint lastHarmonicRank;
     uint lastPeak;
 
     struct Candidate {
-        float f0; array<uint> peaks0, peaks;
-        Candidate(float f0=0, array<uint>&& peaks0={}, array<uint>&& peaks={}):f0(f0),peaks0(move(peaks0)),peaks(move(peaks)){}
+        float f0; float energy; uint peakCount; float HPS; array<uint> peaks0, peaks, peaksLS;
+        Candidate(float f0=0, float energy=0, uint peakCount=0, float HPS=0, array<uint>&& peaks0={}, array<uint>&& peaks={}, array<uint>&& peaksLS={}):
+            f0(f0),energy(energy),peakCount(peakCount),HPS(HPS),peaks0(move(peaks0)),peaks(move(peaks)),peaksLS(move(peaksLS)){}
     };
     list<Candidate, 5> candidates;
 #else
@@ -163,17 +164,18 @@ struct PitchEstimator : FFT {
         peaks0.reserve(256); peaks.reserve(256);
         peaks0.clear(); peaks.clear(); leastSquareF0.clear();
         candidates.clear();
-        float bestEnergy = 0; //, bestPeakCount=0;
+        float bestEnergy = 0/*, bestHPS=-inf*/; uint bestPeakCount=0;
         // Always tests both nearest rank (to F1) to avoid getting stuck in local minimum (rank shift)
 #if 1
-        //uint nLow = max(1,int(F1/F0)), nHigh = nLow+1;
-        //float f0Low = (float) F1 / (+1);
-        //for(uint n1: range(nLow, nHigh+2)) {
-        //for(uint n1: range(max(1, int(round(F1/F0)-1)), round(F1/F0)+1 +1)) {
-        //for(uint n1: range(max(1, int(F1/F0)), max(1, int(F1/F0)*7/6)+1+1 +1)) {
-        for(uint n1: range(max(1, int(F1/F0)), max(1, int(round(F1/F0*6/5))) +1)) {
+        uint nLow = max(1,int(F1/F0)), nHigh = max(nLow+2, uint(F1/F0*5/4)); //6/5));
+        float f0Low = (float) F1 / nHigh;
+        log(nHigh);
+        for(uint n1: range(nLow,  nHigh /*+1*/)) {
             float f0 = (float) F1 / n1;
+            float totalEnergy = 0; uint peakCount=0; float HPS=0;
+            array<uint> peaks0, peaks, peaksLS;
             for(uint maxRank unused: maxRanks) { //for(uint maxRank: maxRanks) { //TODO: until convergence
+                peaks0.clear(); peaks.clear(); peaksLS.clear(); totalEnergy = 0; peakCount=0; HPS=0; uint productCount=0;
 #else
         for(uint maxRank unused: maxRanks) { //for(uint maxRank: maxRanks) { //TODO: until convergence
             uint nLow = max(1,int(F1/F0)), nHigh = nLow+1;
@@ -183,15 +185,15 @@ struct PitchEstimator : FFT {
 #endif
                 // Least square optimization of linear fit: n.f0 = f[n] <=> Xb = y (X=n, b=f0, y=f[n])
                 float n2=0, nf=0; // Least square X'X and X'y coefficients
-                array<uint> peaks0, peaks; peaks0.reserve(N/2); peaks.reserve(N/2);
-                float totalEnergy = 0; float merit=0; //uint peakCount=0; float HPS=0;
-                for(uint n=1; n<=/*maxRank*/ maxRank*n1; n++) {
+                for(uint n=1; n<=/*maxRank*/ /*maxRank*//*2*n1*/ (28/nLow)*n1; n++) {
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
                     uint expectedF = n*f0;
                     //if(expectedF>fMax) break;
                     //if(expectedF>N/4) break;
                     uint localF = expectedF; float peakEnergy = spectrum[localF]; // Weighted by 1/(1+distance) //FIXME: integrate energy ?
-                    for(uint df=1; df < /*(uint)(f0Low/2)*//*f0Low*/f0/4; df++) { // Avoids solution only fitting the strongest peaks extremely well
+                    //for(uint df=1; df < /*(uint)(f0Low/2)*//*f0Low*/f0/4; df++) { // Avoids solution only fitting the strongest peaks extremely well
+                    uint df=1;
+                    for(; df < f0Low/6 /*4*/; df++) { // Avoids solution only fitting the strongest peaks extremely well
                         assert_(int(expectedF-df)>=0 && expectedF+df<N/2);
                         float w = 1; //1./(1+df); //1./(1+df) - 1./(1+maxDistance);
                         // Only search below to avoid interval shift ?
@@ -202,36 +204,58 @@ struct PitchEstimator : FFT {
                     //if(peakEnergy > 2*periodPower) {
                     //if(peakEnergy > periodPower/8) {
                         totalEnergy += peakEnergy;
-                        merit += peakEnergy;
                         if(spectrum[expectedF]>periodPower) lastHarmonicRank=max(lastHarmonicRank, n);
-                        //peakCount += peakEnergy > 2*periodPower;
-                        //assert_(peakEnergy>0);
-                        //HPS += log2(peakEnergy);
+                        peakCount += peakEnergy > 3*periodPower;
+                        assert_(peakEnergy>0);
+                        if(peakEnergy > periodPower*2) { HPS += log2(peakEnergy); productCount++; }
                         peaks << localF;
                         if(peakEnergy > periodPower*2)
                             lastPeak = max(lastPeak, localF);
                         // Refines f0 with a weighted least square fit
-                        float w = merit; //log2(peakEnergy); //./(1+n); //weightedEnergyDensity; // Weights by energy density, distance from integer harmonic //, rank
+                        /*for(; df < f0Low/3; df++) { // Search further to find correct direction for least square fit
+                            assert_(int(expectedF-df)>=0 && expectedF+df<N/2);
+                            float w = 1; //1./(1+df); //1./(1+df) - 1./(1+maxDistance);
+                            // Only search below to avoid interval shift ?
+                            if(w*spectrum[expectedF-df] > peakEnergy) peakEnergy=w*spectrum[expectedF-df], localF=expectedF-df;
+                            if(w*spectrum[expectedF+df] > peakEnergy) peakEnergy=w*spectrum[expectedF+df], localF=expectedF+df;
+                        }*/
+                        peaksLS << localF;
+                        float w = peakEnergy / n; //log2(peakEnergy); //./(1+n); //weightedEnergyDensity; // Weights by energy density, distance from integer harmonic //, rank
                         nf += w * n * localF;
                         n2 += w * sq(n);
                     //}
                     //else peaks << 0; // DEBUG: display correct rank
                 }
-                assert_(n2); float f0Fit = nf / n2; // Least square fit X'X b = X' y
+                assert_(n2,nLow); float f0Fit = nf / n2; // Least square fit X'X b = X' y
                 leastSquareF0 << f0Fit;
                 this->peaks0 << copy(peaks0); this->peaks << copy(peaks); // DEBUG
-                candidates.insert(totalEnergy, Candidate(f0Fit, copy(peaks0), copy(peaks)));
-                //if(peakCount > bestPeakCount) { // Optimal peak energy
-                if(totalEnergy > bestEnergy) { // Optimal peak energy
-                    //bestHPS = HPS;
-                    //bestPeakCount = peakCount;
+                HPS /= productCount; // Normalizes HPS
+                //candidates.insert(totalEnergy, Candidate(f0Fit, totalEnergy, peakCount, HPS, copy(peaks0), copy(peaks)));
+                //if(totalEnergy > bestEnergy) { // Optimal peak energy
+                //if(HPS > bestHPS) { // Optimal loudness (sum of log)
+                //if(peakCount > bestPeakCount) { // Optimal peak count
+                /*const float energyWeight = 16;
+                candidates.insert(energyWeight*totalEnergy+peakCount, Candidate(f0Fit, totalEnergy, peakCount, HPS, copy(peaks0), copy(peaks)));
+                if(energyWeight*totalEnergy+peakCount > energyWeight*bestEnergy+bestPeakCount) {
+                    bestHPS = HPS;
+                    bestPeakCount = peakCount;
                     bestEnergy = totalEnergy;
                     F0 = f0Fit;
                     this->bestF0 = F0;
                     bestPeaks0 = move(peaks0), bestPeaks = move(peaks);
-                } //else break;
+                } //else break;*/
                 f0 = f0Fit;
             }
+            const float energyWeight = 16;
+            candidates.insert(energyWeight*totalEnergy+peakCount, Candidate(f0, totalEnergy, peakCount, HPS, copy(peaks0), copy(peaks), copy(peaksLS)));
+            if(energyWeight*totalEnergy+peakCount > energyWeight*bestEnergy+bestPeakCount) {
+                //bestHPS = HPS;
+                bestPeakCount = peakCount;
+                bestEnergy = totalEnergy;
+                F0 = f0;
+                this->bestF0 = F0;
+                bestPeaks0 = move(peaks0), bestPeaks = move(peaks);
+            } //else break;
         }
         harmonicEnergy = bestEnergy;
         return F0;
