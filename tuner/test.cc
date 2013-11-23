@@ -100,7 +100,8 @@ struct Plot : Widget {
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
 
-                Text label(dec(n+1)+" "_+ftoa(spectrum[f]),16, vec4(color.xyz(),1.f));
+                Text label(dec(n+1) /*+" "_+ftoa(spectrum[f])*/
+                           ,16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
             }
             for(uint n: range(candidate.peaksLS.size)) {
@@ -217,12 +218,12 @@ struct PitchEstimation {
             float f0 = estimator.estimate(signal);
             int key = f0>1 ? round(pitchToKey(f0*rate/N)) : 0; //FIXME: stretched reference
 
-            const float absoluteThreshold = 1./3/*4*/; // Absolute harmonic energy in the current period (i.e over mean period energy)
+            const float absoluteThreshold = 1./3/*3*/; // Absolute harmonic energy in the current period (i.e over mean period energy)
             //float meanPeriodEnergy = estimator.meanPeriodEnergy; // Stabilizes around 4 (depends on FFT size, energy, range)
             float meanPeriodEnergy = 8; // Using constant to benchmark before mean energy converges
             float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
 
-            const float relativeThreshold = 1./7/*6*//*8*/; // Relative harmonic energy (i.e over current period energy)
+            const float relativeThreshold = 1./7/*7*/; // Relative harmonic energy (i.e over current period energy)
             float periodEnergy = estimator.periodEnergy;
             float relative = estimator.harmonicEnergy  / periodEnergy;
 
@@ -255,7 +256,6 @@ struct PitchEstimation {
                     spectrum.expectedF = expectedF;
                     spectrum.iMin = min(estimator.peaks.first(), (uint)min(f0, expectedF))-2;
                     spectrum.iMax = max(estimator.peaks.last(), estimator.lastPeak);
-                    //spectrum.iMax = (3*estimator.peaks.last()+estimator.lastPeak)/4;
 
                     // Relax for hard cases
                     if(     relative<1./2 &&
@@ -283,7 +283,7 @@ struct PitchEstimation {
                         else if(offsetF0>-3./8 && key==expectedKey-1 && expectedKey<=parseKey("F#0"_)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
-                        else if( key==expectedKey-1 && expectedKey<=parseKey("D#0"_)) {
+                        else if( key==expectedKey-1 && expectedKey<=parseKey("F#0"_)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
                         else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("G#1"_), parseKey).contains(expectedKey)) log("-"_);

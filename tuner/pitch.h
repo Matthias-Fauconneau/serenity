@@ -111,7 +111,7 @@ struct PitchEstimator : FFT {
         Candidate(float f0=0, float B=0, float energy=0, array<uint>&& peaks={}, array<uint>&& peaksLS={}):
             f0(f0),B(B),energy(energy),peaks(move(peaks)),peaksLS(move(peaksLS)){}
     };
-    list<Candidate, 2> candidates;
+    list<Candidate, 3> candidates;
 
     /// Returns first partial (f1=f0*sqrt(1+B)~f0*(1+B))
     /// \a fMin Minimum fundamental frequency for harmonic evaluation
@@ -145,9 +145,9 @@ struct PitchEstimator : FFT {
         medianF0 = F0;
         lastPeak = 0;
         float bestEnergy = 0, bestMerit = 0;
-        uint nLow = max(1,int(F1/F0 /*+1.f/16*/)); // Rounds up when nearly exact
-        uint nHigh = max(int(F1/F0)+2, int(ceil/*round*/(F1/F0*4/3)));
-        log(index, nLow, F1/F0, F1/F0*4/3, nHigh);
+        uint nLow = max(1,int(F1/F0));
+        uint nHigh = max(int(F1/F0)+2, int(ceil(F1/F0*4/3)));
+        log(F0,F1, index, nLow, F1/F0, F1/F0*4/3, nHigh);
         for(uint n1: range(nLow,  nHigh +1)) {
             float f0 = (float) F1 / n1, f0B = 0, energy = 0;
             array<uint> peaks, peaksLS;
@@ -156,23 +156,27 @@ struct PitchEstimator : FFT {
                 peaks.clear(); peaksLS.clear(); energy = 0;
                 // Least square optimization of linear fit: n.f0 = f[n] => argmin |Xb - y|^2 (X=n, b=f0, y=f[n]) <=> X'X b = X' y
                 float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
-                for(uint n=1; n<=(46/*32*//*48*//nLow)*n1; n++) { // Every candidates stops at same peak
+                bool forwardOnly=false;
+                for(uint n=1; n<=(46/*32*//nLow)*n1; n++) { // Every candidates stops at same peak
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
                     uint fn = round(f0*n + f0B*n*n); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
                     if(fn>N/4) break;
-                    uint df=1; uint f=fn; float peakEnergy = spectrum[f];
-                    for(; df<=5/*4*//*0*/; df++) { // Compensate peak inaccuracy
+                    uint f=fn; float peakEnergy = spectrum[f];
+                    uint df=1;
+                    for(; df<=min(uint(F0/20),5u); df++) { // Compensates peak inaccuracy (frequency dependent ?)
                         assert_(fn+df<N/2);
-                        if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
+                        if(!forwardOnly) // Prevents two consecutive harmonics to pinch the same peak
+                            if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
                         if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], f=fn+df;
                     }
+                    forwardOnly = f > fn;
                     if(spectrum[f]>noiseThreshold) lastPeak = max(lastPeak, f);
                     energy += peakEnergy;
                     peaks << f;
                     if(n<=(t+1)*8) {
                         // Refines f0 with a weighted least square fit
                         uint maxF = f;
-                        for(; df<=4 /*f0Low/4*/; df++) { // Fit nearest peak
+                        for(; df<=5; df++) { // Fit nearest peak
                             assert_(int(fn-df)>=0 && fn+df<N/2, f0, fn, df, F1);
                             if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], maxF=fn-df;
                             if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], maxF=fn+df;
@@ -194,7 +198,7 @@ struct PitchEstimator : FFT {
                 f0B = (-c*nf + a*n2f) / det;
                 if(f0B<0) f0 = nf/n2, f0B=0;
             }
-            float merit = energy / (/*396*/15104+peaks.size); // Keeps higher octaves
+            float merit = energy / (15104+peaks.size); // Keeps higher octaves
             candidates.insert(merit, Candidate(f0, f0B/f0, energy, copy(peaks), copy(peaksLS)));
             if(merit > bestMerit) {
             //if(energy > bestEnergy) {
