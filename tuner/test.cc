@@ -56,11 +56,11 @@ struct Plot : Widget {
     void render(int2 position, int2 size) {
         assert_(iMin <= iMax && iMax <= spectrum.size);
         float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
-        float sMin = min(estimator.noiseThreshold, estimator.periodPower);
+        float sMin = min(estimator.periodPower,  estimator.noiseThreshold/2);
 
-        float s = estimator.noiseThreshold;
+        {float s = estimator.noiseThreshold;
         float y = (logy ? (log2(s) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (s / sMax)) * (size.y-12);
-        line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(1,0,0,1));
+        line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
 
         for(uint i: range(iMin, iMax)) { // Energy density
             float x0 = x(i) * size.x;
@@ -69,19 +69,20 @@ struct Plot : Widget {
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
         }
 
-        /*for(uint f: estimator.peaks) {
+        for(uint f: estimator.peaks) {
             float x = this->x(f+0.5)*size.x;
             line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(1,0,0,1./2));
-        }*/
+        }
 
         // First peak and first F0 estimation (median distance)
         {float x = this->x(estimator.firstPeakFrequency+0.5)*size.x;
-            fill(position.x+floor(x),position.y,position.x+ceil(x),position.y+size.y, vec4(0,1,0,1./2));}
+            fill(position.x+floor(x),position.y,position.x+ceil(x),position.y+size.y, vec4(0,1,0,1));}
         {float x = this->x(estimator.firstPeakFrequency+estimator.medianF0+0.5)*size.x;
-            fill(position.x+floor(x),position.y,position.x+ceil(x),position.y+size.y, vec4(0,1,0,1./3));}
+            fill(position.x+floor(x),position.y,position.x+ceil(x),position.y+size.y, vec4(0,1,0,1./2));}
         {float x = this->x(estimator.firstPeakFrequency-estimator.medianF0+0.5)*size.x;
-            fill(position.x+floor(x),position.y,position.x+ceil(x),position.y+size.y, vec4(0,1,0,1./3));}
+            fill(position.x+floor(x),position.y,position.x+ceil(x),position.y+size.y, vec4(0,1,0,1./2));}
 
+#if 1
         for(uint i: range(estimator.candidates.size)) {
             const auto& candidate = estimator.candidates[i];
             bool best = i==estimator.candidates.size-1;
@@ -99,7 +100,7 @@ struct Plot : Widget {
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
 
-                Text label(dec(n+1)/*+" "_+ftoa(f/candidate.f0,1)*/,16, vec4(color.xyz(),1.f));
+                Text label(dec(n+1)+" "_+ftoa(spectrum[f]),16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
             }
             for(uint n: range(candidate.peaksLS.size)) {
@@ -108,6 +109,7 @@ struct Plot : Widget {
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));
             }
         }
+#endif
 
         for(uint i=64; i>=1; i--) {
             float f = expectedF*i;
@@ -131,8 +133,8 @@ struct Plot : Widget {
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
     // Input
-    const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B2"_)-12;
-    //const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
+    //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B2"_)-12;
+    const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
@@ -252,8 +254,7 @@ struct PitchEstimation {
 
                     spectrum.expectedF = expectedF;
                     spectrum.iMin = min(estimator.peaks.first(), (uint)min(f0, expectedF))-2;
-                    //spectrum.iMax = estimator.peaks.last();
-                    spectrum.iMax = estimator.lastPeak;
+                    spectrum.iMax = max(estimator.peaks.last(), estimator.lastPeak);
                     //spectrum.iMax = (3*estimator.peaks.last()+estimator.lastPeak)/4;
 
                     // Relax for hard cases
