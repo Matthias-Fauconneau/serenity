@@ -80,7 +80,7 @@ generic T quickselect(const mref<T>& at, int left, int right, int k) {
         else { k -= pivotDist; left = pivotIndex + 1; }
     }
 }
-generic T median(const mref<T>& at) { /*assert(at.size%2==1);*/ return quickselect(at, 0, at.size-1, at.size/2); }
+generic T median(const mref<T>& at) { if(at.size==1) return at[0]; return quickselect(at, 0, at.size-1, at.size/2); }
 generic T median(const ref<T>& at) { T buffer[at.size]; rawCopy(buffer,at.data,at.size); return median(mref<T>(buffer,at.size)); }
 
 generic void quicksort(mref<T>& at, int left, int right) {
@@ -98,8 +98,9 @@ struct PitchEstimator : FFT {
     float totalPeriodsEnergy = 0;
     uint periodCount = 0;
     float meanPeriodEnergy;
-
+    float noiseThreshold;
     uint firstPeakFrequency;
+    array<uint> peaks;
     float medianF0;
     uint lastPeak;
     float harmonicEnergy;
@@ -112,59 +113,68 @@ struct PitchEstimator : FFT {
     };
     list<Candidate, 2> candidates;
 
-
     /// Returns first partial (f1=f0*sqrt(1+B)~f0*(1+B))
     /// \a fMin Minimum fundamental frequency for harmonic evaluation
-    float estimate(const ref<float>& signal, const uint fMin) {
+    float estimate(const ref<float>& signal) {
+        peaks.clear(); candidates.clear();
 
         ref<float> spectrum = powerSpectrum(signal);
-        // Accumulates evaluation of each period energy to use as a reference for an absolute threshold
+        // Accumulates evaluation of each period energy to use as a reference for an absolute confidence threshold
         totalPeriodsEnergy += periodEnergy; periodCount++;
         meanPeriodEnergy = totalPeriodsEnergy/periodCount;
+        {float meanPeriodEnergy = 32; // Using constant to benchmark before mean energy converges
+            float meanPeriodPower = meanPeriodEnergy  / (N/2);
+            noiseThreshold = max(periodPower,meanPeriodPower);
+        }
 
-        float maximum=0; int F1=0; // F1: Maximum peak
+        float maximum=0; uint F1=0;
         uint distance[512]; uint last=0, index=0;
-        for(uint i: range(fMin, N/2-3)) {
-            if(spectrum[i] > 2*periodPower
+        for(uint i: range(8, N/4)) {
+            if(spectrum[i] > noiseThreshold
                     && spectrum[i- 2] < spectrum[i-  1] && spectrum[i- 1] < spectrum[i] && spectrum[i-  2] < spectrum[i]
                     && spectrum[i+2] < spectrum[i+1] && spectrum[i+1] < spectrum[i] && spectrum[i+2] < spectrum[i]) {
-                if(i-last > fMin) { assert_(index < 512); distance[index++] = i-last; last=i; }
-                else if(spectrum[i]>spectrum[last] && index) {  distance[index-1] += i-last; last=i; } // Overwrites lower peak //else skips lower peak
-                if(spectrum[i] > maximum) maximum=spectrum[i], /*F2=F1,*/ F1=i; // Selects maximum peak and keeps second (lower than first)
+                if(i-last >= 8) { assert_(index < 512); distance[index++] = i-last; last=i; peaks<<i; }
+                else if(spectrum[i]>spectrum[last] && index) {  distance[index-1] += i-last; last=i; peaks.last()=i; } // Overwrites lower peak
+                // else skips lower peak
             }
+            if(spectrum[i] > maximum) maximum=spectrum[i], F1=i; // Selects maximum peak and keeps second (lower than first)
         }
-        if(!index) return 0;
         firstPeakFrequency = F1;
-
-        float F0 = ::median(mref<uint>(distance,index));  // "0th" order estimation of first partial (f0)
+        float F0 = index > 0 ? ::median(mref<uint>(distance,index)) : F1;  // "0th" order estimation of first partial (f0)
         medianF0 = F0;
-
-        lastPeak=0;
-        candidates.clear();
-        float bestEnergy = 0;
-        uint nLow = max(1,int(F1/F0)), nHigh = max(nLow+2, uint(round(F1/F0*4/3)));
+        lastPeak = 0;
+        float bestEnergy = 0, bestMerit = 0;
+        log(index, F1/F0, int(F1/F0), F1/F0-2?1./(F1/F0-2):0, int(F1/F0+1.f/16));
+        uint nLow = max(1,int(F1/F0+1.f/16)); // Rounds up when very near
+        //uint nLow = max(1,int(F1/F0));
+        uint nHigh = max(int(F1/F0)+2, int(round(F1/F0*4/3)));
         float f0Low = (float) F1 / nHigh;
         for(uint n1: range(nLow,  nHigh)) {
-            float f0 = (float) F1 / n1;
-            float f0B = 0;
-            float totalEnergy = 0;
+            float f0 = (float) F1 / n1, f0B = 0, energy = 0;
             array<uint> peaks, peaksLS;
-            for(uint t unused: range(4)) {
-                peaks.clear(); peaksLS.clear(); totalEnergy = 0;
+            for(uint t unused: range(3)) {
+                peaks.clear(); peaksLS.clear(); energy = 0;
                 // Least square optimization of linear fit: n.f0 = f[n] => argmin |Xb - y|^2 (X=n, b=f0, y=f[n]) <=> X'X b = X' y
                 float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
-                for(uint n=1; n<=(31/nLow)*n1; n++) {
+                for(uint n=1; n<=(45/*31*//nLow)*n1; n++) { // Every candidates stops at same peak
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
-                    uint f = f0*n + f0B*n*n; // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
-                    if(f>N/2) break;
-                    float peakEnergy = spectrum[f];
-                    totalEnergy += peakEnergy;
+                    uint fn = round(f0*n + f0B*n*n); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
+                    if(fn>N/4) break;
+                    uint df=1; uint f=fn; float peakEnergy = spectrum[f];
+                    for(; df<2; df++) { // Compensate peak inaccuracy
+                        assert_(fn+df<N/2);
+                        if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
+                        if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], f=fn+df;
+                    }
+                    if(spectrum[f]>periodPower) lastPeak = max(lastPeak, f);
+                    energy += peakEnergy;
                     peaks << f;
                     // Refines f0 with a weighted least square fit
                     uint maxF = f;
-                    for(uint df=1; df<f0Low/3; df++) { // Search higher frequencies further to fit any inharmonicity
-                        assert_(f+df<N/2);
-                        if(spectrum[f+df] > peakEnergy) peakEnergy=spectrum[f+df], maxF=f+df;
+                    for(; df<f0Low/3; df++) { // Fit nearest peak
+                        assert_(fn+df<N/2);
+                        if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], maxF=fn-df;
+                        if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], maxF=fn+df;
                     }
                     peaksLS << maxF;
                     float w = peakEnergy;
@@ -174,17 +184,20 @@ struct PitchEstimator : FFT {
                     n4 += w * sq(n)*sq(n);
                     n2f += w * sq(n) * maxF;
                 }
-                assert_(n2,nLow);
                 // Solves X'X b = X'y
                 float a=n2, b=n3, c=n3, d=n4;
                 float det = a*d-b*c;
+                assert_(det, nLow);
                 f0 = (d*nf - b*n2f) / det;
                 f0B = (-c*nf + a*n2f) / det;
                 if(f0B<0) f0 = nf/n2, f0B=0;
             }
-            candidates.insert(totalEnergy, Candidate(f0, f0B/f0, totalEnergy, copy(peaks), copy(peaksLS)));
-            if(totalEnergy > bestEnergy) {
-                bestEnergy = totalEnergy;
+            float merit = energy / (1729/*719*/+peaks.size); // Keeps higher octaves
+            candidates.insert(merit, Candidate(f0, f0B/f0, energy, copy(peaks), copy(peaksLS)));
+            if(merit > bestMerit) {
+            //if(energy > bestEnergy) {
+                bestMerit = merit;
+                bestEnergy = energy;
                 F0 = f0;
                 this->B = f0B/f0;
             }

@@ -28,7 +28,10 @@ struct Player {
             int need = outputSize-readSize;
             int read = 0;
             if(resampler.sourceRate*audio.rate != file.rate*resampler.targetRate && !resamplerFlushed) {
-                if(file.rate != audio.rate) new (&nextResampler) Resampler(audio.channels, file.rate, audio.rate, audio.periodSize);
+                if(file.rate != audio.rate) {
+                    assert_(!nextResampler);
+                    new (&nextResampler) Resampler(audio.channels, file.rate, audio.rate, audio.periodSize);
+                }
                 if(resampler) { // Flushes previous resampler using start of next file
                     uint previousNeed = resampler.need(resampler.N/2*resampler.sourceRate/resampler.targetRate);
                     Resampler nextToPrevious(resampler.channels, file.rate, resampler.sourceRate, previousNeed);
@@ -67,8 +70,8 @@ struct Player {
             if(readSize == outputSize) { update(file.position/file.rate,file.duration/file.rate); break; } // Complete chunk
             else if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) next(); // End of file
             else { // Previous resampler can be replaced once properly flushed
-                resampler = move(nextResampler);  nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
-                assert_(resampler);
+                resampler = move(nextResampler); nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
+                assert_(!nextResampler);
             }
         }
         if(!lastPeriod) for(uint i: range(outputSize)) { // Fades in

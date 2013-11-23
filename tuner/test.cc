@@ -42,36 +42,37 @@ void writeWaveFile(const string& path, const ref<int32>& data, int32 rate, int c
 }
 
 struct Plot : Widget {
+    const bool logx, logy; // Whether to use log scale on x/y axis
+    const float resolution; // Resolution in bins / Hz
+    uint iMin = 0, iMax = 0; // Displayed range in bins
+    ref<float> spectrum; // Displayed power spectrum
+    // Additional analysis data
     const PitchEstimator& estimator;
-    const bool logx;
-    const bool logy;
-    const float scale;
-    uint iMin = 0, iMax = 0;
-    ref<float> data;
-    float expectedF = 0, estimatedF = 0;
+    float expectedF = 0;
 
-    Plot(const PitchEstimator& estimator, bool logx, bool logy, float scale):
-        estimator(estimator),logx(logx),logy(logy),scale(scale){}
+    Plot(bool logx, bool logy, float resolution, ref<float> spectrum, const PitchEstimator& estimator):
+        logx(logx),logy(logy),resolution(resolution),spectrum(spectrum),estimator(estimator){}
     float x(float f) { return logx ? (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)) : (float)(f-iMin)/(iMax-iMin); }
-    float s(uint f) { return data[f]; }
     void render(int2 position, int2 size) {
-        assert_(/*0 <= iMi0 &&*/ iMin <= iMax && iMax <= data.size, iMin, iMax, data.size);
-        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, s(i));
-        float sMin = estimator.periodPower;
-        float noiseThreshold = 2*estimator.periodPower;
+        assert_(iMin <= iMax && iMax <= spectrum.size);
+        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
+        float sMin = min(estimator.noiseThreshold, estimator.periodPower);
 
-        { // Noise threshold
-            float s = noiseThreshold;
-            float y = (logy ? (log2(s) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (s / sMax)) * (size.y-12);
-            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(1,0,0,1));
-        }
+        float s = estimator.noiseThreshold;
+        float y = (logy ? (log2(s) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (s / sMax)) * (size.y-12);
+        line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(1,0,0,1));
 
         for(uint i: range(iMin, iMax)) { // Energy density
             float x0 = x(i) * size.x;
             float x1 = x(i+1) * size.x;
-            float y = (logy ? (s(i) ? (log2(s(i)) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (s(i) / sMax)) * (size.y-12);
-            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,0.5));
+            float y = (logy ? (spectrum[i] ? (log2(spectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (spectrum[i] / sMax)) * (size.y-12);
+            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
         }
+
+        /*for(uint f: estimator.peaks) {
+            float x = this->x(f+0.5)*size.x;
+            line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(1,0,0,1./2));
+        }*/
 
         // First peak and first F0 estimation (median distance)
         {float x = this->x(estimator.firstPeakFrequency+0.5)*size.x;
@@ -83,10 +84,16 @@ struct Plot : Widget {
 
         for(uint i: range(estimator.candidates.size)) {
             const auto& candidate = estimator.candidates[i];
-            bool best = i==estimator.candidates.size-1; //estimator.leastSquareF0[i]==estimator.bestF0;
-            vec4 color(!best,best,0,1); //1./(2*(last-(2*t+i-1)))
-            Text label(ftoa(candidate.key)+" "_+ftoa(candidate.B?1./candidate.B:0), 16,  vec4(color.xyz(),1.f));
-            label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*32));
+            bool best = i==estimator.candidates.size-1;
+            vec4 color(!best,best,0,1);
+            float Ea = estimator.candidates.last().energy;
+            float Na = estimator.candidates.last().peaks.size;
+            float Eb = estimator.candidates[0].energy;
+            float Nb = estimator.candidates[0].peaks.size;
+            float rankEnergyTradeoff = (Eb*Na-Ea*Nb)/(Ea-Eb);
+            Text label(ftoa(candidate.energy)+" "_+ftoa(candidate.B?1./candidate.B:0)+" "_+dec(candidate.peaks.size)+" "_+ftoa(rankEnergyTradeoff),
+                       16,  vec4(color.xyz(),1.f));
+            label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
             for(uint n: range(candidate.peaks.size)) {
                 uint f = candidate.peaks[n];
                 float x = this->x(f+0.5)*size.x;
@@ -97,35 +104,25 @@ struct Plot : Widget {
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));}
 
                 Text label(dec(n+1)+" "_+ftoa(f/candidate.f0,1),16, vec4(color.xyz(),1.f));
-                label.render(int2(position.x+x,position.y+16+(i)*32+(n%2)*16));
+                label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
             }
         }
 
         for(uint i=64; i>=1; i--) {
             float f = expectedF*i;
             float x = this->x(round(f)+0.5)*size.x;
-            float v = i==1 ? 1 : min(1., 2 * (log2(s(f)) - log2(sMin)) / (log2(sMax)-log2(sMin)));
+            float v = i==1 ? 1 : min(1., 2 * (log2(spectrum[f]) - log2(sMin)) / (log2(sMax)-log2(sMin)));
             v = max(1.f/2, v);
-            line(position.x+x,position.y,position.x+x+1,position.y+size.y, vec4(0,0,1,v));
+            line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(0,0,1,v));
             Text label(dec(i),16,vec4(1,1,1,1));
             label.render(int2(position.x+x,position.y));
         }
 
-        {
-            const uint N = data.size*2;
-            const uint rate = 96000;
-            {
-                const float bandwidth = 1./(1*12);
-                float x0 = this->x(50.*N/rate*exp2(-bandwidth))*size.x;
-                float x1 = this->x(50.*N/rate*exp2(+bandwidth))*size.x;
-                fill(position.x+floor(x0),position.y,position.x+ceil(x1),position.y+size.y, vec4(1,1,0,1./2));
-            }
-            {
-                const float bandwidth = 1./(3*12);
-                float x0 = this->x(3*50.*N/rate*exp2(-bandwidth))*size.x;
-                float x1 = this->x(3*50.*N/rate*exp2(+bandwidth))*size.x;
-                fill(position.x+floor(x0),position.y,position.x+ceil(x1),position.y+size.y, vec4(1,1,0,1./3));
-            }
+        for(uint i=1; i<=5; i+=2){
+            const float bandwidth = 1./(i*12);
+            float x0 = this->x(i*50.*resolution*exp2(-bandwidth))*size.x;
+            float x1 = this->x(i*50.*resolution*exp2(+bandwidth))*size.x;
+            fill(position.x+floor(x0),position.y,position.x+ceil(x1),position.y+size.y, vec4(1,1,0,1./2));
         }
     }
 };
@@ -148,13 +145,13 @@ struct PitchEstimation {
     static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
     const uint periodSize = 4096;
     PitchEstimator estimator {N};
-    const float fMin  = N*440*exp2(-4)/rate; // A0
     HighPass highPass {3*50./rate}; // High pass filter to remove low frequency noise
     Notch notch1 {1*50./rate, 1./(1*12)}; // Notch filter to remove 50Hz noise
     Notch notch3 {3*50./rate, 1./(3*12)}; // Notch filter to remove 150Hz noise
+    Notch notch5 {5*50./rate, 1./(5*12)}; // Notch filter to remove 250Hz noise
 
     // UI
-    Plot spectrum {estimator, false, true, (float)rate/N};
+    Plot spectrum {false, true, (float)N/rate, estimator.spectrum, estimator};
     OffsetPlot profile;
     VBox plots {{&spectrum/*, &profile*/}};
     Window window {&plots, int2(1050, 1680/2), "Test"_};
@@ -188,7 +185,7 @@ struct PitchEstimation {
     void next() {
         if(fail) return;
         t+=periodSize;
-        for(; t<=stereo.size/2-N; t+=periodSize) {
+        for(; t<=stereo.size/2-14*N; t+=periodSize) {
             // Checks for missed note
             if((t+periodSize)/rate/5 != t/rate/5) {
                 if(maxDenyAbsolute!=-inf) globalMaxDenyAbsolute = min(globalMaxDenyAbsolute, maxDenyAbsolute); maxDenyAbsolute = -inf;
@@ -206,6 +203,7 @@ struct PitchEstimation {
                 x = highPass(x);
                 x = notch1(x);
                 x = notch3(x);
+                x = notch5(x);
                 signal[N-periodSize+i] = x;
             }
 
@@ -213,55 +211,31 @@ struct PitchEstimation {
             if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)
             expectedKey = highKey+1 - t/rate/5; // Recorded one key every 5 seconds from high key to low key
 
-            float f0 = estimator.estimate(signal, fMin);
-            //assert_(f0==0 || pitchToKey(f0*rate/N)>-7, fMin, pitchToKey(f0*rate/N), 1./estimator.inharmonicity);
+            float f0 = estimator.estimate(signal);
             int key = f0>1 ? round(pitchToKey(f0*rate/N)) : 0; //FIXME: stretched reference
 
-            const float absoluteThreshold = 1./2; // Absolute harmonic energy in the current period (i.e over mean period energy)
+            const float absoluteThreshold = 1./3; // Absolute harmonic energy in the current period (i.e over mean period energy)
             //float meanPeriodEnergy = estimator.meanPeriodEnergy; // Stabilizes around 4 (depends on FFT size, energy, range)
             float meanPeriodEnergy = 4; // Using constant to benchmark before mean energy converges
             float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
 
-            const float relativeThreshold = 1./7; // Relative harmonic energy (i.e over current period energy)
+            const float relativeThreshold = 1./8; // Relative harmonic energy (i.e over current period energy)
             float periodEnergy = estimator.periodEnergy;
             float relative = estimator.harmonicEnergy  / periodEnergy;
 
             float keyF0 = keyToPitch(key)*N/rate;
             const float offsetF0 = f0 ? 12*log2(f0/keyF0) : 0;
-            //float keyPeakF = keyToPitch(round(pitchToKey(rate*estimator.fPeak/N)))*N/rate;
-            //const float offsetPeak = estimator.fPeak ?  12*log2(estimator.fPeak/keyPeakF) : 0;
-            //const float fError = 12*log2((keyF+1./PitchEstimator::H)/keyF);
             const float expectedF = keyToPitch(expectedKey)*N/rate;
-
-            /*const auto& candidates = estimator.candidates.slice(estimator.candidates.size-2);
-            uint first = (candidates[0].H+estimator.peakCountRatioTradeoff)*candidates[1].peakCount;
-            uint second = (candidates[1].H+estimator.peakCountRatioTradeoff)*candidates[0].peakCount;*/
-
-            /*uint bestPeakCount=0, bestH=-1;
-            for(uint n=1,lastH=0, peakCount=0;;n++) {
-                const uint f = round(expectedF*n);
-                if(f>=N/2) break;
-                if(estimator.spectrum[f] > 2*estimator.periodPower) {
-                    lastH = n; peakCount++;
-                    if((bestH+estimator.peakCountRatioTradeoff)*peakCount >= (lastH+estimator.peakCountRatioTradeoff)*bestPeakCount) {
-                        bestH=lastH, bestPeakCount=peakCount;
-                    }
-                }
-            }*/
 
             log(dec((t/rate)/60,2)+":"_+ftoa(float(t%(60*rate))/rate,2,2)+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_
                 +dec(round(f0*rate/N),4)+" Hz\t"_ +dec(round(100*offsetF0),2) +" c\t"_ //dec(round(100*offsetPeak),) +"\t"_
-                +dec(round(absolute?1./(absolute):0),2)+" "_+dec(round(relative?1./relative:0),2)+"\t"_//+dec(estimator.peaks.size)+"\t"_
-                //+dec(estimator.peakCount,2)+" / "_+dec(estimator.lastHarmonicRank,2)+"\t"_
-                //+dec(bestPeakCount,2)+" / "_+dec(bestH,2)+"\t"_
+                +dec(round(absolute?1./(absolute):0),2)+" "_+dec(round(relative?1./relative:0),2)+"\t"_
                 +"B~"_+dec(estimator.B?1./estimator.B:0,3)+"\t"_
-                //+"1st: "_+str(first)+" 2nd: "_+str(second)+"\t"_
-                +(expectedKey == key ? (f0 > fMin && absolute > absoluteThreshold && relative > relativeThreshold ? "O"_ : "~"_) : "X"_));
+                +(expectedKey == key ? (absolute > absoluteThreshold && relative > relativeThreshold ? "O"_ : "~"_) : "X"_));
 
-            if(/*f0 > fMin &&*/ absolute > absoluteThreshold && relative > relativeThreshold) {
+            if(absolute > absoluteThreshold && relative > relativeThreshold) {
 
                 if(expectedKey==key) {
-                    //if(estimator.inharmonicity>maxB) log(1./(maxB=estimator.inharmonicity));
                     success++;
                     lastKey = key;
 
@@ -275,14 +249,11 @@ struct PitchEstimation {
                 else {
                     fail++;
 
-                    spectrum.data = estimator.spectrum;
-                    spectrum.iMin = min(f0, expectedF);
-                    spectrum.estimatedF = f0;
                     spectrum.expectedF = expectedF;
-                    //spectrum.iMax = max(f0,expectedF)*max(estimator.lastHarmonicRank,bestH);
-                    //spectrum.iMax = max(uint(16*max(f0,expectedF)), estimator.bestPeaks.last()+1);
-                    //spectrum.iMax = max(f0,expectedF)*estimator.lastHarmonicRank;
-                    spectrum.iMax = estimator.lastPeak+8*f0;
+                    spectrum.iMin = min(estimator.peaks.first(), (uint)min(f0, expectedF))-2;
+                    //spectrum.iMax = estimator.peaks.last();
+                    spectrum.iMax = estimator.lastPeak;
+                    //spectrum.iMax = (3*estimator.peaks.last()+estimator.lastPeak)/4;
 
                     // Relax for hard cases
                     if(     relative<1./2 &&
@@ -320,7 +291,7 @@ struct PitchEstimation {
                         else if(expectedKey<=parseKey("A#0"_) && key==expectedKey+1) log("~"_); // Bass strings swings
                         else if(expectedKey<=parseKey("F#0"_) && key==expectedKey-2) log("_"_); // Bass strings swings
                         else if(expectedKey<=parseKey("E0"_) && key==expectedKey+2) log("_"_); // Bass strings swings
-                        else { log("Corner case"); break; }
+                        else { log("Corner case", stereo.size/2-t, (stereo.size/2-t)/N); break; }
                     } else { log("FIXME",relative<1./2, key==expectedKey-1, expectedKey<=parseKey("D#0"_) ); break; }
                 }
                 tries++;
@@ -328,24 +299,15 @@ struct PitchEstimation {
             previousKey = key;
             total++;
 
-            if(key==expectedKey /*&& lastKey!=expectedKey*/) {
+            if(key==expectedKey) {
                 maxAbsolute = max(maxAbsolute, absolute); if(relative > relativeThreshold) maxDenyAbsolute = max(maxDenyAbsolute, absolute);
                 maxRelative = max(maxRelative, relative); if(absolute > absoluteThreshold) maxDenyRelative = max(maxDenyRelative, relative);
             } else {
                 minAbsolute = max(minAbsolute, absolute); if(relative > relativeThreshold) minAllowAbsolute = max(minAllowAbsolute, absolute);
                 minRelative = max(minRelative, relative); if(absolute > absoluteThreshold) minAllowRelative = max(minAllowRelative, relative);
             }
-
-            //break;
         }
-        if(fail) {
-            log(str(1./minAbsolute)+" "_+str(1./minAllowAbsolute)+" "_+str(1./globalMaxDenyAbsolute)+" "_+str(1./maxDenyAbsolute)+" "_+str(1./maxAbsolute));
-            log(str(1./minRelative)+" "_+str(1./minAllowRelative)+" "_+str(1./globalMaxDenyRelative)+" "_+str(1./maxDenyRelative)+" "_+str(1./maxRelative));
-        } else {
-            log("Maximum inharmonicity", maxB?1./maxB:0);
-            log("Mean period energy", log2(estimator.meanPeriodEnergy));
-        }
-        if(spectrum.data) {
+        if(spectrum.spectrum) {
             window.setTitle(strKey(expectedKey));
             window.render();
             window.show();
