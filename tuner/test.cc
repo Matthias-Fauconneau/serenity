@@ -99,12 +99,13 @@ struct Plot : Widget {
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
 
-                {uint fLS = candidate.peaksLS[n];
-                float x = this->x(fLS+0.5)*size.x;
-                line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));}
-
-                Text label(dec(n+1)+" "_+ftoa(f/candidate.f0,1),16, vec4(color.xyz(),1.f));
+                Text label(dec(n+1)/*+" "_+ftoa(f/candidate.f0,1)*/,16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
+            }
+            for(uint n: range(candidate.peaksLS.size)) {
+                uint f = candidate.peaksLS[n];
+                float x = this->x(f+0.5)*size.x;
+                line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));
             }
         }
 
@@ -145,7 +146,7 @@ struct PitchEstimation {
     static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
     const uint periodSize = 4096;
     PitchEstimator estimator {N};
-    HighPass highPass {3*50./rate}; // High pass filter to remove low frequency noise
+    HighPass highPass {1*50./rate}; // High pass filter to remove low frequency noise
     Notch notch1 {1*50./rate, 1./(1*12)}; // Notch filter to remove 50Hz noise
     Notch notch3 {3*50./rate, 1./(3*12)}; // Notch filter to remove 150Hz noise
     Notch notch5 {5*50./rate, 1./(5*12)}; // Notch filter to remove 250Hz noise
@@ -214,12 +215,12 @@ struct PitchEstimation {
             float f0 = estimator.estimate(signal);
             int key = f0>1 ? round(pitchToKey(f0*rate/N)) : 0; //FIXME: stretched reference
 
-            const float absoluteThreshold = 1./3; // Absolute harmonic energy in the current period (i.e over mean period energy)
+            const float absoluteThreshold = 1./3/*4*/; // Absolute harmonic energy in the current period (i.e over mean period energy)
             //float meanPeriodEnergy = estimator.meanPeriodEnergy; // Stabilizes around 4 (depends on FFT size, energy, range)
-            float meanPeriodEnergy = 4; // Using constant to benchmark before mean energy converges
+            float meanPeriodEnergy = 8; // Using constant to benchmark before mean energy converges
             float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
 
-            const float relativeThreshold = 1./8; // Relative harmonic energy (i.e over current period energy)
+            const float relativeThreshold = 1./7/*6*//*8*/; // Relative harmonic energy (i.e over current period energy)
             float periodEnergy = estimator.periodEnergy;
             float relative = estimator.harmonicEnergy  / periodEnergy;
 
@@ -261,24 +262,27 @@ struct PitchEstimation {
                                 ((offsetF0>1./5 || expectedKey<=parseKey("G#1"_)) && key==expectedKey-1)
                                 || (t%(5*rate)<2*rate && ((offsetF0>-1./3 && key==expectedKey-1) || t%(5*rate)<rate))
                               || (t%(5*rate)>4*rate && key<expectedKey)
-                             || ((previousKey==expectedKey || previousKey==expectedKey-1 ||
+                             || ((previousKey==expectedKey || previousKey==expectedKey-1 || key==expectedKey-2 ||
                                   key==expectedKey+1 || key==expectedKey+2 || key==expectedKey+3)
                                  && expectedKey<=parseKey("A#0"_))
                              || (t%(5*rate)<2*rate && previousKey==expectedKey && relative<1./3 /*&& key==expectedKey-12*/))) {
                         if(0) {}
-                        else if(offsetF0>3./8 && key==expectedKey-1 && apply(split("A2 B1 A#1 A1 F1 E1"_), parseKey).contains(expectedKey)) {
+                        else if(offsetF0>3./8 && key==expectedKey-1 && apply(split("A2 B1 A#1 A1"_), parseKey).contains(expectedKey)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
-                        else if(offsetF0>3./8 && key==expectedKey-1 && expectedKey<=parseKey("D1"_)) {
-                            log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
-                        }
-                        else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("E1 C#1 C1 B0 A#0 G0 F0"_), parseKey).contains(expectedKey)) {
+                        else if(offsetF0>2./8 && key==expectedKey-1 && expectedKey<=parseKey("F1"_)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
                         else if(offsetF0>0 && key==expectedKey-1 && expectedKey<=parseKey("C#1"_)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
-                        else if(offsetF0>-1./4 && key==expectedKey-1 && expectedKey<=parseKey("G0"_)) {
+                        else if(offsetF0>-2./8 && key==expectedKey-1 && expectedKey<=parseKey("A#0"_)) {
+                            log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
+                        }
+                        else if(offsetF0>-3./8 && key==expectedKey-1 && expectedKey<=parseKey("F#0"_)) {
+                            log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
+                        }
+                        else if( key==expectedKey-1 && expectedKey<=parseKey("D#0"_)) {
                             log("-"_); lastKey=expectedKey; // Avoid false negative from mistune
                         }
                         else if(offsetF0>2./8 && key==expectedKey-1 && apply(split("G#1"_), parseKey).contains(expectedKey)) log("-"_);
@@ -288,13 +292,15 @@ struct PitchEstimation {
                         else if(t%(5*rate) < 2*rate && relative<1./3 && apply(split("C4 A3"_), parseKey).contains(expectedKey)) log("/"_);
                         else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2)) log("!"_); // Attack
                         else if(t%(5*rate)>4*rate && key<=expectedKey) log("."_); // Release
-                        else if(expectedKey<=parseKey("A#0"_) && key==expectedKey+1) log("~"_); // Bass strings swings
+                        else if(expectedKey<=parseKey("A#0"_) && key==expectedKey+1 && offsetF0<0) log("~"_); // Bass strings swings
                         else if(expectedKey<=parseKey("F#0"_) && key==expectedKey-2) log("_"_); // Bass strings swings
-                        else if(expectedKey<=parseKey("E0"_) && key==expectedKey+2) log("_"_); // Bass strings swings
+                        else if(expectedKey<=parseKey("F0"_) && key==expectedKey+2) log("_"_); // Bass strings swings
                         else { log("Corner case", stereo.size/2-t, (stereo.size/2-t)/N); break; }
                     } else { log("FIXME",relative<1./2, key==expectedKey-1, expectedKey<=parseKey("D#0"_) ); break; }
                 }
                 tries++;
+            } else if((key==expectedKey || key==expectedKey-1) && expectedKey<=parseKey("C0"_)) { // FIXME: Hard keys
+                log("?"_); lastKey=expectedKey; // Any match (even without confidence) will allow the key to pass (but false positives do still abort)
             }
             previousKey = key;
             total++;
