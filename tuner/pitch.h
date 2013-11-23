@@ -106,17 +106,16 @@ struct PitchEstimator : FFT {
     float B;
 
     struct Candidate {
-        float f0; float B; float energy; uint peakCount; float HPS; array<uint> peaks0, peaks, peaksLS;
-        Candidate(float f0=0, float B=0, float energy=0, uint peakCount=0, float HPS=0,
-                  array<uint>&& peaks0={}, array<uint>&& peaks={}, array<uint>&& peaksLS={}):
-            f0(f0),B(B),energy(energy),peakCount(peakCount),HPS(HPS),peaks0(move(peaks0)),peaks(move(peaks)),peaksLS(move(peaksLS)){}
+        float f0; float B; float energy; array<uint> peaks, peaksLS;
+        Candidate(float f0=0, float B=0, float energy=0, array<uint>&& peaks={}, array<uint>&& peaksLS={}):
+            f0(f0),B(B),energy(energy),peaks(move(peaks)),peaksLS(move(peaksLS)){}
     };
-    list<Candidate, 5> candidates;
+    list<Candidate, 2> candidates;
 
 
     /// Returns first partial (f1=f0*sqrt(1+B)~f0*(1+B))
     /// \a fMin Minimum fundamental frequency for harmonic evaluation
-    float estimate(const ref<float>& signal, const uint fMin, const uint fMax unused) {
+    float estimate(const ref<float>& signal, const uint fMin) {
 
         ref<float> spectrum = powerSpectrum(signal);
         // Accumulates evaluation of each period energy to use as a reference for an absolute threshold
@@ -142,86 +141,49 @@ struct PitchEstimator : FFT {
 
         lastPeak=0;
         candidates.clear();
-        float bestEnergy = 0; uint bestPeakCount=0;
-        uint nLow = max(1,int(F1/F0)), nHigh = max(nLow+2, uint(round(F1/F0*4/3))); //5/4))); //F1/F0*5/4)); //6/5));
+        float bestEnergy = 0;
+        uint nLow = max(1,int(F1/F0)), nHigh = max(nLow+2, uint(round(F1/F0*4/3)));
         float f0Low = (float) F1 / nHigh;
-        log(F1/F0, nHigh);
         for(uint n1: range(nLow,  nHigh)) {
             float f0 = (float) F1 / n1;
             float f0B = 0;
-            float totalEnergy = 0; uint peakCount=0; float HPS=0;
-            array<uint> peaks0, peaks, peaksLS;
-            for(uint t unused: range(5)) { // until convergence ?
-                peaks0.clear(); peaks.clear(); peaksLS.clear(); totalEnergy = 0; peakCount=0; HPS=0; uint productCount=0;
+            float totalEnergy = 0;
+            array<uint> peaks, peaksLS;
+            for(uint t unused: range(4)) {
+                peaks.clear(); peaksLS.clear(); totalEnergy = 0;
                 // Least square optimization of linear fit: n.f0 = f[n] => argmin |Xb - y|^2 (X=n, b=f0, y=f[n]) <=> X'X b = X' y
-                float n2=0, n4=0, n6=0, nf=0, n3f=0; // Least square X'X and X'y coefficients
-                for(uint n=1; n<=(31/*28*//nLow)*n1; n++) {
+                float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
+                for(uint n=1; n<=(31/nLow)*n1; n++) {
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
-#if 0
-                    uint expectedF = f0*n*(1+B*n*n); // Using (1+Bn^2) instead of sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
-#else
-                    uint expectedF = f0*n + f0B*n*n; // Using (1+Bn^2) instead of sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
-#endif
-                    //if(expectedF>fMax) break;
-                    if(expectedF>N/2) break;
-                    uint localF = expectedF; float peakEnergy = spectrum[localF]; // Weighted by 1/(1+distance) //FIXME: integrate energy ?
-                    //for(uint df=1; df < /*(uint)(f0Low/2)*//*f0Low*/f0/4; df++) { // Avoids solution only fitting the strongest peaks extremely well
-                    uint df=1;
-#if 0
-                    for(; df < f0Low/8; df++) { // Avoids solution only fitting the strongest peaks extremely well
-                        assert_(int(expectedF-df)>=0 && expectedF+df<N/2);
-                        float w = 1; //1./(1+df); //1./(1+df) - 1./(1+maxDistance);
-                        // Only search below to avoid interval shift ?
-                        if(w*spectrum[expectedF-df] > peakEnergy) peakEnergy=w*spectrum[expectedF-df], localF=expectedF-df;
-                        if(w*spectrum[expectedF+df] > peakEnergy) peakEnergy=w*spectrum[expectedF+df], localF=expectedF+df;
+                    uint f = f0*n + f0B*n*n; // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
+                    if(f>N/2) break;
+                    float peakEnergy = spectrum[f];
+                    totalEnergy += peakEnergy;
+                    peaks << f;
+                    // Refines f0 with a weighted least square fit
+                    uint maxF = f;
+                    for(uint df=1; df<f0Low/3; df++) { // Search higher frequencies further to fit any inharmonicity
+                        assert_(f+df<N/2);
+                        if(spectrum[f+df] > peakEnergy) peakEnergy=spectrum[f+df], maxF=f+df;
                     }
-#endif
-                    peaks0 << expectedF;
-                    //if(peakEnergy > 2*periodPower) {
-                    //if(peakEnergy > periodPower/8) {
-                        totalEnergy += peakEnergy;
-                        //if(spectrum[expectedF]>periodPower) lastHarmonicRank=max(lastHarmonicRank, n);
-                        peakCount += peakEnergy > 3*periodPower; // FIXME: explicit parameter
-                        assert_(peakEnergy>0);
-                        if(peakEnergy > periodPower*2) { HPS += log2(peakEnergy); productCount++; }
-                        peaks << localF;
-                        if(peakEnergy > periodPower*2)
-                            lastPeak = max(lastPeak, localF);
-                        // Refines f0 with a weighted least square fit
-                        for(; df < f0Low/3; df++) { // Search higher frequencies further to fit any inharmonicity
-                            assert_(int(expectedF-df)>=0 && expectedF+df<N/2);
-                            float w = 1; //1./(1+df); //1./(1+df) - 1./(1+maxDistance);
-                            // Only search below to avoid interval shift ?
-                            //if(w*spectrum[expectedF-df] > peakEnergy) peakEnergy=w*spectrum[expectedF-df], localF=expectedF-df;
-                            if(w*spectrum[expectedF+df] > peakEnergy) peakEnergy=w*spectrum[expectedF+df], localF=expectedF+df;
-                        }
-                        peaksLS << localF;
-                        float w = peakEnergy / n; //log2(peakEnergy); //./(1+n); //weightedEnergyDensity; // Weights by energy density, distance from integer harmonic //, rank
-                        n2 += w * n*n;
-                        nf += w * n * localF;
-#if 0
-                        n4 += w * n*cb(n);
-                        n6 += w * cb(n)*cb(n);
-                        n3f += w * cb(n) * localF;
-#else
-                        n4 += w * n*sq(n);
-                        n6 += w * sq(n)*sq(n);
-                        n3f += w * sq(n) * localF;
-#endif
+                    peaksLS << maxF;
+                    float w = peakEnergy;
+                    n2 += w * n*n;
+                    nf += w * n * maxF;
+                    n3 += w * n*sq(n);
+                    n4 += w * sq(n)*sq(n);
+                    n2f += w * sq(n) * maxF;
                 }
                 assert_(n2,nLow);
                 // Solves X'X b = X'y
-                real a=n2, b=n4, c=n4, d=n6;
-                real det = a*d-b*c;
-                f0 = (d*nf - b*n3f) / det;
-                f0B = (-c*nf + a*n3f) / det;
-                if(f0B<0)
-                    f0 = nf/n2, f0B=0;
+                float a=n2, b=n3, c=n3, d=n4;
+                float det = a*d-b*c;
+                f0 = (d*nf - b*n2f) / det;
+                f0B = (-c*nf + a*n2f) / det;
+                if(f0B<0) f0 = nf/n2, f0B=0;
             }
-            const float energyWeight = 16;
-            candidates.insert(energyWeight*totalEnergy+peakCount, Candidate(f0, f0B/f0, totalEnergy, peakCount, HPS, copy(peaks0), copy(peaks), copy(peaksLS)));
-            if(energyWeight*totalEnergy+peakCount > energyWeight*bestEnergy+bestPeakCount) {
-                bestPeakCount = peakCount;
+            candidates.insert(totalEnergy, Candidate(f0, f0B/f0, totalEnergy, copy(peaks), copy(peaksLS)));
+            if(totalEnergy > bestEnergy) {
                 bestEnergy = totalEnergy;
                 F0 = f0;
                 this->B = f0B/f0;
