@@ -134,8 +134,8 @@ struct Plot : Widget {
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
     // Input
-    //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B2"_)-12;
-    const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
+    const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B2"_)-12;
+    //const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;

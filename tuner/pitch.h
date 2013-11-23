@@ -111,7 +111,7 @@ struct PitchEstimator : FFT {
         Candidate(float f0=0, float B=0, float energy=0, array<uint>&& peaks={}, array<uint>&& peaksLS={}):
             f0(f0),B(B),energy(energy),peaks(move(peaks)),peaksLS(move(peaksLS)){}
     };
-    list<Candidate, 3> candidates;
+    list<Candidate, 2> candidates;
 
     /// Returns first partial (f1=f0*sqrt(1+B)~f0*(1+B))
     /// \a fMin Minimum fundamental frequency for harmonic evaluation
@@ -147,7 +147,7 @@ struct PitchEstimator : FFT {
         float bestEnergy = 0, bestMerit = 0;
         uint nLow = max(1,int(F1/F0));
         uint nHigh = max(int(F1/F0)+2, int(ceil(F1/F0*4/3)));
-        log(F0,F1, index, nLow, F1/F0, F1/F0*4/3, nHigh);
+        log(F0, F0/20, F1, index, nLow, F1/F0, F1/F0*4/3, nHigh);
         for(uint n1: range(nLow,  nHigh +1)) {
             float f0 = (float) F1 / n1, f0B = 0, energy = 0;
             array<uint> peaks, peaksLS;
@@ -165,7 +165,7 @@ struct PitchEstimator : FFT {
                     uint df=1;
                     for(; df<=min(uint(F0/20),5u); df++) { // Compensates peak inaccuracy (frequency dependent ?)
                         assert_(fn+df<N/2);
-                        if(!forwardOnly) // Prevents two consecutive harmonics to pinch the same peak
+                        //if(!forwardOnly) // Prevents two consecutive harmonics to pinch the same peak
                             if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
                         if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], f=fn+df;
                     }
@@ -198,7 +198,7 @@ struct PitchEstimator : FFT {
                 f0B = (-c*nf + a*n2f) / det;
                 if(f0B<0) f0 = nf/n2, f0B=0;
             }
-            float merit = energy / (15104+peaks.size); // Keeps higher octaves
+            float merit = energy / (/*15104*/10554+peaks.size); // Keeps higher octaves
             candidates.insert(merit, Candidate(f0, f0B/f0, energy, copy(peaks), copy(peaksLS)));
             if(merit > bestMerit) {
             //if(energy > bestEnergy) {
