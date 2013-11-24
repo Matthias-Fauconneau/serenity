@@ -19,8 +19,8 @@ struct OffsetPlot : Widget {
     void reset() { clear(offsets, keyCount); clear(variances, keyCount); }
     int2 sizeHint() { return int2(keyCount*12, -236); }
     void render(int2 position, int2 size) {
-        float minimumOffset = -1./8;
-        float maximumOffset = 1./8;
+        float minimumOffset = -1./3;
+        float maximumOffset = 1./3;
         for(int key: range(keyCount)) {
             int x0 = position.x + key * size.x / keyCount;
             int x1 = position.x + (key+1) * size.x / keyCount;
@@ -30,7 +30,7 @@ struct OffsetPlot : Widget {
             int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
 
             float offset = offsets[key];
-            float deviation = sqrt(variances[key]);
+            float deviation = 0; sqrt(variances[key]);
             float sign = ::sign(offset-p0) ? : 1;
 
             // High confidence between zero and max(0, |offset|-deviation)

@@ -141,7 +141,9 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
+#if __x86_64
     setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
+#endif
 }
 
 template<> void warn(const string& message) {

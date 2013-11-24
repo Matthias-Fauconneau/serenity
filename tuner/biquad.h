@@ -13,7 +13,6 @@ struct Biquad {
     void reset() { x1=0, x2=0, y1=0, y2=0; }
 };
 
-#if 1
 // High pass filter
 //  H(s) = s^2 / (s^2 + s/Q + 1)
 struct HighPass : Biquad {
@@ -26,20 +25,6 @@ struct HighPass : Biquad {
         b0 = ((1+cos(w0))/2)/a0, b1 = -(1+cos(w0))/a0, b2 = ((1+cos(w0))/2)/a0;
     }
 };
-#else
-// First order high pass filter
-struct HighPass {
-    float alpha;
-    HighPass(real f0, real unused bw=0):alpha(1/(1+2*PI*f0)){}
-    float x1=0, y1=0;
-    float operator ()(float x) {
-        float y = alpha * (y1 + x - x1);
-        x1=x; y1=y;
-        return y;
-    }
-    void reset() { x1=0, y1=0; }
-};
-#endif
 
 // Notch filter
 // H(s) = (s^2 + 1) / (s^2 + s/Q + 1)
