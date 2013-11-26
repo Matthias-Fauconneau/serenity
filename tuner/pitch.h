@@ -146,7 +146,8 @@ struct PitchEstimator : FFT {
         float bestEnergy = 0, bestMerit = 0;
         uint nLow = max(1,int(F1/medianF0));
         uint nHigh = max(int(F1/medianF0)+2, int(ceil(F1/medianF0*3/2)));
-        log(nLow, nHigh);
+        if(F1/medianF0 > 10 && F1>N/64) // 1500Hz
+            medianF0 = F1, nLow=1, nHigh=1; //FIXME: better noise level detection (different levels before and after F1?)
         for(uint n1: range(nLow,  nHigh +1)) {
             float f0 = (float) F1 / n1, f0B = 0, energy = 0, energyWeightedF = 0;
             array<uint> peaks, peaksLS;
@@ -156,8 +157,8 @@ struct PitchEstimator : FFT {
                 float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
                 for(uint n=1; n<=max(1u,9/nLow)*n1; n++) { // Every candidates stops at same peak
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
-                    uint fn = round(f0*n + f0B*n*n); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
-                    assert_(fn<N/2, fn, n, f0, f0B, F1, n1);
+                    int fn = round(f0*n + f0B*n*n); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
+                    assert(fn-3>=0 && fn+3<int(N/2)); if(fn-3<0 || fn+3>=int(N/2)) break;
                     uint f=fn; float peakEnergy = spectrum[f];
                     peaks << f;
                     uint df=1;
@@ -165,7 +166,6 @@ struct PitchEstimator : FFT {
                     energy += peakEnergy;
                     uint maxF = f;
                     for(; df<=3; df++) { // Fit nearest peak
-                        assert_(int(fn-df)>=0 && fn+df<N/2, f0, f0B, F1, n1, F1/n1);
                         if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], maxF=fn+df;
                         if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], maxF=fn-df;
                     }

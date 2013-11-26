@@ -134,11 +134,11 @@ struct Plot : Widget {
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
     // Input
-    const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("C2"_)-12;
+    //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("C2"_)-12;
     //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B2"_)-12;
-    //const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
-    //const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
     //const uint lowKey=parseKey("B1"_)-12, highKey=parseKey("D3"_)-12;
+    //const uint lowKey=parseKey("F3"_)-12, highKey=parseKey("F5"_)-12;
+    const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
@@ -194,8 +194,9 @@ struct PitchEstimation {
         if(fail) return;
         t+=periodSize;
         for(; t<=stereo.size/2-14*N; t+=periodSize) {
+            const uint sync = rate; // Sync with benchmark
             // Checks for missed note
-            if((t+periodSize)/rate/5 != t/rate/5) {
+            if((t+sync+periodSize)/rate/5 != (t+sync)/rate/5) {
                 if(maxDenyAbsolute!=-inf) globalMaxDenyAbsolute = min(globalMaxDenyAbsolute, maxDenyAbsolute); maxDenyAbsolute = -inf;
                 if(maxDenyRelative!=-inf) globalMaxDenyRelative = min(globalMaxDenyRelative, maxDenyRelative); maxDenyRelative = -inf;
                 if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; }
@@ -219,7 +220,7 @@ struct PitchEstimation {
 
             // Benchmark
             if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)
-            expectedKey = highKey+1 - t/rate/5; // Recorded one key every 5 seconds from high key to low key
+            expectedKey = highKey+1 - (t+sync)/rate/5; // Recorded one key every 5 seconds from high key to low key
 
             float f = estimator.estimate(signal);
             const float expectedF = keyToPitch(expectedKey)*N/rate;
@@ -232,11 +233,11 @@ struct PitchEstimation {
                 break;
             }*/
 
-            const float absoluteThreshold = 1./3; // Absolute harmonic energy in the current period (i.e over mean period energy)
-            float meanPeriodEnergy = 128; // Fix for benchmark start
+            const float absoluteThreshold = 1./13; // Absolute harmonic energy in the current period (i.e over mean period energy)
+            float meanPeriodEnergy = 64; // Fix for benchmark start
             float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
 
-            const float relativeThreshold = 1./9; // Relative harmonic energy (i.e over current period energy)
+            const float relativeThreshold = 1./13; // Relative harmonic energy (i.e over current period energy)
             float periodEnergy = estimator.periodEnergy;
             float relative = estimator.harmonicEnergy  / periodEnergy;
 
@@ -311,7 +312,7 @@ struct PitchEstimation {
                         else if(key==expectedKey-1 && expectedKey<=parseKey("C1"_)) log("-"_);
                         else if(t%(5*rate) < 2*rate && relative<1./3 && apply(split("C4 A3"_), parseKey).contains(expectedKey)) log("/"_);
                         //else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2) && key==expectedKey+1) log("!"_); // Attack
-                        else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2)) log("!"_); // Attack
+                        //else if((relative<1./3 && (t%(5*rate) < rate)) || (t%(5*rate) < rate/2)) log("!"_); // Attack
                         else if(t%(5*rate)>4*rate && key<=expectedKey) log("."_); // Release
                         //else if(expectedKey<=parseKey("A#0"_) && key==expectedKey+1 && offsetF0<0) log("~"_); // Bass strings swings
                         else if(expectedKey<=parseKey("F#0"_) && key==expectedKey-2) log("_"_); // Bass strings swings
@@ -334,7 +335,7 @@ struct PitchEstimation {
                 minRelative = max(minRelative, relative); if(absolute > absoluteThreshold) minAllowRelative = max(minAllowRelative, relative);
             }
         }
-        if(spectrum.spectrum) {
+        if(spectrum.expectedF) {
             window.setTitle(strKey(expectedKey));
             window.render();
             window.show();

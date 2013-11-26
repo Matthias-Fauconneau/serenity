@@ -84,7 +84,7 @@ struct Tuner : Poll {
 
     // Input-dependent parameters
     float absoluteThreshold = 3; // 1/x, Absolute harmonic energy in the current period (i.e over mean period energy)
-    float relativeThreshold = 7; // 1/x, Relative harmonic energy (i.e over current period energy)
+    float relativeThreshold = 9; // 1/x, Relative harmonic energy (i.e over current period energy)
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
     // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
@@ -105,7 +105,7 @@ struct Tuner : Poll {
 
     // Result
     float signalMaximum = 0x1p31; //1; //0x1p31; // 31bit range (1bit sign) + stereo - 3dB headroom
-    uint worstKey = 0;
+    int worstKey = -1;
 
     // UI
     const uint textSize = 64;
@@ -205,7 +205,7 @@ struct Tuner : Poll {
         float periodEnergy = estimator.periodEnergy;
         float relative = estimator.harmonicEnergy  / periodEnergy;
 
-        if(absolute > 1./(absoluteThreshold*2) && relative > 1./(relativeThreshold*2)) {
+        if(absolute > 1./(absoluteThreshold+1) && relative > 1./(relativeThreshold+1)) {
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
             const int cOffset =  round(100*offset);
@@ -229,10 +229,11 @@ struct Tuner : Poll {
                 float variance = sq(offset - keyOffset);
                 float& keyVariance = profile.variances[key-21];
                 {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
-                {uint k = this->worstKey;
+                {int k = this->worstKey;
                     for(uint i: range(7,keyCount)) //FIXME: quadratic, cubic, exp curve ?
-                        if(  min(abs(profile.offsets[i ]), abs(profile.offsets[i ] - 1.f/8 * (float)(i -keyCount/2)/(keyCount/2))) /*+ sqrt(profile.variances[i ])*/ >
-                             min(abs(profile.offsets[k]), abs(profile.offsets[k] - 1.f/8 * (float)(k-keyCount/2)/(keyCount/2))) /*+ sqrt(profile.variances[k])*/ ) k = i;
+                        if(  k<0 ||
+                                abs(profile.offsets[i ] - 1.f/8 * (float)(i -keyCount/2)/(keyCount/2)) /*+ sqrt(profile.variances[i ])*/ >
+                             abs(profile.offsets[k] - 1.f/8 * (float)(k-keyCount/2)/(keyCount/2)) /*+ sqrt(profile.variances[k])*/ ) k = i;
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
             }

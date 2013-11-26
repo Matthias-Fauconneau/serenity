@@ -9,7 +9,7 @@ struct OffsetPlot : Widget {
     OffsetPlot() {
       if(!existsFile("offsets.profile"_,config())) return;
       TextData s = readFile("offsets.profile"_,config());
-      for(uint i: range(keyCount)) { offsets[i] = s.decimal()/100; s.skip(" "_); variances[i] = sq(s.decimal()/100); s.skip("\n"_); }
+      for(uint i: range(keyCount)) { offsets[i] = clip(-1./2, s.decimal()/100, 1./2); s.skip(" "_); variances[i] = sq(s.decimal()/100); s.skip("\n"_); }
     }
     ~OffsetPlot() {
         String s;
