@@ -42,9 +42,9 @@ enum { IDLE=64 };
 struct Stream : Handle {
     Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
-    void read(void* buffer, size_t size);
+    void read(byte* buffer, size_t size);
     /// Reads up to \a size bytes into \a buffer
-    int64 readUpTo(void* buffer, size_t size);
+    int64 readUpTo(byte* buffer, size_t size);
     /// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
     /// Reads up to \a size bytes
@@ -54,7 +54,7 @@ struct Stream : Handle {
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
         ::buffer<T> buffer(size); size_t byteSize=size*sizeof(T);
-        size_t offset=0; while(offset<byteSize) offset+=readUpTo(buffer.begin()+offset, byteSize-offset);
+        size_t offset=0; while(offset<byteSize) offset+=readUpTo((byte*)buffer.begin()+offset, byteSize-offset);
         assert(offset==byteSize);
         return buffer;
     }

@@ -149,6 +149,7 @@ struct Player {
             next();
         }
         window.show();
+        mainThread.setPriority(-20);
     }
     ~Player() { writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate))); }
     void queueFile(const string& folder, const string& file, bool withAlbumName=true) {

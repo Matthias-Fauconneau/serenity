@@ -32,11 +32,10 @@ struct SpectrumPlot : Widget {
         if(!spectrum || iMin >= iMax) return;
         assert_(iMin <= iMax && iMax <= spectrum.size);
         float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
-        float sMin = min(estimator.periodPower,  estimator.noiseThreshold/2);
+        float sMin = estimator.periodPower;
 
-        {float s = estimator.noiseThreshold;
-        float y = (logy ? (log2(s) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (s / sMax)) * (size.y-12);
-        line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
+        {float y = (logy ? (log2(2*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * (size.y-12);
+            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
 
         for(uint i: range(iMin, iMax)) { // Energy density
             float x0 = x(i) * size.x;
@@ -74,37 +73,25 @@ struct Tuner : Poll {
     const uint rate = input.rate;
 
 #if TEST
-    //Audio audio = decodeAudio("/Samples/A0-B2.flac"_);
-    Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
+    Audio audio = decodeAudio("/Samples/A0-B1.flac"_);
+    //Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
     Timer timer {thread};
     Time realTime;
     Time totalTime;
     float frameTime = 0;
 #endif
 
-    // Input-dependent parameters
-    float absoluteThreshold = 3; // 1/x, Absolute harmonic energy in the current period (i.e over mean period energy)
-    float relativeThreshold = 9; // 1/x, Relative harmonic energy (i.e over current period energy)
-
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
     // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
-    buffer<int32> raw {2*2*N}; // Ring buffer storing unfiltered stereo samples to be recorded
     buffer<float> signal {2*N}; // Ring buffer
     uint writeIndex = 0, readIndex = 0;
     Semaphore readCount {0}; // Audio thread releases input samples, processing thread acquires
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
-    // Filter
-    Notch notch1 {1*50./rate, 1./(1*12)}; // Notch filter to remove 50Hz noise
-    Notch notch3 {3*50./rate, 1./(3*12)}; // Notch filter to remove 150Hz noise
-    Notch notch5 {5*50./rate, 1./(5*12)}; // Notch filter to remove 250Hz noise
-
     // Analysis
+    float threshold = 8; // 1/x, Relative harmonic energy (i.e over current period energy)
     PitchEstimator estimator {N};
-
-    // Result
-    float signalMaximum = 0x1p31; //1; //0x1p31; // 31bit range (1bit sign) + stereo - 3dB headroom
     int worstKey = -1;
 
     // UI
@@ -112,24 +99,17 @@ struct Tuner : Poll {
     Text key {""_, textSize, white};
     Text pitch {""_, textSize, white};
     Text fOffset {""_, textSize, white};
-    Text offsetMean {""_, textSize/2, white};
-    Text offsetMax {""_, textSize/2, white};
-    Text B {""_, textSize, white};
+    Text B {""_, textSize/2, white};
     Text fError {""_, textSize/3, white};
-    Text absolute {""_, textSize/4, white};
-    Text relative {""_, textSize/4, white};
-    SpectrumPlot spectrum {false, true, (float)N/rate, estimator.spectrum, estimator};
-    HBox status {{&key,&pitch,&fOffset,&offsetMean, &offsetMax, &B, &fError, &absolute,&relative}};
+    Text confidence {""_, textSize/4, white};
+    SpectrumPlot spectrum {false, true, (float)N/rate, estimator.filteredSpectrum, estimator};
+    HBox status {{&key,&pitch,&fOffset, &B, &fError, &confidence}};
     OffsetPlot profile;
     VBox layout {{&spectrum, &status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
-        map<string,string> args;
-        for(string arg: arguments()) { string key=section(arg,'='), value=section(arg,'=',1); if(key) args.insert(key, value); }
-        if(args.contains("abs"_)) { absoluteThreshold=toInteger(args.at("abs"_)); log("Absolute threshold: ", absoluteThreshold); }
-        if(args.contains("rel"_)) { relativeThreshold=toInteger(args.at("rel"_)); log("Relative threshold: ", relativeThreshold); }
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
@@ -142,9 +122,10 @@ struct Tuner : Poll {
         input.start();
 #endif
         thread.spawn();
+        readCount.acquire(N-periodSize);
     }
 #if TEST
-    uint t = 2*rate; // Let input settle
+    uint t = 0;// 5*rate; // Let input settle
     void feed() {
         const uint size = periodSize;
         if(t+size > audio.data.size/2) { exit(); return; }
@@ -154,21 +135,15 @@ struct Tuner : Poll {
         float time = ((float)size/rate) / (float)realTime; // Instant playback rate
         const float alpha = 1./16; frameTime = (1-alpha)*frameTime + alpha*(float)time; // IIR Smoother
         realTime.reset();
-        timer.setRelative(size*1000/rate/8); // 8xRT
+        timer.setRelative(size*1000/rate/16); // 8xRT
     }
 #endif
     uint write(const int32* input, uint size) {
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
         assert(writeIndex+size<=signal.size);
         for(uint i: range(size)) {
-            raw[2*(writeIndex+i)+0] = input[i*2+0];
-            raw[2*(writeIndex+i)+1] = input[i*2+1];
             float L = input[i*2+0], R = input[i*2+1];
-            signalMaximum=::max(signalMaximum, abs(L+R));
-            float x = (L+R) / signalMaximum;
-            x = notch1(x);
-            x = notch3(x);
-            x = notch5(x);
+            float x = (L+R) * 0x1p-31;
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
@@ -188,52 +163,42 @@ struct Tuner : Poll {
         }
         readCount.acquire(periodSize); periods++;
         frames++;
-        buffer<float> frame {N}; // Need a linear buffer for autocorrelation (FIXME: mmap ring buffer)
         assert(readIndex+periodSize<=signal.size);
-        for(uint i: range(min<int>(N,signal.size-readIndex))) frame[i] = signal[readIndex+i]; // Copies ring buffer head into linear frame buffer
-        for(uint i: range(signal.size-readIndex, N)) frame[i] = signal[i+readIndex-signal.size]; // Copies ring buffer tail into linear frame buffer
+        for(uint i: range(min<int>(N,signal.size-readIndex))) estimator.windowed[i] = estimator.window[i] * signal[readIndex+i];
+        for(uint i: range(signal.size-readIndex, N)) estimator.windowed[i] = estimator.window[i] * signal[i+readIndex-signal.size];
 
-        float f = estimator.estimate(frame);
+        float f = estimator.estimate();
         int key = round(pitchToKey(f*rate/N));
 
         spectrum.iMin = keyToPitch(key-1./2)*N/rate;
         spectrum.iMax = min(N/4, uint(16*keyToPitch(key+1./2)*N/rate));
 
-        float meanPeriodEnergy = estimator.meanPeriodEnergy; // Stabilizes around 8 (depends on FFT size, energy, range, noise, signal, ...)
-        float absolute = estimator.harmonicEnergy / meanPeriodEnergy;
-
         float periodEnergy = estimator.periodEnergy;
-        float relative = estimator.harmonicEnergy  / periodEnergy;
+        float confidence = estimator.harmonicEnergy  / periodEnergy;
 
-        if(absolute > 1./(absoluteThreshold+1) && relative > 1./(relativeThreshold+1)) {
+        if(confidence > 1./(threshold+1)) {
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
-            const int cOffset =  round(100*offset);
             const float error =  12*log2((expectedF+1)/expectedF);
 
             this->key.setText(strKey(key));
             this->pitch.setText(dec(round(f*rate/N )));
             this->fOffset.setText(dec(round(100*offset)));
-            {int offset = round(100*12*log2(estimator.energyWeightedF/expectedF));
-                this->offsetMean.setText(abs(offset)<100&&offset!=cOffset?dec(offset):""_);}
-            {int offset = round(100*12*log2(estimator.peakF/expectedF));
-                this->offsetMax.setText(abs(offset)<100&&offset!=cOffset?dec(offset):""_);}
             this->B.setText(dec(round(100*12*log2(1+estimator.B))));
             this->fError.setText(dec(round(100*error)));
-            this->absolute.setText(dec(round(1./absolute)));
-            this->relative.setText(dec(round(1./relative)));
+            this->confidence.setText(dec(round(1./confidence)));
 
-            if(absolute > 1./absoluteThreshold && relative > 1./relativeThreshold && key>=21 && key<21+keyCount) {
+            if(confidence > 1./threshold && key>=21 && key<21+keyCount) {
                 float& keyOffset = profile.offsets[key-21]; {const float alpha = 1./4; // Prevents mistuned neighbouring note from affecting wrong key
                         keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes
                 float variance = sq(offset - keyOffset);
                 float& keyVariance = profile.variances[key-21];
                 {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
                 {int k = this->worstKey;
-                    for(uint i: range(7,keyCount)) //FIXME: quadratic, cubic, exp curve ?
+                    for(uint i: range(keyCount)) //FIXME: quadratic, cubic, exp curve ?
                         if(  k<0 ||
-                                abs(profile.offsets[i ] - 1.f/8 * (float)(i -keyCount/2)/(keyCount/2)) /*+ sqrt(profile.variances[i ])*/ >
-                             abs(profile.offsets[k] - 1.f/8 * (float)(k-keyCount/2)/(keyCount/2)) /*+ sqrt(profile.variances[k])*/ ) k = i;
+                                abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
+                             abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
             }

@@ -81,7 +81,8 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
         } else { warn("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
     }
-    {ConnectionSetupReply r=read<ConnectionSetupReply>(); assert(r.status==1,string((byte*)&r.release,r.reason-1));
+    {ConnectionSetupReply1 r=read<ConnectionSetupReply1>(); assert_(r.status==1);}
+    {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>();

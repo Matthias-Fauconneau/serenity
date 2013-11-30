@@ -29,17 +29,10 @@ struct HighPass : Biquad {
 // Notch filter
 // H(s) = (s^2 + 1) / (s^2 + s/Q + 1)
 struct Notch : Biquad {
-    Notch(real f, real bw) {
+    Notch(real f, real Q/*bw*/) {
         real w0 = 2*PI*f;
-        real alpha;
-        if(bw) {
-            alpha = sin(w0) * sinh(ln(2)/2*bw*w0/sin(w0));
-            real Q = 1/(2*sinh(ln(2)/2*bw*w0/sin(w0))); assert_(Q>1./sqrt(2.), Q);
-            assert_(alpha>0x1p-14, log2(alpha));
-        } else {
-            real Q=1./sqrt(2.);
-            alpha = sin(w0)/(2*Q);
-        }
+        //real alpha = sin(w0) * sinh(ln(2)/2*bw*w0/sin(w0));
+        real alpha = sin(w0)/(2*Q);
         real a0 = 1+alpha;
         a1 = -2*cos(w0)/a0, a2 = (1-alpha)/a0;
         b0 = 1/a0, b1 = -2*cos(w0)/a0, b2 = 1/a0;
