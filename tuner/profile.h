@@ -26,12 +26,18 @@ struct OffsetPlot : Widget {
             int x0 = position.x + key * size.x / keyCount;
             int x1 = position.x + (key+1) * size.x / keyCount;
 
-            // TODO: Offset reference according to inharmonicty (~railsback curve)
+#if 1
+            float target = stretch(key);
+            float offset = offsets[key];
+            int y0 = position.y + size.y * (maximumOffset-target) / (maximumOffset-minimumOffset);
+            int y1 = position.y + size.y * (maximumOffset-offset) / (maximumOffset-minimumOffset);
+            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, offset>target ? vec4(1,0,0,1) : vec4(0,0,1,1));
+#else
             float p0 = stretch(key);
             int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
 
             float offset = offsets[key];
-            float deviation = 0; //sqrt(variances[key]);
+            float deviation = sqrt(variances[key]);
             float sign = ::sign(offset-p0) ? : 1;
 
             // High confidence between zero and max(0, |offset|-deviation)
@@ -39,7 +45,7 @@ struct OffsetPlot : Widget {
             int y1 = position.y + size.y * (maximumOffset-sign*p1) / (maximumOffset-minimumOffset);
             fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, sign*p1>0 ? vec4(1,0,0,1) : vec4(0,0,1,1));
 
-            /*// Mid confidence between max(0,|offset|-deviation) and |offset|
+            // Mid confidence between max(0,|offset|-deviation) and |offset|
             float p2 = abs(offset);
             int y2 = position.y + size.y * (maximumOffset-sign*p2) / (maximumOffset-minimumOffset);
             fill(x0,y1<y2?y1:y2,x1,y1<y2?y2:y1, sign*p2>0 ? vec4(3./4,0,0,1) : vec4(0,0,3./4,1));
@@ -52,7 +58,8 @@ struct OffsetPlot : Widget {
             // Low confidence between min(|offset|-deviation, 0) and zero
             float p4 = min(0.f, abs(offset)-deviation);
             int y4 = position.y + size.y * (maximumOffset-sign*p4) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));*/
+            fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
+#endif
         }
     }
 };

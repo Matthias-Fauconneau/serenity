@@ -73,8 +73,8 @@ struct Tuner : Poll {
     const uint rate = input.rate;
 
 #if TEST
-    Audio audio = decodeAudio("/Samples/A0-B1.flac"_);
-    //Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
+    //Audio audio = decodeAudio("/Samples/A0-B1.flac"_);
+    Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
     Timer timer {thread};
     Time realTime;
     Time totalTime;
@@ -92,6 +92,7 @@ struct Tuner : Poll {
     // Analysis
     float threshold = 8; // 1/x, Relative harmonic energy (i.e over current period energy)
     PitchEstimator estimator {N};
+    int lastKey = 0;
     int worstKey = -1;
 
     // UI
@@ -110,6 +111,7 @@ struct Tuner : Poll {
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
+        if(arguments()) threshold=toInteger(arguments()[0]);
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
@@ -170,8 +172,8 @@ struct Tuner : Poll {
         float f = estimator.estimate();
         int key = round(pitchToKey(f*rate/N));
 
-        spectrum.iMin = keyToPitch(key-1./2)*N/rate;
-        spectrum.iMax = min(N/4, uint(16*keyToPitch(key+1./2)*N/rate));
+        spectrum.iMin = f;
+        spectrum.iMax = min(estimator.fMax,  (uint) f * estimator.candidates.last().lastHarmonicRank);
 
         float periodEnergy = estimator.periodEnergy;
         float confidence = estimator.harmonicEnergy  / periodEnergy;
@@ -188,12 +190,9 @@ struct Tuner : Poll {
             this->fError.setText(dec(round(100*error)));
             this->confidence.setText(dec(round(1./confidence)));
 
-            if(confidence > 1./threshold && key>=21 && key<21+keyCount) {
-                float& keyOffset = profile.offsets[key-21]; {const float alpha = 1./4; // Prevents mistuned neighbouring note from affecting wrong key
-                        keyOffset = (1-alpha)*keyOffset + alpha*offset;} // Smoothes offset changes
-                float variance = sq(offset - keyOffset);
-                float& keyVariance = profile.variances[key-21];
-                {const float alpha = 1./8; keyVariance = (1-alpha)*keyVariance + alpha*variance;} // Smoothes deviation changes
+            if(confidence > 1./threshold && key==lastKey && key>=21 && key<21+keyCount) {
+                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-confidence)*keyOffset + confidence*offset;
+                float& keyVariance = profile.variances[key-21]; keyVariance = (1-confidence)*keyVariance + confidence*sq(offset - keyOffset);
                 {int k = this->worstKey;
                     for(uint i: range(keyCount)) //FIXME: quadratic, cubic, exp curve ?
                         if(  k<0 ||
@@ -203,6 +202,7 @@ struct Tuner : Poll {
                 }
             }
         }
+        lastKey = key;
 
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)

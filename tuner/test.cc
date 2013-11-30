@@ -48,7 +48,7 @@ struct Plot : Widget {
         logx(logx),logy(logy),resolution(resolution),spectrum(spectrum),unfilteredSpectrum(unfilteredSpectrum),estimator(estimator){}
     float x(float f) { return logx ? (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)) : (float)(f-iMin)/(iMax-iMin); }
     void render(int2 position, int2 size) {
-        assert_(iMin < iMax && iMax <= spectrum.size, iMin, iMax);
+        assert_(iMin < iMax && iMax <= spectrum.size, iMin, iMax, spectrum.size);
         if(iMin >= iMax) return;
         float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
         float sMin = estimator.periodPower;
@@ -106,8 +106,8 @@ struct Plot : Widget {
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
     // Input
-    const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B1"_)-12;
-    //const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
+    //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B1"_)-12;
+    const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
@@ -150,7 +150,7 @@ struct PitchEstimation {
         if(fail) return;
         t+=periodSize;
         for(; t<=stereo.size/2-14*N; t+=periodSize) {
-            const uint sync = 0; // Sync with benchmark
+            const uint sync = rate; // Sync with benchmark
             // Checks for missed note
             if((t+sync+periodSize)/rate/5 != (t+sync)/rate/5 && lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; }
 
@@ -171,20 +171,28 @@ struct PitchEstimation {
             float f = estimator.estimate();
             const float expectedF = keyToPitch(expectedKey)*N/rate;
 
-            const float threshold = 1./8; // Relative harmonic energy (i.e over current period energy)
-            float periodEnergy = estimator.periodEnergy;
+            const float threshold = 1./14; // Relative harmonic energy (i.e over current period energy)
+            float periodEnergy = (estimator.periodEnergy/estimator.filteredEnergy > 6 ? estimator.filteredEnergy : estimator.periodEnergy);
             float confidence = estimator.harmonicEnergy  / periodEnergy;
 
             int key = round(pitchToKey(f*rate/N));
             float keyF0 = keyToPitch(key)*N/rate;
             const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
 
+            float Ea = estimator.candidates.last().energy;
+            float Na = estimator.candidates.last().lastHarmonicRank;
+            float Eb = estimator.candidates[0].energy;
+            float Nb = estimator.candidates[0].lastHarmonicRank;
+            float rankEnergyTradeoff = (Eb*Na-Ea*Nb)/(Ea-Eb);
+
             if(confidence > threshold/2)
                     log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
                 +dec(round(100*offsetF0),2) +" c\t"_+dec(round(confidence?1./confidence:0),2)+"\t"_
                 +"B~"_+dec(round(1000*12*log2(1+(estimator.B>-1?estimator.B:0))))+" m\t"_+str(estimator.B>0?log2(estimator.B):0)+"\t"_
-                        +str(estimator.F1/estimator.medianF0)+" "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
-                +(expectedKey == key ? (confidence > threshold ? "O"_ : "~"_) : "X"_));
+                        +(expectedKey == key ? (confidence > threshold ? "O"_ : "~"_) : "X"_)+"  "_
+                        +str(estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+" "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
+                        +dec(Ea)+" "_+dec(Na)+" "_+dec(Eb)+" "_+dec(Nb)+" "_+dec(rankEnergyTradeoff)+"\t"_
+                        );
 
             if(confidence > threshold) {
 
@@ -197,7 +205,7 @@ struct PitchEstimation {
 
                     plot.expectedF = expectedF;
                     plot.iMin = f;
-                    plot.iMax = 16*f;
+                    plot.iMax = min(estimator.fMax, (uint)max(expectedF, f) * (estimator.candidates.last().lastHarmonicRank+1));
 
                     // Relax for hard cases
                     if(offsetF0<-1./4 && key==expectedKey+1 && apply(split("E0 C#0 C0 B-1 A#-1 A-1"_), parseKey).contains(expectedKey)) log("+"_);
