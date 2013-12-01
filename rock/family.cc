@@ -1,13 +1,8 @@
+/// \file family.cc Operations on families (pores)
 #include "volume-operation.h"
 #include "thread.h"
 #include "display.h"
-
-// FIXME: -> header (used by link.cc)
-struct Family : array<uint64> {
-    Family(uint64 root):root(root){}
-    uint64 root;
-};
-extern array<Family> parseFamilies(const string& data);
+#include "family.h"
 
 void rootIndex(Volume16& target, const ref<Family>& families) {
     uint16* const targetData = target;
