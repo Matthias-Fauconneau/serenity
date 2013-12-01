@@ -46,9 +46,9 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 int2 SliceView::sizeHint() {
     assert_(volumes);
     const Volume& volume = volumes[currentIndex];
-    int2 size = (volume.sampleCount-2*volume.margin).xy();
-    while(size<int2(512)) size*=2;
-    return renderVolume ? 1024 : int2(align(4,size.x),align(4,size.y));
+    int2 size = volume.sampleCount.xy(), margin = 2*volume.margin.xy();
+    while(size<int2(1024)) size*=2, margin *= 2;
+    return renderVolume ? 1024 : int2(align(4,size.x-margin.x),align(4,size.y-margin.y));
 }
 
 void SliceView::render(int2 position, int2 size) {
@@ -61,7 +61,9 @@ void SliceView::render(int2 position, int2 size) {
         ::render(framebuffer, volumes[0], volumes[1], view);
     } else {
         Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
-        while(2*image.size()<=size) image=upsample(image);
+        const Volume& volume = volumes[currentIndex];
+        int2 imageSize = volume.sampleCount.xy();
+        while(2*imageSize<=size) image=upsample(image), imageSize*=2;
         int2 centered = position+(size-image.size())/2;
         blit(centered, image);
     }
