@@ -20,6 +20,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
         array<Tube> tubes;
         for(Random random; spheres.size < (uint)size.x; ) {
             vec3 radius = vec3(1)+vec3(random(),random(),random())*float(maximumRadius-1);
+            if(max(max(radius.x,radius.y),radius.z) > 4*min(min(radius.x,radius.y),radius.z)) continue; // Limits aspect ratio
             const vec3 margin = radius+vec3(1);
             vec3 center = margin+vec3(random(),random(),random())*(vec3(size) - 2.f*margin);
             Sphere nearest = {vec3(0),0}; float distance=size.x;
