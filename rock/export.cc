@@ -254,7 +254,10 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
                 uint value = 0;
                 if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
                 else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-                else if(source.sampleSize==3 && !source.floatingPoint) value = ((bgr*)source.data.data)[index].g; //FIXME: colored CDL output
+                else if(source.sampleSize==3 && !source.floatingPoint) { //FIXME: colored CDL output
+                    bgr color = ((bgr*)source.data.data)[index];
+                    value = (int(color.r)+int(color.g)+int(color.b))/3;
+                }
                 else if(source.sampleSize==4 && !source.floatingPoint) value = ((uint32*)source.data.data)[index];
                 else if(source.sampleSize==4 && source.floatingPoint) value = round(((float*)source.data.data)[index]); //FIXME: converts to ASCII with decimals
                 else error(source.sampleSize);
