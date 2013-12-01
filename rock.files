@@ -98,6 +98,6 @@ rock/summary.cc
 rock/slice.h
 rock/diff.cc
 rock/cluster.cc
-rock/link.cc
 rock/family.cc
 rock/synthetic.cc
+rock/family.h

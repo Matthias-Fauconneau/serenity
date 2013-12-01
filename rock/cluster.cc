@@ -1,8 +1,9 @@
-/// \file cluster.cc Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
+/// \file cluster.cc Computes trees of overlapping balls
 #include "sample.h"
 #include "volume-operation.h"
 #include "thread.h"
 #include "crop.h"
+#include "family.h"
 
 /// Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
 buffer<array<short3> > parseLists(const string& data) {
@@ -22,12 +23,6 @@ buffer<array<short3> > parseLists(const string& data) {
     return lists;
 }
 
-struct Family : array<uint64> {
-    Family(uint64 root):root(root){}
-    uint64 root;
-};
-String str(const Family& o) { return str(o.root)/*+":"_+str((const array<uint64>&)o)*/; }
-
 struct FamilySet {
     array<Family*> families; // Family set
     map<uint,uint> unions; // Maps an other family set index to the index of the union of this family set and the other family set.
@@ -35,7 +30,6 @@ struct FamilySet {
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
-//FIXME: output root nodes instead of recomputing in Link step
 array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
     uint32* const targetData = target;
     clear(targetData, target.size());
