@@ -149,12 +149,10 @@ String replace(const string& s, const string& before, const string& after) {
 }
 
 char toLower(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
+String toLower(const string& s) { String lower(s.size); for(char c: s) lower<<toLower(c); return lower; }
 
-String toLower(const string& s) {
-    String lower;
-    for(char c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
-    return lower;
-}
+char toUpper(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
+String toUpper(const string& s) { String upper(s.size); for(char c: s) upper<<toUpper(c); return upper; }
 
 String simplify(String&& s) {
     for(uint i=0; i<s.size;) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading

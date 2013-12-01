@@ -1,5 +1,5 @@
 #include "flac.h"
-#include "string.h"
+#include "thread.h" // setExceptions
 
 #define swap64 __builtin_bswap64
 
@@ -106,7 +106,7 @@ void FLAC::parseFrame() {
 }
 
 inline double roundDown(double x) { //depends on setRoundMode(Down) to round towards negative infinity
-    const double lead = 0x1.0p52f+0x1.0p51f; //add leading bit to force rounding (+1p51 to also force negative numbers)
+    const double lead = 0x1p52+0x1p51; //add leading bit to force rounding (+1p51 to also force negative numbers)
     return x+lead-lead; // WARNING: miscompiles with -Ofast !
 }
 
@@ -151,6 +151,7 @@ void FLAC::decodeFrame() {
     int allocSize = align(4096,blockSize);
     float block[2][allocSize];
     setRoundMode(Down);
+    setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormal and underflow in roundDown
     for(int channel=0;channel<2;channel++) {
         int rawSampleSize = sampleSize; //one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channelMode==RightSide) rawSampleSize++; }
@@ -245,6 +246,7 @@ void FLAC::decodeFrame() {
         int t=rice*rate/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
     }
     setRoundMode(Even);
+    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); // Restores denormal and underflow
     index=align(8,index);
     skip(16);
     assert(align(4,blockSize)<=readIndex+audio.capacity-writeIndex,blockSize,align(4,blockSize),align(4,blockSize)+writeIndex,audio.capacity);

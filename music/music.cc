@@ -89,7 +89,7 @@ struct Music {
 #if RECORD
     Window window {&layout,int2(1280,720),"Piano"_,musicIcon()};
 #else
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon()/*, Window::OpenGL*/};
+    Window window {&layout,int2(0,0),"Piano"_,musicIcon(), Window::OpenGL};
 #endif
     List<Text> sheets;
 

@@ -257,7 +257,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // Finds least buffered note
-            if(n.flac.blockSize && n.writeCount>=n.flac.blockSize && n.flac.audio.size<minBufferSize) {
+            if(n.flac.blockSize && n.writeCount>=(int)n.flac.blockSize && n.flac.audio.size<minBufferSize) {
                 note=&n;
                 minBufferSize=n.flac.audio.size;
             }

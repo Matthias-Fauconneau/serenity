@@ -128,8 +128,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 }
 #if __x86_64
 // Configures floating-point exceptions
-enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
-void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
 void __attribute((constructor(102))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recursive calls

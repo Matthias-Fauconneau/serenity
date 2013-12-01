@@ -61,6 +61,8 @@ String replace(const string& s, const string& before, const string& after);
 char toLower(char c);
 /// Lowers case
 String toLower(const string& s);
+/// Uppers case
+String toUpper(const string& s);
 /// Removes duplicate whitespace
 String simplify(String&& s);
 /// Repeats a string

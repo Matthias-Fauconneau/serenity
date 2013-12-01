@@ -228,7 +228,11 @@ void PDF::open(const string& data) {
                 auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
                 Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
                 if(!fontFile) continue;
+#if GL
                 Font& font = fonts.insert(e.key, Font{move(name), unique<::Font>(parseVariant(xref[fontFile->integer()]).data), {}, {}});
+#else
+                Font& font = fonts.insert(e.key, Font{move(name), unique<::Font>(parseVariant(xref[fontFile->integer()]).data), {}});
+#endif
                 Variant* firstChar = fontDict.find("FirstChar"_);
                 if(firstChar) font.widths.grow(firstChar->integer());
                 Variant* widths = fontDict.find("Widths"_);
@@ -585,7 +589,10 @@ void PDF::render(int2 position, int2 size) {
 
         return;
     }
+#else
+#error Unsupported software rendering
 #endif
+    error("Unsupported software rendering");
     scale = size.x/(x2-x1); // Fit width
 
     for(Blit& blit: blits) {

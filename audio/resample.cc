@@ -124,7 +124,7 @@ void Resampler::write(const float* source, uint size) {
 
 int Resampler::available() {
     uint available = ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate;
-    assert_(need(available)==0, sourceRate, targetRate, integerIndex, fractionalIndex, writeIndex, available, need(available));
+    assert_(need(available)==0 || (sourceRate>targetRate && need(available)==-1));
     return available;
 }
 

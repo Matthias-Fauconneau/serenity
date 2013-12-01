@@ -12,7 +12,6 @@ extern Image framebuffer;
 extern Lock framebufferLock;
 extern int resolution; /// Device resolution in dots per inch (dpi)
 
-#define GL 0
 #if GL
 extern int2 viewportSize;
 vec2 vertex(float x, float y);

@@ -6,6 +6,9 @@
 #include "string.h"
 #include <pthread.h>
 
+enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
+void setExceptions(uint except);
+
 /// Logical cores count
 constexpr uint coreCount=8;
 
@@ -117,7 +120,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 };
 
 struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
-static void* start_routine(thread* t) {
+inline void* start_routine(thread* t) {
     for(;;) {
         uint64 i=__sync_fetch_and_add(t->counter,1);
         if(i>=t->stop) break;

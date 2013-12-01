@@ -1,8 +1,8 @@
 #include "display.h"
 #include "math.h"
 #if GL
-//include "gl.h"
-//fILE(display);
+#include "gl.h"
+FILE(display)
 #endif
 
 typedef vector<bgra,int,4> int4;
