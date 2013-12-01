@@ -23,13 +23,21 @@ vec3 parse3f(TextData& s) {
 }
 vec3 parse3f(const string& data) { TextData s(data); return parse3f(s); }
 
-/// Converts text file formatted as ((x y z):( x y z)+)*\n to families
+struct Ball { uint64 index; uint16 sqRadius; };
+typedef array<Ball> Family;
+
+/// Converts text file formatted as ((x y z r2):( x y z r2)+)*\n to families
 array<Family> parseFamilies(const string& data) {
     array<Family> families;
     TextData s(data);
     while(s) {
-        s.skip("("_); Family family (zOrder(parse3(s))); s.skip("):\n"_); s.skip();
-        while(s && s.peek()!='(') { family << zOrder(parse3(s)); s.skip(); }
+        Family family;
+        for(;;) {
+            uint64 index = zOrder(parse3(s)); uint16 sqRadius = s.integer();
+            family << Ball{index, sqRadius};
+            if(!s || s.match('\n')) break;
+            s.skip(" "_);
+        }
         families << move(family);
     }
     return families;
@@ -43,11 +51,9 @@ void rootIndex(Volume16& target, const ref<Family>& families) {
     uint i=0; for(const Family& family: families) {
         i++;
         assert(i<1<<16);
-        if(!targetData[family.root]) targetData[family.root] = i;
-        else targetData[family.root] = target.maximum; // Multiple family
-        for(uint64 index: family) {
-            if(!targetData[index]) targetData[index] = i;
-            else targetData[index] = target.maximum; // Multiple family
+        for(Ball ball: family) {
+            if(!targetData[ball.index]) targetData[ball.index] = i;
+            else targetData[ball.index] = target.maximum; // Multiple family
         }
     }
 }
@@ -100,10 +106,11 @@ String toASCII(const ref<mat4>& boxes) {
 array<mat4> bound(const ref<Family>& families) {
     array<mat4> bounds (families.size);
     for(const Family& family: families) {
-        int3 min = zOrder(family.root), max = zOrder(family.root);
-        for(uint64 index: family) {
-            min=::min(min, zOrder(index));
-            max=::max(max, zOrder(index));
+        int3 min = zOrder(family.first().index)-int3(sqrt((float)family.first().sqRadius));
+        int3 max = zOrder(family.first().index)+int3(sqrt((float)family.first().sqRadius));
+        for(Ball ball: family) {
+            min=::min(min, zOrder(ball.index)-int3(sqrt((float)ball.sqRadius)));
+            max=::max(max, zOrder(ball.index)+int3(sqrt((float)ball.sqRadius)));
         }
         vec3 origin = vec3(min+max)/2.f, scale = vec3(max-min)/2.f;
         mat4 box(scale); box[3] = vec4(origin, 1.f);
@@ -111,6 +118,7 @@ array<mat4> bound(const ref<Family>& families) {
     }
     return bounds;
 }
+
 /// Bounds each familiy with an axis-aligned bounding box
 class(Bound, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
@@ -138,7 +146,7 @@ void rasterizeBox(Volume16& target, const ref<mat4>& boxes) {
     target.maximum++; // maximum = Multiple family index (e.g throats)
     uint i=0; for(const mat4& box: boxes) {
         i++; assert(i<1<<16);
-#if OOB //FIXME
+#if 1 //FIXME
         // Computes world axis-aligned bounding box of object's oriented bounding box
         vec3 A = vec3(-1), B = vec3(1); // Canonical box
         vec3 O = box[3].xyz(), min = O, max = O; // Initialize min/max to origin
@@ -155,9 +163,8 @@ void rasterizeBox(Volume16& target, const ref<mat4>& boxes) {
         }
 #else
         vec3 origin = box[3].xyz(); vec3 scale = vec3(box(0,0), box(1,1), box(2,2));
-        log(origin, scale);
         vec3 min = origin-scale, max = origin+scale;
-        for(int z: range(min.z, max.z+1)) for(int y: range(min.y, max.y+1)) for(int x: range(min.x, max.x+1)) {
+        for(int z: range(min.z, ceil(max.z))) for(int y: range(min.y, ceil(max.y))) for(int x: range(min.x, ceil(max.x))) {
             target(x,y,z) = target(x,y,z) ? target.maximum : i; // Rasterize family index, except for intersection (throats) which gets maximum value
         }
 #endif

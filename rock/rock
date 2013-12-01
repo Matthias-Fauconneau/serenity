@@ -120,7 +120,7 @@ bounding-boxes = Bound maximum-balls-families
 box-volume = RasterizeBox bounding-boxes voxelSize
 
 # Colorizes each box in a different color
-colored-box = ColorizeIndex box-volume
+colored-boxes = ColorizeIndex box-volume
 
 # Writes root index (into the family list) of each voxel
 family-skeleton = RootIndex maximum-balls-families voxelSize
@@ -191,6 +191,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-flood = ToPNG flood
   png-denoised-connected = ToPNG denoised-connected
   png-colored-families = ToPNG colored-families
+  png-colored-boxes = ToPNG colored-boxes
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised

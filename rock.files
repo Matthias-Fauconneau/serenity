@@ -100,4 +100,3 @@ rock/diff.cc
 rock/cluster.cc
 rock/family.cc
 rock/synthetic.cc
-rock/family.h

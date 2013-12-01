@@ -200,9 +200,9 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
                             }
                             else if(sqRadius > R) {
                                 if(p) { // Resolve pore throats collision by taking relative nearest (flat section border)
-                                    uint16 throatR = R;
+                                    //uint16 throatR = R;
                                     uint throatD = sq(voxel-p);
-                                    uint16 poreR = sqRadius;
+                                    //uint16 poreR = sqRadius;
                                     uint poreD = sq(voxel-tileBall);
                                     if(poreD < throatD) { // Pore is nearest
                                         R = sqRadius;

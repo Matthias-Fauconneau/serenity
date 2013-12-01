@@ -3,7 +3,8 @@
 #include "volume-operation.h"
 #include "thread.h"
 #include "crop.h"
-#include "family.h"
+
+typedef array<uint64> Family;
 
 /// Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
 buffer<array<short3>> parseLists(const string& data) {
@@ -49,7 +50,7 @@ array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<a
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             uint32& parentIndex = targetData[parent];
             if(!parentIndex) { // parent is a new root
-                families << unique<Family>(parent);
+                families << unique<Family>(ref<uint64>{parent});
                 unique<FamilySet> set; set->families << families.last().pointer;
                 parentIndex = familiesLookup.size; // New family set lookup index
                 familiesLookup << move(set);
@@ -140,17 +141,15 @@ array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<a
     return families;
 }
 
-/// Converts families to a text file formatted as ((x y z):( x y z)+\n)*
-String toASCII(const ref<unique<Family>>& families) {
-    uint size = 0; // Estimates data size to avoid unnecessary reallocations
-    for(const Family& family: families) /*if(family.size)*/ size += (3*5+2) + (family.size)*(3*5+1);
-    String text (size);
+/// Converts families to a text file formatted as ((x y z r2)+\n)*
+String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
+    String text ( sum(apply(families,[](const Family& family){ return family.size*4*5;})) ); // Estimates text size to avoid unnecessary reallocations
     for(const Family& family: families) {
-        //if(!family.size) continue; // Might be an isolated root (also includes them)
-        int3 position = zOrder(family.root); // Convert back Z-order index to position
-        text << str(position)+":\n"_;
-        for(uint i: range(family.size)) { int3 p = zOrder(family[i]); text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ((i+1)%16?"  "_:"\n"_); }
-        text << "\n"_;
+        for(uint64 index: family) {
+            int3 p = zOrder(index);
+            text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ' ' << dec(source[index],3) << ' ';
+        }
+        text.last() = '\n';
     }
     return text;
 }
@@ -162,6 +161,6 @@ class(Cluster, Operation), virtual VolumeOperation {
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs, const ref<const Result*>& otherInputs) override {
         array<unique<Family>> families = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
         otherOutputs[0]->metadata = String("families"_);
-        otherOutputs[0]->data = toASCII(families);
+        otherOutputs[0]->data = toASCII(families, inputs[0]);
     }
 };
