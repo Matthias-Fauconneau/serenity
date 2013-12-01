@@ -12,7 +12,7 @@
 /// Presents all important informations extracted from a rock data set
 class(Summary, Operation) {
     string parameters() const override { return "path denoise"_; }
-    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
+    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
         const int2 pageSize = int2(round(1024/sqrt(2.)), 1024);
         Dict args = copy(arguments);
         VBox vbox (Linear::Share, Linear::Expand);

@@ -55,7 +55,7 @@ generic UniformHistogram histogram(const VolumeT<T>& source, CropVolume crop) {
 /// Computes histogram using uniform integer bins
 class(Histogram, Operation) {
     string parameters() const override { return "cylinder downsample"_; }
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
         crop.min -= source.origin, crop.max -= source.origin;

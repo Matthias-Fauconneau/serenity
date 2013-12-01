@@ -18,8 +18,8 @@ inline Volume toVolume(const Result& result) { return toVolume(result.metadata, 
 struct VolumeOperation : virtual Operation {
     /// Overriden by implementation to return required output sample size (or 0 for non-volume output)
     virtual uint outputSampleSize(uint index unused) { return 0; } // No volume output by default
-    virtual uint outputSampleSize(const Dict&, const ref<Result*>&, uint index) { return this->outputSampleSize(index); }
-    size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
+    virtual uint outputSampleSize(const Dict&, const ref<const Result*>&, uint index) { return this->outputSampleSize(index); }
+    size_t outputSize(const Dict& args, const ref<const Result*>& inputs, uint index) override {
         assert(inputs);
         assert(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
         return toVolume(*inputs[0]).size() * this->outputSampleSize(args,inputs,index);
@@ -27,19 +27,19 @@ struct VolumeOperation : virtual Operation {
     /// Actual operation (overriden by implementation)
     virtual void execute(const Dict& args unused, const mref<Volume>& outputs unused, const ref<Volume>& inputs unused) { error("None of the execute methods were overriden by implementation"_); }
     /// Actual operation (overriden by implementation) with additional non-volume outputs
-    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const mref<Result*>&) { this->execute(args, outputs, inputs); }
-    /// Actual operation (overriden by implementation) with additional non-volume inputs
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>&) { this->execute(args, outputs, inputs); }
+    /// Actual operation (overriden by implementation) with additional non-volume inputs
+    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>&) { this->execute(args, outputs, inputs); }
     /// Actual operation (overriden by implementation) with additional non-volume outputs and inputs
-    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const mref<Result*>& otherOutputs, const ref<Result*>& otherInputs) {
+    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs, const ref<const Result*>& otherInputs) {
         if(!otherOutputs && !otherInputs) return this->execute(args, outputs, inputs);
         if(otherOutputs && !otherInputs) return this->execute(args, outputs, inputs, otherOutputs);
         if(otherInputs && !otherOutputs) return this->execute(args, outputs, inputs, otherInputs);
         error("Implementation ignores all non-volume inputs and non-volume outputs", outputs, inputs, otherOutputs, otherInputs);
     }
-    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
-        array<Volume> inputVolumes; array<Result*> otherInputs;
-        for(Result* input: inputs) {
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
+        array<Volume> inputVolumes; array<const Result*> otherInputs;
+        for(const Result* input: inputs) {
             Volume volume = toVolume(*input);
             if(volume) inputVolumes << move(volume);
             else otherInputs << input;

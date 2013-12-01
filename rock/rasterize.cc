@@ -13,7 +13,7 @@ generic void zOrder(VolumeT<T>& target, const VolumeT<T>& source) {
     for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
 }
 class(ZOrder, Operation), virtual VolumeOperation {
-    uint outputSampleSize(const Dict&, const ref<Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         assert_(outputs);
         /***/ if(inputs[0].sampleSize==1) zOrder<uint8>(outputs[0],inputs[0]);

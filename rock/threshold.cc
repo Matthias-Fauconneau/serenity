@@ -16,7 +16,7 @@ UniformSample normalize(const UniformSample& A) { return (1./(A.scale*A.sum()))*
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
 class(Otsu, Operation) {
     string parameters() const override { return "ignore-clip normalize"_; }
-    void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
         if(args.value("ignore-clip"_,"0"_)!="0"_) density.first()=density.last()=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
@@ -88,7 +88,7 @@ UniformSample sample(const Lorentz& lorentz, uint size) {
 }
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 class(LorentzianMixtureModel, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
         const UniformSample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
@@ -117,7 +117,7 @@ class(LorentzianMixtureModel, Operation) {
 /// Computes the mean gradient for each set of voxels with the same density, and defines threshold as the density of the set of voxels with the maximum mean gradient
 /// \note Provided for backward compatibility only
 class(MaximumMeanGradient, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         const Volume16& source = toVolume(*inputs[0]);
         const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
         UniformSample gradientSum (source.maximum+1, source.maximum+1, 0); // Sum of finite differences for voxels belonging to each density value

@@ -32,7 +32,7 @@ class(SquareRootVariable, Operation), virtual Pass {
 NonUniformSample scaleVariable(float scalar, NonUniformSample&& A) { for(real& x: A.keys) x *= scalar; return move(A); }
 /// Scales the variable of a distribution
 class(ScaleVariable, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         assert_(endsWith(inputs[0]->metadata,"tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
         outputs[0]->metadata = copy(inputs[0]->metadata);
@@ -42,7 +42,7 @@ class(ScaleVariable, Operation) {
 
 /// Scales both the variable and the values of a distribution to keep the same area
 class(ScaleDistribution, Operation) {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         assert_(endsWith(inputs[0]->metadata,"tsv"_), "Expected a distribution, not a", "'"_+inputs[0]->metadata+"'"_, "for input", "'"_+inputs[0]->name+"'"_);
         assert_(inputs[1]->metadata=="scalar"_ || inputs[1]->metadata=="argument"_, "Expected a scalar or an argument, not a", inputs[1]->metadata,"for", inputs[1]->name);
         string xlabel,ylabel; { TextData s(inputs[0]->metadata); ylabel = s.until('('); xlabel = s.until(')'); }
@@ -53,7 +53,7 @@ class(ScaleDistribution, Operation) {
 
 /// Divides two scalars / vectors / sample
 class(Div, Operation) {
-    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         outputs[0]->metadata = copy(inputs[0]->metadata);
         if(inputs[0]->metadata=="scalar"_) outputs[0]->data = toASCII(parseScalar(inputs[0]->data)/parseScalar(inputs[1]->data));
         else if(inputs[0]->metadata=="vector"_) outputs[0]->data = toASCII( (1./parseScalar(inputs[1]->data)) * parseVector(inputs[0]->data) );

@@ -140,8 +140,8 @@ generic void colorize(Volume24& target, const VolumeT<T>& source, uint16 thresho
 class(Colorize, Operation), virtual VolumeOperation {
     string parameters() const override { return "threshold"_; }
     uint outputSampleSize(uint) override { return sizeof(bgr); }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
-        real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : otherInputs[0]->data ).decimal();
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
+        real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : (string)otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
         if(inputs[0].sampleSize==1) colorize<uint8>(outputs[0], inputs[0], integerThreshold);
         else if(inputs[0].sampleSize==2) colorize<uint16>(outputs[0], inputs[0], integerThreshold);
@@ -152,7 +152,7 @@ class(Colorize, Operation), virtual VolumeOperation {
 /// Exports volume to 8bit PNGs for visualization (normalized and gamma corrected)
 class(ToPNG, Operation), virtual VolumeOperation {
     virtual string parameters() const { return "z invert binary"_; }
-    void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("png"_);
         if(args.contains("z"_)) {
@@ -170,7 +170,7 @@ class(ToPNG, Operation), virtual VolumeOperation {
 
 /// Exports volume to 8bit BMPs for interoperation (deprecated: use ToTIFF instead)
 class(ToBMP, Operation), virtual VolumeOperation {
-    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("bmp"_);
         uint marginZ = volume.margin.z;
@@ -184,7 +184,7 @@ class(ToBMP, Operation), virtual VolumeOperation {
 
 /// Exports volume to 16bit TIFFs  for interoperation
 class(ToTIFF, Operation), virtual VolumeOperation {
-    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("tiff"_);
         uint marginZ = volume.margin.z;
@@ -232,7 +232,7 @@ static buffer<byte> toASCII(const Volume& source) {
     return target;
 }
 class(ToASCII, Operation), virtual VolumeOperation {
-    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         outputs[0]->metadata = String("ascii"_);
         outputs[0]->data = toASCII(inputs[0]);
     }
@@ -287,12 +287,12 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
     outputBuffer.size = data.size;
 }
 class(ToCDL, Operation), virtual VolumeOperation {
-    size_t outputSize(const Dict&, const ref<Result*>& inputs, uint) override {
+    size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint) override {
         assert_(inputs);
         assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
         return toVolume(*inputs[0]).size() * 32;
     }
-    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const mref<Result*>& outputs) override {
+    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         outputs[0]->metadata = String("cdl"_);
         toCDL(outputs[0]->data, inputs[0]);
     }

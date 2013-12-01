@@ -338,7 +338,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
     array<shared<Result>> outputs;
     for(uint index: range(outputNames.size)) {
         const string& output = outputNames[index];
-        int64 outputSize = operation->outputSize(localArguments, cast<Result*>(inputs), index);
+        int64 outputSize = operation->outputSize(localArguments, cast<const Result*>(inputs), index);
         if(outputSize==-1) { // Prevents process from allocating any output Result (used for Operation using custom rules (own compute call), use outputs to pass output names
             outputs << shared<ResultFile>(output, 0, Dict(), String(), String(), ""_, ""_);
             continue;
@@ -428,7 +428,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
     Time time;
     Dict args = copy(arguments);
     for(auto arg: relevantArguments) if(args.contains(arg.key)) args.at(arg.key)=copy(arg.value); else args.insert(copy(arg.key), copy(arg.value));
-    operation->execute(args, localArguments, cast<Result*>(outputs), cast<Result*>(inputs), *this);
+    operation->execute(args, localArguments, cast<Result*>(outputs), cast<const Result*>(inputs), *this);
     if((uint64)time>=50) log(operationName, localArguments ? str(localArguments) : ""_, time);
 
     for(shared<Result>& output : outputs) {

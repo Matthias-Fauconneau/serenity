@@ -21,7 +21,7 @@ class(Diff, Operation), virtual VolumeOperation {
 class(Compare, Operation) {
     virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return -1; } // Prevent output allocation (will be done in custom ResultManager::compute call)
     string parameters() const override { return "target parameter A B hold"_; }
-    void execute(const Dict& arguments, const Dict& localArguments, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
+    void execute(const Dict& arguments, const Dict& localArguments, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
         shared<Result> hold;
         if(arguments.contains("hold"_)) hold = results.getResult(arguments.at("hold"_), arguments); // Prevents last common ancestor from being recycled (FIXME: automatic?)
         string target = arguments.at("target"_), parameter = arguments.at("parameter"_);
@@ -38,7 +38,7 @@ class(Compare, Operation) {
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
 class(Sweep, Operation) {
     string parameters() const override { return "target parameter hold"_; }
-    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& process) override {
+    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& process) override {
         shared<Result> hold;
         if(arguments.contains("hold"_)) hold = process.getResult(arguments.at("hold"_), arguments); // Prevents last common ancestor from being recycled (FIXME: automatic?)
         string target = arguments.at("target"_), parameter = arguments.at("parameter"_);

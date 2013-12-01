@@ -5,7 +5,7 @@
 #include "crop.h"
 
 /// Computes lists of positions for each value
-buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 minimum) {
+buffer<array<short3>> list(const Volume16& source, CropVolume crop, uint16 minimum) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     uint radiusSq = crop.cylinder ? sq(crop.size.x/2) : -1;
     int2 center = ((crop.min+crop.max)/2).xy();
@@ -57,7 +57,7 @@ String toASCII(const buffer<array<short3>>& lists) {
 /// Computes lists of positions for each value
 class(List, Operation) {
     string parameters() const override { return "cylinder downsample minimum"_; }
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override {
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
         crop.min -= source.origin, crop.max -= source.origin;

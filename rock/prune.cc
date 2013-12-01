@@ -4,7 +4,7 @@
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
 class(Prune, Operation) {
     string parameters() const override { return "path connect-pore"_; } //FIXME: get parameters from target (recursive dependency)
-    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
+    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
         real resolution = parseScalar(results.getResult("resolution"_, arguments)->data);
         shared<Result> inputResult = results.getResult("skeleton-tiled"_, arguments); // Keep this reference to prevent this input to be evicted from cache
         Volume input = toVolume(inputResult);

@@ -15,11 +15,11 @@ struct Operation {
     /// Returns which parameters affects this operation output
     virtual string parameters() const { return ""_; }
     /// Returns the desired intermediate data size in bytes for each outputs
-    virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
+    virtual size_t outputSize(const Dict& args unused, const ref<const Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
     /// Executes the operation using inputs to compute outputs
-    virtual void execute(const Dict& args unused, const ref<Result*>& outputs unused, const ref<Result*>& inputs unused) { error("Neither execute methods implemented"); }
+    virtual void execute(const Dict& args unused, const ref<Result*>& outputs unused, const ref<const Result*>& inputs unused) { error("Neither execute methods implemented"); }
     /// Executes the operation using inputs and or any results to compute outputs
-    virtual void execute(const Dict& args unused, const Dict& localArgs, const ref<Result*>& outputs, const ref<Result*>& inputs, ResultManager& results unused) { execute(localArgs,outputs,inputs); }
+    virtual void execute(const Dict& args unused, const Dict& localArgs, const ref<Result*>& outputs, const ref<const Result*>& inputs, ResultManager& results unused) { execute(localArgs,outputs,inputs); }
     /// Virtual destructor
     virtual ~Operation() {}
 };
@@ -49,5 +49,5 @@ template<Type F> bool outputElements(const ref<Result*>& outputs, const string& 
 /// Convenience class to define a single input, single output operation
 struct Pass : virtual Operation {
     virtual void execute(const Dict& args, Result& output, const Result& source) abstract;
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs) override { execute(args, *outputs[0], *inputs[0]); }
+    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override { execute(args, *outputs[0], *inputs[0]); }
 };

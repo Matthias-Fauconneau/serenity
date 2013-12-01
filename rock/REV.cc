@@ -4,7 +4,7 @@
 /// Returns relative deviation versus cylinder radius of 8 volume samples
 class(REV, Operation) {
     string parameters() const override { return "path"_; }
-    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<Result*>&, ResultManager& results) override {
+    void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
         real resolution = parseScalar(results.getResult("resolution"_, arguments)->data);
         Volume input = toVolume(results.getResult("maximum"_, arguments));
         int margin = max(max(input.margin.x, input.margin.y), input.margin.z), size=min(min(input.sampleCount.x, input.sampleCount.y), input.sampleCount.z)-2*margin;

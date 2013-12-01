@@ -6,7 +6,7 @@
 #include "family.h"
 
 /// Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
-buffer<array<short3> > parseLists(const string& data) {
+buffer<array<short3>> parseLists(const string& data) {
     buffer<array<short3>> lists;
     TextData s(data);
     while(s) {
@@ -30,7 +30,7 @@ struct FamilySet {
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
-array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
+array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
     uint32* const targetData = target;
     clear(targetData, target.size());
 
@@ -159,7 +159,7 @@ String toASCII(const ref<unique<Family>>& families) {
 class(Cluster, Operation), virtual VolumeOperation {
     string parameters() const override { return "minimum"_; }
     uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint32) : 0; }
-    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const mref<Result*>& otherOutputs, const ref<Result*>& otherInputs) override {
+    virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs, const ref<const Result*>& otherInputs) override {
         array<unique<Family>> families = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
         otherOutputs[0]->metadata = String("families"_);
         otherOutputs[0]->data = toASCII(families);

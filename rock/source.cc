@@ -10,7 +10,7 @@ class(Source, Operation), virtual VolumeOperation {
     CropVolume crop;
 
     string parameters() const override { return "path resolution cylinder box downsample extra"_; }
-    uint outputSampleSize(const Dict& args, const ref<Result*>&, uint index) override {
+    uint outputSampleSize(const Dict& args, const ref<const Result*>&, uint index) override {
         if(index) return 0; // Extra outputs
         assert_(args.contains("path"_), args);
         string path = args.at("path"_);
@@ -28,7 +28,7 @@ class(Source, Operation), virtual VolumeOperation {
             return isTiff(file) ? 2 : 1; // Assumes TIFF (only) are 16bit
         }
     }
-    size_t outputSize(const Dict& args, const ref<Result*>& inputs, uint index) override {
+    size_t outputSize(const Dict& args, const ref<const Result*>& inputs, uint index) override {
         if(index) return 0;
         int3 size;
         assert_(args.contains("path"_), args);
@@ -51,7 +51,7 @@ class(Source, Operation), virtual VolumeOperation {
         assert(crop.sampleCount);
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(args, inputs, 0);
     }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const mref<Result*>& otherOutputs) override { //FIXME: template for 8bit vs 16bit sample size
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>& otherOutputs) override { //FIXME: template for 8bit vs 16bit sample size
         assert_(crop.size);
         int3 min=crop.min, size=crop.size;
         string path = args.at("path"_);

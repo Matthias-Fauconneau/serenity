@@ -5,7 +5,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
     const int3 size = 128;
 
     uint outputSampleSize(uint) override { return 1; }
-    size_t outputSize(const Dict&, const ref<Result*>&, uint) override { return (uint64)size.x*size.y*size.z; }
+    size_t outputSize(const Dict&, const ref<const Result*>&, uint) override { return (uint64)size.x*size.y*size.z; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&) override {
         Volume8& target = outputs.first();
         assert_(target.data.data, target.data.data, target.data.size, target.data.capacity);
