@@ -6,7 +6,6 @@
 #include "font.h"
 #include "widget.h"
 #include "function.h"
-//include "matrix.h" FIXME
 #include "time.h"
 #include "gl.h"
 
@@ -37,6 +36,7 @@ struct PDF : Widget {
     void render(int2 position, int2 size) override;
 
     mat3x2 Tm,Cm;
+    vec2 pageMin, pageMax;
     float x1,y1,x2,y2;
     void extend(vec2 p) { if(p.x<x1) x1=p.x; if(p.x>x2) x2=p.x; if(p.y<y1) y1=p.y; if(p.y>y2) y2=p.y; }
 

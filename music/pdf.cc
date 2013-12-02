@@ -4,9 +4,34 @@
 #include "deflate.h"
 #include "display.h"
 #include "text.h" //annotations
+#define GL 1 //for QtCreator autocompletion
 #if GL
 FILE(pdf)
 #endif
+
+// Quicksort
+generic uint partition(mref<T>& at, int left, int right, int pivotIndex) {
+    swap(at[pivotIndex], at[right]);
+    const T& pivot = at[right];
+    uint storeIndex = left;
+    for(uint i: range(left,right)) {
+        if(at[i] < pivot) {
+            swap(at[i], at[storeIndex]);
+            storeIndex++;
+        }
+    }
+    swap(at[storeIndex], at[right]);
+    return storeIndex;
+}
+generic void quicksort(mref<T>& at, int left, int right) {
+    if(left < right) { // If the list has 2 or more items
+        int pivotIndex = partition(at, left, right, (left + right)/2);
+        if(pivotIndex) quicksort(at, left, pivotIndex-1);
+        quicksort(at, pivotIndex+1, right);
+    }
+}
+/// Quicksorts the array in-place
+generic void quicksort(mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }
 
 struct Variant { //TODO: union
     enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
@@ -286,6 +311,10 @@ void PDF::open(const string& data) {
                 }
             }
         }
+        const array<Variant>& box = // Lower-left, upper-right
+                (dict.value("ArtBox"_)?:dict.value("TrimBox"_)?:dict.value("BleedBox"_)?:dict.value("CropBox"_)?:dict.at("MediaBox"_)).list;
+        pageMin = vec2(min(box[0].real(),box[2].real()),min(box[1].real(),box[3].real()));
+        pageMax = vec2(max(box[0].real(),box[2].real()),max(box[1].real(),box[3].real()));
         Variant* contents = dict.find("Contents"_);
         if(contents) {
             if(contents->type==Variant::Integer) contents->list << contents->integer();
@@ -297,7 +326,6 @@ void PDF::open(const string& data) {
                 data << content.data;
             }
             TextData s = move(data);
-            //y1 = __FLT_MAX__, y2 = -__FLT_MAX__;
             Cm=Tm=mat3x2(); array<mat3x2> stack;
             Font* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat3x2 Tlm;
             array<array<vec2>> path;
@@ -389,12 +417,10 @@ void PDF::open(const string& data) {
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); //intersect odd even clip
                 }
-                //log(str((const char*)&op),args);
                 args.clear();
             }
         }
         // translate from page to document
-        //const array<Variant>& cropBox = (dict.value("CropBox"_)?:dict.at("MediaBox"_)).list; pageOffset += vec2(0,-cropBox[3].real()); vec2 offset = pageOffset;
         pageOffset += vec2(0,y1-y2-16); vec2 offset = pageOffset+vec2(0,-y1);
         for(uint i: range(pageFirstBlit,blits.size)) blits[i].position += offset;
         for(uint i: range(pageFirstLine,lines.size)) lines[i].a += offset, lines[i].b += offset;
@@ -422,26 +448,8 @@ void PDF::open(const string& data) {
         for(vec2& pos: polygon.vertices) pos = vec2(pos.x-x1, -pos.y);
     }
 
-    // insertion sorts blits for culling
-    if(blits) for(int i : range(1,blits.size)) {
-        auto e = move(blits[i]);
-        while(i>0 && blits[i-1] > e) { blits[i]=move(blits[i-1]);  i--; }
-        blits[i] = move(e);
-    }
-
-    // insertion sorts lines for culling
-    if(lines) for(int i : range(1,lines.size)) {
-        auto e = lines[i];
-        while(i>0 && e < lines[i-1]) { lines[i]=lines[i-1];  i--; }
-        lines[i] = e;
-    }
-
-    // insertion sorts characters for culling
-    if(characters) for(int i : range(1,characters.size)) {
-        auto e = characters[i];
-        while(i>0 && characters[i-1] > e) { characters[i]=characters[i-1];  i--; }
-        characters[i] = e;
-    }
+    // Sorts primitives for culling
+    quicksort(blits), quicksort(lines), quicksort(characters);
 
     scale = normalizedScale = 1280/(x2-x1); // Normalize width to 1280 for onGlyph/onPath callbacks
     for(const array<vec2>& path : paths) { array<vec2> scaled; for(vec2 pos : path) scaled<<scale*pos; onPath(scaled); }
@@ -453,7 +461,7 @@ void PDF::open(const string& data) {
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 void PDF::drawPath(array<array<vec2>>& paths, int flags) {
     for(array<vec2>& path : paths) {
-        for(vec2 p : path) extend(p);
+        for(vec2 p : path) if(p > pageMin && p < pageMax) extend(p); // FIXME: clip
         array<vec2> polyline;
         for(uint i=0; i<path.size-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
@@ -503,8 +511,10 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
         mat3x2 Trm = Tm*Cm;
         uint16 index = font->font->index(code);
         vec2 position = vec2(Trm(0,2),Trm(1,2));
-        if(position.y<y1) y1=position.y; if(position.y>y2) y2=position.y; //extend(position); extend(position+Trm.m11*font->font.size(index));
-        characters << Character{font, Trm(0,0)*fontSize, index, position, code};
+        if(position > pageMin && position < pageMax) {
+            if(position.y<y1) y1=position.y; if(position.y>y2) y2=position.y;
+            characters << Character{font, Trm(0,0)*fontSize, index, position, code};
+        }
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < font->widths.size) advance += fontSize*font->widths[code]/1000;
         else advance += font->font->linearAdvance(index);
@@ -589,10 +599,7 @@ void PDF::render(int2 position, int2 size) {
 
         return;
     }
-#else
-#error Unsupported software rendering
 #endif
-    error("Unsupported software rendering");
     scale = size.x/(x2-x1); // Fit width
 
     for(Blit& blit: blits) {

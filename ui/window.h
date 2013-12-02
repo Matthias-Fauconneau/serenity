@@ -101,7 +101,7 @@ struct Window : Socket, Poll {
     /// If set, this window will not be managed by the session window manager
     bool overrideRedirect;
     /// If set, this window will resize to widget->sizeHint before any rendering
-    bool autoResize = false;
+    //bool autoResize = false;
     /// If set, this window will always be anchored to this position
     Anchor anchor = Float;
     /// Window position and size

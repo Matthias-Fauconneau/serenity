@@ -6,11 +6,11 @@
 #include "thread.h"
 
 extern bool softwareRendering;
-
 /// Framebuffer of the window being rendered (X11 shared memory to be used only under Window::render)
 extern Image framebuffer;
 extern Lock framebufferLock;
 extern int resolution; /// Device resolution in dots per inch (dpi)
+extern bool additiveBlend;
 
 #if GL
 extern int2 viewportSize;

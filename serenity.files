@@ -53,8 +53,6 @@ ui/gl.h
 ui/interface.h
 ui/interface.cc
 ui/layout.h
-ui/plot.cc
-ui/plot.h
 ui/text.cc
 ui/text.h
 ui/utf8.cc

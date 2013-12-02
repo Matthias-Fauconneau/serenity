@@ -13,6 +13,7 @@ Image framebuffer;
 Lock framebufferLock;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
+bool additiveBlend = false; // Defaults to alpha blend
 
 #if GL
 int2 viewportSize;
@@ -47,11 +48,10 @@ void fill(Rect rect, vec4 color) {
     if(color8.a == 0xFF) {
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) framebuffer(x,y) = byte4(color8);
     } else {
-        //int a=color8.a; assert(a);
+        int a=color8.a;
         for(int y=rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
             byte4& d = framebuffer(x,y);
-            //int4 t = int4(d)*(0xFF-a)/0xFF + color8;
-            int4 t = min(int4(0xFF), int4(d) + color8);
+            int4 t = additiveBlend ? min(int4(0xFF), int4(d) + color8) : int4(d)*(0xFF-a)/0xFF + color8;
             d = byte4(t.b, t.g, t.r, 0xFF);
         }
     }
@@ -89,7 +89,7 @@ void blit(int2 target, const Image& source, vec4 color) {
             for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
                 byte4 s = source(x-target.x,y-target.y); int a=color8.a*int(s.a)/0xFF;
                 byte4& d = framebuffer(x,y);
-                byte4 t = byte4((int4(d)*(0xFF-a) + color8*int4(s)/0xFF*a)/0xFF); t.a=0xFF;//min(0xFF,d.a+a);
+                byte4 t = byte4((int4(d)*(0xFF-a) + color8*int4(s)/0xFF*a)/0xFF); t.a=0xFF;
                 d = t;
             }
         }
@@ -111,9 +111,7 @@ inline void plot(int x, int y, float alpha, bool transpose, vec4 color) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
         byte4& d = framebuffer(x,y);
-        //d=byte4(round((1-alpha)*d.b+alpha*color.b),round((1-alpha)*d.g+alpha*color.g),round((1-alpha)*d.r+alpha*color.r),0xFF);
-        //int4 t = int4(d)*(0xFF-a)/0xFF + color8; // Transparency
-        int4 t = min(int4(0xFF), int4(d) + int4(alpha*color)); // Additive
+        int4 t = min(int4(0xFF), additiveBlend ? int4(d) + int4(alpha*color) : int4(round((1-alpha)*vec4(d) + alpha*color))); // Additive
         d = byte4(t.b, t.g, t.r, 0xFF);
     }
 }
@@ -135,8 +133,7 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
         return;
     }
 #endif
-    assert(vec4(0) <= color && color <= vec4(1));
-    vec4 color8 (color.z*color.w*0xFF,color.y*color.w*0xFF,color.x*color.w*0xFF,0xFF); // Premultiply source alpha
+    vec4 color8 (color.z*0xFF,color.y*0xFF,color.x*0xFF,0xFF);
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
     if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
@@ -164,16 +161,3 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
         intery += gradient;
     }
 }
-
-vec3 HSVtoRGB(float h, float s, float v) {
-    float H = h/PI*3, C = v*s, X = C*(1-abs(mod(H,2)-1));
-    int i=H;
-    if(i==0) return vec3(C,X,0);
-    if(i==1) return vec3(X,C,0);
-    if(i==2) return vec3(0,C,X);
-    if(i==3) return vec3(0,X,C);
-    if(i==4) return vec3(X,0,C);
-    if(i==5) return vec3(C,0,X);
-    return vec3(0,0,0);
-}
-

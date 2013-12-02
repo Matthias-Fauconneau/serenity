@@ -8,6 +8,7 @@
 #include "png.h"
 #include "linux.h"
 #include "x.h"
+#define GL 1 //for QtCreator autocompletion
 #if GL
 #include "gl.h"
 #undef packed
@@ -136,15 +137,15 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
 #if GL
         if(glDisplay || glContext) { assert(glDisplay && glContext); return; }
         glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert(glDisplay);
-        const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1, 0};
+        const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
         int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
         const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
         glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
                 (glDisplay, fbConfigs[0], 0, 1, contextAttribs);
         assert(glContext);
         glXMakeCurrent(glDisplay, id, glContext);
-        glEnable(GL_FRAMEBUFFER_SRGB);
-        ((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
+        //glEnable(GL_FRAMEBUFFER_SRGB);
+        //((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
 #else
         error("Unsupported: OpenGL was not configured at compile-time");
 #endif
@@ -185,12 +186,12 @@ void Window::event() {
         processEvent(type, e);
     }
     while(eventQueue) { lock.lock(); QEvent e=eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
-    if(revents==IDLE && needUpdate) {
+    if(/*revents==IDLE &&*/ needUpdate) {
         needUpdate = false;
-        if(autoResize) {
+        /*if(autoResize) {
             int2 hint = widget->sizeHint();
             if(hint != size) { setSize(hint); return; }
-        }
+        }*/
         assert(size);
         currentClip=Rect(size);
 
@@ -255,6 +256,7 @@ void Window::event() {
             assert(!clipStack);
             viewportSize = 0;
             glFlush();
+            glXSwapBuffers(glDisplay, id);
 #else
             error("Unsupported: OpenGL was not configured at compile-time");
 #endif

@@ -103,7 +103,7 @@ struct Music {
     Sequencer input{thread};
 
     Sampler sampler;
-#define AUDIO 1
+#define AUDIO 0
 #if AUDIO
     AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #endif
@@ -111,7 +111,7 @@ struct Music {
     Record record;
 #endif
     vec2 position=0, target=0, speed=0; //smooth scroll
-    bool freeLook=false; // Unlock view from smooth scroll practice/playback
+    bool freeLook=true; // Unlock view from smooth scroll practice/playback
 
     Music() {
         window.localShortcut(Escape).connect([]{exit();});
@@ -151,22 +151,20 @@ struct Music {
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
         window.localShortcut(Key('t')).connect([this]{ freeLook=!freeLook; });
+#if AUDIO
         window.localShortcut(Key('1')).connect([this]{
-            sampler.open(audio.rate, "Salamander.original.sfz"_, Folder("Samples"_));
-            window.setTitle("Original");
+            sampler.open(audio.rate, "Salamander.raw.sfz"_, Folder("Samples"_));
+            window.setTitle("Salamander - Raw"_);
         });
         window.localShortcut(Key('2')).connect([this]{
-            sampler.open(audio.rate, "Salamander.4096.sfz"_, Folder("Samples"_));
-            window.setTitle("4K");
+            sampler.open(audio.rate, "Salamander.flat.sfz"_, Folder("Samples"_));
+            window.setTitle("Salamander - Flat"_);
         });
         window.localShortcut(Key('3')).connect([this]{
-            sampler.open(audio.rate, "Salamander.8192.sfz"_, Folder("Samples"_));
-            window.setTitle("8K");
+            sampler.open(audio.rate, "Blanchet.raw.sfz"_, Folder("Samples"_));
+            window.setTitle("Blanchet"_);
         });
-        window.localShortcut(Key('4')).connect([this]{
-            sampler.open(audio.rate, "Salamander.16384.sfz"_, Folder("Samples"_));
-            window.setTitle("16K");
-        });
+#endif
         //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
@@ -185,16 +183,16 @@ struct Music {
         }
         sheets.itemPressed.connect(this,&Music::openSheet);
         showSheetList();
-        if(arguments()) for(const Text& text: sheets) if(text.text==toUTF32(arguments()[0])) { openSheet(arguments()[0]); break; }
+        for(string arg: arguments()) for(const Text& text: sheets) if(toUTF8(text.text)==arg) { openSheet(arg); break; }
 #if RECORD
         window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
         layout<<&keyboard;
 #endif
         window.show();
-        thread.spawn();
-        input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
 #if AUDIO
+        input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
+        thread.spawn();
         audio.start();
 #endif
     }
@@ -213,7 +211,7 @@ struct Music {
             if(!position) position=target, pdfScore.delta=int2(round(position));
         }
         midiScore.center(int2(0,bottom));
-        smoothScroll();
+        freeLook=false; smoothScroll();
     }
     /// Smoothly scrolls towards target
     void smoothScroll() {
