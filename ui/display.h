@@ -54,9 +54,3 @@ void blit(int2 target, const Image& source, int2 size);
 void line(float x1, float y1, float x2, float y2, vec4 color=black);
 inline void line(vec2 p1, vec2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
 inline void line(int2 p1, int2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
-
-/// Converts linear float in [0,1] to sRGB
-inline uint sRGB(float x) { extern uint8 sRGB_lookup[256]; return sRGB_lookup[ clip<int>(0, round(0xFF*x), 0xFF) ]; }
-
-/// Converts hue, saturation, value to linear RGB
-vec3 HSVtoRGB(float h, float s, float v);

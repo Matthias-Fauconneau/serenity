@@ -4,7 +4,6 @@
 #include "deflate.h"
 #include "display.h"
 #include "text.h" //annotations
-#define GL 1 //for QtCreator autocompletion
 #if GL
 FILE(pdf)
 #endif
@@ -472,14 +471,14 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
         }
         polyline << copy(path.last());
         array<Line> lines;
-        if((flags&Stroke) || (flags&Fill) || polyline.size>16) {
+        if(flags&Stroke || (flags&Fill) || polyline.size>16) {
             for(uint i: range(polyline.size-1)) {
                 if(polyline[i] != polyline[i+1])
                     lines << Line{ polyline[i], polyline[i+1] };
             }
             if(flags&Close) lines << Line{polyline.last(), polyline.first()};
         }
-        /*if(flags&Stroke)*/ this->lines << lines;
+        if(flags&Stroke) this->lines << lines;
         if(flags&Fill) {
             Polygon polygon;
             // Software rendering (FIXME: precompute line equations)
@@ -541,7 +540,7 @@ void PDF::render(int2 position, int2 size) {
             array<vec2> vertices;
             for(const Polygon& polygon: polygons) {
                 const array<vec2>& p = polygon.vertices;
-                if(p.size > 4) continue; //FIXME: triangulate concave polygons
+                if(p.size > 5) continue; //FIXME: triangulate concave polygons
                 vec2 p0 = vertex(scale*p[0]);
                 for(uint i: range(1,p.size-1))
                     vertices << p0 << vertex(scale*p[i]) << vertex(scale*p[i+1]);
@@ -614,8 +613,8 @@ void PDF::render(int2 position, int2 size) {
         a+=vec2(position), b+=vec2(position);
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
         if(a.y > currentClip.max.y+200 && b.y > currentClip.max.y+200) break;
-        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
-        line(a,b);
+        //if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
+        line(int2(a),int2(b)); //line(a,b);
     }
 
     for(const Polygon& polygon: polygons) {

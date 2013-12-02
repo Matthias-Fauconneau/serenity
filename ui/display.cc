@@ -110,9 +110,11 @@ void blit(int2 target, const Image& source, int2 size) {
 inline void plot(int x, int y, float alpha, bool transpose, vec4 color) {
     if(transpose) swap(x,y);
     if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
-        byte4& d = framebuffer(x,y);
-        int4 t = min(int4(0xFF), additiveBlend ? int4(d) + int4(alpha*color) : int4(round((1-alpha)*vec4(d) + alpha*color))); // Additive
-        d = byte4(t.b, t.g, t.r, 0xFF);
+        byte4& sRGB = framebuffer(x,y);
+        extern uint8 sRGB_lookup[256], inverse_sRGB_lookup[256];
+        byte4 linear (inverse_sRGB_lookup[sRGB.b], inverse_sRGB_lookup[sRGB.g], inverse_sRGB_lookup[sRGB.r], 0);
+        int4 linearBlend = min(int4(0xFF), additiveBlend ? int4(linear) + int4(alpha*color) : int4(round((1-alpha)*vec4(linear) + alpha*color))); // Blend
+        sRGB = byte4(sRGB_lookup[linearBlend.b], sRGB_lookup[linearBlend.g], sRGB_lookup[linearBlend.r], 0xFF);
     }
 }
 

@@ -8,7 +8,6 @@
 #include "png.h"
 #include "linux.h"
 #include "x.h"
-#define GL 1 //for QtCreator autocompletion
 #if GL
 #include "gl.h"
 #undef packed

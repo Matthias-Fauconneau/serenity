@@ -184,10 +184,11 @@ Image decodeImage(const ref<byte>& file) {
     else { if(file.size) warn("Unknown image format"_,hex(file.slice(0,min<int>(file.size,4)))); return Image(); }
 }
 
-uint8 sRGB_lookup[256];
+uint8 sRGB_lookup[256], inverse_sRGB_lookup[256];
 void __attribute((constructor(10000))) compute_sRGB_lookup() {
-    for(uint i=0;i<256;i++) {
-        float c = i/255.f;
-        sRGB_lookup[i] = round(255*( c>=0.0031308 ? 1.055*pow(c,1/2.4f)-0.055 : 12.92*c ));
+    for(uint linear: range(256)) {
+        float c = linear/255.f;
+        uint8 sRGB = round(255*( c>=0.0031308 ? 1.055*pow(c,1/2.4f)-0.055 : 12.92*c ));
+        sRGB_lookup[linear] = sRGB, inverse_sRGB_lookup[sRGB] = linear;
     }
 }
