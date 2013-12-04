@@ -223,7 +223,7 @@ void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
     if(primitiveType==Lines) {
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
         glEnable(GL_LINE_SMOOTH);
-        glLineWidth(1);
+        glLineWidth(2);
     }
     glDrawArrays(primitiveType, 0, vertexCount);
 }

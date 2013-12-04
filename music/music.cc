@@ -141,6 +141,7 @@ struct Music {
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
         pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
+        pdfScore.scrollbar = true;
 
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
         score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
@@ -278,6 +279,7 @@ struct Music {
             else if(existsFile(String(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(String(name+".not"_),folder)));
             layout.first()= &pdfScore.area();
             pdfScore.delta = 0; position=0,speed=0,target=0;
+            window.focus = &pdfScore.area();
         } else if(existsFile(String(name+".mid"_),folder)) {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature,midi.ticksPerBeat);
             layout.first()= &midiScore.area();

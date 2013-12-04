@@ -17,10 +17,14 @@ struct ScrollArea : Widget {
     void center(int2 target);
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
-    int2 delta=0, dragStart, flickStart;
+    bool scrollbar = false;
+    const int scrollBarWidth = 16;
+    int2 delta=0;
+    int2 dragStartCursor, dragStartDelta;
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
     void render(int2 position, int2 size) override;
     int2 size; // keep last size for ensureVisible
 };

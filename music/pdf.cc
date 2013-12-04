@@ -88,13 +88,11 @@ static Variant parseVariant(TextData& s) {
         dictionaryEnd: s.skip();
         Variant v = move(dict);
         if(s.match("stream"_)) { s.skip();
-            /*array<byte> stream (s.read(v.dict.at("Length"_).integer()));
-            s.skip(); if(!s.match("endstream"_)) error(v.dict,s.peek(16));*/
             array<byte> stream ( s.until("endstream"_) );
             if(v.dict.contains("Filter"_)) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
                 if(filter=="FlateDecode"_) stream=inflate(stream, true);
-                else error("Unsupported filter",v.dict);
+                else { log("Unsupported filter",v.dict); return Variant(); }
             }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
@@ -141,7 +139,7 @@ static Variant parseVariant(TextData& s) {
     }
     if(s.match("true"_)) return true;
     if(s.match("false"_)) return false;
-    error("Unknown type"_,s.index,s.slice(s.index>32?s.index-32:0,32),"|"_,s.slice(s.index,32));
+    log("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.buffer.size-s.index);
     return Variant();
 }
 static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
@@ -246,7 +244,14 @@ void PDF::open(const string& data) {
                 if(fonts.contains(e.key)) continue;
                 map<string,Variant> fontDict = parseVariant(xref[e.value.integer()]).dict;
                 Variant* descendant = fontDict.find("DescendantFonts"_);
-                if(descendant) fontDict = parseVariant(xref[descendant->type==Variant::Integer?descendant->integer():descendant->list[0].integer()]).dict;
+                if(descendant) {
+                    if(descendant->type==Variant::Integer)
+                        fontDict = parseVariant(xref[descendant->integer()]).dict;
+                    else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Integer)
+                        fontDict = parseVariant(xref[descendant->list[0].integer()]).dict;
+                    else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Dict)
+                        fontDict = move(descendant->list[0].dict);
+                }
                 if(!fontDict.contains("FontDescriptor"_)) continue;
                 String name = move(fontDict.at("BaseFont"_).data);
                 auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
@@ -268,6 +273,7 @@ void PDF::open(const string& data) {
                 for(auto e: dict) {
                     if(images.contains(String(e.key))) continue;
                     Variant object = parseVariant(xref[e.value.integer()]);
+                    if(!object.dict.contains("Width"_) || !object.dict.contains("Height"_)) continue;
                     Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
                     int depth=object.dict.at("BitsPerComponent"_).integer();
                     assert(depth, object.dict.at("BitsPerComponent"_).integer());
@@ -331,14 +337,14 @@ void PDF::open(const string& data) {
             array<Variant> args;
             while(s.skip(), s) {
                 string id = s.word("'*"_);
-                if(!id) {
+                if(!id || id=="true"_ || id=="false"_) {
                     assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16ul,s.buffer.size-s.index)));
                     args << parseVariant(s);
                     continue;
                 }
                 uint op = id[0]; if(id.size>1) { op|=id[1]<<8; if(id.size>2) op|=id[2]<<16; }
                 switch( op ) {
-                default: error("Unknown operator '"_+str((const char*)&op)+"'"_,id);
+                default: log("Unknown operator '"_+id+"'"_);
 #define OP(c) break;case c:
 #define OP2(c1,c2) break;case c1|c2<<8:
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
@@ -347,6 +353,8 @@ void PDF::open(const string& data) {
                     OP('b') drawPath(path,Close|Stroke|Fill|Winding|Trace);
                     OP2('b','*') drawPath(path,Close|Stroke|Fill|OddEven|Trace);
                     OP('B') drawPath(path,Stroke|Fill|Winding|Trace);
+                    OP2('B','I') ;
+                    OP2('I','D') while(!s.match("EI"_)) s.advance(1);
                     OP2('B','*') drawPath(path,Stroke|Fill|OddEven|Trace);
                     OP3('B','D','C') ;
                     OP3('E','M','C') ;
@@ -460,6 +468,7 @@ void PDF::open(const string& data) {
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 void PDF::drawPath(array<array<vec2>>& paths, int flags) {
     for(array<vec2>& path : paths) {
+        if(path.size > 5) continue; //FIXME: triangulate concave polygons
         for(vec2 p : path) if(p > pageMin && p < pageMax) extend(p); // FIXME: clip
         array<vec2> polyline;
         for(uint i=0; i<path.size-3; i+=3) {
@@ -532,7 +541,7 @@ void PDF::render(int2 position, int2 size) {
             array<vec2> lineVertices;
             for(const Line& l: lines) {
                 vec2 a = scale*l.a, b = scale*l.b;
-                if(a.x==b.x) a.x=b.x=floor(a.x)+0.5; if(a.y==b.y) a.y=b.y=floor(a.y)+0.5;
+                //if(a.x==b.x) a.x=b.x=floor(a.x)+0.5; if(a.y==b.y) a.y=b.y=floor(a.y)+0.5;
                 lineVertices << vertex(a) << vertex(b);
             }
             glLines.upload(lineVertices);
@@ -576,7 +585,7 @@ void PDF::render(int2 position, int2 size) {
 
         // Render triangles
         glTriangles.bindAttribute(fill, "position"_, 2);
-        glTriangles.draw(Triangles);  // No VFC cull
+        //glTriangles.draw(Triangles);  // No VFC cull
 
         // Render glyphs, TODO: texture array + VBO
         GLShader blit (pdf(), {"blit"_});

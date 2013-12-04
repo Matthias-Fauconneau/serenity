@@ -5,7 +5,11 @@
 
 /// Key symbols
 enum Key {
-    Escape=0xff1b, BackSpace=0xff08, Tab, Return=0xff0d, Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, End=0xff57, PrintScreen=0xff61,
+#define XK_Page_Up                       0xff55
+#define XK_Next                          0xff56  /* Next */
+#define XK_Page_Down                     0xff56
+    Escape=0xff1b, BackSpace=0xff08, Tab, Return=0xff0d,
+    Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, PageUp, PageDown, End, PrintScreen=0xff61,
     Execute, Insert,
     KP_Enter=0xff8d, KP_Multiply=0xffaa, KP_Add, KP_Separator, KP_Sub, KP_Decimal, KP_Divide, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
     ShiftKey=0xffe1, ControlKey=0xffe3,

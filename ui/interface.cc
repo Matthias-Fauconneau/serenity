@@ -7,24 +7,33 @@
 void ScrollArea::render(int2 position, int2 size) {
     this->size=size;
     int2 hint = abs(widget().sizeHint());
-    //delta = min(int2(0,0), max(size-hint, delta));
-    delta = max(min(int2(0,0),size-hint), delta), delta.x = min(0,delta.x); // Allow scrolling over top (for piano application)
     widget().render(position+delta, int2(horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y));
+    if(scrollbar && size.y<hint.y) fill(size.x-scrollBarWidth, -delta.y*size.y/hint.y,size.x,(-delta.y+size.y)*size.y/hint.y, vec4(0.5));
 }
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint());
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
         delta.y += (button==WheelUp?1:-1) * 64;
         delta = min(int2(0,0), max(size-hint, delta));
+        setFocus(this);
         return true;
     }
-    if(event==Press && button==LeftButton) { dragStart=cursor, flickStart=delta; }
+    if(event==Press && button==LeftButton) { dragStartCursor=cursor, dragStartDelta=delta; setFocus(this); }
+    if(event==Motion && button==LeftButton && scrollbar && size.y<hint.y && dragStartCursor.x>size.x-scrollBarWidth) {
+        delta = min(int2(0,0), max(size-hint, dragStartDelta-(cursor-dragStartCursor)*hint.y/size.y));
+        return true;
+    }
     if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;
     if(event==Motion && button==LeftButton && size.y<hint.y) {
         setDrag(this);
-        delta = min(int2(0,0), max(size-hint, flickStart+cursor-dragStart));
+        delta = min(int2(0,0), max(size-hint, dragStartDelta+cursor-dragStartCursor));
         return true;
     }
+    return false;
+}
+bool ScrollArea::keyPress(Key key, Modifiers) {
+    int2 hint = abs(widget().sizeHint());
+    if(key==PageUp || key==PageDown) { delta.y += (key==PageUp?1:-1) * size.y; delta = min(int2(0,0), max(size-hint, delta)); return true; }
     return false;
 }
 void ScrollArea::ensureVisible(Rect target) { delta = max(-target.min, min(size-target.max, delta)); }
