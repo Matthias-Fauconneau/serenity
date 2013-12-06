@@ -134,7 +134,7 @@ struct Build {
         String binary = tmp+join(flags," "_)+"/"_+name+"."_+join(flags," "_);
         if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime()) {
             array<String> args; args<<String("-o"_)<<copy(binary);
-            if(flags.contains("32"_)) args<<String("-m32"_);
+            if(flags.contains("atom"_)) args<<String("-m32"_);
             args << apply(modules, [this](const unique<Node>& module){ return tmp+join(flags," "_)+"/"_+module->name+".o"_; });
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });

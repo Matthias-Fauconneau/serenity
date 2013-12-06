@@ -73,8 +73,8 @@ struct Tuner : Poll {
     const uint rate = input.rate;
 
 #if TEST
-    //Audio audio = decodeAudio("/Samples/A0-B1.flac"_);
-    Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
+    Audio audio = decodeAudio("/Samples/A0-B1.flac"_);
+    //Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
     Timer timer {thread};
     Time realTime;
     Time totalTime;

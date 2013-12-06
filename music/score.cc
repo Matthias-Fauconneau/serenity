@@ -107,7 +107,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
                 lastClef=pos;
             }
         } else if(endsWith(font,"Maestro"_)) {
-            if(code==38/*treble*/||code==63/*bass*/) {
+            if((code==38/*treble*/||code==63/*bass*/)||(code==9/*treble*/||code==34/*bass*/)) {
                 if(lastClef.y != 0 && pos.y-lastClef.y>128 && staffCount!=1) {
                     staffs << (lastClef.y+pos.y)/2;
                     staffCount=1;
@@ -210,13 +210,12 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             else if(code==106) duration = 8; //half
             else if(code==105) duration = 16; //whole
         } else if(endsWith(font,"Maestro"_)) { //TODO: glyph OCR
-            //debug[int2(pos)]<<str(code);
-            if(code==207) {
+            if(code==207 || code==161) {
                 if(size<2) duration = 0; //grace
                 else duration = 4; //quarter
             }
-            else if(code==250) duration = 8; //half
-            else if(code==119) duration = 16; //whole
+            else if(code==250 || code==204) duration = 8; //half
+            else if(code==119 || code==88) duration = 16; //whole
         } else if(font=="Manual"_) {
             uint i=0; for(;i<staffs.size && pos.y>staffs[i];i++) {}
             if(i>=notes.size) notes.grow(i+1);
@@ -434,7 +433,7 @@ continueTie: ;
         for(int x : staff.keys) for(int y : staff.at(x).keys) {
             staff.at(x).at(y).scoreIndex=indices.size;
             positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
-            //debug[positions.last()]<<str(i)+" "_;
+            debug[positions.last()]<<str(i)+" "_;
         }
         i++;
     }
@@ -485,7 +484,7 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
     uint t=-1; for(uint i: range(min(notes.size,positions.size))) { //reconstruct chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(notes[i].key); //,notes[i].duration);
+        debug[positions[i]]<<str(i, notes[i].key); //,notes[i].duration);
     }
 }
 

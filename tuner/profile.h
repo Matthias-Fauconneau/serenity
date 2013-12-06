@@ -26,7 +26,7 @@ struct OffsetPlot : Widget {
             int x0 = position.x + key * size.x / keyCount;
             int x1 = position.x + (key+1) * size.x / keyCount;
 
-#if 1
+#if 0
             float target = stretch(key);
             float offset = offsets[key];
             int y0 = position.y + size.y * (maximumOffset-target) / (maximumOffset-minimumOffset);
@@ -41,22 +41,22 @@ struct OffsetPlot : Widget {
             float sign = ::sign(offset-p0) ? : 1;
 
             // High confidence between zero and max(0, |offset|-deviation)
-            float p1 = max(0.f, abs(offset)-deviation);
+            float p1 = max(0.f, p0+abs(offset-p0)-deviation);
             int y1 = position.y + size.y * (maximumOffset-sign*p1) / (maximumOffset-minimumOffset);
             fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, sign*p1>0 ? vec4(1,0,0,1) : vec4(0,0,1,1));
 
             // Mid confidence between max(0,|offset|-deviation) and |offset|
-            float p2 = abs(offset);
+            float p2 = p0+abs(offset-p0);
             int y2 = position.y + size.y * (maximumOffset-sign*p2) / (maximumOffset-minimumOffset);
             fill(x0,y1<y2?y1:y2,x1,y1<y2?y2:y1, sign*p2>0 ? vec4(3./4,0,0,1) : vec4(0,0,3./4,1));
 
             // Low confidence between |offset| and |offset|+deviation
-            float p3 = abs(offset)+deviation;
+            float p3 = p0+abs(offset-p0)+deviation;
             int y3 = position.y + size.y * (maximumOffset-sign*p3) / (maximumOffset-minimumOffset);
             fill(x0,y2<y3?y2:y3,x1,y2<y3?y3:y2, sign*p3>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
 
             // Low confidence between min(|offset|-deviation, 0) and zero
-            float p4 = min(0.f, abs(offset)-deviation);
+            float p4 = min(0.f, p0+abs(offset-p0)-deviation);
             int y4 = position.y + size.y * (maximumOffset-sign*p4) / (maximumOffset-minimumOffset);
             fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
 #endif

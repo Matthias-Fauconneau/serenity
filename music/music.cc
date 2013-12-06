@@ -84,6 +84,18 @@ struct PDFScore : PDF {
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
     Folder folder{"Sheets"_};
+    MidiFile midi;
+
+    Thread thread{-20};
+    Sequencer input{thread};
+
+    Sampler sampler;
+#define AUDIO 1
+#if AUDIO
+    AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
+#endif
+
+#if UI
     ICON(music)
     VBox layout;
 #if RECORD
@@ -96,27 +108,20 @@ struct Music {
     List<Text> sheets;
 
     String name;
-    MidiFile midi;
     Scroll<PDFScore> pdfScore;
     Scroll<MidiScore> midiScore;
     Score score;
 
-    Thread thread{-20};
-    Sequencer input{thread};
-
-    Sampler sampler;
-#define AUDIO 0
-#if AUDIO
-    AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
+    vec2 position=0, target=0, speed=0; //smooth scroll
+    bool freeLook=true; // Unlock view from smooth scroll practice/playback
 #endif
+
 #if RECORD
     Record record;
 #endif
-    vec2 position=0, target=0, speed=0; //smooth scroll
-    bool freeLook=true; // Unlock view from smooth scroll practice/playback
+
 
     Music() {
-        window.localShortcut(Escape).connect([]{exit();});
 
 #if AUDIO
         if(arguments() && endsWith(arguments()[0],".sfz"_)) {
@@ -128,12 +133,15 @@ struct Music {
 
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
-        input.noteEvent.connect(&score,&Score::noteEvent);
 
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
         //midi.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
-        midi.noteEvent.connect(&score,&Score::noteEvent);
 
+#if UI
+        window.localShortcut(Escape).connect([]{exit();});
+
+        input.noteEvent.connect(&score,&Score::noteEvent);
+        midi.noteEvent.connect(&score,&Score::noteEvent);
         midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
         window.frameReady.connect(this,&Music::smoothScroll);
@@ -186,13 +194,19 @@ struct Music {
         }
         sheets.itemPressed.connect(this,&Music::openSheet);
         showSheetList();
-        for(string arg: arguments()) for(const Text& text: sheets) if(toUTF8(text.text)==arg) { openSheet(arg); break; }
+#endif
+        //for(string arg: arguments()) for(const Text& text: sheets) if(toUTF8(text.text)==arg) { openSheet(arg); break; }
+        for(string arg: arguments()) if(!endsWith(arg,".sfz"_)) { openSheet(arg); break; }
 #if RECORD
         window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
         sampler.frameReady.connect(&record,&Record::capture);
         layout<<&keyboard;
 #endif
+#if UI
         window.show();
+#else
+        togglePlay();
+#endif
 #if AUDIO
         input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
         thread.spawn();
@@ -200,6 +214,23 @@ struct Music {
 #endif
     }
 
+    /// Toggles MIDI playing
+    bool play=false;
+    void togglePlay() {
+        play=!play;
+        if(play) { midi.seek(0);
+#if UI
+            score.seek(0); score.showActive=true;
+#endif
+            sampler.timeChanged.connect(&midi,&MidiFile::update); }
+        else {
+#if UI
+            score.showActive=false;
+#endif
+            sampler.timeChanged.delegates.clear(); }
+    }
+
+#if UI
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float /*previous*/ /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float unused next /* next bottom*/, float x) {
         if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
@@ -228,14 +259,16 @@ struct Music {
         if(!record) toggleRecord();
 #endif
     }
-    /// Toggles MIDI playing
-    bool play=false;
-    void togglePlay() {
-        play=!play;
-        if(play) { midi.seek(0); score.seek(0); score.showActive=true; sampler.timeChanged.connect(&midi,&MidiFile::update); }
-        else { score.showActive=false; sampler.timeChanged.delegates.clear(); }
-    }
 
+    /// Shows PDF+MIDI sheets selection to open
+    void showSheetList() {
+        layout.first()=&sheets;
+        window.render();
+    }
+    void toggleAnnotations() {
+        if(pdfScore.annotations) pdfScore.annotations.clear(), window.render(); else pdfScore.setAnnotations(score.debug);
+    }
+#endif
 #if RECORD
     void toggleRecord() {
         if(!name) name=String("Piano"_);
@@ -249,24 +282,19 @@ struct Music {
     }
 #endif
 
-    /// Shows PDF+MIDI sheets selection to open
-    void showSheetList() {
-        layout.first()=&sheets;
-        window.render();
-    }
-
-    void toggleAnnotations() {
-        if(pdfScore.annotations) pdfScore.annotations.clear(), window.render(); else pdfScore.setAnnotations(score.debug);
-    }
-
-    /// Opens the given PDF+MIDI sheet
+#if UI
     void openSheet(uint index) { openSheet(toUTF8(sheets[index].text)); }
+#endif
+    /// Opens the given PDF+MIDI sheet
     void openSheet(const string& name) {
         if(play) togglePlay();
-        score.clear(); midi.clear(); pdfScore.clear();
-        this->name=String(name);
-        window.setTitle(name);
+        midi.clear();
         if(existsFile(String(name+".mid"_),folder)) midi.open(readFile(String(name+".mid"_),folder));
+#if UI
+        score.clear();
+        pdfScore.clear();
+        //this->name=String(name);
+        window.setTitle(name);
         window.backgroundCenter=window.backgroundColor=1;
         if(existsFile(String(name+".pdf"_),folder)) {
             pdfScore.open(readFile(String(name+".pdf"_),folder));
@@ -291,8 +319,10 @@ struct Music {
         }
         score.seek(0);
         window.render();
+#endif
     }
 
+#if UI
     void annotationsChanged(const map<uint, Chord>& chords) {
         pdfScore.setAnnotations(score.debug);
         String annotations;
@@ -312,5 +342,5 @@ struct Music {
         else if(existsFile(String(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(String(name+".not"_),folder)));
         pdfScore.setAnnotations(score.debug);
     }
-
+#endif
 } application;

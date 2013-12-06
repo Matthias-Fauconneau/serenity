@@ -563,7 +563,7 @@ void PDF::render(int2 position, int2 size) {
                 GLTexture& texture = c.font->cache[scale*c.size][c.index];
                 c.font->font->setSize(scale*c.size);
                 const Glyph& glyph = c.font->font->glyph(c.index);
-                if(!glyph.image) continue;
+                //if(!glyph.image) continue;
                 if(!texture) texture = GLTexture(glyph.image);
                 vec2 min = round(vec2(scale*c.position)+vec2(glyph.offset));
                 vec2 max = min+vec2(texture.size());
@@ -605,6 +605,12 @@ void PDF::render(int2 position, int2 size) {
             i++;
         }
 
+        for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
+            int2 pos = position+int2(text.key*scale/normalizedScale);
+            if(pos.y<=currentClip.min.y) continue;
+            if(pos.y>=currentClip.max.y) continue; //break;
+            Text(text.value,12,vec4(1,0,0,1)).render(pos,int2(0,0));
+        }
         return;
     }
 #endif
