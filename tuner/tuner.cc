@@ -73,8 +73,7 @@ struct Tuner : Poll {
     const uint rate = input.rate;
 
 #if TEST
-    Audio audio = decodeAudio("/Samples/A0-B1.flac"_);
-    //Audio audio = decodeAudio("/Samples/A6-A7.flac"_);
+    Audio audio = decodeAudio("/Samples/A3-A4.flac"_);
     Timer timer {thread};
     Time realTime;
     Time totalTime;
@@ -120,6 +119,7 @@ struct Tuner : Poll {
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
         assert_(audio.rate == input.rate, audio.rate, input.rate);
+        profile.reset();
 #else
         input.start();
 #endif
@@ -130,7 +130,7 @@ struct Tuner : Poll {
     uint t = 0;// 5*rate; // Let input settle
     void feed() {
         const uint size = periodSize;
-        if(t+size > audio.data.size/2) { exit(); return; }
+        if(t+size > audio.data.size/2) { /*exit();*/ return; }
         const int32* period = audio.data + t*2;
         write(period, size);
         t += size;
