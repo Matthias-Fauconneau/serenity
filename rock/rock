@@ -116,6 +116,11 @@ last-root-index maximum-balls-families = Cluster connected-skeleton maximum-ball
 # Bounds pores with bounding boxes
 bounding-boxes = Bound maximum-balls-families
 
+aspect-ratios = AspectRatio bounding-boxes
+aspect-ratio = KernelDensityEstimation aspect-ratios
+distances = NearestDistance bounding-boxes
+distance = KernelDensityEstimation distances
+
 # Rasterizes boxes in a volume
 box-volume = RasterizeBox bounding-boxes voxelSize
 

@@ -28,6 +28,7 @@
 //#include "cluster.h"
 //#include "link.h"
 //#include "family.h"
+//#include "rock.h"
 
 //#include "slice.h"
 //#include "plot.h"
