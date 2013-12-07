@@ -4,10 +4,8 @@
 #include "thread.h"
 #include "crop.h"
 
-typedef array<uint64> Family;
-
 /// Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
-buffer<array<short3>> parseLists(const string& data) {
+buffer<array<short3> > parseLists(const string& data) {
     buffer<array<short3>> lists;
     TextData s(data);
     while(s) {
@@ -24,14 +22,23 @@ buffer<array<short3>> parseLists(const string& data) {
     return lists;
 }
 
+/// Set of points belonging together (clustered by maximum ball)
+typedef array<uint64> Family;
+/// Set of families
 struct FamilySet {
     array<Family*> families; // Family set
     map<uint,uint> unions; // Maps an other family set index to the index of the union of this family set and the other family set.
     map<uint,uint> complements; // Maps an other family set index to the index of the relative complement of this family set in the other family set.
+    array<uint64> points; // Points belonging to this family set (i.e to all families in the set (i.e intersection))
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
-array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
+// Workaround lack of multiple return values
+struct MultipleReturnValues {
+    array<unique<Family>> families;
+    array<unique<FamilySet>> familySets;
+};
+MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
     uint32* const targetData = target;
     clear(targetData, target.size());
 
@@ -75,15 +82,17 @@ array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<
                         if(r2>R2) continue; // Only adds smaller (or equal) balls
                         if(d>=R+r) continue; // Overlaps when d<R+r
                         if(!otherIndex) { // Appends to family
-                            otherIndex = parentIndex; // Updates last assigned root
                             for(Family* family: parentFamilies) family->append( index );
+                            parentSet.points.append( index );
+                            otherIndex = parentIndex; // Updates last assigned root
                         }
                         else if(unions.values.contains(otherIndex)) {} // Already in an union set containing the parent family set
                         else {
                             int i = unions.keys.indexOf(otherIndex);
+                            uint unionIndex;
                             if(i<0) { // In a family for which no union set with the parent exists yet
                                 FamilySet& otherSet = familySets[otherIndex];
-                                uint unionIndex = parentIndex;
+                                unionIndex = parentIndex;
                                 for(Family* family: otherSet.families) {
                                     if(!parentFamilies.contains(family)) { // Creates a new set only if other is not included in this
                                         unique<FamilySet> unionSet;
@@ -126,10 +135,10 @@ array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<
                                     } //else Empty complement as other set is included in parent set
                                     otherSet.complements.insert(parentIndex, complementIndex);
                                 }
-                            }
+                            } else unionIndex = unions.values[i];
                             int complementIndex = complements.at(otherIndex);
                             for(Family* family: familySets[complementIndex]->families) family->append( index ); // Appends to the complement
-                            int unionIndex = unions.values[i];
+                            familySets[unionIndex]->points.append( index );
                             otherIndex = unionIndex; // Updates to the union set index
                         }
                     }
@@ -137,7 +146,7 @@ array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<
             }
         }
     }
-    return families;
+    return {move(families), move(familySets)};
 }
 
 /// Converts families to a text file formatted as ((x y z r2)+\n)*
@@ -152,14 +161,29 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
     }
     return text;
 }
+/// Converts familySets to a text file formatted as ((x y z r2)+\n)*
+String toASCII(const ref<unique<FamilySet>>& familySets, const Volume16& source) {
+    String text ( sum(apply(familySets,[](const FamilySet& family){ return family.points.size*4*5;})) ); // Estimates text size to avoid unnecessary reallocations
+    for(const FamilySet& family: familySets) {
+        if(family.families.size<=1) continue; // Only intersections
+        for(uint64 index: family.points) {
+            int3 p = zOrder(index);
+            text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ' ' << dec(source[index],3) << ' ';
+        }
+        text.last() = '\n';
+    }
+    return text;
+}
 
 /// Computes trees of overlapping balls
 class(Cluster, Operation), virtual VolumeOperation {
     string parameters() const override { return "minimum"_; }
     uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint32) : 0; }
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs, const ref<const Result*>& otherInputs) override {
-        array<unique<Family>> families = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
+        auto multipleReturnValues = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
         otherOutputs[0]->metadata = String("families"_);
-        otherOutputs[0]->data = toASCII(families, inputs[0]);
+        otherOutputs[0]->data = toASCII(multipleReturnValues.families, inputs[0]);
+        otherOutputs[1]->metadata = String("intersections"_);
+        otherOutputs[1]->data = toASCII(multipleReturnValues.familySets, inputs[0]);
     }
 };

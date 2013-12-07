@@ -125,7 +125,7 @@ struct Rock : virtual PersistentProcess {
             if(slides) {
                 for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) { // one slide per view element
                     titles << String(view->name());
-                    newWindow(view.pointer, int2(1080*4/3,1080), view->name());
+                    newWindow(view.pointer, int2(1080,1080*3/4), view->name());
                 }
             } else {
                 for(array<unique<View>>& views : viewers.values) {

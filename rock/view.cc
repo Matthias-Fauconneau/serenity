@@ -43,5 +43,6 @@ class(PlotView, View), virtual Plot {
         legends << String(legend);
         return true;
     }
+    int2 sizeHint() override { return int2(1080,1080*3/4); }
     string name() override { return title; }
 };
