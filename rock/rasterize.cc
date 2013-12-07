@@ -199,6 +199,7 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
                                 }
                             }
                             else if(sqRadius > R) {
+#if 0
                                 if(p) { // Resolve pore throats collision by taking relative nearest (flat section border)
                                     //uint16 throatR = R;
                                     uint throatD = sq(voxel-p);
@@ -208,7 +209,9 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
                                         R = sqRadius;
                                         A = attribute;
                                     } //else throat is nearest
-                                } else { // Normal maximum output
+                                } else
+#endif
+                                { // Normal maximum output
                                     R = sqRadius;
                                     A = attribute;
                                 }
