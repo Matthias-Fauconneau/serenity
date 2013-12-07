@@ -31,7 +31,7 @@ struct FamilySet {
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
-array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
+array<unique<Family> > cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
     uint32* const targetData = target;
     clear(targetData, target.size());
 
@@ -40,22 +40,23 @@ array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<a
     const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
     array<unique<Family>> families;
-    array<unique<FamilySet>> familiesLookup; familiesLookup<<unique<FamilySet>(); // index 0 is no families (background or yet unassigned)
+    array<unique<FamilySet>> familySets;
+    familySets << unique<FamilySet>(); // index 0 is no families (background or yet unassigned)
     for(int R2=lists.size-1; R2>=0; R2--) { // Process balls from largest to smallest
         const array<short3>& balls = lists[R2];
         float R = sqrt((float)R2);
         int D = ceil(2*R);
-        log(R, families.size, familiesLookup.size);
+        log(R, families.size, familySets.size);
         for(short3 P: balls) {
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             uint32& parentIndex = targetData[parent];
             if(!parentIndex) { // parent is a new root
                 families << unique<Family>(ref<uint64>{parent});
                 unique<FamilySet> set; set->families << families.last().pointer;
-                parentIndex = familiesLookup.size; // New family set lookup index
-                familiesLookup << move(set);
+                parentIndex = familySets.size; // New family set lookup index
+                familySets << move(set);
             }
-            FamilySet& parentSet = familiesLookup[parentIndex];
+            FamilySet& parentSet = familySets[parentIndex];
             const array<Family*>& parentFamilies = parentSet.families;
             map<uint,uint>& unions = parentSet.unions;
             map<uint,uint>& complements = parentSet.complements;
@@ -80,21 +81,16 @@ array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<a
                         else if(unions.values.contains(otherIndex)) {} // Already in an union set containing the parent family set
                         else {
                             int i = unions.keys.indexOf(otherIndex);
-                            if(i>=0) { // In a family for which a union set with the parent already exists
-                                int complementIndex = complements.at(otherIndex);
-                                for(Family* family: familiesLookup[complementIndex]->families) family->append( index ); // Appends to the complement
-                                int unionIndex = unions.values[i];
-                                otherIndex = unionIndex; // Updates to the union set index
-                            } else { // In a family for which no union set exists yet
-                                FamilySet& otherSet = familiesLookup[otherIndex];
+                            if(i<0) { // In a family for which no union set with the parent exists yet
+                                FamilySet& otherSet = familySets[otherIndex];
                                 uint unionIndex = parentIndex;
                                 for(Family* family: otherSet.families) {
                                     if(!parentFamilies.contains(family)) { // Creates a new set only if other is not included in this
                                         unique<FamilySet> unionSet;
                                         unionSet->families << parentSet.families; // Copies the parent set
                                         unionSet->families += otherSet.families; // Adds (without duplicates) the other set
-                                        unionIndex = familiesLookup.size; // New lookup index to the union family set
-                                        familiesLookup << move(unionSet);
+                                        unionIndex = familySets.size; // New lookup index to the union family set
+                                        familySets << move(unionSet);
                                         break;
                                     }
                                 } //else No-op union as other set is included in parent set
@@ -109,8 +105,8 @@ array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<a
                                             unique<FamilySet> complementSet; // Relative complement of parent in other (other \ parent)
                                             complementSet->families << otherSet.families; // Copies the other set
                                             complementSet->families.filter([&parentSet](const Family* f){ return parentSet.families.contains(f); }); // Removes the parent set
-                                            complementIndex = familiesLookup.size; // New lookup index to the union family set
-                                            familiesLookup << move(complementSet);
+                                            complementIndex = familySets.size; // New lookup index to the union family set
+                                            familySets << move(complementSet);
                                             break;
                                         }
                                     } //else Empty complement as other set is included in parent set
@@ -123,15 +119,18 @@ array<unique<Family>> cluster(Volume32& target, const Volume16& source, buffer<a
                                             unique<FamilySet> complementSet; // Relative complement of parent in other (other \ parent)
                                             complementSet->families << parentSet.families; // Copies the parent set
                                             complementSet->families.filter([&otherSet](const Family* f){ return otherSet.families.contains(f); }); // Removes the other set
-                                            complementIndex = familiesLookup.size; // New lookup index to the union family set
-                                            familiesLookup << move(complementSet);
+                                            complementIndex = familySets.size; // New lookup index to the union family set
+                                            familySets << move(complementSet);
                                             break;
                                         }
                                     } //else Empty complement as other set is included in parent set
                                     otherSet.complements.insert(parentIndex, complementIndex);
                                 }
-                                otherIndex = unionIndex;
                             }
+                            int complementIndex = complements.at(otherIndex);
+                            for(Family* family: familySets[complementIndex]->families) family->append( index ); // Appends to the complement
+                            int unionIndex = unions.values[i];
+                            otherIndex = unionIndex; // Updates to the union set index
                         }
                     }
                 }
