@@ -12,7 +12,6 @@ UniformSample kernelDensityEstimation(const UniformHistogram& histogram, real h=
     const real scale = (normalize ? real(histogram.size) : 1) / ( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
     real K[clip]; for(int i: range(clip)) { real x=-1./2*sq(i/h); K[i] = x>expUnderflow ? scale * exp(x) : 0; } // Precomputes gaussian kernel
     UniformSample pdf (histogram.size);
-    if(normalize) pdf.scale = 1./histogram.size;
     parallel(pdf.size, [&](uint, uint x0) {
         real sum = 0;
         for(int i: range(1,min(clip,x0))) sum += histogram[x0-i]*K[i];
@@ -31,7 +30,7 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real
     uint sampleCount = align(coreCount, max/delta);
     delta = max/sampleCount;
     UniformSample pdf ( sampleCount );
-    pdf.scale = delta / (normalize ? max : 1);
+    pdf.scale = delta;
     const real scale = 1./( sqrt(2*PI) * h /*Normalize kernel (area=1)*/ * (normalize ? N : 1) /*Normalize sampleCount (to density)*/);
     chunk_parallel(pdf.size, [&](uint, uint offset, uint size) { for(uint i : range(offset, offset+size)) {
         const real x0 = i*delta;
@@ -45,7 +44,9 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real
 class(KernelDensityEstimation, Operation), virtual Pass {
     virtual string parameters() const { return "ignore-clip bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
-        NonUniformHistogram H = parseNonUniformSample(source.data);
+        NonUniformHistogram H;
+        if(source.metadata=="vector"_) for(real value: parseVector(source.data)) H.sorted(value)++;
+        else H = parseNonUniformSample(source.data); // Histogram
         if(args.value("ignore-clip"_,"0"_)!="0"_) { log("clip"); H.values.first()=H.values.last()=0; } // Ignores clipped values
         bool uniform = true;
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }

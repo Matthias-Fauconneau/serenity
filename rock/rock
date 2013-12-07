@@ -21,7 +21,8 @@ if resample: resampled mipmap = Resample denoised resolution process-resolution 
 # Density distribution
 if !threshold-from-source: histogram-radiodensity = Histogram resampled
 if threshold-from-source: histogram-radiodensity = Histogram source
-distribution-radiodensity = KernelDensityEstimation histogram-radiodensity
+histogram-radiodensity-normalizeX = NormalizeX histogram-radiodensity
+distribution-radiodensity = KernelDensityEstimation histogram-radiodensity-normalizeX
 
 # Debug
 histogram-radiodensity-normalizeY = NormalizeAreaY histogram-radiodensity
@@ -118,8 +119,8 @@ bounding-boxes = Bound maximum-balls-families
 
 aspect-ratios = AspectRatio bounding-boxes
 aspect-ratio = KernelDensityEstimation aspect-ratios
-distances = NearestDistance bounding-boxes
-distance = KernelDensityEstimation distances
+nearest-distances = NearestDistance bounding-boxes
+nearest-distance = KernelDensityEstimation nearest-distances
 
 # Rasterizes boxes in a volume
 box-volume = RasterizeBox bounding-boxes voxelSize

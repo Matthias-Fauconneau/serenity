@@ -1,4 +1,6 @@
 #include "volume-operation.h"
+#include "matrix.h"
+#include "sample.h"
 
 /// Parses boxes from a text file formatted as "x y z sx sy sz"
 array<mat4> parseBoxes(const string& data) {
@@ -61,7 +63,7 @@ array<real> aspectRatio(const ref<mat4>& boxes) {
 
 class(AspectRatio, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
-        outputs[0]->metadata = String("scalar"_);
+        outputs[0]->metadata = String("vector"_);
         outputs[0]->data = toASCII(aspectRatio(parseBoxes(inputs[0]->data)));
     }
 };
@@ -74,7 +76,7 @@ array<real> nearestDistance(const ref<mat4>& boxes) {
         float distance = FLT_MAX;
         for(const mat4& b: boxes) {
             vec3 o = b[3].xyz();
-            distance = min(distance, sq(o-origin));
+            if(o!=origin) distance = min(distance, sq(o-origin));
         }
         nearestDistances << sqrt(distance);
     }
@@ -83,7 +85,7 @@ array<real> nearestDistance(const ref<mat4>& boxes) {
 
 class(NearestDistance, Operation) {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
-        outputs[0]->metadata = String("scalar"_);
+        outputs[0]->metadata = String("vector"_);
         outputs[0]->data = toASCII(nearestDistance(parseBoxes(inputs[0]->data)));
     }
 };

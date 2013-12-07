@@ -62,14 +62,11 @@ class(Div, Operation) {
     }
 };
 
-class(NormalizeAreaXY, Operation), virtual Pass {
+class(NormalizeX, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         UniformSample sample = parseUniformSample(source.data);
-        sample.scale = 1./(sample.size-1); // Also normalize X axis
-        float sum = sample.sum();
-        assert_(sum);
-        target.data = toASCII((1./(sample.scale*sum))*sample); // Normalize Y axis by integral
+        sample.scale = 1./(sample.size-1); // Normalizes X axis
     }
 };
 
@@ -77,6 +74,17 @@ class(NormalizeAreaY, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
         UniformSample sample = parseUniformSample(source.data);
+        float sum = sample.sum();
+        assert_(sum);
+        target.data = toASCII((1./(sample.scale*sum))*sample); // Normalize Y axis by integral
+    }
+};
+
+class(NormalizeAreaXY, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = copy(source.metadata);
+        UniformSample sample = parseUniformSample(source.data);
+        sample.scale = 1./(sample.size-1); // Also normalizes X axis
         float sum = sample.sum();
         assert_(sum);
         target.data = toASCII((1./(sample.scale*sum))*sample); // Normalize Y axis by integral

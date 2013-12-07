@@ -86,3 +86,22 @@ template<Type O> struct VolumePass : virtual VolumeOperation {
 };
 #define defineVolumePass(name, type, function) \
     class(name, Operation), virtual VolumePass<type> { void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
+
+// Convenience helpers to parse 3 components vectors
+/// Parses 3 integers
+inline int3 parse3(TextData& s) {
+    uint x=s.integer(); s.whileAny(" ,x"_);
+    uint y=s.integer(); s.whileAny(" ,x"_);
+    uint z=s.integer(); s.whileAny(" ,x"_);
+    return int3(x,y,z);
+}
+inline int3 parse3(const string& data) { TextData s(data); return parse3(s); }
+
+/// Parses 3 decimals
+inline vec3 parse3f(TextData& s) {
+    float x=s.decimal(); s.whileAny(" ,x"_);
+    float y=s.decimal(); s.whileAny(" ,x"_);
+    float z=s.decimal(); s.whileAny(" ,x"_);
+    return vec3(x,y,z);
+}
+inline vec3 parse3f(const string& data) { TextData s(data); return parse3f(s); }

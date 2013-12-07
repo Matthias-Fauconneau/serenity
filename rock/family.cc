@@ -4,24 +4,6 @@
 #include "display.h"
 #include "matrix.h"
 
-/// Parses 3 integers
-int3 parse3(TextData& s) {
-    uint x=s.integer(); s.whileAny(" ,x"_);
-    uint y=s.integer(); s.whileAny(" ,x"_);
-    uint z=s.integer(); s.whileAny(" ,x"_);
-    return int3(x,y,z);
-}
-int3 parse3(const string& data) { TextData s(data); return parse3(s); }
-
-/// Parses 3 decimals
-vec3 parse3f(TextData& s) {
-    float x=s.decimal(); s.whileAny(" ,x"_);
-    float y=s.decimal(); s.whileAny(" ,x"_);
-    float z=s.decimal(); s.whileAny(" ,x"_);
-    return vec3(x,y,z);
-}
-vec3 parse3f(const string& data) { TextData s(data); return parse3f(s); }
-
 struct Ball { uint64 index; uint16 sqRadius; };
 typedef array<Ball> Family;
 

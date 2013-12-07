@@ -28,7 +28,7 @@
 //#include "cluster.h"
 //#include "link.h"
 //#include "family.h"
-//#include "rock.h"
+//#include "box.h"
 
 //#include "slice.h"
 //#include "plot.h"
@@ -156,7 +156,7 @@ struct Rock : virtual PersistentProcess {
             unique<Window> window(widget, sizeHint, title);
             window->localShortcut(Escape).connect([]{exit();});
             String* name = new String(title+".png"_);
-            window->localShortcut(PrintScreen).connect([=]{writeFile(*name, encodePNG(renderToImage(widget, int2(128,128))), home());});
+            window->localShortcut(PrintScreen).connect([=]{writeFile(*name, encodePNG(renderToImage(widget, int2(1024,768))), home());});
             window->backgroundColor = 1;
             window->show();
             windows << move(window);

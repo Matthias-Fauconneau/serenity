@@ -108,6 +108,7 @@ array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples);
 
 struct NonUniformHistogram : NonUniformSample {
     using NonUniformSample::NonUniformSample;
+    NonUniformHistogram(){}
     NonUniformHistogram(NonUniformSample&& A):NonUniformSample(move(A)){}
     /// Returns the number of samples represented by this histogram
     uint64 sampleCount() const { return NonUniformSample::sum(); }

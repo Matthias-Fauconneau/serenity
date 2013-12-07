@@ -113,7 +113,7 @@ Rule& Process::ruleForOutput(const string& target, const Dict& arguments) {
         else error("Unknown operator", "'"_+op+"'"_);
         if(enable) match << &rule;
     }
-    assert_(match.size<=1);
+    assert_(match.size<=1,"Multiple matches:\n"_+str(match,'\n'));
     return match ? *match.first() : *(Rule*)0;
 }
 
