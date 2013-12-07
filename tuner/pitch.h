@@ -79,9 +79,10 @@ struct PitchEstimator : FFT {
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
     const uint fMin = 5, fMax = N/16; // 15 ~ 6000 Hz
-    const uint rankEnergyTradeoff = 1437; //2489; //5271; //10554; // Keeps higher octaves
+    const uint rankEnergyTradeoff = 937; // Keeps higher octaves
     const uint iterationCount = 2; // Number of least square iterations
     const uint harmonicsPerIteration = 19; // Number of additional harmonics to evaluate at each least square iterations
+    const float initialInharmonicity = 1./cb(22); // Initial inharmonicity
 
     float harmonicEnergy=0;
     float filteredEnergy=0;
@@ -105,7 +106,7 @@ struct PitchEstimator : FFT {
         for(uint i: range(0, fMax)) filteredSpectrum[i] = 0;
 
         struct Peak { uint f; };
-        list<Peak, 3> maxPeaks;
+        list<Peak, 6> maxPeaks;
         array<uint> distance(512); uint last=0;
         for(uint i: range(fMin/*8*/, fMax)) {
             if(spectrum[i- 1] < spectrum[i] && spectrum[i] > spectrum[i+1]) {
@@ -132,21 +133,28 @@ struct PitchEstimator : FFT {
         uint medianF0 = distance.size > 6 ? ::median(distance) : F1;  // "0th" order estimation of first partial (f0)
         this->medianF0 = medianF0;
         //for(const auto& peak: maxPeaks) if(peak.f < F1 && peak.f/medianF0 > 9) F1=peak.f; // Uses lowest maximum peak (avoids inharmonicity bias)
-        if(F1/medianF0 >= 29 && F1>N/64) medianF0 = F1;
+        if(F1/medianF0 >= 4 && F1>=149) { // Corrects outlying fundamental estimate from median
+            for(const auto& peak: maxPeaks) {
+                log(peak.f/medianF0, peak.f);
+                if(peak.f/medianF0 >= 2 && peak.f >= 149 && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
+            }
+            medianF0 = F1;
+        }
         uint nLow = F1/medianF0;
-        uint nHigh = F1/(medianF0-4);
+        if(nLow>1) log(F1/(nLow-1)-medianF0, distance.size);
+        uint nHigh = max(nLow, F1/(medianF0-4));
         this->nLow=nLow, this->nHigh=nHigh, this->F1=F1;
         float bestEnergy = 0, bestMerit = 0;
-        for(uint n1: range(nLow>1 ? nLow-1 : 1,  nHigh +1)) {
-            if(n1==nLow-1) n1=1; // Always evaluate n1=1
-            float f0 = (float) F1 / n1, f0B = f0/cb(22), energy = 0, merit=0, lastHarmonicRank=0;
+        for(uint n1: range(nLow>1 ? nLow-2 : 1,  nHigh +1)) {
+            if(n1==nLow-2) n1=1; // Always evaluate n1=1
+            float f0 = (float) F1 / n1, f0B = f0*initialInharmonicity, energy = 0, merit=0, lastHarmonicRank=0, lastEnergy = 0;
             array<uint> peaks, peaksLS;
             for(uint t: range(1,iterationCount +1)) {
                 peaks.clear(); peaksLS.clear(); energy = 0, merit=0, lastHarmonicRank=0;
                 // Least square optimization of linear fit: n.f0 = f[n] => argmin |Xb - y|^2 (X=n, b=f0, y=f[n]) <=> X'X b = X' y
                 float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
                 if(f0+f0B<fMin) f0=fMin;
-                for(uint n=1; n<74; n++) {
+                for(uint n=1; n<64; n++) {
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
                     int fn = round(f0*n + f0B*cb(n)); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
                     if(fn+fMin>=fMax) break;
@@ -155,7 +163,7 @@ struct PitchEstimator : FFT {
                     uint df=1;
                     energy += peakEnergy;
                     float rankMerit = energy/(rankEnergyTradeoff+n);
-                    if(rankMerit > merit) lastHarmonicRank=n, merit=rankMerit;
+                    if(rankMerit > merit) lastHarmonicRank=n, merit=rankMerit, lastEnergy = energy;
                     for(; df<=fMin; df++) { // Fit nearest peak
                         if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], f=fn+df;
                         if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
@@ -179,7 +187,7 @@ struct PitchEstimator : FFT {
                     else f0 = nf/n2, f0B=0;
                 } else f0 = nf/n2, f0B=0;
             }
-            candidates.insert(merit, Candidate(f0, f0B/f0, energy, lastHarmonicRank, copy(peaks), copy(peaksLS)));
+            candidates.insert(merit, Candidate(f0, f0B/f0, lastEnergy, lastHarmonicRank, copy(peaks), copy(peaksLS)));
             if(merit > bestMerit) {
                 bestMerit = merit;
                 bestEnergy = energy;

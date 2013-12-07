@@ -74,7 +74,15 @@ struct Plot : Widget {
             const auto& candidate = estimator.candidates[i];
             bool best = i==estimator.candidates.size-1;
             vec4 color(!best,best,0,1);
-            Text label(ftoa(candidate.energy)+" B~"_+dec(round(1000*12*log2(1+(estimator.B>-1?estimator.B:0)))), 16,  vec4(color.xyz(),1.f));
+            float Ea = estimator.candidates.last().energy;
+            float Na = estimator.candidates.last().lastHarmonicRank;
+            float Eb = estimator.candidates[i].energy;
+            float Nb = estimator.candidates[i].lastHarmonicRank;
+            float rankEnergyTradeoff = Ea==Eb ? 0 : (Eb*Na-Ea*Nb)/(Ea-Eb);
+
+            Text label(ftoa(candidate.energy)+" "_+ftoa(rankEnergyTradeoff)+" B~"_+
+                       //dec(round(1000*12*log2(1+(estimator.B>-1?estimator.B:0))))
+                       dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
             for(uint n: range(candidate.peaks.size)) {
                 uint f = candidate.peaks[n];
@@ -107,7 +115,8 @@ struct Plot : Widget {
 struct PitchEstimation {
     // Input
     //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B1"_)-12;
-    const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
+    //const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
+    const uint lowKey=parseKey("A3"_)-12, highKey=parseKey("A4"_)-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
@@ -138,7 +147,7 @@ struct PitchEstimation {
         assert_(audio.channels==2, audio.channels);
         assert_(((stereo.size/2+4*rate)/rate)/5>=uint(1+(highKey+1)-lowKey), uint(1+(highKey+1)-lowKey), (stereo.size/2/rate));
 
-        window.backgroundColor=window.backgroundCenter=0;
+        window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
         window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
         window.frameReady.connect(this, &PitchEstimation::next);
@@ -171,7 +180,7 @@ struct PitchEstimation {
             float f = estimator.estimate();
             const float expectedF = keyToPitch(expectedKey)*N/rate;
 
-            const float threshold = 1./14; // Relative harmonic energy (i.e over current period energy)
+            const float threshold = 1./8; // Relative harmonic energy (i.e over current period energy)
             float periodEnergy = (estimator.periodEnergy/estimator.filteredEnergy > 6 ? estimator.filteredEnergy : estimator.periodEnergy);
             float confidence = estimator.harmonicEnergy  / periodEnergy;
 
@@ -183,14 +192,14 @@ struct PitchEstimation {
             float Na = estimator.candidates.last().lastHarmonicRank;
             float Eb = estimator.candidates[0].energy;
             float Nb = estimator.candidates[0].lastHarmonicRank;
-            float rankEnergyTradeoff = (Eb*Na-Ea*Nb)/(Ea-Eb);
+            float rankEnergyTradeoff = Ea-Eb ? (Eb*Na-Ea*Nb)/(Ea-Eb) : 0;
 
             if(confidence > threshold/2)
                     log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
                 +dec(round(100*offsetF0),2) +" c\t"_+dec(round(confidence?1./confidence:0),2)+"\t"_
                 +"B~"_+dec(round(1000*12*log2(1+(estimator.B>-1?estimator.B:0))))+" m\t"_+str(estimator.B>0?log2(estimator.B):0)+"\t"_
                         +(expectedKey == key ? (confidence > threshold ? "O"_ : "~"_) : "X"_)+"  "_
-                        +str(estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+" "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
+                        +str("F1"_,estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+"th "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
                         +dec(Ea)+" "_+dec(Na)+" "_+dec(Eb)+" "_+dec(Nb)+" "_+dec(rankEnergyTradeoff)+"\t"_
                         );
 
@@ -204,7 +213,7 @@ struct PitchEstimation {
                     fail++;
 
                     plot.expectedF = expectedF;
-                    plot.iMin = f;
+                    plot.iMin = f/2;
                     plot.iMax = min(estimator.fMax, (uint)max(expectedF, f) * (estimator.candidates.last().lastHarmonicRank+1));
 
                     // Relax for hard cases

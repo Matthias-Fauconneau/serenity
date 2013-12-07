@@ -218,7 +218,8 @@ struct Music {
     bool play=false;
     void togglePlay() {
         play=!play;
-        if(play) { midi.seek(0);
+        if(play) {
+            midi.seek(0);
 #if UI
             score.seek(0); score.showActive=true;
 #endif

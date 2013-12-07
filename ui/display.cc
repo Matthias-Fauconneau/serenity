@@ -113,6 +113,7 @@ inline void plot(int x, int y, float alpha, bool transpose, vec4 color) {
         byte4& sRGB = framebuffer(x,y);
         extern uint8 sRGB_lookup[256], inverse_sRGB_lookup[256];
         byte4 linear (inverse_sRGB_lookup[sRGB.b], inverse_sRGB_lookup[sRGB.g], inverse_sRGB_lookup[sRGB.r], 0);
+        alpha *= color.w;
         int4 linearBlend = min(int4(0xFF), additiveBlend ? int4(linear) + int4(alpha*color) : int4(round((1-alpha)*vec4(linear) + alpha*color))); // Blend
         sRGB = byte4(sRGB_lookup[linearBlend.b], sRGB_lookup[linearBlend.g], sRGB_lookup[linearBlend.r], 0xFF);
     }
@@ -135,7 +136,7 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
         return;
     }
 #endif
-    vec4 color8 (color.z*0xFF,color.y*0xFF,color.x*0xFF,0xFF);
+    vec4 color8 (color.z*0xFF,color.y*0xFF,color.x*0xFF, color.w);
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
     if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
