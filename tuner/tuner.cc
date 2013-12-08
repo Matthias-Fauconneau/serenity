@@ -75,9 +75,6 @@ struct Tuner : Poll {
 #if TEST
     Audio audio = decodeAudio("/Samples/A3-A4.flac"_);
     Timer timer {thread};
-    Time realTime;
-    Time totalTime;
-    float frameTime = 0;
 #endif
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
@@ -102,15 +99,14 @@ struct Tuner : Poll {
     Text B {""_, textSize/2, white};
     Text fError {""_, textSize/3, white};
     Text confidence {""_, textSize/4, white};
-    SpectrumPlot spectrum {false, true, (float)N/rate, estimator.filteredSpectrum, estimator};
     HBox status {{&key,&pitch,&fOffset, &B, &fError, &confidence}};
     OffsetPlot profile;
-    VBox layout {{&spectrum, &status, &profile}};
+    VBox layout {{&status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
-        if(arguments()) threshold=toInteger(arguments()[0]);
+        if(arguments() && isInteger(arguments()[0])) threshold=toInteger(arguments()[0]);
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
@@ -134,10 +130,7 @@ struct Tuner : Poll {
         const int32* period = audio.data + t*2;
         write(period, size);
         t += size;
-        float time = ((float)size/rate) / (float)realTime; // Instant playback rate
-        const float alpha = 1./16; frameTime = (1-alpha)*frameTime + alpha*(float)time; // IIR Smoother
-        realTime.reset();
-        timer.setRelative(size*1000/rate/16); // 8xRT
+        timer.setRelative(size*1000/rate/16); // 16xRT
     }
 #endif
     uint write(const int32* input, uint size) {
@@ -172,11 +165,7 @@ struct Tuner : Poll {
         float f = estimator.estimate();
         int key = round(pitchToKey(f*rate/N));
 
-        spectrum.iMin = f;
-        spectrum.iMax = min(estimator.fMax,  (uint) f * estimator.candidates.last().lastHarmonicRank);
-
-        float periodEnergy = estimator.periodEnergy;
-        float confidence = estimator.harmonicEnergy  / periodEnergy;
+        float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
 
         if(confidence > 1./(threshold+1)) {
             float expectedF = keyToPitch(key)*N/rate;

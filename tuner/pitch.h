@@ -100,10 +100,10 @@ struct PitchEstimator : FFT {
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
     const uint fMin = 5, fMax = N/16; // 15 ~ 6000 Hz
-    const uint rankEnergyTradeoff = 92 /*78,92,138*/; // Keeps higher octaves
+    const uint rankEnergyTradeoff = 92; // Keeps higher octaves
     const uint iterationCount = 4; // Number of least square iterations
-    const uint harmonicsPerIteration = 19; // Number of additional harmonics to evaluate at each least square iterations
-    const float initialInharmonicity = 1./cb(17/*16,20*/); // Initial inharmonicity
+    //const uint harmonicsPerIteration = 19; // Number of additional harmonics to evaluate at each least square iterations
+    const float initialInharmonicity = 1./cb(17); // Initial inharmonicity
 
     struct Peak {
         uint f;
@@ -133,7 +133,7 @@ struct PitchEstimator : FFT {
         ref<float> spectrum = transform();
         for(uint i: range(0, fMax)) filteredSpectrum[i] = 0;
 
-        peaks.clear(); //array<uint> distance(512);
+        peaks.clear();
         uint last=0;
         minF=fMax, maxF=fMin;
         for(uint i: range(fMin, fMax-2)) {
@@ -147,9 +147,6 @@ struct PitchEstimator : FFT {
                 for(uint j=i+1; j<fMax && spectrum[j-1]>spectrum[j]; j++) filteredSpectrum[j] = w*spectrum[j];
 
                 if(i<minF) minF=i; if(i>maxF) maxF=i;
-#if 0
-                peaks.insert(filteredSpectrum[i], {i}); // Records maximum peaks
-#else
                 if(filteredSpectrum[i] > 2*periodPower &&
                         filteredSpectrum[i-2] < filteredSpectrum[i-1] && filteredSpectrum[i+1] > filteredSpectrum[i+2]) {
                     if(i-fMin > last) { peaks.insert(filteredSpectrum[i], {i}); last=i; } // Records maximum peaks
@@ -158,12 +155,7 @@ struct PitchEstimator : FFT {
                         peaks.insert(filteredSpectrum[i], {i});
                         last=i;
                     } // else skips lower peak
-                    /*// Records distance between peaks
-                    if(i-last > 6) { distance << i-last; last=i; }
-                    else if(filteredSpectrum[i]>filteredSpectrum[last] && distance) {  distance.last() += i-last; last=i; } // Overwrites lower peak
-                    // else skips lower peak*/
                 }
-#endif
             }
         }
         spectrum = filteredSpectrum; // Cleans spectrum
@@ -172,41 +164,26 @@ struct PitchEstimator : FFT {
         array<uint> byFrequency(peaks.size);
         for(Peak peak: peaks) byFrequency.insertSorted(peak.f); // Insertion sorts by frequency
         array<uint> distance (peaks.size);
-        //{uint last=byFrequency.first(); for(uint f: byFrequency.slice(1)) /*if(f-last > fMin)*/ { distance << f-last; last=f; }} // Compute distances
         {uint last=0; for(uint f: byFrequency) { distance << f-last; last=f; }} // Compute distances
         uint medianF0 = ::median(distance);
         this->medianF0 = medianF0;
-        assert_(medianF0);
-        //if(!medianF0) { harmonicEnergy=0; return 0; }
-        if(F1/medianF0>1) log(F1, (float)F1/medianF0);
-#if 1
         if(F1/medianF0>=10 && F1>=132) { // Corrects outlying fundamental estimate from median
-            log_(str(F1, (float)F1/medianF0, ":\t\t"));
-            for(const auto& peak: peaks) { log_(str(peak.f/medianF0,peak.f,"\t"_));
-                if(peak.f/medianF0>=5 && peak.f >= 132 && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
-            } log("");
-            log("=> medianF0=F1", F1, F1/medianF0);
+            for(const auto& peak: peaks) if(peak.f/medianF0>=5 && peak.f >= 132 && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
             medianF0 = F1;
         }
-#endif
-        //for(const auto& peak: peaks) log_(str(peak.f/medianF0,peak.f,"\t"_)); log("");
-        //if(F1/medianF0>1) log(F1, medianF0, (float)F1/medianF0 /*, (float)F1/(F1/medianF0-1)-medianF0*/);
-        //log((float)F1/medianF0);
         uint nLow = F1/medianF0;
         uint nHigh = F1/(medianF0-4);
         this->nLow=nLow, this->nHigh=nHigh, this->F1=F1;
         float bestEnergy = 0, bestMerit = 0;
-        for(uint n1: range(/*nLow>2 ? nLow-2 :*/ 1 /*max(1,(int)nLow-1)*/,  nHigh +1)) {
-            //if(n1==nLow-2) n1=1; // Always evaluate n1=1
-            //else if(n1==nLow-1) n1=2; // Always evaluate n1=2
+        for(uint n1: range(1, nHigh +1)) {
             float f0 = (float) F1 / n1, f0B = f0*initialInharmonicity, energy = 0, merit=0, lastHarmonicRank=0, lastEnergy = 0;
             array<uint> peaks, peaksLS;
-            for(uint t: range(1,iterationCount +1)) {
+            for(uint t unused: range(1,iterationCount +1)) {
                 peaks.clear(); peaksLS.clear(); energy = 0, merit=0, lastHarmonicRank=0;
                 // Least square optimization of linear fit: n.f0 = f[n] => argmin |Xb - y|^2 (X=n, b=f0, y=f[n]) <=> X'X b = X' y
                 float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
                 if(f0+f0B<fMin) f0=fMin;
-                for(uint n=1; n<32; n++) {
+                for(uint n=1;; n++) {
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
                     int fn = round(f0*n + f0B*cb(n)); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
                     if(fn+fMin>=fMax) break;
@@ -225,14 +202,14 @@ struct PitchEstimator : FFT {
                         if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
                     }
                     peaksLS << f;
-                    if(n<=t*harmonicsPerIteration) { // Refines f0 with a weighted least square fit
+                    //if(n<=t*harmonicsPerIteration) { // Refines f0 with a weighted least square fit
                         float w = peakEnergy;
                         nf  += w * n * f;
                         n2 += w * n * n;
                         n2f+= w * cb(n) * f;
                         n3 += w * cb(n) * n;
                         n4 += w * cb(n) * cb(n);
-                    }
+                    //}
                 }
                 // Solves X'X b = X'y
                 float a=n2, b=n3, c=n3, d=n4;
@@ -252,9 +229,7 @@ struct PitchEstimator : FFT {
             }
         }
         harmonicEnergy = bestEnergy;
-        float f1 = this->F0*(1+this->B);
-        //assert_(f1>0, f1, peaks.size);
-        return f1;
+        return this->F0*(1+this->B);
     }
 };
 

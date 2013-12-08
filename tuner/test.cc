@@ -187,7 +187,6 @@ struct PitchEstimation {
 
             const float threshold = 1./8; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-            //float confidence = estimator.harmonicEnergy - log2(estimator.periodEnergy);
 
             if(confidence > threshold/2) {
                 int key = round(pitchToKey(f*rate/N));
@@ -229,9 +228,9 @@ struct PitchEstimation {
                         plot.iMax = min(plot.iMax, estimator.fMax);
 
                         // Relax for hard cases
-                        if(offsetF0<-1./4 && key==expectedKey+1 && apply(split("E0 C#0 C0 B-1 A#-1 A-1"_), parseKey).contains(expectedKey)) log("+"_);
+                        /*if(offsetF0<-1./4 && key==expectedKey+1 && apply(split("E0 C#0 C0 B-1 A#-1 A-1"_), parseKey).contains(expectedKey)) log("+"_);
                         else if(confidence<1./5 && expectedKey<=parseKey("A#-1"_) && t%(5*rate) < 2*rate && key==expectedKey+2) log("!"_); // Mistune attack
-                        else { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
+                        else*/ { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
                     }
                     tries++;
                 }
