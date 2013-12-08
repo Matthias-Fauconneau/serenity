@@ -86,7 +86,7 @@ struct Tuner : Poll {
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     // Analysis
-    float threshold = 8; // 1/x, Relative harmonic energy (i.e over current period energy)
+    float threshold = 7; // 1/x, Relative harmonic energy (i.e over current period energy)
     PitchEstimator estimator {N};
     int lastKey = 0;
     int worstKey = -1;
@@ -180,8 +180,9 @@ struct Tuner : Poll {
             this->confidence.setText(dec(round(1./confidence)));
 
             if(confidence > 1./threshold && key==lastKey && key>=21 && key<21+keyCount) {
-                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-confidence)*keyOffset + confidence*offset;
-                float& keyVariance = profile.variances[key-21]; keyVariance = (1-confidence)*keyVariance + confidence*sq(offset - keyOffset);
+                const float alpha = confidence; //1./8 | confidence
+                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
+                float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
                 {int k = this->worstKey;
                     for(uint i: range(keyCount)) //FIXME: quadratic, cubic, exp curve ?
                         if(  k<0 ||
