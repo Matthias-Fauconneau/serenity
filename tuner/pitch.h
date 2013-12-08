@@ -79,7 +79,7 @@ struct PitchEstimator : FFT {
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
     const uint fMin = 7/*5*/, fMax = N/16; // 15 ~ 6000 Hz
-    const uint rankEnergyTradeoff = 92 /*46, 937*/; // Keeps higher octaves
+    const uint rankEnergyTradeoff = 46 /*46, 53, 64, 86, 92, 937*/; // Keeps higher octaves
     const uint iterationCount = 4; // Number of least square iterations
     const uint harmonicsPerIteration = 19; // Number of additional harmonics to evaluate at each least square iterations
     const float initialInharmonicity = 1./cb(23); // Initial inharmonicity
@@ -135,16 +135,16 @@ struct PitchEstimator : FFT {
         uint F1=peaks.last().f;
         array<uint> byFrequency(peaks.size);
         for(Peak peak: peaks) byFrequency.insertSorted(peak.f); // Insertion sorts by frequency
-        array<uint> distance (peaks.size); uint last=0; for(uint f: byFrequency) if(f-last > 6) { distance << f-last; last=f; } // Compute distances
+        array<uint> distance (peaks.size); uint last=0; for(uint f: byFrequency) if(f-last > fMin) { distance << f-last; last=f; } // Compute distances
         uint medianF0 = ::median(distance);
         this->medianF0 = medianF0;
-        /*if(F1/medianF0>=4 && F1>=100) { // Corrects outlying fundamental estimate from median
-            for(const auto& peak: maxPeaks) { log_(str(peak.f/medianF0,peak.f,"\t"_));
-                if(F1/medianF0>=1 && peak.f >=65 && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
+        if(F1/medianF0>=4 && F1>=100/*126*/) { // Corrects outlying fundamental estimate from median
+            for(const auto& peak: peaks.slice(9-8)) { log_(str(peak.f/medianF0,peak.f,"\t"_));
+                if(F1/medianF0>=1/*3*/ && peak.f >= 67/*65, 79, 125*/ && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
             } log("");
-            log("=> medianF0=F1", F1, F1/medianF0, distance.size);
+            log("=> medianF0=F1", F1, F1/medianF0);
             medianF0 = F1;
-        }*/
+        }
         uint nLow = F1/medianF0;
         uint nHigh = F1/(medianF0-4);
         this->nLow=nLow, this->nHigh=nHigh, this->F1=F1;
