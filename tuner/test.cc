@@ -53,7 +53,7 @@ struct Plot : Widget {
         float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
         float sMin = estimator.periodPower;
 
-        {float y = (logy ? (log2(2*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * (size.y-12);
+        {float y = (logy ? (log2(estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * (size.y-12);
             line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
 
         for(uint i: range(iMin, iMax)) { // Unfiltered energy density
@@ -100,14 +100,14 @@ struct Plot : Widget {
             Text label(dec(candidate.f0)+" "_+dec(round(candidate.energy))+" "_+dec(candidate.lastHarmonicRank)
                        +" "_+dec(round(rankEnergyTradeoff))+" B~"_+dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
-            for(uint n: range(candidate.peaks.size)) {
+            for(uint n: range(candidate.lastHarmonicRank)) {
                 uint f = candidate.peaks[n];
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
                 Text label(dec(n+1),16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
             }
-            for(uint n: range(candidate.peaksLS.size)) {
+            for(uint n: range(candidate.lastHarmonicRank)) {
                 uint f = candidate.peaksLS[n];
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));
@@ -181,8 +181,8 @@ struct PitchEstimation {
             const int32* period = stereo + t*2;
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
             for(uint i: range(periodSize)) {
-                float L = period[i*2+0], R = period[i*2+1];
-                float x = (L+R) * 0x1p-31;
+                float L = period[i*2+0];//, R = period[i*2+1];
+                float x = (L/*+R*/) * 0x1p-31;
                 signal[N-periodSize+i] = x;
             }
 
@@ -193,7 +193,7 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float threshold = 1./9/*8*/; // Relative harmonic energy (i.e over current period energy)
+            const float threshold = 1./4/*5*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
 
             if(confidence > threshold/2) {
@@ -206,7 +206,6 @@ struct PitchEstimation {
                 float Eb = estimator.candidates[0].lastEnergy;
                 float Nb = estimator.candidates[0].lastHarmonicRank;
                 float rankEnergyTradeoff = Ea-Eb ? (Eb*Na-Ea*Nb)/(Ea-Eb) : 0;
-
 
                 maxB = max(maxB, estimator.B);
                 log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
@@ -230,14 +229,14 @@ struct PitchEstimation {
                         plot.expectedF = expectedF;
                         plot.iMin = estimator.minF;
                         plot.iMax = estimator.maxF;
-                        plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * estimator.candidates.last().lastHarmonicRank));
+                        plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
                         plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
                         plot.iMax = min(plot.iMax, uint(expectedF*28));
                         plot.iMax = min(plot.iMax, estimator.fMax);
 
                         // Relax for hard cases
                         if(offsetF0>1./3 && key==expectedKey-1 && apply(split("D#1 C#1 A#0 G0 D#0 C#0"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(offsetF0>1./4 && key==expectedKey-1 && apply(split("D#0"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(offsetF0>1./5 && key==expectedKey-1 && apply(split("A#-1"_), parseKey).contains(expectedKey)) log("-"_);
                         else if( t%(5*rate) < rate && confidence<1./4 && expectedKey<=parseKey("A#0"_)) log("!"_); // Attack
                         else if( t%(5*rate) < 2*rate && confidence<1./5 && expectedKey<=parseKey("D#0"_)) log("!"_); // Attack
                         else { log("FIXME", confidence<1./5, float(t%(5*rate))/rate); break; }

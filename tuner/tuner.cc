@@ -86,7 +86,7 @@ struct Tuner : Poll {
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     // Analysis
-    float threshold = 7; // 1/x, Relative harmonic energy (i.e over current period energy)
+    float threshold = 6; // 1/x, Relative harmonic energy (i.e over current period energy)
     PitchEstimator estimator {N};
     int lastKey = 0;
     int worstKey = -1;
@@ -130,15 +130,15 @@ struct Tuner : Poll {
         const int32* period = audio.data + t*2;
         write(period, size);
         t += size;
-        timer.setRelative(size*1000/rate/16); // 16xRT
+        timer.setRelative(size*1000/rate/8); // 8xRT
     }
 #endif
     uint write(const int32* input, uint size) {
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
         assert(writeIndex+size<=signal.size);
         for(uint i: range(size)) {
-            float L = input[i*2+0], R = input[i*2+1];
-            float x = (L+R) * 0x1p-31;
+            float L = input[i*2+0];//, R = input[i*2+1];
+            float x = (L/*+R*/) * 0x1p-31;
             signal[writeIndex+i] = x;
         }
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer

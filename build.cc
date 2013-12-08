@@ -92,7 +92,7 @@ struct Build {
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             log(target);
-            while(pids.size>=4) { // Waits for a job to finish before launching a new unit
+            while(pids.size>=3) { // Waits for a job to finish before launching a new unit
                 int pid =  wait(); // Waits for any child to terminate
                 if(wait(pid)) fail();
                 pids.remove(pid);
