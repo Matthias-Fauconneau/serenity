@@ -185,7 +185,7 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float threshold = 1./8/*9*/; // Relative harmonic energy (i.e over current period energy)
+            const float threshold = 1./7/*8*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
 
             if(confidence > threshold/2) {

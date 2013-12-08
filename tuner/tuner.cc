@@ -73,7 +73,7 @@ struct Tuner : Poll {
     const uint rate = input.rate;
 
 #if TEST
-    Audio audio = decodeAudio("/Samples/A3-A4.flac"_);
+    Audio audio = decodeAudio("/Samples/"_+arguments()[0]+"-"_+arguments()[1]+".flac"_);
     Timer timer {thread};
 #endif
 
@@ -126,7 +126,7 @@ struct Tuner : Poll {
     uint t = 0;// 5*rate; // Let input settle
     void feed() {
         const uint size = periodSize;
-        if(t+size > audio.data.size/2) { /*exit();*/ return; }
+        if(t+size > audio.data.size/2) { return; }
         const int32* period = audio.data + t*2;
         write(period, size);
         t += size;
