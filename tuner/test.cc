@@ -81,7 +81,7 @@ struct Plot : Widget {
             float Nb = estimator.candidates[i].lastHarmonicRank;
             float rankEnergyTradeoff = Ea==Eb ? 0 : (Eb*Na-Ea*Nb)/(Ea-Eb);
 
-            Text label(ftoa(candidate.energy)+" "_+ftoa(rankEnergyTradeoff)+" B~"_+
+            Text label(dec(candidate.f0)+" "_+ftoa(candidate.energy)+" "_+ftoa(rankEnergyTradeoff)+" B~"_+
                        //dec(round(1000*12*log2(1+(estimator.B>-1?estimator.B:0))))
                        dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
@@ -133,7 +133,7 @@ struct PitchEstimation {
     PitchEstimator estimator {N};
 
     // UI
-    Plot plot {false, false, (float)N/rate, estimator.filteredSpectrum, estimator.spectrum, estimator};
+    Plot plot {false, true, (float)N/rate, estimator.filteredSpectrum, estimator.spectrum, estimator};
     Window window {&plot, int2(1050, 1680/2), "Test"_};
 
     // Results
