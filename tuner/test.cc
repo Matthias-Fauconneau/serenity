@@ -79,6 +79,14 @@ struct Plot : Widget {
             label.render(int2(position.x+x,position.y+16));
         }*/
 
+        { // F1
+            float f = estimator.F1;
+            float x = this->x(f+0.5)*size.x;
+            line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1));
+            Text label(str(estimator.nLow,estimator.nHigh),16, vec4(1,1,1,1));
+            label.render(int2(position.x+x,position.y+16));
+        }
+
         for(uint i: range(estimator.candidates.size)) {
             const auto& candidate = estimator.candidates[i];
             bool best = i==estimator.candidates.size-1;
@@ -185,7 +193,7 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float threshold = 1./7/*8*/; // Relative harmonic energy (i.e over current period energy)
+            const float threshold = 1./9/*8*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
 
             if(confidence > threshold/2) {
@@ -228,9 +236,11 @@ struct PitchEstimation {
                         plot.iMax = min(plot.iMax, estimator.fMax);
 
                         // Relax for hard cases
-                        if(offsetF0>1./3 && key==expectedKey-1 && apply(split("D#1 C#1 A#0"_), parseKey).contains(expectedKey)) log("-"_); // Mistune
-                        //else if(confidence<1./5 && expectedKey<=parseKey("A#-1"_) && t%(5*rate) < 2*rate && key==expectedKey+2) log("!"_); // Mistune
-                        else { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
+                        if(offsetF0>1./3 && key==expectedKey-1 && apply(split("D#1 C#1 A#0 G0 D#0 C#0"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if(offsetF0>1./4 && key==expectedKey-1 && apply(split("D#0"_), parseKey).contains(expectedKey)) log("-"_);
+                        else if( t%(5*rate) < rate && confidence<1./4 && expectedKey<=parseKey("A#0"_)) log("!"_); // Attack
+                        else if( t%(5*rate) < 2*rate && confidence<1./5 && expectedKey<=parseKey("D#0"_)) log("!"_); // Attack
+                        else { log("FIXME", confidence<1./5, float(t%(5*rate))/rate); break; }
                     }
                     tries++;
                 }

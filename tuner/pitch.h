@@ -95,11 +95,11 @@ struct PitchEstimator : FFT {
     using FFT::FFT;
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
-    const uint fMin = 8, fMax = N/16; // 15 ~ 6000 Hz
+    const uint fMin = 7/*5,7*/, fMax = N/16; // 15 ~ 6000 Hz
     const uint rankEnergyTradeoff = 50; // Keeps higher octaves
-    const uint iterationCount = 4; // Number of least square iterations
-    const uint harmonicsPerIteration = 10; // Number of additional harmonics to evaluate at each least square iterations
-    const float initialInharmonicity = 1./cb(14); // Initial inharmonicity
+    const uint iterationCount = 4/*4*/; // Number of least square iterations
+    const uint harmonicsPerIteration = 19/*10*/; // Number of additional harmonics to evaluate at each least square iterations
+    const float initialInharmonicity = 1./cb(22/*14,17,18,22*/); // Initial inharmonicity
 
     struct Peak {
         uint f;
@@ -116,7 +116,8 @@ struct PitchEstimator : FFT {
 
     struct Candidate {
         float f0; float B; float energy, lastEnergy; uint lastHarmonicRank; array<uint> peaks, peaksLS;
-        Candidate(float f0=0, float B=0, float energy=0, float lastEnergy=0, uint lastHarmonicRank=0, array<uint>&& peaks={}, array<uint>&& peaksLS={}):
+        Candidate(float f0=0, float B=0, float energy=0, float lastEnergy=0, uint lastHarmonicRank=0,
+                  array<uint>&& peaks={}, array<uint>&& peaksLS={}):
             f0(f0),B(B),energy(energy),lastEnergy(lastEnergy), lastHarmonicRank(lastHarmonicRank),peaks(move(peaks)),peaksLS(move(peaksLS)){}
     };
     list<Candidate, 2> candidates;
@@ -169,11 +170,12 @@ struct PitchEstimator : FFT {
             }
             medianF0 = F1;
         }
+        //else for(const auto& peak: peaks.slice(max<int>(0,peaks.size-4))) if(peak.f < F1 && peak.f/medianF0 >= 5) F1=peak.f; // Lower maximum
         uint nLow = F1/medianF0;
         uint nHigh = F1/(medianF0-4);
         this->nLow=nLow, this->nHigh=nHigh, this->F1=F1;
         float bestEnergy = 0, bestMerit = 0;
-        for(uint n1: range(/*1*/ max<int>(1, nLow-10), nHigh +1)) {
+        for(uint n1: range(/*1*/ max<int>(1, nLow/*-10*/), nHigh +1)) {
             float f0 = (float) F1 / (n1*(1 + initialInharmonicity*sq(n1))), f0B = f0*initialInharmonicity;
             float energy = 0, merit=0, lastHarmonicRank=0, lastEnergy = 0;
             array<uint> peaks, peaksLS;
