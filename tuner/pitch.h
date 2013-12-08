@@ -37,7 +37,6 @@ template<Type V, uint N> struct list { // Small sorted list
     struct element : V { float key; element(float key=0, V&& value=V()):V(move(value)),key(key){} } elements[N];
     void clear() { for(size_t i: range(size)) elements[i]=element(); size=0; }
     void insert(float key, V&& value) {
-        //for(auto& e: elements) log_(str(e.key)+" "_); log(""); log("insert",key);
         int i=0;
         while(i<size && elements[i].key<=key) i++;
         if(size<capacity) {
@@ -45,20 +44,17 @@ template<Type V, uint N> struct list { // Small sorted list
             size++;
             elements[i] = element(key, move(value)); // Inserts new candidate
         } else {
-            if(i<=0) { /*log("lower");*/ return; } // New candidate would be lower than current
+            if(i<=0) return; // New candidate would be lower than current
             for(uint j: range(i-1)) elements[j]=move(elements[j+1]); // Shifts left
             assert_(i>=1 && i<=size, i, size, N);
             elements[i-1] = element(key, move(value)); // Inserts new candidate
         }
-        //for(auto& e: elements) log_(str(e.key)+" "_); log("");
     }
     void remove(V key) {
-        //for(auto& e: elements) log_(str(e.key)+" "_); log(""); log("remove");
         for(int i=0; i<size; i++) {
             if((V)elements[i] == key) {
                 for(uint j: range(i, size-1)) elements[j]=move(elements[j+1]); // Shifts left
                 size--;
-                //for(auto& e: elements) log_(str(e.key)+" "_); log("");
                 return;
             }
         }
@@ -101,8 +97,8 @@ struct PitchEstimator : FFT {
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
     const uint fMin = 5, fMax = N/16; // 15 ~ 6000 Hz
     const uint rankEnergyTradeoff = 92; // Keeps higher octaves
-    const uint iterationCount = 4; // Number of least square iterations
-    //const uint harmonicsPerIteration = 19; // Number of additional harmonics to evaluate at each least square iterations
+    const uint iterationCount = 3/*2-3*/; // Number of least square iterations
+    const uint harmonicsPerIteration = 10/*10,16,17,19,21*/; // Number of additional harmonics to evaluate at each least square iterations
     const float initialInharmonicity = 1./cb(17); // Initial inharmonicity
 
     struct Peak {
@@ -110,7 +106,7 @@ struct PitchEstimator : FFT {
         bool operator ==(const Peak& o) const { return f == o.f; }
     };
     uint minF, maxF;
-    list<Peak, 11> peaks;
+    list<Peak, 16/*11*/> peaks;
 
     float harmonicEnergy=0;
     float filteredEnergy=0;
@@ -167,7 +163,8 @@ struct PitchEstimator : FFT {
         {uint last=0; for(uint f: byFrequency) { distance << f-last; last=f; }} // Compute distances
         uint medianF0 = ::median(distance);
         this->medianF0 = medianF0;
-        if(F1/medianF0>=10 && F1>=132) { // Corrects outlying fundamental estimate from median
+        if(F1/medianF0>12/*=10*/ && F1>374/*132*/) { // Corrects outlying fundamental estimate from median
+            log(F1/medianF0, F1);
             for(const auto& peak: peaks) if(peak.f/medianF0>=5 && peak.f >= 132 && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
             medianF0 = F1;
         }
@@ -175,15 +172,16 @@ struct PitchEstimator : FFT {
         uint nHigh = F1/(medianF0-4);
         this->nLow=nLow, this->nHigh=nHigh, this->F1=F1;
         float bestEnergy = 0, bestMerit = 0;
-        for(uint n1: range(1, nHigh +1)) {
-            float f0 = (float) F1 / n1, f0B = f0*initialInharmonicity, energy = 0, merit=0, lastHarmonicRank=0, lastEnergy = 0;
+        for(uint n1: range(/*1*/ max(1u, nLow), nHigh +1)) {
+            float f0 = (float) F1 / (n1*(1 + initialInharmonicity*sq(n1))), f0B = f0*initialInharmonicity;
+            float energy = 0, merit=0, lastHarmonicRank=0, lastEnergy = 0;
             array<uint> peaks, peaksLS;
             for(uint t unused: range(1,iterationCount +1)) {
                 peaks.clear(); peaksLS.clear(); energy = 0, merit=0, lastHarmonicRank=0;
                 // Least square optimization of linear fit: n.f0 = f[n] => argmin |Xb - y|^2 (X=n, b=f0, y=f[n]) <=> X'X b = X' y
                 float n2=0, n3=0, n4=0, nf=0, n2f=0; // Least square X'X and X'y coefficients
                 if(f0+f0B<fMin) f0=fMin;
-                for(uint n=1;; n++) {
+                for(uint n=1; n<=32; n++) {
                     // Finds local maximum around harmonic frequencies predicted by last f0 estimation
                     int fn = round(f0*n + f0B*cb(n)); // Using Bn^2 instead of n*sqrt(1+Bn^2) in order to keep least square linear (assumes B<<1)
                     if(fn+fMin>=fMax) break;
@@ -202,14 +200,14 @@ struct PitchEstimator : FFT {
                         if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
                     }
                     peaksLS << f;
-                    //if(n<=t*harmonicsPerIteration) { // Refines f0 with a weighted least square fit
+                    if(n<=t*harmonicsPerIteration) { // Refines f0 with a weighted least square fit
                         float w = peakEnergy;
                         nf  += w * n * f;
                         n2 += w * n * n;
                         n2f+= w * cb(n) * f;
                         n3 += w * cb(n) * n;
                         n4 += w * cb(n) * cb(n);
-                    //}
+                    }
                 }
                 // Solves X'X b = X'y
                 float a=n2, b=n3, c=n3, d=n4;

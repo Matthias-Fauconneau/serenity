@@ -185,7 +185,7 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float threshold = 1./8; // Relative harmonic energy (i.e over current period energy)
+            const float threshold = 1./8/*9*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
 
             if(confidence > threshold/2) {
@@ -193,9 +193,9 @@ struct PitchEstimation {
                 float keyF0 = keyToPitch(key)*N/rate;
                 const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
 
-                float Ea = estimator.candidates.last().energy;
+                float Ea = estimator.candidates.last().lastEnergy;
                 float Na = estimator.candidates.last().lastHarmonicRank;
-                float Eb = estimator.candidates[0].energy;
+                float Eb = estimator.candidates[0].lastEnergy;
                 float Nb = estimator.candidates[0].lastHarmonicRank;
                 float rankEnergyTradeoff = Ea-Eb ? (Eb*Na-Ea*Nb)/(Ea-Eb) : 0;
 
@@ -224,13 +224,13 @@ struct PitchEstimation {
                         plot.iMax = estimator.maxF;
                         plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * estimator.candidates.last().lastHarmonicRank));
                         plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
-                        plot.iMax = min(plot.iMax, uint(expectedF*16));
+                        plot.iMax = min(plot.iMax, uint(expectedF*28));
                         plot.iMax = min(plot.iMax, estimator.fMax);
 
                         // Relax for hard cases
-                        /*if(offsetF0<-1./4 && key==expectedKey+1 && apply(split("E0 C#0 C0 B-1 A#-1 A-1"_), parseKey).contains(expectedKey)) log("+"_);
-                        else if(confidence<1./5 && expectedKey<=parseKey("A#-1"_) && t%(5*rate) < 2*rate && key==expectedKey+2) log("!"_); // Mistune attack
-                        else*/ { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
+                        if(offsetF0>1./3 && key==expectedKey-1 && apply(split("D#1 C#1 A#0"_), parseKey).contains(expectedKey)) log("-"_); // Mistune
+                        //else if(confidence<1./5 && expectedKey<=parseKey("A#-1"_) && t%(5*rate) < 2*rate && key==expectedKey+2) log("!"_); // Mistune
+                        else { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
                     }
                     tries++;
                 }
