@@ -71,6 +71,14 @@ struct Plot : Widget {
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
         }
 
+        /*for(PitchEstimator::Peak peak: estimator.peaks) { // Peaks
+            float f = peak.f;
+            float x = this->x(f+0.5)*size.x;
+            line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1./4));
+            Text label("·",16, vec4(1,1,1,1));
+            label.render(int2(position.x+x,position.y+16));
+        }*/
+
         for(uint i: range(estimator.candidates.size)) {
             const auto& candidate = estimator.candidates[i];
             bool best = i==estimator.candidates.size-1;
@@ -81,9 +89,8 @@ struct Plot : Widget {
             float Nb = estimator.candidates[i].lastHarmonicRank;
             float rankEnergyTradeoff = Ea==Eb ? 0 : (Eb*Na-Ea*Nb)/(Ea-Eb);
 
-            Text label(dec(candidate.f0)+" "_+ftoa(candidate.energy)+" "_+ftoa(rankEnergyTradeoff)+" B~"_+
-                       //dec(round(1000*12*log2(1+(estimator.B>-1?estimator.B:0))))
-                       dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
+            Text label(dec(candidate.f0)+" "_+dec(round(candidate.energy))+" "_+dec(candidate.lastHarmonicRank)
+                       +" "_+dec(round(rankEnergyTradeoff))+" B~"_+dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
             for(uint n: range(candidate.peaks.size)) {
                 uint f = candidate.peaks[n];
@@ -115,10 +122,7 @@ struct Plot : Widget {
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation {
     // Input
-    //const uint lowKey=parseKey("A0"_)-12, highKey=parseKey("B1"_)-12;
-    //const uint lowKey=parseKey("A6"_)-12, highKey=parseKey("A7"_)-12;
-    //const uint lowKey=parseKey("A3"_)-12, highKey=parseKey("A4"_)-12;
-    const uint lowKey=parseKey("A2"_)-12, highKey=parseKey("A3"_)-12;
+    const uint lowKey=parseKey(arguments()[0])-12, highKey=parseKey(arguments()[1])-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
     ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
@@ -180,54 +184,59 @@ struct PitchEstimation {
 
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
-            const float expectedF = keyToPitch(expectedKey)*N/rate;
 
             const float threshold = 1./8; // Relative harmonic energy (i.e over current period energy)
-            float periodEnergy = estimator.periodEnergy;
-            float confidence = estimator.harmonicEnergy  / periodEnergy;
-
-            int key = round(pitchToKey(f*rate/N));
-            float keyF0 = keyToPitch(key)*N/rate;
-            const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
-
-            float Ea = estimator.candidates.last().lastEnergy;
-            float Na = estimator.candidates.last().lastHarmonicRank;
-            float Eb = estimator.candidates[0].lastEnergy;
-            float Nb = estimator.candidates[0].lastHarmonicRank;
-            float rankEnergyTradeoff = Ea-Eb ? (Eb*Na-Ea*Nb)/(Ea-Eb) : 0;
+            float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
+            //float confidence = estimator.harmonicEnergy - log2(estimator.periodEnergy);
 
             if(confidence > threshold/2) {
+                int key = round(pitchToKey(f*rate/N));
+                float keyF0 = keyToPitch(key)*N/rate;
+                const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
+
+                float Ea = estimator.candidates.last().energy;
+                float Na = estimator.candidates.last().lastHarmonicRank;
+                float Eb = estimator.candidates[0].energy;
+                float Nb = estimator.candidates[0].lastHarmonicRank;
+                float rankEnergyTradeoff = Ea-Eb ? (Eb*Na-Ea*Nb)/(Ea-Eb) : 0;
+
+
                 maxB = max(maxB, estimator.B);
-                    log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
-                +dec(round(100*offsetF0),2) +" c\t"_+dec(round(confidence?1./confidence:0),2)+"\t"_
-                +"B1~"_+dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_+str(estimator.B>0?log2(estimator.B):0)+"\t"_
-                        +(expectedKey == key ? (confidence > threshold ? "O"_ : "~"_) : "X"_)+"  "_
-                        +str("F1"_,estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+"th "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
-                        +dec(Ea)+" "_+dec(Na)+" "_+dec(Eb)+" "_+dec(Nb)+" "_+dec(rankEnergyTradeoff)+"\t"_
-                        );
-            }
+                log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
+                    +dec(round(100*offsetF0),2) +" c\t"_+dec(round(confidence?1./confidence:0),2)+"\t"_
+                    +"B1~"_+dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_+str(estimator.B>0?log2(estimator.B):0)+"\t"_
+                    +(expectedKey == key ? (confidence > threshold ? "O"_ : "~"_) : "X"_)+"  "_
+                    +str("F1"_,estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+"th "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
+                    +dec(Ea)+" "_+dec(Na)+" "_+dec(Eb)+" "_+dec(Nb)+" "_+dec(rankEnergyTradeoff)+"\t"_
+                    );
 
-            if(confidence > threshold) {
+                if(confidence > threshold) {
 
-                if(expectedKey==key) {
-                    success++;
-                    lastKey = key;
+                    if(expectedKey==key) {
+                        success++;
+                        lastKey = key;
+                    }
+                    else {
+                        fail++;
+
+                        const float expectedF = keyToPitch(expectedKey)*N/rate;
+                        plot.expectedF = expectedF;
+                        plot.iMin = estimator.minF;
+                        plot.iMax = estimator.maxF;
+                        plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * estimator.candidates.last().lastHarmonicRank));
+                        plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
+                        plot.iMax = min(plot.iMax, uint(expectedF*16));
+                        plot.iMax = min(plot.iMax, estimator.fMax);
+
+                        // Relax for hard cases
+                        if(offsetF0<-1./4 && key==expectedKey+1 && apply(split("E0 C#0 C0 B-1 A#-1 A-1"_), parseKey).contains(expectedKey)) log("+"_);
+                        else if(confidence<1./5 && expectedKey<=parseKey("A#-1"_) && t%(5*rate) < 2*rate && key==expectedKey+2) log("!"_); // Mistune attack
+                        else { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
+                    }
+                    tries++;
                 }
-                else {
-                    fail++;
-
-                    plot.expectedF = expectedF;
-                    plot.iMin = f/2;
-                    plot.iMax = min(estimator.fMax, (uint)max(expectedF, f) * estimator.candidates.last().lastHarmonicRank);
-
-                    // Relax for hard cases
-                    if(offsetF0<-1./4 && key==expectedKey+1 && apply(split("E0 C#0 C0 B-1 A#-1 A-1"_), parseKey).contains(expectedKey)) log("+"_);
-                    else if(confidence<1./5 && expectedKey<=parseKey("A#-1"_) && t%(5*rate) < 2*rate && key==expectedKey+2) log("!"_); // Mistune attack
-                    else { log("FIXME", confidence<1./3, expectedKey<=parseKey("A#-1"_), t%(5*rate) < 2*rate, key==expectedKey+2); break; }
-                }
-                tries++;
+                previousKey = key;
             }
-            previousKey = key;
             total++;
         }
         if(plot.expectedF) {

@@ -187,6 +187,6 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 /// Returns whether an integer is a power of two
 inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 /// Returns floor(log2(v))
-inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+//inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
 inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
