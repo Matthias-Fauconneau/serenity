@@ -96,7 +96,7 @@ struct PitchEstimator : FFT {
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
     const uint fMin = 8, fMax = N/16; // 15 ~ 6000 Hz
-    const uint rankEnergyTradeoff = 326 /*78*/; // Keeps higher octaves
+    const uint rankEnergyTradeoff = 645 /*134, 326*/; // Keeps higher octaves
     const uint iterationCount = 4; // Number of least square iterations
     const float initialInharmonicity = 1./cb(22); // Initial inharmonicity
     const float noiseThreshold = 2/*4*/;
@@ -167,15 +167,16 @@ struct PitchEstimator : FFT {
         {uint last=0; for(uint f: byFrequency) { distance << f-last; last=f; }} // Compute distances
         uint medianF0 = ::median(distance);
         this->medianF0 = medianF0;
-#if 0
+#if 1
         log(byFrequency.last()/medianF0, byFrequency.last(), F1/medianF0, F1);
-        if(byFrequency.last()/medianF0>=23/*28*/ && byFrequency.last()>=235/*660*/ && F1/medianF0>=3/*10*/ && F1>=101) { // Corrects outlying fundamental estimate from median
-#if 0
+        // Corrects outlying fundamental estimate from median
+        if(byFrequency.last()/medianF0>=23/*28*/ && byFrequency.last()>=235/*660*/ && F1/medianF0>=3/*10*/ && F1>=101) {
+#if 1
             for(const auto& peak: peaks) { log(peak.f/medianF0, peak.f);
-                if(peak.f/medianF0>=1/*5*/ && peak.f >= 35/*132*/ && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
+                if(spectrum[peak.f] > 2*noiseThreshold*periodPower && peak.f/medianF0>=2/*5*/ && peak.f >= 56/*132*/ && peak.f < F1)
+                    medianF0=peak.f; // Uses lowest maximum peak as median F0
             }
 #endif
-            medianF0 = F1;
         }
         //else for(const auto& peak: peaks.slice(max<int>(0,peaks.size-4))) if(peak.f < F1 && peak.f/medianF0 >= 5) F1=peak.f; // Lower maximum
 #endif

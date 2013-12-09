@@ -168,7 +168,7 @@ struct Tuner : Poll {
         float f = estimator.estimate();
         float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
         assert(estimator.candidates.size==2);
-        float ambiguity = estimator.candidates[1].energy ? estimator.candidates[0].energy / estimator.candidates[1].energy : 0;
+        float ambiguity = estimator.candidates[1].key ? estimator.candidates[0].key / estimator.candidates[1].key : 0;
 
         if(confidence > 1./(confidencethreshold+1) && ambiguity <= 1) {
             int key = round(pitchToKey(f*rate/N));
