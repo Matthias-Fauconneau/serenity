@@ -86,9 +86,11 @@ struct Tuner : Poll {
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     // Analysis
-    float threshold = 6; // 1/x, Relative harmonic energy (i.e over current period energy)
+    float confidencethreshold = 6; // 1/ Relative harmonic energy (i.e over current period energy)
+    float ambiguityThreshold = 16; // 1-1/ Energy of second candidate relative to first
     PitchEstimator estimator {N};
     int lastKey = 0;
+    float lastOffset, lastConfidence;
     int worstKey = -1;
 
     // UI
@@ -106,7 +108,8 @@ struct Tuner : Poll {
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
-        if(arguments() && isInteger(arguments()[0])) threshold=toInteger(arguments()[0]);
+        if(arguments().size>0 && isInteger(arguments()[0])) confidencethreshold=toInteger(arguments()[0]);
+        if(arguments().size>1 && isInteger(arguments()[1])) ambiguityThreshold=toInteger(arguments()[1]);
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
@@ -163,11 +166,12 @@ struct Tuner : Poll {
         for(uint i: range(signal.size-readIndex, N)) estimator.windowed[i] = estimator.window[i] * signal[i+readIndex-signal.size];
 
         float f = estimator.estimate();
-        int key = round(pitchToKey(f*rate/N));
-
         float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
+        assert(estimator.candidates.size==2);
+        float ambiguity = estimator.candidates[1].energy ? estimator.candidates[0].energy / estimator.candidates[1].energy : 0;
 
-        if(confidence > 1./(threshold+1)) {
+        if(confidence > 1./(confidencethreshold+1) && ambiguity <= 1) {
+            int key = round(pitchToKey(f*rate/N));
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
             const float error =  12*log2((expectedF+1)/expectedF);
@@ -179,10 +183,10 @@ struct Tuner : Poll {
             this->fError.setText(dec(round(100*error)));
             this->confidence.setText(dec(round(1./confidence)));
 
-            if(confidence > 1./threshold && key==lastKey && key>=21 && key<21+keyCount) {
-                const float alpha = confidence; //1./8 | confidence
-                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
-                float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
+            if(key==lastKey) {
+                const float alpha = lastConfidence; //1./8 | confidence
+                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*lastOffset;
+                float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(lastOffset - keyOffset);
                 {int k = this->worstKey;
                     for(uint i: range(keyCount)) //FIXME: quadratic, cubic, exp curve ?
                         if(  k<0 ||
@@ -191,8 +195,12 @@ struct Tuner : Poll {
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
             }
+            // Delay effect (Swap both tests for immediate effect)
+            if(confidence > 1./confidencethreshold && ambiguity < 1-1./ambiguityThreshold && key>=21 && key<21+keyCount) {
+                lastKey = key; lastConfidence=confidence, lastOffset=offset; // Delays offset effect until key change confirmation
+                //FIXME: last lastKey is never
+            }
         }
-        lastKey = key;
 
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
