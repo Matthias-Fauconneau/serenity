@@ -95,12 +95,11 @@ struct PitchEstimator : FFT {
     using FFT::FFT;
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
-    const uint fMin = 8/*5*//*5,7*/, fMax = N/16; // 15 ~ 6000 Hz
-    const uint rankEnergyTradeoff = 78/*65*/; // Keeps higher octaves
-    const uint iterationCount = 4/*4*/; // Number of least square iterations
-    //const uint harmonicsPerIteration = 19/*10*/; // Number of additional harmonics to evaluate at each least square iterations
-    const float initialInharmonicity = 1./cb(22/*14,17,18,22*/); // Initial inharmonicity
-    const float noiseThreshold = 4;
+    const uint fMin = 8, fMax = N/16; // 15 ~ 6000 Hz
+    const uint rankEnergyTradeoff = 326 /*78*/; // Keeps higher octaves
+    const uint iterationCount = 4; // Number of least square iterations
+    const float initialInharmonicity = 1./cb(22); // Initial inharmonicity
+    const float noiseThreshold = 2/*4*/;
 
     struct Peak {
         uint f;
@@ -110,7 +109,7 @@ struct PitchEstimator : FFT {
     list<Peak, 16> peaks;
 
     float harmonicEnergy=0;
-    float filteredEnergy=0;
+    //float filteredEnergy=0;
     float F0=0, B=0; // F0.n+F0.B.n^2 fit of all harmonics (1st harmonic is F0.(1+B))
     buffer<float> filteredSpectrum {fMax}; // Filtered power spectrum
     uint medianF0, F1, nLow, nHigh;
@@ -136,28 +135,31 @@ struct PitchEstimator : FFT {
         minF=fMax, maxF=fMin;
         for(uint i: range(fMin, fMax-2)) {
             if(spectrum[i- 1] < spectrum[i] && spectrum[i] > spectrum[i+1]) {
-                // Copies peaks / Filters non peaks
-                float w = 1; // Attenuates 50Hz
-                //if(abs(50*N/rate-int(i)) < 2) w = 1./64;
-                //if(abs(3*50*N/rate-int(i)) < 2) w = 1./4;
-                filteredSpectrum[i] = w*spectrum[i];
-                for(uint j=i-1; j>0 && spectrum[j+1]>spectrum[j] && j>i-3; j--) filteredSpectrum[j] = w*spectrum[j];
-                for(uint j=i+1; j<fMax && spectrum[j-1]>spectrum[j] && j<i+3; j++) filteredSpectrum[j] = w*spectrum[j];
-
-                if(filteredSpectrum[i] > noiseThreshold*periodPower &&
-                        filteredSpectrum[i-2] < filteredSpectrum[i-1] && filteredSpectrum[i+1] > filteredSpectrum[i+2]) {
-                    if(i<minF) minF=i; if(i>maxF) maxF=i;
-                    if(i-fMin > last) { peaks.insert(filteredSpectrum[i], {i}); last=i; } // Records maximum peaks
-                    else if(filteredSpectrum[i]>filteredSpectrum[last]) { // Overwrites lower peak
-                        peaks.remove({last}); // Ensures only one is kept
-                        peaks.insert(filteredSpectrum[i], {i});
-                        last=i;
-                    } // else skips lower peak
+                if(spectrum[i] > noiseThreshold*periodPower) {
+                    if(spectrum[i-2]/2 < spectrum[i-1] && spectrum[i+1] > spectrum[i+2]/2) {
+                        /*if(filteredSpectrum[i] > noiseThreshold*periodPower &&
+                        filteredSpectrum[i-2] < filteredSpectrum[i-1] && filteredSpectrum[i+1] > filteredSpectrum[i+2]) {*/
+                        // Copies peaks / Filters non peaks
+                        filteredSpectrum[i] = spectrum[i];
+                        for(uint j=i-1; j>0 && spectrum[j+1]>spectrum[j] && j>i-3; j--) filteredSpectrum[j] = spectrum[j];
+                        for(uint j=i+1; j<fMax && spectrum[j-1]>spectrum[j] && j<i+3; j++) filteredSpectrum[j] = spectrum[j];
+                        if(spectrum[i-2] < spectrum[i-1] && spectrum[i+1] > spectrum[i+2]) {
+                            if(i<minF) minF=i; if(i>maxF) maxF=i;
+                            if(i-fMin > last) { peaks.insert(spectrum[i], {i}); } // Records maximum peaks
+                            else if(spectrum[i]>spectrum[last]) { // Overwrites lower peak
+                                peaks.remove({last}); // Ensures only one is kept
+                                peaks.insert(spectrum[i], {i});
+                            } // else skips lower peak
+                            last=i;
+                        }
+                    }
                 }
             }
         }
+        //for(Peak peak: peaks) filteredSpectrum[peak.f] = spectrum[peak.f];
         spectrum = filteredSpectrum; // Cleans spectrum
-        for(uint i: range(fMin, fMax)) filteredEnergy += spectrum[i];
+        //for(uint i: range(fMin, fMax)) filteredEnergy += spectrum[i];
+        if(!peaks.size) { harmonicEnergy=0; return 0; }
         uint F1=peaks.last().f;
         array<uint> byFrequency(peaks.size);
         for(Peak peak: peaks) byFrequency.insertSorted(peak.f); // Insertion sorts by frequency
@@ -166,17 +168,19 @@ struct PitchEstimator : FFT {
         uint medianF0 = ::median(distance);
         this->medianF0 = medianF0;
 #if 0
-        log(byFrequency.last()/medianF0, byFrequency.last());
-        if(byFrequency.last()/medianF0>=23/*28*/ && byFrequency.last()>=235/*660*/ && F1/medianF0>=10 && F1>=101) { // Corrects outlying fundamental estimate from median
+        log(byFrequency.last()/medianF0, byFrequency.last(), F1/medianF0, F1);
+        if(byFrequency.last()/medianF0>=23/*28*/ && byFrequency.last()>=235/*660*/ && F1/medianF0>=3/*10*/ && F1>=101) { // Corrects outlying fundamental estimate from median
+#if 0
             for(const auto& peak: peaks) { log(peak.f/medianF0, peak.f);
                 if(peak.f/medianF0>=1/*5*/ && peak.f >= 35/*132*/ && peak.f < F1) F1=peak.f; // Uses lowest maximum peak
             }
+#endif
             medianF0 = F1;
         }
         //else for(const auto& peak: peaks.slice(max<int>(0,peaks.size-4))) if(peak.f < F1 && peak.f/medianF0 >= 5) F1=peak.f; // Lower maximum
 #endif
         uint nLow = F1/medianF0;
-        uint nHigh = F1/(medianF0-2/*4*/);
+        uint nHigh = F1/(medianF0-2);
         this->nLow=nLow, this->nHigh=nHigh, this->F1=F1;
         float bestEnergy = 0, bestMerit = 0;
         for(uint n1: range(1 /*max<int>(1, nLow-10)*/, nHigh +1)) {
@@ -218,8 +222,8 @@ struct PitchEstimator : FFT {
                 if(det) {
                     f0B = (-c*nf + a*n2f) / det;
                     if(f0B>0) f0 = (d*nf - b*n2f) / det;
-                    else f0 = nf/n2, f0B=0;
-                } else f0 = nf/n2, f0B=0;
+                    else if(n2) f0 = nf/n2, f0B=0;
+                } else if(n2) f0 = nf/n2, f0B=0;
             }
             candidates.insert(merit, Candidate(f0, f0B/f0, energy, lastEnergy, lastHarmonicRank, copy(peaks), copy(peaksLS)));
             if(merit > bestMerit) {

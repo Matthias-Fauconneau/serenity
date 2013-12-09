@@ -82,7 +82,7 @@ struct Plot : Widget {
         { // F1
             float f = estimator.F1;
             float x = this->x(f+0.5)*size.x;
-            line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1));
+            //line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1));
             Text label(str(estimator.nLow,estimator.nHigh),16, vec4(1,1,1,1));
             label.render(int2(position.x+x,position.y+16));
         }
@@ -182,7 +182,7 @@ struct PitchEstimation {
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
             for(uint i: range(periodSize)) {
                 float L = period[i*2+0];//, R = period[i*2+1];
-                float x = (L/*+R*/) * 0x1p-31;
+                float x = (L/*+R*/) * 0x1p-24;
                 signal[N-periodSize+i] = x;
             }
 
@@ -193,10 +193,13 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float threshold = 1./4/*5*/; // Relative harmonic energy (i.e over current period energy)
+            const float confidenceThreshold = 1./5/*5*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
+            const float ambiguityThreshold = 1./16/*227*/; // 1- Energy of second candidate relative to first
+            assert(estimator.candidates.size==2);
+            float ambiguity = estimator.candidates[1].energy ? estimator.candidates[0].energy / estimator.candidates[1].energy : 0;
 
-            if(confidence > threshold/2) {
+            if(confidence > confidenceThreshold/2) {
                 int key = round(pitchToKey(f*rate/N));
                 float keyF0 = keyToPitch(key)*N/rate;
                 const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
@@ -209,14 +212,15 @@ struct PitchEstimation {
 
                 maxB = max(maxB, estimator.B);
                 log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
-                    +dec(round(100*offsetF0),2) +" c\t"_+dec(round(confidence?1./confidence:0),2)+"\t"_
+                    +dec(round(100*offsetF0),2) +" c\t"_
+                    +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(ambiguity!=1?1./(1-ambiguity):0),2)+"\t"_
                     +"B1~"_+dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_+str(estimator.B>0?log2(estimator.B):0)+"\t"_
-                    +(expectedKey == key ? (confidence > threshold ? "O"_ : "~"_) : "X"_)+"  "_
+                    +(expectedKey == key ? (confidence > confidenceThreshold ? "O"_ : "~"_) : "X"_)+"  "_
                     +str("F1"_,estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+"th "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
                     +dec(Ea)+" "_+dec(Na)+" "_+dec(Eb)+" "_+dec(Nb)+" "_+dec(rankEnergyTradeoff)+"\t"_
                     );
 
-                if(confidence > threshold) {
+                if(confidence > confidenceThreshold && ambiguity < 1-ambiguityThreshold) {
 
                     if(expectedKey==key) {
                         success++;
@@ -225,21 +229,29 @@ struct PitchEstimation {
                     else {
                         fail++;
 
-                        const float expectedF = keyToPitch(expectedKey)*N/rate;
-                        plot.expectedF = expectedF;
-                        plot.iMin = estimator.minF;
-                        plot.iMax = estimator.maxF;
-                        plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
-                        plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
-                        plot.iMax = min(plot.iMax, uint(expectedF*28));
-                        plot.iMax = min(plot.iMax, estimator.fMax);
-
                         // Relax for hard cases
-                        if(offsetF0>1./3 && key==expectedKey-1 && apply(split("D#1 C#1 A#0 G0 D#0 C#0"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if(offsetF0>1./5 && key==expectedKey-1 && apply(split("A#-1"_), parseKey).contains(expectedKey)) log("-"_);
-                        else if( t%(5*rate) < rate && confidence<1./4 && expectedKey<=parseKey("A#0"_)) log("!"_); // Attack
-                        else if( t%(5*rate) < 2*rate && confidence<1./5 && expectedKey<=parseKey("D#0"_)) log("!"_); // Attack
-                        else { log("FIXME", confidence<1./5, float(t%(5*rate))/rate); break; }
+                        if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 1*rate && apply(split("C2"_), parseKey).contains(expectedKey))
+                            log("-"_); // Mistune
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && apply(split("C1"_), parseKey).contains(expectedKey))
+                            log("... -"_); // Release
+                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && apply(split("E1"_), parseKey).contains(expectedKey))
+                            log("... -"_); // Release
+                        else if(offsetF0>0 && key==expectedKey-1 && apply(split("A#-1"_), parseKey).contains(expectedKey)) log("-"_); // Mistune
+                        else if(t%(5*rate) < rate && confidence<1./4 && expectedKey<=parseKey("A#-1"_)) log("!"_); // Attack
+                        else {
+                            const float expectedF = keyToPitch(expectedKey)*N/rate;
+                            plot.expectedF = expectedF;
+                            plot.iMin = estimator.minF;
+                            plot.iMax = expectedF*4;
+                            plot.iMax = max(plot.iMax, estimator.maxF);
+                            plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
+                            plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
+                            plot.iMax = min(plot.iMax, uint(expectedF*28));
+                            plot.iMax = min(plot.iMax, estimator.fMax);
+
+                            log("FIXME", confidence<1./5, float(t%(5*rate))/rate);
+                            break;
+                        }
                     }
                     tries++;
                 }
