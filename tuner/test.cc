@@ -193,9 +193,9 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./7/*5,7*/; // Relative harmonic energy (i.e over current period energy)
+            const float confidenceThreshold = 1./10/*7*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-            const float ambiguityThreshold = 1./7/*7,16,18,102*/; // 1- Energy of second candidate relative to first
+            const float ambiguityThreshold = 1./7/*7,16*/; // 1- Energy of second candidate relative to first
             const float threshold = 1./17; //34;
 
             if(confidence > confidenceThreshold/2) {
@@ -235,33 +235,23 @@ struct PitchEstimation {
                         // FIXME: Inharmonic match on attack and release
                         if(confidence<1./5 && t%(5*rate) > 4.5*rate && apply(split("G4 A#1"_), parseKey).contains(expectedKey)) //FIXME: absolute volume
                             log("x -"_); // Release
-                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < 1*rate && apply(split("G#2"_), parseKey).contains(expectedKey))
-                            log("! -"_); // Attack
-                        else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && apply(split("G2"_), parseKey).contains(expectedKey))
-                            log("! -"_); // Attack
-                        else if(offsetF0>1./6 && key==expectedKey-1 && t%(5*rate) > 1*rate && apply(split("C2"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Mistune? (FIXME)
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && apply(split("A#1"_), parseKey).contains(expectedKey))
-                            log("! -"_); // Attack
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && apply(split("A1"_), parseKey).contains(expectedKey))
-                            log("! -"_); // Mistune? (FIXME)
-                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && apply(split("E1"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Release
-                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) < rate/2 && apply(split("D#1"_), parseKey).contains(expectedKey))
-                            log("! -"_); // Attack (FIXME)
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 4*rate && apply(split("D#1"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Release
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && apply(split("C1"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Release
-                        else if(offsetF0>1./4 && key==expectedKey-1 && apply(split("A#0"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Mistune? (FIXME)
-                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < rate && apply(split("F#0"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Mistune? (FIXME)
-                        else if(offsetF0>0 && key==expectedKey-1 && apply(split("A#-1"_), parseKey).contains(expectedKey)) {
+                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
+                        else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("G2"_)) log("! -"_); // Attack
+                        else if(offsetF0>1./6 && key==expectedKey-1 && confidence<1./4 && expectedKey==parseKey("C2"_)) log("x -"_); // Mistune?
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! -"_); // Attack
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && expectedKey==parseKey("A1"_)) log("! -"_); // Mistune?
+                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("E1"_)) log("x -"_); // Release
+                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("D#1"_)) log("! -"_); // Attack
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("D#1"_)) log("x -"_); // Release
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && expectedKey==parseKey("C1"_)) log("x -"_); // Release
+                        else if(offsetF0>1./4 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#0"_)) log("x -"_); // Mistune?
+                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < rate && expectedKey==parseKey("F#0"_)) log("x -"_); // Mistune?
+                        else if(offsetF0>0 && key==expectedKey-1 && t%(5*rate) > 3*rate && expectedKey==parseKey("B-1"_)) log("-"_); // Mistune?
+                        else if(offsetF0>0 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#-1"_)) {
                             if(offsetF0>1./3) { lastKey = expectedKey; log("FIXME"_); }
                             log("-"_); // Mistune? (FIXME)
                         }
-                        else if(t%(5*rate) < rate && confidence<1./4 && expectedKey<=parseKey("A#-1"_)) log("!"_); // Attack
+                        else if(t%(5*rate) < rate/2 && confidence<1./4 && expectedKey==parseKey("A#-1"_)) log("!"_); // Attack
                         else {
                             const float expectedF = keyToPitch(expectedKey)*N/rate;
                             plot.expectedF = expectedF;

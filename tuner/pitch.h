@@ -102,7 +102,7 @@ struct PitchEstimator : FFT {
     const float initialInharmonicity = 0; //1./cb(24/*21,22*/); // Initial inharmonicity
     const float noiseThreshold = 2/*4*/;
     const uint medianError = 3;
-    const uint maxHarmonicCount = 19/*27*/;
+    const uint maxHarmonicCount = 18/*18-27*/;
     // Conditions for median F0 override
     const uint lastHarmonicRank = 24;
     const uint peakRank = 4;
