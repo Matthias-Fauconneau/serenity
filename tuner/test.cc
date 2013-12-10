@@ -181,8 +181,8 @@ struct PitchEstimation {
             const int32* period = stereo + t*2;
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
             for(uint i: range(periodSize)) {
-                float L = period[i*2+0];//, R = period[i*2+1];
-                float x = (L/*+R*/) * 0x1p-24;
+                float L = period[i*2+0];
+                float x = L* 0x1p-24;
                 signal[N-periodSize+i] = x;
             }
 
@@ -193,37 +193,37 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./5/*5*/; // Relative harmonic energy (i.e over current period energy)
+            const float confidenceThreshold = 1./7/*5,7*/; // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-            const float ambiguityThreshold = 1./18/*16,102*/; // 1- Energy of second candidate relative to first
-            assert(estimator.candidates.size==2);
-            float ambiguity = estimator.candidates[1].key /*&& abs(estimator.candidates[0].f0*(1+estimator.candidates[0].B) - f) > 1*/ ?
-                        estimator.candidates[0].key / estimator.candidates[1].key : 0; // Only tests if both best candidates are not identical
+            const float ambiguityThreshold = 1./7/*7,16,18,102*/; // 1- Energy of second candidate relative to first
+            const float threshold = 1./17; //34;
 
             if(confidence > confidenceThreshold/2) {
+                float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
+                        && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
+                            estimator.candidates[0].key / estimator.candidates[1].key : 0;
+                assert_(ambiguity!=1, estimator.candidates[0].f0*(1+estimator.candidates[0].B), f);
+
                 int key = round(pitchToKey(f*rate/N));
                 float keyF0 = keyToPitch(key)*N/rate;
                 const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
 
-                /*float Ea = estimator.candidates.last().lastEnergy;
-                float Na = estimator.candidates.last().lastHarmonicRank;
-                float Eb = estimator.candidates[0].lastEnergy;
-                float Nb = estimator.candidates[0].lastHarmonicRank;
-                float rankEnergyTradeoff = Ea-Eb ? (Eb*Na-Ea*Nb)/(Ea-Eb) : 0;*/
-
                 maxB = max(maxB, estimator.B);
                 log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
                     +dec(round(100*offsetF0),2) +" c\t"_
-                    +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(ambiguity!=1?1./(1-ambiguity):0),2)+"\t"_
-                    +dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_+str(estimator.B>0?log2(estimator.B):0)+"\t"_
-                    +(expectedKey == key ? (confidence > confidenceThreshold ? "O"_ : "~"_) : "X"_)+"  "_
-                    +dec(round(estimator.candidates[0].f0*(1+estimator.candidates[0].B))) +" "_+ dec(round(f))+"\t"_
-                    +str("F1"_,estimator.F1)+" "_+str(estimator.F1/estimator.medianF0)+"th "_+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
+                    +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(1-ambiguity?1./(1-ambiguity):0),2)+"\t"_
+                    +dec(round((confidence*(1-ambiguity))?1./(confidence*(1-ambiguity)):0),2)+"\t"_
+                    +dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_
+                    +(expectedKey == key ? (confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold ? "O"_ : "~"_) : "X"_)
+                    //+"  "_+str((estimator.candidates[0].f0*(1+estimator.candidates[0].B))==f)+"\t"_
+                    //+str(estimator.candidates.size,estimator.candidates[0].f0*(1+estimator.candidates[0].B),f)+"\t"_
+                    //+str("F1"_,estimator.F1,"F0",estimator.medianF0)+" "_+str((float)estimator.F1/(estimator.nLow+1)-estimator.medianF0)+" "_
+                    //+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
                     //+dec(round(estimator.candidates[0].energy))+" "_+dec(round(estimator.candidates[1].energy))+"\t"_
-                    //+dec(Ea)+" "_+dec(Na)+" "_+dec(Eb)+" "_+dec(Nb)+" "_+dec(rankEnergyTradeoff)+"\t"_
                     );
 
-                if(confidence > confidenceThreshold && ambiguity < 1-ambiguityThreshold) {
+                if(confidence > confidenceThreshold && //1-ambiguity > ambiguityThreshold &&
+                      confidence*(1-ambiguity) > threshold) {
 
                     if(expectedKey==key) {
                         success++;
@@ -232,21 +232,40 @@ struct PitchEstimation {
                     else {
                         fail++;
 
-                        // Relax for hard cases
-                        if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 1*rate && apply(split("C2"_), parseKey).contains(expectedKey))
-                            log("x -"_); // Mistune
+                        // FIXME: Inharmonic match on attack and release
+                        if(confidence<1./5 && t%(5*rate) > 4.5*rate && apply(split("G4 A#1"_), parseKey).contains(expectedKey)) //FIXME: absolute volume
+                            log("x -"_); // Release
+                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < 1*rate && apply(split("G#2"_), parseKey).contains(expectedKey))
+                            log("! -"_); // Attack
+                        else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && apply(split("G2"_), parseKey).contains(expectedKey))
+                            log("! -"_); // Attack
+                        else if(offsetF0>1./6 && key==expectedKey-1 && t%(5*rate) > 1*rate && apply(split("C2"_), parseKey).contains(expectedKey))
+                            log("x -"_); // Mistune? (FIXME)
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && apply(split("A#1"_), parseKey).contains(expectedKey))
+                            log("! -"_); // Attack
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && apply(split("A1"_), parseKey).contains(expectedKey))
+                            log("! -"_); // Mistune? (FIXME)
                         else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && apply(split("E1"_), parseKey).contains(expectedKey))
+                            log("x -"_); // Release
+                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) < rate/2 && apply(split("D#1"_), parseKey).contains(expectedKey))
+                            log("! -"_); // Attack (FIXME)
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 4*rate && apply(split("D#1"_), parseKey).contains(expectedKey))
                             log("x -"_); // Release
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && apply(split("C1"_), parseKey).contains(expectedKey))
                             log("x -"_); // Release
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && apply(split("A#1"_), parseKey).contains(expectedKey))
-                            log("! -"_); // Attack
-                        else if(offsetF0>0 && key==expectedKey-1 && apply(split("A#-1"_), parseKey).contains(expectedKey)) log("-"_); // Mistune
+                        else if(offsetF0>1./4 && key==expectedKey-1 && apply(split("A#0"_), parseKey).contains(expectedKey))
+                            log("x -"_); // Mistune? (FIXME)
+                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < rate && apply(split("F#0"_), parseKey).contains(expectedKey))
+                            log("x -"_); // Mistune? (FIXME)
+                        else if(offsetF0>0 && key==expectedKey-1 && apply(split("A#-1"_), parseKey).contains(expectedKey)) {
+                            if(offsetF0>1./3) { lastKey = expectedKey; log("FIXME"_); }
+                            log("-"_); // Mistune? (FIXME)
+                        }
                         else if(t%(5*rate) < rate && confidence<1./4 && expectedKey<=parseKey("A#-1"_)) log("!"_); // Attack
                         else {
                             const float expectedF = keyToPitch(expectedKey)*N/rate;
                             plot.expectedF = expectedF;
-                            plot.iMin = estimator.minF;
+                            plot.iMin = min(estimator.minF, uint(f));
                             plot.iMax = expectedF*4;
                             plot.iMax = max(plot.iMax, estimator.maxF);
                             plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));

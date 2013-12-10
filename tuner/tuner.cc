@@ -170,7 +170,7 @@ struct Tuner : Poll {
         assert(estimator.candidates.size==2);
         float ambiguity = estimator.candidates[1].key ? estimator.candidates[0].key / estimator.candidates[1].key : 0;
 
-        if(confidence > 1./(confidencethreshold+1) && ambiguity <= 1) {
+        if(confidence > 1./(confidencethreshold+1) && 1-ambiguity >= 0) {
             int key = round(pitchToKey(f*rate/N));
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
@@ -196,7 +196,7 @@ struct Tuner : Poll {
                 }
             }
             // Delay effect (Swap both tests for immediate effect)
-            if(confidence > 1./confidencethreshold && ambiguity < 1-1./ambiguityThreshold && key>=21 && key<21+keyCount) {
+            if(confidence > 1./confidencethreshold && 1-ambiguity > 1./ambiguityThreshold && key>=21 && key<21+keyCount) {
                 lastKey = key; lastConfidence=confidence, lastOffset=offset; // Delays offset effect until key change confirmation
                 //FIXME: last lastKey is never
             }
