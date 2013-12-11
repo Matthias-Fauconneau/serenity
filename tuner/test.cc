@@ -93,29 +93,15 @@ struct Plot : Widget {
             const auto& candidate = estimator.candidates[i];
             bool best = i==estimator.candidates.size-1;
             vec4 color(!best,best,0,1);
-            float Ea = estimator.candidates.last().lastEnergy;
-            float Na = estimator.candidates.last().lastHarmonicRank;
-            float Eb = estimator.candidates[i].lastEnergy;
-            float Nb = estimator.candidates[i].lastHarmonicRank;
-            float rankEnergyTradeoff = Ea==Eb ? 0 : (Eb*Na-Ea*Nb)/(Ea-Eb);
 
-            Text label(dec(candidate.f0)+" "_+dec(round(candidate.energy))
-                       +" "_+dec(candidate.lastHarmonicRank)
-                       +" "_+dec(round(rankEnergyTradeoff))
-                       +" B~"_+dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
+            Text label(dec(candidate.f0)+" "_+dec(round(1000*12*2*log2(1+3*(candidate.B>-1?candidate.B:0))))+" m\t"_, 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
-            for(uint n: range(candidate.lastHarmonicRank/*candidate.peaks.size*/)) {
+            for(uint n: range(candidate.peaks.size)) {
                 uint f = candidate.peaks[n];
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
                 Text label(dec(n+1),16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
-            }
-            for(uint n: range(candidate.lastHarmonicRank/*candidate.peaksLS.size*/)) {
-                uint f = candidate.peaksLS[n];
-                float x = this->x(f+0.5)*size.x;
-                //if(f!=candidate.peaks[n])
-                    line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
             }
         }
 
@@ -159,7 +145,7 @@ struct PitchEstimation {
     int lastKey = highKey+1;
     uint success = 0, fail=0, tries = 0, total=0;
     Time totalTime;
-    float maxB = 0;
+    float minB = inf, maxB = 0;
 
     PitchEstimation() {
         assert_(rate==96000, audio.rate);
@@ -179,8 +165,11 @@ struct PitchEstimation {
         t+=periodSize;
         for(; t<=stereo.size/2-14*N; t+=periodSize) {
             const uint sync = highKey==(uint)parseKey("A6"_) ? rate/32 : 0; // Sync with benchmark
-            // Checks for missed note
-            if((t+sync+periodSize)/rate/5 != (t+sync)/rate/5 && lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; }
+            if(t>5*rate && (t+sync+periodSize)/rate/5 != (t+sync)/rate/5) {
+                if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; } // Checks for missed note
+                assert_(minB<inf, minB);
+                maxB = max(maxB, minB); minB=inf;
+            }
 
             // Prepares new period
             const int32* period = stereo + t*2;
@@ -198,36 +187,29 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./8;//5, 10 // Relative harmonic energy (i.e over current period energy)
-            const float ambiguityThreshold = 1./6;//7 // 1- Energy of second candidate relative to first
-            const float threshold = 1./19; // 22
+            const float confidenceThreshold = 1./8; // Relative harmonic energy (i.e over current period energy)
+            const float ambiguityThreshold = 1./6; // 1- Energy of second candidate relative to first
+            const float threshold = 1./22; //19
 
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
             if(confidence > confidenceThreshold/2) {
                 float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
                         && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
                             estimator.candidates[0].key / estimator.candidates[1].key : 0;
-                assert_(ambiguity!=1, estimator.candidates[0].f0*(1+estimator.candidates[0].B), f);
 
                 int key = round(pitchToKey(f*rate/N));
                 float keyF0 = keyToPitch(key)*N/rate;
                 const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
                 const float expectedF = keyToPitch(expectedKey)*N/rate;
 
-                maxB = max(maxB, estimator.B);
                 log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
                     +dec(round(100*offsetF0),2) +" c\t"_
                     +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(1-ambiguity?1./(1-ambiguity):0),2)+"\t"_
                     +dec(round((confidence*(1-ambiguity))?1./(confidence*(1-ambiguity)):0),2)+"\t"_
                     +dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_
-                    +(expectedKey == key ? (confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold ? "O"_ : "~"_) : "X"_)
-                    //+"  "_+str((estimator.candidates[0].f0*(1+estimator.candidates[0].B))==f)+"\t"_
-                    //+str(estimator.candidates.size,estimator.candidates[0].f0*(1+estimator.candidates[0].B),f)+"\t"_
-                    +" "_+str(estimator.F1,"/",estimator.medianF0,"=",estimator.nHigh)
-                    +" "_+str(round(expectedF))
-                        //,"F0",estimator.medianF0)+" "_+str((float)estimator.F1/(estimator.nLow+1)-estimator.medianF0)+" "_
-                    //+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
-                    //+dec(round(estimator.candidates[0].energy))+" "_+dec(round(estimator.candidates[1].energy))+"\t"_
+                    +(expectedKey == key ?
+                          (confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold ? "O"_ : "~"_)
+                        : "X"_)
                     );
 
                 if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold &&
@@ -236,56 +218,28 @@ struct PitchEstimation {
                     if(expectedKey==key) {
                         success++;
                         lastKey = key;
+                        minB = min(minB, estimator.B);
                     }
                     else {
                         fail++;
+                        plot.iMin = min(f, expectedF)/2;
+                        plot.iMax = min(uint(expectedF*2), estimator.fMax);
 
-                        if(t%(5*rate) > 4.5*rate && confidence<1./6 && expectedKey==parseKey("G4"_)) log("???"_); // Noise?
                         // FIXME: Inharmonic match on attack and release
-                        else if(t%(5*rate) < rate/2 && key==expectedKey+1 && offsetF0<-1./3 && expectedKey==parseKey("A6"_)) log("! +"_); // Attack
-                        //if(confidence<1./5 && t%(5*rate) > 4.5*rate && expectedKey=="G4"_) log("x -"_); // Release
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("C3"_)) log("! -"_); // Attack
-                        else if(confidence<1./7 && offsetF0>0 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("A2"_)) log("! -"_); // Attack
-                        else if(confidence<1./6 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
-                        else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("G2"_)) log("! +"_); // Attack
-                        else if(key==expectedKey-1 && offsetF0>1./3 && t%(5*rate) <= rate && expectedKey==parseKey("G2"_)) log("! -"_); // Attack
-                        else if(key==expectedKey-1 && confidence<1./7 && t%(5*rate) <= rate/2 && expectedKey==parseKey("F#2"_)) log("! -"_); // Attack
-                        else if(offsetF0>1./6 && key==expectedKey-1 && confidence<1./4 && expectedKey==parseKey("C2"_)) log("x -"_); // Mistune?
-                        else if(confidence<1./4 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! +"_); // Attack
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! -"_); // Attack
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && expectedKey==parseKey("A1"_)) log("! -"_); // Mistune?
-                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("E1"_)) log("x -"_); // Release
-                        else if(confidence<1./5 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("D#1"_)) log("! -"_); // Attack
-                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("D#1"_)) log("x -"_); // Release
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && expectedKey==parseKey("C1"_)) log("x -"_); // Release
-                        else if(offsetF0>1./4 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#0"_)) log("x -"_); // Mistune?
-                        else if(confidence<1./5 && key==expectedKey-1 && offsetF0>1./4 && t%(5*rate) < rate && expectedKey==parseKey("G0"_)) log("! -"_); // Attack
-                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < rate && expectedKey==parseKey("F#0"_)) log("x -"_); // Mistune?
-                        else if(offsetF0>1./2-1./32 && key==expectedKey-1 && expectedKey==parseKey("D0"_)) log("-"_); // Mistune
-                        else if(key==expectedKey-1 && offsetF0>1./4 && confidence<1./3 && expectedKey==parseKey("B-1"_)) log("-"_); // Mistune?
-                        else if(offsetF0>0 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#-1"_)) {
-                            if(offsetF0>1./3) { lastKey = expectedKey; log("FIXME"_); }
-                            log("-"_); // Mistune? (FIXME)
-                        }
-                        else if(t%(5*rate) < rate/2 && confidence<1./4 && expectedKey==parseKey("A#-1"_)) log("!"_); // Attack
-                        else {
-                            plot.expectedF = expectedF;
-                            plot.iMin = min(f, expectedF)/2;
-                            plot.iMin = min(estimator.minF, uint(f));
-                            plot.iMin = 0;
-                            //plot.iMin = max(plot.iMin, estimator.F1/2);
-                            plot.iMax = expectedF;
-                            plot.iMax = max(plot.iMax, estimator.maxF);
-                            if(estimator.candidates.size) plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
-                            if(estimator.candidates.size) plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
-                            plot.iMax = max(plot.iMax, estimator.F1*8);
-                            plot.iMax = max(plot.iMax, uint(expectedF*8));
-                            plot.iMax = min(plot.iMax, uint(expectedF*estimator.lastHarmonicRank));
-                            plot.iMax = min(plot.iMax, estimator.fMax);
-
-                            log("FIXME", confidence<1./5, float(t%(5*rate))/rate);
-                            break;
-                        }
+                        if(key==expectedKey-1 && confidence<1./3) {
+                            if(expectedKey==parseKey("C2"_) && offsetF0>1./6) log("x -"_); // Mistune?
+                            else if(expectedKey==parseKey("A1"_) && offsetF0>1./3 && t%(5*rate) < 2*rate) log("! -"_); // Mistune?
+                            else if(expectedKey==parseKey("E1"_) && offsetF0>1./7 && t%(5*rate) > 4*rate) log("x -"_); // Release
+                            else if(expectedKey==parseKey("D#1"_) && confidence<1./5 && t%(5*rate) < rate/2) log("! -"_); // Attack
+                            else if(expectedKey==parseKey("D#1"_) && offsetF0>1./4 && t%(5*rate) > 4*rate) log("x -"_); // Release
+                            else if(expectedKey==parseKey("C1"_) && offsetF0>1./3 && t%(5*rate) > 3*rate) log("x -"_); // Release
+                            else if(expectedKey==parseKey("A#0"_) && offsetF0>1./4) log("x -"_); // Mistune?
+                            else if(expectedKey==parseKey("F#0"_) && offsetF0>1./4 && t%(5*rate) < rate) log("x -"_); // Mistune?
+                            else if(expectedKey==parseKey("D0"_) && offsetF0>1./2-1./32) log("-"_); // Mistune
+                            else if(expectedKey==parseKey("B-1"_) && offsetF0>1./4) log("-"_); // Mistune?
+                            else if(expectedKey==parseKey("A#-1"_) && offsetF0>0) log("-"_); // Mistune?
+                            else { plot.expectedF = expectedF/2; break; }
+                        } else { plot.expectedF = expectedF/2; break; }
                     }
                     tries++;
                 }
@@ -297,6 +251,6 @@ struct PitchEstimation {
             window.setTitle(strKey(expectedKey));
             window.render();
             window.show();
-        } else log(100*12*2*log2(1+3*(estimator.B>-1?estimator.B:0)));
+        } else log(100*12*2*log2(1+3*(maxB>-1?maxB:0)));
     }
 } app;
