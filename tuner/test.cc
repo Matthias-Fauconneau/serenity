@@ -198,11 +198,11 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./10;//10 // Relative harmonic energy (i.e over current period energy)
-            float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-            const float ambiguityThreshold = 1./7;//7 // 1- Energy of second candidate relative to first
-            const float threshold = 1./17; //17
+            const float confidenceThreshold = 1./8;//5, 10 // Relative harmonic energy (i.e over current period energy)
+            const float ambiguityThreshold = 1./6;//7 // 1- Energy of second candidate relative to first
+            const float threshold = 1./19; // 22
 
+            float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
             if(confidence > confidenceThreshold/2) {
                 float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
                         && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
@@ -256,11 +256,13 @@ struct PitchEstimation {
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && expectedKey==parseKey("A1"_)) log("! -"_); // Mistune?
                         else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("E1"_)) log("x -"_); // Release
                         else if(confidence<1./5 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("D#1"_)) log("! -"_); // Attack
-                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("D#1"_)) log("x -"_); // Release
+                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("D#1"_)) log("x -"_); // Release
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && expectedKey==parseKey("C1"_)) log("x -"_); // Release
                         else if(offsetF0>1./4 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#0"_)) log("x -"_); // Mistune?
+                        else if(confidence<1./5 && key==expectedKey-1 && offsetF0>1./4 && t%(5*rate) < rate && expectedKey==parseKey("G0"_)) log("! -"_); // Attack
                         else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < rate && expectedKey==parseKey("F#0"_)) log("x -"_); // Mistune?
-                        else if(offsetF0>0 && key==expectedKey-1 && t%(5*rate) > 3*rate && expectedKey==parseKey("B-1"_)) log("-"_); // Mistune?
+                        else if(offsetF0>1./2-1./32 && key==expectedKey-1 && expectedKey==parseKey("D0"_)) log("-"_); // Mistune
+                        else if(key==expectedKey-1 && offsetF0>1./4 && confidence<1./3 && expectedKey==parseKey("B-1"_)) log("-"_); // Mistune?
                         else if(offsetF0>0 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#-1"_)) {
                             if(offsetF0>1./3) { lastKey = expectedKey; log("FIXME"_); }
                             log("-"_); // Mistune? (FIXME)
