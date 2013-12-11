@@ -55,7 +55,7 @@ struct Plot : Widget {
 
         {float y = (logy ? (log2(estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
             line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
-        {float y = (logy ? (log2(2*estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
+        {float y = (logy ? (log2(estimator.highPeakThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
             line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
 
         for(uint i: range(iMin, iMax)) { // Unfiltered energy density
@@ -246,7 +246,7 @@ struct PitchEstimation {
                         //if(confidence<1./5 && t%(5*rate) > 4.5*rate && expectedKey=="G4"_) log("x -"_); // Release
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("C3"_)) log("! -"_); // Attack
                         else if(confidence<1./7 && offsetF0>0 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("A2"_)) log("! -"_); // Attack
-                        else if(confidence<1./7 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
+                        else if(confidence<1./6 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
                         else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("G2"_)) log("! +"_); // Attack
                         else if(key==expectedKey-1 && offsetF0>1./3 && t%(5*rate) <= rate && expectedKey==parseKey("G2"_)) log("! -"_); // Attack
                         else if(key==expectedKey-1 && confidence<1./7 && t%(5*rate) <= rate/2 && expectedKey==parseKey("F#2"_)) log("! -"_); // Attack
@@ -255,7 +255,7 @@ struct PitchEstimation {
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! -"_); // Attack
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && expectedKey==parseKey("A1"_)) log("! -"_); // Mistune?
                         else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("E1"_)) log("x -"_); // Release
-                        else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("D#1"_)) log("! -"_); // Attack
+                        else if(confidence<1./5 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("D#1"_)) log("! -"_); // Attack
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("D#1"_)) log("x -"_); // Release
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) > 3*rate && expectedKey==parseKey("C1"_)) log("x -"_); // Release
                         else if(offsetF0>1./4 && key==expectedKey-1 && confidence<1./3 && expectedKey==parseKey("A#0"_)) log("x -"_); // Mistune?
@@ -276,8 +276,8 @@ struct PitchEstimation {
                             plot.iMax = max(plot.iMax, estimator.maxF);
                             if(estimator.candidates.size) plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
                             if(estimator.candidates.size) plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
-                            plot.iMax = max(plot.iMax, estimator.F1*2);
-                            plot.iMax = max(plot.iMax, uint(expectedF*2));
+                            plot.iMax = max(plot.iMax, estimator.F1*8);
+                            plot.iMax = max(plot.iMax, uint(expectedF*8));
                             plot.iMax = min(plot.iMax, uint(expectedF*estimator.lastHarmonicRank));
                             plot.iMax = min(plot.iMax, estimator.fMax);
 
