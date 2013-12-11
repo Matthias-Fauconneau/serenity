@@ -200,7 +200,7 @@ struct PitchEstimation {
 
             const float confidenceThreshold = 1./10;//10 // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-            const float ambiguityThreshold = 1./7;//16 // 1- Energy of second candidate relative to first
+            const float ambiguityThreshold = 1./7;//7 // 1- Energy of second candidate relative to first
             const float threshold = 1./17; //17
 
             if(confidence > confidenceThreshold/2) {
@@ -246,9 +246,10 @@ struct PitchEstimation {
                         //if(confidence<1./5 && t%(5*rate) > 4.5*rate && expectedKey=="G4"_) log("x -"_); // Release
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("C3"_)) log("! -"_); // Attack
                         else if(confidence<1./7 && offsetF0>0 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("A2"_)) log("! -"_); // Attack
-                        else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
+                        else if(confidence<1./7 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
                         else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("G2"_)) log("! +"_); // Attack
                         else if(key==expectedKey-1 && offsetF0>1./3 && t%(5*rate) <= rate && expectedKey==parseKey("G2"_)) log("! -"_); // Attack
+                        else if(key==expectedKey-1 && confidence<1./7 && t%(5*rate) <= rate/2 && expectedKey==parseKey("F#2"_)) log("! -"_); // Attack
                         else if(offsetF0>1./6 && key==expectedKey-1 && confidence<1./4 && expectedKey==parseKey("C2"_)) log("x -"_); // Mistune?
                         else if(confidence<1./4 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! +"_); // Attack
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! -"_); // Attack

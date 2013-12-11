@@ -101,18 +101,27 @@ struct PitchEstimator : FFT {
     const float initialInharmonicity = 0; //1./cb(24); // Initial inharmonicity
     const float noiseThreshold = 2;
     const uint medianError = 3;
-    const uint maxHarmonicCount = 18; //27
+    const uint maxHarmonicCount = 16; //18,27
     // Conditions for median F0 override
+#if 0
     const uint lastHarmonicRank = 17;
     const uint peakRank = 4;
     const uint lastHarmonicFrequency = 381; //674
-    const uint peakFrequency = 71; //71, 140
+    const uint peakFrequency = 57; //71, 140
     const uint minNum = 117;
     const uint minDen = 478; // 478, 382, 239
+#else
+    const uint lastHarmonicRank = 17;
+    const uint peakRank = 4;
+    const uint lastHarmonicFrequency = 381;
+    const uint peakFrequency = 57;
+    const uint minNum = 40;
+    const uint minDen = 233;
+#endif
     // Conditions for F1 override
-    const uint minHighPeak = 638; // 633, 767, 846
-    const uint minHighPeakNum = 119; // 133
-    const uint minHighPeakDen = 1209; // 1135
+    const uint minHighPeak = 505; // 505, 633
+    const uint minHighPeakNum = 83; // 83, 111
+    const uint minHighPeakDen = 640; //857
 
     struct Peak {
         uint f;
@@ -185,19 +194,18 @@ struct PitchEstimator : FFT {
         // Corrects outlying fundamental estimate from median
         //log(byFrequency.last()/medianF0, byFrequency.last(), F1/medianF0, F1);
         //uint nHigh;
-        if(highPeak && highPeak!=F1) {
-            //log("highPeak", F1, highPeak);
+        if(highPeak /*&& highPeak!=F1*/) {
             //if(F1 >= highPeak*minHighPeakNum/minHighPeakDen && F1 >= minHighPeakNum) medianF0=F1; else medianF0 = highPeak;
             //log(byFrequency.last()/medianF0, byFrequency.last(), highPeak/medianF0, highPeak);
             if(byFrequency.last()/medianF0>=18/*lastHarmonicRank*/ && byFrequency.last()>=538/*607*//*lastHarmonicFrequency*/
-                  && highPeak/medianF0>=peakRank && highPeak>=peakFrequency) {
+                  && highPeak/medianF0>=peakRank /*&& highPeak>=peakFrequency*/) {
                 medianF0 = highPeak;
                 for(const auto& peak: peaks.slice(max<int>(0,peaks.size-5))) {
-                    //log_(str(peak.f)+"  "_);
+                    log_(str(peak.f)+"  "_);
                     //if(peak.f >= F1*minNum/minDen && peak.f >= minNum && peak.f < medianF0) medianF0=peak.f;
                     if(peak.f >= highPeak*minHighPeakNum/minHighPeakDen && peak.f >= minHighPeakNum && peak.f<medianF0) medianF0=peak.f;
                 }
-                //log("\t ->", F1, medianF0, highPeak);
+                log("\thighPeak ->", F1, medianF0, highPeak);
             }
             F1=highPeak;
             //assert_(F1 && highPeak/F1, F1, highPeak);
@@ -206,10 +214,11 @@ struct PitchEstimator : FFT {
                   && F1/medianF0>=peakRank && F1>=peakFrequency) {
             medianF0=F1;
             for(const auto& peak: peaks.slice(max<int>(0,peaks.size-6/*7*/))) {
-                //log_(str(peak.f)+"  "_);
+                log_(str(peak.f)+"  "_);
                 if(peak.f >= F1*minNum/minDen && peak.f >= minNum && peak.f < medianF0) medianF0=peak.f;
+                //else log(peak.f >= F1*minNum/minDen, peak.f >= minNum, peak.f < medianF0);
             }
-            //log("\t ->",medianF0, F1);
+            log("\t ->",medianF0, F1, F1*minNum/minDen, minNum);
         }
         //if(highPeak || ) {
             //nHigh = F1*660/medianF0/641;
