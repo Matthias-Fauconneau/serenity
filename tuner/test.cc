@@ -53,37 +53,39 @@ struct Plot : Widget {
         float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
         float sMin = estimator.periodPower;
 
-        {float y = (logy ? (log2(estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * (size.y-12);
+        {float y = (logy ? (log2(estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
+            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
+        {float y = (logy ? (log2(2*estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
             line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
 
         for(uint i: range(iMin, iMax)) { // Unfiltered energy density
             float x0 = x(i) * size.x;
             float x1 = x(i+1) * size.x;
             float y = (logy ? (unfilteredSpectrum[i] ? (log2(unfilteredSpectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) :
-                              (unfilteredSpectrum[i] / sMax)) * (size.y-12);
+                              (unfilteredSpectrum[i] / sMax)) * size.y;
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,0.5));
         }
 
         for(uint i: range(iMin, iMax)) { // Energy density
             float x0 = x(i) * size.x;
             float x1 = x(i+1) * size.x;
-            float y = (logy ? (spectrum[i] ? (log2(spectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (spectrum[i] / sMax)) * (size.y-12);
+            float y = (logy ? (spectrum[i] ? (log2(spectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (spectrum[i] / sMax)) * size.y;
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
         }
 
-        /*for(PitchEstimator::Peak peak: estimator.peaks) { // Peaks
+        for(PitchEstimator::Peak peak: estimator.peaks) { // Peaks
             float f = peak.f;
             float x = this->x(f+0.5)*size.x;
             line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1./4));
             Text label("·",16, vec4(1,1,1,1));
             label.render(int2(position.x+x,position.y+16));
-        }*/
+        }
 
         { // F1
             float f = estimator.F1;
             float x = this->x(f+0.5)*size.x;
             //line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1));
-            Text label(str(estimator.nLow,estimator.nHigh),16, vec4(1,1,1,1));
+            Text label(str(estimator.nHigh),16, vec4(1,1,1,1));
             label.render(int2(position.x+x,position.y+16));
         }
 
@@ -97,20 +99,23 @@ struct Plot : Widget {
             float Nb = estimator.candidates[i].lastHarmonicRank;
             float rankEnergyTradeoff = Ea==Eb ? 0 : (Eb*Na-Ea*Nb)/(Ea-Eb);
 
-            Text label(dec(candidate.f0)+" "_+dec(round(candidate.energy))+" "_+dec(candidate.lastHarmonicRank)
-                       +" "_+dec(round(rankEnergyTradeoff))+" B~"_+dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
+            Text label(dec(candidate.f0)+" "_+dec(round(candidate.energy))
+                       +" "_+dec(candidate.lastHarmonicRank)
+                       +" "_+dec(round(rankEnergyTradeoff))
+                       +" B~"_+dec(estimator.B?round(pow(estimator.B,-1./3)):0), 16,  vec4(color.xyz(),1.f));
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
-            for(uint n: range(candidate.lastHarmonicRank)) {
+            for(uint n: range(candidate.lastHarmonicRank/*candidate.peaks.size*/)) {
                 uint f = candidate.peaks[n];
                 float x = this->x(f+0.5)*size.x;
                 line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
                 Text label(dec(n+1),16, vec4(color.xyz(),1.f));
                 label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
             }
-            for(uint n: range(candidate.lastHarmonicRank)) {
+            for(uint n: range(candidate.lastHarmonicRank/*candidate.peaksLS.size*/)) {
                 uint f = candidate.peaksLS[n];
                 float x = this->x(f+0.5)*size.x;
-                line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f));
+                //if(f!=candidate.peaks[n])
+                    line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
             }
         }
 
@@ -173,7 +178,7 @@ struct PitchEstimation {
         if(fail) return;
         t+=periodSize;
         for(; t<=stereo.size/2-14*N; t+=periodSize) {
-            const uint sync = 0; // Sync with benchmark
+            const uint sync = highKey==(uint)parseKey("A6"_) ? rate/32 : 0; // Sync with benchmark
             // Checks for missed note
             if((t+sync+periodSize)/rate/5 != (t+sync)/rate/5 && lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; }
 
@@ -193,10 +198,10 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./10/*7*/; // Relative harmonic energy (i.e over current period energy)
+            const float confidenceThreshold = 1./10;//10 // Relative harmonic energy (i.e over current period energy)
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-            const float ambiguityThreshold = 1./7/*7,16*/; // 1- Energy of second candidate relative to first
-            const float threshold = 1./17; //34;
+            const float ambiguityThreshold = 1./7;//16 // 1- Energy of second candidate relative to first
+            const float threshold = 1./17; //17
 
             if(confidence > confidenceThreshold/2) {
                 float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
@@ -207,6 +212,7 @@ struct PitchEstimation {
                 int key = round(pitchToKey(f*rate/N));
                 float keyF0 = keyToPitch(key)*N/rate;
                 const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
+                const float expectedF = keyToPitch(expectedKey)*N/rate;
 
                 maxB = max(maxB, estimator.B);
                 log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
@@ -217,12 +223,14 @@ struct PitchEstimation {
                     +(expectedKey == key ? (confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold ? "O"_ : "~"_) : "X"_)
                     //+"  "_+str((estimator.candidates[0].f0*(1+estimator.candidates[0].B))==f)+"\t"_
                     //+str(estimator.candidates.size,estimator.candidates[0].f0*(1+estimator.candidates[0].B),f)+"\t"_
-                    //+str("F1"_,estimator.F1,"F0",estimator.medianF0)+" "_+str((float)estimator.F1/(estimator.nLow+1)-estimator.medianF0)+" "_
+                    +" "_+str(estimator.F1,"/",estimator.medianF0,"=",estimator.nHigh)
+                    +" "_+str(round(expectedF))
+                        //,"F0",estimator.medianF0)+" "_+str((float)estimator.F1/(estimator.nLow+1)-estimator.medianF0)+" "_
                     //+str(estimator.nLow)+"-"_+str(estimator.nHigh)+"\t"_
                     //+dec(round(estimator.candidates[0].energy))+" "_+dec(round(estimator.candidates[1].energy))+"\t"_
                     );
 
-                if(confidence > confidenceThreshold && //1-ambiguity > ambiguityThreshold &&
+                if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold &&
                       confidence*(1-ambiguity) > threshold) {
 
                     if(expectedKey==key) {
@@ -232,12 +240,17 @@ struct PitchEstimation {
                     else {
                         fail++;
 
+                        if(t%(5*rate) > 4.5*rate && confidence<1./6 && expectedKey==parseKey("G4"_)) log("???"_); // Noise?
                         // FIXME: Inharmonic match on attack and release
-                        if(confidence<1./5 && t%(5*rate) > 4.5*rate && apply(split("G4 A#1"_), parseKey).contains(expectedKey)) //FIXME: absolute volume
-                            log("x -"_); // Release
+                        else if(t%(5*rate) < rate/2 && key==expectedKey+1 && offsetF0<-1./3 && expectedKey==parseKey("A6"_)) log("! +"_); // Attack
+                        //if(confidence<1./5 && t%(5*rate) > 4.5*rate && expectedKey=="G4"_) log("x -"_); // Release
+                        else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("C3"_)) log("! -"_); // Attack
+                        else if(confidence<1./7 && offsetF0>0 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("A2"_)) log("! -"_); // Attack
                         else if(offsetF0>1./4 && key==expectedKey-1 && t%(5*rate) < 1*rate && expectedKey==parseKey("G#2"_)) log("! -"_); // Attack
-                        else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("G2"_)) log("! -"_); // Attack
+                        else if(confidence<1./5 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("G2"_)) log("! +"_); // Attack
+                        else if(key==expectedKey-1 && offsetF0>1./3 && t%(5*rate) <= rate && expectedKey==parseKey("G2"_)) log("! -"_); // Attack
                         else if(offsetF0>1./6 && key==expectedKey-1 && confidence<1./4 && expectedKey==parseKey("C2"_)) log("x -"_); // Mistune?
+                        else if(confidence<1./4 && key==expectedKey+1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! +"_); // Attack
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < rate/2 && expectedKey==parseKey("A#1"_)) log("! -"_); // Attack
                         else if(offsetF0>1./3 && key==expectedKey-1 && t%(5*rate) < 2*rate && expectedKey==parseKey("A1"_)) log("! -"_); // Mistune?
                         else if(offsetF0>1./7 && key==expectedKey-1 && t%(5*rate) > 4*rate && expectedKey==parseKey("E1"_)) log("x -"_); // Release
@@ -253,14 +266,18 @@ struct PitchEstimation {
                         }
                         else if(t%(5*rate) < rate/2 && confidence<1./4 && expectedKey==parseKey("A#-1"_)) log("!"_); // Attack
                         else {
-                            const float expectedF = keyToPitch(expectedKey)*N/rate;
                             plot.expectedF = expectedF;
+                            plot.iMin = min(f, expectedF)/2;
                             plot.iMin = min(estimator.minF, uint(f));
-                            plot.iMax = expectedF*4;
+                            plot.iMin = 0;
+                            //plot.iMin = max(plot.iMin, estimator.F1/2);
+                            plot.iMax = expectedF;
                             plot.iMax = max(plot.iMax, estimator.maxF);
-                            plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
-                            plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
-                            plot.iMax = min(plot.iMax, uint(expectedF*28));
+                            if(estimator.candidates.size) plot.iMax = max(plot.iMax, uint(estimator.candidates.last().f0 * (estimator.candidates.last().lastHarmonicRank+1)));
+                            if(estimator.candidates.size) plot.iMax = max(plot.iMax, uint(estimator.candidates[0].f0 * (estimator.candidates[0].lastHarmonicRank+1)));
+                            plot.iMax = max(plot.iMax, estimator.F1*2);
+                            plot.iMax = max(plot.iMax, uint(expectedF*2));
+                            plot.iMax = min(plot.iMax, uint(expectedF*estimator.lastHarmonicRank));
                             plot.iMax = min(plot.iMax, estimator.fMax);
 
                             log("FIXME", confidence<1./5, float(t%(5*rate))/rate);
