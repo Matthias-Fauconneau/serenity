@@ -50,7 +50,7 @@ struct Plot : Widget {
     void render(int2 position, int2 size) {
         assert_(iMin < iMax && iMax <= spectrum.size, iMin, iMax, spectrum.size);
         if(iMin >= iMax) return;
-        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
+        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, unfilteredSpectrum[i]);
         float sMin = estimator.periodPower;
 
         {float y = (logy ? (log2(estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
@@ -174,11 +174,7 @@ struct PitchEstimation {
             // Prepares new period
             const int32* period = stereo + t*2;
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
-            for(uint i: range(periodSize)) {
-                float L = period[i*2+0];
-                float x = L* 0x1p-24;
-                signal[N-periodSize+i] = x;
-            }
+            for(uint i: range(periodSize)) signal[N-periodSize+i] = period[i*2+0] * 0x1p-24;
 
             // Benchmark
             if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)
@@ -187,15 +183,15 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./8; // Relative harmonic energy (i.e over current period energy)
-            const float ambiguityThreshold = 1./6; // 1- Energy of second candidate relative to first
-            const float threshold = 1./22; //19
+            const float confidenceThreshold = 1./9; // Relative harmonic energy (i.e over current period energy)
+            const float ambiguityThreshold = 1./21; // 1- Energy of second candidate relative to first
+            const float threshold = 1./25;
 
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
+            float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
+                    && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
+                        estimator.candidates[0].key / estimator.candidates[1].key : 0;
             if(confidence > confidenceThreshold/2) {
-                float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
-                        && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
-                            estimator.candidates[0].key / estimator.candidates[1].key : 0;
 
                 int key = round(pitchToKey(f*rate/N));
                 float keyF0 = keyToPitch(key)*N/rate;
@@ -212,8 +208,7 @@ struct PitchEstimation {
                         : "X"_)
                     );
 
-                if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold &&
-                      confidence*(1-ambiguity) > threshold) {
+                if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold) {
 
                     if(expectedKey==key) {
                         success++;
@@ -238,6 +233,7 @@ struct PitchEstimation {
                             else if(expectedKey==parseKey("D0"_) && offsetF0>1./2-1./32) log("-"_); // Mistune
                             else if(expectedKey==parseKey("B-1"_) && offsetF0>1./4) log("-"_); // Mistune?
                             else if(expectedKey==parseKey("A#-1"_) && offsetF0>0) log("-"_); // Mistune?
+                            else if(expectedKey==parseKey("A-1"_) && offsetF0>0) log("-"_); // Mistune?
                             else { plot.expectedF = expectedF/2; break; }
                         } else { plot.expectedF = expectedF/2; break; }
                     }

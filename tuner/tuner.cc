@@ -16,51 +16,6 @@
 #include "ffmpeg.h"
 #endif
 
-struct SpectrumPlot : Widget {
-    const bool logx, logy; // Whether to use log scale on x/y axis
-    const float resolution; // Resolution in bins / Hz
-    uint iMin = 0, iMax = 0; // Displayed range in bins
-    ref<float> spectrum; // Displayed power spectrum
-    // Additional analysis data
-    const PitchEstimator& estimator;
-    float expectedF = 0;
-
-    SpectrumPlot(bool logx, bool logy, float resolution, ref<float> spectrum, const PitchEstimator& estimator):
-        logx(logx),logy(logy),resolution(resolution),spectrum(spectrum),estimator(estimator){}
-    float x(float f) { return logx ? (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)) : (float)(f-iMin)/(iMax-iMin); }
-    void render(int2 position, int2 size) {
-        if(!spectrum || iMin >= iMax) return;
-        assert_(iMin <= iMax && iMax <= spectrum.size);
-        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
-        float sMin = estimator.periodPower;
-
-        {float y = (logy ? (log2(2*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * (size.y-12);
-            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
-
-        for(uint i: range(iMin, iMax)) { // Energy density
-            float x0 = x(i) * size.x;
-            float x1 = x(i+1) * size.x;
-            float y = (logy ? (spectrum[i] ? (log2(spectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (spectrum[i] / sMax)) * (size.y-12);
-            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
-        }
-
-        const auto& candidate = estimator.candidates.last();
-        vec4 color(1,0,0,1);
-        for(uint n: range(candidate.peaks.size)) {
-            uint f = candidate.peaks[n];
-            float x = this->x(f+0.5)*size.x;
-            line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
-        }
-
-        for(uint i=1; i<=5; i+=2){
-            const float bandwidth = 1./(i*12);
-            float x0 = this->x(i*50.*resolution*exp2(-bandwidth))*size.x;
-            float x1 = this->x(i*50.*resolution*exp2(+bandwidth))*size.x;
-            fill(position.x+floor(x0),position.y,position.x+ceil(x1),position.y+size.y, vec4(1,1,0,1./2));
-        }
-    }
-};
-
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
     // Static parameters
@@ -86,11 +41,11 @@ struct Tuner : Poll {
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     // Analysis
-    float confidencethreshold = 6; // 1/ Relative harmonic energy (i.e over current period energy)
-    float ambiguityThreshold = 16; // 1-1/ Energy of second candidate relative to first
+    float confidenceThreshold = 9; // 1/ Relative harmonic energy (i.e over current period energy)
+    float ambiguityThreshold = 21; // 1-1/ Energy of second candidate relative to first
+    float threshold = 25; // Product of confidence and ambiguity
+
     PitchEstimator estimator {N};
-    int lastKey = 0;
-    float lastOffset, lastConfidence;
     int worstKey = -1;
 
     // UI
@@ -108,7 +63,7 @@ struct Tuner : Poll {
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
-        if(arguments().size>0 && isInteger(arguments()[0])) confidencethreshold=toInteger(arguments()[0]);
+        if(arguments().size>0 && isInteger(arguments()[0])) confidenceThreshold=toInteger(arguments()[0]);
         if(arguments().size>1 && isInteger(arguments()[1])) ambiguityThreshold=toInteger(arguments()[1]);
 
         window.backgroundColor=window.backgroundCenter=0;
@@ -118,7 +73,7 @@ struct Tuner : Poll {
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
         assert_(audio.rate == input.rate, audio.rate, input.rate);
-        profile.reset();
+        //profile.reset();
 #else
         input.start();
 #endif
@@ -126,10 +81,10 @@ struct Tuner : Poll {
         readCount.acquire(N-periodSize);
     }
 #if TEST
-    uint t = 0;// 5*rate; // Let input settle
+    uint t = 0;
     void feed() {
         const uint size = periodSize;
-        if(t+size > audio.data.size/2) { return; }
+        if(t+size > audio.data.size/2) { exit(); return; }
         const int32* period = audio.data + t*2;
         write(period, size);
         t += size;
@@ -139,11 +94,7 @@ struct Tuner : Poll {
     uint write(const int32* input, uint size) {
         writeCount.acquire(size); // Will overflow if processing thread doesn't follow
         assert(writeIndex+size<=signal.size);
-        for(uint i: range(size)) {
-            float L = input[i*2+0];//, R = input[i*2+1];
-            float x = (L/*+R*/) * 0x1p-31;
-            signal[writeIndex+i] = x;
-        }
+        for(uint i: range(size)) signal[writeIndex+i] = input[i*2+0] * 0x1p-24;
         writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
         readCount.release(size); // Releases new samples
         queue(); // Queues processing thread
@@ -167,10 +118,11 @@ struct Tuner : Poll {
 
         float f = estimator.estimate();
         float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
-        assert(estimator.candidates.size==2);
-        float ambiguity = estimator.candidates[1].key ? estimator.candidates[0].key / estimator.candidates[1].key : 0;
+        float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
+                && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
+                    estimator.candidates[0].key / estimator.candidates[1].key : 0;
 
-        if(confidence > 1./(confidencethreshold+1) && 1-ambiguity >= 0) {
+        if(confidence > 1./confidenceThreshold/2) {
             int key = round(pitchToKey(f*rate/N));
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
@@ -183,22 +135,18 @@ struct Tuner : Poll {
             this->fError.setText(dec(round(100*error)));
             this->confidence.setText(dec(round(1./confidence)));
 
-            if(key==lastKey) {
-                const float alpha = lastConfidence; //1./8 | confidence
-                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*lastOffset;
-                float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(lastOffset - keyOffset);
+            if(confidence > 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
+                    && key>=21 && key<21+keyCount) {
+                const float alpha = confidence;
+                float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
+                float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
                 {int k = this->worstKey;
                     for(uint i: range(keyCount)) //FIXME: quadratic, cubic, exp curve ?
                         if(  k<0 ||
-                                abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
+                             abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
                              abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
-            }
-            // Delay effect (Swap both tests for immediate effect)
-            if(confidence > 1./confidencethreshold && 1-ambiguity > 1./ambiguityThreshold && key>=21 && key<21+keyCount) {
-                lastKey = key; lastConfidence=confidence, lastOffset=offset; // Delays offset effect until key change confirmation
-                //FIXME: last lastKey is never
             }
         }
 

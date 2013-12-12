@@ -239,7 +239,7 @@ struct PitchEstimator : FFT {
             if(energy > bestEnergy) {
                 bestEnergy = energy;
                 this->F0 = f0;
-                this->B = f0B/f0;
+                this->B = f0 ? f0B/f0 : 0;
             }
         }
         harmonicEnergy = bestEnergy;
