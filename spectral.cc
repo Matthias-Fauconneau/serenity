@@ -20,14 +20,10 @@ struct Spectral {
 #endif
         /// Parameters
         const uint n = 10; // Number of points / resolution (~ cut-off frequency)
-        const float H = 0; // Helmholtz coefficient
-        const float alpha[2] = {0,0}, beta[2] = {1,1}; // Robin boundary condition coefficients: (a + b·dx)u  = g)
-
-        /// Gauss-Lobatto collocation points on [-1, 1]
-        Vector x(n); for(uint i: range(n)) x[i] = -cos(PI*i/(n-1));
-        /// Expected solution
-        const float k = 2*PI; // Test frequency
-        Vector u0(n); for(uint i: range(n)) u0[i] = cos(k*x[i]);
+        const float w = 1;
+        const float nu = 1;
+        const float H = 1./nu; // Helmholtz coefficient
+        const float dt = 1;
 
         /// Operators
         // Discrete Chebyshev transform operator (Gauss-Lobatto)
@@ -53,45 +49,49 @@ struct Spectral {
 
         /// System equation
         Matrix L = Dx*Dx;
-        // Imposition of the Robin Boundary conditions
-        for(uint j: range(n)) L(0   ,j) = beta[0]*Dx(0,   j); L(0,      0) += alpha[0];
-        for(uint j: range(n)) L(n-1,j) = beta[1]*Dx(n-1,j); L(n-1,n-1) += alpha[1];
-        // Source term definition
-        Vector S = (-sq(k) - sq(H))*u0; // Lu = S
-        S[0   ] = alpha[0]*u0[0   ] + beta[0] * -k*sin(k*x[0   ]);
-        S[n-1] = alpha[1]*u0[n-1] + beta[1] * -k*sin(k*x[n-1]);
-
+        // Imposition of the Dirichlet boundary conditions
+        L(0,      0) += 1;
+        L(n-1,n-1) += 1;
         // Resolution by diagonalization of the interior operator
         Mat2 iP = Mat2( L(0,0), L(0,n-1), L(n-1,0), L(n-1,n-1) ).inverse();
         // Interior operator
         Matrix Li(n-2);
         for(uint i: range(1,n-1)) for(uint j: range(1,n-1)) Li(i-1,j-1) = L(i ,j) - dot(Vec2(L(i,0), L(i,n-1)), iP * Vec2(L(0,j),L(n-1,j)));
-        // Interior source
-        Vector Si(n-2);
-        for(uint i: range(1,n-1)) Si[i-1] = S[i] - dot(Vec2(L(i,0), L(i, n-1)), iP * Vec2(S[0], S[n-1]));
         // Diagonalization
         auto E = EigenDecomposition( Li ); // Q^-1 * eigenvalues * Q = Li
         const Vector& eigenvalues = E.eigenvalues; // Eigenvalues are all real and negative
         const Matrix& Q = E.eigenvectors;
-        // Inversion including helmholtz coefficient and filtering of spurious modes
+        // Inversion including filtering of spurious modes and Helmholtz coefficient
         Vector eigenvalueReciprocals(n-2);
         const real lowestReliableEigenvalue = min(apply(eigenvalues, abs<real>));
         for(uint i: range(n-2)) eigenvalueReciprocals[i] = abs(eigenvalues[i]) <= lowestReliableEigenvalue ? (H ? 1./sq(H) : 0) : 1./(eigenvalues[i] - H*H);
-        // Interior solution
-        Vector ui = Q * (eigenvalueReciprocals * solve(Q, Si));
-        // Solution at boundaries
-        Vec2 v = 0;
-        for(uint i: range(n-2)) v += ui[i] * Vec2(L(0,1+i), L(n-1,1+i));
-        Vec2 ub = iP * (Vec2(S[0], S[n-1]) - v);
-        // Total solution
-        Vector u(n);
-        u[0   ] = ub[0];
-        for(uint i: range(1,n-1)) u[i] = ui[i-1];
-        u[n-1] = ub[1];
 
-        log(u);
-        //plot(x,u);
-        //plot(u-u0);
-        //plot(abs(T*(u-u0));
+        Vector x(n); for(uint i: range(n)) x[i] = -cos(PI*i/(n-1)); // Gauss-Lobatto collocation points on [-1, 1]
+        Vector v(n); for(uint i: range(n)) v[i] = i==0 ? sin(w*0) : 0; // v(x=0,t) = sin(wt), v(t=0,x≠0) = 0
+        Vector pNL(n), pB(n); pNL.clear(); pB.clear(); // Previous non-linear, constant term (assumes v[-1]=0)
+        for(uint t: range(1)) {
+            Vector NL = v*(Dx*v); // Non-linear term
+            // Constant term
+            Vector b = pB + dt/(2*nu)*(pNL + -3*NL);
+            // Source term (from boundary conditions)
+            b[0] += dt/(2*nu)*sin(w*t); // v(x=0,t) = sin(wt)
+            // Interior constant term
+            Vector bi(n-2);
+            for(uint i: range(1,n-1)) bi[i-1] = b[i] - dot(Vec2(L(i,0), L(i, n-1)), iP * Vec2(b[0], b[n-1]));
+            // Interior solution
+            Vector vi = Q * (eigenvalueReciprocals * solve(Q, bi));
+            // Solution at boundaries
+            Vec2 bb = 0;
+            for(uint i: range(n-2)) bb += vi[i] * Vec2(L(0,1+i), L(n-1,1+i));
+            Vec2 vb = iP * (Vec2(b[0], b[n-1]) - bb);
+            // Total solution
+            v[0   ] = vb[0];
+            for(uint i: range(1,n-1)) v[i] = vi[i-1];
+            v[n-1] = vb[1];
+
+            log(v);
+            //plot(x,u);
+            pNL = move(NL);
+        }
     }
 } app;

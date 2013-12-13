@@ -8,6 +8,12 @@ inline Vector operator*(real a, const Vector& x) {
     for(uint i: range(y.size)) y[i] = a * x[i];
     return y;
 }
+inline Vector operator+(const Vector& a, const Vector& b) {
+    assert(a.size == b.size);
+    Vector v(a.size);
+    for(uint i: range(v.size)) v[i] = a[i] + b[i];
+    return v;
+}
 inline Vector operator*(const Vector& a, const Vector& b) {
     assert(a.size == b.size);
     Vector v(a.size);

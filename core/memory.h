@@ -109,7 +109,7 @@ generic struct buffer : mref<T> {
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
 
-    void clear(const T& value) { ::clear((T*)data, size, value); }
+    void clear(const T& value=0) { ::clear((T*)data, size, value); }
 
     using mref<T>::data;
     using mref<T>::size;
