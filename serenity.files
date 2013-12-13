@@ -107,3 +107,5 @@ lu.h
 lu.cc
 eigen.h
 eigen.cc
+tuner/fft.h
+tuner/list.h

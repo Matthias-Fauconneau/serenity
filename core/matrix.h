@@ -19,7 +19,7 @@ struct Mat2 {
 
     real det() const { return M(0,0) * M(1,1) - M(0,1) * M(1,0); }
     Mat2 transpose() {Mat2 r; for(int j=0;j<2;j++) for(int i=0;i<2;i++) r(j,i)=M(i,j); return r;}
-    Mat2 cofactor() const { return Mat2(M(1,1), -M(0,1), M(1,0), M(0,0)); }
+    Mat2 cofactor() const { return Mat2(M(1,1), -M(1,0), -M(0,1), M(0,0)); }
     Mat2 adjugate() const { return cofactor().transpose(); }
     Mat2 inverse() const { return 1/det() * adjugate() ; }
 };
@@ -30,7 +30,7 @@ struct mat3x2 {
     float data[3*2];
     mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
     mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
-    mat3x2(float m11, float m12, float m21, float m22, float dx, float dy):data{m11,m21,m12,m22, dx,dy}{assert(m12==0 && m21==0);}
+    mat3x2(float m00, float m01, float m10, float m11, float dx, float dy):data{m00,m10,m01,m11, dx,dy}{assert(m01==0 && m10==0);}
 
     float M(int i, int j) const {assert(i<2 && j<3); return data[j*2+i]; }
     float& M(int i, int j) {assert(i<2 && j<3); return data[j*2+i]; }
@@ -152,13 +152,13 @@ struct mat4 {
 };
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
 
-template<int N, int M> inline String str(const float a[M*N]) {
+template<int N, int M, Type T> inline String str(const T a[M*N]) {
     String s; s<<"\n["_;
     for(int i=0;i<M;i++) {
-        if(N==1) s = s+"\t"_+str(a[i]);
+        if(N==1) s = s+"\t"_+ftoa(a[i],4);
         else {
             for(int j=0;j<N;j++) {
-                s = s+"\t"_+str(a[j*M+i]);
+                s = s+"\t"_+ftoa(a[j*M+i],4);
             }
             if(i<M-1) s=s+"\n"_;
         }
@@ -166,7 +166,7 @@ template<int N, int M> inline String str(const float a[M*N]) {
     s<<" ]"_;
     return s;
 }
-//inline String str(const mat2& M) { return str<2,2>(M.data); }
+inline String str(const Mat2& M) { return str<2,2>(M.data); }
 inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }
 inline String str(const mat4& M) { return str<4,4>(M.data); }

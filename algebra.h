@@ -1,5 +1,5 @@
 #pragma once
-#include "memory.h"
+#include "array.h"
 
 typedef double real;
 typedef buffer<real> Vector;
@@ -18,12 +18,13 @@ inline Vector operator*(const Vector& a, const Vector& b) {
 struct Matrix {
     uint m,n;
     buffer<real> elements;
-    Matrix(uint m, uint n) : m(m), n(n), elements(m*n) { /*elements.clear();*/ }
+    Matrix(uint m, uint n) : m(m), n(n), elements(m*n) { elements.clear(__builtin_nan("")); }
     Matrix(uint n) : Matrix(n,n) {}
     const real& operator ()(uint i, uint j) const { return elements[j*m+i]; } // Column major storage
     real& operator ()(uint i, uint j) { return elements[j*m+i]; }
 };
 inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.elements=copy(o.elements); return move(t); }
+String str(const Matrix& A);
 inline Vector operator*(const Matrix& A, const Vector& x) {
     assert(A.n == x.size);
     Vector y (A.n);

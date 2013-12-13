@@ -8,30 +8,6 @@
 FILE(pdf)
 #endif
 
-// Quicksort
-generic uint partition(mref<T>& at, int left, int right, int pivotIndex) {
-    swap(at[pivotIndex], at[right]);
-    const T& pivot = at[right];
-    uint storeIndex = left;
-    for(uint i: range(left,right)) {
-        if(at[i] < pivot) {
-            swap(at[i], at[storeIndex]);
-            storeIndex++;
-        }
-    }
-    swap(at[storeIndex], at[right]);
-    return storeIndex;
-}
-generic void quicksort(mref<T>& at, int left, int right) {
-    if(left < right) { // If the list has 2 or more items
-        int pivotIndex = partition(at, left, right, (left + right)/2);
-        if(pivotIndex) quicksort(at, left, pivotIndex-1);
-        quicksort(at, pivotIndex+1, right);
-    }
-}
-/// Quicksorts the array in-place
-generic void quicksort(mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }
-
 struct Variant { //TODO: union
     enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
     double number=0; String data; array<Variant> list; map<string,Variant> dict;

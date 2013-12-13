@@ -2,6 +2,7 @@
 #include "layout.h"
 #include "window.h"
 #include "matrix.h"
+#include "algebra.h"
 #include "eigen.h"
 #include "lu.h"
 
@@ -18,7 +19,7 @@ struct Spectral {
     Spectral() {
 #endif
         /// Parameters
-        const uint n = 101; // Number of points / resolution (~ cut-off frequency)
+        const uint n = 10; // Number of points / resolution (~ cut-off frequency)
         const float H = 0; // Helmholtz coefficient
         const float alpha[2] = {0,0}, beta[2] = {1,1}; // Robin boundary condition coefficients: (a + b·dx)u  = g)
 
@@ -29,24 +30,24 @@ struct Spectral {
         Vector u0(n); for(uint i: range(n)) u0[i] = cos(k*x[i]);
 
         /// Operators
-        // Derivation operator in the Chebyshev spectral space on Gauss-Lobatto nodes
-        Matrix Ds(n);
-        for(uint i: range(n)) {
-            float ci = (i==0||i==n) ? 2 : 1;
-            for(uint j: range(n)) if((j+i)%2 != 0) Ds(i,j) = 2 * j / ci;
-        }
         // Discrete Chebyshev transform operator (Gauss-Lobatto)
         Matrix T(n);
         for(uint i: range(n)) {
-            float ci = (i==0||i==n) ? 2 : 1;
+            float ci = (i==0||i==n-1) ? 2 : 1;
             for(uint j: range(n)) {
-                float cj = (j==0||j==n) ? 2 : 1;
-                T(i,j) = (i%2?-1:1) * 2 * cos( i*j*PI/(n-1) ) / (n*ci*cj);
+                float cj = (j==0||j==n-1) ? 2 : 1;
+                T(i,j) = (i%2?-1:1) * 2 * cos( i*j*PI/(n-1) ) / ((n-1)*ci*cj);
             }
         }
-        // Inverse transform
+        // Inverse transform (Gauss-Lobatto)
         Matrix iT(n);
-        for(uint i: range(n)) for(uint j: range(n)) iT(i,j) = (i%2?-1:1) * cos(i*j*PI/(n-1));
+        for(uint i: range(n)) for(uint j: range(n)) iT(i,j) = (j%2?-1:1) * cos(i*j*PI/(n-1));
+        // Derivation operator in the Chebyshev spectral space (on Gauss-Lobatto nodes)
+        Matrix Ds(n);
+        for(uint i: range(n)) {
+            float ci = (i==0||i==n-1) ? 2 : 1;
+            for(uint j: range(n)) Ds(i,j) = j>i && (j+i)%2 ? 2 * j / ci : 0;
+        }
         // Derivation operator in the physical space
         Matrix Dx = iT*Ds*T;
 
@@ -60,10 +61,7 @@ struct Spectral {
         S[0   ] = alpha[0]*u0[0   ] + beta[0] * -k*sin(k*x[0   ]);
         S[n-1] = alpha[1]*u0[n-1] + beta[1] * -k*sin(k*x[n-1]);
 
-#if 1 // Direct linear system resolution
-        for(uint i: range(n)) L(i,i) -= H*H;
-        Vector u = solve(move(L), S);
-#else // Resolution by diagonalization of the interior operator
+        // Resolution by diagonalization of the interior operator
         Mat2 iP = Mat2( L(0,0), L(0,n-1), L(n-1,0), L(n-1,n-1) ).inverse();
         // Interior operator
         Matrix Li(n-2);
@@ -72,26 +70,25 @@ struct Spectral {
         Vector Si(n-2);
         for(uint i: range(1,n-1)) Si[i-1] = S[i] - dot(Vec2(L(i,0), L(i, n-1)), iP * Vec2(S[0], S[n-1]));
         // Diagonalization
-        setExceptions(/*Invalid | Denormal | DivisionByZero | Overflow | Underflow*/0); // Masks underflow
-        EigenDecomposition E = Li; // Q^-1 * eigenvalues * Q = Li
+        auto E = EigenDecomposition( Li ); // Q^-1 * eigenvalues * Q = Li
         const Vector& eigenvalues = E.eigenvalues; // Eigenvalues are all real and negative
         const Matrix& Q = E.eigenvectors;
         // Inversion including helmholtz coefficient and filtering of spurious modes
         Vector eigenvalueReciprocals(n-2);
-        const float reliableThreshold = 0x1p-24; //FIXME
-        for(uint i: range(n-2)) eigenvalueReciprocals[i] = abs(eigenvalues[i]-sq(H)) < reliableThreshold ? (H ? 1./sq(H) : 0) : 1./(eigenvalues[i] - H*H);
+        const real lowestReliableEigenvalue = min(apply(eigenvalues, abs<real>));
+        for(uint i: range(n-2)) eigenvalueReciprocals[i] = abs(eigenvalues[i]) <= lowestReliableEigenvalue ? (H ? 1./sq(H) : 0) : 1./(eigenvalues[i] - H*H);
         // Interior solution
         Vector ui = Q * (eigenvalueReciprocals * solve(Q, Si));
         // Solution at boundaries
         Vec2 v = 0;
         for(uint i: range(n-2)) v += ui[i] * Vec2(L(0,1+i), L(n-1,1+i));
-        Vec2 ub = iP * (v +Vec2(S[1], S[n-1]));
+        Vec2 ub = iP * (Vec2(S[0], S[n-1]) - v);
         // Total solution
         Vector u(n);
         u[0   ] = ub[0];
         for(uint i: range(1,n-1)) u[i] = ui[i-1];
         u[n-1] = ub[1];
-#endif
+
         log(u);
         //plot(x,u);
         //plot(u-u0);

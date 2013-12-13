@@ -9,12 +9,12 @@ EigenDecomposition::EigenDecomposition(const Matrix& A) : eigenvalues(A.n), eige
     Eigen::EigenSolver<Eigen::MatrixXd> e(a);
     const auto& eigenvalues = e.eigenvalues();
     for(uint i: range(A.n)) {
-        if(!(eigenvalues[i].imag()>0)) log(eigenvalues[i]);
+        if(eigenvalues[i].imag()) log(eigenvalues[i]);
         this->eigenvalues[i] = eigenvalues[i].real();
     }
     auto eigenvectors = e.eigenvectors();
     for(uint i: range(A.n)) for(uint j: range(A.n)) {
-        if(!(eigenvectors(i,j).imag()>0)) log(eigenvectors(i,j));
+        if(eigenvectors(i,j).imag()) log(eigenvectors(i,j));
         this->eigenvectors(i,j) = eigenvectors(i,j).real();
     }
 }
