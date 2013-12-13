@@ -96,24 +96,24 @@ struct PitchEstimator : FFT {
     using FFT::FFT;
     // Parameters
     const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
-    const uint fMin = 8, fMax = N/16; //440*exp2(3+2./12)*N/rate; // 15 ~ 6000 Hz
+    const uint fMin = 8, fMax = N/16; // 15 ~ 6000 Hz
     const uint iterationCount = 4; // Number of least square iterations
     const float initialInharmonicity = 0; //1./cb(24); // Initial inharmonicity
-    const float noiseThreshold = 2; //2;
+    const float noiseThreshold = 2;
     const float highPeakThreshold = 8;
-    const uint medianError = 4; //3, 5, 7
-    const uint maxHarmonicCount = 16; //18,27
+    const uint medianError = 4;
+    const uint maxHarmonicCount = 16;
     // Conditions for median F0 override
-    const uint lastHarmonicRank = 39; // 32
-    const uint lastHarmonicFrequency = 868; // 321
-    const uint peakRank = 6; // 6
-    const uint peakFrequency = 113; // 118
-    const uint minNum = 26; // 35, 41, 47, 59, 82
-    const uint minDen = 79; // 69, 79, 90, 171, 178
+    const uint lastHarmonicRank = 39;
+    const uint lastHarmonicFrequency = 868;
+    const uint peakRank = 6;
+    const uint peakFrequency = 113;
+    const uint minNum = 26;
+    const uint minDen = 79;
     // Conditions for F1 override
-    const uint minHighPeak = 506; // 506-509
-    const uint minHighPeakNum = 83; // 83, 111
-    const uint minHighPeakDen = 640; //857
+    const uint minHighPeak = 506;
+    const uint minHighPeakNum = 83;
+    const uint minHighPeakDen = 640;
 
     struct Peak {
         uint f;
@@ -165,7 +165,7 @@ struct PitchEstimator : FFT {
             }
         }
         uint highPeak = 0;
-        for(Peak peak: peaks.slice(max<int>(0,peaks.size-6/*5*/)))
+        for(Peak peak: peaks.slice(max<int>(0,peaks.size-6)))
             if(peak.f > minHighPeak && spectrum[peak.f] > highPeakThreshold*periodPower) highPeak = peak.f;
         spectrum = filteredSpectrum; // Cleans spectrum
         if(!peaks.size) { harmonicEnergy=0; return 0; }
@@ -185,7 +185,7 @@ struct PitchEstimator : FFT {
             if(byFrequency.last()/medianF0>=lastHarmonicRank && byFrequency.last()>=lastHarmonicFrequency
                     && F1/medianF0>=peakRank && F1>=peakFrequency) {
                 medianF0=F1;
-                for(const auto& peak: peaks.slice(max<int>(0,peaks.size-6/*6*/))) {
+                for(const auto& peak: peaks.slice(max<int>(0,peaks.size-6))) {
                     if(peak.f >= F1*minNum/minDen && peak.f >= minNum && peak.f < medianF0) medianF0=peak.f;
                 }
             }

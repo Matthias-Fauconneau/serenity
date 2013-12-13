@@ -12,6 +12,11 @@ generic struct mref : ref<T> {
     /// Converts an std::initializer_list to mref
     constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.data, list.size) {}
 
+    explicit operator bool() const { if(size) assert(data); return size; }
+    explicit operator bool() { if(size) assert(data); return size; }
+    operator const T*() const { return data; }
+    operator T*() { return data; }
+
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
     T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
@@ -25,7 +30,8 @@ generic struct mref : ref<T> {
 
 // Memory operations
 /// Initializes memory using a constructor (placement new)
-inline void* operator new(size_t, void* p) { return p; }
+//inline void* operator new(size_t, void* p) { return p; }
+#include <new>
 /// Initializes raw memory to zero
 inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer[i]=0; }
 /// Copies raw memory from \a src to \a dst
@@ -102,6 +108,8 @@ generic struct buffer : mref<T> {
     const T& operator [](size_t i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
+
+    void clear(const T& value) { ::clear(data, size, value); }
 
     using mref<T>::data;
     using mref<T>::size;

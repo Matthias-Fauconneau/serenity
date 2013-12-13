@@ -157,7 +157,7 @@ struct Tuner {
             real totalEnergy = 0;
             for(int key: range(keys.size)) {
                 real previous = 0;
-                real* s = logSpectrums[key].begin();
+                real* s = logSpectrums[key];
                 for(int m: range(M)) {
                     real current = s[m];
                     if(m < keyCents || m >= M-keyCents) current = 0; // Trim spectrum to avoid window boundary effects (FIXME)
@@ -170,7 +170,7 @@ struct Tuner {
             assert_(totalEnergy);
             for(int m: range(M)) total[m] /= totalEnergy; // Normalizes (for entropy evaluation)
             for(int key: range(keys.size)) {
-                real* s = logSpectrums[key].begin();
+                real* s = logSpectrums[key];
                 for(int m: range(M)) s[m] /= totalEnergy; // Normalizes shifts operators also
             }
             int shiftCount[keys.size]; clear(shiftCount, keys.size); // Positive offset is lower pitch (left shifts)

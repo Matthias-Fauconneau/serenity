@@ -4,12 +4,9 @@
 // Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-/// Less verbose template declarations
 #define Type typename
 #define generic template<Type T>
-/// Nicer abstract declaration
 #define abstract =0
-/// Declares the default move constructor and move assigmment operator
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
 
 // Move semantics
@@ -45,17 +42,13 @@ generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t
 /// Forwards moveable values
 generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 
-template<Type A, Type B> bool operator !=(const A& a, const B& b) { return !(a==b); }
-// Arithmetic functions
+template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
+// Comparison functions
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 generic bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
 generic T min(T a, T b) { return a<b ? a : b; }
 generic T max(T a, T b) { return a<b ? b : a; }
 generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
-generic T abs(T x) { return x>=0 ? x : -x; }
-generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
-generic inline constexpr T sq(const T& x) { return x*x; }
-generic inline constexpr T cb(const T& x) { return x*x*x; }
 
 // Basic types
 typedef char byte;
@@ -69,12 +62,9 @@ typedef unsigned int uint;
 typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
-#if __x86_64
-typedef unsigned long size_t;
-#else
-typedef unsigned int size_t;
-#endif
-namespace std { generic struct initializer_list { const T* data; size_t size; }; }
+typedef __SIZE_TYPE__ 	size_t;
+//namespace std { generic struct initializer_list { const T* data; size_t size; }; }
+#include <initializer_list>
 generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;
@@ -144,7 +134,7 @@ generic struct ref {
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(size_t pos, int64 size) const { assert(pos+size>=0 || pos+size<=this->size); return ref<T>(data+pos, size>=0?size:this->size-pos+size); }
+    ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
     /// Slices a reference to elements from to the end of the reference
     ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 

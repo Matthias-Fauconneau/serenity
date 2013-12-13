@@ -172,7 +172,7 @@ String repeat(const string& s, uint times) {
 
 String pad(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
 
-stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
+stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r << s; r << '\0'; return r; }
 
 /// array<string>
 
