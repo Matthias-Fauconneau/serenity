@@ -161,7 +161,7 @@ class(MaximumMeanGradient, Operation) {
 
 /// Segments by setting values over a fixed threshold
 generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold, bool invert=false, int maskValue=0, bool cylinder=true) {
-    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int marginX=target.margin.x=source.margin.x, marginY=target.margin.y=source.margin.y, marginZ=target.margin.z=source.margin.z;
     bool tiled = source.tiled();
     assert_(X%16==0);
@@ -178,7 +178,7 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
     const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     uint64 count[2] = {};
     parallel(0, Z, [&](uint, int z) {
-        const T* const sourceZ = source + (tiled ? offsetZ[z] : z*XY);
+        const T* const sourceZ = source + (tiled ? offsetZ[z] : z*X*Y);
         uint8* const targetZ = targetData + offsetZ[z];
         if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const targetZY = targetZ + offsetY[y]; for(int x=0; x<X; x++) targetZY[x]=1; }
         else for(int y=0; y<Y; y++) {

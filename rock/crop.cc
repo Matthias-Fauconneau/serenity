@@ -77,7 +77,8 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
 
 /// Crops a volume to remove boundary effects
 void crop(Volume16& target, const Volume16& source, CropVolume crop) {
-    assert_(source.tiled() && target.tiled());
+    bool tiled = source.tiled();
+    interleavedLookup(target);
     target.sampleCount = crop.sampleCount;
     assert_(crop.min>=source.margin && crop.max<=source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     target.margin = crop.margin;
@@ -85,19 +86,19 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     target.data.size = target.size()*target.sampleSize;
     const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z;
     const uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     for(uint z=0; z<marginZ; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
     for(uint z=marginZ; z<Z-marginZ; z++) {
-        const uint16* const sourceZ = sourceData + offsetZ[crop.min.z-marginZ+z];
+        const uint16* const sourceZ = sourceData + (tiled ? offsetZ[crop.min.z-marginZ+z] : ((crop.min.z-marginZ+z)*Y*X));
         uint16* const targetZ = targetData + offsetZ[z];
         for(uint y=0; y<marginY; y++) for(uint x=0; x<X; x++) targetZ[offsetY[y]+offsetX[x]]=0;
         for(uint y=marginY; y<Y-marginY; y++) {
-            const uint16* const sourceZY = sourceZ + offsetY[crop.min.y-marginY+y];
+            const uint16* const sourceZY = sourceZ + (tiled ? offsetY[crop.min.y-marginY+y] : ((crop.min.y-marginY+y)*X));
             uint16* const targetZY = targetZ + offsetY[y];
             for(uint x=0; x<marginX; x++) targetZY[offsetX[x]]=0;
-            for(uint x=marginX; x<X-marginX; x++) targetZY[offsetX[x]]=sourceZY[offsetX[crop.min.x-marginX+x]];
+            for(uint x=marginX; x<X-marginX; x++) targetZY[offsetX[x]]=sourceZY[tiled ? offsetX[crop.min.x-marginX+x] : (crop.min.x-marginX+x)];
             for(uint x=X-marginX; x<X; x++) targetZY[offsetX[x]]=0;
         }
         for(uint y=X-marginY; y<Y; y++) for(uint x=0; x<X; x++) targetZ[offsetY[y]+offsetX[x]]=0;

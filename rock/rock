@@ -207,8 +207,10 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-maximum = ToPNG maximum invert=1
   png-flood = ToPNG flood
   png-denoised-connected = ToPNG denoised-connected
-  png-colored-families = ToPNG colored-families
-  png-colored-boxes = ToPNG colored-boxes
+  png-colored-pores = ToPNG colored-pores
+  png-pore-colored-boxes = ToPNG pore-colored-boxes
+  png-colored-throats = ToPNG colored-throats
+  png-throat-colored-boxes = ToPNG throat-colored-boxes
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
   bmp-denoised = ToBMP denoised
