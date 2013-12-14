@@ -82,7 +82,7 @@ generic struct buffer : mref<T> {
     buffer(buffer&& o) : mref<T>((T*)o.data, o.size), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
     buffer(size_t capacity, size_t size):mref<T>((T*)0,size),capacity(capacity){
-     assert(capacity>=size); if(!capacity) return;
+     assert(capacity>=size && size>=0); if(!capacity) return;
      if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
     }
     explicit buffer(size_t size) : buffer(size, size){}

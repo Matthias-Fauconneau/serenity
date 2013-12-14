@@ -260,7 +260,7 @@ void Window::event() {
             error("Unsupported: OpenGL was not configured at compile-time");
 #endif
         }
-        frameReady();
+        frameSent();
     }
     window=0;
 }

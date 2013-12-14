@@ -155,7 +155,7 @@ struct PitchEstimation {
         window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
         window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
-        window.frameReady.connect(this, &PitchEstimation::next);
+        window.frameSent.connect(this, &PitchEstimation::next);
 
         next();
     }

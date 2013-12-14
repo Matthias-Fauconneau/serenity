@@ -63,7 +63,7 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ 	size_t;
-//namespace std { generic struct initializer_list { const T* data; size_t size; }; }
+//namespace std { generic struct initializer_list { const T* data; size_t len; const T* begin() const { return data; } size_t size() { return len; } }; }
 #include <initializer_list>
 generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
@@ -119,7 +119,7 @@ generic struct ref {
     /// References \a size elements from const \a data pointer
     constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
     /// Converts an std::initializer_list to ref
-    constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
+    constexpr ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
     /// Converts a static array to ref
     template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
 

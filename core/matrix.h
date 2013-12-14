@@ -2,29 +2,6 @@
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
 
-struct Mat2; inline Mat2 operator*(real s, Mat2 M);
-/// 2D linear transformation
-struct Mat2 {
-    real data[2*2];
-    Mat2(real d=1) : data{d,0,0,d} {}
-    Mat2(real m00, real m01, real m10, real m11):data{m00,m10,m01,m11}{}
-
-    real M(int i, int j) const {assert(i<2 && j<2); return data[j*2+i]; }
-    real& M(int i, int j) {assert(i<2 && j<2); return data[j*2+i]; }
-    real operator()(int i, int j) const { return M(i,j); }
-    real& operator()(int i, int j) { return M(i,j); }
-
-    Mat2 operator*(Mat2 b) const {Mat2 r(0); for(int i=0;i<2;i++) for(int j=0;j<2;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); return r; }
-    Vec2 operator*(Vec2 v) const {Vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1); return r; }
-
-    real det() const { return M(0,0) * M(1,1) - M(0,1) * M(1,0); }
-    Mat2 transpose() {Mat2 r; for(int j=0;j<2;j++) for(int i=0;i<2;i++) r(j,i)=M(i,j); return r;}
-    Mat2 cofactor() const { return Mat2(M(1,1), -M(1,0), -M(0,1), M(0,0)); }
-    Mat2 adjugate() const { return cofactor().transpose(); }
-    Mat2 inverse() const { return 1/det() * adjugate() ; }
-};
-inline Mat2 operator*(real s, Mat2 M) {Mat2 r; for(int j=0;j<2;j++) for(int i=0;i<2;i++) r.M(i,j)=s*M(i,j); return r; }
-
 /// 2D affine transformation
 struct mat3x2 {
     float data[3*2];
@@ -166,7 +143,6 @@ template<int N, int M, Type T> inline String str(const T a[M*N]) {
     s<<" ]"_;
     return s;
 }
-inline String str(const Mat2& M) { return str<2,2>(M.data); }
 inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }
 inline String str(const mat4& M) { return str<4,4>(M.data); }

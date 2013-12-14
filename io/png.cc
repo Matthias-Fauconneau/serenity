@@ -7,11 +7,11 @@ generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255};
 generic struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
 generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
 
-typedef vector<rgb,uint8,3> rgb3;
+typedef vec<rgb,uint8,3> rgb3;
 
 template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
-    typedef vector<T,uint8,N> S;
-    typedef vector<T,int,N> V;
+    typedef vec<T,uint8,N> S;
+    typedef vec<T,int,N> V;
     S prior[width]; clear(prior,width,S(0));
     for(uint y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);

@@ -357,7 +357,7 @@ uint Sampler::read(float* output, uint size) {
 
     time+=size;
     queue(); //queue background decoder in main thread
-    frameReady(output, size);
+    frameSent(output, size);
     return size;
 }
 

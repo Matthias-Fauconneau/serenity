@@ -89,3 +89,19 @@ Vector solve(Matrix&& A, const Vector& b) {
     PLU plu = factorize(move(A));
     return solve(plu.P,plu.LU,b);
 }
+
+Matrix inverse(const Permutation& P, const Matrix &LU) {
+    uint n = LU.n;
+    Matrix A_1(n,n);
+    for(uint j=0;j<n;j++) {
+        Vector e(n); for(uint i=0;i<n;i++) e[i] = 0; e[j] = 1;
+        Vector x = solve(P,LU,move(e));
+        for(uint i=0;i<n;i++) A_1(i,j) = move(x[i]);
+    }
+    return A_1;
+}
+
+Matrix inverse(Matrix&& A) {
+    PLU plu = factorize(move(A));
+    return inverse(plu.P, plu.LU);
+}

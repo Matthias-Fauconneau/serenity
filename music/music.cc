@@ -144,7 +144,7 @@ struct Music {
         midi.noteEvent.connect(&score,&Score::noteEvent);
         midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
-        window.frameReady.connect(this,&Music::smoothScroll);
+        window.frameSent.connect(this,&Music::smoothScroll);
 
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);

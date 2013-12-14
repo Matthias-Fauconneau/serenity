@@ -96,7 +96,7 @@ struct Sampler : Poll {
     void startRecord(const string& path);
     void stopRecord();
     File record {0};
-    signal<float* /*data*/, uint /*size*/> frameReady;
+    signal<float* /*data*/, uint /*size*/> frameSent;
 
     operator bool() const { return samples.size; }
 };

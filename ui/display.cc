@@ -5,7 +5,7 @@
 FILE(display)
 #endif
 
-typedef vector<bgra,int,4> int4;
+typedef vec<bgra,int,4> int4;
 
 bool softwareRendering = true;
 int resolution = 96;

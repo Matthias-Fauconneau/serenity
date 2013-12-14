@@ -129,8 +129,8 @@ struct Window : Socket, Poll {
     /// Window drag state
     int2 dragStart, dragPosition, dragSize;
 
-    /// Signals when a render request completed
-    signal<> frameReady;
+    /// Signals sent frames
+    signal<> frameSent;
 
     /// Root window
     uint root = 0;
