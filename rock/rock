@@ -76,12 +76,11 @@ distance = Distance position
 
 # Computes skeleton (medial axis)
 skeleton = Skeleton position
-skeleton-tiled = ZOrder skeleton #FIXME: output tiled position in positionZ
 
 # Discards small pores
 minimalSqRadius = '0'
-if minimalSqRadius: pruned = ThresholdClip skeleton-tiled minimalSqRadius
-if !minimalSqRadius: pruned = skeleton-tiled
+if minimalSqRadius: pruned = ThresholdClip skeleton minimalSqRadius
+if !minimalSqRadius: pruned = skeleton
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
 #if crop.cylinder: crop = Crop pruned
@@ -89,7 +88,7 @@ if !minimalSqRadius: pruned = skeleton-tiled
 crop = Crop pruned #FIXME: defaults to cylinder even with source.box (requires crop.box)
 
 # Floodfills skeleton
-unconnected = Binary crop threshold=1 box=crop.box
+unconnected = Binary crop threshold=1 box=crop.box # Binary also Z-orders (speeds up FloodFill, Cluster, FIXME: Bin)
 connected-bottom = FloodFill unconnected minimalSqRadius seed=001000 # Keeps pore space connected to bottom face
 connected-top = FloodFill unconnected minimalSqRadius seed=000001 # Keeps pore space connected to top face
 connected-both = Intersect connected-bottom connected-top # Keeps pore space connected to both face
@@ -102,7 +101,8 @@ if connect-pore=='top': connected = connected-top
 if connect-pore=='1': connected = connected-both
 
 # Masks skeleton keeping only unpruned connected voxels
-connected-skeleton = Mask connected crop invert=1 value=0
+if !precomputedSkeleton: connected-skeleton = Mask connected crop invert=1 value=0
+if precomputedSkeleton: connected-skeleton = ZOrder source
 
 # Computes histogram of maximum squared radii of skeleton voxels
 histogram-skeleton-bg = Histogram connected-skeleton
