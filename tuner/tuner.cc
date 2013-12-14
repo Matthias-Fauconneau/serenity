@@ -45,17 +45,16 @@ struct Tuner : Poll {
     float threshold = 25; // Product of confidence and ambiguity
 
     PitchEstimator estimator {N};
+    int lastKey = -1;
+    float keyOffset = 0;
     int worstKey = -1;
 
     // UI
     const uint textSize = 64;
     Text key {""_, textSize, white};
-    Text pitch {""_, textSize, white};
     Text fOffset {""_, textSize, white};
     Text B {""_, textSize/2, white};
-    Text fError {""_, textSize/3, white};
-    Text confidence {""_, textSize/4, white};
-    HBox status {{&key,&pitch,&fOffset, &B, &fError, &confidence}};
+    HBox status {{&key, &fOffset, &B}};
     OffsetPlot profile;
     VBox layout {{&status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
@@ -121,26 +120,24 @@ struct Tuner : Poll {
                 && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
                     estimator.candidates[0].key / estimator.candidates[1].key : 0;
 
-        if(confidence > 1./confidenceThreshold/2) {
+        if(confidence > 1./confidenceThreshold/2 && 1-ambiguity > 1./ambiguityThreshold/2 && confidence*(1-ambiguity) > 1./threshold/2) {
             int key = round(pitchToKey(f*rate/N));
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
-            const float error =  12*log2((expectedF+1)/expectedF);
 
+            if(key!=lastKey) keyOffset = offset; // Resets on key change
+            keyOffset = (keyOffset+offset)/2; // Running average
             this->key.setText(strKey(key));
-            this->pitch.setText(dec(round(f*rate/N )));
-            this->fOffset.setText(dec(round(100*offset)));
+            this->fOffset.setText(dec(round(100*keyOffset)));
             this->B.setText(dec(round(100*12*log2(1+estimator.B))));
-            this->fError.setText(dec(round(100*error)));
-            this->confidence.setText(dec(round(1./confidence)));
 
-            if(confidence > 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
+            if(confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
                     && key>=21 && key<21+keyCount) {
-                const float alpha = confidence;
+                const float alpha = 1./16;
                 float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
                 float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
                 {int k = this->worstKey;
-                    for(uint i: range(keyCount)) //FIXME: quadratic, cubic, exp curve ?
+                    for(uint i: range(1, keyCount)) //FIXME: quadratic, cubic, exp curve ?
                         if(  k<0 ||
                              abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
                              abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;

@@ -19,7 +19,6 @@ generic struct array : buffer<T> {
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
 
-    explicit operator const T*() const { return data; } // Explicits ref::operator const T*
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 

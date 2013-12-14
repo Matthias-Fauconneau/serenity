@@ -14,8 +14,8 @@ generic struct mref : ref<T> {
 
     explicit operator bool() const { if(size) assert(data); return size; }
     explicit operator bool() { if(size) assert(data); return size; }
-    operator const T*() const { return data; }
-    operator T*() { return (T*)data; }
+    explicit operator const T*() const { return data; }
+    explicit operator T*() { return (T*)data; }
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }

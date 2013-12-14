@@ -153,7 +153,7 @@ struct PitchEstimator : FFT {
             }
         }
         harmonicEnergy = bestEnergy;
-        if(highPeak && this->F0 >= highPeak-1) harmonicEnergy = periodEnergy ;
+        if(highPeak && this->F0 >= highPeak-1) harmonicEnergy = max(harmonicEnergy, periodEnergy/9);
         return this->F0*(1+this->B);
     }
 };

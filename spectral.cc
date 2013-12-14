@@ -9,7 +9,7 @@
 /// Solves 1D Helmholtz problems with general Robin boundary conditions
 struct Spectral {
     /// Parameters
-    static constexpr uint n = 270; // Node count
+    static constexpr uint n = 160; // Node count
     const float dt = 1./n; // Time step (~ Courant–Friedrichs–Lewy condition)
     const float nu = 1; // Diffusion coefficient
     const float H = 1./(nu*dt); // Helmholtz coefficient
@@ -82,7 +82,7 @@ struct Spectral {
         Q = move(E.eigenvectors);
         v.clear(); pNL.clear(); // v[t<=0] = 0
         step();
-        record.start("spectral"_,true, false);
+        //record.start("spectral"_,true, false);
     }
     void step() {
         Vector NL = v*(Dx*v); // Non-linear term
