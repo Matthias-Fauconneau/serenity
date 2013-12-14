@@ -149,7 +149,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
     return {move(families), move(familySets)};
 }
 
-/// Converts families to a text file formatted as ((x y z r2)+\n)*
+/// Converts sets to a text file formatted as ((x y z r2)+\n)*
 String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
     String text ( sum(apply(families,[](const Family& family){ return family.size*4*5;})) ); // Estimates text size to avoid unnecessary reallocations
     for(const Family& family: families) {
@@ -161,12 +161,21 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
     }
     return text;
 }
-/// Converts familySets to a text file formatted as ((x y z r2)+\n)*
-String toASCII(const ref<unique<FamilySet>>& familySets, const Volume16& source) {
-    String text ( sum(apply(familySets,[](const FamilySet& family){ return family.points.size*4*5;})) ); // Estimates text size to avoid unnecessary reallocations
-    for(const FamilySet& family: familySets) {
-        if(family.families.size<=1) continue; // Only intersections
-        for(uint64 index: family.points) {
+/// Merges intersecting sets of intersections and converts sets to a text file formatted as ((x y z r2)+\n)*
+String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
+    array<unique<FamilySet>> mergedSets;
+    while(familySets) {
+        unique<FamilySet> set = familySets.pop();
+        if(set->families.size<=1) continue; // Only intersections
+        for(const FamilySet& other: familySets) {
+            if(other.families.size<=1) continue; // Only intersections
+            for(Family* family: set->families) if(other.families.contains(family)) { set->points << other.points; break; }
+        }
+        mergedSets << move(set);
+    }
+    String text ( sum(apply(mergedSets,[](const FamilySet& family){ return family.points.size*4*5;})) ); // Estimates text size to avoid reallocations
+    for(const FamilySet& set: mergedSets) {
+        for(uint64 index: set.points) {
             int3 p = zOrder(index);
             text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ' ' << dec(source[index],3) << ' ';
         }
@@ -184,6 +193,6 @@ class(Cluster, Operation), virtual VolumeOperation {
         otherOutputs[0]->metadata = String("families"_);
         otherOutputs[0]->data = toASCII(multipleReturnValues.families, inputs[0]);
         otherOutputs[1]->metadata = String("intersections"_);
-        otherOutputs[1]->data = toASCII(multipleReturnValues.familySets, inputs[0]);
+        otherOutputs[1]->data = toASCII(move(multipleReturnValues.familySets), inputs[0]);
     }
 };

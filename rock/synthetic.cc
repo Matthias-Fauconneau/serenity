@@ -68,7 +68,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
             }
             break_:;
         }
-        /*/// Links each ellipsoid to its nearest neighbour (TODO: all non-intersecting links)
+        /// Links each ellipsoid to its nearest neighbour (TODO: all non-intersecting links)
         struct Tube { vec3 A, B; float radius; };
         array<Tube> tubes;
         for(const mat4& ellipsoid: ellipsoids) {
@@ -79,7 +79,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
             vec4 b = nearest*vec4(1,1,1,0); float vVolume = b.x*b.y*b.z;
             // Rasterizes tubes (throats)
             vec3 A = center, B = nearest[3].xyz();
-            float tubeRadius = max(1., pow(min(aVolume,vVolume), 1./3));
+            float tubeRadius = 1; //max(1., pow(min(aVolume,vVolume), 1./3));
             int3 min=clip(int3(0),int3(::min(A,B))-int3(tubeRadius),target.sampleCount);
             int3 max=clip(int3(0),int3(ceil(::max(A,B)))+int3(tubeRadius),target.sampleCount);
             for(int z: range(min.z, max.z)) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
@@ -90,7 +90,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
                 if(sq(P - (A+t*(B-A))) < sq(tubeRadius)) target(x,y,z) = 0; // Straight cylinder
             }
             tubes << Tube{A, B, tubeRadius};
-        }*/
+        }
         output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z) + " voxels"_;});
     }
 };
