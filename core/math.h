@@ -4,7 +4,7 @@
 
 /// Declares real as a double-precision floating point number
 typedef double real;
-
+const float inf = __builtin_inff();
 constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }

@@ -11,24 +11,16 @@ mat3 randomRotation(Random& random) {
     return H*R;
 }
 
-// Oriented bounding box intersection (FIXME)
-bool intersects(const mat4& a, const mat4& b) {
-    {mat4 AB = a.inverse()*b; // Check if any corners of B are in A
-        vec3 min = vec3(-1), max = vec3(1); // Canonical box
-        for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) { // Check each corner
-            vec3 corner = AB*vec3((i?min:max).x,(j?min:max).y,(k?min:max).z);
-            if(corner > vec3(-1) && corner < vec3(1)) return true;
-        }
+// Oriented bounding box intersection
+bool overlaps(const mat4& a, const mat4& b) {
+    vec3 min = inf, max = -inf;
+    for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) {
+        vec3 t = a.inverse()*b*vec3(i?-1:1,j?-1:1,k?-1:1); // Projects B corners to A
+        min = ::min(min, t), max = ::max(max, t);
     }
-    {mat4 BA = b.inverse()*a; // Check if any corners of A are in B
-        vec3 min = vec3(-1), max = vec3(1); // Canonical box
-        for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) { // Check each corner
-            vec3 corner = BA*vec3((i?min:max).x,(j?min:max).y,(k?min:max).z);
-            if(corner > vec3(-1) && corner < vec3(1)) return true;
-        }
-    }
-    return false;
+    return min < vec3(1) && max > vec3(-1);
 }
+bool intersects(const mat4& a, const mat4& b) { return overlaps(a, b) && overlaps(b, a); }
 
 class(Synthetic, Operation), virtual VolumeOperation {
     const int3 size = 128;
@@ -61,10 +53,9 @@ class(Synthetic, Operation), virtual VolumeOperation {
             /*else*/ {
                 // Rasterizes ellipsoids
                 // Computes world axis-aligned bounding box of object's oriented bounding box
-                vec3 A = vec3(-1), B = vec3(1); // Canonical box
                 vec3 O = ellipsoid[3].xyz(), min = O, max = O; // Initialize min/max to origin
                 for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) { // Bounds each corner
-                    vec3 corner = ellipsoid*vec3((i?A:B).x,(j?A:B).y,(k?A:B).z);
+                    vec3 corner = ellipsoid*vec3(i?-1:1,j?-1:1,k?-1:1);
                     min=::min(min, corner), max=::max(max, corner);
                 }
                 min = ::max(min, vec3(0)), max = ::min(max, vec3(size));
@@ -77,7 +68,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
             }
             break_:;
         }
-        /// Links each ellipsoid to its nearest neighbour (TODO: all non-intersecting links)
+        /*/// Links each ellipsoid to its nearest neighbour (TODO: all non-intersecting links)
         struct Tube { vec3 A, B; float radius; };
         array<Tube> tubes;
         for(const mat4& ellipsoid: ellipsoids) {
@@ -88,7 +79,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
             vec4 b = nearest*vec4(1,1,1,0); float vVolume = b.x*b.y*b.z;
             // Rasterizes tubes (throats)
             vec3 A = center, B = nearest[3].xyz();
-            float tubeRadius = pow(min(aVolume,vVolume), 1./3);
+            float tubeRadius = max(1., pow(min(aVolume,vVolume), 1./3));
             int3 min=clip(int3(0),int3(::min(A,B))-int3(tubeRadius),target.sampleCount);
             int3 max=clip(int3(0),int3(ceil(::max(A,B)))+int3(tubeRadius),target.sampleCount);
             for(int z: range(min.z, max.z)) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
@@ -99,7 +90,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
                 if(sq(P - (A+t*(B-A))) < sq(tubeRadius)) target(x,y,z) = 0; // Straight cylinder
             }
             tubes << Tube{A, B, tubeRadius};
-        }
+        }*/
         output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z) + " voxels"_;});
     }
 };
