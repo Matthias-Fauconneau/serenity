@@ -10,7 +10,6 @@
 #include "layout.h"
 #include "window.h"
 #include "profile.h"
-#include "biquad.h"
 #if __x86_64
 #define TEST 1
 #include "ffmpeg.h"

@@ -4,6 +4,7 @@
 #include "lu.h"
 #include "plot.h"
 #include "window.h"
+#include "record.h"
 
 /// Solves 1D Helmholtz problems with general Robin boundary conditions
 struct Spectral {
@@ -12,7 +13,7 @@ struct Spectral {
     const float dt = 1./n; // Time step (~ Courant–Friedrichs–Lewy condition)
     const float nu = 1; // Diffusion coefficient
     const float H = 1./(nu*dt); // Helmholtz coefficient
-    const float w = 1./24; // Velocity source frequency
+    const float w = 1./30; // Velocity source frequency
     Vector x{n}; // Nodes positions
 
     /// System
@@ -27,10 +28,12 @@ struct Spectral {
     Vector pNL{n}, v {n}; // Non-linear term at t-1. solution at t
 
     Plot plot {x, v, 1};
-    Window window {&plot, int2(1080,1080), "Spectral"};
+    Window window {&plot, int2(640,480), "Spectral"};
+    Record record {640,480};
     Spectral() {
         window.backgroundColor=window.backgroundCenter=1;
         window.localShortcut(Escape).connect([]{exit();});
+        window.frameSent.connect(&record,&Record::captureVideoFrame);
         window.frameSent.connect(this, &Spectral::step); // Displays time steps as fast as possible
         //window.localShortcut(Key(' ')).connect(this, &Spectral::step); // Displays time steps on user input
         window.show();
@@ -79,6 +82,7 @@ struct Spectral {
         Q = move(E.eigenvectors);
         v.clear(); pNL.clear(); // v[t<=0] = 0
         step();
+        record.start("spectral"_,true, false);
     }
     void step() {
         Vector NL = v*(Dx*v); // Non-linear term

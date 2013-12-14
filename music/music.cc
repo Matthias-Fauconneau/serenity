@@ -200,7 +200,7 @@ struct Music {
         for(string arg: arguments()) if(!endsWith(arg,".sfz"_)) { openSheet(arg); break; }
 #if RECORD
         window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
-        sampler.frameReady.connect(&record,&Record::capture);
+        sampler.frameSent.connect(&record,&Record::capture);
         layout<<&keyboard;
 #endif
 #if UI
