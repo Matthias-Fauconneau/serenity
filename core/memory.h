@@ -15,7 +15,7 @@ generic struct mref : ref<T> {
     explicit operator bool() const { if(size) assert(data); return size; }
     explicit operator bool() { if(size) assert(data); return size; }
     operator const T*() const { return data; }
-    operator T*() { return data; }
+    operator T*() { return (T*)data; }
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
@@ -87,7 +87,7 @@ generic struct buffer : mref<T> {
     }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
-    buffer(size_t capacity, size_t size, const T& value) : buffer(capacity, size) { clear((T*)data, size, value); }
+    buffer(size_t capacity, size_t size, const T& value) : buffer(capacity, size) { ::clear((T*)data, size, value); }
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator

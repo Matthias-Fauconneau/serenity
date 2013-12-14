@@ -95,8 +95,9 @@ struct Music {
     AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #endif
 
-#if UI
+#define UI 1
     ICON(music)
+#if UI
     VBox layout;
 #if RECORD
     Window window {&layout,int2(1280,720),"Piano"_,musicIcon()};

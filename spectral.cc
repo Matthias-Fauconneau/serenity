@@ -9,12 +9,10 @@
 struct Spectral {
     /// Parameters
     static constexpr uint n = 270; // Node count
-    const float dx = 1./n; // Spatial resolution
-    const float u = 1; // Velocity source amplitude
+    const float dt = 1./n; // Time step (~ Courant–Friedrichs–Lewy condition)
     const float nu = 1; // Diffusion coefficient
-    const float dt = dx/nu; // Time step (~ Courant–Friedrichs–Lewy condition)
     const float H = 1./(nu*dt); // Helmholtz coefficient
-    const float w = 1/dt; // Velocity source frequency
+    const float w = 1./24; // Velocity source frequency
     Vector x{n}; // Nodes positions
 
     /// System
@@ -26,9 +24,9 @@ struct Spectral {
 
     /// Variables
     uint t = 1;
-    Vector v {n}, pNL{n}, pB{n}; // Previous solution, previous non-linear term, previous constant term
+    Vector pNL{n}, v {n}; // Non-linear term at t-1. solution at t
 
-    Plot plot {x, v, 2*u};
+    Plot plot {x, v, 1};
     Window window {&plot, int2(1080,1080), "Spectral"};
     Spectral() {
         window.backgroundColor=window.backgroundCenter=1;
@@ -79,13 +77,14 @@ struct Spectral {
         const real lowestReliableEigenvalue = min(apply(eigenvalues, abs<real>));
         for(uint i: range(n-2)) eigenvalueReciprocals[i] = abs(eigenvalues[i]) <= lowestReliableEigenvalue ? 1./H : 1./(eigenvalues[i] - H);
         Q = move(E.eigenvectors);
-        v.clear(); pNL.clear(); pB.clear(); // v[t<=0] = 0
+        v.clear(); pNL.clear(); // v[t<=0] = 0
         step();
     }
     void step() {
         Vector NL = v*(Dx*v); // Non-linear term
-        Vector b = pB + 1/(2*nu)*(pNL - 3*NL); // Constant term
-        b[0] = u/(2*nu)*(sin(w*(t-1))+sin(w*t)); // Source term (v(x=0,t) = sin(wt), v(x=1,t)=0)
+        Vector L = Dx*Dx*v + 1/(dt*nu) * v; // Linear term
+        Vector b = 1/(2*nu)*(3*NL - pNL) - L; // Constant term
+        b[0] = -1/(2*nu)*(sin(w*(t-1))+sin(w*t)); // Source term (v(x=0,t) = sin(wt), v(x=1,t)=0)
         b[n-1] = 0;
         Vector bi = b(1, n-1) - boundaryColumns * (iLb * Vector(b[0], b[n-1])); // Interior constant term
         Vector vi = Q * (eigenvalueReciprocals * solve(Q, bi)); // Interior solution
@@ -96,7 +95,6 @@ struct Spectral {
         v[n-1] = vb[1];
 
         pNL = move(NL);
-        pB = move(b);
         t++;
         window.render();
     }
