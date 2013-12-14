@@ -167,9 +167,14 @@ String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
     while(familySets) {
         unique<FamilySet> set = familySets.pop();
         if(set->families.size<=1) continue; // Only intersections
-        for(const FamilySet& other: familySets) {
-            if(other.families.size<=1) continue; // Only intersections
-            for(Family* family: set->families) if(other.families.contains(family)) { set->points << other.points; break; }
+        for(uint i=0; i<familySets.size;) {
+            const FamilySet& other = familySets[i];
+            if(other.families.size<=1) { i++; continue; } // Only intersections
+            for(Family* family: set->families) if(other.families.contains(family)) { goto break_; }
+            /*else*/ { i++; continue; }
+            break_:
+            set->points << other.points;
+            familySets.removeAt(i);
         }
         mergedSets << move(set);
     }
