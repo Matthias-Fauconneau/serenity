@@ -202,7 +202,8 @@ struct PitchEstimation {
                     +dec(round(100*offsetF0),2) +" c\t"_
                     +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(1-ambiguity?1./(1-ambiguity):0),2)+"\t"_
                     +dec(round((confidence*(1-ambiguity))?1./(confidence*(1-ambiguity)):0),2)+"\t"_
-                    +dec(round(1000*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" m\t"_
+                    +dec(round(100*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" c\t"_
+                    +dec(estimator.medianF0)+"\t"_
                     +(expectedKey == key ?
                           (confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold ? "O"_ : "~"_)
                         : "X"_)
@@ -217,8 +218,8 @@ struct PitchEstimation {
                     }
                     else {
                         fail++;
-                        plot.iMin = min(f, expectedF)/2;
-                        plot.iMax = min(uint(expectedF*2), estimator.fMax);
+                        plot.iMin = 0; //min(f, expectedF)/2;
+                        plot.iMax = min(uint(expectedF*16), estimator.fMax);
 
                         // FIXME: Inharmonic match on attack and release
                         if(key==expectedKey-1 && confidence<1./3) {

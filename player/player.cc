@@ -208,7 +208,7 @@ struct Player {
         }
         randomIndex += files.size-listIndex; // Assumes already queued tracks are from randomSequence
         while(titles.count() < listIndex + 16) { // Schedules at least 16 tracks drawing from random sequence as needed
-            string path = randomSequence[randomIndex];
+            string path = randomSequence[randomIndex%randomSequence.size];
             string folder = section(path,'/',0,1), file = section(path,'/',1,-1);
             queueFile(folder, file, true);
             randomIndex++;

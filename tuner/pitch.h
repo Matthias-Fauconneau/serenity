@@ -55,7 +55,7 @@ struct PitchEstimator : FFT {
 
         peaks.clear();
         minF=fMax, maxF=fMin; uint last=0; uint F1=0; uint maxPeak=0;
-        for(uint i: range(19, fMax-2)) {
+        for(uint i: range(11/*19*/, fMax-2)) {
             if(spectrum[i- 1] < spectrum[i] && spectrum[i] > spectrum[i+1] && spectrum[i] > noiseThreshold*periodPower) {
                 if(spectrum[i-2]/2 < spectrum[i-1] && spectrum[i+1] > spectrum[i+2]/2) {
                     // Copies peaks / Filters non peaks
@@ -64,7 +64,7 @@ struct PitchEstimator : FFT {
                     for(uint j=i+1; j<fMax && spectrum[j-1]>spectrum[j] && j<i+3; j++) filteredSpectrum[j] = spectrum[j];
                     // Records peaks
                     if(i<minF) minF=i; if(i>maxF) maxF=i;
-                    if(i-fMin > last) { peaks.insert(spectrum[i], {i}); } // Records maximum peaks
+                    if(i-fMin >= last) { peaks.insert(spectrum[i], {i}); } // Records maximum peaks
                     else if(spectrum[i]>spectrum[last]) { // Overwrites lower peak
                         peaks.remove({last}); // Ensures only one is kept
                         peaks.insert(spectrum[i], {i});

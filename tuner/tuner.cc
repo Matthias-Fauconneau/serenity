@@ -47,7 +47,8 @@ struct Tuner : Poll {
     PitchEstimator estimator {N};
     int lastKey = -1;
     float keyOffset = 0;
-    int worstKey = -1;
+    bool record = true;
+    int worstKey = 0;
 
     // UI
     const uint textSize = 64;
@@ -66,6 +67,7 @@ struct Tuner : Poll {
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
+        window.localShortcut(Key(' ')).connect([this]{record=!record;}); //FIXME: threads waiting on semaphores will be stuck
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
@@ -125,25 +127,26 @@ struct Tuner : Poll {
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
 
-            if(key!=lastKey) keyOffset = offset; // Resets on key change
-            keyOffset = (keyOffset+offset)/2; // Running average
-            this->key.setText(strKey(key));
-            this->fOffset.setText(dec(round(100*keyOffset)));
-            this->B.setText(dec(round(100*12*log2(1+estimator.B))));
-
-            if(confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
+            if(record && confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
                     && key>=21 && key<21+keyCount) {
                 const float alpha = 1./16;
                 float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
                 float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
                 {int k = this->worstKey;
-                    for(uint i: range(1, keyCount)) //FIXME: quadratic, cubic, exp curve ?
+                    for(uint i: range(3, keyCount-2))
                         if(  k<0 ||
                              abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
                              abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
             }
+
+            if(key!=lastKey) keyOffset = offset; // Resets on key change
+            keyOffset = (keyOffset+offset)/2; // Running average
+            this->key.setText(strKey(key));
+            this->fOffset.setText(dec(round(100*keyOffset)));
+            const int B = round(100*12*log2(1+estimator.B));
+            this->B.setText(B?dec(B):strKey(21+worstKey));
         }
 
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
