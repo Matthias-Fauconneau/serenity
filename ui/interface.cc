@@ -19,8 +19,8 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) 
         return true;
     }
     if(event==Press && button==LeftButton) { dragStartCursor=cursor, dragStartDelta=delta; setFocus(this); }
-    if(event==Motion && button==LeftButton && scrollbar && size.y<hint.y && dragStartCursor.x>size.x-scrollBarWidth) {
-        delta = min(int2(0,0), max(size-hint, dragStartDelta-(cursor-dragStartCursor)*hint.y/size.y));
+    if(event==Motion && button==LeftButton && size.y<hint.y && scrollbar && dragStartCursor.x>size.x-scrollBarWidth) {
+        delta.y = min(0, max(size.y-hint.y, dragStartDelta.y-(cursor.y-dragStartCursor.y)*hint.y/size.y));
         return true;
     }
     if(widget().mouseEvent(cursor-delta,max(hint,size),event,button)) return true;

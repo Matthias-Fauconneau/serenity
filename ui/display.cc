@@ -107,20 +107,18 @@ void blit(int2 target, const Image& source, int2 size) {
     bilinear(region, source);
 }
 
-inline void plot(int x, int y, float alpha, bool transpose, vec4 color) {
-    if(transpose) swap(x,y);
-    if(x>=currentClip.min.x && x<currentClip.max.x && y>=currentClip.min.y && y<currentClip.max.y) {
-        byte4& sRGB = framebuffer(x,y);
-        extern uint8 sRGB_lookup[256], inverse_sRGB_lookup[256];
-        byte4 linear (inverse_sRGB_lookup[sRGB.b], inverse_sRGB_lookup[sRGB.g], inverse_sRGB_lookup[sRGB.r], 0);
-        alpha *= color.w;
-        int4 linearBlend = min(int4(0xFF), additiveBlend ? int4(linear) + int4(alpha*color) : int4(round((1-alpha)*vec4(linear) + alpha*color))); // Blend
-        sRGB = byte4(sRGB_lookup[linearBlend.b], sRGB_lookup[linearBlend.g], sRGB_lookup[linearBlend.r], 0xFF);
-    }
+void blend(int x, int y, vec4 color, float alpha) {
+    if(x<currentClip.min.x || x>=currentClip.max.x || y<currentClip.min.y || y>=currentClip.max.y) return;
+    byte4& sRGB = framebuffer(x,y);
+    extern uint8 sRGB_lookup[256], inverse_sRGB_lookup[256];
+    byte4 linear (inverse_sRGB_lookup[sRGB.b], inverse_sRGB_lookup[sRGB.g], inverse_sRGB_lookup[sRGB.r], 0);
+    int4 linearBlend = min(int4(0xFF), additiveBlend ? int4(linear) + int4(0xFF*alpha*color) : int4(round((1-alpha)*vec4(linear) + 0xFF*alpha*color)));
+    sRGB = byte4(sRGB_lookup[linearBlend.b], sRGB_lookup[linearBlend.g], sRGB_lookup[linearBlend.r], 0xFF);
+    //sRGB = byte4(linearBlend.b, linearBlend.g, linearBlend.r, 0xFF);
 }
 
+inline void blend(int x, int y, vec4 color, float alpha, bool transpose) { if(transpose) swap(x,y); blend(x,y,color, alpha); }
 inline float fpart(float x) { return x-int(x); }
-inline float rfpart(float x) { return 1 - fpart(x); }
 void line(float x1, float y1, float x2, float y2, vec4 color) {
 #if GL
     if(!softwareRendering) {
@@ -136,31 +134,32 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
         return;
     }
 #endif
-    vec4 color8 (color.z*0xFF,color.y*0xFF,color.x*0xFF, color.w);
+    x1 -= 1./2, x2 -= 1./2, y1 -= 1./2, y2 -= 1./2; // Pixel centers at 1/2
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
-    if(abs(dx) < abs(dy)) swap(x1, y1), swap(x2, y2), swap(dx, dy), transpose=true;
-    if(x2 < x1) swap(x1, x2), swap(y1, y2);
+    if(abs(dx) < abs(dy)) { swap(x1, y1); swap(x2, y2); swap(dx, dy); transpose=true; }
+    if(x2 < x1) { swap(x1, x2); swap(y1, y2); }
+    if(dx==0) return; //p1==p2
     float gradient = dy / dx;
     int i1,i2; float intery;
     {
         float xend = round(x1), yend = y1 + gradient * (xend - x1);
-        float xgap = rfpart(x1 + 0.5);
-        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, color8);
-        plot(int(xend), int(yend)+1, fpart(yend) * xgap, transpose, color8);
+        float xgap = 1-fpart(x1 + 0.5);
+        blend(xend, yend, color, (1-fpart(yend)) * xgap * color.w, transpose);
+        blend(xend, yend+1, color, fpart(yend) * xgap * color.w, transpose);
         i1 = int(xend);
         intery = yend + gradient;
     }
     {
         float xend = round(x2), yend = y2 + gradient * (xend - x2);
         float xgap = fpart(x2 + 0.5);
-        plot(int(xend), int(yend), rfpart(yend) * xgap, transpose, color8);
-        plot(int(xend), int(yend) + 1, fpart(yend) * xgap, transpose, color8);
+        blend(xend, yend, color, (1-fpart(yend)) * xgap * color.w, transpose);
+        blend(xend, yend+1, color, fpart(yend) * xgap * color.w, transpose);
         i2 = int(xend);
     }
     for(int x=i1+1;x<i2;x++) {
-        plot(x, int(intery), rfpart(intery), transpose, color8);
-        plot(x, int(intery)+1, fpart(intery), transpose, color8);
+        blend(x, intery, color, (1-fpart(intery)) * color.w, transpose);
+        blend(x, intery+1, color, fpart(intery) * color.w, transpose);
         intery += gradient;
     }
 }

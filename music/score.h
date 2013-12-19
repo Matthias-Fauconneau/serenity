@@ -32,15 +32,14 @@ struct Score {
         Note(int index, int duration) : index(index), duration(duration) {}
         int index,duration,scoreIndex=-1;
     };
-    typedef map<int, map<int, Note>> Staff;
+    typedef map<float, map<float, Note>> Staff;
     array<Staff> notes; //[staff][x][y]
     map<int, array<vec2>> dots;
     //map<vec2,Note> nearStaffLimit;
 
     void parse();
     void synchronize(const map<uint,Chord>& MIDI);
-    void annotate(map<uint,Chord>&& chords);
-    signal<const map<uint,Chord>&> annotationsChanged;
+
     map<uint,Chord> chords; // chronological MIDI notes key values
     array<vec2> positions; // MIDI-synchronized note positions in associated PDF
     array<int> indices; // MIDI-synchronized character indices in associated PDF
@@ -50,20 +49,24 @@ struct Score {
     int chordSize=0; //Initial expected set size (to allow missing notes on large chords)
     map<uint,uint> active;
     map<uint,uint> expected;
-    bool editMode=false;
     bool showActive=false; // Toggles whether active notes are highlighted
     bool showExpected=false; // Toggles whether expected notes are highlighted (set on errors, cleared on sucess)
     int errors=0;
+#if ANNOTATION
+    bool editMode=false;
     void toggleEdit();
     void previous();
     void next();
     void insert();
     void remove();
+    void annotate(map<uint,Chord>&& chords);
+    signal<const map<uint,Chord>&> annotationsChanged;
+#endif
     void expect();
     void seek(uint time);
     void noteEvent(uint, uint);
     signal<const map<int,vec4>&> activeNotesChanged;
-    signal<float,float,float,float,float> nextStaff;
+    signal<float,float,float> nextStaff;
     map<vec2, String> debug;
     int pass=-1;
     int msScore=0; //HACK

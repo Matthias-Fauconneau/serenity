@@ -14,6 +14,7 @@ Device getMIDIDevice() {
 Sequencer::Sequencer(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread) { registerPoll(); }
 
 void Sequencer::event() {
+    if(!(revents&POLLIN)) return;
     uint8 key=read<uint8>();
     if(key & 0x80) { type=key>>4; key=read<uint8>(); }
     uint8 value=0;

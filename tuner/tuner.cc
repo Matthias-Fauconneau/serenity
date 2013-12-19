@@ -127,6 +127,13 @@ struct Tuner : Poll {
             float expectedF = keyToPitch(key)*N/rate;
             const float offset =  12*log2(f/expectedF);
 
+            this->key.setText(strKey(key));
+            {if(key!=lastKey) keyOffset = offset; // Resets on key change
+                keyOffset = (keyOffset+offset)/2; // Running average
+                this->fOffset.setText(dec(round(100*keyOffset)));}
+            const int B = round(100*12*log2(1+estimator.B));
+            this->B.setText(B?dec(B):strKey(21+worstKey));
+
             if(record && confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
                     && key>=21 && key<21+keyCount) {
                 const float alpha = 1./16;
@@ -139,14 +146,8 @@ struct Tuner : Poll {
                              abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
+                this->fOffset.setText(dec(round(100*keyOffset)));
             }
-
-            if(key!=lastKey) keyOffset = offset; // Resets on key change
-            keyOffset = (keyOffset+offset)/2; // Running average
-            this->key.setText(strKey(key));
-            this->fOffset.setText(dec(round(100*keyOffset)));
-            const int B = round(100*12*log2(1+estimator.B));
-            this->B.setText(B?dec(B):strKey(21+worstKey));
         }
 
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer

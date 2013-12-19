@@ -35,6 +35,7 @@ map<uint, Chord> parseAnnotations(String&& annotations) {
     return chords;
 }
 
+#if 0
 struct PDFScore : PDF {
     array<vec2> positions;
     signal<const ref<vec2>&> positionsChanged;
@@ -42,22 +43,24 @@ struct PDFScore : PDF {
     void loadPositions(const ref<byte>& data) {
         positions.clear();
         for(vec2 pos: cast<vec2>(data)) {
-            if(pos.x>0 && pos.y<-y2 && pos.x*scale<1280) {
+            if(pos.x>0 && pos.y<-y2 && pos.x<1) {
                 positions << pos;
             }
         }
         {int i=0; for(vec2 position: positions) {
-            onGlyph(i++,position*scale,32,"Manual"_,0,0);
+            onGlyph(i++,position,32,"Manual"_,0,0);
         }}
         {int i=0; for(vec2 position: positions) {
-            onGlyph(i++,position*scale,32,"Manual"_,0,0);
+            onGlyph(i++,position,32,"Manual"_,0,0);
         }}
     }
+    bool autoScroll=false;
     bool editMode=false;
     void toggleEdit() { editMode=!editMode; }
     bool mouseEvent(int2 cursor, int2, Event event, Button button) override {
+        autoScroll = false;
         if(!editMode || event!=Press) return false;
-        vec2 position = vec2(cursor)/scale;
+        vec2 position = vec2(cursor);
         int best=-1; float D=60;
         for(int i: range(positions.size)) {
             vec2 delta = positions[i]-position;
@@ -80,6 +83,7 @@ struct PDFScore : PDF {
         }
     }
 };
+#endif
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
@@ -90,7 +94,7 @@ struct Music {
     Sequencer input{thread};
 
     Sampler sampler;
-#define AUDIO 1
+#define AUDIO 0
 #if AUDIO
     AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
 #endif
@@ -104,17 +108,16 @@ struct Music {
 #elif GL
     Window window {&layout,int2(0,0),"Piano"_,musicIcon(), Window::OpenGL};
 #else
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon()};
+    Window window {&layout,int2(0,720),"Piano"_,musicIcon()};
 #endif
     List<Text> sheets;
 
     String name;
-    Scroll<PDFScore> pdfScore;
+    Scroll<PDF/*Score*/> pdfScore;
     Scroll<MidiScore> midiScore;
     Score score;
 
     vec2 position=0, target=0, speed=0; //smooth scroll
-    bool freeLook=true; // Unlock view from smooth scroll practice/playback
 #endif
 
 #if RECORD
@@ -149,20 +152,16 @@ struct Music {
 
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
-        pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
+        //pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
         pdfScore.scrollbar = true;
 
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
         score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
-        score.annotationsChanged.connect(this,&Music::annotationsChanged);
 
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
         window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
-        window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
-        window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
-        window.localShortcut(Key('t')).connect([this]{ freeLook=!freeLook; });
 #if AUDIO
         window.localShortcut(Key('1')).connect([this]{
             sampler.open(audio.rate, "Salamander.raw.sfz"_, Folder("Samples"_));
@@ -178,11 +177,16 @@ struct Music {
         });
 #endif
         //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
+#if ANNOTATION
+        score.annotationsChanged.connect(this,&Music::annotationsChanged);
+        window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
+        window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
         window.localShortcut(LeftArrow).connect(&score,&Score::previous);
         window.localShortcut(RightArrow).connect(&score,&Score::next);
         window.localShortcut(Insert).connect(&score,&Score::insert);
         window.localShortcut(Delete).connect(&score,&Score::remove);
-        window.localShortcut(Return).connect(this,&Music::toggleAnnotations);
+#endif
+        window.localShortcut(Return).connect(this,&Music::toggleDebug);
 
         layout << &sheets; sheets.expanding=true;
         array<String> files = folder.list(Files);
@@ -234,28 +238,21 @@ struct Music {
 
 #if UI
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float /*previous*/ /*previous top*/, float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float unused next /* next bottom*/, float x) {
-        if(pdfScore.normalizedScale && (pdfScore.x2-pdfScore.x1)) {
-            if(!pdfScore.size) pdfScore.size=window.size; //FIXME: called before first render, no layout
-            float scale = pdfScore.size.x/(pdfScore.x2-pdfScore.x1)/pdfScore.normalizedScale;
-            // Always set current staff as second staff from bottom edge (allows to repeat page, track scrolling, see keyboard)
-            float t = (x/pdfScore.normalizedScale)/(pdfScore.x2-pdfScore.x1);
-            //assert(t>=0 && t<=1);
-            //target = vec2(0, -(scale*( (1-t)*bottom + t*next )-pdfScore.ScrollArea::size.y)); // Align bottom edge between current bottom and next bottom
-            target = vec2(0, -(scale*( (1-t)*top + t*bottom )-pdfScore.ScrollArea::size.y/2)); // Align center between current top and current bottom
-            //target = vec2(0, -scale*( (1-t)*previous + t*top )); // Align top edge between previous top and current top
-            if(!position) position=target, pdfScore.delta=int2(round(position));
-        }
+    void nextStaff(float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float x) {
+        float t = x / (pdfScore.size.y?:window.size.y);
+        target = vec2(0, -(( (1-t)*top + t*bottom )-pdfScore.ScrollArea::size.y/2)); // Align center between current top and current bottom
+        if(!position) position=target, pdfScore.delta=int2(round(position));
         midiScore.center(int2(0,bottom));
-        freeLook=false; smoothScroll();
+        window.focus=0;
+        smoothScroll();
     }
     /// Smoothly scrolls towards target
     void smoothScroll() {
-        if(pdfScore.annotations || freeLook) return;
+        if(window.focus == &pdfScore.area()) return;
         const float k=1./60, b=1./60; //stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration
-        pdfScore.delta=int2(round(position));
+        pdfScore.delta =  min(int2(0,0), max(pdfScore.size-abs(pdfScore.widget().sizeHint()), int2(round(position))));
         if(round(target)!=round(position)) window.render();
 #if RECORD
         if(!record) toggleRecord();
@@ -267,7 +264,7 @@ struct Music {
         layout.first()=&sheets;
         window.render();
     }
-    void toggleAnnotations() {
+    void toggleDebug() {
         if(pdfScore.annotations) pdfScore.annotations.clear(), window.render(); else pdfScore.setAnnotations(score.debug);
     }
 #endif
@@ -300,13 +297,17 @@ struct Music {
         window.backgroundCenter=window.backgroundColor=1;
         if(existsFile(String(name+".pdf"_),folder)) {
             pdfScore.open(readFile(String(name+".pdf"_),folder));
+#if ANNOTATION
             if(existsFile(String(name+".pos"_),folder)) {
                 score.clear();
                 pdfScore.loadPositions(readFile(String(name+".pos"_),folder));
             }
+#endif
             score.parse();
             if(midi.notes) score.synchronize(copy(midi.notes));
+#if ANNOTATION
             else if(existsFile(String(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(String(name+".not"_),folder)));
+#endif
             layout.first()= &pdfScore.area();
             pdfScore.delta = 0; position=0,speed=0,target=0;
             window.focus = &pdfScore.area();
@@ -324,7 +325,7 @@ struct Music {
 #endif
     }
 
-#if UI
+#if ANNOTATION
     void annotationsChanged(const map<uint, Chord>& chords) {
         pdfScore.setAnnotations(score.debug);
         String annotations;

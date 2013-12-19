@@ -14,7 +14,8 @@ generic struct mref : ref<T> {
 
     explicit operator bool() const { if(size) assert(data); return size; }
     explicit operator bool() { if(size) assert(data); return size; }
-    explicit operator T*() { return (T*)data; }
+    operator const T*() const { return (T*)data; }
+    operator T*() { return (T*)data; }
 
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
@@ -22,6 +23,13 @@ generic struct mref : ref<T> {
     T& operator [](size_t i) const { return at(i); }
     T& first() const { return at(0); }
     T& last() const { return at(size-1); }
+
+    /// Slices a reference to elements from \a pos to \a pos + \a size
+    ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+    /// Slices a reference to elements from to the end of the reference
+    ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+    /// Slices a reference to elements from to the end of the reference
+    mref<T> slice(size_t pos) { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
 
     using ref<T>::data;
     using ref<T>::size;
@@ -38,15 +46,15 @@ inline void copy(byte* dst, const byte* src, size_t size) {
     if(size<32) { for(size_t i: range(size)) dst[i] = src[i]; return; }
     size_t size16 = size/16;
     if(ptr(src)%16==0) {
-        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16q*)(dst+i*16) = *(v16q*)(src+i*16);
-        else for(size_t i: range(size16)) storeu(dst+i*16, *(v16q*)(src+i*16));
+        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16qi*)(dst+i*16) = *(v16qi*)(src+i*16);
+        else for(size_t i: range(size16)) storeu(dst+i*16, *(v16qi*)(src+i*16));
     } else {
-        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16q*)(dst+i*16) =loadu(src+i*16);
+        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16qi*)(dst+i*16) =loadu(src+i*16);
         else {
             if(ptr(dst)%16==ptr(src)%16) {
                 size_t align = 16-ptr(dst)%16;
                 for(size_t i: range(0, align)) dst[i]=src[i];
-                for(size_t i: range(0, size16-16)) *(v16q*)(dst+align+i*16) = *(v16q*)(src+align+i*16);
+                for(size_t i: range(0, size16-16)) *(v16qi*)(dst+align+i*16) = *(v16qi*)(src+align+i*16);
             }
             else error("FIXME", ptr(dst)%16, ptr(src)%16);
         }
