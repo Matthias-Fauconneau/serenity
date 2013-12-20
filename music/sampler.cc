@@ -215,25 +215,20 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
                 assert_(layer && layer->notes.size<layer->notes.capacity);
 
-                layer->notes.append( ::copy(s.flac) ); // Copy predecoded buffer and corresponding FLAC decoder state
+                layer->notes.append( ::copy(s.flac) ); // Copies predecoded buffer and corresponding FLAC decoder state
                 Note& note = layer->notes.last();
                 note.envelope = s.envelope;
-
-                float level;
-                if(current) { //rt_decay is unreliable, matching levels works better
-                    level = current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11/*12 might be better*/); //341ms/21ms
-                    if(level>8) level=8;
-                } else {
-                    level = velocity/127. * s.volume; // E ~ A^2 ~ v^2 => A ~ v
+                if(!current) { // Press
+                    note.key=key, note.velocity=velocity;
+                    note.level = float4(s.volume * float(velocity) / 127.f); // E ~ A^2 ~ v^2 => A ~ v
+                } else { // Release (rt_decay is unreliable, matching levels works better)
+                    note.level = float4(min(8.f, current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11))); //341ms/21ms
                 }
-                if(level<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
-
-                if(!current) note.key=key, note.velocity=velocity;
+                if(note.level[0]<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
                 note.step=(v4sf){1,1,1,1};
                 note.releaseTime=s.releaseTime;
                 note.envelope=s.envelope;
-                if(note.flac.sampleSize==16) level*=0x1p8;
-                note.level=(v4sf){level,level,level,level};
+                if(note.flac.sampleSize==16) note.level *= 0x1p8;
             }
             queue(); //queue background decoder in main thread
             return;

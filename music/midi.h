@@ -4,7 +4,7 @@
 #include "data.h"
 #include "map.h"
 
-struct MidiNote { uint key; uint start; float duration; bool operator <(const MidiNote& o)const{return key<o.key;} };
+struct MidiNote { uint key; /*uint start; float duration;*/ bool operator <(const MidiNote& o)const{return key<o.key;} };
 inline String str(const MidiNote& m) { return str(m.key); }
 typedef array<MidiNote> MidiChord;
 

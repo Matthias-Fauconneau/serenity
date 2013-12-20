@@ -32,7 +32,7 @@ void Score::onPath(const ref<vec2>& p) {
     }
 }
 
-void Score::onGlyph(int index, const vec2 pos, float size,const string& font, int, int fontIndex) {
+void Score::onGlyph(int index, vec2 pos, float size,const string& font, int, int fontIndex) {
     if(!font) return;
     if(index == 0) {
         pass++;
@@ -76,10 +76,10 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             if(endsWith(font,"Opus"_)) {
             if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200_px) {
                 if(pos.y-lastClef.y>130_px/*148*/ && staffCount!=1) {
-                    staffs << (lastClef.y+pos.y)/2+14_px;
+                    staffs << (lastClef.y+pos.y)/2; //+14_px;
                     staffCount=1;
                 } else if(staffCount==3) {
-                    staffs << (previousClef.y+lastClef.y)/2-14_px;
+                    staffs << (previousClef.y+lastClef.y)/2; //-14_px;
                     staffCount=2;
                 } else staffCount++;
                 previousClef = lastClef;
@@ -165,7 +165,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
 #endif
             if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
-                    if(size<34_px) duration= 0; //grace
+                    if(size<29_px) duration= 0; //grace
                     else duration = 4; //quarter
                 }
                 else if(fontIndex==66) duration = 8; //half
@@ -239,7 +239,6 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
         }
 #endif
         if(duration<0) return;
-        if(notes[i].sorted(pos.x).contains(-pos.y)) return;
 #if LEDGER
         if(staffs) {
             float nearestStaffCut = min(abs(pos.y-staffs[max(int(i)-1,0)]),abs(pos.y-staffs[min<int>(i,staffs.size-1)]));
@@ -268,7 +267,11 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             }
         }
 #endif
-        for(pair<float, Chord> e: notes[i]) if(abs(e.key-pos.x)<1_px) e.value.insertSorted(-pos.y, Note(index,duration));
+        float nearest = inf;
+        for(float x: notes[i].keys) if(abs(x-pos.x)<abs(nearest-pos.x)) nearest = x;
+        if(abs(nearest-pos.x)<1_px) pos.x = nearest;
+        for(float y: notes[i].sorted(pos.x).keys) if(abs(y-(-pos.y))<1_px) return; // Double note
+        notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
     }
 }
 
@@ -286,6 +289,7 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
         }
     }
 
+#if DIADIC
     /// Fix chords with diadics (shifted x positions) or double notes
     for(Staff& staff : notes) {
         for(uint i: range(staff.keys.size)) {
@@ -299,18 +303,18 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
                         if(lastChord.at(pY).duration && (
                                     abs(x-pX)<2_px ||
                                     (abs(x-pX)<10_px && abs(y-pY)<180_px && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
-                                    ((abs(x-pX)<18_px && abs(y-pY)<=36_px) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
-                                    ((abs(x-pX)<=19_px && abs(y-pY)<=7_px) && (y!=pY)) ||
-                                    ((lastD>=16 || (y==pY && lastChord.at(pY).duration>=8 && lastChord.size()>1)) && (abs(x-pX)<=26_px && abs(y-pY)<=18_px) && (y!=pY || lastChord.size()>1 || chord.size()>1))
+                                    ((abs(x-pX)<18_px && abs(y-pY)<36_px) && (y!=pY || lastChord.size()>1 || chord.size()>1)) ||
+                                    ((abs(x-pX)<19_px && abs(y-pY)<7_px) && (y!=pY)) ||
+                                    ((lastD>=16 || (y==pY && lastChord.at(pY).duration>=8 && lastChord.size()>1)) && (abs(x-pX)<26_px && abs(y-pY)<18_px) && (y!=pY || lastChord.size()>1 || chord.size()>1))
                                     )) {
                             //prevent stealing diadic from wrong chord
                             if( (!(lastD>=16) || (y==pY && lastChord.at(pY).duration<16)) && i<staff.keys.size-1 && abs(staff.keys[i+1]/*nextX*/ - x) <= abs(x-pX)) {
                                 for(float nY : staff.values[i+1].keys) if(abs(nY-y)<=abs(x-pX)) goto skip;
                             }
                             if((lastChord.size()>=chord.size() || (lastChord.size()==3 && chord.size()==4)/*FIXME*/) && (
-                                          (abs(x-pX)<18_px && abs(y-pY)<=36_px) ||
-                                          (chord.size()==1 && abs(x-pX)<=23_px && abs(y-pY)<=0) ||
-                                    (lastD>=16 && (abs(x-pX)<=26_px && abs(y-pY)<=18_px) && (y!=pY || lastChord.size()>1 || chord.size()>1))
+                                          (abs(x-pX)<18_px && abs(y-pY)<36_px) ||
+                                          (chord.size()==1 && abs(x-pX)<23_px && abs(y-pY)<=0) ||
+                                    (lastD>=16 && (abs(x-pX)<26_px && abs(y-pY)<18_px) && (y!=pY || lastChord.size()>1 || chord.size()>1))
                                           )) {
                                 lastChord.insertSortedMulti(y,chord.at(y)); //tie only one duplicate
                                 chord.remove(y);
@@ -329,7 +333,9 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
             }
         }
     }
-#if TIE
+#endif
+
+#if 1
     /// Detect and remove tied notes
     array<Tie> tied;
     //for(Line tie : ties) {
@@ -346,13 +352,16 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
 
                     /// Detect first note of a tie
                     if(!t.ly || abs(ly)<abs(t.dy)) {
-                        if(notes[i].at(x).at(y).duration>0/*not grace*/ && lx < 4_px && lx>-46_px && ly>=-30_px/*-34*/ && ly<32_px/*18*/ && rx<1) {
-                            for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) { debug[vec2(x,-y)]<<"D"_<<str(t2.dy,ly); goto alreadyTied; }
+                        if(notes[i].at(x).at(y).duration>0/*not grace*/ && lx < 4_px && lx>-32_px && ly>=-30_px/*-34*/ && ly<32_px/*18*/ && rx<1_px) {
+                            for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) { /*debug[vec2(x,-y)]<<"D"_<<str(t2.dy,ly);*/ goto alreadyTied; }
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                        } else if(lx>-50_px && lx<50_px && ly>-50_px && ly<50_px) debug[vec2(x,-y)]<<"!L"_+str(lx,ly);
+                        } else if(lx<4_px && lx>=-32_px && ly>=-30_px && ly<32_px && rx<1_px) {
+                            debug[vec2(x,-y)]<<"!L"_+str(round(lx/1_px),round(ly/1_px));
+                        }
                     }
 alreadyTied: ;
                 }
+#if 0
                 if(!t.ly) { // No left tie found, try again and allow to steal an already tied note
                     for(float y : notes[i].at(x).keys) {
                         float ly = -y-tie.a.y;
@@ -363,10 +372,11 @@ alreadyTied: ;
                                 for(uint j: range(tied.size)) { Tie t2=tied[j]; if(t2.li==i && t2.lx==x && t2.ly==y) { debug[vec2(x,-y)]<<"S"_<<str(t2.dy,ly); tied.removeAt(j); ties<<t2.o; /*Move tie back*/ goto stolen; } }
                                 error("Nothing to steal after stealing prevention"); stolen:;
                                 t.li=i; t.lx=x; t.ly=y; t.dy=ly;
-                            } else if(lx>-50_px && lx<50_px && ly>-50_px && ly<50_px) debug[vec2(x,-y)]<<"!L"_+str(lx,ly);
+                            } else if(lx<4_px && lx>-32_px && ly>-34_px && ly<34_px) debug[vec2(x,-y)]<<"!L"_+str(round(lx/1_px),round(ly/1_px));
                         }
                     }
                 }
+#endif
                 for(float y : notes[i].at(x).keys) {
                     float ry = y-t.ly;
                     /// Detect if there is a note between the tied notes (necessary to sync with HTTYD sheets)
@@ -380,19 +390,19 @@ alreadyTied: ;
                         break;
                     }
                     /// Detect right note of a tie
-                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210_px)) && ry>-5_px && ry <=12_px && rx < 21_px && rx > -10_px) {
+                    if( noteBetween<3 && (!sameNoteBetween || (sameNoteBetween<2 && l>210_px)) && ry>-5_px && ry <12_px && rx < 21_px && rx > -10_px) {
                         t.ri=i;t.rx=x; t.ry=y;
-                        //if(ry<=-4) for(Line t2: ties) if(sq(vec2(x,-y)-t2.b)<sq(vec2(x,-y)-tie.b)) { debug[vec2(x,-y)]<<"E"_<<str(int2(x,-y),int2(t2.b),int2(tie.b),ry); goto closerExists; }
+                        //if(ry<-4) for(Line t2: ties) if(sq(vec2(x,-y)-t2.b)<sq(vec2(x,-y)-tie.b)) { debug[vec2(x,-y)]<<"E"_<<str(int2(x,-y),int2(t2.b),int2(tie.b),ry); goto closerExists; }
                         tied << t; //defer remove for double ties
                         debug[vec2(x,-y)]<<"R"_<<str(ry);
                         debug[vec2(tie.b)]<<"R"_;
                         goto continueTie; //goto staffDone;
                         //closerExists:;
-                    } else if(rx>-42_px && rx<42_px && ry>-42_px && ry<42_px) debug[vec2(x,-y)]<<"!R"_+str(rx,ry);
+                    } else if(rx>-11_px && rx<22_px && ry>-6_px && ry<13_px) debug[vec2(x,-y)]<<"!R"_+str(round(rx/1_px),round(ry/1_px));
                 }
             }
 //staffDone: ;
-#if WRAPPED_TIE
+#if 1
             /// Detect notes tied over a line wrap
             if(t.ly && (!noteBetween || (noteBetween<2 && l>156_px)) && i+1<staffs.size && tie.b.x > notes[i].keys.last()+10_px ) {
                 float ly=100_px; for(float y: keys) if(abs(-y-t.ly) < abs(ly)) ly = -y-t.ly;
@@ -417,10 +427,13 @@ alreadyTied1: ;
                         if(dy>=-15_px && abs(dy)<=min) {
                             t.ri=i+1;t.rx=rx; t.ry=y2;
                             for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
-                            debug[vec2(t.rx,-t.ry)]<<"^R"_<<str(dy);
-                            tied << t;
-                            goto tieFound;
-                        } else debug[vec2(t.rx,-t.ry)]<<"!R"_<<str(dy);
+                            for(Line tie : ties) if(sq(tie.b-vec2(t.rx,-t.ry))<sq(32_px)) { // Search for the matching wrapped tie
+                                debug[vec2(t.rx,-t.ry)]<<"^R"_<<str(round(dy/1_px));
+                                debug[vec2(tie.b)]<<"^"_;
+                                tied << t;
+                                goto tieFound;
+                            }
+                        } /*else*/ debug[vec2(t.rx,-t.ry)]<<"!R"_<<str(dy);
 alreadyTied2: ;
                     }
                 }
@@ -429,9 +442,10 @@ trillCancelTie: ;
             }
 #endif
         }
-        debug[vec2(tie.b)]<<(t.ly?"!R"_:"!L"_); continue;
+        //debug[vec2(tie.b)]<<(t.ly?"!R"_:"!L"_);
+        continue;
 continueTie: ;
-        debug[vec2(t.lx,-t.ly)]<<str("L"_,t.dy);
+        debug[vec2(t.lx,-t.ly)]<<str("L"_/*,t.dy*/);
     }
     for(Tie t: tied) {
         if(notes.at(t.ri).at(t.rx).contains(t.ry)) notes.at(t.ri).at(t.rx).remove(t.ry);
@@ -489,24 +503,24 @@ void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     // Removes graces both in MIDI and score (separately as they are not ordered correctly)
     for(uint i=0; i<notes.size;) if(notes[i].duration==0) notes.removeAt(i); else i++;
     for(uint i=0; i<durations.size;) if(durations[i]==0)  positions.removeAt(i), indices.removeAt(i), durations.removeAt(i); else i++;
+#endif
 
     // Synchronize score with MIDI
-    vec2 lastPos=vec2(0,0); int lastKey=0;
+    vec2 lastPos=vec2(0,0); uint lastKey=0;
     for(uint i=0; i<notes.size && i<positions.size;) {
         vec2 pos=positions[i]; MidiNote note = notes[i];
         if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
             debug[pos]=String("++++"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else i++;
-        lastPos=pos; lastKey=note.key;
+        } else { i++; lastKey=note.key; }
+        lastPos=pos;
     }
-#endif
 
     chords.clear();
     uint t=-1; for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(t, notes[i].key);
+        debug[positions[i]]<<str(notes[i].key);
     }
 }
 

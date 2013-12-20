@@ -1,7 +1,6 @@
 #pragma once
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
-#include "simd.h"
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
@@ -41,25 +40,11 @@ generic struct mref : ref<T> {
 #include <new>
 /// Initializes raw memory to zero
 inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer[i]=0; }
+void simdCopy(byte* dst, const byte* src, size_t size);
 /// Copies raw memory from \a src to \a dst
 inline void copy(byte* dst, const byte* src, size_t size) {
-    if(size<32) { for(size_t i: range(size)) dst[i] = src[i]; return; }
-    size_t size16 = size/16;
-    if(ptr(src)%16==0) {
-        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16qi*)(dst+i*16) = *(v16qi*)(src+i*16);
-        else for(size_t i: range(size16)) storeu(dst+i*16, *(v16qi*)(src+i*16));
-    } else {
-        if(ptr(dst)%16==0) for(size_t i: range(size16)) *(v16qi*)(dst+i*16) =loadu(src+i*16);
-        else {
-            if(ptr(dst)%16==ptr(src)%16) {
-                size_t align = 16-ptr(dst)%16;
-                for(size_t i: range(0, align)) dst[i]=src[i];
-                for(size_t i: range(0, size16-16)) *(v16qi*)(dst+align+i*16) = *(v16qi*)(src+align+i*16);
-            }
-            else error("FIXME", ptr(dst)%16, ptr(src)%16);
-        }
-    }
-    for(size_t i: range(size16*16,size)) dst[i]=src[i];
+    if(size<32) { for(size_t i: range(size)) dst[i] = src[i]; }
+    else simdCopy(dst, src, size);
 }
 /// Initializes buffer to \a value
 generic inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }

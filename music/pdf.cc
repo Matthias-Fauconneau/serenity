@@ -403,7 +403,8 @@ void PDF::open(const string& data) {
                 }
                 args.clear();
             }
-            pageMin=min(pageMin, boxMin); pageMax = max(pageMax, boxMax); // Keep margins
+            pageMin.x=min(pageMin.x, boxMin.x); pageMax.x = max(pageMax.x, boxMax.x); // Keep full horizontal margins
+            pageMin.y=(pageMin.y+min(pageMin.y, boxMin.y))/2; pageMax.y = (pageMax.y+max(pageMax.y, boxMax.y))/2; // Keep half vertical margins
             mat3x2 m (1,0, 0,-1, 0, pageMax.y + (documentMax.y==-inf?0:documentMax.y));
             { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
             // Transforms from page to document

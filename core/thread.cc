@@ -1,4 +1,5 @@
 #include "thread.h"
+#include "memory.h"
 #include "string.h"
 #include "linux.h"
 #include "data.h"

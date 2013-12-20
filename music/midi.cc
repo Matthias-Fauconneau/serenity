@@ -1,5 +1,6 @@
 #include "midi.h"
 #include "file.h"
+#include "math.h"
 
 void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
     clear();
@@ -46,14 +47,18 @@ void MidiFile::read(Track& track, uint64 time, State state) {
             if(state==Play) noteEvent(key,0);
             uint start = active.take(key);
             if(state==Sort) {
-                uint duration = track.time-start;
-                notes.sorted(start).insertSorted(MidiNote{key, start*4/ticksPerBeat, duration*4.f/ticksPerBeat});
+                //uint duration = track.time - start;
+                uint nearest = 0;
+                for(pair<uint, MidiChord> e: notes) { if(abs(int(e.key-start))<abs(int(nearest-start))) nearest=e.key; }
+                if(abs(int(nearest-start))<ticksPerBeat/12) start=nearest; // Merges dates under 1/8 beat at 120 (~62ms, ~16Hz)
+                //else if(abs(int(nearest-start))<=ticksPerBeat/4) log(ticksPerBeat/4, abs(int(nearest-start)), (float)ticksPerBeat/abs(int(nearest-start)));
+                notes.sorted(start).insertSorted(MidiNote{key /*, start*4/ticksPerBeat, duration*4.f/ticksPerBeat*/});
             }
         }
         if(type==NoteOn && vel) {
             if(!active.contains(key)) {
                 if(state==Play) noteEvent(key,vel);
-                active.insert(key,track.time);
+                active.insert(key, track.time);
             }
         }
 
