@@ -17,7 +17,7 @@ struct MidiScore : Widget {
         {0,2,0,2,0,3,0,0,2,0,2,0},  // G major TODO
         {3,0,0,2,0,3,0,0,2,0,2,0}  // D major TODO
     };
-    map<uint,Chord> notes;
+    map<uint, MidiChord> notes;
     int key=-1; uint tempo=120; uint timeSignature[2] = {4,4};
 
     const int staffCount = 2;

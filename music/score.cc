@@ -14,25 +14,25 @@ void Score::onPath(const ref<vec2>& p) {
     } else if(p.size==5_px||p.size==13_px) {
         if(span.x > 12_px && span.y < 28_px) {
             ties += Line(vec2(min.x,center.y),vec2(max.x,center.y));
-            debug[center]<<"I"_;
-        } else debug[center]="!I"_+str(int2(round(span)));
+            //debug[center]<<"I"_;
+        } //else debug[center]="!I"_+str(int2(round(span)));
         if(span.x > 75_px && span.x < 76_px && span.y > 8_px && span.y < 18_px) {
             tremolos << Line(p[0], p[3]);
         }
     } else if((p.size==4&&p[1]!=p[2]&&p[2]!=p[3])||p.size==7) {
         if(span.y>2_px && span.x<500_px && span.y<14_px+span.x/17) {
             ties += Line(vec2(min.x,p[0].y),vec2(max.x,p[3].y));
-            debug[center]="V"_+str(span);
-        } else debug[center]="!V"_+str(span);
+            //debug[center]="V"_+str(span);
+        } //else debug[center]="!V"_+str(span);
     } else if(p.size==10_px) {
         if(span.x>36_px && span.x<1000_px && span.y>10_px && (span.y<14_px || (span.x>100_px && span.y<29_px))) {
             ties += Line(vec2(min.x,center.y),vec2(max.x,center.y));
-            debug[center]="X"_+str(span);
-        } else debug[center]="!X"_+str(span);
+            //debug[center]="X"_+str(span);
+        } //else debug[center]="!X"_+str(span);
     }
 }
 
-void Score::onGlyph(int index, const vec2 pos, float size,const string& font, int code, int fontIndex) {
+void Score::onGlyph(int index, const vec2 pos, float size,const string& font, int, int fontIndex) {
     if(!font) return;
     if(index == 0) {
         pass++;
@@ -47,6 +47,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
     }
     //TODO: factorize, OCR
     if(pass==0) { // 1st pass: split score in staves
+#if 0
         if(font=="MScore-20"_) {
             if((code==1||code==12/*treble*/||code==2||code==13/*bass*/) && pos.x<200_px) {
                 if(pos.y-lastClef.y>170_px) staffs << (lastClef.y+pos.y)/2;
@@ -70,7 +71,9 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
                 lastClef=pos; keys<<pos.y;
             }
             histogram[code]++;
-        } else if(endsWith(font,"Opus"_)) {
+        } else
+#endif
+            if(endsWith(font,"Opus"_)) {
             if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200_px) {
                 if(pos.y-lastClef.y>130_px/*148*/ && staffCount!=1) {
                     staffs << (lastClef.y+pos.y)/2+14_px;
@@ -82,7 +85,9 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
                 previousClef = lastClef;
                 lastClef=pos;
             }
-         } else if(find(font,"DUCRGK"_)) {
+         }
+#if 0
+            else if(find(font,"DUCRGK"_)) {
             if(code==1/*treble*/||code==5/*bass*/) {
                 if(lastClef.y != 0 && pos.y-lastClef.y>128_px) staffs << (lastClef.y+pos.y)/2;
                 lastClef=pos;
@@ -121,10 +126,12 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             else lastClef.y=max(lastClef.y, pos.y);
             lastPos=pos;
         }
+#endif
     } else if(pass==1) { // 2nd pass: detect notes and assign to staves
         uint i=0; for(;i<staffs.size && pos.y>staffs[i];i++) {}
         if(i>=notes.size) notes.grow(i+1);
         int duration=-1;
+#if 0
         if(font=="MScore-20"_) { //TODO: glyph OCR
             if(msScore) {
                 if(code==14) {
@@ -147,15 +154,16 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             }
             else if(code==61) duration = 8; //half
             else if(code==60) duration = 16; //whole
-        } else if(find(font,"Opus"_)) {
-            if(font=="OpusStd"_) { //FIXME: OCR
+        } else if(font=="OpusStd"_) { //FIXME: OCR
                 if(code == quarter) {
                     if(size<34) duration= 0; //grace
                     else duration = 4; //quarter
                 }
                 else if(code == half) duration = 8; //half
                 else if(code == whole) duration = 16; //whole
-            } else if(endsWith(font,"Opus"_)) {
+            } else
+#endif
+            if(endsWith(font,"Opus"_)) {
                 if(fontIndex==53) {
                     if(size<34_px) duration= 0; //grace
                     else duration = 4; //quarter
@@ -163,6 +171,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
                 else if(fontIndex==66) duration = 8; //half
                 else if(fontIndex==39) duration = 16; //whole
             }
+#if 0
             if(code==41 && trills && abs(trills.last().b.y-pos.y)<16_px) trills.last().b=pos; //trill tail
             else if(code==56) trills << Line(pos,pos); //trill head
             else if(code==58 || (font=="OpusSpecialStd"_ && code==1)) { //dot
@@ -228,6 +237,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             /*else*/ notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,4));
             break_:;
         }
+#endif
         if(duration<0) return;
         if(notes[i].sorted(pos.x).contains(-pos.y)) return;
 #if LEDGER
@@ -258,7 +268,7 @@ void Score::onGlyph(int index, const vec2 pos, float size,const string& font, in
             }
         }
 #endif
-        notes[i].sorted(pos.x).insertSorted(-pos.y, Note(index,duration));
+        for(pair<float, Chord> e: notes[i]) if(abs(e.key-pos.x)<1_px) e.value.insertSorted(-pos.y, Note(index,duration));
     }
 }
 
@@ -277,11 +287,11 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
     }
 
     /// Fix chords with diadics (shifted x positions) or double notes
-    for(map<float, map<float, Note>>& staff : notes) {
+    for(Staff& staff : notes) {
         for(uint i: range(staff.keys.size)) {
             if(i>0) {
-                float pX = staff.keys[i-1]; map<float, Note>& lastChord = staff.values[i-1];
-                float x = staff.keys[i]; map<float, Note>& chord = staff.values[i];
+                float pX = staff.keys[i-1]; Chord& lastChord = staff.values[i-1];
+                float x = staff.keys[i]; Chord& chord = staff.values[i];
                 int lastD=0; for(const Note& note: lastChord.values) lastD=max(lastD, note.duration);
                 again: ;
                 for(float y: chord.keys) {
@@ -303,12 +313,16 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
                                     (lastD>=16 && (abs(x-pX)<=26_px && abs(y-pY)<=18_px) && (y!=pY || lastChord.size()>1 || chord.size()>1))
                                           )) {
                                 lastChord.insertSortedMulti(y,chord.at(y)); //tie only one duplicate
-                                chord.remove(y); debug[vec2(x,-y)]<<str("<"_,x-pX,y-pY); goto again;
+                                chord.remove(y);
+                                //debug[vec2(x,-y)]<<str("<"_,x-pX,y-pY);
+                                goto again;
                             } else if(lastChord.size()<=chord.size() && !(lastChord.size()==3 && chord.size()==4)/*FIXME*/) {
                                 if(!chord.contains(pY)) chord.insertSorted(pY,lastChord.at(pY));
-                                lastChord.remove(pY); debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY)); goto again;
-                            } else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
-                        } else if(abs(x-pX)<30_px && abs(y-pY)<40_px) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
+                                lastChord.remove(pY);
+                                //debug[vec2(pX,-pY)]<<str(">"_,abs(x-pX),abs(y-pY));
+                                goto again;
+                            } //else debug[vec2(x,-y)]<<str("?"_,x-pX,y-pY);
+                        } else //if(abs(x-pX)<30_px && abs(y-pY)<40_px) debug[vec2(x,-y)]<<"!"_+str(x-pX,y-pY);
                         skip:;
                     }
                 }
@@ -428,7 +442,7 @@ continueTie: ;
     /// Removes duplicates (added to tie only once)
     for(Staff& staff: notes) {
         for(uint i: range(staff.keys.size)) {
-            map<float, Note>& chord = staff.values[i];
+            Chord& chord = staff.values[i];
             for(uint i=0;i<chord.size();) {
                 for(uint j=0;j<chord.size();j++) {
                     if(i!=j && chord.keys[i]==chord.keys[j]) { chord.keys.removeAt(i), chord.values.removeAt(i); goto continue2; }
@@ -439,13 +453,11 @@ continueTie: ;
     }
 
     /// Flatten sorted notes
-    uint i=0; for(Staff& staff: notes) {
+    for(Staff& staff: notes) {
         for(float x : staff.keys) for(float y : staff.at(x).keys) {
             staff.at(x).at(y).scoreIndex=indices.size;
             positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
-            debug[positions.last()]<<str(i)+" "_;
         }
-        i++;
     }
 
     /// Detect and explicit repeats
@@ -465,13 +477,13 @@ continueTie: ;
         }
     }
 
-    for(int i: range(staffs.size)) debug[vec2(0,staffs[i]-16)]=str(i,staffs[i]-staffs[max(0,i-1)],"________"_);
+    for(int i: range(staffs.size)) debug[vec2(0,staffs[i])]=str(i,"________"_);
 }
 
-void Score::synchronize(const map<uint,Chord>& MIDI) {
+void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     /// Synchronize notes to MIDI track
-    array<MidiNote> notes; //flatten chords for robust MIDI synchronization
-    for(const Chord& chord: MIDI.values) notes<<chord;
+    array<MidiNote> notes; // Flatten chords for robust MIDI synchronization (FIXME)
+    for(const MidiChord& chord: MIDI.values) notes<<chord;
 
 #if 0
     // Removes graces both in MIDI and score (separately as they are not ordered correctly)
@@ -491,18 +503,18 @@ void Score::synchronize(const map<uint,Chord>& MIDI) {
 #endif
 
     chords.clear();
-    uint t=-1; for(uint i: range(min(notes.size,positions.size))) { //reconstruct chords after edition
+    uint t=-1; for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(i, notes[i].key); //,notes[i].duration);
+        debug[positions[i]]<<str(t, notes[i].key);
     }
 }
 
 #if ANNOTATION
 /// Show manual note annotations
-void Score::annotate(map<uint,Chord>&& chords) {
+void Score::annotate(map<uint,MidiChord>&& chords) {
     array<MidiNote> notes; //flatten chords for robust annotations
-    for(const Chord& chord: chords.values) notes<<chord;
+    for(const MidiChord& chord: chords.values) notes<<chord;
     for(uint i=0; i<notes.size && i<durations.size;) {
         notes[i].duration = durations[i];
         i++;
@@ -557,7 +569,7 @@ void Score::insert() {
         assert(expected.size()==1 && expected.values[0]==noteIndex);
 
         array<MidiNote> notes; //flatten chords for robust synchronization
-        uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
+        uint t=0; for(const MidiChord& chord: chords.values) { notes<<chord; t++; }
         if(noteIndex<=notes.size) {
             notes.insertAt(noteIndex,MidiNote{0,0,0});
 
@@ -582,7 +594,7 @@ void Score::remove() {
         assert(expected.size()==1 && expected.values[0]==noteIndex);
 
         array<MidiNote> notes; //flatten chords for robust synchronization
-        uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
+        uint t=0; for(const MidiChord& chord: chords.values) { notes<<chord; t++; }
         if(noteIndex<=notes.size) {
             notes.removeAt(noteIndex);
 
@@ -652,7 +664,7 @@ void Score::noteEvent(uint key, uint vel) {
             assert(expected.size()==1 && expected.values[0]==noteIndex);
 
             array<MidiNote> notes; //flatten chords for robust synchronization
-            uint t=0; for(const Chord& chord: chords.values) { notes<<chord; t++; }
+            uint t=0; for(const MidiChord& chord: chords.values) { notes<<chord; t++; }
             if(noteIndex<=notes.size) {
                 if(noteIndex==notes.size) notes << MidiNote{key, t, 1};
                 else notes[noteIndex]=MidiNote{key, t, 1};

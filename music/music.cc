@@ -12,14 +12,18 @@
 #include "interface.h"
 #include "pdf.h"
 #include "score.h"
-#include "midiscore.h"
 //include "keyboard.h"
+
+#if MIDISCORE
+//include "midiscore.h"
+#endif
 
 #define RECORD 0
 #if RECORD
 //include "record.h"
 #endif
 
+#if ANNOTATION
 // Simple human readable/editable format for score synchronization annotations
 map<uint, Chord> parseAnnotations(String&& annotations) {
     map<uint, Chord> chords;
@@ -35,7 +39,6 @@ map<uint, Chord> parseAnnotations(String&& annotations) {
     return chords;
 }
 
-#if 0
 struct PDFScore : PDF {
     array<vec2> positions;
     signal<const ref<vec2>&> positionsChanged;
@@ -83,6 +86,8 @@ struct PDFScore : PDF {
         }
     }
 };
+#else
+typedef PDF PDFScore;
 #endif
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
@@ -113,9 +118,11 @@ struct Music {
     List<Text> sheets;
 
     String name;
-    Scroll<PDF/*Score*/> pdfScore;
-    Scroll<MidiScore> midiScore;
+    Scroll<PDFScore> pdfScore;
     Score score;
+#if MIDISCORE
+    Scroll<MidiScore> midiScore;
+#endif
 
     vec2 position=0, target=0, speed=0; //smooth scroll
 #endif
@@ -146,7 +153,6 @@ struct Music {
 
         input.noteEvent.connect(&score,&Score::noteEvent);
         midi.noteEvent.connect(&score,&Score::noteEvent);
-        midiScore.contentChanged.connect(&window,&Window::render);
         pdfScore.contentChanged.connect(&window,&Window::render);
         window.frameSent.connect(this,&Music::smoothScroll);
 
@@ -156,7 +162,6 @@ struct Music {
         pdfScore.scrollbar = true;
 
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
-        score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
 
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
@@ -177,6 +182,10 @@ struct Music {
         });
 #endif
         //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
+#if MIDISCORE
+        midiScore.contentChanged.connect(&window,&Window::render);
+        score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
+#endif
 #if ANNOTATION
         score.annotationsChanged.connect(this,&Music::annotationsChanged);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
@@ -217,6 +226,7 @@ struct Music {
         thread.spawn();
         audio.start();
 #endif
+        toggleDebug();
     }
 
     /// Toggles MIDI playing
@@ -242,7 +252,9 @@ struct Music {
         float t = x / (pdfScore.size.y?:window.size.y);
         target = vec2(0, -(( (1-t)*top + t*bottom )-pdfScore.ScrollArea::size.y/2)); // Align center between current top and current bottom
         if(!position) position=target, pdfScore.delta=int2(round(position));
+#if MIDISCORE
         midiScore.center(int2(0,bottom));
+#endif
         window.focus=0;
         smoothScroll();
     }
@@ -311,7 +323,9 @@ struct Music {
             layout.first()= &pdfScore.area();
             pdfScore.delta = 0; position=0,speed=0,target=0;
             window.focus = &pdfScore.area();
-        } else if(existsFile(String(name+".mid"_),folder)) {
+        }
+#if MIDISCORE
+        else if(existsFile(String(name+".mid"_),folder)) {
             midiScore.parse(move(midi.notes),midi.key,midi.tempo,midi.timeSignature,midi.ticksPerBeat);
             layout.first()= &midiScore.area();
             midiScore.delta=0; position=0,speed=0,target=0;
@@ -320,6 +334,7 @@ struct Music {
             score.staffs = move(midiScore.staffs);
             score.positions = move(midiScore.positions);
         }
+#endif
         score.seek(0);
         window.render();
 #endif

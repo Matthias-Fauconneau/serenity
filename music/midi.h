@@ -6,7 +6,7 @@
 
 struct MidiNote { uint key; uint start; float duration; bool operator <(const MidiNote& o)const{return key<o.key;} };
 inline String str(const MidiNote& m) { return str(m.key); }
-typedef array<MidiNote> Chord;
+typedef array<MidiNote> MidiChord;
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {
@@ -23,7 +23,7 @@ struct MidiFile {
     uint16 ticksPerBeat=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
     map<int,int> active;
-    map<uint,Chord> notes;
+    map<uint,MidiChord> notes;
     signal<uint, uint> noteEvent;
     void open(const ref<byte>& data);
 

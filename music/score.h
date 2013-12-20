@@ -32,15 +32,16 @@ struct Score {
         Note(int index, int duration) : index(index), duration(duration) {}
         int index,duration,scoreIndex=-1;
     };
-    typedef map<float, map<float, Note>> Staff;
+    typedef map<float, Note> Chord;
+    typedef map<float, Chord> Staff;
     array<Staff> notes; //[staff][x][y]
     map<int, array<vec2>> dots;
     //map<vec2,Note> nearStaffLimit;
 
     void parse();
-    void synchronize(const map<uint,Chord>& MIDI);
+    void synchronize(const map<uint,MidiChord>& MIDI);
 
-    map<uint,Chord> chords; // chronological MIDI notes key values
+    map<uint,MidiChord> chords; // chronological MIDI notes key values
     array<vec2> positions; // MIDI-synchronized note positions in associated PDF
     array<int> indices; // MIDI-synchronized character indices in associated PDF
     array<int> durations; // MIDI-synchronized character indices in associated PDF
@@ -59,8 +60,8 @@ struct Score {
     void next();
     void insert();
     void remove();
-    void annotate(map<uint,Chord>&& chords);
-    signal<const map<uint,Chord>&> annotationsChanged;
+    void annotate(map<uint,MidiChord>&& chords);
+    signal<const map<uint,MidiChord>&> annotationsChanged;
 #endif
     void expect();
     void seek(uint time);
