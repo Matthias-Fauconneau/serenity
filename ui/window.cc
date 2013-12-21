@@ -36,25 +36,6 @@ Display* glDisplay;
 GLXContext glContext;
 #endif
 
-Image renderToImage(Widget& widget, int2 size, int imageResolution) {
-    Image framebuffer = move(::framebuffer);
-    array<Rect> clipStack = move(::clipStack);
-    Rect currentClip = move(::currentClip);
-    int resolution = ::resolution;
-    ::framebuffer = Image(size.x, size.y);
-    ::currentClip = Rect(::framebuffer.size());
-    ::resolution = imageResolution;
-    fill(Rect(::framebuffer.size()),1);
-    assert(&widget);
-    widget.render(0,::framebuffer.size());
-    Image image = move(::framebuffer);
-    ::framebuffer = move(framebuffer);
-    ::clipStack = move(clipStack);
-    ::currentClip = move(currentClip);
-    ::resolution = resolution;
-    return image;
-}
-
 static thread_local Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
 bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
@@ -209,7 +190,7 @@ void Window::event() {
                 {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             }
             framebuffer=share(buffer);
-            {Locker lock(framebufferLock);
+            {//Locker lock(framebufferLock);
                 currentClip=Rect(size);
                 if(clearBackground) {
                     if(backgroundCenter==backgroundColor) {
@@ -243,7 +224,6 @@ void Window::event() {
             r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
             r.srcW=size.x; r.srcH=size.y; send(raw(r));
             state=Server;
-            //framebuffer=Image(); // Leave for capture
         } else {
 #if GL
             ::softwareRendering=false;
@@ -261,6 +241,7 @@ void Window::event() {
 #endif
         }
         frameSent();
+        framebuffer=Image(); // After frameSent() for capture
     }
     window=0;
 }

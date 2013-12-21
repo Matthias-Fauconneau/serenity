@@ -76,11 +76,17 @@ struct Sampler : Poll {
     signal<uint /*delta*/> timeChanged;
     uint64 lastTime=0, time=0, recordStart=0, stopTime=0;
 
-    ~Sampler();
+    /// Whether decoding is run in advance in main thread (prevents underruns when latency is much lower than FLAC frame sizes (FLAC frames need to be fully decoded in order to get both channels))
+    bool backgroundDecoder;
+
+    /// Samples composing the current instrument
+    array<Sample> samples;
+    operator bool() const { return samples.size; }
+
+    Sampler(bool backgroundDecoder=true):backgroundDecoder(backgroundDecoder){}
 
     /// Opens a .sfz instrument and maps all its samples
     void open(uint outputRate, const string& path, const Folder& root=::root());
-    array<Sample> samples;
 
     /// Receives MIDI note events
     void noteEvent(uint key, uint velocity);
@@ -91,12 +97,17 @@ struct Sampler : Poll {
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
     uint read(int32* output, uint size);
     uint read(float* output, uint size);
+    uint read16(int16* output, uint size);
 
+    /// Signals when all samples are done playing
+    signal<> silence;
+
+#if WAV // Superseed by record module
     /// Records performance to WAV file
     void startRecord(const string& path);
     void stopRecord();
-    File record {0};
-    signal<float* /*data*/, uint /*size*/> frameSent;
-
-    operator bool() const { return samples.size; }
+    //File record {0};
+    //signal<float* /*data*/, uint /*size*/> frameSent;
+    ~Sampler();
+#endif
 };

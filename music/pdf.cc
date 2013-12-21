@@ -604,7 +604,7 @@ void PDF::render(int2 position, int2 size) {
     for(Blit& blit: blits) {
         if(position.y+scale*(blit.position.y+blit.size.y) < currentClip.min.y) continue;
         if(position.y+scale*blit.position.y > currentClip.max.y) break;
-        if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
+        //if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
         ::blit(position+int2(scale*blit.position),blit.resized);
     }
 

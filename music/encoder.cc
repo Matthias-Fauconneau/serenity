@@ -1,4 +1,4 @@
-#include "record.h"
+#include "encoder.h"
 #include "thread.h"
 #include "string.h"
 #include "display.h"
@@ -15,7 +15,7 @@ extern "C" {
 }
 //#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
-void Record::start(const string& name, bool video, bool audio) {
+void Encoder::start(const string& name, bool video, bool audio) {
     av_register_all();
     if(context) stop();
 
@@ -67,21 +67,20 @@ void Record::start(const string& name, bool video, bool audio) {
     this->context = context; // Set once completely ready (in case methods are called in other threads while starting)
 }
 
-void Record::captureVideoFrame() {
+void Encoder::writeVideoFrame(const Image &image) {
     if(!videoStream) return;
     AVFrame* frame = avcodec_alloc_frame();
-    {Locker lock(framebufferLock);
-        const Image& image = framebuffer;
-        assert_(image);
-        if(width!=image.width || height!=image.height) { log("Window size",image.width,"x",image.height,"changed while recording at", width,"x", height); return; }
-        avpicture_alloc((AVPicture*)frame, PIX_FMT_YUV420P, width, height);
-        int stride = image.stride*4; sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
-    }
+    assert_(image);
+    if(width!=image.width || height!=image.height) { log("Image size",image.width,"x",image.height,"changed while recording at", width,"x", height); return; }
+    avpicture_alloc((AVPicture*)frame, PIX_FMT_YUV420P, width, height);
+    int stride = image.stride*4; sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
     frame->pts = videoTime*videoStream->time_base.den/(fps*videoStream->time_base.num);
 
-    AVPacket pkt = {}; av_init_packet(&pkt);
+    AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotVideoPacket;
+    setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormal and underflow in x264
     avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
+    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
     avpicture_free((AVPicture*)frame);
     avcodec_free_frame(&frame);
     if(gotVideoPacket) {
@@ -92,23 +91,24 @@ void Record::captureVideoFrame() {
     }
 
     videoTime++;
+    while(audioStream && videoTime*rate >= audioTime*fps) {
+        const uint audioSize = 1024;
+        buffer<int16> audio(audioSize*2);
+        uint readSize = readAudio(audio, audioSize);
+        assert_(readSize == audioSize);
+        writeAudioFrame(audio, readSize);
+    }
 }
 
-void Record::captureAudioFrame(float* audio, uint audioSize) {
-    if(!audioStream) return;
+void Encoder::writeAudioFrame(const int16* audio, uint audioSize) {
+    assert_(audioStream); //if(!audioStream) return;
     AVFrame *frame = avcodec_alloc_frame();
     frame->nb_samples = audioSize;
-    if(audioSize != 1024) error("Bad frame size", audioSize);
-    buffer<int16> audio16(audioSize*2);
-    for(uint i: range(audioSize*2)) {
-        float s = audio[i]*0x1p-16;
-        if(s < -(1<<15) || s >= (1<<15) ) error(s);
-        audio16[i] = s;
-    }
-    avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio16.data, audioSize * 2 * sizeof(int16), 1);
+    if(audioSize != 1024) error("Unsupported audio period length: Expected 1024 frames, got ", audioSize);
+    avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio, audioSize * 2 * sizeof(int16), 1);
     frame->pts = audioTime;
 
-    AVPacket pkt={}; av_init_packet(&pkt);
+    AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotAudioPacket;
     avcodec_encode_audio2(audioCodec, &pkt, frame, &gotAudioPacket);
     avcodec_free_frame(&frame);
@@ -120,20 +120,25 @@ void Record::captureAudioFrame(float* audio, uint audioSize) {
     audioTime += audioSize;
 }
 
-void Record::capture(float* audio, uint audioSize) {
-    if(!context) return;
-    assert_(videoStream->time_base.num==1);
-    if(videoStream && videoTime*rate <= audioTime*fps) captureVideoFrame();
-    if(audioStream) captureAudioFrame(audio,audioSize);
+#if FLOAT
+void Encoder::writeAudioFrame(const float* audio, uint audioSize) {
+    buffer<int16> audio16(audioSize*2);
+    for(uint i: range(audioSize*2)) {
+        float s = audio[i]*0x1p-16;
+        if(s < -(1<<15) || s >= (1<<15) ) error(s);
+        audio16[i] = s;
+    }
+    writeAudioFrame(audio16.data, audioSize);
 }
+#endif
 
-void Record::stop() {
+void Encoder::stop() {
     if(!context) return;
 
     //FIXME: video lags on final frames
     if(videoStream) for(;;) {
         int gotVideoPacket;
-        {AVPacket pkt = {}; av_init_packet(&pkt);
+        {AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
             avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
             if(gotVideoPacket) {
                 pkt.pts = av_rescale_q(videoEncodedTime, videoCodec->time_base, videoStream->time_base);
@@ -149,7 +154,7 @@ void Record::stop() {
 
     if(audioStream) for(;;) {
         int gotAudioPacket;
-        {AVPacket pkt={}; av_init_packet(&pkt);
+        {AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
             avcodec_encode_audio2(audioCodec, &pkt, 0, &gotAudioPacket);
             if(gotAudioPacket) {
                 pkt.stream_index = audioStream->index;
@@ -163,3 +168,16 @@ void Record::stop() {
     av_write_trailer(context);
     avformat_free_context(context); context=0;
 }
+
+#if CAPTURE
+void Encoder::captureVideoFrame() {
+    Locker lock(framebufferLock);
+    writeVideoFrame(framebuffer);
+}
+void Encoder::capture(const float* audio, uint audioSize) {
+    if(!context) return;
+    assert_(videoStream->time_base.num==1);
+    if(audioStream) captureAudioFrame(audio,audioSize);
+    if(videoStream && videoTime*rate < audioTime*fps) captureVideoFrame();
+}
+#endif

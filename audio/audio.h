@@ -22,7 +22,7 @@ struct AudioOutput : Device, Poll {
     AudioOutput(function<uint(int32* output, uint size)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
 	AudioOutput(32,rate,periodSize,thread) { read32=read; }
     /// Configures PCM for either 16bit or 32bit output depending on driver capability
-    /// \note read will be called back periodically to provide an \a input frame of \a size samples
+    /// \note read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
     AudioOutput(function<uint(int16* output, uint size)> read16, function<uint(int32* output, uint size)> read32,
                 uint rate=0, uint periodSize=0, Thread& thread=mainThread):

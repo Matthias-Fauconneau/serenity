@@ -13,6 +13,7 @@ bool operator ==(const Node& a, const string& b) { return a.name==b; }
 
 struct Build {
     string target = arguments().size>=1?arguments()[0]:"test"_;
+    array<String> defines;
     array<string> flags;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
@@ -67,10 +68,15 @@ struct Build {
                     }
                 }
             }
+            if(s.match("#define "_)) {
+                string id = s.identifier("_"_);
+                defines << toLower(id);
+            }
             if(s.match("#if "_)) {
                 string id = s.identifier("_"_);
                 if(id=="__x86_64"_ && !flags.contains("atom"_)) {}
-                else if(flags.contains(toLower(id))) {} // Conditionnal build (use flag)
+                else if(flags.contains(toLower(id))) {} // Conditionnal build (extern use flag)
+                else if(defines.contains(toLower(id))) {} // Conditionnal build (intern use flag)
                 else s.until("#endif"_); // FIXME: Nesting unsupported
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {

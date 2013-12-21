@@ -21,6 +21,7 @@ inline v8hi short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
 inline v8hi loada(const uint16* const ptr) { return *(v8hi*)ptr; }
 inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_loaddqu((byte*)ptr); }
 inline void storea(uint16* const ptr, v8hi a) { *(v8hi*)ptr = a; }
+inline v8hi packss(v4si a, v4si b) { return __builtin_ia32_packssdw128(a,b); }
 inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, imm); }
 
 inline v4si unpacklo(v8hi a, v8hi b) { return (v4si)__builtin_ia32_punpcklwd128(a, b); }

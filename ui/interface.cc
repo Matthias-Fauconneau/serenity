@@ -3,6 +3,32 @@
 #include "layout.h"
 #include "text.h"
 
+// renderToImage
+Image renderToImage(Widget& widget, int2 size, int imageResolution) {
+    Image framebuffer = move(::framebuffer);
+    array<Rect> clipStack = move(::clipStack);
+    Rect currentClip = move(::currentClip);
+    int resolution = ::resolution;
+    ::framebuffer = Image(size.x, size.y);
+    ::currentClip = Rect(::framebuffer.size());
+    ::resolution = imageResolution;
+    fill(Rect(::framebuffer.size()),1);
+    assert(&widget);
+    widget.render(0,::framebuffer.size());
+    Image image = move(::framebuffer);
+    ::framebuffer = move(framebuffer);
+    ::clipStack = move(clipStack);
+    ::currentClip = move(currentClip);
+    ::resolution = resolution;
+    return image;
+}
+// Provides weak symbols in case an application links interface only to render to image
+__attribute((weak)) void setFocus(Widget*) { error("Window support not linked"_); }
+ __attribute((weak)) bool hasFocus(Widget*) { error("Window support not linked"_); }
+ __attribute((weak)) void setDrag(Widget*) { error("Window support not linked"_); }
+ __attribute((weak)) String getSelection(bool) { error("Window support not linked"_); }
+__attribute((weak)) void setCursor(Rect, Cursor) { error("Window support not linked"_); }
+
 // ScrollArea
 void ScrollArea::render(int2 position, int2 size) {
     this->size=size;

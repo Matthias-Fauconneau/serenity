@@ -1,26 +1,36 @@
 /// \file music.cc Keyboard (piano) practice application
 #include "thread.h"
 #include "file.h"
-#include "time.h"
-
-#include "sequencer.h"
 #include "sampler.h"
-#include "audio.h"
 #include "midi.h"
 
+#define SCORE 1
+#define KEYBOARD 1
+#define ENCODE 1
+#define WINDOW 1
+
+#if AUDIO
+#include "audio.h"
+#endif
+#if INPUT
+#include "sequencer.h"
+#endif
+#if SCORE
+#if WINDOW
 #include "window.h"
+#endif
 #include "interface.h"
 #include "pdf.h"
 #include "score.h"
-//include "keyboard.h"
-
-#if MIDISCORE
-//include "midiscore.h"
+#if KEYBOARD
+#include "keyboard.h"
 #endif
-
-#define RECORD 0
-#if RECORD
-//include "record.h"
+#if MIDISCORE
+#include "midiscore.h"
+#endif
+#endif
+#if ENCODE
+#include "encoder.h"
 #endif
 
 #if ANNOTATION
@@ -92,101 +102,109 @@ typedef PDF PDFScore;
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder folder{"Sheets"_};
+    Folder folder{"Scores"_};
     MidiFile midi;
 
+    const uint rate = 48000;
+#if THREAD
     Thread thread{-20};
-    Sequencer input{thread};
-
-    Sampler sampler;
-#define AUDIO 0
+    Sampler sampler {true}; // Audio mixing (consumer thread) preempts decoder running in advance (in producer thread (main thread))
 #if AUDIO
-    AudioOutput audio{{&sampler, &Sampler::read}, 48000, Sampler::periodSize, thread};
+    AudioOutput audio{{&sampler, &Sampler::read}, rate, Sampler::periodSize, thread};
+#endif
+#if INPUT
+    Sequencer input{thread};
+#endif
+#else
+    Sampler sampler {false}; // Decodes as needed in same consumer thread
+#if AUDIO
+    AudioOutput audio{{&sampler, &Sampler::read}, rate, Sampler::periodSize};
+#endif
+#if INPUT
+    Sequencer input;
+#endif
 #endif
 
-#define UI 1
-    ICON(music)
-#if UI
+#if SCORE
     VBox layout;
-#if RECORD
-    Window window {&layout,int2(1280,720),"Piano"_,musicIcon()};
-#elif GL
+#if WINDOW
+    ICON(music)
+#if GL
     Window window {&layout,int2(0,0),"Piano"_,musicIcon(), Window::OpenGL};
 #else
     Window window {&layout,int2(0,720),"Piano"_,musicIcon()};
 #endif
-    List<Text> sheets;
+    List<Text> scores;
+#endif
 
     String name;
+    // Smooth scroll (FIXME: inherit ScrollArea)
+     vec2 position=0, target=0, speed=0;
+     signal<> contentChanged;
     Scroll<PDFScore> pdfScore;
     Score score;
 #if MIDISCORE
     Scroll<MidiScore> midiScore;
 #endif
-
-    vec2 position=0, target=0, speed=0; //smooth scroll
+#if KEYBOARD
+    Keyboard keyboard;
 #endif
-
-#if RECORD
-    Record record;
 #endif
-
 
     Music() {
-
-#if AUDIO
+        // Sampler
         if(arguments() && endsWith(arguments()[0],".sfz"_)) {
-            sampler.open(audio.rate, arguments()[0], Folder("Samples"_));
+            sampler.open(rate, arguments()[0], Folder("Samples"_));
         } else {
-            sampler.open(audio.rate, "Salamander.sfz"_, Folder("Samples"_));
+            sampler.open(rate, "Salamander.sfz"_, Folder("Samples"_));
         }
+        midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
+#if INPUT
+        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
 #endif
 
-        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
-        //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
+#if SCORE
+        layout << &pdfScore.area();
 
-        midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
-        //midi.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
-
-#if UI
-        window.localShortcut(Escape).connect([]{exit();});
-
-        input.noteEvent.connect(&score,&Score::noteEvent);
         midi.noteEvent.connect(&score,&Score::noteEvent);
-        pdfScore.contentChanged.connect(&window,&Window::render);
-        window.frameSent.connect(this,&Music::smoothScroll);
-
         pdfScore.onGlyph.connect(&score,&Score::onGlyph);
         pdfScore.onPath.connect(&score,&Score::onPath);
-        //pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
-        pdfScore.scrollbar = true;
 
         score.activeNotesChanged.connect(&pdfScore,&PDF::setColors);
         score.nextStaff.connect(this,&Music::nextStaff);
 
+#if INPUT
+        input.noteEvent.connect(&score,&Score::noteEvent);
+#endif
+#if WINDOW
+        pdfScore.scrollbar = true;
+        pdfScore.contentChanged.connect(&window,&Window::render);
+        window.frameSent.connect(this,&Music::smoothScroll);
+
+        window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
-        window.localShortcut(Key('o')).connect(this,&Music::showSheetList);
+        window.localShortcut(Key('o')).connect(this,&Music::showScoreList);
         window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
 #if AUDIO
         window.localShortcut(Key('1')).connect([this]{
-            sampler.open(audio.rate, "Salamander.raw.sfz"_, Folder("Samples"_));
+            sampler.open(rate, "Salamander.raw.sfz"_, Folder("Samples"_));
             window.setTitle("Salamander - Raw"_);
         });
         window.localShortcut(Key('2')).connect([this]{
-            sampler.open(audio.rate, "Salamander.flat.sfz"_, Folder("Samples"_));
+            sampler.open(rate, "Salamander.flat.sfz"_, Folder("Samples"_));
             window.setTitle("Salamander - Flat"_);
         });
         window.localShortcut(Key('3')).connect([this]{
-            sampler.open(audio.rate, "Blanchet.raw.sfz"_, Folder("Samples"_));
+            sampler.open(rate, "Blanchet.raw.sfz"_, Folder("Samples"_));
             window.setTitle("Blanchet"_);
         });
 #endif
-        //window.localShortcut(Key('y')).connect([this]{ if(layout.tryRemove(&keyboard)==-1) layout<<&keyboard; });
 #if MIDISCORE
         midiScore.contentChanged.connect(&window,&Window::render);
         score.activeNotesChanged.connect(&midiScore,&MidiScore::setColors);
 #endif
 #if ANNOTATION
+        //pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
         score.annotationsChanged.connect(this,&Music::annotationsChanged);
         window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
         window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
@@ -196,37 +214,72 @@ struct Music {
         window.localShortcut(Delete).connect(&score,&Score::remove);
 #endif
         window.localShortcut(Return).connect(this,&Music::toggleDebug);
-
-        layout << &sheets; sheets.expanding=true;
         array<String> files = folder.list(Files);
         for(String& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
-                for(const Text& text: sheets) if(text.text==toUTF32(section(file,'.'))) goto break_;
-                /*else*/ sheets << String(section(file,'.'));
+                for(const Text& text: scores) if(text.text==toUTF32(section(file,'.'))) goto break_;
+                /*else*/ scores << String(section(file,'.'));
                 break_:;
             }
         }
-        sheets.itemPressed.connect(this,&Music::openSheet);
-        showSheetList();
-#endif
-        //for(string arg: arguments()) for(const Text& text: sheets) if(toUTF8(text.text)==arg) { openSheet(arg); break; }
-        for(string arg: arguments()) if(!endsWith(arg,".sfz"_)) { openSheet(arg); break; }
-#if RECORD
-        window.localShortcut(Key('t')).connect(this,&Music::toggleRecord);
-        sampler.frameSent.connect(&record,&Record::capture);
+        scores.itemPressed.connect(this,&Music::openScore);
+        showScoreList();
+#endif // WINDOW
+#endif // SCORE
+#if KEYBOARD
         layout<<&keyboard;
+        midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
+        keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        keyboard.noteEvent.connect(&score,&Score::noteEvent);
+        keyboard.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
+#if INPUT
+        input.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 #endif
-#if UI
-        window.show();
-#else
-        togglePlay();
+#if WINDOW
+        keyboard.contentChanged.connect(&window,&Window::render);
 #endif
+#endif
+        for(string arg: arguments()) if(!endsWith(arg,".sfz"_)) { openScore(arg); break; }
+
+#if !ENCODE
 #if AUDIO
-        input.recordMID("Archive/Stats/"_+str(Date(currentTime()))+".mid"_);
-        thread.spawn();
-        audio.start();
+        //midi.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
+#if INPUT
+        //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
 #endif
+        audio.start();
+#else
         toggleDebug();
+#endif
+#if WINDOW
+        window.show();
+#endif
+#if THREAD
+        thread.spawn();
+#endif
+#else
+        bool contentChanged = true;
+        pdfScore.contentChanged.connect([&contentChanged]{ contentChanged=true; });
+        keyboard.contentChanged.connect([&contentChanged]{ contentChanged=true; });
+        this->contentChanged.connect([&contentChanged]{ contentChanged=true; });
+        bool endOfFile = false;
+        midi.endOfFile.connect([&endOfFile]{ endOfFile=true; });
+        assert_(!play);
+        togglePlay();
+        Encoder encoder {{&sampler, &Sampler::read16}};
+        assert_(name);
+        encoder.start(name);
+        int repeat=0, total=0;
+        for(Image image; !endOfFile;) { // Renders score as quickly as possible (no need for an event loop with any display, audio nor input)
+            smoothScroll();
+            if(contentChanged) {
+                image = renderToImage(layout, encoder.size()); contentChanged=false;
+                //log(round(100.*midi.time/midi.duration), 100.*repeat./total);
+            } else repeat++;
+            total++;
+            encoder.writeVideoFrame(image);
+        }
+#endif
     }
 
     /// Toggles MIDI playing
@@ -235,78 +288,74 @@ struct Music {
         play=!play;
         if(play) {
             midi.seek(0);
-#if UI
-            score.seek(0); score.showActive=true;
+#if SCORE
+            score.seek(0);
+            score.showActive=true;
 #endif
-            sampler.timeChanged.connect(&midi,&MidiFile::update); }
-        else {
-#if UI
+            sampler.timeChanged.connect(&midi,&MidiFile::update);
+        } else {
+#if SCORE
             score.showActive=false;
 #endif
             sampler.timeChanged.delegates.clear(); }
     }
 
-#if UI
+#if SCORE
     /// Called by score to scroll PDF as needed when playing
-    void nextStaff(float top /*previous bottom, current top*/, float bottom /*current bottom / next top*/, float x) {
-        float t = x / (pdfScore.size.y?:window.size.y);
-        target = vec2(0, -(( (1-t)*top + t*bottom )-pdfScore.ScrollArea::size.y/2)); // Align center between current top and current bottom
+    void nextStaff(float top /*previous bottom, current top*/, float bottom /*current bottom, next top*/, float x) {
+        if(top==bottom) return; // last staff
+        assert_(x>=0 && x<=1, x);
+        target = vec2(0, -(( (1-x)*top + x*bottom )*pdfScore.lastSize.x-pdfScore.size.y/2)); // Align center between current top and current bottom
         if(!position) position=target, pdfScore.delta=int2(round(position));
 #if MIDISCORE
         midiScore.center(int2(0,bottom));
 #endif
+#if WINDOW
         window.focus=0;
-        smoothScroll();
+#endif
     }
     /// Smoothly scrolls towards target
-    void smoothScroll() {
-        if(window.focus == &pdfScore.area()) return;
-        const float k=1./60, b=1./60; //stiffness and damping constants
+    void smoothScroll() { //FIXME: inherit ScrollArea
+        //if(window.focus == &pdfScore.area()) return;
+        const float k=1./60, b=1./60; // Stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration
-        pdfScore.delta =  min(int2(0,0), max(pdfScore.size-abs(pdfScore.widget().sizeHint()), int2(round(position))));
+        int2 delta = min(int2(0,0), max(pdfScore.size-abs(pdfScore.widget().sizeHint()), int2(round(position))));
+        if(delta!=pdfScore.delta) { pdfScore.delta = delta; contentChanged(); }
+#if WINDOW
         if(round(target)!=round(position)) window.render();
-#if RECORD
-        if(!record) toggleRecord();
 #endif
     }
 
-    /// Shows PDF+MIDI sheets selection to open
-    void showSheetList() {
-        layout.first()=&sheets;
+#if WINDOW
+    /// Shows PDF+MIDI scores selection to open
+    void showScoreList() {
+        layout.first()= &scores;
+        scores.expanding=true;
         window.render();
     }
     void toggleDebug() {
         if(pdfScore.annotations) pdfScore.annotations.clear(), window.render(); else pdfScore.setAnnotations(score.debug);
     }
 #endif
-#if RECORD
-    void toggleRecord() {
-        if(!name) name=String("Piano"_);
-        if(record) { record.stop(); window.setTitle(name); }
-        else {
-            window.setTitle(String(name+"*"_));
-            window.setSize(int2(record.width,record.height));
-            record.start(name);
-            if(!play) togglePlay();
-        }
-    }
 #endif
 
-#if UI
-    void openSheet(uint index) { openSheet(toUTF8(sheets[index].text)); }
+#if WINDOW
+    void openScore(uint index) { openScore(toUTF8(scores[index].text)); }
 #endif
-    /// Opens the given PDF+MIDI sheet
-    void openSheet(const string& name) {
+    /// Opens the given PDF+MIDI score
+    void openScore(const string& name) {
         if(play) togglePlay();
         midi.clear();
         if(existsFile(String(name+".mid"_),folder)) midi.open(readFile(String(name+".mid"_),folder));
-#if UI
+#if SCORE
         score.clear();
         pdfScore.clear();
-        //this->name=String(name);
+        this->name=String(name);
+#if WINDOW
         window.setTitle(name);
         window.backgroundCenter=window.backgroundColor=1;
+#endif
         if(existsFile(String(name+".pdf"_),folder)) {
             pdfScore.open(readFile(String(name+".pdf"_),folder));
 #if ANNOTATION
@@ -322,7 +371,7 @@ struct Music {
 #endif
             layout.first()= &pdfScore.area();
             pdfScore.delta = 0; position=0,speed=0,target=0;
-            window.focus = &pdfScore.area();
+            //window.focus = &pdfScore.area();
         }
 #if MIDISCORE
         else if(existsFile(String(name+".mid"_),folder)) {
@@ -336,7 +385,9 @@ struct Music {
         }
 #endif
         score.seek(0);
+#if WINDOW
         window.render();
+#endif
 #endif
     }
 

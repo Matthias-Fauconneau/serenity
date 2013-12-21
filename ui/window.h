@@ -12,10 +12,6 @@ enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom
 
 extern int2 displaySize;
 
-extern int resolution;
-/// Configures global display context to render to an image
-Image renderToImage(Widget& widget, int2 size, int imageResolution=::resolution);
-
 /// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
     enum Renderer { Raster, OpenGL };

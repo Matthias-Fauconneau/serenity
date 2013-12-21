@@ -18,23 +18,23 @@ void Keyboard::render(int2 position, int2 size) {
         vec4 white = midi.contains(key+21)?red:input.contains(key+21)?blue: ::white;
         int x0 = position.x + margin + key*dx;
         int x1 = x0 + dx;
-        line(x0,y0, x0,y1-1, black);
+        line(int2(x0, y0), int2(x0, y1-1), black);
 
         int notch[12] = { 3, 1, 4, 0, 1, 2, 1, 4, 0, 1, 2, 1 };
         int l = notch[key%12], r = notch[(key+1)%12];
         if(key==0) l=0; //A-1 has no left notch
         if(l==1) { // black key
-            line(x0,y1-1, x1,y1-1, black);
+            line(int2(x0, y1-1), int2(x1, y1-1), black);
             fill(x0+1,y0, x1+1,y1-1, midi.contains(key+21)?red:input.contains(key+21)?blue: ::black);
         } else {
             fill(x0+1,y0, x1,y2, white); // white key
-            line(x0-l*dx/6,y1-1, x0-l*dx/6, y2, black); //left edge
+            line(int2(x0-l*dx/6, y1-1), int2(x0-l*dx/6, y2), black); //left edge
             fill(x0+1-l*dx/6,y1, x1,y2, white); //left notch
             if(key!=87) fill(x1,y1, x1-1+(6-r)*dx/6,y2, white); //right notch
             //right edge will be next left edge
         }
         if(key==87) { //C7 has no right notch
-            line(x1+dx/2,y0,x1+dx/2,y2, black);
+            line(int2(x1+dx/2, y0), int2(x1+dx/2, y2), black);
             fill(x1,y0, x1+dx/2,y1-1, white);
         }
     }

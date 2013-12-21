@@ -7,6 +7,10 @@
 #include "layout.h"
 #include "text.h"
 
+/// Configures global display context to render to an image
+// In this module because the definition depends on display and widget
+Image renderToImage(Widget& widget, int2 size, int imageResolution=::resolution);
+
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget

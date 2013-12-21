@@ -8,7 +8,10 @@
 #include "string.h"
 #include "math.h"
 #include <fftw3.h> //fftw3f
-//include <fftw3.h> //fftw3f_threads
+#define FFTW_THREADS 1
+#if FFTW_THREADS
+#include <fftw3.h> //fftw3f_threads
+#endif
 
 int noteToMIDI(const string& value) {
     int note=24;
@@ -163,8 +166,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
     for(int c=0;c<2;c++) filter[c] = buffer<float>(N,N,0.f);
     for(uint i: range(reverbSize)) for(int c=0;c<2;c++) filter[c][i] = scale*stereoFilter[2*i+c];
 
-    //fftwf_init_threads();
-    //fftwf_plan_with_nthreads(4);
+#if FFTW_THREADS
+    fftwf_init_threads();
+    fftwf_plan_with_nthreads(4);
+#endif
 
     // Transforms reverb filter to frequency domain
     for(int c=0;c<2;c++) {
@@ -230,7 +235,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 note.envelope=s.envelope;
                 if(note.flac.sampleSize==16) note.level *= 0x1p8;
             }
-            queue(); //queue background decoder in main thread
+            if(backgroundDecoder) queue(); //queue background decoder in main thread
             return;
         }
     }
@@ -252,16 +257,17 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
     for(;;) {
         Note* note=0; uint minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // Finds least buffered note
-            if(n.flac.blockSize && n.writeCount>=(int)n.flac.blockSize && n.flac.audio.size<minBufferSize) {
+            if(n.flac.blockSize && n.writeCount>=(int)n.flac.blockSize && uint(n.flac.audio.size)<minBufferSize) {
                 note=&n;
                 minBufferSize=n.flac.audio.size;
             }
         }
-        if(!note) break; //all notes are already fully buffered
+        if(!note) { // All notes are already fully buffered
+            break;
+        }
         int size=note->flac.blockSize; note->writeCount.acquire(size); note->flac.decodeFrame(); note->readCount.release(size);
     }
-
-    if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI
+    if(backgroundDecoder && time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI (while in main thread)
 }
 
 /// Audio mixer (realtime thread)
@@ -287,34 +293,55 @@ void Note::read(v4sf* out, uint size) {
     flac.position+=size*2; //keep track of position for release sample level matching
 }
 
+uint Sampler::read16(int16* output, uint size) { // Record
+    v4sf buffer[size*2/4];
+    read((float*)buffer, size);
+    for(uint i: range(size*2/8)) ((v8hi*)output)[i] = packss( cvtps2dq(buffer[i*2+0]*0x1p-8f), cvtps2dq(buffer[i*2+1]*0x1p-8f) ); // 24bit -> 16bit with no headroom (saturate)
+#if WAV
+    if(record) record.write(ref<byte>((byte*)output,2*size*sizeof(int32)));
+#endif
+    return size;
+}
+
 uint Sampler::read(int32* output, uint size) { // Audio thread
     v4sf buffer[size*2/4];
     read((float*)buffer, size);
     for(uint i: range(size*2/4)) ((v4si*)output)[i] = cvtps2dq(buffer[i]*0x1p5f); // 24bit -> 32bit with 3bit headroom for multiple notes
+#if WAV
     if(record) record.write(ref<byte>((byte*)output,2*size*sizeof(int32)));
+#endif
     return size;
 }
 
 uint Sampler::read(float* output, uint size) {
-    clear(output, size*2);
-    Locker locker(lock);
-    int notes=0;
-    for(Layer& layer: layers) { // Mixes all notes of all layers
-        if(layer.resampler) {
-            uint inSize=align(2,layer.resampler.need(size));
-            if(layer.audio.capacity<inSize*2) layer.audio = buffer<float>(inSize*2);
-            clear(layer.audio.begin(), inSize*2);
-            for(Note& note: layer.notes) note.read((v4sf*)layer.audio.data, inSize/2);
-            layer.resampler.filter<true>(layer.audio, inSize, output, size);
-        } else {
-            for(Note& note: layer.notes) note.read((v4sf*)output, size/2);
-        }
-        notes+=layer.notes.size;
+    if(!backgroundDecoder) {
+        event(); // Decodes before mixing
+        for(Layer& layer: layers) for(Note& n: layer.notes) assert_(!n.flac.blockSize || n.readCount > align(2,layer.resampler.need(size)), n.readCount, align(2,layer.resampler.need(size)), n.flac.blockSize, n.writeCount, n.flac.audio.size);
     }
-    /*if(!notes && !record) { // Stops audio output when all notes are released
+    clear(output, size*2);
+    int noteCount = 0;
+    {Locker locker(lock);
+        for(Layer& layer: layers) { // Mixes all notes of all layers
+            if(layer.resampler) {
+                uint inSize=align(2,layer.resampler.need(size));
+                if(layer.audio.capacity<inSize*2) layer.audio = buffer<float>(inSize*2);
+                clear(layer.audio.begin(), inSize*2);
+                for(Note& note: layer.notes) note.read((v4sf*)layer.audio.data, inSize/2);
+                layer.resampler.filter<true>(layer.audio, inSize, output, size);
+            } else {
+                for(Note& note: layer.notes) note.read((v4sf*)output, size/2);
+            }
+            noteCount += layer.notes.size;
+        }
+    }
+    if(noteCount==0 /*&& !record*/) { // Stops audio output when all notes are released
             if(!stopTime) stopTime=time; // First waits for reverb
-            else if(time>stopTime+reverbSize) { stopTime=0; return 0; } // Stops audio output (will be restarted on noteEvent (cf music.cc))
-        } else stopTime=0;*/
+            else if(time>stopTime+reverbSize) {
+                stopTime=0;
+                silence();
+                //return 0; // Stops audio output (will be restarted on noteEvent (cf music.cc)) (FIXME: disable on video record)
+            }
+      } else stopTime=0;
 
     if(enableReverb) { // Convolution reverb
         if(size!=periodSize) error("Expected period size ",periodSize,"got",size);
@@ -351,12 +378,13 @@ uint Sampler::read(float* output, uint size) {
     }
 
     time+=size;
-    queue(); //queue background decoder in main thread
-    frameSent(output, size);
+    //frameSent(output, size);
+    if(backgroundDecoder) queue(); // Queues background decoder in main thread
+    else if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI (while in main thread)
     return size;
 }
 
-void Sampler::startRecord(const string& name) {
+/*void Sampler::startRecord(const string& name) {
     String path = name+".wav"_;
     record = File(path,home(),Flags(WriteOnly|Create|Truncate));
     struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
@@ -367,8 +395,10 @@ void Sampler::startRecord(const string& name) {
 }
 void Sampler::stopRecord() {
     if(record) { record.seek(4); record.write(raw<int32>(36+time)); record=0; }
-}
+}*/
 
 Sampler::FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
+#if WAV
 Sampler::~Sampler() { stopRecord(); }
+#endif
 constexpr uint Sampler::periodSize;

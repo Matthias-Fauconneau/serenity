@@ -1,4 +1,5 @@
 #include "display.h"
+#include "image.h"
 #include "math.h"
 #if GL
 #include "gl.h"
@@ -7,10 +8,11 @@ FILE(display)
 
 typedef vec<bgra,int,4> int4;
 
+//FIXME: thread_local
+//Lock framebufferLock;
 bool softwareRendering = true;
 int resolution = 96;
 Image framebuffer;
-Lock framebufferLock;
 array<Rect> clipStack;
 Rect currentClip=Rect(0);
 bool additiveBlend = false; // Defaults to alpha blend

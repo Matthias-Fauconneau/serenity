@@ -11,6 +11,7 @@ void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
         ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
             BinaryData track = array<byte>(s.peek(length));
+            // Reads first time (next event time will always be kept to read events in time)
             uint8 c=track.read(); uint t=c&0x7f;
             if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|c;}}}
             tracks<< Track(t,move(track));
@@ -18,13 +19,19 @@ void MidiFile::open(const ref<byte>& data) { /// parse MIDI header
         s.advance(length);
     }
     uint64 minTime=-1; for(Track& track: tracks) minTime=min(minTime,track.time);
-    for(Track& track: tracks) { track.startTime=track.time-minTime, track.startIndex=track.data.index; read(track,-1,Sort); track.reset(); }
+    for(Track& track: tracks) {
+        track.startTime = track.time-minTime; // Time of the first event
+        track.startIndex = track.data.index; // Index of the first event
+        read(track,-1,Sort);
+        duration = max(duration, track.time*(48*60000/120)/ticksPerBeat);
+        track.reset();
+    }
     seek(0);
 }
 
 void MidiFile::read(Track& track, uint64 time, State state) {
     BinaryData& s = track.data;
-    if(!s) return;
+    if(!s) { endOfFile(); return; }
     while(track.time*(48*60000/120)/ticksPerBeat < time) {
         uint8 key=s.read();
         if(key & 0x80) { track.type_channel=key; key=s.read(); }
@@ -52,7 +59,9 @@ void MidiFile::read(Track& track, uint64 time, State state) {
                 for(pair<uint, MidiChord> e: notes) { if(abs(int(e.key-start))<abs(int(nearest-start))) nearest=e.key; }
                 if(abs(int(nearest-start))<ticksPerBeat/12) start=nearest; // Merges dates under 1/8 beat at 120 (~62ms, ~16Hz)
                 //else if(abs(int(nearest-start))<=ticksPerBeat/4) log(ticksPerBeat/4, abs(int(nearest-start)), (float)ticksPerBeat/abs(int(nearest-start)));
-                notes.sorted(start).insertSorted(MidiNote{key /*, start*4/ticksPerBeat, duration*4.f/ticksPerBeat*/});
+                //assert_(!notes.sorted(start).contains(key));
+                if(!notes.sorted(start).contains(key))
+                    notes.sorted(start).insertSorted(MidiNote{key /*, start*4/ticksPerBeat, duration*4.f/ticksPerBeat*/});
             }
         }
         if(type==NoteOn && vel) {

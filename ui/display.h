@@ -5,12 +5,17 @@
 #include "image.h"
 #include "thread.h"
 
+//FIXME: thread_local
 extern bool softwareRendering;
 /// Framebuffer of the window being rendered (X11 shared memory to be used only under Window::render)
 extern Image framebuffer;
-extern Lock framebufferLock;
+//extern Lock framebufferLock;
 extern int resolution; /// Device resolution in dots per inch (dpi)
 extern bool additiveBlend;
+extern array<Rect> clipStack;
+extern Rect currentClip;
+inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip & clip; }
+inline void pop() { currentClip=clipStack.pop(); }
 
 #if GL
 extern int2 viewportSize;
@@ -19,12 +24,6 @@ vec2 vertex(vec2 v);
 struct Vertex { vec2 position, texCoord; };
 Vertex vertex(Rect r, float x, float y);
 #endif
-
-// Clip
-extern array<Rect> clipStack;
-extern Rect currentClip;
-inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip & clip; }
-inline void pop() { currentClip=clipStack.pop(); }
 
 // Colors
 constexpr vec4 black(0, 0, 0, 1);
@@ -56,4 +55,4 @@ void blend(int x, int y, vec4 color, float alpha=1);
 /// Draws a thin antialiased line from p1 to p2
 void line(float x1, float y1, float x2, float y2, vec4 color=black);
 inline void line(vec2 p1, vec2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
-inline void line(int2 p1, int2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
+inline void line(int2 p1, int2 p2, vec4 color=black) { line(p1.x+1./2,p1.y+1./2,p2.x+1./2,p2.y+1./2,color); }

@@ -4,8 +4,9 @@
 #include "data.h"
 #include "map.h"
 
-struct MidiNote { uint key; /*uint start; float duration;*/ bool operator <(const MidiNote& o)const{return key<o.key;} };
-inline String str(const MidiNote& m) { return str(m.key); }
+//struct MidiNote { uint key; /*uint start; float duration;*/ bool operator <(const MidiNote& o)const{return key<o.key;} };
+typedef uint MidiNote;
+//inline String str(const MidiNote& m) { return str(m.key); }
 typedef array<MidiNote> MidiChord;
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
@@ -25,12 +26,13 @@ struct MidiFile {
     map<int,int> active;
     map<uint,MidiChord> notes;
     signal<uint, uint> noteEvent;
+    signal<> endOfFile;
+    uint64 time=0; // Current time in 48KHz samples
+    uint64 duration=0; // Duration in 48KHz samples
     void open(const ref<byte>& data);
-
     enum State { Seek=0, Play=1, Sort=2 };
     void read(Track& track, uint64 time, State state);
-    uint64 time=0;
     void seek(uint64 time);
     void update(uint delta);
-    void clear() { tracks.clear(); trackCount=0; ticksPerBeat=0; notes.clear(); active.clear(); }
+    void clear() { tracks.clear(); trackCount=0; ticksPerBeat=0; notes.clear(); active.clear(); duration=0; time=0; }
 };

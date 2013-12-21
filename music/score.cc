@@ -279,7 +279,7 @@ struct Tie { Score::Line o; uint li; float lx,ly; uint ri; float rx,ry; float dy
 String str(const Tie& t) { return "Tie("_+str(t.li,t.lx,t.ly,"-",t.ri,t.rx,t.ry)+")"_; }
 void Score::parse() { //FIXME: All the local rules makes recognition work only on specific sheets, this recognition should be reimplemented as a global optimization.
     if(!staffs) return; assert(staffs);
-    staffs << (lastClef.y+110); //add a last split at the bottom of the last page
+    staffs << (lastClef.y+110_px); //add a last split at the bottom of the last page
 
     /// Lengthens dotted notes
     for(const_pair< int,array<vec2>> dots: (const map<int, array<vec2>>&)this->dots) {
@@ -509,10 +509,10 @@ void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     vec2 lastPos=vec2(0,0); uint lastKey=0;
     for(uint i=0; i<notes.size && i<positions.size;) {
         vec2 pos=positions[i]; MidiNote note = notes[i];
-        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // missing note in MIDI
+        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note/*.key*/<lastKey) { // missing note in MIDI
             debug[pos]=String("++++"_);
             positions.removeAt(i); indices.removeAt(i);
-        } else { i++; lastKey=note.key; }
+        } else { i++; lastKey=note/*.key*/; }
         lastPos=pos;
     }
 
@@ -520,7 +520,7 @@ void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     uint t=-1; for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
         if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(notes[i].key);
+        debug[positions[i]]<<str(notes[i]/*.key*/);
     }
 }
 
@@ -631,11 +631,12 @@ void Score::remove() {
 
 void Score::expect() {
     while(!expected && chordIndex<chords.size()-1) {
-        int i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note.key) /*skip double notes*/ ) {
-                expected.insert(note.key, i);
+        uint i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
+            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note/*.key*/) /*skip double notes*/ ) {
+                expected.insert(note/*.key*/, i);
                 errors = 0; showExpected = false; // Hides highlighting while succeeding
             }
+            assert_(i<positions.size);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size-1) {
                 currentStaff++;
                 currentX=0;
@@ -643,6 +644,7 @@ void Score::expect() {
             currentX = max(currentX, positions[i].x);
             i++;
         }
+        assert_(currentStaff<staffs.size);
         nextStaff(currentStaff>0?staffs[currentStaff-1]:0,staffs[currentStaff],currentX);
         chordSize = expected.size();
         noteIndex += chords.values[chordIndex].size;
