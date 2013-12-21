@@ -263,20 +263,20 @@ struct Music {
         keyboard.contentChanged.connect([&contentChanged]{ contentChanged=true; });
         this->contentChanged.connect([&contentChanged]{ contentChanged=true; });
         bool endOfFile = false;
-        midi.endOfFile.connect([&endOfFile]{ endOfFile=true; });
+        midi.endOfFile.connect([this,&endOfFile]{ sampler.silence.connect([&endOfFile]{ endOfFile=true; }); });
         assert_(!play);
         togglePlay();
         Encoder encoder {{&sampler, &Sampler::read16}};
         assert_(name);
         encoder.start(name);
-        int repeat=0, total=0;
+        int lastReport=0;
         for(Image image; !endOfFile;) { // Renders score as quickly as possible (no need for an event loop with any display, audio nor input)
             smoothScroll();
             if(contentChanged) {
                 image = renderToImage(layout, encoder.size()); contentChanged=false;
-                //log(round(100.*midi.time/midi.duration), 100.*repeat./total);
-            } else repeat++;
-            total++;
+                int percent = round(100.*midi.time/midi.duration);
+                if(percent!=lastReport) { log(percent); lastReport=percent; }
+            }
             encoder.writeVideoFrame(image);
         }
 #endif

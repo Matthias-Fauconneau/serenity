@@ -4,7 +4,8 @@
 #include "lu.h"
 #include "plot.h"
 #include "window.h"
-#include "record.h"
+#include "interface.h"
+#include "encoder.h"
 
 /// Solves 1D Helmholtz problems with general Robin boundary conditions
 struct Spectral {
@@ -13,7 +14,7 @@ struct Spectral {
     const float dt = 1./n; // Time step (~ Courant–Friedrichs–Lewy condition)
     const float nu = 1; // Diffusion coefficient
     const float H = 1./(nu*dt); // Helmholtz coefficient
-    const float w = 1./30; // Velocity source frequency
+    const float w = 2*PI / 30; // Velocity source frequency
     Vector x{n}; // Nodes positions
 
     /// System
@@ -28,16 +29,9 @@ struct Spectral {
     Vector pNL{n}, v {n}; // Non-linear term at t-1. solution at t
 
     Plot plot {x, v, 1};
-    Window window {&plot, int2(640,480), "Spectral"};
-    Record record {640,480};
+    Window window {&plot, int2(0,720), "Spectral"};
+    Encoder encoder {1280,720};
     Spectral() {
-        window.backgroundColor=window.backgroundCenter=1;
-        window.localShortcut(Escape).connect([]{exit();});
-        window.frameSent.connect(&record,&Record::captureVideoFrame);
-        window.frameSent.connect(this, &Spectral::step); // Displays time steps as fast as possible
-        //window.localShortcut(Key(' ')).connect(this, &Spectral::step); // Displays time steps on user input
-        window.show();
-
         /// Operators
         for(uint i: range(n)) x[i] = -cos(PI*i/(n-1)); // Gauss-Lobatto nodes on [-1, 1]
         // Discrete Chebyshev transform operator (Gauss-Lobatto)
@@ -81,8 +75,20 @@ struct Spectral {
         for(uint i: range(n-2)) eigenvalueReciprocals[i] = abs(eigenvalues[i]) <= lowestReliableEigenvalue ? 1./H : 1./(eigenvalues[i] - H);
         Q = move(E.eigenvectors);
         v.clear(); pNL.clear(); // v[t<=0] = 0
-        step();
-        //record.start("spectral"_,true, false);
+
+        if(0) { // Displays
+            window.backgroundColor=window.backgroundCenter=1;
+            window.localShortcut(Escape).connect([]{exit();});
+            window.frameSent.connect(this, &Spectral::step); // Displays time steps as fast as possible
+            //window.localShortcut(Key(' ')).connect(this, &Spectral::step); // Displays time steps on user input
+            window.show();
+        } else { // Records
+            encoder.start("spectral"_, true, false);
+            while(w*t<=2*2*PI) { // Renders as quickly as possible (no display)
+                step();
+                encoder.writeVideoFrame(renderToImage(plot, encoder.size()));
+            }
+        }
     }
     void step() {
         Vector NL = v*(Dx*v); // Non-linear term

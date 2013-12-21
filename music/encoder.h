@@ -17,23 +17,17 @@ struct Encoder {
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
-    //void writeAudioFrame(const float* audio, uint audioSize);
     void writeAudioFrame(const int16* audio, uint audioSize);
     /// Flushes all encoders and close the file
     void stop();
 
     /// readAudio will be called back to request an \a audio frame of \a size samples as needed to follow video time
     function<uint(int16* output, uint size)> readAudio = [](int16*,uint){return 0;};
-    /// Captures current window and record to current file
-    //void captureVideoFrame();
-    /// Captures given audio frame and record to current file, also captures current window as necessary to keep framerate
-    //void capture(const float* audio, uint audioSize);
 
     uint width, height, fps, rate;
     struct AVFormatContext* context=0;
     struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
     struct AVStream* audioStream=0; struct AVCodecContext* audioCodec=0;
     struct SwsContext* swsContext=0;
-    uint videoTime = 0, videoEncodedTime = 0;
-    uint audioTime = 0;
+    uint videoTime = 0, videoEncodedTime = 0, audioTime = 0, audioEncodedTime;
 };

@@ -241,8 +241,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
     }
     if(current) return; //release samples are not mandatory
     if(key<=30 || key>=90) return; // Harpsichord don't have the lowest/highest piano notes
-    log("Missing sample"_,key);
-    log(samples);
+    log("Missing sample"_, key);
 }
 
 /// Background decoder (background thread)
