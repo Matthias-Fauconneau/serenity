@@ -129,7 +129,6 @@ void Encoder::stop() {
                 pkt.pts = av_rescale_q(videoEncodedTime, videoCodec->time_base, videoStream->time_base);
                 if (videoCodec->coded_frame->key_frame) assert_(pkt.flags & AV_PKT_FLAG_KEY);
                 if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
-                assert_(pkt.stream_index == videoStream->index);
                 pkt.stream_index = videoStream->index;
                 av_interleaved_write_frame(context, &pkt);
                 videoEncodedTime++;
@@ -143,7 +142,6 @@ void Encoder::stop() {
             if(gotAudioPacket) {
                 assert_(pkt.pts);
                 pkt.pts = av_rescale_q(audioEncodedTime, audioCodec->time_base, audioStream->time_base);
-                assert_(pkt.stream_index == audioStream->index);
                 pkt.stream_index = audioStream->index;
                 av_interleaved_write_frame(context, &pkt);
             }

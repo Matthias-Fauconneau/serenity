@@ -4,14 +4,14 @@
 #include "data.h"
 #include "map.h"
 
-//struct MidiNote { uint key; /*uint start; float duration;*/ bool operator <(const MidiNote& o)const{return key<o.key;} };
-typedef uint MidiNote;
-//inline String str(const MidiNote& m) { return str(m.key); }
+struct MidiNote { uint time, key, velocity; };
+inline bool operator ==(const MidiNote& a, uint key) { return a.key == key; }
+inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.key < b.key; }
 typedef array<MidiNote> MidiChord;
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {
-    uint64 time=0; uint8 type_channel=0; BinaryData data;
+    uint time=0; uint8 type_channel=0; BinaryData data;
     Track(uint time, BinaryData&& data):time(time),data(move(data)){}
     uint startTime=0, startIndex=0;
     void reset() { type_channel=0; time=startTime; data.index=startIndex; }
@@ -23,16 +23,16 @@ struct MidiFile {
     int trackCount=0;
     uint16 ticksPerBeat=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
-    map<int,int> active;
+    array<MidiNote> active;
     map<uint,MidiChord> notes;
     signal<uint, uint> noteEvent;
     signal<> endOfFile;
-    uint64 time=0; // Current time in 48KHz samples
-    uint64 duration=0; // Duration in 48KHz samples
+    uint time=0; // Current time in 48KHz samples
+    uint duration=0; // Duration in 48KHz samples
     void open(const ref<byte>& data);
     enum State { Seek=0, Play=1, Sort=2 };
-    void read(Track& track, uint64 time, State state);
-    void seek(uint64 time);
+    void read(Track& track, uint time, State state);
+    void seek(uint time);
     void update(uint delta);
     void clear() { tracks.clear(); trackCount=0; ticksPerBeat=0; notes.clear(); active.clear(); duration=0; time=0; }
 };

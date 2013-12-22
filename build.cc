@@ -70,14 +70,17 @@ struct Build {
             }
             if(s.match("#define "_)) {
                 string id = s.identifier("_"_);
-                defines << toLower(id);
+                s.whileAny(" "_);
+                if(!s.match('0')) defines << toLower(id);
             }
             if(s.match("#if "_)) {
+                bool condition = !s.match('!');
                 string id = s.identifier("_"_);
-                if(id=="__x86_64"_ && !flags.contains("atom"_)) {}
-                else if(flags.contains(toLower(id))) {} // Conditionnal build (extern use flag)
-                else if(defines.contains(toLower(id))) {} // Conditionnal build (intern use flag)
-                else s.until("#endif"_); // FIXME: Nesting unsupported
+                bool value = false;
+                if(id=="__x86_64"_ && !flags.contains("atom"_)) value=true;
+                else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
+                else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
+                if(value != condition) s.until("#endif"_); // FIXME: Nesting unsupported
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {
                 string file = s.identifier("_-"_);

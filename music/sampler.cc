@@ -218,7 +218,8 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
-                assert_(layer && layer->notes.size<layer->notes.capacity);
+                assert_(layer);
+                if(layer->notes.size>=layer->notes.capacity) log(layer->notes.size, layer->notes.capacity);
 
                 layer->notes.append( ::copy(s.flac) ); // Copies predecoded buffer and corresponding FLAC decoder state
                 Note& note = layer->notes.last();
@@ -229,7 +230,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 } else { // Release (rt_decay is unreliable, matching levels works better)
                     note.level = float4(min(8.f, current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11))); //341ms/21ms
                 }
-                if(note.level[0]<0x1p-23) { layer->notes.removeAt(layer->notes.size-1); return; }
+                if(note.level[0]<0x1p-15) { layer->notes.removeAt(layer->notes.size-1); return; }
                 note.step=(v4sf){1,1,1,1};
                 note.releaseTime=s.releaseTime;
                 note.envelope=s.envelope;
@@ -249,7 +250,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
 void Sampler::event() { // Main thread event posted every period from Sampler::read by audio thread
     if(lock.tryLock()) { // Cleanup silent notes
         for(Layer& layer: layers) layer.notes.filter([](const Note& note){
-            return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)) || note.level[0]<0x1p-23;
+            return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)) || note.level[0]<0x1p-15;
         });
         lock.unlock();
     }

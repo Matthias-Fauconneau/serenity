@@ -7,7 +7,11 @@
 #define SCORE 1
 #define KEYBOARD 1
 #define ENCODE 1
+#if !ENCODE
 #define WINDOW 1
+#define AUDIO 1
+#define THREAD 1
+#endif
 
 #if AUDIO
 #include "audio.h"
@@ -293,6 +297,9 @@ struct Music {
             score.showActive=true;
 #endif
             sampler.timeChanged.connect(&midi,&MidiFile::update);
+#if WINDOW
+        window.focus=0;
+#endif
         } else {
 #if SCORE
             score.showActive=false;
@@ -310,13 +317,12 @@ struct Music {
 #if MIDISCORE
         midiScore.center(int2(0,bottom));
 #endif
-#if WINDOW
-        window.focus=0;
-#endif
     }
     /// Smoothly scrolls towards target
     void smoothScroll() { //FIXME: inherit ScrollArea
-        //if(window.focus == &pdfScore.area()) return;
+#if WINDOW
+        if(window.focus == &pdfScore.area()) return;
+#endif
         const float k=1./60, b=1./60; // Stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration
@@ -371,7 +377,9 @@ struct Music {
 #endif
             layout.first()= &pdfScore.area();
             pdfScore.delta = 0; position=0,speed=0,target=0;
-            //window.focus = &pdfScore.area();
+#if WINDOW
+            window.focus = &pdfScore.area();
+#endif
         }
 #if MIDISCORE
         else if(existsFile(String(name+".mid"_),folder)) {

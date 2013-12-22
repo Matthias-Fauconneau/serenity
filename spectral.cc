@@ -7,7 +7,7 @@
 #include "interface.h"
 #include "encoder.h"
 
-/// Solves 1D Helmholtz problems with general Robin boundary conditions
+/// Solves ∂t v + v·∂x v = ν∂xx v on [-1, 1]
 struct Spectral {
     /// Parameters
     static constexpr uint n = 160; // Node count

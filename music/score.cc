@@ -505,22 +505,26 @@ void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     for(uint i=0; i<durations.size;) if(durations[i]==0)  positions.removeAt(i), indices.removeAt(i), durations.removeAt(i); else i++;
 #endif
 
+#if 1
     // Synchronize score with MIDI
     vec2 lastPos=vec2(0,0); uint lastKey=0;
     for(uint i=0; i<notes.size && i<positions.size;) {
-        vec2 pos=positions[i]; MidiNote note = notes[i];
-        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note/*.key*/<lastKey) { // missing note in MIDI
-            debug[pos]=String("++++"_);
+        vec2 pos=positions[i]; const MidiNote& note = notes[i];
+        if(i>0 && lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) // downward chord in MIDI
+                if(notes[i].time-notes[i-1].time<4) { debug[pos]<<"~"_; swap(notes[i-1], notes[i]); lastKey=note.key; }
+        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // Missing note in MIDI
+            debug[pos]<<"-"_<<str(note.time);
             positions.removeAt(i); indices.removeAt(i);
-        } else { i++; lastKey=note/*.key*/; }
+        } else { i++; lastKey=note.key; }
         lastPos=pos;
     }
+#endif
 
     chords.clear();
     uint t=-1; for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
-        if(i==0 || positions[i-1].x != positions[i].x) chords.insert(++t);
+        if(i==0 || (positions[i-1].x != positions[i].x && notes[i].time-notes[i-1].time > 0)) chords.insert(++t);
+        debug[positions[i]]<<str(notes[i].key)<<" "_<<str(chords.at(t).size)<<" "_<<str(notes[i].time-notes[i?i-1:0].time);
         chords.at(t) << notes[i];
-        debug[positions[i]]<<str(notes[i]/*.key*/);
     }
 }
 
@@ -632,8 +636,8 @@ void Score::remove() {
 void Score::expect() {
     while(!expected && chordIndex<chords.size()-1) {
         uint i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note/*.key*/) /*skip double notes*/ ) {
-                expected.insert(note/*.key*/, i);
+            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note.key) /*skip double notes*/ ) {
+                expected.insert(note.key, i);
                 errors = 0; showExpected = false; // Hides highlighting while succeeding
             }
             assert_(i<positions.size);
