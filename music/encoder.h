@@ -6,7 +6,7 @@
 struct Encoder {
     /// Configures for recording, does nothing until #start
     Encoder(int width=1280, int height=720, int fps=30, int rate=48000) : width(width), height(height), fps(fps), rate(rate){}
-    Encoder(function<uint(int16* output, uint size)> readAudio, int width=1280, int height=720, int fps=30, int rate=48000)
+    Encoder(function<uint(const mref<short2>& output)> readAudio, int width=1280, int height=720, int fps=30, int rate=48000)
         : readAudio(readAudio), width(width), height(height), fps(fps), rate(rate){}
     ~Encoder() { stop(); }
     operator bool() { return context; }
@@ -17,12 +17,12 @@ struct Encoder {
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
-    void writeAudioFrame(const int16* audio, uint audioSize);
+    void writeAudioFrame(const ref<short2>& audio);
     /// Flushes all encoders and close the file
     void stop();
 
     /// readAudio will be called back to request an \a audio frame of \a size samples as needed to follow video time
-    function<uint(int16* output, uint size)> readAudio = [](int16*,uint){return 0;};
+    function<uint(const mref<short2>& output)> readAudio = [](const mref<short2>&){return 0;};
 
     uint width, height, fps, rate;
     struct AVFormatContext* context=0;

@@ -123,7 +123,6 @@ template<Type A, Type... Args> String str(const A& a, const Args&... args) { ret
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }
-/// Logs to standard output using str(...) serialization
-template<Type... Args> void __attribute((noreturn)) warn(const Args&... args) { warn<string>(str(args...)); }
+#define warn log
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }

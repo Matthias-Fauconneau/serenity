@@ -74,9 +74,13 @@ void Encoder::writeVideoFrame(const Image &image) {
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotVideoPacket;
+#if __x86_64
     setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormal and underflow in x264
+#endif
     avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
+#if __x86_64
     setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
+#endif
     avpicture_free((AVPicture*)frame);
     avcodec_free_frame(&frame);
     if(gotVideoPacket) {
@@ -90,18 +94,18 @@ void Encoder::writeVideoFrame(const Image &image) {
     videoTime++;
     while(audioStream && videoTime*rate >= audioTime*fps) {
         const uint audioSize = 1024;
-        buffer<int16> audio(audioSize*2);
-        uint readSize = readAudio(audio, audioSize);
-        assert_(readSize == audioSize);
-        writeAudioFrame(audio, readSize);
+        buffer<short2> audio(audioSize);
+        audio.size = readAudio(audio);
+        assert_(audio.size == audio.capacity);
+        writeAudioFrame(audio);
     }
 }
 
-void Encoder::writeAudioFrame(const int16* audio, uint audioSize) {
-    assert_(audioStream && audio && audioSize==1024,"Unsupported audio period length: Expected 1024 frames, got ", audioSize);
+void Encoder::writeAudioFrame(const ref<short2>& audio) {
+    assert_(audioStream && audio.size==1024,"Unsupported audio period length: Expected 1024 frames, got ", audio.size);
     AVFrame *frame = avcodec_alloc_frame();
-    frame->nb_samples = audioSize;
-    avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio, audioSize * 2 * sizeof(int16), 1);
+    frame->nb_samples = audio.size;
+    avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * 2 * sizeof(int16), 1);
     frame->pts = audioTime;
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -111,10 +115,10 @@ void Encoder::writeAudioFrame(const int16* audio, uint audioSize) {
     if (gotAudioPacket) {
         pkt.stream_index = audioStream->index;
         av_interleaved_write_frame(context, &pkt);
-        audioEncodedTime += audioSize;
+        audioEncodedTime += audio.size;
     }
 
-    audioTime += audioSize;
+    audioTime += audio.size;
 }
 
 void Encoder::stop() {

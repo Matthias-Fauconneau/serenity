@@ -24,7 +24,7 @@ inline real round(real x) { return __builtin_round(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
 inline real ceil(real x) { return __builtin_ceil(x); }
 inline real mod(real q, real d) { return __builtin_fmod(q, d); }
-inline constexpr float sqrt(float f) { return __builtin_sqrtf(f); }
+//inline constexpr float sqrt(float f) { return __builtin_sqrtf(f); }
 inline real sqrt(real f) { return __builtin_sqrt(f); }
 inline real pow(real x, real y) { return __builtin_pow(x,y); }
 
@@ -47,5 +47,5 @@ inline real rad(real t) { return t/180*PI; }
 inline real deg(real t) { return t/PI*180; }
 inline real exp2(real x) { return __builtin_exp2(x); }
 inline real log2(real x) { return __builtin_log2(x); }
-inline real exp10(real x) { return __builtin_exp10(x); }
+inline real exp10(real x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline real log10(real x) { return __builtin_log10(x); }

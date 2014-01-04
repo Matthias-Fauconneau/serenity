@@ -165,7 +165,7 @@ void Window::event() {
         lock.unlock();
         processEvent(type, e);
     }
-    while(eventQueue) { lock.lock(); QEvent e=eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
+    while(eventQueue) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     if(/*revents==IDLE &&*/ needUpdate) {
         needUpdate = false;
         /*if(autoResize) {

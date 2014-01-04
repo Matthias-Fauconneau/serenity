@@ -19,7 +19,6 @@ generic struct array : buffer<T> {
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
 
-    explicit operator const T*() const { return data; } // Explicits ref::operator const T*
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
@@ -151,7 +150,7 @@ generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivo
 generic T quickselect(const mref<T>& at, size_t left, size_t right, size_t k) {
     for(;;) {
         size_t pivotIndex = partition(at, left, right, (left + right)/2);
-        int pivotDist = pivotIndex - left + 1;
+        size_t pivotDist = pivotIndex - left + 1;
         if(pivotDist == k) return at[pivotIndex];
         else if(k < pivotDist) right = pivotIndex - 1;
         else { k -= pivotDist; left = pivotIndex + 1; }

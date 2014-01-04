@@ -88,7 +88,7 @@ generic String str(const vec& v) { String s("("_); for(uint i=0;i<N;i++) { s<<st
 
 generic struct xy { T x,y; };
 /// Integer x,y vector (16bit)
-typedef vec<xy,uint16,2> short2;
+typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
 /// Single precision x,y vector

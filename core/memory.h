@@ -12,10 +12,7 @@ generic struct mref : ref<T> {
     constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.data, list.size) {}
 
     explicit operator bool() const { if(size) assert(data); return size; }
-    explicit operator bool() { if(size) assert(data); return size; }
-    operator const T*() const { return (T*)data; }
-    operator T*() { return (T*)data; }
-
+    explicit operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
     T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
@@ -40,19 +37,21 @@ generic struct mref : ref<T> {
 #include <new>
 /// Initializes raw memory to zero
 inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer[i]=0; }
-void simdCopy(byte* dst, const byte* src, size_t size);
 /// Copies raw memory from \a src to \a dst
 inline void copy(byte* dst, const byte* src, size_t size) {
-    if(size<32) { for(size_t i: range(size)) dst[i] = src[i]; }
-    else simdCopy(dst, src, size);
+#if SIMD
+    extern void simdCopy(byte* dst, const byte* src, size_t size);
+    if(size>=32) return simdCopy(dst, src, size);
+#endif
+    for(size_t i: range(size)) dst[i] = src[i];
 }
 /// Initializes buffer to \a value
 generic inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }
 /// Copies values from \a src to \a dst
 /// \note Ignores move and copy operators
-generic inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
+//generic inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
 /// Copies raw memory from \a src to \a dst
-inline void copy(const mref<byte>& dst, const ref<byte>& src) { assert(dst.size==src.size, dst.size, src.size); copy(dst.begin(), src.begin(), src.size); }
+//inline void copy(const mref<byte>& dst, const ref<byte>& src) { assert(dst.size==src.size, dst.size, src.size); copy(dst.begin(), src, src.size); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size) throw();
@@ -84,22 +83,6 @@ generic struct buffer : mref<T> {
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
-
-    // Overrides mref const operators
-    T* begin() { return (T*)data; }
-    T* end() { return (T*)data+size; }
-    T& at(size_t i) { assert(i<size); return (T&)data[i]; }
-    T& operator [](size_t i) { return at(i); }
-    T& first() { return at(0); }
-    T& last() { return at(size-1); }
-
-    // and reenable const const versions
-    const T* begin() const { return data; }
-    const T* end() const { return data+size; }
-    const T& at(size_t i) const { assert(i<size); return data[i]; }
-    const T& operator [](size_t i) const { return at(i); }
-    const T& first() const { return at(0); }
-    const T& last() const { return at(size-1); }
 
     void clear(const T& value=0) { ::clear((T*)data, size, value); }
 

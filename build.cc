@@ -101,13 +101,13 @@ struct Build {
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             log(target);
-            while(pids.size>=3) { // Waits for a job to finish before launching a new unit
-                int pid =  wait(); // Waits for any child to terminate
+            while(pids.size>=1) { // Waits for a job to finish before launching a new unit
+                int pid = wait(); // Waits for any child to terminate
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
             {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -o"_);
-                pids << execute("/usr/bin/g++"_,flags+toRefs(args), false);}
+                pids << execute("/usr/bin/clang++"_,flags+toRefs(args), false);}
         }
         return lastLinkEdit;
     }
@@ -149,7 +149,7 @@ struct Build {
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
             log(name);
-            if(execute("/usr/bin/g++"_,toRefs(args))) fail();
+            if(execute("/usr/bin/clang++"_,toRefs(args))) fail();
         }
         if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
     }

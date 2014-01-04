@@ -135,7 +135,7 @@ void __attribute((constructor(102))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recursive calls
     //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
-    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={0};
+    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
@@ -146,7 +146,7 @@ void __attribute((constructor(102))) setup_signals() {
 #endif
 }
 
-template<> void warn(const string& message) {
+/*template<> void warn(const string& message) {
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
@@ -155,7 +155,7 @@ template<> void warn(const string& message) {
         reentrant = false;
     }
     log(message);
-}
+}*/
 
 template<> void __attribute((noreturn)) error(const string& message) {
     log(message); // In case, tracing crashes

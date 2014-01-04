@@ -61,9 +61,9 @@ bool isASCII(const string& s) {
 bool isUTF8(const string& s) {
     for(uint i=0; i<s.size;i++) {
         /**/  if((s[i]&0b10000000)==0b00000000) {}
-        else if((s[i]&0b11100000)==0b11000000) for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false;
-        else if((s[i]&0b11110000)==0b11100000) for(uint j unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false;
-        else if((s[i]&0b11111000)==0b11110000) for(uint j unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false;
+        else if((s[i]&0b11100000)==0b11000000) { for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11110000)==0b11100000) { for(uint j unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11111000)==0b11110000) { for(uint j unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false; }
         else return false;
     }
     return true;
@@ -207,7 +207,7 @@ template<uint base> String utoa(uint64 n, int pad) {
 template String utoa<2>(uint64,int);
 template String utoa<16>(uint64,int);
 
-template<uint base> String itoa(int64 number, int pad, char padChar=' ') {
+template<uint base> String itoa(int64 number, int pad, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);

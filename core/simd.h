@@ -2,10 +2,6 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
-// Memory
-inline void movnt(uint64* const ptr, uint64 v) { return  __builtin_ia32_movntq(ptr,v); }
-inline void sfence() { __builtin_ia32_sfence(); }
-
 // v4si
 typedef int v4si __attribute((__vector_size__ (16)));
 unused const v4si _1i = {1,1,1,1};

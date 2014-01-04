@@ -124,7 +124,7 @@ generic struct ref {
     template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
 
     explicit operator bool() const { if(size) assert(data); return size; }
-    operator const T*() const { return data; }
+    explicit operator const T*() const { return data; }
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }

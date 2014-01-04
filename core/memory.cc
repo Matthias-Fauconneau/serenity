@@ -1,6 +1,6 @@
 #include "memory.h"
+#if SIMD
 #include "simd.h"
-
 void simdCopy(byte* dst, const byte* src, size_t size) {
     size_t size16 = size/16;
     if(ptr(src)%16==0) {
@@ -19,3 +19,4 @@ void simdCopy(byte* dst, const byte* src, size_t size) {
     }
     for(size_t i: range(size16*16,size)) dst[i]=src[i];
 }
+#endif

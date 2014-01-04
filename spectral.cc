@@ -30,7 +30,6 @@ struct Spectral {
 
     Plot plot {x, v, 1};
     Window window {&plot, int2(0,720), "Spectral"};
-    Encoder encoder {1280,720};
     Spectral() {
         /// Operators
         for(uint i: range(n)) x[i] = -cos(PI*i/(n-1)); // Gauss-Lobatto nodes on [-1, 1]
@@ -76,13 +75,13 @@ struct Spectral {
         Q = move(E.eigenvectors);
         v.clear(); pNL.clear(); // v[t<=0] = 0
 
-        if(0) { // Displays
+        if(1) { // Displays
             window.backgroundColor=window.backgroundCenter=1;
             window.localShortcut(Escape).connect([]{exit();});
             window.frameSent.connect(this, &Spectral::step); // Displays time steps as fast as possible
-            //window.localShortcut(Key(' ')).connect(this, &Spectral::step); // Displays time steps on user input
             window.show();
         } else { // Records
+            Encoder encoder {1280,720};
             encoder.start("spectral"_, true, false);
             while(w*t<=2*2*PI) { // Renders as quickly as possible (no display)
                 step();
