@@ -26,8 +26,8 @@ Folder::Folder(const string& folder, const Folder& at, bool create):Handle(0){
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);
 }
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
-int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
-int64 Folder::modifiedTime() const { struct stat stat = Folder::stat(); return stat.st_mtim.tv_sec*1000000000ul + stat.st_mtim.tv_nsec;  }
+int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ull + stat.st_atim.tv_nsec; }
+int64 Folder::modifiedTime() const { struct stat stat = Folder::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
 array<String> Folder::list(uint flags) const {
     Folder fd(""_,*this);
     array<String> list; byte buffer[0x1000];
@@ -72,8 +72,8 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666), path)){ assert_(path.size<0x100); }
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 int64 File::size() const { return stat().st_size; }
-int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ul + stat.st_atim.tv_nsec; }
-int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ul + stat.st_mtim.tv_nsec;  }
+int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ull + stat.st_atim.tv_nsec; }
+int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
 void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 

@@ -148,7 +148,6 @@ struct Build {
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-            log(name);
             if(execute("/usr/bin/clang++"_,toRefs(args))) fail();
         }
         if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);

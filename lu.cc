@@ -1,17 +1,6 @@
 #include "lu.h"
 #include "math.h"
 
-/// Permutation matrix
-struct Permutation {
-    int even=1; //1 if even count of swaps, -1 if odd count of swaps (used for determinant)
-    buffer<int> order;
-
-    Permutation(int n) : order(n) { order.size=n; for(uint i: range(n)) order[i] = i; } // identity ordering
-    void swap(int i, int j) { ::swap(order[i],order[j]); even=-even; }
-    int determinant() const { return even; }
-    int operator[](int i) const { return order[i]; } //b[P[i]] = (P*b)[i]
-};
-
 /// Swap row j with the row having the largest value on column j, while maintaining a permutation matrix P
 inline void pivot(Matrix& A, Permutation& P, uint j) {
     uint best=j; float maximum=abs<float>(A(best,j));
@@ -26,9 +15,6 @@ inline void pivot(Matrix& A, Permutation& P, uint j) {
     }
 }
 
-struct PLU { Permutation P; Matrix LU; };
-/// Factorizes any matrix as the product of a lower triangular matrix and an upper triangular matrix
-/// \return permutations (P) and packed LU (U's diagonal is 1).
 PLU factorize(Matrix&& LU) {
     const Matrix& A = LU; //const access to LU
     assert(A.m==A.n);
@@ -61,16 +47,17 @@ PLU factorize(Matrix&& LU) {
     return {move(P), move(LU)};
 }
 
+#if DEBUG
 /// Compute determinant of a packed PLU matrix (product along diagonal)
-float determinant(const Permutation& P, const Matrix& LU) {
+static float determinant(const Permutation& P, const Matrix& LU) {
     float det = P.determinant();
     for(uint i: range(LU.n)) det *= LU(i,i);
     return det;
 }
+#endif
 
-/// Solves PLUx=b
 Vector solve(const Permutation& P, const Matrix& LU, const Vector& b) {
-    //assert(determinant(P,LU),"Coefficient matrix is singular"_);
+    assert(determinant(P,LU),"Coefficient matrix is singular"_);
     uint n=LU.n;
     Vector x(n);
     for(uint i: range(n)) x[i] = b[P[i]]; // Reorder b in x

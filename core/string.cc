@@ -229,10 +229,11 @@ String ftoa(double n, int precision, int pad, int exponent, bool inf) {
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';
-    if(precision && n!=round(n)) {
+    if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);
         uint decimal = round(fract*exp10(precision));
-        if(decimal==(uint)exp10(precision)) integer++, decimal=0; // Rounds to ceiling integer
+        uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
+        if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
         s<<utoa(integer,pad)<<'.'<< utoa<10>(decimal,precision);
     } else s<<utoa(round(n));
     if(exponent==3 && e==3) s<<'K';
