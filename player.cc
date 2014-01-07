@@ -19,13 +19,13 @@ struct Player {
     //bool resamplerFlushed = false;
     //Resampler nextResampler;
     const uint rate = 48000;
-    AudioOutput audio{{this,&Player::read}, rate, nextPowerOfTwo(rate/2)};
-    int32* lastPeriod = 0, lastPeriodSize = 0;
-    uint read(int32* output, uint outputSize) {
+    AudioOutput audio{{this,&Player::read16}, {this,&Player::read}, rate, 8192};
+    mref<int2> lastPeriod;
+    uint read(const mref<int2>& output) {
         uint readSize = 0;
-        for(int32* chunk=output;;) {
+        for(mref<int2> chunk=output;;) {
             if(!file) break;
-            int need = outputSize-readSize;
+            assert(readSize<output.size);
             int read = 0;
             if(resampler.sourceRate*audio.rate != file.rate*resampler.targetRate /*&& !resamplerFlushed*/) {
 #if 0
@@ -55,37 +55,46 @@ struct Player {
             }
             if(resampler) {
                 //if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) {
-                    uint sourceNeed = resampler.need(need);
-                    float source[sourceNeed*2];
-                    uint sourceRead = file.read(source, sourceNeed);
-                    resampler.write(source, sourceRead);
+                    uint sourceNeed = resampler.need(chunk.size);
+                    buffer<float2> source(sourceNeed);
+                    uint sourceRead = file.read(source);
+                    resampler.write(source.slice(0, sourceRead));
                 //}
-                read = min(need, resampler.available());
+                read = min(chunk.size, resampler.available());
                 if(read) {
-                    float target[read*2];
-                    resampler.read(target, read);
-                    for(uint i: range(read*2)) {
-                        int64 s = target[i]*(1<<29); // 3dB headroom
-                        if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
-                        chunk[i] = s;
+                    buffer<float2> target(read);
+                    resampler.read(target);
+                    for(uint i: range(read)) {
+                        chunk[i][0] = target[i][0]*(1<<29); // 3dB headroom
+                        chunk[i][1] = target[i][1]*(1<<29); // 3dB headroom
                     }
                 }
-            } else /*if(!nextResampler)*/ read = file.read(chunk, need);
-            assert(read<=need, read, need);
-            chunk += read*channels; readSize += read;
-            if(readSize == outputSize) { update(file.position/file.rate,file.duration/file.rate); break; } // Complete chunk
+            } else /*if(!nextResampler)*/ read = file.read(chunk);
+            assert(read<=chunk.size, read);
+            chunk = chunk.slice(read); readSize += read;
+            if(readSize == output.size) { update(file.position/file.rate,file.duration/file.rate); break; } // Complete chunk
             else /*if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) */next(); // End of file
             /*else { // Previous resampler can be replaced once properly flushed
                 resampler = move(nextResampler); nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
                 assert_(!nextResampler);
             }*/
         }
-        if(!lastPeriod) for(uint i: range(outputSize)) { // Fades in
-            float level = exp(12. * ((float) i / outputSize - 1) ); // Linear perceived sound level
-            output[i*2] *= level;
-            output[i*2+1] *= level;
+        if(!lastPeriod) for(uint i: range(output.size)) { // Fades in
+            float level = exp(12. * ((float) i / output.size - 1) ); // Linear perceived sound level
+            output[i][0] *= level;
+            output[i][1] *= level;
         }
-        lastPeriod = output; lastPeriodSize = outputSize;
+        lastPeriod = output;
+        return readSize;
+    }
+    uint read16(const mref<short2>& output) {
+        buffer<int2> buffer(output.size);
+        uint readSize = read(buffer);
+        lastPeriod=mref<int2>(); //FIXME: 16bit fade out
+        for(uint i: range(output.size)) {
+            output[i][0]=buffer[i][0]>>16; // Truncates 32bit to 16bit
+            output[i][1]=buffer[i][1]>>16; // Truncates 32bit to 16bit
+        }
         return readSize;
     }
 
@@ -220,15 +229,15 @@ struct Player {
         if(play) { audio.start(); window.setIcon(playIcon()); }
         else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
-            for(uint i: range(lastPeriodSize)) {
-                float level = exp2(-12. * i / lastPeriodSize); // Linear perceived sound level
+            for(uint i: range(lastPeriod.size)) {
+                float level = exp2(-12. * i / lastPeriod.size); // Linear perceived sound level
                 lastPeriod[i*2] *= level;
                 lastPeriod[i*2+1] *= level;
             }
-            lastPeriod=0, lastPeriodSize=0;
-            window.setIcon(pauseIcon());
+            file.seek(max(0, int(file.position-lastPeriod.size)));
+            lastPeriod=mref<int2>();
             audio.stop();
-            file.seek(max(0, (int)file.position-lastPeriodSize));
+            window.setIcon(pauseIcon());
         }
         playButton.enabled=play;
         window.render();

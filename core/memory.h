@@ -2,6 +2,9 @@
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
 
+/// Initializes memory using a constructor (placement new)
+inline void* operator new(size_t, void* p) throw() { return p; }
+
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
     /// Default constructs an empty reference
@@ -10,6 +13,8 @@ generic struct mref : ref<T> {
     mref(T* data, size_t size) : ref<T>(data,size) {}
     /// Converts an std::initializer_list to mref
     constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.data, list.size) {}
+    /// Converts a static array to ref
+    template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
     explicit operator bool() const { if(size) assert(data); return size; }
     explicit operator T*() const { return (T*)data; }
@@ -21,37 +26,24 @@ generic struct mref : ref<T> {
     T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+    mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
     /// Slices a reference to elements from to the end of the reference
-    ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
-    /// Slices a reference to elements from to the end of the reference
-    mref<T> slice(size_t pos) { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+    mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+
+    /// Initializes buffer using the same constructor for all elements
+    template<Type... Args> void clear(Args... args) { for(size_t i: range(size)) new (&at(i)) T(args...); }
 
     using ref<T>::data;
     using ref<T>::size;
 };
+/// Returns mutable reference to memory used by \a t
+generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }
 
 // Memory operations
-/// Initializes memory using a constructor (placement new)
-//inline void* operator new(size_t, void* p) { return p; }
-#include <new>
-/// Initializes raw memory to zero
-inline void clear(byte* buffer, size_t size) { for(size_t i: range(size)) buffer[i]=0; }
-/// Copies raw memory from \a src to \a dst
-inline void copy(byte* dst, const byte* src, size_t size) {
-#if SIMD
-    extern void simdCopy(byte* dst, const byte* src, size_t size);
-    if(size>=32) return simdCopy(dst, src, size);
-#endif
-    for(size_t i: range(size)) dst[i] = src[i];
-}
-/// Initializes buffer to \a value
-generic inline void clear(T* buffer, size_t size, const T& value=T()) { for(size_t i: range(size)) new (&buffer[i]) T(copy(value)); }
-/// Copies values from \a src to \a dst
-/// \note Ignores move and copy operators
-//generic inline void rawCopy(T* dst,const T* src, size_t size) { copy((byte*)dst, (const byte*)src, size*sizeof(T)); }
-/// Copies raw memory from \a src to \a dst
-//inline void copy(const mref<byte>& dst, const ref<byte>& src) { assert(dst.size==src.size, dst.size, src.size); copy(dst.begin(), src, src.size); }
+/// Initializes \a dst from \a src using move constructor
+generic void move(const mref<T>& dst, const mref<T>& src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(move(src[i])); }
+/// Initializes \a dst from \a src using copy constructor
+generic void copy(const mref<T>& dst, const ref<T> src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(copy(src[i])); }
 
 // C runtime memory allocation
 extern "C" void* malloc(size_t size) throw();
@@ -78,13 +70,11 @@ generic struct buffer : mref<T> {
     }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
-    buffer(size_t capacity, size_t size, const T& value) : buffer(capacity, size) { ::clear((T*)data, size, value); }
+    buffer(size_t capacity, size_t size, const T& value) : buffer(capacity, size) { this->clear(value); }
 
     buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
-
-    void clear(const T& value=0) { ::clear((T*)data, size, value); }
 
     using mref<T>::data;
     using mref<T>::size;
@@ -98,7 +88,7 @@ generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.
 /// Unique reference to an heap allocated value
 generic struct unique {
     unique(decltype(nullptr)):pointer(0){}
-    template<Type D> unique(unique<D>&& o):pointer(/*dynamic_cast<T*>(*/o.pointer/*)*/){o.pointer=0;}
+    template<Type D> unique(unique<D>&& o):pointer(o.pointer){o.pointer=0;}
     template<Type... Args> explicit unique(Args&&... args):pointer(new T(forward<Args>(args)...)){}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }
     ~unique() { if(pointer) { delete pointer; } pointer=0; }

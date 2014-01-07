@@ -1,6 +1,7 @@
 #pragma once
 /// \file audio.h PCM audio output interface
 #include "thread.h"
+#include "vector.h"
 #include "function.h"
 
 /// Audio output through ALSA PCM interface
@@ -14,17 +15,17 @@ struct AudioOutput : Device, Poll {
     /// Configures PCM for 16bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
-    AudioOutput(function<uint(int16* output, uint size)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
+    AudioOutput(function<uint(const mref<short2>& output)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
 	AudioOutput(16,rate,periodSize,thread) { read16=read; }
     /// Configures PCM for 32bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
-    AudioOutput(function<uint(int32* output, uint size)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
+    AudioOutput(function<uint(const mref<int2>& output)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
 	AudioOutput(32,rate,periodSize,thread) { read32=read; }
     /// Configures PCM for either 16bit or 32bit output depending on driver capability
     /// \note read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
-    AudioOutput(function<uint(int16* output, uint size)> read16, function<uint(int32* output, uint size)> read32,
+    AudioOutput(function<uint(const mref<short2>&)> read16, function<uint(const mref<int2>&)> read32,
                 uint rate=0, uint periodSize=0, Thread& thread=mainThread):
     AudioOutput(0,rate,periodSize,thread) { this->read16=read16; this->read32=read32; }
 
@@ -37,8 +38,8 @@ struct AudioOutput : Device, Poll {
     /// Cancels last period, event() will be called again to replace the period
     void cancel();
 
-    function<uint(int16* output, uint size)> read16 = [](int16*,uint){return 0;};
-    function<uint(int32* output, uint size)> read32 = [](int32*,uint){return 0;};
+    function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
+    function<uint(const mref<int2>&)> read32 = [](const mref<int2>&){return 0;};
 
     Map maps[3];
     void* buffer = 0;

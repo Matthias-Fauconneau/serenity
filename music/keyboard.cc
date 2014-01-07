@@ -2,10 +2,10 @@
 #include "display.h"
 
 void Keyboard::inputNoteEvent(uint key, uint vel) {
-    if(vel) { if(!input.contains(key)) input << key; } else input.removeAll(key); contentChanged();
+    if(vel) { if(!input.contains(key)) input << key; } else input.remove(key); contentChanged();
 }
 void Keyboard::midiNoteEvent(uint key, uint vel) {
-    if(vel) { if(!midi.contains(key)) midi << key; } else midi.removeAll(key); contentChanged();
+    if(vel) { if(!midi.contains(key)) midi << key; } else midi.remove(key); contentChanged();
 }
 
 void Keyboard::render(int2 position, int2 size) {

@@ -1,5 +1,6 @@
 #pragma once
 #include "thread.h"
+#include "vector.h"
 
 /// Generic audio decoder (using ffmpeg)
 struct AudioFile {
@@ -13,8 +14,8 @@ struct AudioFile {
     struct AVCodecContext* audio=0;
     struct AVFrame* frame=0;
 
-    buffer<int> intBuffer;
-    buffer<float> floatBuffer;
+    buffer<int2> intBuffer;
+    buffer<float2> floatBuffer;
     uint bufferIndex=0, bufferSize=0;
 
     AudioFile();
@@ -26,17 +27,16 @@ struct AudioFile {
     bool open();
     void close();
 
-    // \note As \a buffer type depends on previous usages of \a read, switching between overloads may only happen when no data is buffered
-    uint read(int32* output, uint outputSize);
-    uint read(float* output, uint outputSize);
+    uint read(const mref<int2>& output);
+    uint read(const mref<float2>& output);
 
     void seek(uint position);
 };
 
-struct Audio {
+/*struct Audio {
     uint channels;
     uint rate;
-    buffer<int32> data;
+    buffer<int2> data;
 };
-Audio decodeAudio(const string& path, uint duration=-1);
+Audio decodeAudio(const string& path, uint duration=-1);*/
 //Audio decodeAudio(buffer<byte>&& data);

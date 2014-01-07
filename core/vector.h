@@ -92,6 +92,7 @@ typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
 /// Single precision x,y vector
+typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2;
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }

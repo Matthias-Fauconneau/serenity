@@ -23,7 +23,7 @@ void Sequencer::event() {
     if(type == NoteOn) {
         if(value == 0 ) {
             if(!pressed.contains(key)) return; //pressed even before the device was opened
-            pressed.removeAll(key);
+            pressed.remove(key);
             if(sustain) sustained += key;
             else {
                 noteEvent(key,0);
@@ -34,7 +34,7 @@ void Sequencer::event() {
                 }
             }
         } else {
-            sustained.removeAll(key);
+            sustained.remove(key);
             assert(!pressed.contains(key));
             pressed << key;
             noteEvent(key, min(127,(int)value*4/3)); //x4/3 to reach maximum velocity without destroying the keyboard

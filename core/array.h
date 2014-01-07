@@ -9,11 +9,11 @@ generic struct array : buffer<T> {
     /// Default constructs an empty array
     array() {}
     /// Allocates an uninitialized buffer for \a capacity elements
-    explicit array(size_t capacity/*, size_t size=0*/) : buffer<T>(capacity, /*size*/0) {}
+    explicit array(size_t capacity) : buffer<T>(capacity, 0) {}
     /// Moves elements from a reference
-    explicit array(mref<T>&& ref) : buffer<T>(ref.size) { for(size_t i: range(ref.size)) new (&at(i)) T(move(ref[i])); }
+    explicit array(mref<T>&& ref) : buffer<T>(ref.size) { move(*this, ref); }
     /// Copies elements from a reference
-    explicit array(const ref<T>& ref) : buffer<T>(ref.size) { for(size_t i: range(ref.size)) new (&at(i)) T(copy(ref[i])); }
+    explicit array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
     /// Converts a buffer to an array
     array(buffer<T>&& o) : buffer<T>(move(o)) {}
     /// If the array owns the reference, destroys all initialized elements
@@ -23,20 +23,20 @@ generic struct array : buffer<T> {
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
     /// Allocates enough memory for \a capacity elements
-    void reserve(size_t capacity) {
-        if(capacity>this->capacity) {
-            assert(capacity>=size);
-            if(this->capacity) {
-                data=(T*)realloc((T*)data, capacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+    void reserve(size_t nextCapacity) {
+        if(nextCapacity>capacity) {
+            assert(nextCapacity>=size);
+            if(capacity) {
+                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
                 assert_(size_t(data)%alignof(T)==0, alignof(T));
-            } else if(posix_memalign((void**)&data,16,capacity*sizeof(T))) error("");
-            this->capacity=capacity;
+            } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("");
+            capacity=nextCapacity;
         }
     }
     /// Resizes the array to \a size and default initialize new elements
-    void grow(size_t size) { size_t old=this->size; assert(size>=old); reserve(size); this->size=size; for(size_t i: range(old,size)) new (&at(i)) T(); }
+    void grow(size_t nextSize) { size_t previousSize=size; assert(nextSize>=previousSize); reserve(nextSize); size=nextSize; slice(previousSize,nextSize).clear(); }
     /// Sets the array size to \a size and destroys removed elements
-    void shrink(size_t size) { assert(capacity && size<=this->size); for(size_t i: range(size,this->size)) data[i].~T(); this->size=size; }
+    void shrink(size_t nextSize) { assert(capacity && nextSize<=size); for(size_t i: range(nextSize,size)) data[i].~T(); size=nextSize; }
     /// Removes all elements
     void clear() { if(size) shrink(0); }
 
@@ -45,23 +45,22 @@ generic struct array : buffer<T> {
 
     /// \name Append operators
     array& operator<<(T&& e) { size_t s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
-    array& operator<<(array<T>&& a) {size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(move(a[i])); return *this; }
+    array& operator<<(array<T>&& a) {size_t s=size; reserve(size=s+a.size); move(slice(s,a.size), a); return *this; }
     array& operator<<(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
-    array& operator<<(const ref<T>& a) {size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(copy(a[i])); return *this; }
+    array& operator<<(const ref<T>& a) {size_t s=size; reserve(size=s+a.size); copy(slice(s,a.size), a); return *this; }
     /// \}
 
     /// \name Appends once (if not already contained) operators
     array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
-    array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
-    //array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; } Confusing character set operations when string append is expected
+    //array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
+    //array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
     /// \}
 
     /// Inserts an element at \a index
     template<Type V> T& insertAt(int index, V&& e) {
         assert(index>=0);
         reserve(++size);
-        for(int i=size-2;i>=index;i--) copy((byte*)&at(i+1),(const byte*)&at(i),sizeof(T));
+        for(int i=size-2;i>=index;i--) copy(raw(at(i+1)), raw(at(i)));
         new (&at(index)) T(move(e));
         return at(index);
     }
@@ -69,7 +68,7 @@ generic struct array : buffer<T> {
     template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
 
     /// Removes one element at \a index
-    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }
+    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy(raw(at(i)), raw(at(i+1))); size--; }
     /// Removes one element at \a index and returns its value
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
@@ -77,10 +76,10 @@ generic struct array : buffer<T> {
 
     /// Removes one matching element and returns an index to its successor
     template<Type K> int tryRemove(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
-    /// Removes one matching element and returns an index to its successor, aborts if not contained
+    /// Removes one matching element and returns an index to its successor, aborts if not sed
     template<Type K> int remove(const K& key) { int i=indexOf(key); assert(i>=0); removeAt(i); return i; }
     /// Removes all matching elements
-    template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
+    //template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
     template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
@@ -108,6 +107,7 @@ generic struct array : buffer<T> {
     using buffer<T>::capacity;
     using buffer<T>::end;
     using buffer<T>::at;
+    using buffer<T>::slice;
 };
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }

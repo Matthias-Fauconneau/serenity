@@ -6,6 +6,9 @@
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
 
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
 /// Reinterpret cast a const reference to another type
 template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);

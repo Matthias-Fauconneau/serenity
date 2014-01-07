@@ -12,11 +12,7 @@ typedef vec<rgb,uint8,3> rgb3;
 template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
     typedef vec<T,uint8,N> S;
     typedef vec<T,int,N> V;
-#if __clang__
-    byte prior_[width*sizeof(S)]; clear(prior_,sizeof(prior_)); S* prior = (S*)prior_;
-#else
-    S prior[width]; clear(prior,width,S(0));
-#endif
+    buffer<S> prior(width); prior.clear(0);
     for(uint y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
         S* src = (S*)raw;

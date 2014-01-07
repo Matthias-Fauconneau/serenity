@@ -24,27 +24,27 @@ template<Type K, Type V> struct map {
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
 
     template<Type KK> const V& at(const KK& key) const {
-        int i = keys.indexOf(key);
-        if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i = keys.indexOf(key);
+        if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
         return values[i];
     }
     template<Type KK> V& at(const KK& key) {
-        int i = keys.indexOf(key);
-        if(i<0) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i = keys.indexOf(key);
+        if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
         return values[i];
     }
 
     template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
-        int i = keys.indexOf(key);
-        return i>=0 ? VV(values[i]) : move(value);
+        size_t i = keys.indexOf(key);
+        return i!=invalid ? VV(values[i]) : move(value);
     }
     template<Type KK> const V& value(const KK& key, const V& value=V()) const {
-        int i = keys.indexOf(key);
-        return i>=0 ? values[i] : value;
+        size_t i = keys.indexOf(key);
+        return i!=invalid ? values[i] : value;
     }
 
-    template<Type KK> const V* find(const KK& key) const { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
-    template<Type KK> V* find(const KK& key) { int i = keys.indexOf(key); return i>=0 ? &values[i] : 0; }
+    template<Type KK> const V* find(const KK& key) const { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
+    template<Type KK> V* find(const KK& key) { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V& insert(KK&& key) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         keys << K(move(key)), values << V();
@@ -83,19 +83,19 @@ template<Type K, Type V> struct map {
         return values.insertAt(keys.insertSorted(key),value);
     }
 
-    template<Type KK> V& operator [](KK key) { int i = keys.indexOf(key); return i>=0 ? values[i] : insert(key); }
+    template<Type KK> V& operator [](KK key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
     template<Type KK> V& sorted(const KK& key) {
-        int i = keys.indexOf(key); if(i>=0) return values[i];
+        size_t i = keys.indexOf(key); if(i!=invalid) return values[i];
         return values.insertAt(keys.insertSorted(key),V());
     }
 
     template<Type KK> V take(const KK& key) {
-        int i=keys.indexOf(key); assert_(i>=0,"'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i=keys.indexOf(key); assert_(i!=invalid,"'"_+str(key)+"' not in {"_,keys,"}"_);
         keys.removeAt(i); return values.take(i);
     }
     template<Type KK> void remove(const KK& key) {
-        int i=keys.indexOf(key); assert_(i>=0,"'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i=keys.indexOf(key); assert_(i!=invalid,"'"_+str(key)+"' not in {"_,keys,"}"_);
         keys.removeAt(i); values.removeAt(i);
     }
 

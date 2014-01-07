@@ -63,6 +63,8 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ 	size_t;
+constexpr size_t invalid = -1; // Invalid index
+
 //namespace std { generic struct initializer_list { const T* data; size_t len; const T* begin() const { return data; } size_t size() { return len; } }; }
 #include <initializer_list>
 generic struct ref;
@@ -145,9 +147,9 @@ generic struct ref {
         return true;
     }
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    int indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
+    size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
-    bool contains(const T& key) const { return indexOf(key)>=0; }
+    bool contains(const T& key) const { return indexOf(key)!=invalid; }
 
     const T* data = 0;
     size_t size = 0;
@@ -168,15 +170,3 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
 generic T sum(const ref<T>& a) { T sum=0; for(const T& e: a) sum += e; return sum; }
-
-// Integer operations
-/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
-inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
-/// Returns whether an integer is a power of two
-inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
-/// Returns floor(log2(v))
-//inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
-/// Computes the next highest power of 2
-inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }

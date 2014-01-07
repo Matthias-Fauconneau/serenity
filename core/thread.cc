@@ -24,7 +24,7 @@ template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 // Poll
 void Poll::registerPoll() {
     Locker lock(thread.lock);
-    if(thread.unregistered.contains(this)) { thread.unregistered.removeAll(this); }
+    if(thread.unregistered.contains(this)) { thread.unregistered.remove(this); }
     else if(!thread.contains(this)) thread<<this;
     thread.post(); // Reset poll to include this new descriptor (FIXME: only if not current)
 }
@@ -76,9 +76,9 @@ void Thread::run() {
                 }
             }
         }
-        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
+        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); remove(poll); queue.remove(poll);}
     }
-    Locker lock(threadsLock); threads.removeAll(this);
+    Locker lock(threadsLock); threads.remove(this);
     thread = 0;
 }
 
@@ -169,7 +169,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
     }
     log(message);
     exit(-1); // Signals all threads to terminate
-    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } } // Removes this thread from list
+    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
     __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(-1); // Exits this thread
 }

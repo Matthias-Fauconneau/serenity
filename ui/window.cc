@@ -48,7 +48,7 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true),
       renderer(renderer) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
-    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
+    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home())) {
@@ -335,7 +335,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
     for(;;) { uint8 type = read<uint8>();
         if(type==0) {
             XError e=read<XError>(); processEvent(0,(XEvent&)e);
-            if(e.seq==sequence) { if(pendingEvents) queue(); T t; clear((byte*)&t,sizeof(T)); return t; }
+            if(e.seq==sequence) { if(pendingEvents) queue(); T t; raw(t).clear(); return t; }
         }
         else if(type==1) {
             T reply = read<T>();
@@ -385,8 +385,8 @@ void Window::setGeometry(int2 position, int2 size) {
 Key Window::KeySym(uint8 code, uint8 state) {
     //FIXME: not atomic
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
-    array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-    if(!keysyms) error(code,state); //return (Key)0;
+    ::buffer<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
+    if(!keysyms) error(code,state);
     if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
     return (Key)keysyms[state&1 && keysyms.size>=2];
 }
