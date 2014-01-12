@@ -165,7 +165,7 @@ void Window::event() {
         lock.unlock();
         processEvent(type, e);
     }
-    while(eventQueue) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
+    while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     if(/*revents==IDLE &&*/ needUpdate) {
         needUpdate = false;
         /*if(autoResize) {
@@ -343,7 +343,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
             if(pendingEvents) queue();
             return reply;
         }
-        else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; pendingEvents=true; } // Queues events to avoid reentrance
+        else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
 void Window::render() { needUpdate=true; if(mapped) queue(); }
@@ -440,6 +440,7 @@ String Window::getSelection(bool clipboard) {
         uint8 type = read<uint8>();
         if((type&0b01111111)==SelectionNotify) { read<XEvent>(); break; }
         eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())};
+        semaphore.release(1);
         pendingEvents = true;
     }
     if(pendingEvents) queue();

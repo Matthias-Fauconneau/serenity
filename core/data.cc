@@ -139,9 +139,9 @@ int TextData::integer(bool sign) {
     return toInteger(s, 10);
 }
 
-uint TextData::mayInteger(bool sign) {
-    string s = whileInteger(sign);
-    return s?toInteger(s, 10):-1;
+uint TextData::mayInteger(uint defaultValue) {
+    string s = whileInteger();
+    return s ? toInteger(s, 10): defaultValue;
 }
 
 string TextData::whileHexadecimal() {

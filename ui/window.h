@@ -158,6 +158,8 @@ struct Window : Socket, Poll {
 
     struct QEvent { default_move(QEvent); uint8 type; unique<XEvent> event; };
     array<QEvent> eventQueue;
+    Semaphore semaphore;
+
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);
 };
