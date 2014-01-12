@@ -148,7 +148,7 @@ struct PitchEstimation {
 
     PitchEstimation() {
         assert_(rate==96000, audio.rate);
-        assert_(((audio.size/2+4*rate)/rate)/5>=uint(1+(highKey+1)-lowKey), uint(1+(highKey+1)-lowKey), (audio.size/2/rate));
+        assert_(((audio.size+4*rate)/rate)/5>=uint(1+(highKey+1)-lowKey), uint(1+(highKey+1)-lowKey), audio.size/(5*rate));
 
         window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
         window.localShortcut(Escape).connect([]{exit();});
@@ -161,7 +161,7 @@ struct PitchEstimation {
     void next() {
         if(fail) return;
         t+=periodSize;
-        for(; t<=audio.size/2-14*N; t+=periodSize) {
+        for(; t<=audio.size-14*N; t+=periodSize) {
             const uint sync = highKey==(uint)parseKey("A6"_) ? rate/32 : 0; // Sync with benchmark
             if(t>5*rate && (t+sync+periodSize)/rate/5 != (t+sync)/rate/5) {
                 if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; } // Checks for missed note
@@ -181,9 +181,14 @@ struct PitchEstimation {
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
-            const float confidenceThreshold = 1./9; // Relative harmonic energy (i.e over current period energy)
-            const float ambiguityThreshold = 1./21; // 1- Energy of second candidate relative to first
-            const float threshold = 1./25;
+            float confidenceThreshold = 1./10; //9-10 Relative harmonic energy (i.e over current period energy)
+            float ambiguityThreshold = 1./21; // 1- Energy of second candidate relative to first
+            float threshold = 1./24; // 19-24
+            float offsetThreshold = 1./2;
+            if(f < 13) { // Strict threshold for ambiguous bass notes
+                threshold = 1./21;
+                offsetThreshold = 0.43;
+            }
 
             float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
             float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
@@ -207,7 +212,8 @@ struct PitchEstimation {
                         : "X"_)
                     );
 
-                if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold) {
+                if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold
+                        && abs(offsetF0)<offsetThreshold) {
 
                     if(expectedKey==key) {
                         success++;

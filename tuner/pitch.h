@@ -21,9 +21,10 @@ struct PitchEstimator : FFT {
     const uint minNum = 26;
     const uint minDen = 79;
     // Conditions for F1 override
+    const uint minHighPeakRank = 27;
     const uint minHighPeak = 506;
     const uint minHighPeakNum = 83;
-    const uint minHighPeakDen = 640;
+    const uint minHighPeakDen = 637; // 640
 
     struct Peak {
         uint f;
@@ -85,11 +86,13 @@ struct PitchEstimator : FFT {
         {uint last=0; for(uint f: byFrequency) { distance << f-last; last=f; }} // Compute distances
         uint medianF0 = ::median(distance);
         // Corrects outlying fundamental estimate from median
-        if(highPeak && highPeak/medianF0>26) {
+        if(highPeak && highPeak/medianF0>=minHighPeakRank) {
             medianF0 = highPeak;
             for(const auto& peak: peaks.slice(max<int>(0,peaks.size-5))) {
+                //log_(str(peak.f)+"  "_);
                 if(peak.f >= highPeak*minHighPeakNum/minHighPeakDen && peak.f >= minHighPeakNum && peak.f<medianF0) medianF0=peak.f;
             }
+            //log("\thighPeak ->", F1, medianF0, highPeak, highPeak*minHighPeakNum/minHighPeakDen);
             F1=highPeak;
         } else {
             if(byFrequency.last()/medianF0>=lastHarmonicRank && byFrequency.last()>=lastHarmonicFrequency

@@ -12,7 +12,7 @@ struct Resampler {
     /// Stores \a sourceSize samples to the resampling buffer
     void write(const ref<float2>& source);
     /// Returns available output size
-    uint available();
+    size_t available();
     /// Convolves buffered samples with the resampling kernel to produce \a targetSize samples
     /// \note If mix is true, samples are mixed with \a target (instead of overwriting the \a target buffer).
     template<bool mix=false> void read(const mref<float2>& target);

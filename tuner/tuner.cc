@@ -3,7 +3,6 @@
 #include "time.h"
 #include <fftw3.h> //fftw3f
 #include "pitch.h"
-#include "sequencer.h"
 #include "audio.h"
 #include "display.h"
 #include "text.h"
@@ -40,9 +39,9 @@ struct Tuner : Poll {
     uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
 
     // Analysis
-    float confidenceThreshold = 9; // 1/ Relative harmonic energy (i.e over current period energy)
+    float confidenceThreshold = 10; // 1/ Relative harmonic energy (i.e over current period energy)
     float ambiguityThreshold = 21; // 1-1/ Energy of second candidate relative to first
-    float threshold = 25; // Product of confidence and ambiguity
+    float threshold = 24; // Product of confidence and ambiguity
 
     PitchEstimator estimator {N};
     int lastKey = -1;
@@ -83,25 +82,24 @@ struct Tuner : Poll {
 #if TEST
     uint t = 0;
     void feed() {
-        const uint size = periodSize;
-        if(t+size > audio.data.size/2) { exit(); return; }
-        const int32* period = audio.data + t*2;
-        write(period, size);
-        t += size;
-        timer.setRelative(size*1000/rate/8); // 8xRT
+        if(t+periodSize > audio.size) { exit(); return; }
+        const ref<int2> period = audio.slice(t, periodSize);
+        write(period);
+        t += period.size;
+        timer.setRelative(period.size*1000/rate/8); // 8xRT
     }
 #endif
-    uint write(const int32* input, uint size) {
-        writeCount.acquire(size); // Will overflow if processing thread doesn't follow
-        assert(writeIndex+size<=signal.size);
-        for(uint i: range(size)) signal[writeIndex+i] = input[i*2+0] * 0x1p-24;
-        writeIndex = (writeIndex+size)%signal.size; // Updates ring buffer pointer
-        readCount.release(size); // Releases new samples
+    uint write(const ref<int2>& input) {
+        writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow
+        assert(writeIndex+input.size<=signal.size);
+        for(uint i: range(input.size)) signal[writeIndex+i] = input[i][0] * 0x1p-24; // Left channel only
+        writeIndex = (writeIndex+input.size)%signal.size; // Updates ring buffer pointer
+        readCount.release(input.size); // Releases new samples
         queue(); // Queues processing thread
-        return size;
+        return input.size;
     }
     void event() {
-        if(readCount>2*periodSize) { // Skips frames (reduces overlap) when lagging too far behind input
+        if(readCount>int(2*periodSize)) { // Skips frames (reduces overlap) when lagging too far behind input
             readCount.acquire(periodSize); periods++; skipped++;
             readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
             writeCount.release(periodSize); // Releases free samples
@@ -121,11 +119,20 @@ struct Tuner : Poll {
         float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
                 && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
                     estimator.candidates[0].key / estimator.candidates[1].key : 0;
+        int key = f > 0 ? round(pitchToKey(f*rate/N)) : 0;
+        float expectedF = f > 0 ? keyToPitch(key)*N/rate : 0;
+        const float offset = f > 0 ? 12*log2(f/expectedF) : 0;
 
-        if(confidence > 1./confidenceThreshold/2 && 1-ambiguity > 1./ambiguityThreshold/2 && confidence*(1-ambiguity) > 1./threshold/2) {
-            int key = round(pitchToKey(f*rate/N));
-            float expectedF = keyToPitch(key)*N/rate;
-            const float offset =  12*log2(f/expectedF);
+        float confidenceThreshold = this->confidenceThreshold;
+        float ambiguityThreshold = this->ambiguityThreshold;
+        float threshold = this->threshold;
+        float offsetThreshold = 1./2;
+        if(f < 13) { // Stricter thresholds for ambiguous bass notes
+            threshold = 21;
+            offsetThreshold = 0.43;
+        }
+        if(confidence > 1./confidenceThreshold/2 && 1-ambiguity > 1./ambiguityThreshold/2 && confidence*(1-ambiguity) > 1./threshold/2
+                && abs(offset)<offsetThreshold ) {
 
             this->key.setText(strKey(key));
             {if(key!=lastKey) keyOffset = offset; // Resets on key change
@@ -140,7 +147,7 @@ struct Tuner : Poll {
                 float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
                 float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
                 {int k = this->worstKey;
-                    for(uint i: range(3, keyCount-2))
+                    for(uint i: range(keyCount))
                         if(  k<0 ||
                              abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
                              abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;

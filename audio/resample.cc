@@ -130,8 +130,8 @@ void Resampler::write(const ref<float2>& source) {
      assert(writeIndex<bufferSize);
 }
 
-uint Resampler::available() {
-    uint available = ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate;
+size_t Resampler::available() {
+    size_t available = ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate;
     assert_(int(available)>=0 && (need(available)==0 || (sourceRate>targetRate && need(available)==-1)));
     return available;
 }
