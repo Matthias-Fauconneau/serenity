@@ -17,7 +17,7 @@ struct OffsetPlot : Widget {
         for(uint i: range(keyCount)) s << str(offsets[i]*100) << " "_ << str(sqrt(variances[i])*100) << "\n"_;
         writeFile("offsets.profile"_, s, config());
     }
-    void reset() { clear(offsets, keyCount); clear(variances, keyCount); }
+    void reset() { mref<float>(offsets).clear(); mref<float>(variances).clear(); }
     int2 sizeHint() { return int2(keyCount*12, -236); }
     void render(int2 position, int2 size) {
         float minimumOffset = -1./4;

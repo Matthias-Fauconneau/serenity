@@ -16,7 +16,7 @@ struct AudioFile {
 
     buffer<int2> intBuffer;
     buffer<float2> floatBuffer;
-    uint bufferIndex=0, bufferSize=0;
+    size_t bufferIndex=0, bufferSize=0;
 
     AudioFile();
     ~AudioFile() { close(); }
@@ -33,10 +33,8 @@ struct AudioFile {
     void seek(uint position);
 };
 
-/*struct Audio {
-    uint channels;
+struct Audio : buffer<int2> {
+    Audio(buffer&& data, uint rate):buffer(move(data)),rate(rate){}
     uint rate;
-    buffer<int2> data;
 };
-Audio decodeAudio(const string& path, uint duration=-1);*/
-//Audio decodeAudio(buffer<byte>&& data);
+Audio decodeAudio(const string& path, uint duration=-1);

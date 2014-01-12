@@ -1,5 +1,6 @@
 #pragma once
 #include "memory.h"
+#include "vector.h"
 /// \file flac.h High performance FLAC decoder
 
 /// Decodes packed bitstreams
@@ -25,7 +26,6 @@ struct BitReader {
     void setData(const ref<byte>& buffer);
 };
 
-typedef float float2 __attribute((vector_size(8)));
 struct FLAC : BitReader {
     buffer<float2> audio {1<<16,0};
     uint writeIndex = 0;
@@ -42,10 +42,10 @@ struct FLAC : BitReader {
     /// Decodes next FLAC frame
     void decodeFrame();
     /// Reads \a size samples synchronously buffering new frames as needed
-    uint read(float2* out, uint size);
+    uint read(mref<float2> out);
 };
 inline FLAC copy(const FLAC& o) { FLAC t; t.data=o.data, t.bsize=o.bsize, t.index=o.index, t.audio=copy(o.audio), t.writeIndex=o.writeIndex, t.readIndex=o.readIndex, t.blockSize=o.blockSize, t.rate=o.rate, t.channelMode=o.channelMode, t.sampleSize=o.sampleSize, t.position=o.position, t.duration=o.duration; return t; }
 
-struct Audio { buffer<float2> data; uint rate; };
+struct Audio : buffer<float2> { Audio(buffer&& data, uint rate):buffer(move(data)),rate(rate){} uint rate; };
 /// Decodes a full audio file
 Audio decodeAudio(const ref<byte>& data, uint duration=-1);

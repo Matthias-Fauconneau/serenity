@@ -94,18 +94,18 @@ void Encoder::writeVideoFrame(const Image &image) {
     videoTime++;
     while(audioStream && videoTime*rate >= audioTime*fps) {
         const uint audioSize = 1024;
-        buffer<short2> audio(audioSize);
+        buffer<float2> audio(audioSize);
         audio.size = readAudio(audio);
         assert_(audio.size == audio.capacity);
         writeAudioFrame(audio);
     }
 }
 
-void Encoder::writeAudioFrame(const ref<short2>& audio) {
+void Encoder::writeAudioFrame(const ref<float2>& audio) {
     assert_(audioStream && audio.size==1024,"Unsupported audio period length: Expected 1024 frames, got ", audio.size);
     AVFrame *frame = avcodec_alloc_frame();
     frame->nb_samples = audio.size;
-    avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * 2 * sizeof(int16), 1);
+    avcodec_fill_audio_frame(frame, 2, AV_SAMPLE_FMT_FLT, (uint8*)audio.data, audio.size * 2 * sizeof(float), 1);
     frame->pts = audioTime;
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;

@@ -22,8 +22,8 @@ struct Note {
     ref<float> envelope; //to level release sample
     /// Decodes frames until \a available samples is over \a need
     void decode(uint need);
-    /// Reads \a size samples to be mixed into \a out and returns true when decayed
-    void read(v4sf* out, uint size);
+    /// Reads samples to be mixed into \a output
+    void read(const mref<float2>& output);
     /// Computes sum of squares on the next \a size samples (to compute envelope)
     float sumOfSquares(uint size);
     /// Computes actual sound level on the next \a size samples (using precomputed envelope)
@@ -46,7 +46,7 @@ struct Sampler : Poll {
         float shift;
         array<Note> notes; // Active notes (currently being sampled) in this layer
         Resampler resampler; // Resampler to shift pitch
-        buffer<float> audio; // Buffer to mix notes before resampling
+        buffer<float2> audio; // Buffer to mix notes before resampling
     };
     array<Layer> layers;
 
@@ -59,7 +59,7 @@ struct Sampler : Poll {
 
     /// Convolution reverb
     bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
-    uint reverbSize=0; // Reverb filter size
+    //uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
     buffer<float> reverbBuffer[2]; // Mixer output in time-domain
@@ -95,9 +95,8 @@ struct Sampler : Poll {
     void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
-    uint read(int32* output, uint size);
-    uint read(float* output, uint size);
-    uint read16(int16* output, uint size);
+    //uint read(const mref<int2>& output);
+    uint read(const mref<float2>& output);
 
     /// Signals when all samples are done playing
     signal<> silence;

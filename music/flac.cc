@@ -1,7 +1,6 @@
 #include "flac.h"
 #include "thread.h" // setExceptions
-
-#define swap64 __builtin_bswap64
+#include "data.h"
 
 void BitReader::setData(const ref<byte>& buffer) { data=buffer.data; bsize=8*buffer.size; index=0; }
 
@@ -12,7 +11,7 @@ uint BitReader::bit() { uint8 bit = uint8(data[index/8]<<(index&7))>>7; index++;
 uint BitReader::binary(int size) {
     assert(size<=32);//48
     assert(index<bsize);
-    uint value = (swap64(*(uint64*)(data+index/8)) << (index&7)) >> int8(64-size);
+    uint value = (big64(*(uint64*)(data+index/8)) << (index&7)) >> int8(64-size);
     index += size;
     return value;
 }
@@ -20,7 +19,7 @@ uint BitReader::binary(int size) {
 int BitReader::sbinary(int size) {
     assert(size<=32);//48
     assert(index<bsize);
-    int64 word = swap64(*(uint64*)(data+index/8)) << (index&7);
+    int64 word = big64(*(uint64*)(data+index/8)) << (index&7);
     index += size;
     return word>>int8(64-size);
 }
@@ -29,11 +28,11 @@ static uint8 log2i[256];
 uint BitReader::unary() {
     assert(index<bsize);
     // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
-    uint64 w = swap64(*(uint64*)(data+index/8)) << (index&7);
+    uint64 w = big64(*(uint64*)(data+index/8)) << (index&7);
     uint size=0;
     if(!w) {
         size+=64-(index&7);
-        w = swap64(*(uint64*)(data+index/8+8));
+        w = big64(*(uint64*)(data+index/8+8));
     }
     assert(w);
     uint8 b=w>>(64-8);
@@ -264,19 +263,19 @@ void FLAC::decodeFrame() {
     //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }
 
-uint FLAC::read(float2 *out, uint size) {
-    while(audio.size<size){ if(blockSize==0) { size=audio.size; break; } decodeFrame(); }
+uint FLAC::read(mref<float2> out) {
+    while(audio.size<out.size){ if(blockSize==0) { out.size=audio.size; break; } decodeFrame(); }
     uint beforeWrap = audio.capacity-readIndex;
-    if(size>beforeWrap) {
-        rawCopy(out,audio+readIndex,beforeWrap);
-        rawCopy(out+beforeWrap,audio+0,size-beforeWrap);
-        readIndex=size-beforeWrap;
+    if(out.size>beforeWrap) {
+        copy(out.slice(0, beforeWrap), audio.slice(readIndex, beforeWrap));
+        copy(out.slice(beforeWrap), audio.slice(0, out.size-beforeWrap));
+        readIndex=out.size-beforeWrap;
     } else {
-        rawCopy(out,audio+readIndex,size);
-        readIndex+=size;
+        copy(out, audio.slice(readIndex, out.size));
+        readIndex+=out.size;
     }
-    audio.size-=size; position+=size;
-    return size;
+    audio.size -= out.size; position += out.size;
+    return out.size;
 }
 
 Audio decodeAudio(const ref<byte>& data, uint duration) {

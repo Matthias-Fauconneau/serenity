@@ -80,7 +80,7 @@ static Variant parseVariant(TextData& s) {
                 byte* dst = stream.begin(); // in-place
                 int predictor = v.dict.at("DecodeParms"_).dict.value("Predictor"_,1);
                 if(predictor>=10) { // PNG predictor
-                    uint8 prior[width]; clear(prior,width);
+                    uint8 prior[width]; mref<uint8>(prior, width).clear();
                     for(uint unused y: range(height)) {
                         uint filter = *src++; assert(filter<=4,"Unknown PNG filter",filter);
                         uint8 a=0;

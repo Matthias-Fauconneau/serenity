@@ -270,7 +270,7 @@ struct Music {
         midi.endOfFile.connect([this,&endOfFile]{ sampler.silence.connect([&endOfFile]{ endOfFile=true; }); });
         assert_(!play);
         togglePlay();
-        Encoder encoder {{&sampler, &Sampler::read16}};
+        Encoder encoder {{&sampler, &Sampler::read}};
         assert_(name);
         encoder.start(name);
         int lastReport=0;

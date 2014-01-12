@@ -31,7 +31,7 @@ generic struct mref : ref<T> {
     mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
 
     /// Initializes buffer using the same constructor for all elements
-    template<Type... Args> void clear(Args... args) { for(size_t i: range(size)) new (&at(i)) T(args...); }
+    template<Type... Args> void clear(Args... args) const { for(size_t i: range(size)) new (&at(i)) T(args...); }
 
     using ref<T>::data;
     using ref<T>::size;

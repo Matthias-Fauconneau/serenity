@@ -123,7 +123,6 @@ struct PitchEstimation {
     // Input
     const uint lowKey=parseKey(arguments()[0])-12, highKey=parseKey(arguments()[1])-12;
     Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
-    ref<int32> stereo = audio.data;
     const uint rate = audio.rate;
 
     // Signal
@@ -149,8 +148,7 @@ struct PitchEstimation {
 
     PitchEstimation() {
         assert_(rate==96000, audio.rate);
-        assert_(audio.channels==2, audio.channels);
-        assert_(((stereo.size/2+4*rate)/rate)/5>=uint(1+(highKey+1)-lowKey), uint(1+(highKey+1)-lowKey), (stereo.size/2/rate));
+        assert_(((audio.size/2+4*rate)/rate)/5>=uint(1+(highKey+1)-lowKey), uint(1+(highKey+1)-lowKey), (audio.size/2/rate));
 
         window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
         window.localShortcut(Escape).connect([]{exit();});
@@ -163,7 +161,7 @@ struct PitchEstimation {
     void next() {
         if(fail) return;
         t+=periodSize;
-        for(; t<=stereo.size/2-14*N; t+=periodSize) {
+        for(; t<=audio.size/2-14*N; t+=periodSize) {
             const uint sync = highKey==(uint)parseKey("A6"_) ? rate/32 : 0; // Sync with benchmark
             if(t>5*rate && (t+sync+periodSize)/rate/5 != (t+sync)/rate/5) {
                 if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; } // Checks for missed note
@@ -172,9 +170,9 @@ struct PitchEstimation {
             }
 
             // Prepares new period
-            const int32* period = stereo + t*2;
+            const ref<int2> period = audio.slice(t, periodSize);
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
-            for(uint i: range(periodSize)) signal[N-periodSize+i] = period[i*2+0] * 0x1p-24;
+            for(uint i: range(periodSize)) signal[N-periodSize+i] = period[i][0] * 0x1p-24; // Left channel only
 
             // Benchmark
             if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)

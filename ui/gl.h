@@ -81,6 +81,7 @@ struct GLVertexBuffer {
     uint vertexCount = 0;
     uint vertexSize = 0;
 };
+#undef offsetof
 #define offsetof __builtin_offsetof
 
 struct GLIndexBuffer {

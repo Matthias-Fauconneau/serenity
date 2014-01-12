@@ -153,11 +153,10 @@ void AudioFile::close() {
     if(file) avformat_close_input(&file);
 }
 
-/*Audio decodeAudio(const string& path, uint duration) {
+Audio decodeAudio(const string& path, uint duration) {
     AudioFile file; file.openPath(path);
     duration = min(duration, file.duration);
-    uint size = duration*file.channels;
-    Audio audio {file.channels, file.rate, buffer<int32>(size)};
-    audio.data.size = file.read(audio.data.begin(), duration) * file.channels;
+    Audio audio {buffer<int2>(duration), file.rate};
+    audio.size = file.read(audio);
     return audio;
-}*/
+}
