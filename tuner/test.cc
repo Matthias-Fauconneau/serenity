@@ -20,20 +20,6 @@ int parseKey(const string& name) {
     return key;
 }
 
-void writeWaveFile(const string& path, const ref<int32>& data, int32 rate, int channels) {
-    File file(path,home(),Flags(WriteOnly|Create|Truncate));
-    struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
-             int32 headerSize=16; int16 compression=1; int16 channels; int32 rate; int32 bps;
-                  int16 stride; int16 bitdepth=32; char data[4]={'d','a','t','a'}; } packed header;
-    header.size = sizeof(header) + data.size*sizeof(int32);
-    header.channels = channels;
-    header.rate = rate;
-    header.bps = rate*channels*sizeof(int32);
-    header.stride = channels*sizeof(int32);
-    file.write(raw(header));
-    file.write(cast<byte>(data));
-}
-
 struct Plot : Widget {
     const bool logx, logy; // Whether to use log scale on x/y axis
     const float resolution; // Resolution in bins / Hz

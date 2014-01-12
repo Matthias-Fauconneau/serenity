@@ -99,3 +99,4 @@ music/encoder.h
 music/encoder.cc
 music/flac.cc
 music/flac.h
+tuner/stretch.cc
