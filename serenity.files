@@ -72,6 +72,7 @@ audio/ffmpeg.h
 
 player.cc
 
+tuner/fft.h
 tuner/list.h
 tuner/pitch.h
 tuner/tuner.cc
@@ -100,3 +101,5 @@ music/encoder.cc
 music/flac.cc
 music/flac.h
 tuner/stretch.cc
+tuner/fft.cc
+tuner/pitch.cc

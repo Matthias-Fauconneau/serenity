@@ -34,12 +34,16 @@ uint localMaximum(ref<float> spectrum, uint start) {
 
 struct StretchEstimation : Poll, Widget {
     // Input
-    array<String> samples = Folder("Samples"_).list(Files);
+    //static constexpr uint rate = 96000;
+    //const string path = "/Samples"_;
+    static constexpr uint rate = 48000;
+    //const string path = "/Samples/Blanchet"_;
+    const string path = "/Samples/Salamander"_;
+    array<String> samples = Folder(path).list(Files);
     AudioFile file;
     buffer<float> signal {N,N,0};
 
     // Analysis
-    static constexpr uint rate = 96000;
     static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
     static constexpr uint periodSize = 4096;
     PitchEstimator estimator {N};
@@ -69,8 +73,9 @@ struct StretchEstimation : Poll, Widget {
                 while(!file) {
                     if(!samples) return;
                     TextData s = samples.pop();
-                    if(parseKey(s)>=0 && s.match("-"_) && parseKey(s)>=0)
-                        file.openPath("/Samples/"_+s.buffer);
+                    if(endsWith(s.buffer,".flac"_))
+                        //if(parseKey(s)>=0 && s.match("-"_) && parseKey(s)>=0)
+                        file.openPath(path+"/"_+s.buffer);
                 }
                 assert_(file.rate==rate);
             }
@@ -97,10 +102,10 @@ struct StretchEstimation : Poll, Widget {
 
             int key = f > 0 ? round(pitchToKey(f*rate/N)) : 0;
             float keyF0 = f > 0 ? keyToPitch(key)*N/rate : 0;
-            const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
+            const float offsetF1 = f > 0 ? 12*log2(f/keyF0) : 0;
 
             if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold
-                    && abs(offsetF0)<offsetThreshold) {
+                    && abs(offsetF1)<offsetThreshold) {
                 float f1 = f;
                 float f2 = estimator.F0*(2+estimator.B*cb(2));
 #if 0 // Overrides least square fit with a direct estimation from spectrum peaks
@@ -113,8 +118,7 @@ struct StretchEstimation : Poll, Widget {
                 f1 = target;
                 f2 = target*(2+estimator.B*cb(2));
 #endif
-                /*log(strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_+dec(round(100*offsetF0),2) +" c\t"_+str(f1)+" "_+str(f2)+"\t"_
-                                            +str(12*log2(f1/keyF0))+" "_+str(12*log2(f2/(2*keyF0))));*/
+                log(strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_+dec(round(100*offsetF1),2) +" c\t"_+dec(round(100*12*log2(f2/(2*f1))))+" c\t"_);
                 if(key>=21 && key<21+keyCount) {
                     F1[key-21] << f1;
                     F2[key-21] << f2;

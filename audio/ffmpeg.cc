@@ -78,11 +78,13 @@ uint AudioFile::read(const mref<int2>& output) {
                         intBuffer[i][1] = ((int16*)frame->data[1])[i]<<16;
                     }
                 }
-                /*else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    error("AV_SAMPLE_FMT_S16"_);
-                    intBuffer = buffer<int>(bufferSize*channels);
-                    for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int16*)frame->data[0])[i]<<16;
-                }*/
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    intBuffer = buffer<int2>(bufferSize);
+                    for(uint i : range(bufferSize)) {
+                        intBuffer[i][0] = ((int16*)frame->data[0])[i*2+0]<<16;
+                        intBuffer[i][1] = ((int16*)frame->data[0])[i*2+1]<<16;
+                    }
+                }
                 else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
