@@ -21,27 +21,35 @@ int parseKey(const string& name) {
 }
 
 struct Plot : Widget {
-    const bool logx, logy; // Whether to use log scale on x/y axis
+    static constexpr bool logx = false, logy = true; // Whether to use log scale on x/y axis
     const float resolution; // Resolution in bins / Hz
-    uint iMin = 0, iMax = 0; // Displayed range in bins
-    ref<float> spectrum; // Displayed power spectrum
-    ref<float> unfilteredSpectrum; // Displayed power spectrum
+    static constexpr uint iMin = 0;
+    const uint iMax; // Displayed range in bins
     // Additional analysis data
-    const PitchEstimator& estimator;
-    float expectedF = 0;
+    const buffer<float> spectrum; // Displayed power spectrum
+    const buffer<float> unfilteredSpectrum; // Displayed power spectrum
+    const float periodPower;
+    list<PitchEstimator::Peak, 16> peaks;
+    list<PitchEstimator::Candidate, 2> candidates;
+    const uint F1, nHigh;
+    const uint expectedKey;
+    const float expectedF;
 
-    Plot(bool logx, bool logy, float resolution, ref<float> spectrum, ref<float> unfilteredSpectrum, const PitchEstimator& estimator):
-        logx(logx),logy(logy),resolution(resolution),spectrum(spectrum),unfilteredSpectrum(unfilteredSpectrum),estimator(estimator){}
+    Plot(float resolution, uint iMax, buffer<float>&& spectrum, buffer<float>&& unfilteredSpectrum, float periodPower,
+         list<PitchEstimator::Peak, 16>&& peaks, list<PitchEstimator::Candidate, 2>&& candidates, uint F1, uint nHigh,
+         uint expectedKey, float expectedF) :
+        resolution(resolution), iMax(iMax), spectrum(move(spectrum)), unfilteredSpectrum(move(unfilteredSpectrum)), periodPower(periodPower),
+        peaks(move(peaks)), candidates(move(candidates)), F1(F1), nHigh(nHigh), expectedKey(expectedKey), expectedF(expectedF) {}
     float x(float f) { return logx ? (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)) : (float)(f-iMin)/(iMax-iMin); }
     void render(int2 position, int2 size) {
-        assert_(iMin < iMax && iMax <= spectrum.size, iMin, iMax, spectrum.size);
+        assert_(iMin < iMax && iMax <= spectrum.size, iMax, spectrum.size);
         if(iMin >= iMax) return;
-        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, unfilteredSpectrum[i]);
-        float sMin = estimator.periodPower;
+        float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
+        float sMin = periodPower;
 
-        {float y = (logy ? (log2(estimator.noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
+        {float y = (logy ? (log2(PitchEstimator::noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
             line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
-        {float y = (logy ? (log2(estimator.highPeakThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
+        {float y = (logy ? (log2(PitchEstimator::highPeakThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
             line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
 
         for(uint i: range(iMin, iMax)) { // Unfiltered energy density
@@ -59,7 +67,7 @@ struct Plot : Widget {
             fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
         }
 
-        for(PitchEstimator::Peak peak: estimator.peaks) { // Peaks
+        for(PitchEstimator::Peak peak: peaks) { // Peaks
             float f = peak.f;
             float x = this->x(f+0.5)*size.x;
             line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1./4));
@@ -68,16 +76,16 @@ struct Plot : Widget {
         }
 
         { // F1
-            float f = estimator.F1;
+            float f = F1;
             float x = this->x(f+0.5)*size.x;
             //line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1));
-            Text label(str(estimator.nHigh),16, vec4(1,1,1,1));
+            Text label(str(nHigh),16, vec4(1,1,1,1));
             label.render(int2(position.x+x,position.y+16));
         }
 
-        for(uint i: range(estimator.candidates.size)) {
-            const auto& candidate = estimator.candidates[i];
-            bool best = i==estimator.candidates.size-1;
+        for(uint i: range(candidates.size)) {
+            const auto& candidate = candidates[i];
+            bool best = i==candidates.size-1;
             vec4 color(!best,best,0,1);
 
             Text label(dec(candidate.f0)+" "_+dec(round(1000*12*2*log2(1+3*(candidate.B>-1?candidate.B:0))))+" m\t"_, 16,  vec4(color.xyz(),1.f));
@@ -105,65 +113,34 @@ struct Plot : Widget {
 };
 
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
-struct PitchEstimation {
-    // Input
-    const uint lowKey=parseKey(arguments()[0])-12, highKey=parseKey(arguments()[1])-12;
-    Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
-    const uint rate = audio.rate;
+struct PitchEstimation : Poll {
+        // Input
+        const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
+        Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
+        const uint rate = audio.rate;
+        uint t=0;
 
-    // Signal
-    uint t=0;
-    buffer<float> signal {N};
+        // Analysis
+        static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
+        const uint periodSize = 4096;
+        buffer<float> signal {N};
+        PitchEstimator estimator {N};
 
-    // Analysis
-    static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
-    const uint periodSize = 4096;
-    PitchEstimator estimator {N};
-
-    // UI
-    Plot plot {false, true, (float)N/rate, estimator.filteredSpectrum, estimator.spectrum, estimator};
-    Window window {&plot, int2(1050, 1680/2), "Test"_};
-
-    // Results
-    int expectedKey = highKey+1;
-    int previousKey = 0;
-    int lastKey = highKey+1;
-    uint success = 0, fail=0, tries = 0, total=0;
-    Time totalTime;
-    float minB = inf, maxB = 0;
-
-    PitchEstimation() {
-        assert_(rate==96000, audio.rate);
-        assert_(((audio.size+4*rate)/rate)/5>=uint(1+(highKey+1)-lowKey), uint(1+(highKey+1)-lowKey), audio.size/(5*rate));
-
-        window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
-        window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(Key(' ')).connect(this, &PitchEstimation::next);
-        window.frameSent.connect(this, &PitchEstimation::next);
-
-        next();
-    }
-
-    void next() {
-        if(fail) return;
-        t+=periodSize;
-        for(; t<=audio.size-14*N; t+=periodSize) {
-            const uint sync = highKey==(uint)parseKey("A6"_) ? rate/32 : 0; // Sync with benchmark
-            if(t>5*rate && (t+sync+periodSize)/rate/5 != (t+sync)/rate/5) {
-                if(lastKey != expectedKey) { fail++; log("False negative", strKey(expectedKey)); break; } // Checks for missed note
-                assert_(minB<inf, minB);
-                maxB = max(maxB, minB); minB=inf;
+        // Results
+        int expectedKey = highKey+1;
+        uint success = 0, fail=0, tries = 0, total=0;
+        PitchEstimation() { queue(); }
+        void event() {
+            if(t>min<uint>(audio.size-periodSize,(highKey-lowKey)*2*rate)) {
+                log(fail, "/"_, tries, dec(round(100.*fail/tries))+"%"_);
+                return;
             }
-
             // Prepares new period
             const ref<int2> period = audio.slice(t, periodSize);
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
             for(uint i: range(periodSize)) signal[N-periodSize+i] = period[i][0] * 0x1p-24; // Left channel only
-
-            // Benchmark
-            if(t<5*rate) continue; // First 5 seconds are silence (let input settle, use for noise profile if necessary)
-            expectedKey = highKey+1 - (t+sync)/rate/5; // Recorded one key every 5 seconds from high key to low key
-
+            t+=periodSize;
+            if(t<N) { queue(); return; } // Fills complete window
             for(uint i: range(N)) estimator.windowed[i] = estimator.window[i] * signal[i];
             float f = estimator.estimate();
 
@@ -181,38 +158,31 @@ struct PitchEstimation {
                     && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
                         estimator.candidates[0].key / estimator.candidates[1].key : 0;
             if(confidence > confidenceThreshold/2) {
-
                 int key = round(pitchToKey(f*rate/N));
+                if(key==expectedKey-1) expectedKey--; // Next key
                 float keyF0 = keyToPitch(key)*N/rate;
                 const float offsetF0 = f > 0 ? 12*log2(f/keyF0) : 0;
                 const float expectedF = keyToPitch(expectedKey)*N/rate;
-
-                log(dec((t/rate)/60,2)+":"_+dec((t/rate)%60,2,'0')+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
+                const float f1 = f;
+                const float f2 = estimator.F0*(2+estimator.B*cb(2));
+                bool confident = confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold
+                        && abs(offsetF0)<offsetThreshold;
+                log(dec(t/rate,2,'0')+"."_+dec((t*10/rate)%10)+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
                     +dec(round(100*offsetF0),2) +" c\t"_
                     +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(1-ambiguity?1./(1-ambiguity):0),2)+"\t"_
                     +dec(round((confidence*(1-ambiguity))?1./(confidence*(1-ambiguity)):0),2)+"\t"_
-                    +dec(round(100*12*2*log2(1+3*(estimator.B>-1?estimator.B:0))))+" c\t"_
+                    +dec(round(100*12*log2(f2/(2*f1))))+" c\t"_
                     +dec(estimator.medianF0)+"\t"_
-                    +(expectedKey == key ?
-                          (confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold ? "O"_ : "~"_)
-                        : "X"_)
-                    );
+                    +(expectedKey == key ? (confident ? "O"_ : "o"_) : (confident ? "X"_ : "x"_)));
 
-                if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold
-                        && abs(offsetF0)<offsetThreshold) {
-
+                if(confident) {
                     if(expectedKey==key) {
                         success++;
-                        lastKey = key;
-                        minB = min(minB, estimator.B);
                     }
                     else {
-                        fail++;
-                        plot.iMin = 0; //min(f, expectedF)/2;
-                        plot.iMax = min(uint(expectedF*16), estimator.fMax);
 
                         // FIXME: Inharmonic match on attack and release
-                        if(key==expectedKey-1 && confidence<1./3) {
+                        /*if(key==expectedKey-1 && confidence<1./3) {
                             if(expectedKey==parseKey("C2"_) && offsetF0>1./6) log("x -"_); // Mistune?
                             else if(expectedKey==parseKey("A1"_) && offsetF0>1./3 && t%(5*rate) < 2*rate) log("! -"_); // Mistune?
                             else if(expectedKey==parseKey("E1"_) && offsetF0>1./7 && t%(5*rate) > 4*rate) log("x -"_); // Release
@@ -226,18 +196,26 @@ struct PitchEstimation {
                             else if(expectedKey==parseKey("A#-1"_) && offsetF0>0) log("-"_); // Mistune?
                             else if(expectedKey==parseKey("A-1"_) && offsetF0>0) log("-"_); // Mistune?
                             else { plot.expectedF = expectedF/2; break; }
-                        } else { plot.expectedF = expectedF/2; break; }
+                        } else*/ {
+                            if(fail<1) {
+                                auto plot = new Plot (
+                                            (float)N/rate, min(uint(expectedF*16), estimator.fMax),
+                                            copy(estimator.filteredSpectrum), copy(estimator.spectrum),
+                                            estimator.periodPower, move(estimator.peaks), move(estimator.candidates),
+                                            estimator.F1, estimator.nHigh,
+                                            expectedKey, expectedF);
+                                Window& window = *(new Window(plot, int2(1050, 1680/2), strKey(plot->expectedKey)));
+                                window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
+                                window.localShortcut(Escape).connect([]{exit();});
+                                window.show();
+                            }
+                        }
+                        fail++;
                     }
                     tries++;
                 }
-                previousKey = key;
             }
             total++;
+            queue();
         }
-        if(plot.expectedF) {
-            window.setTitle(strKey(expectedKey));
-            window.render();
-            window.show();
-        } else log(100*12*2*log2(1+3*(maxB>-1?maxB:0)));
-    }
 } app;

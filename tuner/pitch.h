@@ -12,8 +12,8 @@ struct PitchEstimator : FFT {
     const uint fMin = 8, fMax = N/16; // 15 ~ 6000 Hz
     const uint iterationCount = 4; // Number of least square iterations
     const float initialInharmonicity = 0; //1./cb(24); // Initial inharmonicity
-    const float noiseThreshold = 2;
-    const float highPeakThreshold = 8;
+    static constexpr float noiseThreshold = 2;
+    static constexpr float highPeakThreshold = 8;
     const uint medianError = 4;
     const uint maxHarmonicCount = 16;
     // Conditions for median F0 override

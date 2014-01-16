@@ -131,6 +131,7 @@ generic struct ref {
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
     const T& at(size_t i) const { assert(i<size); return data[i]; }
+    T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
     const T& operator [](size_t i) const { return at(i); }
     const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
