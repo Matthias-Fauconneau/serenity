@@ -194,18 +194,18 @@ array<string> split(const string& str, byte separator) {
 
 /// Number conversions
 
-template<uint base> String utoa(uint64 n, int pad) {
+template<uint base> String utoa(uint64 n, int pad, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(64-i<pad) buf[--i] = '0';
+    while(64-i<pad) buf[--i] = padChar;
     return String(string(buf+i,64-i));
 }
-template String utoa<2>(uint64,int);
-template String utoa<16>(uint64,int);
+template String utoa<2>(uint64,int, char padChar);
+template String utoa<16>(uint64,int, char padChar);
 
 template<uint base> String itoa(int64 number, int pad, char padChar) {
     assert(base>=2 && base<=16);
@@ -221,7 +221,7 @@ template<uint base> String itoa(int64 number, int pad, char padChar) {
 }
 template String itoa<10>(int64,int,char);
 
-String ftoa(double n, int precision, int pad, int exponent, bool inf) {
+String ftoa(double n, int precision, uint pad, int exponent, bool inf) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return String("NaN"_);
     if(n==::inf) { assert_(inf); return String("inf"_); } //"∞"_
@@ -234,11 +234,11 @@ String ftoa(double n, int precision, int pad, int exponent, bool inf) {
         uint decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
-        s<<utoa(integer,pad)<<'.'<< utoa<10>(decimal,precision);
+        s<<utoa(integer)<<'.'<< utoa<10>(decimal,precision,'0');
     } else s<<utoa(round(n));
     if(exponent==3 && e==3) s<<'K';
     else if(exponent==3 && e==6) s<<'M';
     else if(exponent==3 && e==9) s<<'G';
     else if(e) s<<'e'<<itoa<10>(e);
-    return move(s);
+    return pad>s.size ? repeat(" "_,pad-s.size)+s : move(s);
 }

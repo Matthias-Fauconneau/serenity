@@ -81,7 +81,7 @@ stringz strz(const string& s);
 array<string> split(const string& str, byte separator=' ');
 
 /// Converts integers
-template<uint base=10> String utoa(uint64 number, int pad=0);
+template<uint base=10> String utoa(uint64 number, int pad=0, char padChar='0');
 template<uint base=10> String itoa(int64 number, int pad=0, char padChar=' ');
 inline String dec(int64 n, int pad=0, char padChar=' ') { return itoa<10>(n,pad,padChar); }
 inline String str(const uint8& n) { return dec(n); }
@@ -102,7 +102,7 @@ generic String str(const unique<T>& t) { return str(*t.pointer); }
 generic String str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-String ftoa(double number, int precision=2, int pad=0, int exponent=0, bool inf=true);
+String ftoa(double number, int precision=2, uint pad=0, int exponent=0, bool inf=true);
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 

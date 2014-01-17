@@ -107,7 +107,7 @@ struct Build {
                 pids.remove(pid);
             }
             {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -o"_);
-                pids << execute("/usr/bin/clang++"_,flags+toRefs(args), false);}
+                pids << execute("/usr/bin/g++-4.8"_,flags+toRefs(args), false);}
         }
         return lastLinkEdit;
     }
@@ -148,7 +148,7 @@ struct Build {
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-            if(execute("/usr/bin/clang++"_,toRefs(args))) fail();
+            if(execute("/usr/bin/g++-4.8"_,toRefs(args))) fail();
         }
         if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
     }
