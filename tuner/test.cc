@@ -11,14 +11,15 @@
 #include "profile.h"
 #include <fftw3.h> //fftw3f
 
-int parseKey(const string& name) {
-    TextData s(name);
+int parseKey(TextData& s) {
     int key=24;
+    if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
     key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
     if(s.match('#')) key++;
-    key += 12*s.decimal();
+    key += 12*s.mayInteger(4);
     return key;
 }
+int parseKey(const string& name) { TextData s(name); return parseKey(s); }
 
 struct Plot : Widget {
     static constexpr bool logx = false, logy = true; // Whether to use log scale on x/y axis
@@ -116,7 +117,7 @@ struct Plot : Widget {
 struct PitchEstimation : Poll {
         // Input
         const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
-        Audio audio = decodeAudio("/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_);
+        AudioFile audio {"/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_};
         const uint rate = audio.rate;
         uint t=0;
 
@@ -125,18 +126,19 @@ struct PitchEstimation : Poll {
         const uint periodSize = 4096;
         buffer<float> signal {N};
         PitchEstimator estimator {N};
+        int expectedKey = highKey+1;
 
         // Results
-        int expectedKey = highKey+1;
         uint success = 0, fail=0, tries = 0, total=0;
+
         PitchEstimation() { queue(); }
         void event() {
-            if(t>min<uint>(audio.size-periodSize,(highKey-lowKey)*2*rate)) {
+            // Prepares new period
+            buffer<int2> period (periodSize);
+            if(t>(highKey-lowKey)*2*rate || audio.read(period) < period.size) {
                 log(fail, "/"_, tries, dec(round(100.*fail/tries))+"%"_);
                 return;
             }
-            // Prepares new period
-            const ref<int2> period = audio.slice(t, periodSize);
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
             for(uint i: range(periodSize)) signal[N-periodSize+i] = period[i][0] * 0x1p-24; // Left channel only
             t+=periodSize;
@@ -176,39 +178,19 @@ struct PitchEstimation : Poll {
                     +(expectedKey == key ? (confident ? "O"_ : "o"_) : (confident ? "X"_ : "x"_)));
 
                 if(confident) {
-                    if(expectedKey==key) {
-                        success++;
-                    }
+                    if(expectedKey==key) success++;
                     else {
-
-                        // FIXME: Inharmonic match on attack and release
-                        /*if(key==expectedKey-1 && confidence<1./3) {
-                            if(expectedKey==parseKey("C2"_) && offsetF0>1./6) log("x -"_); // Mistune?
-                            else if(expectedKey==parseKey("A1"_) && offsetF0>1./3 && t%(5*rate) < 2*rate) log("! -"_); // Mistune?
-                            else if(expectedKey==parseKey("E1"_) && offsetF0>1./7 && t%(5*rate) > 4*rate) log("x -"_); // Release
-                            else if(expectedKey==parseKey("D#1"_) && confidence<1./5 && t%(5*rate) < rate/2) log("! -"_); // Attack
-                            else if(expectedKey==parseKey("D#1"_) && offsetF0>1./4 && t%(5*rate) > 4*rate) log("x -"_); // Release
-                            else if(expectedKey==parseKey("C1"_) && offsetF0>1./3 && t%(5*rate) > 3*rate) log("x -"_); // Release
-                            else if(expectedKey==parseKey("A#0"_) && offsetF0>1./4) log("x -"_); // Mistune?
-                            else if(expectedKey==parseKey("F#0"_) && offsetF0>1./4 && t%(5*rate) < rate) log("x -"_); // Mistune?
-                            else if(expectedKey==parseKey("D0"_) && offsetF0>1./2-1./32) log("-"_); // Mistune
-                            else if(expectedKey==parseKey("B-1"_) && offsetF0>1./4) log("-"_); // Mistune?
-                            else if(expectedKey==parseKey("A#-1"_) && offsetF0>0) log("-"_); // Mistune?
-                            else if(expectedKey==parseKey("A-1"_) && offsetF0>0) log("-"_); // Mistune?
-                            else { plot.expectedF = expectedF/2; break; }
-                        } else*/ {
-                            if(fail<1) {
-                                auto plot = new Plot (
-                                            (float)N/rate, min(uint(expectedF*16), estimator.fMax),
-                                            copy(estimator.filteredSpectrum), copy(estimator.spectrum),
-                                            estimator.periodPower, move(estimator.peaks), move(estimator.candidates),
-                                            estimator.F1, estimator.nHigh,
-                                            expectedKey, expectedF);
-                                Window& window = *(new Window(plot, int2(1050, 1680/2), strKey(plot->expectedKey)));
-                                window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
-                                window.localShortcut(Escape).connect([]{exit();});
-                                window.show();
-                            }
+                        if(fail<1) {
+                            auto plot = new Plot (
+                                        (float)N/rate, min(uint(expectedF*16), estimator.fMax),
+                                        copy(estimator.filteredSpectrum), copy(estimator.spectrum),
+                                        estimator.periodPower, move(estimator.peaks), move(estimator.candidates),
+                                        estimator.F1, estimator.nHigh,
+                                        expectedKey, expectedF);
+                            Window& window = *(new Window(plot, int2(1050, 1680/2), strKey(plot->expectedKey)));
+                            window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
+                            window.localShortcut(Escape).connect([]{exit();});
+                            window.show();
                         }
                         fail++;
                     }

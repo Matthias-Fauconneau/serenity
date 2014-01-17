@@ -63,6 +63,11 @@ ui/window.cc
 ui/window.h
 ui/x.h
 
+tuner/fft.cc
+tuner/pitch.cc
+tuner/test.cc
+tuner/stretch.cc
+
 algebra.h
 algebra.cc
 lu.h

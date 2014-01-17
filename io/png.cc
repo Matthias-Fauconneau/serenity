@@ -128,8 +128,8 @@ Image decodePNG(const ref<byte>& file) {
 
 uint32 crc32(const ref<byte>& data) {
     static uint crc_table[256];
-    static bool unused once = ({ for(uint n: range(256)) {
-                                     uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } true;});
+    static int unused once = ({ for(uint n: range(256)) {
+                                     uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
     uint crc = 0xFFFFFFFF;
     for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
     return ~crc;
@@ -157,20 +157,6 @@ buffer<byte> filter(const Image& image) {
     }
     return data;
 }
-
-#if 0
-array<byte> deflate(array<byte> data) {
-    array<byte> zlib;
-    zlib << "\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
-    for(uint i=0; i<data.size;) {
-        uint16 len = min(data.size-i,65535u), nlen = ~len;
-        zlib << (i+len==data.size) << raw(len) << raw(nlen) << data.slice(i,len);
-        i+=len;
-    }
-    zlib<< raw(big32(adler32(data)));
-    return zlib;
-}
-#endif
 
 buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n"_);

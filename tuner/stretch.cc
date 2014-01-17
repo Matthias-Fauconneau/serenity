@@ -12,15 +12,17 @@
 
 int parseKey(TextData& s) {
     int key=24;
-    if(!s.matchAny("cdefgabCDEFGAB"_)) return -1;
+    if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
     key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
     if(s.match('#')) key++;
     key += 12*s.mayInteger(4);
     return key;
 }
+int parseKey(const string& name) { TextData s(name); return parseKey(s); }
 
 uint localMaximum(ref<float> spectrum, uint start) {
-    uint best=start; float maximum=spectrum[start];
+    if(start>=spectrum.size) return start;
+    float maximum=spectrum[start]; uint best=start;
     for(int i=start+1; i<int(spectrum.size); i++) {
         if(spectrum[i]<maximum) break;
         maximum = spectrum[i], best=i;
@@ -34,19 +36,17 @@ uint localMaximum(ref<float> spectrum, uint start) {
 
 struct StretchEstimation : Poll, Widget {
     // Input
-    //static constexpr uint rate = 96000;
-    //const string path = "/Samples"_;
-    static constexpr uint rate = 48000;
-    //const string path = "/Samples/Blanchet"_;
-    const string path = "/Samples/Salamander"_;
-    array<String> samples = Folder(path).list(Files);
-    AudioFile file;
-    buffer<float> signal {N,N,0};
+    const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
+    AudioFile audio {"/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_};
+    const uint rate = audio.rate;
+    uint t=0;
 
     // Analysis
     static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
     static constexpr uint periodSize = 4096;
+    buffer<float> signal {N};
     PitchEstimator estimator {N};
+    int expectedKey = highKey+1;
 
     // UI
     Window window {this, int2(1050, 1680/2), "Stretch"_};
@@ -68,17 +68,7 @@ struct StretchEstimation : Poll, Widget {
         for(;;) {
             // Input
             buffer<int2> period (periodSize);
-            while(!file || file.read(period) < period.size) {
-                file.close();
-                while(!file) {
-                    if(!samples) return;
-                    TextData s = samples.pop();
-                    if(endsWith(s.buffer,".flac"_))
-                        //if(parseKey(s)>=0 && s.match("-"_) && parseKey(s)>=0)
-                        file.openPath(path+"/"_+s.buffer);
-                }
-                assert_(file.rate==rate);
-            }
+            if(audio.read(period) < period.size) { audio.close(); break; }
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];  //FIXME
             for(uint i: range(periodSize)) signal[N-periodSize+i] = period[i][0] * 0x1p-24; // Left channel only
 
@@ -108,15 +98,15 @@ struct StretchEstimation : Poll, Widget {
                     && abs(offsetF1)<offsetThreshold) {
                 float f1 = f;
                 float f2 = estimator.F0*(2+estimator.B*cb(2));
-#if 0 // Overrides least square fit with a direct estimation from spectrum peaks
+#if 1 // Overrides least square fit with a direct estimation from spectrum peaks
                 ref<float> spectrum = estimator.filteredSpectrum;
                 f1 = localMaximum(spectrum, round(f1));
                 f2 = localMaximum(spectrum, round(f2));
 #endif
-#if 0 // Correct mistune to only estimate inharmonicity (incorrect in presence of resonnance or tuning dependant inharmonicity)
+#if 1 // Correct mistune to only estimate inharmonicity (incorrect in presence of resonnance or tuning dependant inharmonicity)
                 float target = keyF0*exp2(stretch(key-21)/12);
+                if(f1) f2 *= target/f1;
                 f1 = target;
-                f2 = target*(2+estimator.B*cb(2));
 #endif
                 log(strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_+dec(round(100*offsetF1),2) +" c\t"_+dec(round(100*12*log2(f2/(2*f1))))+" c\t"_);
                 if(key>=21 && key<21+keyCount) {
@@ -160,7 +150,7 @@ struct StretchEstimation : Poll, Widget {
                 line(x0,y, x1,y, vec4(0,0,1,1));
             }
         }
-        if(file) queue();
+        if(audio) queue();
     }
 } app;
 

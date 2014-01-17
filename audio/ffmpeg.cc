@@ -13,13 +13,11 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
-AudioFile::AudioFile() { static int unused once=(av_register_all(), 0); }
+void __attribute((constructor(10000))) initialize_FFMPEG() { av_register_all(); }
 
-bool AudioFile::openPath(const string& path) {
-    close();
-    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path);  file=0; return false; }
-    log(path);
-    return open();
+AudioFile::AudioFile(const string& path) {
+    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return; }
+    open();
 }
 
 bool AudioFile::open() {
@@ -37,13 +35,9 @@ bool AudioFile::open() {
             }
         }
     }
-    assert_(audio);
-    assert_(audio->sample_rate);
-    assert_((uint)audio->channels == channels);
-    assert_(audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S16P
-            || audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32, (int)audio->sample_fmt);
-    string sampleFormats[] = {"8bit"_,"16bit"_,"32bit"_,"24bit float"_,"48bit float"_,"8bit planar"_,"16bit planar"_,"32bit planar"_,"24bit float planar"_};
-    log(audio->sample_rate,"Hz", channels==2?"stereo"_:""_,sampleFormats[audio->sample_fmt]);
+    assert(audio && audio->sample_rate && (uint)audio->channels == channels &&
+            (audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S16P ||
+             audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32));
     return true;
 }
 
@@ -156,7 +150,7 @@ void AudioFile::close() {
 }
 
 Audio decodeAudio(const string& path, uint duration) {
-    AudioFile file; file.openPath(path);
+    AudioFile file(path);
     duration = min(duration, file.duration);
     Audio audio {buffer<int2>(duration), file.rate};
     audio.size = file.read(audio);

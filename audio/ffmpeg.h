@@ -18,12 +18,10 @@ struct AudioFile {
     buffer<float2> floatBuffer;
     size_t bufferIndex=0, bufferSize=0;
 
-    AudioFile();
+    AudioFile(const string& path);
     ~AudioFile() { close(); }
 
     operator bool() { return file; }
-    bool openPath(const string& path);
-    //bool openData(buffer<byte>&& data);
     bool open();
     void close();
 

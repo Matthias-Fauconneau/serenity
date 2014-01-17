@@ -185,7 +185,8 @@ struct Player {
     }
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
-        if(!file.openPath(String("/Music/"_+files[index]))) return;
+        file = AudioFile("/Music/"_+files[index]);
+        if(!file) return;
         assert(audio.channels==file.channels);
         setPlaying(true);
     }

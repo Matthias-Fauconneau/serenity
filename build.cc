@@ -17,6 +17,7 @@ struct Build {
     array<string> flags;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
+    const string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -63,7 +64,7 @@ struct Build {
                 } else { // library header
                     for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
                         string library=s.identifier("_"_);
-                        if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += String(library); }
+                        if(library) { assert_(s.peek()=='\n',s.until('\n')); libraries += String(library); }
                         break;
                     }
                 }
@@ -107,7 +108,7 @@ struct Build {
                 pids.remove(pid);
             }
             {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -o"_);
-                pids << execute("/usr/bin/g++-4.8"_,flags+toRefs(args), false);}
+                pids << execute(CXX, flags+toRefs(args), false);}
         }
         return lastLinkEdit;
     }
@@ -148,7 +149,7 @@ struct Build {
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-            if(execute("/usr/bin/g++-4.8"_,toRefs(args))) fail();
+            if(execute(CXX, toRefs(args))) fail();
         }
         if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
     }
