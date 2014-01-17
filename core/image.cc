@@ -138,7 +138,8 @@ Image doResize(const Image& image, uint width, uint height) {
             src += scale*image.stride;
         }
     } else {
-        error(image.size(), int2(width,height), int2(image.width%width,image.height%height));
+        error(image.size(), int2(width,height), int2(image.width%width,image.height%height), image.width/width==image.height/height,
+              image.width%width<=4 && image.height%height<=4);
         /*Image mipmap;
         bool needMipmap = image.width>2*width || image.height>2*height;
         if(needMipmap) mipmap = doResize(image, image.width/max(1u,(image.width/width)), image.height/max(1u,image.height/height));
