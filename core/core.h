@@ -138,8 +138,10 @@ generic struct ref {
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
     ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
-    /// Slices a reference to elements from to the end of the reference
+    /// Slices a reference to elements from \a pos to the end of the reference
     ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+    /// Slices a reference to elements from \a start to \a stop
+    ref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
     /// Compares all elements
     bool operator ==(const ref<T>& o) const {

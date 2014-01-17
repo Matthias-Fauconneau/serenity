@@ -10,7 +10,6 @@ struct Vector : buffer<real> {
     template<Type... Args> explicit Vector(real first, Args... args):buffer(1+sizeof...(Args)){
         real unpacked[]={first, args...}; for(int i: range(1+sizeof...(Args))) at(i)=unpacked[i]; //FIXME
     }
-    vector operator ()(uint start, uint stop) { return slice(start, stop-start); }
 };
 inline String str(const Vector& a, char separator=' ') { return str((const ref<real>&)a, separator); }
 inline Vector operator*(real a, const vector& x) {

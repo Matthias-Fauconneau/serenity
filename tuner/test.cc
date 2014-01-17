@@ -21,7 +21,7 @@ int parseKey(TextData& s) {
 }
 int parseKey(const string& name) { TextData s(name); return parseKey(s); }
 
-struct Plot : Widget {
+struct SpectrumPlot : Widget {
     static constexpr bool logx = false, logy = true; // Whether to use log scale on x/y axis
     const float resolution; // Resolution in bins / Hz
     static constexpr uint iMin = 0;
@@ -36,7 +36,7 @@ struct Plot : Widget {
     const uint expectedKey;
     const float expectedF;
 
-    Plot(float resolution, uint iMax, buffer<float>&& spectrum, buffer<float>&& unfilteredSpectrum, float periodPower,
+    SpectrumPlot(float resolution, uint iMax, buffer<float>&& spectrum, buffer<float>&& unfilteredSpectrum, float periodPower,
          list<PitchEstimator::Peak, 16>&& peaks, list<PitchEstimator::Candidate, 2>&& candidates, uint F1, uint nHigh,
          uint expectedKey, float expectedF) :
         resolution(resolution), iMax(iMax), spectrum(move(spectrum)), unfilteredSpectrum(move(unfilteredSpectrum)), periodPower(periodPower),
@@ -113,6 +113,30 @@ struct Plot : Widget {
     }
 };
 
+float maxabs(const ref<float>& v) { float y=0; for(float x: v) if(abs(x)>y) y=abs(x); return y; }
+float mean(const ref<float>& v) { return sum(v)/v.size; }
+struct WaveformPlot : Widget {
+    const buffer<float> signal;
+    const float maximum;
+    WaveformPlot(buffer<float>&& signal) : signal(move(signal)), maximum(maxabs(this->signal)) {}
+    void render(int2 position, int2 size) {
+        const uint x0 = position.x, y0 = position.y + size.y/2;
+#if 0
+        for(uint x: range(size.x)) {
+            ref<float> chunk = signal(round(float(x)*signal.size/size.x),round(float(x+1)*signal.size/size.x));
+            const uint dy = round(abs(mean(chunk))/maximum*size.y);
+            fill(x0+x, y0-dy, x0+x+1, y0+dy, white);
+        }
+#else
+        for(uint x: range(size.x-1)) {
+            const float dy0 = mean(signal(round(float(x)*signal.size/size.x),round(float(x+1)*signal.size/size.x)))/maximum*size.y;
+            const float dy1 = mean(signal(round(float(x+1)*signal.size/size.x),round(float(x+2)*signal.size/size.x)))/maximum*size.y;
+            line(x0+x, y0-dy0, x0+x+1, y0-dy1, white);
+        }
+#endif
+    }
+};
+
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation : Poll {
         // Input
@@ -181,13 +205,15 @@ struct PitchEstimation : Poll {
                     if(expectedKey==key) success++;
                     else {
                         if(fail<1) {
-                            auto plot = new Plot (
+                            SpectrumPlot* spectrum = new SpectrumPlot(
                                         (float)N/rate, min(uint(expectedF*16), estimator.fMax),
                                         copy(estimator.filteredSpectrum), copy(estimator.spectrum),
                                         estimator.periodPower, move(estimator.peaks), move(estimator.candidates),
                                         estimator.F1, estimator.nHigh,
                                         expectedKey, expectedF);
-                            Window& window = *(new Window(plot, int2(1050, 1680/2), strKey(plot->expectedKey)));
+                            WaveformPlot* waveform = new WaveformPlot(copy(signal));
+                            Widget* box = new VBox ({spectrum, waveform});
+                            Window& window = *(new Window(box, int2(0, 1680/2), strKey(spectrum->expectedKey)));
                             window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
                             window.localShortcut(Escape).connect([]{exit();});
                             window.show();
