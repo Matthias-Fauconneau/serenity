@@ -10,16 +10,6 @@
 #include "text.h"
 #include <fftw3.h> //fftw3f
 
-int parseKey(TextData& s) {
-    int key=24;
-    if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
-    key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
-    if(s.match('#')) key++;
-    key += 12*s.mayInteger(4);
-    return key;
-}
-int parseKey(const string& name) { TextData s(name); return parseKey(s); }
-
 uint localMaximum(ref<float> spectrum, uint start) {
     if(start>=spectrum.size) return start;
     float maximum=spectrum[start]; uint best=start;
@@ -56,7 +46,11 @@ struct StretchEstimation : Poll, Widget {
     array<float> F2[keyCount];
 
     //float stretch(int key) { return 0; }
-    float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
+    //float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
+    float stretch(int key) { return
+                1.2/100 * exp2((key-(39+12))/8.) // Treble inharmonicity (1./64?)
+                - 1./256 * exp2(-(key-(26))/8.); // Bass inharmonicity
+                           }
 
     StretchEstimation() {
         window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
@@ -98,7 +92,7 @@ struct StretchEstimation : Poll, Widget {
                     && abs(offsetF1)<offsetThreshold) {
                 float f1 = f;
                 float f2 = estimator.F0*(2+estimator.B*cb(2));
-#if 1 // Overrides least square fit with a direct estimation from spectrum peaks
+#if 0 // Overrides least square fit with a direct estimation from spectrum peaks
                 ref<float> spectrum = estimator.filteredSpectrum;
                 f1 = localMaximum(spectrum, round(f1));
                 f2 = localMaximum(spectrum, round(f2));

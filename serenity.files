@@ -67,6 +67,7 @@ tuner/fft.cc
 tuner/pitch.cc
 tuner/test.cc
 tuner/stretch.cc
+tuner/tuner.cc
 
 algebra.h
 algebra.cc

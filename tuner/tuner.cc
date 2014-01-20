@@ -26,7 +26,8 @@ struct Tuner : Poll {
     const uint rate = input.rate;
 
 #if TEST
-    Audio audio = decodeAudio("/Samples/"_+arguments()[0]+"-"_+arguments()[1]+".flac"_);
+    const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
+    AudioFile audio {"/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_};
     Timer timer {thread};
 #endif
 
@@ -82,8 +83,8 @@ struct Tuner : Poll {
 #if TEST
     uint t = 0;
     void feed() {
-        if(t+periodSize > audio.size) { exit(); return; }
-        const ref<int2> period = audio.slice(t, periodSize);
+        buffer<int2> period (periodSize);
+        if(audio.read(period) < period.size) { audio.close(); exit(); return; }
         write(period);
         t += period.size;
         timer.setRelative(period.size*1000/rate/8); // 8xRT

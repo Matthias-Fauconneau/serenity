@@ -4,6 +4,7 @@
 #include "array.h"
 #include "math.h"
 #include "string.h"
+#include "data.h"
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
@@ -56,3 +57,12 @@ struct PitchEstimator : FFT {
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 inline String strKey(int key) { return (string[]){"A"_,"A#"_,"B"_,"C"_,"C#"_,"D"_,"D#"_,"E"_,"F"_,"F#"_,"G"_,"G#"_}[(key+2*12+3)%12]+str(key/12-2); }
+inline int parseKey(TextData& s) {
+    int key=24;
+    if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
+    key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
+    if(s.match('#')) key++;
+    key += 12*s.mayInteger(4);
+    return key;
+}
+inline int parseKey(const string& name) { TextData s(name); return parseKey(s); }

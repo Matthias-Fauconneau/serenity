@@ -2,7 +2,11 @@
 #include "widget.h"
 
 const int keyCount = 85;
-float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
+//float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
+float stretch(int key) { return
+            1.2/100 * exp2((key-(39+12))/8.) // Treble inharmonicity (1./64?)
+            - 1./256 * exp2(-(key-(26))/8.); // Bass inharmonicity
+                       }
 
 struct OffsetPlot : Widget {
     float offsets[keyCount] = {};

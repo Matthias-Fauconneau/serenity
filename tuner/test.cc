@@ -11,16 +11,6 @@
 #include "profile.h"
 #include <fftw3.h> //fftw3f
 
-int parseKey(TextData& s) {
-    int key=24;
-    if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
-    key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
-    if(s.match('#')) key++;
-    key += 12*s.mayInteger(4);
-    return key;
-}
-int parseKey(const string& name) { TextData s(name); return parseKey(s); }
-
 struct SpectrumPlot : Widget {
     static constexpr bool logx = false, logy = true; // Whether to use log scale on x/y axis
     const float resolution; // Resolution in bins / Hz
