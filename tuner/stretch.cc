@@ -39,11 +39,12 @@ struct StretchEstimation : Poll, Widget {
     int expectedKey = highKey+1;
 
     // UI
-    Window window {this, int2(1050, 1680/2), "Stretch"_};
+    Window window {this, int2(0, 0), "Stretch"_};
 
     static constexpr int keyCount = 85;
     array<float> F1[keyCount];
     array<float> F2[keyCount];
+    buffer<float> spectrum[keyCount];
 
     //float stretch(int key) { return 0; }
     //float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
@@ -92,8 +93,8 @@ struct StretchEstimation : Poll, Widget {
                     && abs(offsetF1)<offsetThreshold) {
                 float f1 = f;
                 float f2 = estimator.F0*(2+estimator.B*cb(2));
-#if 0 // Overrides least square fit with a direct estimation from spectrum peaks
                 ref<float> spectrum = estimator.filteredSpectrum;
+#if 0 // Overrides least square fit with a direct estimation from spectrum peaks
                 f1 = localMaximum(spectrum, round(f1));
                 f2 = localMaximum(spectrum, round(f2));
 #endif
@@ -106,6 +107,8 @@ struct StretchEstimation : Poll, Widget {
                 if(key>=21 && key<21+keyCount) {
                     F1[key-21] << f1;
                     F2[key-21] << f2;
+                    if(!this->spectrum[key-21]) this->spectrum[key-21] = buffer<float>(spectrum.size, spectrum.size, 0);
+                    for(uint i: range(spectrum.size)) this->spectrum[key-21][i] += spectrum[i];
                 }
                 break;
             }
@@ -116,8 +119,41 @@ struct StretchEstimation : Poll, Widget {
         for(uint key: range(keyCount)) {
             uint x0 = position.x + key * size.x / keyCount;
             uint x1 = position.x + (key+1) * size.x / keyCount;
-            float keyF0 = keyToPitch(key+21)*N/rate;
-            if(F1[key]) {
+            //float equalTemperament = keyToPitch(key+21)*N/rate;
+            float firstPartial = F1[key].size ? sum(F1[key]) / F1[key].size : 0;
+            float octaveFirstPartial = (key>=12 && F1[key-12].size) ? sum(F1[key-12]) / F1[key-12].size : 0;
+            buffer<float> current (size.y, size.y, 0);
+            buffer<float> octave (size.y, size.y, 0);
+            for(uint f: range(1, spectrum[key].size)) { // Resample spectrum to log scale
+                //float offset = /*12**/log2(f/equalTemperament/*firstPartial*/);
+                //int y = size.y - round(offset * size.y);
+                {
+                    //int y = size.y*3/4/2 - (f - firstPartial); // Normalize tuning offset
+                    //int y = size.y/2 - (f - firstPartial); // Normalize tuning offset
+                    int y = size.y*3/4 - log2(f / firstPartial * exp2(stretch(key)/12)) * size.y/2; // Normalize tuning offset
+                    if(y>=0 && y<size.y) current[y] += spectrum[key][f];
+                }
+                if(key>=12 && spectrum[key-12]) {
+                    //int y = size.y*3/4/2 - (f - firstPartial/*octaveFirstPartial*2*/); // Normalize tuning offset + ET tuning ratio
+                    //int y = size.y/2 - (f - firstPartial); // Normalize tuning offset + ET tuning ratio
+                    //int y = size.y/2 - log2(f / firstPartial) * size.y/3; // Normalize tuning offset
+                    int y = size.y*3/4 - log2(f / (octaveFirstPartial*2) * exp2(stretch(key-12)/12)) * size.y/2; // Normalize tuning offset
+                    if(y>=0 && y<size.y) octave[y] += spectrum[key-12][f];
+                }
+            }
+
+            float currentMean = sum(current) / current.size, octaveMean = sum(octave) / octave.size;
+            float currentMax = ::max(current), octaveMax = ::max(octave/*.slice(0,octave.size*1/4)*/);
+            if(!currentMax || !octaveMax) continue;
+            for(uint y: range(size.y)) {
+                //current[y] / currentMax * 0xFF
+                float c = currentMean && currentMax && current[y]>currentMean ? log2(current[y] / currentMean) / log2(currentMax / currentMean) * 0xFF : 0;
+                float o = octaveMean && octaveMax && octave[y]>octaveMean ? log2(octave[y] / octaveMean) / log2(octaveMax / octaveMean) * 0xFF : 0;
+                byte4 color (clip<int>(0,round(c),0xFF), clip<int>(0,round(o),0xFF), clip<int>(0,round(c),0xFF), 0xFF);
+                //for(uint x: range(x0, x1)) { framebuffer(x,y*2) = c; framebuffer(x,y*2+1) = c; }
+                for(uint x: range(x0, x1)) framebuffer(x,y) = color;
+            }
+            /*if(F1[key]) {
                 float sum = 0; uint count = F1[key].size;
                 for(float f: F1[key]) {
                     float offset = 12*log2(f/keyF0);
@@ -142,7 +178,7 @@ struct StretchEstimation : Poll, Widget {
                 float offset = 12*log2(mean/keyF0);
                 float y = position.y + size.y/2 - offset * size.y;
                 line(x0,y, x1,y, vec4(0,0,1,1));
-            }
+            }*/
         }
         if(audio) queue();
     }
