@@ -10,7 +10,7 @@
 #include "text.h"
 #include <fftw3.h> //fftw3f
 
-uint localMaximum(ref<float> spectrum, uint start) {
+/*uint localMaximum(ref<float> spectrum, uint start) {
     if(start>=spectrum.size) return start;
     float maximum=spectrum[start]; uint best=start;
     for(int i=start+1; i<int(spectrum.size); i++) {
@@ -22,7 +22,23 @@ uint localMaximum(ref<float> spectrum, uint start) {
         maximum = spectrum[i], best=i;
     }
     return best;
-}
+}*/
+
+/*float localMaximum(ref<float> spectrum, uint start) {
+    if(start>=spectrum.size) return 0;
+    float maximum=spectrum[start]; uint best=start;
+    for(int i=start+1; i<int(spectrum.size); i++) {
+        if(spectrum[i]<maximum) break;
+        maximum = spectrum[i], best=i;
+    }
+    for(int i=start-1; i>=0; i--) {
+        if(spectrum[i]<maximum) break;
+        maximum = spectrum[i], best=i;
+    }
+    return maximum;
+}*/
+
+float mean(const ref<float>& v) { return v.size ? sum(v)/v.size : 0; }
 
 struct StretchEstimation : Poll, Widget {
     // Input
@@ -42,15 +58,15 @@ struct StretchEstimation : Poll, Widget {
     Window window {this, int2(0, 0), "Stretch"_};
 
     static constexpr int keyCount = 85;
-    array<float> F1[keyCount];
-    array<float> F2[keyCount];
+    struct Pitch { float F0, B; };
+    array<Pitch> pitch[keyCount];
     buffer<float> spectrum[keyCount];
 
-    //float stretch(int key) { return 0; }
+    //float stretch(int) { return 0; }
     //float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
     float stretch(int key) { return
                 1.2/100 * exp2((key-(39+12))/8.) // Treble inharmonicity (1./64?)
-                - 1./256 * exp2(-(key-(26))/8.); // Bass inharmonicity
+              ;//- 1.2/100 * exp2(-(key-(26))/8.); // Bass inharmonicity
                            }
 
     StretchEstimation() {
@@ -91,22 +107,10 @@ struct StretchEstimation : Poll, Widget {
 
             if(confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold
                     && abs(offsetF1)<offsetThreshold) {
-                float f1 = f;
-                float f2 = estimator.F0*(2+estimator.B*cb(2));
                 ref<float> spectrum = estimator.filteredSpectrum;
-#if 0 // Overrides least square fit with a direct estimation from spectrum peaks
-                f1 = localMaximum(spectrum, round(f1));
-                f2 = localMaximum(spectrum, round(f2));
-#endif
-#if 1 // Correct mistune to only estimate inharmonicity (incorrect in presence of resonnance or tuning dependant inharmonicity)
-                float target = keyF0*exp2(stretch(key-21)/12);
-                if(f1) f2 *= target/f1;
-                f1 = target;
-#endif
-                log(strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_+dec(round(100*offsetF1),2) +" c\t"_+dec(round(100*12*log2(f2/(2*f1))))+" c\t"_);
+                log(strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_+dec(round(100*offsetF1),2) +" c\t"_);
                 if(key>=21 && key<21+keyCount) {
-                    F1[key-21] << f1;
-                    F2[key-21] << f2;
+                    pitch[key-21] << Pitch{estimator.F0, estimator.B};
                     if(!this->spectrum[key-21]) this->spectrum[key-21] = buffer<float>(spectrum.size, spectrum.size, 0);
                     for(uint i: range(spectrum.size)) this->spectrum[key-21][i] += spectrum[i];
                 }
@@ -119,66 +123,104 @@ struct StretchEstimation : Poll, Widget {
         for(uint key: range(keyCount)) {
             uint x0 = position.x + key * size.x / keyCount;
             uint x1 = position.x + (key+1) * size.x / keyCount;
-            //float equalTemperament = keyToPitch(key+21)*N/rate;
-            float firstPartial = F1[key].size ? sum(F1[key]) / F1[key].size : 0;
-            float octaveFirstPartial = (key>=12 && F1[key-12].size) ? sum(F1[key-12]) / F1[key-12].size : 0;
-            buffer<float> current (size.y, size.y, 0);
-            buffer<float> octave (size.y, size.y, 0);
-            for(uint f: range(1, spectrum[key].size)) { // Resample spectrum to log scale
-                //float offset = /*12**/log2(f/equalTemperament/*firstPartial*/);
-                //int y = size.y - round(offset * size.y);
-                {
-                    //int y = size.y*3/4/2 - (f - firstPartial); // Normalize tuning offset
-                    //int y = size.y/2 - (f - firstPartial); // Normalize tuning offset
-                    int y = size.y*3/4 - log2(f / firstPartial * exp2(stretch(key)/12)) * size.y/2; // Normalize tuning offset
-                    if(y>=0 && y<size.y) current[y] += spectrum[key][f];
-                }
-                if(key>=12 && spectrum[key-12]) {
-                    //int y = size.y*3/4/2 - (f - firstPartial/*octaveFirstPartial*2*/); // Normalize tuning offset + ET tuning ratio
-                    //int y = size.y/2 - (f - firstPartial); // Normalize tuning offset + ET tuning ratio
-                    //int y = size.y/2 - log2(f / firstPartial) * size.y/3; // Normalize tuning offset
-                    int y = size.y*3/4 - log2(f / (octaveFirstPartial*2) * exp2(stretch(key-12)/12)) * size.y/2; // Normalize tuning offset
-                    if(y>=0 && y<size.y) octave[y] += spectrum[key-12][f];
+            assert_(position.y == 0); // FIXME: push translation
+            const float scale = 4;
+            if(pitch[key]) {
+                ref<float> power = spectrum[key];
+                //float maxPower = max(power);
+                float meanPower = mean(power);
+                ref<Pitch> s = pitch[key];
+                float meanF1; {float sum = 0; for(Pitch p: s) sum += p.F0*(1+p.B); meanF1 = sum / s.size;}
+                for(uint n: range(1, 3 +1)) {
+                    int y0 = (3-n)*size.y/3, y1 = (3-n+1)*size.y/3, y12 = (y0+y1)/2;
+                    float maxPower = meanPower;
+                    for(uint f: range(1, power.size)) {
+                        float y = y12 - log2((float) f / n / meanF1 * exp2(stretch(key)/12)) * size.y; // Normalizes meanF1 to stretch
+                        if(y>y0 && y<y1) {
+                            if(f<power.size) maxPower = max(maxPower, power[f]);
+                            /*if(meanPower && maxPower) {
+                                float intensity = power[f] > meanPower ? log2(power[f] / meanPower) / log2(maxPower / meanPower) : 0;
+                                line(int2(x0,y), int2(x1,y), vec4(0,1,0, c));
+                            }*/
+                        }
+                    }
+                    float sum = 0;
+                    for(Pitch p: s) {
+                        float f = p.F0*(n+p.B*cb(n));
+                        float y = y12 - log2(f/n /meanF1 * exp2(stretch(key)/12)) * size.y * scale; // Normalizes meanF1 to stretch
+                        if(y>y0 && y<y1) {
+                            //float intensity = 1;
+                            float intensity = 1./s.size;
+                            //if(round(f)<power.size) intensity *= power[round(f)] / maxPower;
+                            if(round(f)<power.size) {
+                                float p = power[round(f)];
+                                intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
+                            }
+                            line(int2(x0,y), int2(x1,y), vec4(0,1,0,intensity));
+                        }
+                        sum += f;
+                    }
+                    float f = sum / s.size;
+                    float y = y12 - log2(f/n /meanF1 * exp2(stretch(key)/12)) * size.y * scale;
+                    if(y>y0 && y<y1) {
+                        float intensity = 1;
+                        //if(round(f)<power.size) intensity *= power[round(f)] / maxPower;
+                        if(round(f)<power.size) {
+                            float p = power[round(f)];
+                            intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
+                        }
+                        line(x0,y, x1,y, vec4(0,1,0,intensity));
+                    }
                 }
             }
-
-            float currentMean = sum(current) / current.size, octaveMean = sum(octave) / octave.size;
-            float currentMax = ::max(current), octaveMax = ::max(octave/*.slice(0,octave.size*1/4)*/);
-            if(!currentMax || !octaveMax) continue;
-            for(uint y: range(size.y)) {
-                //current[y] / currentMax * 0xFF
-                float c = currentMean && currentMax && current[y]>currentMean ? log2(current[y] / currentMean) / log2(currentMax / currentMean) * 0xFF : 0;
-                float o = octaveMean && octaveMax && octave[y]>octaveMean ? log2(octave[y] / octaveMean) / log2(octaveMax / octaveMean) * 0xFF : 0;
-                byte4 color (clip<int>(0,round(c),0xFF), clip<int>(0,round(o),0xFF), clip<int>(0,round(c),0xFF), 0xFF);
-                //for(uint x: range(x0, x1)) { framebuffer(x,y*2) = c; framebuffer(x,y*2+1) = c; }
-                for(uint x: range(x0, x1)) framebuffer(x,y) = color;
-            }
-            /*if(F1[key]) {
-                float sum = 0; uint count = F1[key].size;
-                for(float f: F1[key]) {
-                    float offset = 12*log2(f/keyF0);
-                    int y = position.y + size.y/2 - offset * size.y;
-                    line(int2(x0,y), int2(x1,y), vec4(0,1,0,1./count));
-                    sum += f;
+            if(key >= 12 && pitch[key-12]) {
+                ref<float> power = spectrum[key-12];
+                //float maxPower = max(power);
+                float meanPower = mean(power);
+                ref<Pitch> s = pitch[key-12];
+                float meanF1; {float sum = 0; for(Pitch p: s) sum += p.F0*(1+p.B); meanF1 = sum / s.size;}
+                for(uint n: range(1, 3 +1)) {
+                    int N = 2*n;
+                    int y0 = (3-n)*size.y/3, y1 = (3-n+1)*size.y/3, y12 = (y0+y1)/2;
+                    float maxPower = meanPower;
+                    for(uint f: range(1, power.size)) {
+                        float y = y12 - log2((float) f / N / meanF1 * exp2(stretch(key)/12)) * size.y; // Normalizes meanF1 to stretch
+                        if(y>y0 && y<y1) {
+                            if(f<power.size) maxPower = max(maxPower, power[f]);
+                            /*if(meanPower && maxPower) {
+                                float intensity = power[f] > meanPower ? log2(power[f] / meanPower) / log2(maxPower / meanPower) : 0;
+                                line(int2(x0,y), int2(x1,y), vec4(0,1,0, c));
+                            }*/
+                        }
+                    }
+                    float sum = 0;
+                    for(Pitch p: s) {
+                        float f = p.F0*(N+p.B*cb(N));
+                        float y = y12 - log2(f/N /meanF1 * exp2(stretch(key-12)/12)) * size.y * scale; // Normalizes 2 x meanF1 to 0
+                        if(y>y0 && y<y1) {
+                            //float intensity = 1;
+                            float intensity = 1./s.size;
+                            if(round(f)<power.size) {
+                                float p = power[round(f)];
+                                intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
+                            }
+                            line(int2(x0,y), int2(x1,y), vec4(1,0,1,intensity));
+                        }
+                        sum += f;
+                    }
+                    float f = sum / s.size;
+                    float y = y12 - log2(f/N /meanF1 * exp2(stretch(key-12)/12)) * size.y * scale;
+                    if(y>y0 && y<y1) {
+                        float intensity = 1;
+                        //if(round(f)<power.size) intensity *= power[round(f)] / maxPower;
+                        if(round(f)<power.size) {
+                            float p = power[round(f)];
+                            intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
+                        }
+                        line(x0,y, x1,y, vec4(1,0,1,intensity));
+                    }
                 }
-                float mean = sum / count;
-                float offset = 12*log2(mean/keyF0);
-                float y = position.y + size.y/2 - offset * size.y;
-                line(x0,y, x1,y, vec4(0,1,0,1));
             }
-            if(key >= 12 && F2[key-12]) {
-                float sum = 0; uint count = F1[key-12].size;
-                for(float f: F2[key-12]) {
-                    float offset = 12*log2(f/keyF0);
-                    int y = position.y + size.y/2 - offset * size.y;
-                    line(int2(x0,y), int2(x1,y), vec4(0,0,1,1./count));
-                    sum += f;
-                }
-                float mean = sum / count;
-                float offset = 12*log2(mean/keyF0);
-                float y = position.y + size.y/2 - offset * size.y;
-                line(x0,y, x1,y, vec4(0,0,1,1));
-            }*/
         }
         if(audio) queue();
     }
