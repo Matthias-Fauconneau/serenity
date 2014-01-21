@@ -32,27 +32,41 @@ struct Matrix2D : Matrix {
     real operator ()(uint i, uint j, uint k, uint l) const { return Matrix::operator ()(j*m+i, l*m+k); }
     real& operator ()(uint i, uint j, uint k, uint l) { return Matrix::operator ()(j*m+i, l*m+k); }
 };
-inline String str(const Matrix2D& M) { return str((const Matrix&)M); }
-/*inline String str(const Matrix2D& M) {
+inline String str(const Matrix2D& M) {
     String s;
+    s << repeat("-"_,M.m*(M.n*5+3)) << '\n';
     for(uint i: range(M.m)) {
-        for(uint k: range(M.m)) {
-            for(uint j: range(M.n)) {
+        for(uint j: range(M.n)) {
+            for(uint k: range(M.m)) {
                 for(uint l: range(M.n)) {
-                    s<<ftoa(M(i,j,k,l),2,6);
+                    s<<ftoa(M(i,j,k,l),1,5);
                 }
+                s<<" | "_;
             }
-            if(i<M.m-1) s<<'\n';
+            if(i<M.m-1 || j<M.m-1) s<<'\n';
         }
+        s << repeat("-"_,M.m*(M.n*5+3)) << '\n';
     }
     return s;
-}*/
+}
 
 // Resolution MT=S
 struct Poisson {
+    const real L = 1;
+#if 1
+    real Ta(real x, real y) { return sq(x) + sq(y); }
+    real LTa(real unused x, real unused y) { return 4; }
+    real DxTa(real x, real unused y) { return 2*x; }
+    real DyTa(real unused x, real y) { return 2*y; }
+#else
+    real Ta(real x, real y) { return sin(2 * PI/L * x) * cos(2 * PI/L * y);
+    real LTa(real x, real y) { return -2 * sq(2*PI/L) * Ta(x,y); }
+    real DxTa(real x, real y) { return + 2*PI/L * cos(2*PI/L*x) * cos(2*PI/L*y); }
+    real DyTa(real x, real y) { return - 2*PI/L * sin(2*PI/L*x) * sin(2*PI/L*y); }
+#endif
+
     Poisson() {
         const uint Nx=4, Ny=Nx;
-        const real L = 1;
         // Maillage (irregulier)
         Vector X (Nx), Y (Ny);
         //for(uint i: range(Nx)) X[i] = L/2 * (1 - cos(i*PI/(Nx-1)));
@@ -60,7 +74,7 @@ struct Poisson {
         for(uint j: range(Ny)) Y[j] = L * j / (Ny-1);
         // Solution analytique
         Vector2D T (Nx,Ny);
-        for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = sin(2 * PI/L * X[i]) * cos(2 * PI/L * Y[j]);
+        for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = Ta(X[i], Y[j]);
 
         // Systeme MT=S
         Matrix2D M (Nx, Ny); // Operateur [256^2]
@@ -92,46 +106,6 @@ struct Poisson {
             M(Nx-1,j, Nx-1,j) = 1, S(Nx-1, j) = T(Nx-1, j);
         }
 #else // Neumann
-#if 0
-        for(uint i: range(1,Nx-1)) {
-            auto bordX = [&](int j0, int j1) {
-             real y12 = (Y[j0]+Y[j1])/2;
-             real left  = (y12-Y[j0])/(X[i]-X[i-1]);
-             real right = (y12-Y[j0])/(X[i+1]-X[i]);
-             real xm = (X[i-1]+X[i])/2;
-             real xp = (X[i]+X[i+1])/2;
-             real bottom = (xp-xm)/(Y[j1]-Y[j0]);
-             M(i,j0, i-1,j0) =  left;
-             M(i,j0, i  ,j0) = -left-right-bottom;
-             M(i,j0, i+1,j0) =       right;
-             M(i,j0, i+1,j1) =             bottom;
-             real s = (y12-Y[j0]) * -2 * sq(2*PI/L) * T(i,j0); // Source interieur
-             real f = - 2*PI/L * sin(2*PI/L*X[i]) * sin(2*PI/L*Y[j0]);  // Flux
-             S(i, j0) = (xp-xm) * (s - f);
-            };
-            bordX(0,    1);
-            bordX(Ny-1, Ny-1-1);
-        }
-        for(uint j: range(1,Ny-1)) {
-            auto bordY = [&](int i0, int i1) {
-             real x12 = (X[i0]+X[i1])/2;
-             real top = (x12-X[i0])/(Y[j]-Y[j-1]);
-             real bottom = (x12-X[i0])/(Y[j+1]-Y[j]);
-             real ym = (Y[j-1]+Y[j])/2;
-             real yp = (Y[j]+Y[j+1])/2;
-             real right = (yp-ym)/(X[i1]-X[i0]);
-             M(i0,j, i0,j-1) =  top;
-             M(i0,j, i0,j  ) = -top-bottom-right;
-             M(i0,j, i0,j+1) =      bottom;
-             M(i0,j, i1,j+1) =             right;
-             real s = (x12-X[i0]) * -2 * sq(2*PI/L) * T(i0,j); // Source interieur
-             real f = 2*PI/L * cos(2*PI/L*X[i0]) * cos(2*PI/L*Y[j]);  // Flux
-             S(i0, j) = (yp-ym) * (s - f);
-            };
-            bordY(0,    1);
-            bordY(Nx-1, Nx-1-1);
-        }
-#else
         auto bord = [&](bool transpose, int i0, int i1, int i, real f) {
          const auto& x = !transpose ? X : Y;
          const auto& y = !transpose ? Y : X;
@@ -146,19 +120,19 @@ struct Poisson {
          m(i,i0, i  ,i0) = -left-right-bottom;
          m(i,i0, i+1,i0) =       right;
          m(i,i0, i,  i1) =             bottom;
-         real b = (y12-y[i0]) * -2 * sq(2*PI/L) * T(i,i0); // Source interieur
+         auto lta = [&](int i, int j) -> real { return !transpose ? LTa(i,j) : LTa(j,i); };
+         real b = lta(i, i0);
          auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
-         s(i,i0) = (xp-xm) * (y12-y[0]) * (b - f);
+         s(i,i0) = (xp-xm) * (y12-y[i0]) * (b - f);
         };
         for(uint i: range(1,Nx-1)) {
-            bord(false, 0,    1,      i, - 2*PI/L * sin(2*PI/L*X[i]) * sin(2*PI/L*Y[0   ]));
-            bord(false, Ny-1, Ny-1-1, i, + 2*PI/L * sin(2*PI/L*X[i]) * sin(2*PI/L*Y[Ny-1]));
+            bord(false, 0,    1,      i, + DyTa(X[i], Y[0   ]));
+            bord(false, Ny-1, Ny-1-1, i, - DyTa(X[i], Y[Ny-1]));
         }
         for(uint j: range(1,Ny-1)) {
-            bord(true, 0,    1,       j, + 2*PI/L * cos(2*PI/L*X[0   ]) * cos(2*PI/L*Y[j]));
-            bord(true, Nx-1, Nx-1-1,  j, - 2*PI/L * cos(2*PI/L*X[Nx-1]) * cos(2*PI/L*Y[j]));
+            bord(true,  0,    1,      j, + DxTa(X[0   ], Y[j]));
+            bord(true,  Nx-1, Nx-1-1, j, - DxTa(X[Nx-1], Y[j]));
         }
-#endif
         // Dirichlet au coins
         M(0, 0,    0, 0)          = 1, S(0,    0)    = T(0,    0);
         M(Nx-1, 0,    Nx-1, 0)    = 1, S(Nx-1, 0)    = T(Nx-1, 0);
