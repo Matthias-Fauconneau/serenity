@@ -54,10 +54,10 @@ inline String str(const Matrix2D& M) {
 struct Poisson {
     const real L = 1;
 #if 1
-    real Ta(real x, real y) { return sq(x) + sq(y); }
+    real Ta(real x, real y) { return sq(x-L/2) + sq(y-L/2); }
     real LTa(real unused x, real unused y) { return 4; }
-    real DxTa(real x, real unused y) { return 2*x; }
-    real DyTa(real unused x, real y) { return 2*y; }
+    real DxTa(real x, real unused y) { return 2*x - L; }
+    real DyTa(real unused x, real y) { return 2*y - L; }
 #else
     real Ta(real x, real y) { return sin(2 * PI/L * x) * cos(2 * PI/L * y);
     real LTa(real x, real y) { return -2 * sq(2*PI/L) * Ta(x,y); }
