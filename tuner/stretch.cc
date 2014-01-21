@@ -10,34 +10,6 @@
 #include "text.h"
 #include <fftw3.h> //fftw3f
 
-/*uint localMaximum(ref<float> spectrum, uint start) {
-    if(start>=spectrum.size) return start;
-    float maximum=spectrum[start]; uint best=start;
-    for(int i=start+1; i<int(spectrum.size); i++) {
-        if(spectrum[i]<maximum) break;
-        maximum = spectrum[i], best=i;
-    }
-    for(int i=start-1; i>=0; i--) {
-        if(spectrum[i]<maximum) break;
-        maximum = spectrum[i], best=i;
-    }
-    return best;
-}*/
-
-/*float localMaximum(ref<float> spectrum, uint start) {
-    if(start>=spectrum.size) return 0;
-    float maximum=spectrum[start]; uint best=start;
-    for(int i=start+1; i<int(spectrum.size); i++) {
-        if(spectrum[i]<maximum) break;
-        maximum = spectrum[i], best=i;
-    }
-    for(int i=start-1; i>=0; i--) {
-        if(spectrum[i]<maximum) break;
-        maximum = spectrum[i], best=i;
-    }
-    return maximum;
-}*/
-
 float mean(const ref<float>& v) { return v.size ? sum(v)/v.size : 0; }
 
 struct StretchEstimation : Poll, Widget {
@@ -62,11 +34,9 @@ struct StretchEstimation : Poll, Widget {
     array<Pitch> pitch[keyCount];
     buffer<float> spectrum[keyCount];
 
-    //float stretch(int) { return 0; }
-    //float stretch(int key) { return 1.f/32 * (float)(key - keyCount/2) / 12; }
     float stretch(int key) { return
-                1.2/100 * exp2((key-(39+12))/8.) // Treble inharmonicity (1./64?)
-              ;//- 1.2/100 * exp2(-(key-(26))/8.); // Bass inharmonicity
+                1.2/100 * exp2((key-(39+12))/8.) // Treble inharmonicity
+              - 1.2/100 * exp2(-(key-(26))/8.); // Bass inharmonicity
                            }
 
     StretchEstimation() {
@@ -123,104 +93,42 @@ struct StretchEstimation : Poll, Widget {
         for(uint key: range(keyCount)) {
             uint x0 = position.x + key * size.x / keyCount;
             uint x1 = position.x + (key+1) * size.x / keyCount;
-            assert_(position.y == 0); // FIXME: push translation
             const float scale = 4;
-            if(pitch[key]) {
+            auto render = [&](uint key, float harmonicRatio, vec3 color) {
                 ref<float> power = spectrum[key];
-                //float maxPower = max(power);
                 float meanPower = mean(power);
                 ref<Pitch> s = pitch[key];
                 float meanF1; {float sum = 0; for(Pitch p: s) sum += p.F0*(1+p.B); meanF1 = sum / s.size;}
                 for(uint n: range(1, 3 +1)) {
+                    int N = harmonicRatio*n;
                     int y0 = (3-n)*size.y/3, y1 = (3-n+1)*size.y/3, y12 = (y0+y1)/2;
                     float maxPower = meanPower;
                     for(uint f: range(1, power.size)) {
-                        float y = y12 - log2((float) f / n / meanF1 * exp2(stretch(key)/12)) * size.y; // Normalizes meanF1 to stretch
-                        if(y>y0 && y<y1) {
-                            if(f<power.size) maxPower = max(maxPower, power[f]);
-                            /*if(meanPower && maxPower) {
-                                float intensity = power[f] > meanPower ? log2(power[f] / meanPower) / log2(maxPower / meanPower) : 0;
-                                line(int2(x0,y), int2(x1,y), vec4(0,1,0, c));
-                            }*/
-                        }
-                    }
-                    float sum = 0;
-                    for(Pitch p: s) {
-                        float f = p.F0*(n+p.B*cb(n));
-                        float y = y12 - log2(f/n /meanF1 * exp2(stretch(key)/12)) * size.y * scale; // Normalizes meanF1 to stretch
-                        if(y>y0 && y<y1) {
-                            //float intensity = 1;
-                            float intensity = 1./s.size;
-                            //if(round(f)<power.size) intensity *= power[round(f)] / maxPower;
-                            if(round(f)<power.size) {
-                                float p = power[round(f)];
-                                intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
-                            }
-                            line(int2(x0,y), int2(x1,y), vec4(0,1,0,intensity));
-                        }
-                        sum += f;
-                    }
-                    float f = sum / s.size;
-                    float y = y12 - log2(f/n /meanF1 * exp2(stretch(key)/12)) * size.y * scale;
-                    if(y>y0 && y<y1) {
-                        float intensity = 1;
-                        //if(round(f)<power.size) intensity *= power[round(f)] / maxPower;
-                        if(round(f)<power.size) {
-                            float p = power[round(f)];
-                            intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
-                        }
-                        line(x0,y, x1,y, vec4(0,1,0,intensity));
-                    }
-                }
-            }
-            if(key >= 12 && pitch[key-12]) {
-                ref<float> power = spectrum[key-12];
-                //float maxPower = max(power);
-                float meanPower = mean(power);
-                ref<Pitch> s = pitch[key-12];
-                float meanF1; {float sum = 0; for(Pitch p: s) sum += p.F0*(1+p.B); meanF1 = sum / s.size;}
-                for(uint n: range(1, 3 +1)) {
-                    int N = 2*n;
-                    int y0 = (3-n)*size.y/3, y1 = (3-n+1)*size.y/3, y12 = (y0+y1)/2;
-                    float maxPower = meanPower;
-                    for(uint f: range(1, power.size)) {
-                        float y = y12 - log2((float) f / N / meanF1 * exp2(stretch(key)/12)) * size.y; // Normalizes meanF1 to stretch
-                        if(y>y0 && y<y1) {
-                            if(f<power.size) maxPower = max(maxPower, power[f]);
-                            /*if(meanPower && maxPower) {
-                                float intensity = power[f] > meanPower ? log2(power[f] / meanPower) / log2(maxPower / meanPower) : 0;
-                                line(int2(x0,y), int2(x1,y), vec4(0,1,0, c));
-                            }*/
-                        }
+                        float y = y12 - log2((float) f / N / meanF1 * exp2(stretch(key)/12)) * size.y;
+                        if(y>y0 && y<y1) maxPower = max(maxPower, power[f]);
                     }
                     float sum = 0;
                     for(Pitch p: s) {
                         float f = p.F0*(N+p.B*cb(N));
-                        float y = y12 - log2(f/N /meanF1 * exp2(stretch(key-12)/12)) * size.y * scale; // Normalizes 2 x meanF1 to 0
-                        if(y>y0 && y<y1) {
-                            //float intensity = 1;
-                            float intensity = 1./s.size;
-                            if(round(f)<power.size) {
-                                float p = power[round(f)];
-                                intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
-                            }
-                            line(int2(x0,y), int2(x1,y), vec4(1,0,1,intensity));
+                        float y = y12 - log2(f/N /meanF1 * exp2(stretch(key)/12)) * size.y * scale;
+                        if(y>y0 && y<y1 && round(f)<power.size) {
+                            float p = power[round(f)];
+                            float intensity = (p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0) / s.size;
+                            line(int2(x0, position.y + y), int2(x1, position.y + y), vec4(color,intensity));
                         }
                         sum += f;
                     }
                     float f = sum / s.size;
-                    float y = y12 - log2(f/N /meanF1 * exp2(stretch(key-12)/12)) * size.y * scale;
-                    if(y>y0 && y<y1) {
-                        float intensity = 1;
-                        //if(round(f)<power.size) intensity *= power[round(f)] / maxPower;
-                        if(round(f)<power.size) {
-                            float p = power[round(f)];
-                            intensity *= p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
-                        }
-                        line(x0,y, x1,y, vec4(1,0,1,intensity));
+                    float y = y12 - log2(f/N /meanF1 * exp2(stretch(key)/12)) * size.y * scale;
+                    if(y>y0 && y<y1 && round(f)<power.size) {
+                        float p = power[round(f)];
+                        float intensity = p  > meanPower ? log2(p / meanPower) / log2(maxPower / meanPower) : 0;
+                        line(x0, position.y + y, x1, position.y + y, vec4(color,intensity));
                     }
                 }
-            }
+            };
+            if(pitch[key]) render(key, 1, vec3(0,1,0));
+            if(key >= 12 && pitch[key-12])  render(key-12, 2, vec3(1,0,1));
         }
         if(audio) queue();
     }
