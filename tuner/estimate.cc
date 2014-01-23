@@ -13,7 +13,7 @@ struct PitchEstimation {
     uint t=0;
 
     // Analysis
-    static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
+    static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist)) TODO: 64K resolution
     static constexpr uint periodSize = 4096;
     buffer<float> signal {N};
     PitchEstimator estimator {N};
@@ -70,8 +70,7 @@ struct PitchEstimation {
         Folder stretch("/var/tmp/stretch"_,root(),true);
         for(int key: keys.keys) {
             const KeyData& data = keys.at(key);
-            String f0B; for(KeyData::Pitch pitch: data.pitch) f0B << ftoa(pitch.F0)+" "_+ftoa(pitch.B,2,0,1)+"\n"_;
-            writeFile(strKey(key)+".f0B"_, f0B, stretch);
+            writeFile(strKey(key)+".f0B"_, cast<byte>(data.pitch), stretch);
             writeFile(strKey(key)+".PSD"_, cast<byte>(data.spectrum), stretch);
         }
     }

@@ -2,10 +2,7 @@
 #include "widget.h"
 
 const int keyCount = 85;
-float stretch(int key) { return
-            1.2/100 * exp2((key-(39+12))/8.) // Treble inharmonicity
-          - 1.2/100 * exp2(-(key-(26))/8.); // Bass inharmonicity
-                       }
+float stretch(int m) { return -exp((-33 - m)/12.) + exp((m - 150)/12.); }
 
 struct OffsetPlot : Widget {
     float offsets[keyCount] = {};
@@ -30,13 +27,13 @@ struct OffsetPlot : Widget {
             int x1 = position.x + (key+1) * size.x / keyCount;
 
 #if 0
-            float target = stretch(key);
+            float target = stretch(21+key)*12;
             float offset = offsets[key];
             int y0 = position.y + size.y * (maximumOffset-target) / (maximumOffset-minimumOffset);
             int y1 = position.y + size.y * (maximumOffset-offset) / (maximumOffset-minimumOffset);
             fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, offset>target ? vec4(1,0,0,1) : vec4(0,0,1,1));
 #else
-            float p0 = stretch(key);
+            float p0 = stretch(21+key)*12;
             int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
 
             float offset = offsets[key]-p0;

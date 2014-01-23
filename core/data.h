@@ -15,6 +15,18 @@ template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
+/// Reinterpret cast a buffer to another type
+template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
+    buffer<T> buffer;
+    buffer.data = (const T*)o.data;
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    buffer.size = o.size*sizeof(O)/sizeof(T);
+    assert((o.capacity*sizeof(O))%sizeof(T) == 0);
+    buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
+    o.capacity = 0;
+    return buffer;
+}
+
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
@@ -159,8 +171,8 @@ struct TextData : virtual Data {
     string whileInteger(bool sign=false);
     /// Reads an integer
     int integer(bool sign=false);
-    /// Reads an unsigned integer, return defaultValue if fails
-    uint mayInteger(uint defaultValue=-1);
+    /// Reads a signed integer, return defaultValue if fails
+    int mayInteger(int defaultValue=-1);
     /// Matches [0-9a-fA-F]*
     string whileHexadecimal();
     /// Reads an hexadecimal integer

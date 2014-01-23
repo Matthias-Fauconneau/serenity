@@ -52,7 +52,6 @@ generic struct array : buffer<T> {
 
     /// \name Appends once (if not already contained) operators
     array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    //array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
     array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
     /// \}
 
@@ -98,7 +97,7 @@ generic struct array : buffer<T> {
             if(at(mid) < key) min = mid+1;
             else max = mid;
         }
-        assert(min == max /*&& at(min) == key*/);
+        assert(min == max);
         return min;
     }
 

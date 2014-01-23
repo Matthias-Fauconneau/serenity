@@ -5,9 +5,6 @@
 
 /// Key symbols
 enum Key {
-#define XK_Page_Up                       0xff55
-#define XK_Next                          0xff56  /* Next */
-#define XK_Page_Down                     0xff56
     Escape=0xff1b, BackSpace=0xff08, Tab, Return=0xff0d,
     Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, PageUp, PageDown, End, PrintScreen=0xff61,
     Execute, Insert,

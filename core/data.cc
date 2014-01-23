@@ -139,8 +139,8 @@ int TextData::integer(bool sign) {
     return toInteger(s, 10);
 }
 
-uint TextData::mayInteger(uint defaultValue) {
-    string s = whileInteger();
+int TextData::mayInteger(int defaultValue) {
+    string s = whileInteger(true);
     return s ? toInteger(s, 10): defaultValue;
 }
 

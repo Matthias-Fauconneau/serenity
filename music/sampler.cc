@@ -121,9 +121,9 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                     }
                 }
                 log(s.name+".env"_,envelope.size);
-                writeFile(s.name+".env"_,cast<byte,float>(envelope),folder);
+                writeFile(s.name+".env"_,cast<float>(envelope),folder);
             }
-            s.envelope = array<float>(cast<float,byte>(readFile(String(s.name+".env"_),folder)));
+            s.envelope = cast<float>(readFile(String(s.name+".env"_),folder));
         }
 
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency

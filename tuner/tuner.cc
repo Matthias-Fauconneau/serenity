@@ -150,8 +150,8 @@ struct Tuner : Poll {
                 {int k = this->worstKey;
                     for(uint i: range(keyCount))
                         if(  k<0 ||
-                             abs(profile.offsets[i ] - stretch(i)) /*+ sqrt(profile.variances[i ])*/ >
-                             abs(profile.offsets[k] - stretch(k)) /*+ sqrt(profile.variances[k])*/ ) k = i;
+                             abs(profile.offsets[i ] - stretch(i)*12) /*+ sqrt(profile.variances[i ])*/ >
+                             abs(profile.offsets[k] - stretch(k)*12) /*+ sqrt(profile.variances[k])*/ ) k = i;
                     if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
                 }
                 this->fOffset.setText(dec(round(100*keyOffset)));
