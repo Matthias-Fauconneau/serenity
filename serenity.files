@@ -69,10 +69,14 @@ tuner/test.cc
 tuner/stretch.cc
 tuner/tuner.cc
 tuner/profile.h
+tuner/estimate.cc
+tuner/normalize.cc
+
+music/sampler.cc
+
 
 algebra.h
 algebra.cc
 lu.h
 lu.cc
 poisson.cc
-tuner/estimate.cc

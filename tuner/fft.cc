@@ -1,8 +1,7 @@
 #include "fft.h"
 #include "math.h"
 #include <fftw3.h> //fftw3f
-#define FFTW_THREADS 1
-#if FFTW_THREADS
+#if __x86_64 // app-emulation/emul-linux-x86-soundlibs does not contain libfftw3f_threads
 #include <fftw3.h> //fftw3f_threads
 void __attribute((constructor(10000))) initialize_FFTW() {
     fftwf_init_threads();

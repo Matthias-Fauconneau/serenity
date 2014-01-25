@@ -152,7 +152,7 @@ template<bool mix> void Resampler::read(const mref<float2>& target) {
         assert(integerIndex<writeIndex || (integerIndex==writeIndex && fractionalIndex==0), integerIndex, writeIndex, fractionalIndex);
         assert(fractionalIndex<targetRate);
     }
-    assert(integerIndex>=writeIndex-2);
+    //assert(integerIndex>=writeIndex-2);
 }
 template void Resampler::read<false>(const mref<float2>& target);
 template void Resampler::read<true>(const mref<float2>& target);

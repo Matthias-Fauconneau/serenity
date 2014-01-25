@@ -69,6 +69,8 @@ String simplify(String&& s);
 String repeat(const string& s, uint times);
 /// Pads a string
 String pad(const string& s, uint length, const string& pad=" "_);
+/// Pads a string to the left
+String left(const string& s, uint length, const string& pad=" "_);
 
 /// Forwards string
 inline const String& str(const String& s) { return s; }

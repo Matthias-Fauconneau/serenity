@@ -105,10 +105,12 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             else error("Unknown opcode"_,key);
         }
     }
+    if(sample==&region) samples.insertSorted(move(region)); // Do not forget to record last region
 
+    if(release) Folder("Envelope"_, folder, true);
     for(Sample& s: samples) {
         if(release) {
-            if(!existsFile(String(s.name+".env"_),folder)) {
+            if(!existsFile(String("Envelope/"_+s.name+".env"_),folder)) {
                 FLAC flac(s.data);
                 array<float> envelope; uint size=0;
                 while(flac.blockSize!=0) {
@@ -120,10 +122,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                         size-=period;
                     }
                 }
-                log(s.name+".env"_,envelope.size);
-                writeFile(s.name+".env"_,cast<float>(envelope),folder);
+                log(s.name, envelope.size);
+                writeFile("Envelope/"_+s.name+".env"_,cast<byte>(envelope),folder);
             }
-            s.envelope = cast<float>(readFile(String(s.name+".env"_),folder));
+            s.envelope = cast<float>(readFile(String("Envelope/"_+s.name+".env"_),folder));
         }
 
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
@@ -191,21 +193,21 @@ float Note::actualLevel(uint size) const {
 }
 
 void Sampler::noteEvent(uint key, uint velocity) {
-    Note* current=0;
+    Note* released=0;
     if(velocity==0) {
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
-            current=&note; //schedule release sample
-            if(note.releaseTime) {//release fade out current note
-                float step = pow(1.0/(1<<24),(/*2 samples/step*/2.0/(rate*note.releaseTime)));
+            released=&note; // Records released note to match release sample level
+            if(note.releaseTime) { // Release fades out current note
+                float step = pow(1.0/(1<<24),(2./*2 frame/step*//(rate*note.releaseTime)));
                 note.step=(v4sf){step,step,step,step};
-                note.level=(v4sf){note.level[0],note.level[0],note.level[0]*step,note.level[0]*step}; // Pedantic
+                note.level[2]=note.level[3]=note.level[0]*step/2; // Steps level of second frame
             }
         }
-        if(!current) return; //already fully decayed
-        velocity=current->velocity;
+        if(!released) return; // Already fully decayed
+        velocity=released->velocity;
     }
     for(const Sample& s : samples) {
-        if(s.trigger == (current?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
+        if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
             {Locker locker(lock);
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
@@ -216,11 +218,11 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 layer->notes.append( ::copy(s.flac) ); // Copies predecoded buffer and corresponding FLAC decoder state
                 Note& note = layer->notes.last();
                 note.envelope = s.envelope;
-                if(!current) { // Press
+                if(!released) { // Press
                     note.key=key, note.velocity=velocity;
                     note.level = float4(s.volume * float(velocity) / 127.f); // E ~ A^2 ~ v^2 => A ~ v
-                } else { // Release (rt_decay is unreliable, matching levels works better)
-                    note.level = float4(min(8.f, current->level[0] * current->actualLevel(1<<14) / note.actualLevel(1<<11))); //341ms/21ms
+                } else { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
+                    note.level = float4(min(8.f, released->level[0] * released->actualLevel(1<<14) / note.actualLevel(1<<11))); // 341ms/21ms
                 }
                 if(note.level[0]<0x1p-15) { layer->notes.removeAt(layer->notes.size-1); return; }
                 note.step=(v4sf){1,1,1,1};
@@ -229,11 +231,10 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
             }
             if(backgroundDecoder) queue(); //queue background decoder in main thread
-            return;
         }
     }
-    if(current) return; //release samples are not mandatory
-    if(key<=30 || key>=90) return; // Harpsichord don't have the lowest/highest piano notes
+    if(released) return; // Release samples are not mandatory
+    if(key<=30 || key>=90) return; // Some instruments have a narrower range
     log("Missing sample"_, key);
 }
 
@@ -304,14 +305,14 @@ uint Sampler::read(const mref<float2>& output) {
         event(); // Decodes before mixing
         for(Layer& layer: layers) for(Note& n: layer.notes) assert_(!n.flac.blockSize || n.readCount > (int)align(2,layer.resampler.need(output.size)));
     }
-    output.clear();
+    output.clear(0);
     int noteCount = 0;
     {Locker locker(lock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
                 uint inSize=align(2,layer.resampler.need(output.size));
                 if(layer.audio.capacity<inSize) layer.audio = buffer<float2>(inSize);
-                layer.audio.clear();
+                layer.audio.clear(0);
                 for(Note& note: layer.notes) note.read(layer.audio);
                 layer.resampler.filter<true>(layer.audio, output);
             } else {
