@@ -156,7 +156,7 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
 }
 void GLShader::bind() { glUseProgram(id); }
 void GLShader::bindSamplers(const ref<string> &textures) { for(int i: range(textures.size)) { GLUniform tex = operator[](textures[i]); if(tex) tex = i; } }
-void GLShader::bindFragments(const ref<string> &fragments) { for(uint i: range(fragments.size)) glBindFragDataLocation(id, i, fragments[i]); }
+//void GLShader::bindFragments(const ref<string> &fragments) { for(uint i: range(fragments.size)) glBindFragDataLocation(id, i, fragments[i]); }
 uint GLShader::attribLocation(const string& name) {
     int location = attribLocations.value(String(name),-1);
     if(location<0) {
@@ -209,7 +209,7 @@ void GLVertexBuffer::upload(const ref<byte>& vertices) {
     vertexCount = vertices.size/vertexSize;
 }
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
-    assert_(id>0); assert_(elementSize<=4);
+    assert_(id!=0); assert_(elementSize<=4);
     int index = program.attribLocation(name);
     assert(index>=0); //if(index<0) return;
     glBindBuffer(GL_ARRAY_BUFFER, id);
@@ -310,7 +310,7 @@ GLTexture::GLTexture(const Image& image, uint format)
     : GLTexture(image.width, image.height, (image.alpha?Alpha:0)|format, image.data) {
     assert(width==image.stride);
 }
-GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data)
+/*GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data)
     :  width(width), height(height), depth(depth), format(Alpha|Bilinear|Clamp) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_3D, id);
@@ -319,7 +319,7 @@ GLTexture::GLTexture(uint width, uint height, uint depth, const ref<byte4>& data
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-}
+}*/
 
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
 void GLTexture::bind(uint sampler) const {

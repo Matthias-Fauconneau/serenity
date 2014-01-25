@@ -52,13 +52,14 @@ struct Sampler : Poll {
 
     uint rate = 0;
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
-    static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
+    //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
-    //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
+    static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
     //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
 
     /// Convolution reverb
-    bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
+    //bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
+    bool enableReverb=true;
     //uint reverbSize=0; // Reverb filter size
     uint N=0; // reverbSize+periodSize
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
@@ -95,18 +96,9 @@ struct Sampler : Poll {
     void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
-    //uint read(const mref<int2>& output);
+    uint read(const mref<int2>& output);
     uint read(const mref<float2>& output);
 
     /// Signals when all samples are done playing
     signal<> silence;
-
-#if WAV // Superseed by record module
-    /// Records performance to WAV file
-    void startRecord(const string& path);
-    void stopRecord();
-    //File record {0};
-    //signal<float* /*data*/, uint /*size*/> frameSent;
-    ~Sampler();
-#endif
 };

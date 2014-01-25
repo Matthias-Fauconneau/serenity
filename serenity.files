@@ -73,7 +73,8 @@ tuner/estimate.cc
 tuner/normalize.cc
 
 music/sampler.cc
-
+music/music.cc
+music/pdf.cc
 
 algebra.h
 algebra.cc

@@ -67,10 +67,16 @@ struct PDF : Widget {
     };
     array<Blit> blits;
 
-    struct Polygon { vec2 min,max; array<Line> edges; array<vec2> vertices;/*GL*/ };
+    struct Polygon {
+        vec2 min,max; array<Line> edges;
+#if GL
+        array<vec2> vertices;
+#endif
+    };
     array<Polygon> polygons;
 
 #if GL
+    float scale = 0;
     GLVertexBuffer glLines;
     GLVertexBuffer glTriangles;
     struct GLBlit { vec2 min,max; const GLTexture& texture; };

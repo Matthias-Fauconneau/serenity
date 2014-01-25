@@ -34,7 +34,7 @@ int2 MidiScore::page(int staff, int t, int h) { return position+int2(staffX(t),t
 
 static void glyph(int2 position, const string name, vec4 color=black) {
     //static Font font{"/usr/share/lilypond/2.16.1/fonts/otf/emmentaler-20.otf"_,128};
-    static Font font{"/Sheets/emmentaler-20.otf"_,128};
+    static Font font{"/Scores/emmentaler-20.otf"_,128};
     const Glyph& glyph = font.glyph(font.index(name));
     blit(position+glyph.offset,glyph.image,color);
 }

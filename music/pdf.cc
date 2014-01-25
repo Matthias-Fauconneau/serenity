@@ -415,7 +415,9 @@ void PDF::open(const string& data) {
             for(Polygon& polygon: polygons.slice(firstPolygon)) {
                 { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
                 for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
+#if GL
                 for(vec2& pos: polygon.vertices) pos=m*pos;
+#endif
             }
             // Updates document bounds
             documentMin = min(documentMin, pageMin);
@@ -435,7 +437,9 @@ void PDF::open(const string& data) {
     for(Polygon& polygon: polygons) {
         { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
         for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
+#if GL
         for(vec2& pos: polygon.vertices) pos=m*pos;
+#endif
     }
     height = (documentMax.y-documentMin.y)/width;
 
@@ -480,13 +484,16 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
                 polygon.min=min(polygon.min,p);
                 polygon.max=max(polygon.max,p);
             }
+            assert(polygon.min < polygon.max);
             polygon.edges = move(lines);
             float area=0;
             for(uint i: range(polyline.size)) {
                 area += cross(polyline[(i+1)%polyline.size]-polyline[i], polyline[(i+2)%polyline.size]-polyline[i]);
             }
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b); // Converts to CCW winding in top-left coordinate system
-            polygon.vertices = move(polyline); // GL
+#if GL
+            polygon.vertices = move(polyline);
+#endif
             polygons << move(polygon);
         }
         if(flags&Trace) this->paths << move(path);
@@ -519,7 +526,7 @@ void PDF::render(int2 position, int2 size) {
     lastSize = size;
 #if GL
     if(!softwareRendering) {
-        float newScale = size.x/(x2-x1); // Fit width
+        float newScale = size.x; // Fit width
         if(newScale != scale) {
             scale = newScale;
             glLines = GLVertexBuffer();
@@ -591,7 +598,7 @@ void PDF::render(int2 position, int2 size) {
         }
 
         for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
-            int2 pos = position+int2(text.key*scale/normalizedScale);
+            int2 pos = position+int2(text.key*scale);
             if(pos.y<=currentClip.min.y) continue;
             if(pos.y>=currentClip.max.y) continue; //break;
             Text(text.value,12,vec4(1,0,0,1)).render(pos,int2(0,0));
@@ -614,8 +621,6 @@ void PDF::render(int2 position, int2 size) {
         if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
         if(a.y > currentClip.max.y+200 && b.y > currentClip.max.y+200) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
-        //a=round(a)+vec2(1./2), b=round(b)+vec2(1./2);
-        //a=round(a), b=round(b);
         line(a,b);
     }
 
@@ -627,8 +632,6 @@ void PDF::render(int2 position, int2 size) {
                 vec2 p = vec2(x,y)+vec2(1./2); float coverage=1;
                 for(const Line& e: polygon.edges) {
                     vec2 a = vec2(position)+scale*e.a, b=vec2(position)+scale*e.b;
-                    //a=round(a), b=round(b);
-                    //a=round(a)+vec2(1./2), b=round(b)+vec2(1./2);
                     float d = cross(p-a,normalize(b-a));
                     if(d>1./2) goto outside;
                     if(d>-1./2) coverage *= 1./2-d;

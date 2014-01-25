@@ -77,6 +77,7 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
         }
         else {
             string key = s.until('=');
+            s.whileAny(" "_);
             string value = s.untilAny(" \n\r"_);
             if(key=="sample"_) {
                 String path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
@@ -231,6 +232,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
             }
             if(backgroundDecoder) queue(); //queue background decoder in main thread
+            return;
         }
     }
     if(released) return; // Release samples are not mandatory
@@ -290,15 +292,12 @@ void Note::read(const mref<float2>& output) {
     flac.position += output.size; //keep track of position for release sample level matching
 }
 
-/*uint Sampler::read(int32* output, uint size) { // Audio thread
-    v4sf buffer[size*2/4];
-    read((float*)buffer, size);
-    for(uint i: range(size*2/4)) ((v4si*)output)[i] = cvtps2dq(buffer[i]*float4(0x1p5f)); // 24bit -> 32bit with 3bit headroom for multiple notes
-#if WAV
-    if(record) record.write(ref<byte>((byte*)output,2*size*sizeof(int32)));
-#endif
+uint Sampler::read(const mref<int2>& output) { // Audio thread
+    v4sf buffer[output.size*2/4];
+    uint size = read(mref<float2>((float2*)buffer, output.size));
+    for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p5f)); // 24bit -> 32bit with 3bit headroom for multiple notes
     return size;
-}*/
+}
 
 uint Sampler::read(const mref<float2>& output) {
     if(!backgroundDecoder) {
@@ -310,11 +309,21 @@ uint Sampler::read(const mref<float2>& output) {
     {Locker locker(lock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
-                uint inSize=align(2,layer.resampler.need(output.size));
-                if(layer.audio.capacity<inSize) layer.audio = buffer<float2>(inSize);
-                layer.audio.clear(0);
-                for(Note& note: layer.notes) note.read(layer.audio);
-                layer.resampler.filter<true>(layer.audio, output);
+                /*int need = layer.resampler.need(output.size);
+                const auto& o = layer.resampler;
+                assert(need >= 0, need, output.size,
+                       o.integerIndex,
+                       output.size*o.integerAdvance+int(o.fractionalIndex+output.size*o.fractionalAdvance+o.targetRate-1)/o.targetRate,
+                       o.writeIndex );*/
+                int need = layer.resampler.need(output.size);
+                if(need >= 0 ) {
+                    uint inSize = align(2, need);
+                    if(layer.audio.capacity<inSize) layer.audio = buffer<float2>(inSize);
+                    layer.audio.clear(0);
+                    for(Note& note: layer.notes) note.read(layer.audio);
+                    layer.resampler.write(layer.audio);
+                }
+                layer.resampler.read<true>(output);
             } else {
                 for(Note& note: layer.notes) note.read(output);
             }
@@ -371,21 +380,5 @@ uint Sampler::read(const mref<float2>& output) {
     return output.size;
 }
 
-/*void Sampler::startRecord(const string& name) {
-    String path = name+".wav"_;
-    record = File(path,home(),Flags(WriteOnly|Create|Truncate));
-    struct { char RIFF[4]={'R','I','F','F'}; int32 size; char WAVE[4]={'W','A','V','E'}; char fmt[4]={'f','m','t',' '};
-             int32 headerSize=16; int16 compression=1; int16 channels=2; int32 rate=44100; int32 bps=rate*channels*sizeof(int32);
-        int16 stride=channels*sizeof(int32); int16 bitdepth=32; char data[4]={'d','a','t','a'}; } packed header;
-    record.write(raw(header));
-    recordStart = time;
-}
-void Sampler::stopRecord() {
-    if(record) { record.seek(4); record.write(raw<int32>(36+time)); record=0; }
-}*/
-
 Sampler::FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
-#if WAV
-Sampler::~Sampler() { stopRecord(); }
-#endif
 constexpr uint Sampler::periodSize;

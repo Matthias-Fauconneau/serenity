@@ -6,7 +6,7 @@
 
 #define SCORE 1
 #define KEYBOARD 1
-#define ENCODE 1
+#define ENCODE 0
 #if !ENCODE
 #define WINDOW 1
 #define AUDIO 1
@@ -184,6 +184,7 @@ struct Music {
         pdfScore.scrollbar = true;
         pdfScore.contentChanged.connect(&window,&Window::render);
         window.frameSent.connect(this,&Music::smoothScroll);
+
 
         window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
