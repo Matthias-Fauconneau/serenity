@@ -45,7 +45,7 @@ static void scaleValues(VolumeFloat& target, const VolumeFloat& source, const fl
 }
 class(ScaleValues, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(float); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         scaleValues(outputs[0], inputs[0], parseScalar(otherInputs[0]->data));
     }
 };
@@ -81,7 +81,7 @@ static void maximum(Volume16& target, const Volume16& source, uint16 maximum) {
 }
 class(Maximum, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         maximum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
     }
 };
@@ -93,7 +93,7 @@ static void minimum(Volume16& target, const Volume16& source, uint16 minimum) {
 }
 class(Minimum, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         minimum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
     }
 };

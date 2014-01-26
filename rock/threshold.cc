@@ -168,7 +168,6 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
     if(cylinder || source.cylinder) {
         assert_(X-2*marginX==Y-2*marginY);
         radiusSq = sq(X/2-marginX);
-        //log("Masking to cylinder");
     }
     buffer<uint8> mask(X*Y); // Disk mask
     for(int y: range(Y)) for(int x: range(X)) {
@@ -208,9 +207,10 @@ class(Binary, Operation), virtual VolumeOperation {
     string parameters() const override { return "threshold invert mask box"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        assert_(isDecimal(args.at("threshold"_)), "Expected threshold value, got", args.at("threshold"_));
         execute(args, outputs, inputs, (real)args.at("threshold"_));
     }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         assert_(!args.contains("threshold"_) || !isDecimal(args.at("threshold"_)) || args.at("threshold"_)==otherInputs[0]->data);
         execute(args, outputs, inputs, TextData(otherInputs[0]->data).decimal());
     }

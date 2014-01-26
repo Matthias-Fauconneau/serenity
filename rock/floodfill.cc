@@ -22,7 +22,7 @@ void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
 }
 class(ThresholdClip, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         uint clipThreshold = TextData(otherInputs[0]->data).integer();
         thresholdClip(outputs[0], inputs[0], clipThreshold);
     }
@@ -69,7 +69,7 @@ class(FloodFill, Operation), virtual VolumeOperation {
     string parameters() const override { return "seed"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override { floodFill(outputs[0], inputs[0], args.value("seed"_,"111111"_)); }
-    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherInputs) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         uint marginSq = TextData(otherInputs[0]->data).integer();
         uint margin = ceil(sqrt(real(marginSq))); //FIXME: use minimalRadius = SquareRoot minimalSqRadius
         floodFill(outputs[0], inputs[0], args.value("seed"_,"111111"_), margin);

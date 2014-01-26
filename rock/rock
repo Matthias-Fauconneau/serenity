@@ -47,7 +47,7 @@ if transpose=='Z': transposed = resampled
 if !transpose: transposed = resampled
 
 # Segments
-rock = Binary transposed threshold box=source.box mask=1 # if !box: Also clips to cylinder before distance field evaluation
+rock = Binary transposed threshold mask=1 # If source.cylinder: Also clips to cylinder before distance field evaluation
 colored = Colorize transposed threshold # For visualization
 background = Maximum transposed threshold # For visualization
 foreground = Minimum transposed threshold # For visualization
@@ -88,7 +88,7 @@ if !minimalSqRadius: pruned = skeleton
 crop = Crop pruned
 
 # Floodfills skeleton
-unconnected = Binary crop threshold=1 box=crop.box # Binary also Z-orders (speeds up FloodFill, Cluster, FIXME: Bin)
+unconnected = Binary crop threshold=1 # Binary also Z-orders (speeds up FloodFill, Cluster, FIXME: Bin)
 connected-bottom = FloodFill unconnected minimalSqRadius seed=001000 # Keeps pore space connected to bottom face
 connected-top = FloodFill unconnected minimalSqRadius seed=000001 # Keeps pore space connected to top face
 connected-both = Intersect connected-bottom connected-top # Keeps pore space connected to both face
@@ -162,7 +162,10 @@ histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
 
 # Partitions maximum balls between throats and pores using a global radius threshold
 median-radius = HistogramMedian histogram-radius
-maximum-partition = Binary maximum threshold=15 #~4-15vx
+approximate-pores = Binary maximum median-radius
+not-approximate-pores = Negate approximate-pores
+maximum-mask = Binary maximum threshold=1
+approximate-throats = Intersect maximum-mask not-approximate-pores # Removes background
 
 # Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
 volume-connect-pore = Sum histogram-squaredRadius
@@ -191,7 +194,6 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
- maximum-mask = Binary maximum threshold=1 box=crop.box
  denoised-connected = Mask maximum-mask denoised-tiled
  flood = Add pore maximum-mask
  histogram-flood = Histogram flood
