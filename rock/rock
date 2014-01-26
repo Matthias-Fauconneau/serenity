@@ -150,7 +150,7 @@ colored-pores = ColorizeIndex pore-index
 colored-throats = ColorizeIndex throat-index
 
 # Rasterizes skeleton voxel as maximum spheres
-sphere-bins = Bin connected-skeleton
+sphere-bins = Bin connected-skeleton connected-skeleton
 maximum = Rasterize sphere-bins
 
 # Computes histogram of maximum squared radii
