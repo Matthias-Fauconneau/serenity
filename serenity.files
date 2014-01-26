@@ -76,6 +76,8 @@ music/sampler.cc
 music/music.cc
 music/pdf.cc
 
+player.cc
+
 algebra.h
 algebra.cc
 lu.h

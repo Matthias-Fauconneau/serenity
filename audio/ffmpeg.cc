@@ -56,15 +56,6 @@ uint AudioFile::read(const mref<int2>& output) {
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
                     intBuffer = unsafeReference(ref<int2>((int2*)frame->data[0], bufferSize)); // Valid until next frame
                 }
-                /*else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
-                    error("AV_SAMPLE_FMT_FLTP"_);
-                    intBuffer = buffer<int2>(bufferSize);
-                    for(uint i : range(bufferSize)) for(uint j : range(2)) {
-                        int s = ((float*)frame->data[j])[i]*(1<<29);
-                        if(s<-(1<<30) || s >= (1<<30)) error("Clip", s);
-                        intBuffer[i][j] = s;
-                    }
-                }*/
                 else if(audio->sample_fmt == AV_SAMPLE_FMT_S16P) {
                     intBuffer = buffer<int2>(bufferSize);
                     for(uint i : range(bufferSize)) {
@@ -100,7 +91,13 @@ uint AudioFile::read(const mref<float2>& output) {
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
                 if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
+#if __x86_64
+                setExceptions(Invalid | Denormal | DivisionByZero | Overflow); // Allows underflow in FFMPeg AAC decoder
+#endif
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
+#if __x86_64
+                setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); // Restores previous flags
+#endif
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 floatBuffer = buffer<float2>(bufferSize);
@@ -122,11 +119,6 @@ uint AudioFile::read(const mref<float2>& output) {
                         floatBuffer[i][1] = ((int16*)frame->data[1])[i]*0x1.0p-15;
                     }
                 }
-                /*else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    for(uint i : range(bufferSize*channels)) {
-                        floatBuffer[i] = ((int16*)frame->data[0])[i]*0x1.0p-15;
-                    }
-                }*/
                 else error("Unimplemented conversion to float32 from", (int)audio->sample_fmt);
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }

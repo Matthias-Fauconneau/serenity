@@ -14,7 +14,7 @@
 struct Player {
 // Gapless playback
     static constexpr uint channels = 2;
-    AudioFile file;
+    unique<AudioFile> file = 0;
     Resampler resampler;
     //bool resamplerFlushed = false;
     //Resampler nextResampler;
@@ -26,19 +26,19 @@ struct Player {
         for(mref<int2> chunk=output;;) {
             if(!file) break;
             assert(readSize<output.size);
-            int read = 0;
-            if(resampler.sourceRate*audio.rate != file.rate*resampler.targetRate /*&& !resamplerFlushed*/) {
+            size_t read = 0;
+            if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate /*&& !resamplerFlushed*/) {
 #if 0
-                if(file.rate != audio.rate) {
+                if(file->rate != audio.rate) {
                     assert_(!nextResampler);
-                    nextResampler = Resampler(audio.channels, file.rate, audio.rate, audio.periodSize);
+                    nextResampler = Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
                 }
                 if(resampler) { // Flushes previous resampler using start of next file
                     uint previousNeed = resampler.need(resampler.N/2*resampler.sourceRate/resampler.targetRate);
-                    Resampler nextToPrevious(resampler.channels, file.rate, resampler.sourceRate, previousNeed);
+                    Resampler nextToPrevious(resampler.channels, file->rate, resampler.sourceRate, previousNeed);
                     uint sourceNeed = nextToPrevious.need(previousNeed);
                     {float source[sourceNeed*2];
-                        uint sourceRead = file.read(source, sourceNeed); // Ignores the corner case of file smaller than a resampler half filter size
+                        uint sourceRead = file->read(source, sourceNeed); // Ignores the corner case of file smaller than a resampler half filter size
                         nextToPrevious.write(source, sourceRead);
                         if(nextResampler) nextResampler.write(source, sourceRead);} // Also writes into next resampler (FIXME: skipped if no next resampler)
                     uint read = nextToPrevious.available();
@@ -50,14 +50,14 @@ struct Player {
 #else
                 //resampler = Resampler();
                 resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert_(!resampler);
-                if(file.rate != audio.rate) new (&resampler) Resampler(audio.channels, file.rate, audio.rate, audio.periodSize);
+                if(file->rate != audio.rate) new (&resampler) Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
 #endif
             }
             if(resampler) {
-                //if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) {
+                //if(resampler.sourceRate*audio.rate == file->rate*resampler.targetRate) {
                     uint sourceNeed = resampler.need(chunk.size);
                     buffer<float2> source(sourceNeed);
-                    uint sourceRead = file.read(source);
+                    uint sourceRead = file->read(source);
                     resampler.write(source.slice(0, sourceRead));
                 //}
                 read = min(chunk.size, resampler.available());
@@ -69,11 +69,11 @@ struct Player {
                         chunk[i][1] = target[i][1]*(1<<29); // 3dB headroom
                     }
                 }
-            } else /*if(!nextResampler)*/ read = file.read(chunk);
+            } else /*if(!nextResampler)*/ read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
-            if(readSize == output.size) { update(file.position/file.rate,file.duration/file.rate); break; } // Complete chunk
-            else /*if(resampler.sourceRate*audio.rate == file.rate*resampler.targetRate) */next(); // End of file
+            if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk
+            else /*if(resampler.sourceRate*audio.rate == file->rate*resampler.targetRate) */next(); // End of file
             /*else { // Previous resampler can be replaced once properly flushed
                 resampler = move(nextResampler); nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
                 assert_(!nextResampler);
@@ -160,7 +160,7 @@ struct Player {
         window.show();
         mainThread.setPriority(-20);
     }
-    ~Player() { writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate))); }
+    ~Player() { writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file->position/file->rate))); }
     void queueFile(const string& folder, const string& file, bool withAlbumName=true) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
@@ -185,16 +185,16 @@ struct Player {
     }
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
-        file = AudioFile("/Music/"_+files[index]);
-        if(!file) return;
-        assert(audio.channels==file.channels);
+        file = unique<AudioFile>("/Music/"_+files[index]);
+        if(!file->file) { file=0; return; }
+        assert(audio.channels==file->channels);
         setPlaying(true);
     }
     void next() {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
-        else { setPlaying(false); file.close(); return; }
+        else { setPlaying(false); file->close(); return; }
         updatePlaylist();
     }
     void setRandom(bool random) {
@@ -235,17 +235,17 @@ struct Player {
                 lastPeriod[i*2] *= level;
                 lastPeriod[i*2+1] *= level;
             }
-            file.seek(max(0, int(file.position-lastPeriod.size)));
+            file->seek(max(0, int(file->position-lastPeriod.size)));
             lastPeriod=mref<int2>();
             audio.stop();
             window.setIcon(pauseIcon());
         }
         playButton.enabled=play;
         window.render();
-        writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file.position/file.rate)));
+        writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file->position/file->rate)));
     }
     void seek(int position) {
-        if(file) { file.seek(position*file.rate); update(file.position/file.rate,file.duration/file.rate); resampler.clear(); audio.cancel(); }
+        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); resampler.clear(); audio.cancel(); }
     }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
