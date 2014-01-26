@@ -28,6 +28,7 @@ class(ThresholdClip, Operation), virtual VolumeOperation {
     }
 };
 
+/// Marks all volume voxels connected to the seeded faces
 void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, uint margin=0) {
     assert_(source.tiled() && target.tiled());
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
@@ -39,12 +40,12 @@ void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, ui
     uint64 stackSize=0;
 
     // Seeds faces
-    if(seed[0]=='1') for(uint z=marginZ;z<Z-marginZ;z++) for(uint y=marginY;y<Y-marginY;y++) stack[stackSize++] = short3(marginX+margin,y,z);
-    if(seed[1]=='1') for(uint z=marginZ;z<Z-marginZ;z++) for(uint x=marginX;x<X-marginX;x++) stack[stackSize++] = short3(x,marginY+margin,z);
-    if(seed[2]=='1') for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) stack[stackSize++] = short3(x,y,marginZ+margin);
-    if(seed[3]=='1') for(uint z=marginZ;z<Z-marginZ;z++) for(uint y=marginY;y<Y-marginY;y++) stack[stackSize++] = short3(X-1-marginX-margin,y,z);
-    if(seed[4]=='1') for(uint z=marginZ;z<Z-marginZ;z++) for(uint x=marginX;x<X-marginX;x++) stack[stackSize++] = short3(x,Y-1-marginY-margin,z);
-    if(seed[5]=='1') for(uint y=marginY;y<Y-marginY;y++) for(uint x=marginX;x<X-marginX;x++) stack[stackSize++] = short3(x,y,Z-1-marginZ-margin);
+    if(seed[0]=='1') for(uint z: range(marginZ,Z-marginZ)) for(uint y: range(marginY,Y-marginY)) stack[stackSize++] = short3(marginX+margin,y,z);
+    if(seed[1]=='1') for(uint z: range(marginZ,Z-marginZ)) for(uint x: range(marginX,X-marginX)) stack[stackSize++] = short3(x,marginY+margin,z);
+    if(seed[2]=='1') for(uint y: range(marginY,Y-marginY)) for(uint x: range(marginX,X-marginX)) stack[stackSize++] = short3(x,y,marginZ+margin);
+    if(seed[3]=='1') for(uint z: range(marginZ,Z-marginZ)) for(uint y: range(marginY,Y-marginY)) stack[stackSize++] = short3(X-1-marginX-margin,y,z);
+    if(seed[4]=='1') for(uint z: range(marginZ,Z-marginZ)) for(uint x: range(marginX,X-marginX)) stack[stackSize++] = short3(x,Y-1-marginY-margin,z);
+    if(seed[5]=='1') for(uint y: range(marginY,Y-marginY)) for(uint x: range(marginX,X-marginX)) stack[stackSize++] = short3(x,y,Z-1-marginZ-margin);
 
     uint8* const targetData = target;
     clear(targetData, target.size());
@@ -74,6 +75,54 @@ class(FloodFill, Operation), virtual VolumeOperation {
         uint margin = ceil(sqrt(real(marginSq))); //FIXME: use minimalRadius = SquareRoot minimalSqRadius
         floodFill(outputs[0], inputs[0], args.value("seed"_,"111111"_), margin);
     }
+};
+
+/// Marks each connected subset of the volume with a unique index
+void floodFillSplit(Volume16& target, const Volume8& source) {
+    assert_(source.tiled() && target.tiled());
+    const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
+    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const uint8* const sourceData = source;
+    uint16* const targetData = target;
+    clear(targetData, target.size());
+
+    for(uint64 regionIndex=1, seedIndex=0;;regionIndex++) {
+        buffer<short3> stackBuffer( X*Y*Z ); // 1024^3 ~ 6GiB
+        short3* const stack = stackBuffer.begin();
+        uint64 stackSize=0;
+
+        // S first unprocessed voxel
+        for(;;seedIndex++) {
+            if(seedIndex >= X*Y*Z) return; // End of volume: All regions have been processed
+            int3 p = zOrder(seedIndex); uint x=p.x, y=p.y, z=p.z;
+            if(x<marginX || x>=X-marginX || y<marginY || y>=Y-marginY || z<marginZ || z>=Z-marginZ) continue;
+            if(sourceData[seedIndex] && !targetData[seedIndex]) { // Next unprocessed region
+                stack[stackSize++] = short3(p);
+                break;
+            }
+        }
+        assert_(regionIndex<1<<16);
+
+        while(stackSize) {
+            const short3& p = stack[--stackSize];
+            uint x=p.x, y=p.y, z=p.z;
+            for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
+                uint nx=x+dx, ny=y+dy, nz=z+dz;
+                if(nx<marginX || nx>=X-marginX || ny<marginY || ny>=Y-marginY || nz<marginZ || nz>=Z-marginZ) continue;
+                uint64 index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
+                if(sourceData[index] && !targetData[index]) {
+                    targetData[index] = regionIndex; // Marks previously unvisited skeleton voxel
+                    stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
+                    assert_(stackSize<stackBuffer.capacity);
+                }
+            }
+        }
+    }
+}
+class(FloodFillSplit, Operation), virtual VolumeOperation {
+    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { floodFillSplit(outputs[0], inputs[0]); }
 };
 
 void intersect(Volume8& target, const Volume8& A, const Volume8& B) {

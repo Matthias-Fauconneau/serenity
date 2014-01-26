@@ -166,6 +166,8 @@ approximate-pores = Binary maximum median-radius
 not-approximate-pores = Negate approximate-pores
 maximum-mask = Binary maximum threshold=1
 approximate-throats = Intersect maximum-mask not-approximate-pores # Removes background
+approximate-pore-index = FloodFillSplit approximate-pores
+approximate-colored-pores = ColorizeIndex approximate-pore-index
 
 # Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
 volume-connect-pore = Sum histogram-squaredRadius
