@@ -164,33 +164,38 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int marginX=target.margin.x=source.margin.x, marginY=target.margin.y=source.margin.y, marginZ=target.margin.z=source.margin.z;
     bool tiled = source.tiled();
-    assert_(X%16==0);
     uint radiusSq = -1;
-    if(cylinder) {
+    if(cylinder || source.cylinder) {
         assert_(X-2*marginX==Y-2*marginY);
         radiusSq = sq(X/2-marginX);
         //log("Masking to cylinder");
     }
-    uint8 mask[X*Y]; // Disk mask
-    for(int y=0; y<Y; y++) for(int x=0; x<X; x++) mask[y*X+x]= y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq;
-    uint8* const targetData = target;
+    buffer<uint8> mask(X*Y); // Disk mask
+    for(int y: range(Y)) for(int x: range(X)) {
+        mask[y*X+x]= y<marginY || y>=Y-marginY || x<marginX || x>=X-marginX || uint(sq(y-Y/2)+sq(x-X/2)) > radiusSq;
+    }
+    const ref<T> sourceData = source;
+    const mref<uint8> targetData = target;
     interleavedLookup(target);
-    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const ref<uint64> offsetX = target.offsetX, offsetY = target.offsetY, offsetZ = target.offsetZ;
     uint64 count[2] = {};
     parallel(0, Z, [&](uint, int z) {
-        const T* const sourceZ = source + (tiled ? offsetZ[z] : z*X*Y);
-        uint8* const targetZ = targetData + offsetZ[z];
-        if(z < marginZ || z>=Z-marginZ) for(int y=0; y<Y; y++) { uint8* const targetZY = targetZ + offsetY[y]; for(int x=0; x<X; x++) targetZY[x]=1; }
-        else for(int y=0; y<Y; y++) {
-            const T* const sourceY = sourceZ + (tiled ? offsetY[y] : y*X);
-            uint8* const targetZY = targetZ + offsetY[y];
-            uint8* const maskY = mask + y*X;
+        const ref<T> sourceZ = tiled ? sourceData.slice(offsetZ[z]) : sourceData.slice(z*X*Y, X*Y);
+        const mref<uint8> targetZ = targetData.slice(offsetZ[z]);
+        if(z < marginZ || z>=Z-marginZ) for(uint y: range(Y)) {
+            const mref<uint8> targetZY = targetZ.slice(offsetY[y], X);
+            for(uint x: range(X)) targetZY[offsetX[x]]=1;
+        }
+        else for(uint y: range(Y)) {
+            const ref<T> sourceZY = tiled ? sourceZ.slice(offsetY[y]) : sourceZ.slice(y*X, X);
+            const mref<uint8> targetZY = targetZ.slice(offsetY[y]);
+            const ref<uint8> maskY = mask.slice(y*X, X);
             if(maskValue==1) { // Masked pixel are 1
-                if(invert) for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] < threshold || maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
-                else for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] >= threshold || maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+                if(invert) for(int x=0; x<X; x++) { bool value = sourceZY[tiled ? offsetX[x] : x] < threshold || maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+                else for(uint x: range(X)) { bool value = sourceZY[tiled ? offsetX[x] : x] >= threshold || maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
             } else { // Masked pixel are 0
-                if(invert) for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] < threshold && !maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
-                else for(int x=0; x<X; x++) { bool value = sourceY[tiled ? offsetX[x] : x] >= threshold && !maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+                if(invert) for(int x=0; x<X; x++) { bool value = sourceZY[tiled ? offsetX[x] : x] < threshold && !maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
+                else for(int x=0; x<X; x++) { bool value = sourceZY[tiled ? offsetX[x] : x] >= threshold && !maskY[x]; targetZY[offsetX[x]] = value; count[value]++; }
             }
         }
     });
@@ -211,8 +216,8 @@ class(Binary, Operation), virtual VolumeOperation {
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, real threshold) {
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
-        /**/ if(inputs[0].sampleSize==1) ::binary<uint8>(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, !args.contains("box"_));
-        else if(inputs[0].sampleSize==2) ::binary<uint16>(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, !args.contains("box"_));
+        /**/ if(inputs[0].sampleSize==1) ::binary<uint8>(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, args.contains("cylinder"_));
+        else if(inputs[0].sampleSize==2) ::binary<uint16>(outputs[0], inputs[0], integerThreshold, args.value("invert"_,"0"_)!="0"_, args.value("mask"_,"0"_)!="0"_, args.contains("cylinder"_));
         else error(inputs[0].sampleSize);
     }
 };

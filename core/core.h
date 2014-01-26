@@ -105,17 +105,17 @@ template<> void error(const string& message) __attribute((noreturn));
 
 /// Numeric range
 struct range {
-    range(int start, int stop) : start(start), stop(stop){}
-    range(uint size) : range(0, size){}
+    range(int64 start, int64 stop) : start(start), stop(stop){}
+    range(uint64 size) : range(0, size) {}
     struct iterator {
-        int i;
+        int64 i;
         int operator*() { return i; }
         iterator& operator++() { i++; return *this; }
         bool operator !=(const iterator& o) const{ return i<o.i; }
     };
     iterator begin() const { return {start}; }
     iterator end() const { return {stop}; }
-    int start, stop;
+    int64 start, stop;
 };
 
 /// Unmanaged fixed-size const reference to an array of elements
@@ -159,6 +159,29 @@ generic struct ref {
 
     const T* data = 0;
     size_t size = 0;
+};
+
+/// Unmanaged fixed-size mutable reference to an array of elements
+generic struct mref : ref<T> {
+    /// Default constructs an empty reference
+    mref(){}
+    /// References \a size elements from \a data pointer
+    mref(T* data, size_t size) : ref<T>(data,size){}
+
+    T* begin() const { return (T*)data; }
+    T* end() const { return (T*)data+size; }
+    T& at(size_t i) const { assert(i<size, i , size); return (T&)data[i]; }
+    T& operator [](size_t i) const { return at(i); }
+    T& first() const { return at(0); }
+    T& last() const { return at(size-1); }
+
+    /// Slices a reference to elements from \a pos to \a pos + \a size
+    mref<T> slice(size_t pos, int64 size) const { assert(pos+size>=0 || pos+size<=this->size); return mref<T>((T*)data+pos, size>=0?size:this->size-pos+size); }
+    /// Slices a reference to elements from to the end of the reference
+    mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+
+    using ref<T>::data;
+    using ref<T>::size;
 };
 
 /// Returns const reference to a static string literal

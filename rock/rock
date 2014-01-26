@@ -83,9 +83,9 @@ if minimalSqRadius: pruned = ThresholdClip skeleton minimalSqRadius
 if !minimalSqRadius: pruned = skeleton
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-#if crop.cylinder: crop = Crop pruned
+#if crop.cylinder: crop = Crop pruned #FIXME: if crop.cylinder or crop.box
 #if !crop.cylinder: crop = pruned #FIXME: if !crop.cylinder and !crop.box
-crop = Crop pruned #FIXME: defaults to cylinder even with source.box (requires crop.box)
+crop = Crop pruned
 
 # Floodfills skeleton
 unconnected = Binary crop threshold=1 box=crop.box # Binary also Z-orders (speeds up FloodFill, Cluster, FIXME: Bin)
@@ -139,7 +139,7 @@ throat-colored-boxes = ColorizeIndex throat-box-volume
 pore-skeleton = RootIndex pores voxelSize
 throat-skeleton = RootIndex throats voxelSize
 
-# Rasterizes skeleton voxel as maximum spheres (with family index attribute)
+# Rasterizes skeleton voxel as maximum balls (with family index attribute)
 pore-bins = Bin connected-skeleton pore-skeleton
 throat-bins = Bin connected-skeleton throat-skeleton
 pore-index = RasterizeAttribute pore-bins
@@ -149,7 +149,7 @@ throat-index = RasterizeAttribute throat-bins
 colored-pores = ColorizeIndex pore-index
 colored-throats = ColorizeIndex throat-index
 
-# Rasterizes skeleton voxel as maximum spheres
+# Rasterizes skeleton voxel as maximum balls
 sphere-bins = Bin connected-skeleton connected-skeleton
 maximum = Rasterize sphere-bins
 
@@ -159,6 +159,10 @@ histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
 # Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius
 histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
+
+# Partitions maximum balls between throats and pores using a global radius threshold
+median-radius = HistogramMedian histogram-radius
+maximum-partition = Binary maximum threshold=15 #~4-15vx
 
 # Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
 volume-connect-pore = Sum histogram-squaredRadius

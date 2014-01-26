@@ -75,8 +75,8 @@ class(Synthetic, Operation), virtual VolumeOperation {
             vec3 center = ellipsoid[3].xyz();
             mat4 nearest; float distance=FLT_MAX;
             for(const mat4& o: ellipsoids) if(o[3].xyz()!=center && sq(o[3].xyz()-center)<distance) distance=sq(o[3].xyz()-center), nearest = o;
-            vec4 a = ellipsoid*vec4(1,1,1,0); float aVolume = a.x*a.y*a.z;
-            vec4 b = nearest*vec4(1,1,1,0); float vVolume = b.x*b.y*b.z;
+            //vec4 a = ellipsoid*vec4(1,1,1,0); float aVolume = a.x*a.y*a.z;
+            //vec4 b = nearest*vec4(1,1,1,0); float vVolume = b.x*b.y*b.z;
             // Rasterizes tubes (throats)
             vec3 A = center, B = nearest[3].xyz();
             float tubeRadius = 1; //max(1., pow(min(aVolume,vVolume), 1./3));

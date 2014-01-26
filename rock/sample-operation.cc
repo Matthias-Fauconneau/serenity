@@ -91,6 +91,7 @@ class(NormalizeAreaXY, Operation), virtual Pass {
     }
 };
 
+/// Computes the mean of the values sampled by the histogram
 class(HistogramMean, Operation), virtual Pass {
     virtual void execute(const Dict& , Result& target, const Result& source) override {
         target.metadata = String("scalar"_);
@@ -98,5 +99,22 @@ class(HistogramMean, Operation), virtual Pass {
         real mean = histogram.mean();
         assert_(mean);
         target.data = toASCII(mean);
+    }
+};
+
+/// Computes the median of the values sampled by the histogram
+class(HistogramMedian, Operation), virtual Pass {
+    virtual void execute(const Dict& , Result& target, const Result& source) override {
+        target.metadata = String("scalar"_);
+        NonUniformHistogram histogram = parseNonUniformSample(source.data);
+        uint64 sampleCount = histogram.sampleCount();
+        uint64 sum = 0; real median = 0;
+        for(const_pair<real,real> value_count: histogram) {
+            real value = value_count.key, count = value_count.value;
+            sum += count;
+            if(sum >= sampleCount) { median = value; break; } // FIXME: bias, TODO: linear interpolation
+        }
+        assert_(median);
+        target.data = toASCII(median);
     }
 };

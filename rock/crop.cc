@@ -82,6 +82,7 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     target.sampleCount = crop.sampleCount;
     assert_(crop.min>=source.margin && crop.max<=source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     target.margin = crop.margin;
+    target.cylinder = crop.cylinder;
     assert_(target.data.size >= target.size()*target.sampleSize);
     target.data.size = target.size()*target.sampleSize;
     const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z;

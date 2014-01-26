@@ -1,6 +1,8 @@
 #pragma once
 #include "image.h"
 
+static_assert(sizeof(size_t)==8,"");
+
 generic struct VolumeT;
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
@@ -43,9 +45,12 @@ struct Volume {
     bool floatingPoint=false;  // Whether the sample are stored as floats
     String field; // Symbol of the sampled field
     int3 origin=0; // Coordinates of the origin in some reference coordinates
+    bool cylinder=false; // Whether only data within the inscribed cylinder is valid
 };
 
 generic struct VolumeT : Volume {
+    operator const ref<T>() const { assert(data.size==sizeof(T)*size()); return ref<T>((const T*)data.data, data.size/sizeof(T)); }
+    operator const mref<T>() { assert(data.size==sizeof(T)*size()); return mref<T>((T*)data.data, data.size/sizeof(T)); }
     operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
     operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
     T operator()(uint x, uint y, uint z) const { return ((const T*)data.data)[index(x,y,z)]; }

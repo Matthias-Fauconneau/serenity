@@ -61,6 +61,7 @@ class(Source, Operation), virtual VolumeOperation {
         target.margin = crop.margin;
         target.field = String("μ"_); // Radiodensity
         target.origin = crop.min-target.margin;
+        target.cylinder = crop.cylinder;
         const uint64 X= target.sampleCount.x, Y= target.sampleCount.y;
         const int64 marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
         Time time; Time report;

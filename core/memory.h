@@ -2,24 +2,6 @@
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
 
-/// Unmanaged fixed-size mutable reference to an array of elements
-generic struct mref : ref<T> {
-    /// Default constructs an empty reference
-    mref(){}
-    /// References \a size elements from \a data pointer
-    mref(T* data, size_t size) : ref<T>(data,size){}
-
-    T* begin() const { return (T*)data; }
-    T* end() const { return (T*)data+size; }
-    T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
-    T& operator [](size_t i) const { return at(i); }
-    T& first() const { return at(0); }
-    T& last() const { return at(size-1); }
-
-    using ref<T>::data;
-    using ref<T>::size;
-};
-
 // Memory operations
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) { return p; }
