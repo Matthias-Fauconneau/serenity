@@ -50,28 +50,81 @@ inline String str(const Matrix2D& M) {
     return s;
 }
 
+inline String str(const Matrix2D& M, const Vector2D& v) {
+    String s;
+    s << repeat("-"_,M.m*(M.n*5+2)) << '\n';
+    for(uint i: range(M.m)) {
+        for(uint j: range(M.n)) {
+            for(uint k: range(M.m)) {
+                for(uint l: range(M.n)) {
+                    s << ftoa(M(i,j,k,l),1,5);
+                }
+                s<<" |"_;
+            }
+            s << ftoa(v(i,j),1,5);
+            s <<'\n';
+        }
+        s << repeat("-"_,M.m*(M.n*5+2));
+        if(i<M.m-1) s << '\n';
+    }
+    return s;
+}
+
 // Resolution MT=S
 struct Poisson {
     const real L = 1;
-#if 1
+#define check assert_(x>=0 && x<=1 && y>=0 && y<=1);
+#if 0
     real Ta(real x, real y) { return sq(x-L/2) + sq(y-L/2); }
     real LTa(real unused x, real unused y) { return 4; }
     real DxTa(real x, real unused y) { return 2*x - L; }
     real DyTa(real unused x, real y) { return 2*y - L; }
+#elif 0
+    real Ta(real x, real y) { return sq(x) + sq(y); }
+    real LTa(real unused x, real unused y) { return 4; }
+    real DxTa(real x, real unused y) { return 2*x; }
+    real DyTa(real unused x, real y) { return 2*y; }
+#elif 0
+    real Ta(real x, real y) { return sq(x); }
+    real LTa(real unused x, real unused y) { return 2; }
+    real DxTa(real x, real unused y) { return 2*x; }
+    real DyTa(real unused x, real y) { return 0; }
+#elif 0
+    real Ta(real x, real y) { return sq(y); }
+    real LTa(real unused x, real unused y) { return 2; }
+    real DxTa(real x, real unused y) { return 0; }
+    real DyTa(real unused x, real y) { return 2*y; }
+#elif 0
+    const real kx = 2*PI/L, ky = 0;
+    real Ta(real x, real y) { check; return sin(kx*x) * cos(ky*y); }
+    real LTa(real x, real y) { check; return - (sq(kx) + sq(ky)) * Ta(x,y); }
+    real DxTa(real x, real y) { check; return + kx * cos(kx*x) * cos(ky*y); }
+    real DyTa(real x, real y) { check; return - ky * sin(kx*x) * sin(ky*y); }
+#elif 0
+    const real kx = 0, ky = 2*PI/L;
+    real Ta(real x, real y) { check; return cos(kx*x) * sin(ky*y); }
+    real LTa(real x, real y) { check; return - (sq(kx) + sq(ky)) * Ta(x,y); }
+    real DxTa(real x, real y) { check; return + kx * sin(kx*x) * sin(ky*y); }
+    real DyTa(real x, real y) { check; return - ky * cos(kx*x) * cos(ky*y); }
 #else
-    real Ta(real x, real y) { return sin(2 * PI/L * x) * cos(2 * PI/L * y);
-    real LTa(real x, real y) { return -2 * sq(2*PI/L) * Ta(x,y); }
-    real DxTa(real x, real y) { return + 2*PI/L * cos(2*PI/L*x) * cos(2*PI/L*y); }
-    real DyTa(real x, real y) { return - 2*PI/L * sin(2*PI/L*x) * sin(2*PI/L*y); }
+    const real kx = 2*PI/L, ky = 2*PI/L;
+    real Ta(real x, real y) { check; return sin(kx*x) * cos(ky*y); }
+    real LTa(real x, real y) { check; return - (sq(kx) + sq(ky)) * Ta(x,y); }
+    real DxTa(real x, real y) { check; return + kx * cos(kx*x) * cos(ky*y); }
+    real DyTa(real x, real y) { check; return - ky * sin(kx*x) * sin(ky*y); }
 #endif
 
     Poisson() {
-        const uint Nx=4, Ny=Nx;
-        // Maillage (irregulier)
+        const uint Nx=16, Ny=Nx;
+        // Maillage
         Vector X (Nx), Y (Ny);
-        //for(uint i: range(Nx)) X[i] = L/2 * (1 - cos(i*PI/(Nx-1)));
+#if 0 // Irregulier
+        for(uint i: range(Nx)) X[i] = L/2 * (1 - cos(i*PI/(Nx-1)));
+        for(uint j: range(Ny)) Y[j] = L/2 * (1 - cos(j*PI/(Ny-1)));
+#else
         for(uint i: range(Nx)) X[i] = L * i / (Nx-1);
         for(uint j: range(Ny)) Y[j] = L * j / (Ny-1);
+#endif
         // Solution analytique
         Vector2D T (Nx,Ny);
         for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = Ta(X[i], Y[j]);
@@ -94,9 +147,9 @@ struct Poisson {
             M(i,j, i,  j-1) =             top;
             M(i,j, i,  j+1) =                 bottom;
             M(i,j, i,  j  ) = -left-right-top-bottom;
-            S(i,j) = (xp-xm)*(yp-ym) * -2 * sq(2*PI/L) * T(i,j);
+            S(i,j) = (xp-xm)*(yp-ym) * LTa(X[i],Y[j]);
         }
-#if DIRICHLET
+#if 0 // Dirichlet
         for(uint i: range(Nx)) {
             M(i, 0,    i, 0)    = 1, S(i, 0   ) = T(i, 0);
             M(i, Ny-1, i, Ny-1) = 1, S(i, Ny-1) = T(i, Ny-1);
@@ -120,18 +173,18 @@ struct Poisson {
          m(i,i0, i  ,i0) = -left-right-bottom;
          m(i,i0, i+1,i0) =       right;
          m(i,i0, i,  i1) =             bottom;
-         auto lta = [&](int i, int j) -> real { return !transpose ? LTa(i,j) : LTa(j,i); };
+         auto lta = [&](int i, int j) -> real { return !transpose ? LTa(X[i],Y[j]) : LTa(X[j],Y[i]); };
          real b = lta(i, i0);
          auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
-         s(i,i0) = (xp-xm) * (y12-y[i0]) * (b - f);
+         s(i,i0) = (xp-xm) * ((y12-y[i0]) * b + f);
         };
         for(uint i: range(1,Nx-1)) {
             bord(false, 0,    1,      i, + DyTa(X[i], Y[0   ]));
-            bord(false, Ny-1, Ny-1-1, i, - DyTa(X[i], Y[Ny-1]));
+            bord(false, Ny-1, Ny-1-1, i, + DyTa(X[i], Y[Ny-1]));
         }
         for(uint j: range(1,Ny-1)) {
             bord(true,  0,    1,      j, + DxTa(X[0   ], Y[j]));
-            bord(true,  Nx-1, Nx-1-1, j, - DxTa(X[Nx-1], Y[j]));
+            bord(true,  Nx-1, Nx-1-1, j, + DxTa(X[Nx-1], Y[j]));
         }
         // Dirichlet au coins
         M(0, 0,    0, 0)          = 1, S(0,    0)    = T(0,    0);
@@ -139,17 +192,15 @@ struct Poisson {
         M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
         M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
 #endif
-        log("M"); log(M);
-        log("S"); log(S);
+        if(Nx*Ny <= 16) { log("M=S"); log(M,S); }
 
-        log_("Solving..."_);
+        log_("Solving... "_);
         Vector2D u (solve(M, S), Nx, Ny);
         log("Done");
         log("T"); log(T);
         log("u"); log(u);
-        //log(max(u-T));
-        //Vector2D e = u-T;
-        const Vector2D& e = u;
+        Vector2D e = u-T; log("e", max(e)); log(e);
+        //const Vector2D& e = u;
 
         const uint size = 1024;
         Image& image = *(new Image(size,size));
