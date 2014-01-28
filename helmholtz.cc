@@ -5,6 +5,7 @@
 #include "time.h"
 #include "window.h"
 #include "interface.h"
+#include "plot.h"
 
 real maxabs(const ref<real>& v) { real y=0; for(real x: v) if(abs(x)>y) y=abs(x); return y; }
 
@@ -89,8 +90,11 @@ struct Helmholtz : Widget {
     Vector X, Y;
     Vector2D e;
     real eMax;
-    Window window {this, int2(1024), "Helmholtz"};
+    Plot plot;
+    HBox layout {{&plot, this}};
+    Window window {&layout, int2(1024,512), "Helmholtz"};
     Helmholtz() {
+        plot.dataSets.grow(1);
         step();
         window.localShortcut(Escape).connect([]{exit();});
         window.frameSent.connect(this,&Helmholtz::step);
@@ -199,6 +203,7 @@ struct Helmholtz : Widget {
             log(t, "e="_+ftoa(eMaxt*100,1)+"%"_);
             if(eMaxt >= eMax) break;
             eMax = eMaxt;
+            plot.dataSets.last().insertMulti(N, eMax);
         }
         N++;
         window.render();
