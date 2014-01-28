@@ -1,7 +1,6 @@
 #include "thread.h"
 #include "algebra.h"
 #include "math.h"
-#include "lu.h"
 #include "time.h"
 #include "window.h"
 #include "interface.h"
@@ -123,7 +122,6 @@ struct Helmholtz : Widget {
         // Systeme MT=S
         Matrix2D M (Nx, Ny); // Operateur [256^2]
         Vector2D S (Nx,Ny); // Constante
-        M.elements.clear(0);
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real xm = (X[i-1]+X[i])/2;
             real xp = (X[i]+X[i+1])/2;
@@ -185,7 +183,7 @@ struct Helmholtz : Widget {
 #endif
         log_("N="_+str(Nx)+"x"_+str(Ny)+" "_);
         Time time;
-        PLU plu = factorize(move(M));
+        UMFPACK A = M;
         log("T="_+str(time));
         eMax = inf;
         for(uint t=0;; t++) {
@@ -197,10 +195,10 @@ struct Helmholtz : Widget {
                 real H = (xp-xm)*(yp-ym)/dt;
                 S(i,j) = H*u(i,j) + (xp-xm)*(yp-ym) * LTa(X[i],Y[j]);
             }
-            u = Vector2D(solve(plu, S), Nx, Ny);
+            u = Vector2D(A.solve(S), Nx, Ny);
             e = u-T;
             real eMaxt = maxabs(e);
-            log(t, "e="_+ftoa(eMaxt*100,1)+"%"_);
+            log(t, "e="_+ftoa(eMaxt*100,2)+"%"_);
             if(eMaxt >= eMax) break;
             eMax = eMaxt;
             plot.dataSets.last().insertMulti(N, eMax);
@@ -217,7 +215,7 @@ struct Helmholtz : Widget {
                     real s =
                             (1-v) * ((1-u) * e(i,j  ) + u * e(i+1,j  )) +
                             v     * ((1-u) * e(i,j+1) + u * e(i+1,j+1));
-                    uint8 intensity = (1+s/eMax)/2*0xFF;
+                    uint8 intensity = clip<real>(0,round((1+s/eMax)/2*0xFF),0xFF);
                     framebuffer(position.x + x, position.y + y) = byte4(intensity, intensity, intensity, 0xFF);
                 }
             }

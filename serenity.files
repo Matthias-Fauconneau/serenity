@@ -85,3 +85,5 @@ algebra.cc
 lu.h
 lu.cc
 helmholtz.cc
+sparse.cc
+sparse.h

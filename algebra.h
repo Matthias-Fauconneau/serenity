@@ -1,16 +1,15 @@
 #pragma once
-#include "array.h"
+/// Numeric linear algebra (matrix operations, linear solver)
 #include "string.h"
-
+#include "time.h"
 typedef double real;
 typedef ref<real> vector;
+
+/// Dense vector
 struct Vector : buffer<real> {
     Vector(){}
-    Vector(buffer&& o) : buffer(move(o)) {}
-    explicit Vector(size_t size) : buffer(size, size){ clear(__builtin_nan("")); }
-    template<Type... Args> explicit Vector(real first, Args... args):buffer(1+sizeof...(Args)){
-        real unpacked[]={first, args...}; for(int i: range(1+sizeof...(Args))) at(i)=unpacked[i]; //FIXME
-    }
+    /// Allocates and initializes to zero
+    Vector(uint size):buffer<real>(size,size,0.0){}
 };
 inline String str(const Vector& a, char separator=' ') { return str((const ref<real>&)a, separator); }
 inline Vector operator*(real a, const vector& x) {
@@ -38,27 +37,57 @@ inline Vector operator*(const vector& a, const vector& b) {
     return v;
 }
 
+/// Sparse matrix using compressed column storage (CCS)
 struct Matrix {
-    uint m,n;
-    buffer<real> elements;
-    Matrix() {}
-    Matrix(ref<ref<real>>);
-    Matrix(uint m, uint n) : m(m), n(n), elements(m*n) { elements.clear(__builtin_nan("")); }
-    Matrix(uint n) : Matrix(n,n) {}
-    const real& operator ()(uint i, uint j) const { return elements[j*m+i]; } // Column major storage
-    real& operator ()(uint i, uint j) { return elements[j*m+i]; }
+    Matrix(){}
+    Matrix(uint n):m(n),n(n){columns.grow(n);}
+    Matrix(uint m, uint n):m(m),n(n){columns.grow(n);}
+
+    inline real operator()(uint i, uint j) const {
+        assert(i<m && j<n);
+        const array<Element>& column = columns[j];
+        uint index = column.linearSearch(i);
+        if(index<column.size && column[index].row == i) return column[index].value;
+        return 0;
+    }
+
+    inline real& operator()(uint i, uint j) {
+        assert(i<m && j<n);
+        array<Element>& column = columns[j];
+        uint index = column.linearSearch(i);
+        if(index<column.size && column[index].row == i) return column[index].value;
+        return column.insertAt(index,Element{i,0.0}).value;
+    }
+
+    uint m=0,n=0; /// row and column count
+    struct Element {
+        uint row; real value;
+        bool operator <(uint row) const { return this->row<row; }
+    };
+    array<array<Element> > columns;
 };
-inline Matrix copy(const Matrix& o) { Matrix t(o.m,o.n); t.elements=copy(o.elements); return move(t); }
+inline Matrix copy(const Matrix& A) { Matrix t(A.m,A.n); t.columns=copy(A.columns); return t; }
 String str(const Matrix& A);
-inline Vector operator*(const Matrix& A, const vector& x) {
-    assert(A.n == x.size);
-    Vector y (A.m);
-    for(uint i: range(A.m)) { y[i]=0; for(uint k: range(A.n)) y[i] += A(i,k)*x[k]; }
-    return y;
-}
-inline Matrix operator*(const Matrix& A, const Matrix& B) {
-    assert(A.n == B.m);
-    Matrix M(A.m, B.n);
-    for(uint i: range(A.m)) for(uint j: range(B.n)) { M(i,j)=0; for(uint k: range(A.n)) M(i,j) += A(i,k)*B(k,j); }
-    return M;
-}
+
+inline Matrix identity(uint size) { Matrix I(size,size); for(uint i: range(size)) I(i,i)=1; return I; }
+
+//TODO: Expression templates
+Matrix operator*(real a, const Matrix& A);
+Vector operator*(const Matrix& A, const Vector& b);
+Matrix operator+(const Matrix& A, const Matrix& B);
+Matrix operator-(const Matrix& A, const Matrix& B);
+
+struct UMFPACK {
+    UMFPACK(){}
+    UMFPACK(const Matrix& A);
+
+    Vector solve(const Vector& b);
+
+    struct Symbolic : handle<void*> { ~Symbolic(); };
+    struct Numeric : handle<void*> { Numeric(){} default_move(Numeric); ~Numeric(); };
+    uint m=0,n=0;
+    buffer<int> columnPointers;
+    buffer<int> rowIndices;
+    buffer<real> values;
+    Numeric numeric;
+};
