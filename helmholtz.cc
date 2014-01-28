@@ -75,7 +75,7 @@ inline String str(const Matrix2D& M, const Vector2D& v) {
 }
 
 // Resolution (dt - L)T = S
-struct Helmholtz {
+struct Helmholtz : Widget {
     const real L = 1;
     const real kx = 2*PI/L, ky = 2*PI/L;
     real Ta(real x, real y) { return sin(kx*x) * cos(ky*y); }
@@ -84,112 +84,138 @@ struct Helmholtz {
     real DyTa(real x, real y) { return - ky * sin(kx*x) * sin(ky*y); }
     const real dt = 1;
 
+    Time total;
+    uint N = 4;
+    Vector X, Y;
+    Vector2D e;
+    real eMax;
+    Window window {this, int2(1024), "Helmholtz"};
     Helmholtz() {
-        Time total;
-        for(uint N: range(4,24 +1)) {
-            const uint Nx=N, Ny=Nx;
-            // Maillage
-            Vector X (Nx), Y (Ny);
+        step();
+        window.localShortcut(Escape).connect([]{exit();});
+        window.frameSent.connect(this,&Helmholtz::step);
+        window.show();
+    }
+    void step() {
+        // Maillage
+        const uint Nx=N, Ny=Nx;
+        X = Vector(Nx), Y = Vector(Ny);
 #if 0 // Irregulier
-            for(uint i: range(Nx)) X[i] = L/2 * (1 - cos(i*PI/(Nx-1)));
-            for(uint j: range(Ny)) Y[j] = L/2 * (1 - cos(j*PI/(Ny-1)));
+        for(uint i: range(Nx)) X[i] = L/2 * (1 - cos(i*PI/(Nx-1)));
+        for(uint j: range(Ny)) Y[j] = L/2 * (1 - cos(j*PI/(Ny-1)));
 #else
-            for(uint i: range(Nx)) X[i] = L * i / (Nx-1);
-            for(uint j: range(Ny)) Y[j] = L * j / (Ny-1);
+        for(uint i: range(Nx)) X[i] = L * i / (Nx-1);
+        for(uint j: range(Ny)) Y[j] = L * j / (Ny-1);
 #endif
 
-            // Solution analytique
-            Vector2D T (Nx,Ny);
-            for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = Ta(X[i], Y[j]);
+        // Solution analytique
+        Vector2D T (Nx,Ny);
+        for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = Ta(X[i], Y[j]);
 
-            // Champ solution
-            Vector2D u (Nx,Ny);
-            u.clear(0); // Condition initial
+        // Champ solution
+        Vector2D u (Nx,Ny);
+        u.clear(0); // Condition initial
 
-            // Systeme MT=S
-            Matrix2D M (Nx, Ny); // Operateur [256^2]
-            Vector2D S (Nx,Ny); // Constante
-            M.elements.clear(0);
-            for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+        // Systeme MT=S
+        Matrix2D M (Nx, Ny); // Operateur [256^2]
+        Vector2D S (Nx,Ny); // Constante
+        M.elements.clear(0);
+        for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real xm = (X[i-1]+X[i])/2;
+            real xp = (X[i]+X[i+1])/2;
+            real ym = (Y[j-1]+Y[j])/2;
+            real yp = (Y[j]+Y[j+1])/2;
+            real left = (yp-ym)/(X[i]-X[i-1]);
+            real right = (yp-ym)/(X[i+1]-X[i]);
+            real top = (xp-xm)/(Y[j]-Y[j-1]);
+            real bottom = (xp-xm)/(Y[j+1]-Y[j]);
+            real H = (xp-xm)*(yp-ym)/dt;
+            M(i,j, i-1,j)   = left;
+            M(i,j, i+1,j)   =       right;
+            M(i,j, i,  j-1) =             top;
+            M(i,j, i,  j+1) =                 bottom;
+            M(i,j, i,  j  ) = -left-right-top-bottom+H;
+        }
+#if 0 // Dirichlet
+        for(uint i: range(Nx)) {
+            M(i, 0,    i, 0)    = 1, S(i, 0   ) = T(i, 0);
+            M(i, Ny-1, i, Ny-1) = 1, S(i, Ny-1) = T(i, Ny-1);
+        }
+        for(uint j: range(Ny)) {
+            M(0,   j, 0,   j) = 1, S(0, j)    = T(0, j);
+            M(Nx-1,j, Nx-1,j) = 1, S(Nx-1, j) = T(Nx-1, j);
+        }
+#else // Neumann
+        auto bord = [&](bool transpose, int i0, int i1, int i, real f) {
+            const auto& x = !transpose ? X : Y;
+            const auto& y = !transpose ? Y : X;
+            real xm = (x[i-1]+x[i])/2;
+            real xp = (x[i]+x[i+1])/2;
+            real y12 = (y[i0]+y[i1])/2;
+            real left  = (y12-y[i0])/(x[i]-x[i-1]);
+            real right = (y12-y[i0])/(x[i+1]-x[i]);
+            real bottom = (xp-xm)/(y[i1]-y[i0]);
+            auto m = [&](int i, int j, int k, int l) -> real& { return !transpose ? M(i,j,k,l) : M(j,i,l,k); };
+            m(i,i0, i-1,i0) =  left;
+            m(i,i0, i  ,i0) = -left-right-bottom;
+            m(i,i0, i+1,i0) =       right;
+            m(i,i0, i,  i1) =             bottom;
+            auto lta = [&](int i, int j) -> real { return !transpose ? LTa(X[i],Y[j]) : LTa(X[j],Y[i]); };
+            real b = lta(i, i0);
+            auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
+            s(i,i0) = (xp-xm) * ((y12-y[i0]) * b + f);
+        };
+        for(uint i: range(1,Nx-1)) {
+            bord(false, 0,    1,      i, + DyTa(X[i], Y[0   ]));
+            bord(false, Ny-1, Ny-1-1, i, + DyTa(X[i], Y[Ny-1]));
+        }
+        for(uint j: range(1,Ny-1)) {
+            bord(true,  0,    1,      j, + DxTa(X[0   ], Y[j]));
+            bord(true,  Nx-1, Nx-1-1, j, + DxTa(X[Nx-1], Y[j]));
+        }
+        // Dirichlet au coins
+        M(0, 0,    0, 0)          = 1, S(0,    0)    = T(0,    0);
+        M(Nx-1, 0,    Nx-1, 0)    = 1, S(Nx-1, 0)    = T(Nx-1, 0);
+        M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
+        M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
+#endif
+        log_("N="_+str(Nx)+"x"_+str(Ny)+" "_);
+        Time time;
+        PLU plu = factorize(move(M));
+        log("T="_+str(time));
+        eMax = inf;
+        for(uint t=0;; t++) {
+            for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) { // Source interieur
                 real xm = (X[i-1]+X[i])/2;
                 real xp = (X[i]+X[i+1])/2;
                 real ym = (Y[j-1]+Y[j])/2;
                 real yp = (Y[j]+Y[j+1])/2;
-                real left = (yp-ym)/(X[i]-X[i-1]);
-                real right = (yp-ym)/(X[i+1]-X[i]);
-                real top = (xp-xm)/(Y[j]-Y[j-1]);
-                real bottom = (xp-xm)/(Y[j+1]-Y[j]);
                 real H = (xp-xm)*(yp-ym)/dt;
-                M(i,j, i-1,j)   = left;
-                M(i,j, i+1,j)   =       right;
-                M(i,j, i,  j-1) =             top;
-                M(i,j, i,  j+1) =                 bottom;
-                M(i,j, i,  j  ) = -left-right-top-bottom+H;
+                S(i,j) = H*u(i,j) + (xp-xm)*(yp-ym) * LTa(X[i],Y[j]);
             }
-#if 0 // Dirichlet
-            for(uint i: range(Nx)) {
-                M(i, 0,    i, 0)    = 1, S(i, 0   ) = T(i, 0);
-                M(i, Ny-1, i, Ny-1) = 1, S(i, Ny-1) = T(i, Ny-1);
-            }
-            for(uint j: range(Ny)) {
-                M(0,   j, 0,   j) = 1, S(0, j)    = T(0, j);
-                M(Nx-1,j, Nx-1,j) = 1, S(Nx-1, j) = T(Nx-1, j);
-            }
-#else // Neumann
-            auto bord = [&](bool transpose, int i0, int i1, int i, real f) {
-                const auto& x = !transpose ? X : Y;
-                const auto& y = !transpose ? Y : X;
-                real xm = (x[i-1]+x[i])/2;
-                real xp = (x[i]+x[i+1])/2;
-                real y12 = (y[i0]+y[i1])/2;
-                real left  = (y12-y[i0])/(x[i]-x[i-1]);
-                real right = (y12-y[i0])/(x[i+1]-x[i]);
-                real bottom = (xp-xm)/(y[i1]-y[i0]);
-                auto m = [&](int i, int j, int k, int l) -> real& { return !transpose ? M(i,j,k,l) : M(j,i,l,k); };
-                m(i,i0, i-1,i0) =  left;
-                m(i,i0, i  ,i0) = -left-right-bottom;
-                m(i,i0, i+1,i0) =       right;
-                m(i,i0, i,  i1) =             bottom;
-                auto lta = [&](int i, int j) -> real { return !transpose ? LTa(X[i],Y[j]) : LTa(X[j],Y[i]); };
-                real b = lta(i, i0);
-                auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
-                s(i,i0) = (xp-xm) * ((y12-y[i0]) * b + f);
-            };
-            for(uint i: range(1,Nx-1)) {
-                bord(false, 0,    1,      i, + DyTa(X[i], Y[0   ]));
-                bord(false, Ny-1, Ny-1-1, i, + DyTa(X[i], Y[Ny-1]));
-            }
-            for(uint j: range(1,Ny-1)) {
-                bord(true,  0,    1,      j, + DxTa(X[0   ], Y[j]));
-                bord(true,  Nx-1, Nx-1-1, j, + DxTa(X[Nx-1], Y[j]));
-            }
-            // Dirichlet au coins
-            M(0, 0,    0, 0)          = 1, S(0,    0)    = T(0,    0);
-            M(Nx-1, 0,    Nx-1, 0)    = 1, S(Nx-1, 0)    = T(Nx-1, 0);
-            M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
-            M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
-#endif
-            log_("N="_+str(Nx)+"x"_+str(Ny)+" "_);
-            Time time;
-            PLU plu = factorize(move(M));
-            log("T="_+str(time));
-            real e = inf;
-            for(uint t=0;; t++) {
-                for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) { // Source interieur
-                    real xm = (X[i-1]+X[i])/2;
-                    real xp = (X[i]+X[i+1])/2;
-                    real ym = (Y[j-1]+Y[j])/2;
-                    real yp = (Y[j]+Y[j+1])/2;
-                    real H = (xp-xm)*(yp-ym)/dt;
-                    S(i,j) = H*u(i,j) + (xp-xm)*(yp-ym) * LTa(X[i],Y[j]);
+            u = Vector2D(solve(plu, S), Nx, Ny);
+            e = u-T;
+            real eMaxt = maxabs(e);
+            log(t, "e="_+ftoa(eMaxt*100,1)+"%"_);
+            if(eMaxt >= eMax) break;
+            eMax = eMaxt;
+        }
+        N++;
+        window.render();
+    }
+    void render(int2 position, int2 size) override {
+        for(uint i: range(e.m-1)) for(uint j: range(e.n-1)) {
+            for(uint y: range(round(size.y*Y[j]),round(size.y*Y[j+1]))) {
+                for(uint x: range(round(size.x*X[i]),round(size.x*X[i+1]))) {
+                    real u = ((x+1./2)/size.x-X[i])/(X[i+1]-X[i]);
+                    real v = ((y+1./2)/size.y-Y[j])/(Y[j+1]-Y[j]);
+                    real s =
+                            (1-v) * ((1-u) * e(i,j  ) + u * e(i+1,j  )) +
+                            v     * ((1-u) * e(i,j+1) + u * e(i+1,j+1));
+                    uint8 intensity = (1+s/eMax)/2*0xFF;
+                    framebuffer(position.x + x, position.y + y) = byte4(intensity, intensity, intensity, 0xFF);
                 }
-                u = Vector2D(solve(plu, S), Nx, Ny);
-                real eMax = maxabs(u-T);
-                log(t, "e="_+ftoa(eMax*100,1)+"%"_);
-                if(eMax >= e) break;
-                e = eMax;
             }
         }
-        log(total);
     }
 } test;
