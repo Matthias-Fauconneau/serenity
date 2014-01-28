@@ -82,4 +82,4 @@ algebra.h
 algebra.cc
 lu.h
 lu.cc
-poisson.cc
+helmholtz.cc
