@@ -2,12 +2,16 @@
 #include "algebra.h"
 #include "math.h"
 #include "lu.h"
+#include "time.h"
 #include "window.h"
 #include "interface.h"
 
+real maxabs(const ref<real>& v) { real y=0; for(real x: v) if(abs(x)>y) y=abs(x); return y; }
+
 // 2D field as a vector
 struct Vector2D : Vector {
-    const uint m, n;
+    uint m, n;
+    Vector2D():m(0),n(0){}
     Vector2D(Vector&& v, uint m, uint n):Vector(move(v)),m(m),n(n){}
     Vector2D(uint m, uint n):Vector(m*n),m(m),n(n){}
     real& operator ()(uint i, uint j) { return at(j*m+i); }
@@ -73,49 +77,14 @@ inline String str(const Matrix2D& M, const Vector2D& v) {
 // Resolution MT=S
 struct Poisson {
     const real L = 1;
-#define check assert_(x>=0 && x<=1 && y>=0 && y<=1);
-#if 0
-    real Ta(real x, real y) { return sq(x-L/2) + sq(y-L/2); }
-    real LTa(real unused x, real unused y) { return 4; }
-    real DxTa(real x, real unused y) { return 2*x - L; }
-    real DyTa(real unused x, real y) { return 2*y - L; }
-#elif 0
-    real Ta(real x, real y) { return sq(x) + sq(y); }
-    real LTa(real unused x, real unused y) { return 4; }
-    real DxTa(real x, real unused y) { return 2*x; }
-    real DyTa(real unused x, real y) { return 2*y; }
-#elif 0
-    real Ta(real x, real y) { return sq(x); }
-    real LTa(real unused x, real unused y) { return 2; }
-    real DxTa(real x, real unused y) { return 2*x; }
-    real DyTa(real unused x, real y) { return 0; }
-#elif 0
-    real Ta(real x, real y) { return sq(y); }
-    real LTa(real unused x, real unused y) { return 2; }
-    real DxTa(real x, real unused y) { return 0; }
-    real DyTa(real unused x, real y) { return 2*y; }
-#elif 0
-    const real kx = 2*PI/L, ky = 0;
-    real Ta(real x, real y) { check; return sin(kx*x) * cos(ky*y); }
-    real LTa(real x, real y) { check; return - (sq(kx) + sq(ky)) * Ta(x,y); }
-    real DxTa(real x, real y) { check; return + kx * cos(kx*x) * cos(ky*y); }
-    real DyTa(real x, real y) { check; return - ky * sin(kx*x) * sin(ky*y); }
-#elif 0
-    const real kx = 0, ky = 2*PI/L;
-    real Ta(real x, real y) { check; return cos(kx*x) * sin(ky*y); }
-    real LTa(real x, real y) { check; return - (sq(kx) + sq(ky)) * Ta(x,y); }
-    real DxTa(real x, real y) { check; return + kx * sin(kx*x) * sin(ky*y); }
-    real DyTa(real x, real y) { check; return - ky * cos(kx*x) * cos(ky*y); }
-#else
     const real kx = 2*PI/L, ky = 2*PI/L;
-    real Ta(real x, real y) { check; return sin(kx*x) * cos(ky*y); }
-    real LTa(real x, real y) { check; return - (sq(kx) + sq(ky)) * Ta(x,y); }
-    real DxTa(real x, real y) { check; return + kx * cos(kx*x) * cos(ky*y); }
-    real DyTa(real x, real y) { check; return - ky * sin(kx*x) * sin(ky*y); }
-#endif
+    real Ta(real x, real y) { return sin(kx*x) * cos(ky*y); }
+    real LTa(real x, real y) { return - (sq(kx) + sq(ky)) * Ta(x,y); }
+    real DxTa(real x, real y) { return + kx * cos(kx*x) * cos(ky*y); }
+    real DyTa(real x, real y) { return - ky * sin(kx*x) * sin(ky*y); }
 
     Poisson() {
-        const uint Nx=16, Ny=Nx;
+        const uint Nx=32, Ny=Nx;
         // Maillage
         Vector X (Nx), Y (Ny);
 #if 0 // Irregulier
@@ -125,6 +94,7 @@ struct Poisson {
         for(uint i: range(Nx)) X[i] = L * i / (Nx-1);
         for(uint j: range(Ny)) Y[j] = L * j / (Ny-1);
 #endif
+
         // Solution analytique
         Vector2D T (Nx,Ny);
         for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = Ta(X[i], Y[j]);
@@ -192,16 +162,19 @@ struct Poisson {
         M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
         M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
 #endif
-        if(Nx*Ny <= 16) { log("M=S"); log(M,S); }
+        if(Nx*Ny <= 4*4) { log("M=S"); log(M,S); }
 
-        log_("Solving... "_);
-        Vector2D u (solve(M, S), Nx, Ny);
-        log("Done");
-        log("T"); log(T);
-        log("u"); log(u);
-        Vector2D e = u-T; log("e", max(e)); log(e);
-        //const Vector2D& e = u;
-
+        log_("N="_+str(Nx)+"x"_+str(Ny));
+        Vector2D u; {Time time; u = Vector2D(solve(M, S), Nx, Ny); log_(" T="_+str(time));}
+        Vector2D e = u-T;
+        if(Nx*Ny <= 16*16) {
+            log("T"); log(T);
+            log("u"); log(u);
+            log("e"); log(e);
+        }
+        real eMax = maxabs(e);
+        log(" eMax="_+ftoa(eMax*100,1)+"%"_);
+#if UI
         const uint size = 1024;
         Image& image = *(new Image(size,size));
         for(uint i: range(Nx-1)) for(uint j: range(Ny-1)) {
@@ -211,17 +184,14 @@ struct Poisson {
                 real s =
                         (1-v) * ((1-u) * e(i,j  ) + u * e(i+1,j  )) +
                         v     * ((1-u) * e(i,j+1) + u * e(i+1,j+1));
-#if 0
-                assert_(s>=-1 && s<=1);
-#else
-                s = clip(-1., s, 1.);
-#endif
-                image(x, y) = (1+s/max(e))/2*0xFF;
+                assert_(s>=-eMax && s<=eMax);
+                image(x, y) = (1+s/eMax)/2*0xFF;
             }
         }
         while(image.size() <= int2(512)) image=upsample(image);
         Window& window = *(new Window(new ImageWidget(image),int2(-1),"Poisson"));
         window.localShortcut(Escape).connect([]{exit();});
         window.show();
+#endif
     }
 } test;

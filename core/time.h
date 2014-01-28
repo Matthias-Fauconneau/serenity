@@ -25,7 +25,7 @@ struct Time {
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     operator float() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
 };
-inline String str(const Time& t) { return str((float)t); }
+inline String str(const Time& t) { return str((float)t)+"s"_; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

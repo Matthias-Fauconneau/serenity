@@ -5,6 +5,7 @@
 typedef double real;
 typedef ref<real> vector;
 struct Vector : buffer<real> {
+    Vector(){}
     Vector(buffer&& o) : buffer(move(o)) {}
     explicit Vector(size_t size) : buffer(size, size){ clear(__builtin_nan("")); }
     template<Type... Args> explicit Vector(real first, Args... args):buffer(1+sizeof...(Args)){
