@@ -232,8 +232,7 @@ struct Player {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
             for(uint i: range(lastPeriod.size)) {
                 float level = exp2(-12. * i / lastPeriod.size); // Linear perceived sound level
-                lastPeriod[i*2] *= level;
-                lastPeriod[i*2+1] *= level;
+                lastPeriod[i] *= level;
             }
             file->seek(max(0, int(file->position-lastPeriod.size)));
             lastPeriod=mref<int2>();
