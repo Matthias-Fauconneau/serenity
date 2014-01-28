@@ -12,7 +12,7 @@ generic struct mref : ref<T> {
     /// References \a size elements from \a data pointer
     mref(T* data, size_t size) : ref<T>(data,size) {}
     /// Converts an std::initializer_list to mref
-    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.data, list.size) {}
+    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
     /// Converts a static array to ref
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 

@@ -83,8 +83,9 @@ void Plot::render(int2 position, int2 size) {
     // Colors
     buffer<vec4> colors(dataSets.size);
     if(colors.size==1) colors[0] = black;
-    else if(colors.size==2) colors[0] = red, colors[1] = blue;
-    else error(""); //for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(2*PI*i/colors.size,1,1),1.f); //FIXME: constant intensity
+    //else if(colors.size==2) colors[0] = red, colors[1] = blue;
+    //else if(colors.size==3) colors[0] = red, colors[1] = green, colors[2] = blue;
+    else for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(1.*i/colors.size,1,1.f),1.f); //FIXME: constant intensity
 
     int2 pen=position;
     {Text text(format(Bold)+title,16,white); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
@@ -141,10 +142,10 @@ void Plot::render(int2 position, int2 size) {
         const auto& data = dataSets[i];
         buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
         if(plotPoints) for(uint i: range(data.size())) {
-            vec2 p = round(points[i]);
-            const int pointRadius = 4;
-            line(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
-            line(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
+            int2 p = int2(round(points[i]));
+            const int pointRadius = 3;
+            line(p-int2(pointRadius, 0), p+int2(pointRadius, 0), color);
+            line(p-int2(0, pointRadius), p+int2(0, pointRadius), color);
         }
         if(plotLines) for(uint i: range(data.size()-1)) line(points[i], points[i+1], color);
     }

@@ -65,8 +65,15 @@ typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ 	size_t;
 constexpr size_t invalid = -1; // Invalid index
 
-//namespace std { generic struct initializer_list { const T* data; size_t len; const T* begin() const { return data; } size_t size() { return len; } }; }
-#include <initializer_list>
+namespace std {
+generic struct initializer_list {
+    const T* data; size_t len;
+    constexpr initializer_list(const T* data, size_t len) : data(data), len(len) {}
+    constexpr const T* begin() const { return data; }
+    constexpr size_t size() const { return len; }
+};
+}
+//#include <initializer_list>
 generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;

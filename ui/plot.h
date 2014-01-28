@@ -3,6 +3,7 @@
 #include "map.h"
 
 struct Plot : virtual Widget {
+    Plot(array<String>&& legends):legends(move(legends)){dataSets.grow(this->legends.size);}
     int2 sizeHint() override;
     void render(int2 position, int2 size) override;
 

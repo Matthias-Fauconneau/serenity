@@ -11,7 +11,7 @@ generic struct array : buffer<T> {
     /// Allocates an uninitialized buffer for \a capacity elements
     explicit array(size_t capacity) : buffer<T>(capacity, 0) {}
     /// Moves elements from a reference
-    explicit array(mref<T>&& ref) : buffer<T>(ref.size) { move(*this, ref); }
+    explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
     /// Copies elements from a reference
     explicit array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
     /// Converts a buffer to an array
@@ -121,12 +121,12 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
 
 /// Returns an array of the application of a function to every index up to a size
 template<class Function, class... Args> auto apply(uint size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
-    buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) r[i] = function(i, args...); return r;
+    buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<class T, class Function, class... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
-    buffer<decltype(function(a[0], args...))> r(a.size); for(uint i: range(a.size)) r[i] = function(a[i], args...); return r;
+    buffer<decltype(function(a[0], args...))> r(a.size); for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...)); return r;
 }
 
 /// Converts arrays to references
