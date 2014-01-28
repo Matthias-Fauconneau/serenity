@@ -4,16 +4,18 @@
 
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
-    /// Configures for recording, does nothing until #start
-    Encoder(int width=1280, int height=720, int fps=30, int rate=48000) : width(width), height(height), fps(fps), rate(rate){}
-    Encoder(function<uint(const mref<float2>& output)> readAudio, int width=1280, int height=720, int fps=30, int rate=48000)
-        : readAudio(readAudio), width(width), height(height), fps(fps), rate(rate){}
+    /// Starts a new file recording video (and audio if enabled)
+    Encoder(const string& name, bool audio=false, int width=1280, int height=720, int fps=30, int rate=48000);
+    Encoder(const string& name, function<uint(const mref<float2>& output)> readAudio,
+            int width=1280, int height=720, int fps=30, int rate=48000) : Encoder(name, true, width, height, fps, rate) {
+        this->readAudio = readAudio;
+    }
+
     ~Encoder() { stop(); }
     operator bool() { return context; }
     int2 size() { return int2(width, height); }
 
-    /// Starts a new file recording \a video and/or \a audio
-    void start(const string& name, bool video=true, bool audio=true);
+
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
@@ -22,7 +24,7 @@ struct Encoder {
     void stop();
 
     /// readAudio will be called back to request an \a audio frame of \a size samples as needed to follow video time
-    function<uint(const mref<float2>& output)> readAudio = [](const mref<float2>&){return 0;};
+    function<uint(const mref<float2>& output)> readAudio =[](const mref<float2>&){return 0;};
 
     uint width, height, fps, rate;
     struct AVFormatContext* context=0;

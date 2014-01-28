@@ -1,5 +1,4 @@
 #include "algebra.h"
-#include <suitesparse/umfpack.h> //umfpack
 
 Vector operator*(real a, const Vector& b) {
     Vector t(b.size);
@@ -66,17 +65,19 @@ Matrix operator-(const Matrix& A, const Matrix& B) {
     return t;
 }
 
-/*extern "C" {
-uint umfpack_di_symbolic(uint m, uint n, const uint* columnPointers, const uint* rowIndices, const double* values, void** symbolic,
+// Not using umfpack headers as it includes stdlib.h
+//#include <suitesparse/umfpack.h> //umfpack
+extern "C" {
+uint umfpack_di_symbolic(uint m, uint n, const int* columnPointers, const int* rowIndices, const double* values, void** symbolic,
                          const double* control, double* info);
 void umfpack_di_free_symbolic(void** symbolic);
-uint umfpack_di_numeric(const uint* columnPointers, const uint* rowIndices, const double* values, void* symbolic, void** numeric,
+uint umfpack_di_numeric(const int* columnPointers, const int* rowIndices, const double* values, void* symbolic, void** numeric,
                         const double* control, double* info);
 void umfpack_di_free_numeric(void** numeric);
 enum System { UMFPACK_A };
-uint umfpack_di_solve(System sys, const uint* columnPointers, const uint* rowIndices, const double* values, double* X, const double* B,
+uint umfpack_di_solve(System sys, const int* columnPointers, const int* rowIndices, const double* values, double* X, const double* B,
                       void* numeric, const double* control, double* info);
-}*/
+}
 
 UMFPACK::Symbolic::~Symbolic(){ umfpack_di_free_symbolic(&pointer); }
 UMFPACK::Numeric::~Numeric(){ umfpack_di_free_numeric(&pointer); }

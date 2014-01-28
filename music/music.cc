@@ -271,9 +271,8 @@ struct Music {
         midi.endOfFile.connect([this,&endOfFile]{ sampler.silence.connect([&endOfFile]{ endOfFile=true; }); });
         assert_(!play);
         togglePlay();
-        Encoder encoder {{&sampler, &Sampler::read}};
         assert_(name);
-        encoder.start(name);
+        Encoder encoder (name, {&sampler, &Sampler::read});
         int lastReport=0;
         for(Image image; !endOfFile;) { // Renders score as quickly as possible (no need for an event loop with any display, audio nor input)
             smoothScroll();

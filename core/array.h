@@ -119,9 +119,14 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=after; return move(a);
 }
 
+/// Returns an array of the application of a function to every index up to a size
+template<class Function, class... Args> auto apply(uint size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
+    buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) r[i] = function(i, args...); return r;
+}
+
 /// Returns an array of the application of a function to every elements of a reference
-template<class Iterable, class Function, class... Args> auto apply(const Iterable& a, Function function, Args... args) -> array<decltype(function(*a.begin(), args...))> {
-    array<decltype(function(*a.begin(), args...))> r(a.size); for(const auto& e: a) r << function(e, args...); return r;
+template<class T, class Function, class... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
+    buffer<decltype(function(a[0], args...))> r(a.size); for(uint i: range(a.size)) r[i] = function(a[i], args...); return r;
 }
 
 /// Converts arrays to references

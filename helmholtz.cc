@@ -5,6 +5,7 @@
 #include "window.h"
 #include "interface.h"
 #include "plot.h"
+#include "encoder.h"
 
 real maxabs(const ref<real>& v) { real y=0; for(real x: v) if(abs(x)>y) y=abs(x); return y; }
 
@@ -84,22 +85,32 @@ struct Helmholtz : Widget {
     real DyTa(real x, real y) { return - ky * sin(kx*x) * sin(ky*y); }
     const real dt = 1;
 
-    Time total;
-    uint N = 4;
     Vector X, Y;
     Vector2D e;
     real eMax;
     Plot plot;
     HBox layout {{&plot, this}};
-    Window window {&layout, int2(1024,512), "Helmholtz"};
+#if UI
+    uint N = 4;
+    Window window {&layout, int2(1024,512), "Helmholtz"_};
+#else
+    Encoder encoder {"Helmholtz"_};
+#endif
     Helmholtz() {
         plot.dataSets.grow(1);
-        step();
+#if UI
+        solve(N++);
         window.localShortcut(Escape).connect([]{exit();});
-        window.frameSent.connect(this,&Helmholtz::step);
+        window.frameSent.connect([this](){solve(N++);});
         window.show();
+#else
+        for(uint N: range(8, 64 +1)) {
+            solve(N);
+            encoder.writeVideoFrame(renderToImage(layout, encoder.size()));
+        }
+#endif
     }
-    void step() {
+    void solve(uint N) {
         // Maillage
         const uint Nx=N, Ny=Nx;
         X = Vector(Nx), Y = Vector(Ny);
@@ -138,7 +149,7 @@ struct Helmholtz : Widget {
             M(i,j, i,  j+1) =                 bottom;
             M(i,j, i,  j  ) = -left-right-top-bottom+H;
         }
-#if 0 // Dirichlet
+#if 1 // Dirichlet
         for(uint i: range(Nx)) {
             M(i, 0,    i, 0)    = 1, S(i, 0   ) = T(i, 0);
             M(i, Ny-1, i, Ny-1) = 1, S(i, Ny-1) = T(i, Ny-1);
@@ -203,8 +214,10 @@ struct Helmholtz : Widget {
             eMax = eMaxt;
             plot.dataSets.last().insertMulti(N, eMax);
         }
-        N++;
+#if UI
+        window.setTitle(str(N));
         window.render();
+#endif
     }
     void render(int2 position, int2 size) override {
         for(uint i: range(e.m-1)) for(uint j: range(e.n-1)) {

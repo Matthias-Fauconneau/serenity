@@ -77,6 +77,8 @@ tuner/normalize.cc
 music/sampler.cc
 music/music.cc
 music/pdf.cc
+music/encoder.cc
+music/encoder.h
 
 player.cc
 

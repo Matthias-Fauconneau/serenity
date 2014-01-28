@@ -139,8 +139,7 @@ void Plot::render(int2 position, int2 size) {
     for(uint i: range(dataSets.size)) {
         vec4 color = colors[i];
         const auto& data = dataSets[i];
-        vec2 points[data.size()];
-        for(uint i: range(data.size())) points[i] = point( vec2(data.keys[i],data.values[i]) );
+        buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
         if(plotPoints) for(uint i: range(data.size())) {
             vec2 p = round(points[i]);
             const int pointRadius = 4;

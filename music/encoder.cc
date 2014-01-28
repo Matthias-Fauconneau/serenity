@@ -14,7 +14,8 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
-void Encoder::start(const string& name, bool video, bool audio) {
+Encoder::Encoder(const string& name, bool audio, int width, int height, int fps, int rate)
+    : width(width), height(height), fps(fps), rate(rate) {
     av_register_all();
     if(context) stop();
 
@@ -23,22 +24,21 @@ void Encoder::start(const string& name, bool video, bool audio) {
     struct AVFormatContext* context=0;
     avformat_alloc_output_context2(&context, 0, 0, strz(path));
 
-    if(video) { // Video
-        AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
-        videoStream = avformat_new_stream(context, codec);
-        videoStream->id = 0;
-        videoCodec = videoStream->codec;
-        avcodec_get_context_defaults3(videoCodec, codec);
-        videoCodec->codec_id = AV_CODEC_ID_H264;
-        videoCodec->bit_rate = 3000000;
-        videoCodec->width = width;
-        videoCodec->height = height;
-        videoStream->time_base.num = videoCodec->time_base.num = 1;
-        videoStream->time_base.den = videoCodec->time_base.den = fps;
-        videoCodec->pix_fmt = PIX_FMT_YUV420P;
-        if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-        avcodec_open2(videoCodec, codec, 0);
-    }
+    // Video
+    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+    videoStream = avformat_new_stream(context, codec);
+    videoStream->id = 0;
+    videoCodec = videoStream->codec;
+    avcodec_get_context_defaults3(videoCodec, codec);
+    videoCodec->codec_id = AV_CODEC_ID_H264;
+    videoCodec->bit_rate = 3000000;
+    videoCodec->width = width;
+    videoCodec->height = height;
+    videoStream->time_base.num = videoCodec->time_base.num = 1;
+    videoStream->time_base.den = videoCodec->time_base.den = fps;
+    videoCodec->pix_fmt = PIX_FMT_YUV420P;
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    avcodec_open2(videoCodec, codec, 0);
 
     if(audio) { // Audio
         AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
