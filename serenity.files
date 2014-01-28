@@ -62,6 +62,8 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/x.h
+ui/plot.cc
+ui/plot.h
 
 tuner/fft.cc
 tuner/pitch.cc
@@ -82,4 +84,6 @@ algebra.h
 algebra.cc
 lu.h
 lu.cc
-poisson.cc
+helmholtz.cc
+sparse.cc
+sparse.h
