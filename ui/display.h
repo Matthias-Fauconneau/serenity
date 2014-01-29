@@ -57,5 +57,9 @@ void line(float x1, float y1, float x2, float y2, vec4 color=black);
 inline void line(vec2 p1, vec2 p2, vec4 color=black) { line(p1.x,p1.y,p2.x,p2.y,color); }
 inline void line(int2 p1, int2 p2, vec4 color=black) { line(p1.x+1./2,p1.y+1./2,p2.x+1./2,p2.y+1./2,color); }
 
-/// Converts hue, saturation, value to linear RGB
-vec3 HSVtoRGB(float h, float s, float v);
+/// Converts lightness, chroma, hue to linear sRGB
+/// sRGB primaries:
+/// Red: L~53.23, C~179.02, h~0.21
+/// Green: L~87.74, C~135.80, h~2.23
+/// Blue: L~32.28, C~130.61, h~-1.64
+vec3 LChuvtoBGR(float L, float C, float h);

@@ -85,7 +85,7 @@ void Plot::render(int2 position, int2 size) {
     if(colors.size==1) colors[0] = black;
     //else if(colors.size==2) colors[0] = red, colors[1] = blue;
     //else if(colors.size==3) colors[0] = red, colors[1] = green, colors[2] = blue;
-    else for(uint i: range(colors.size)) colors[i]=vec4(HSVtoRGB(1.*i/colors.size,1,1.f),1.f); //FIXME: constant intensity
+    else for(uint i: range(colors.size)) colors[i]=vec4(LChuvtoBGR(53,179,2*PI*i/colors.size),1.f); //FIXME: constant intensity
 
     int2 pen=position;
     {Text text(format(Bold)+title,16,white); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
