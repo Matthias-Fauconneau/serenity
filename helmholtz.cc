@@ -75,7 +75,7 @@ inline String str(const Matrix2D& M, const Vector2D& v) {
     return s;
 }
 
-// Resolution (dt - L)T = S
+// Resolution (1/dt - L)T = T0/dt - S
 struct Helmholtz : Widget {
     const real L = 1;
     const real kx = 2*PI/L, ky = 2*PI/L;
@@ -83,10 +83,11 @@ struct Helmholtz : Widget {
     real LTa(real x, real y) { return - (sq(kx) + sq(ky)) * Ta(x,y); }
     real DxTa(real x, real y) { return + kx * cos(kx*x) * cos(ky*y); }
     real DyTa(real x, real y) { return - ky * sin(kx*x) * sin(ky*y); }
-    const real dt = 1;
-
-    const bool regularGrid, dirichletBoundaryCondition;
-    Helmholtz(bool regularGrid, bool dirichletBoundaryCondition) : regularGrid(regularGrid), dirichletBoundaryCondition(dirichletBoundaryCondition) {}
+    const bool regularGrid; // Spatial discretisation
+    const bool dirichletBoundaryCondition; // Boundary condition
+    const real dt; // Time step
+    Helmholtz(bool regularGrid, bool dirichletBoundaryCondition, const real dt = inf) :
+        regularGrid(regularGrid), dirichletBoundaryCondition(dirichletBoundaryCondition), dt(dt) {}
 
     Vector X, Y;
     Vector2D e;
@@ -124,11 +125,11 @@ struct Helmholtz : Widget {
             real top = (xp-xm)/(Y[j]-Y[j-1]);
             real bottom = (xp-xm)/(Y[j+1]-Y[j]);
             real H = (xp-xm)*(yp-ym)/dt;
-            M(i,j, i-1,j)   = left;
-            M(i,j, i+1,j)   =       right;
-            M(i,j, i,  j-1) =             top;
-            M(i,j, i,  j+1) =                 bottom;
-            M(i,j, i,  j  ) = -left-right-top-bottom+H;
+            M(i,j, i-1,j)   =    -left;
+            M(i,j, i+1,j)   =         -right;
+            M(i,j, i,  j-1) =                     -top;
+            M(i,j, i,  j+1) =                           -bottom;
+            M(i,j, i,  j  ) = H+left+right+top+bottom;
         }
         Vector2D S (Nx,Ny); // Constante
         if(dirichletBoundaryCondition) {
@@ -141,7 +142,7 @@ struct Helmholtz : Widget {
                 M(Nx-1,j, Nx-1,j) = 1, S(Nx-1, j) = T(Nx-1, j);
             }
         } else {
-            auto bord = [&](bool transpose, int i0, int i1, int i, real f) {
+            auto bord = [&](bool transpose, int i0, int i1, int i) {
                 const auto& x = !transpose ? X : Y;
                 const auto& y = !transpose ? Y : X;
                 real xm = (x[i-1]+x[i])/2;
@@ -150,23 +151,20 @@ struct Helmholtz : Widget {
                 real left  = (y12-y[i0])/(x[i]-x[i-1]);
                 real right = (y12-y[i0])/(x[i+1]-x[i]);
                 real bottom = (xp-xm)/(y[i1]-y[i0]);
+                real H = (xp-xm)*(y12-y[i0])/dt;
                 auto m = [&](int i, int j, int k, int l) -> real& { return !transpose ? M(i,j,k,l) : M(j,i,l,k); };
-                m(i,i0, i-1,i0) =  left;
-                m(i,i0, i  ,i0) = -left-right-bottom;
-                m(i,i0, i+1,i0) =       right;
-                m(i,i0, i,  i1) =             bottom;
-                auto lta = [&](int i, int j) -> real { return !transpose ? LTa(X[i],Y[j]) : LTa(X[j],Y[i]); };
-                real b = lta(i, i0);
-                auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
-                s(i,i0) = (xp-xm) * ((y12-y[i0]) * b + f);
+                m(i,i0, i-1,i0) =  -left; // -Laplacian
+                m(i,i0, i+1,i0) =       -right; // -Laplacian
+                m(i,i0, i,  i1) =                   -bottom; // Flux //FIXME: account for laplacian?
+                m(i,i0, i  ,i0) = H+left+right+bottom;
             };
             for(uint i: range(1,Nx-1)) {
-                bord(false, 0,    1,      i, + DyTa(X[i], Y[0   ]));
-                bord(false, Ny-1, Ny-1-1, i, + DyTa(X[i], Y[Ny-1]));
+                bord(false, 0,    1,      i);
+                bord(false, Ny-1, Ny-1-1, i);
             }
             for(uint j: range(1,Ny-1)) {
-                bord(true,  0,    1,      j, + DxTa(X[0   ], Y[j]));
-                bord(true,  Nx-1, Nx-1-1, j, + DxTa(X[Nx-1], Y[j]));
+                bord(true,  0,    1,      j);
+                bord(true,  Nx-1, Nx-1-1, j);
             }
             // Dirichlet au coins
             M(0, 0,    0, 0)          = 1, S(0,    0)    = T(0,    0);
@@ -174,19 +172,40 @@ struct Helmholtz : Widget {
             M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
             M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
         }
-        log_("N="_+str(Nx)+"x"_+str(Ny)+" "_);
+        log_((regularGrid ? "Regular"_:"Irregular"_) + " - "_ + (dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)+" N="_+str(Nx)+"x"_+str(Ny)+" "_);
         Time time;
         UMFPACK A = M;
         log("T="_+str(time));
         eMax = inf;
-        for(uint t: range(4)) {
+        for(uint t: range(4/dt +1)) {
             for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) { // Source interieur
                 real xm = (X[i-1]+X[i])/2;
                 real xp = (X[i]+X[i+1])/2;
                 real ym = (Y[j-1]+Y[j])/2;
                 real yp = (Y[j]+Y[j+1])/2;
-                real H = (xp-xm)*(yp-ym)/dt;
-                S(i,j) = H*u(i,j) + (xp-xm)*(yp-ym) * LTa(X[i],Y[j]);
+                S(i,j) = (xp-xm)*(yp-ym) * (u(i,j)/dt - LTa(X[i],Y[j]));
+            }
+            if(!dirichletBoundaryCondition) {
+                auto bord = [&](bool transpose, int i0, int i1, int i) {
+                    const auto& x = !transpose ? X : Y;
+                    const auto& y = !transpose ? Y : X;
+                    real xm = (x[i-1]+x[i])/2;
+                    real xp = (x[i]+x[i+1])/2;
+                    real y12 = (y[i0]+y[i1])/2;
+                    auto source = [&](int i, int j) -> real { return !transpose ? u(i,j)/dt - LTa(X[i],Y[j]) : u(j,i)/dt - LTa(X[j],Y[i]); };
+                    real b = source(i, i0);
+                    auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
+                    real f = !transpose ? DyTa(X[i], Y[i0]) : DxTa(X[i0], Y[i]);
+                    s(i,i0) = (xp-xm) * ((y12-y[i0]) * b - f);
+                };
+                for(uint i: range(1,Nx-1)) {
+                    bord(false, 0,    1,      i);
+                    bord(false, Ny-1, Ny-1-1, i);
+                }
+                for(uint j: range(1,Ny-1)) {
+                    bord(true,  0,    1,      j);
+                    bord(true,  Nx-1, Nx-1-1, j);
+                }
             }
             u = Vector2D(A.solve(S), Nx, Ny);
             e = u-T;

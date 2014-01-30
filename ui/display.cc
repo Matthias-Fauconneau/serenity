@@ -180,13 +180,6 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
 vec3 LChuvtoLuv(float L, float C, float h) {
     return vec3(L, C*cos(h) , C*sin(h));
 }
-vec3 LuvtoLChuv(float L, float u, float v) {
-    float C = sqrt(sq(u) + sq(v));
-    float h = atan(v, u);
-    return vec3(L, C, h);
-}
-vec3 LuvtoLChuv(vec3 Luv) { return LuvtoLChuv(Luv[0], Luv[1], Luv[2]); }
-
 vec3 LuvtoXYZ(float L, float u, float v) {
     const float xn=0.3127, yn=0.3290; // D65 white point (2° observer)
     const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
@@ -198,16 +191,6 @@ vec3 LuvtoXYZ(float L, float u, float v) {
     return vec3(X, Y, Z);
 }
 vec3 LuvtoXYZ(vec3 Luv) { return LuvtoXYZ(Luv[0], Luv[1], Luv[2]); }
-
-vec3 xyYtoLuv(float x, float y, float Y) {
-    float L = Y <= cb(6./29) ? cb(29./3) * Y : 116 * pow(Y,1./3) - 16;
-    float u2 = 4*x/(-2*x+12*y+3), v2 = 9*y/(-2*x+12*y+3);
-    const float xn=0.3127, yn=0.3290; // D65 white point (2° observer)
-    const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
-    float u = 13 * L * (u2 - un), v = 13 * L * (v2 - vn);
-    return vec3(L, u, v);
-}
-
 vec3 XYZtoBGR(float X, float Y, float Z) {
     float R = + 3.240479 * X - 1.53715 * Y - 0.498535 * Z;
     float G = - 0.969256 * X + 1.875992 * Y + 0.041556 * Z;
@@ -215,14 +198,4 @@ vec3 XYZtoBGR(float X, float Y, float Z) {
     return vec3(B, G, R);
 }
 vec3 XYZtoBGR(vec3 XYZ) { return XYZtoBGR(XYZ[0], XYZ[1], XYZ[2]); }
-
 vec3 LChuvtoBGR(float L, float C, float h) { return XYZtoBGR(LuvtoXYZ(LChuvtoLuv(L, C, h))); }
-
-struct Test {
-    Test() {
-        log(LuvtoLChuv(xyYtoLuv(0.6400, 0.3300, 0.2126)));
-        log(LuvtoLChuv(xyYtoLuv(0.3000, 0.6000, 0.7153)));
-        log(LuvtoLChuv(xyYtoLuv(0.1500, 0.0600, 0.0721)));
-        log(LuvtoLChuv(xyYtoLuv(0.3127, 0.3290, 1.0000)));
-    }
-} test;
