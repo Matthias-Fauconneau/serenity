@@ -72,7 +72,7 @@ struct Tuner : Poll {
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
         timer.setRelative(1);
-        assert_(audio.rate == input.rate, audio.rate, input.rate);
+        assert(audio.rate == input.rate);
         //profile.reset();
 #else
         input.start();

@@ -18,7 +18,7 @@ struct Vector2D : Vector {
     real& operator ()(uint i, uint j) { return at(j*m+i); }
     const real& operator ()(uint i, uint j) const { return at(j*m+i); }
 };
-inline Vector2D operator-(const Vector2D& a, const Vector2D& b) { assert_(a.m==b.m && a.n==b.n); return Vector2D((const vector&)a-b,a.m,a.n); }
+inline Vector2D operator-(const Vector2D& a, const Vector2D& b) { assert(a.m==b.m && a.n==b.n); return Vector2D((const vector&)a-b,a.m,a.n); }
 inline String str(const Vector2D& v) {
     String s;
     for(uint i: range(v.m)) {
@@ -86,7 +86,7 @@ struct Helmholtz : Widget {
     const bool regularGrid; // Spatial discretisation
     const bool dirichletBoundaryCondition; // Boundary condition
     const real dt; // Time step
-    Helmholtz(bool regularGrid, bool dirichletBoundaryCondition, const real dt = inf) :
+    Helmholtz(bool regularGrid = true, bool dirichletBoundaryCondition = true, const real dt = 1) :
         regularGrid(regularGrid), dirichletBoundaryCondition(dirichletBoundaryCondition), dt(dt) {}
 
     Vector X, Y;
@@ -172,12 +172,15 @@ struct Helmholtz : Widget {
             M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
             M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
         }
-        log_((regularGrid ? "Regular"_:"Irregular"_) + " - "_ + (dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)+" N="_+str(Nx)+"x"_+str(Ny)+" "_);
+        log_((regularGrid ? "Regular"_:"Irregular"_)+
+             " - "_+(dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)+
+             //" - "_+(dt<inf ? "Instationnary"_:"Stationnary"_)
+             " N="_+str(Nx)+"x"_+str(Ny)+" "_);
         Time time;
         UMFPACK A = M;
-        log("T="_+str(time));
+        log_("T="_+str(time)+" "_);
         eMax = inf;
-        for(uint t: range(4/dt +1)) {
+        for(uint unused t: range(2/dt +1)) {
             for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) { // Source interieur
                 real xm = (X[i-1]+X[i])/2;
                 real xp = (X[i]+X[i+1])/2;
@@ -210,10 +213,11 @@ struct Helmholtz : Widget {
             u = Vector2D(A.solve(S), Nx, Ny);
             e = u-T;
             real eMaxt = maxabs(e);
-            log(t, "e="_+ftoa(eMaxt*100,2)+"%"_);
+            //log(t, "e=2^"_+ftoa(log2(eMaxt)));
             //if(eMaxt >= eMax) break;
             eMax = eMaxt;
         }
+        log("e=2^"_+ftoa(log2(eMax)));
         return eMax;
     }
     int2 sizeHint() { return int2(720/2); }
@@ -237,8 +241,10 @@ struct Helmholtz : Widget {
 struct Application {
     UniformGrid<Helmholtz> problems {{Helmholtz(false, false), Helmholtz(false, true), Helmholtz(true, false), Helmholtz(true, true)}};
     Plot plot { apply(problems, [](const Helmholtz& problem){ return
-                (problem.regularGrid ? "Regular"_:"Irregular"_) + " - "_ +
-                (problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_); }) };
+                    (problem.regularGrid ? "Regular"_:"Irregular"_)
+                    +" - "_+(problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)
+                    //+" - "_ +(problem.dt<inf ? "Instationnary"_:"Stationnary"_)
+                    ; }) };
     HBox layout {{&plot, &problems}};
 
     /// Solves Helmholtz problems at resolution NxN
@@ -246,17 +252,28 @@ struct Application {
         real maxE = 0;
         for(uint i: range(problems.size)) {
             real e = problems[i].solve(N);
-            plot.dataSets[i].insertMulti(N, e);
+            plot.dataSets[i].insertMulti(N, log2(e));
             maxE = max(maxE, e);
         }
         for(Helmholtz& problem: problems) problem.eMax = maxE; // Normalizes all problems display with the same maximum error
     }
 
-#if 1
     uint N = 8;
-    Window window {&layout, int2(1280,720), str(N)};
+    Window window {&layout, int2(1050/*1280*/,720), str(N)};
     Application() {
-        solve(N);
+        plot.log[0] = true, plot.log[1] = false; // Linear Y plot of log(error) (i.e log(error) ticks)
+        if(arguments().contains("video"_)) {
+            Time total;
+            Encoder encoder {"Helmholtz"_,false,1050,720};
+            for(uint N: range(8, 64 +1)) {
+                solve(N);
+                if(plot.dataSets.first().size()>=2) // Log plot requires at least two points
+                    encoder.writeVideoFrame(renderToImage(layout, encoder.size()));
+            }
+            log(total);
+            return;
+        }
+        solve(N); N++; solve(N); // Log plot requires at least two points
         window.backgroundColor = window.backgroundCenter = 1;
         window.localShortcut(Escape).connect([]{exit();});
         window.frameSent.connect([this](){
@@ -266,13 +283,5 @@ struct Application {
             window.setTitle(str(N));
         });
         window.show();
-#else
-    Application() {
-        Encoder encoder {"Helmholtz"_};
-        for(uint N: range(8, 64 +1)) {
-            solve(N);
-            encoder.writeVideoFrame(renderToImage(layout, encoder.size()));
-        }
-#endif
     }
 } app;

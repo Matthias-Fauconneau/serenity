@@ -33,7 +33,7 @@ struct SpectrumPlot : Widget {
         peaks(move(peaks)), candidates(move(candidates)), F1(F1), nHigh(nHigh), expectedKey(expectedKey), expectedF(expectedF) {}
     float x(float f) { return logx ? (log2(f)-log2((float)iMin))/(log2((float)iMax)-log2((float)iMin)) : (float)(f-iMin)/(iMax-iMin); }
     void render(int2 position, int2 size) {
-        assert_(iMin < iMax && iMax <= spectrum.size, iMax, spectrum.size);
+        assert(iMin < iMax && iMax <= spectrum.size);
         if(iMin >= iMax) return;
         float sMax = -inf; for(uint i: range(iMin, iMax)) sMax = max(sMax, spectrum[i]);
         float sMin = periodPower;

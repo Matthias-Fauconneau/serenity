@@ -91,11 +91,11 @@ template<Type K, Type V> struct map {
     }
 
     template<Type KK> V take(const KK& key) {
-        size_t i=keys.indexOf(key); assert_(i!=invalid,"'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i=keys.indexOf(key); if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
         keys.removeAt(i); return values.take(i);
     }
     template<Type KK> void remove(const KK& key) {
-        size_t i=keys.indexOf(key); assert_(i!=invalid,"'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i=keys.indexOf(key); if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
         keys.removeAt(i); values.removeAt(i);
     }
 
@@ -146,9 +146,9 @@ template<Type K, Type V> String toASCII(const map<K,V>& m) {
     return replace(move(s),'/','\\');
 }
 
-template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
-    for(const_pair<K, V> e: b) { assert_(!a.contains(e.key), a.at(e.key), e.value, a, b); a.insert(copy(e.key), copy(e.value)); }
+/*template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
+    for(const_pair<K, V> e: b) { assert_(!a.contains(e.key)); a.insert(copy(e.key), copy(e.value)); }
 }
 template<Type K, Type V> void operator<<(map<K,V>& a, map<K,V>&& b) {
     for(pair<K, V> e: b) { a.insertMulti(move(e.key), move(e.value)); }
-}
+}*/

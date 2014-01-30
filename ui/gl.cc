@@ -209,12 +209,12 @@ void GLVertexBuffer::upload(const ref<byte>& vertices) {
     vertexCount = vertices.size/vertexSize;
 }
 void GLVertexBuffer::bindAttribute(GLShader& program, const string& name, int elementSize, uint64 offset) const {
-    assert_(id!=0); assert_(elementSize<=4);
+    assert(id!=0); assert(elementSize<=4);
     int index = program.attribLocation(name);
     assert(index>=0); //if(index<0) return;
     glBindBuffer(GL_ARRAY_BUFFER, id);
     glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
-    //assert_(!glGetError()); //First call to glVertexAttribPointer logs an user error to MESA_DEBUG for some reason :/
+    //assert(!glGetError()); //First call to glVertexAttribPointer logs an user error to MESA_DEBUG for some reason :/
     glEnableVertexAttribArray(index);
 }
 void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
@@ -275,7 +275,7 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
         glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, id);
         int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
         int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
-        assert_(colorSamples==depthSamples);
+        assert(colorSamples==depthSamples);
         if(format&Depth) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
         else glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
     } else {
@@ -334,17 +334,17 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
-    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
 GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color)
     : width(depth.width), height(depth.height), depthTexture(move(depth)), colorTexture(move(color)) {
-    assert_(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
+    assert(depth.size()==color.size() && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     uint target = depthTexture.format&Multisample? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, target, depthTexture.id, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, colorTexture.id, 0);
-    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
 GLFrameBuffer::GLFrameBuffer(uint width, uint height, int sampleCount, uint format):width(width),height(height){
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
@@ -362,7 +362,7 @@ GLFrameBuffer::GLFrameBuffer(uint width, uint height, int sampleCount, uint form
     glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format&Alpha?GL_RGBA8:GL_RGB8, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
-    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
 GLFrameBuffer::~GLFrameBuffer() {
     if(depthBuffer) glDeleteRenderbuffers(1, &depthBuffer);
@@ -390,7 +390,7 @@ void GLFrameBuffer::blit(uint target) {
     glBlitFramebuffer(0,0,width,height,0,0,width,height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 void GLFrameBuffer::blit(GLTexture& color) {
-    assert_(color.width==width && color.height==height);
+    assert(color.width==width && color.height==height);
     uint target=0;
     glGenFramebuffers(1,&target);
     glBindFramebuffer(GL_FRAMEBUFFER,target);

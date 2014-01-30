@@ -18,18 +18,17 @@ void Plot::render(int2 position, int2 size) {
     vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
     else {  // Computes axis scales
-        assert_(dataSets);
+        assert(dataSets);
         for(const auto& data: dataSets) {
-            assert_(data);
+            assert(data);
             for(auto point: data) {
                 vec2 p(point.key,point.value);
-                assert_(isNumber(p.x) && isNumber(p.y), p);
+                assert(isNumber(p.x) && isNumber(p.y), p);
                 min=::min(min,p);
                 max=::max(max,p);
             }
         }
-        if(!log[0] && min.x>0) min.x = 0;
-        if(!log[1] && min.y>0) min.y = 0;
+        for(uint i: range(2)) if(!log[i]) { if(min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
     }
     assert(min.x < max.x && min.y < max.y, min, max);
 
@@ -49,10 +48,11 @@ void Plot::render(int2 position, int2 size) {
                 }
             }
         } else {
+            assert(!log[axis]); //FIXME
             tickCount[axis] = subExponent(min[axis]);
             if(max[axis] > 0) {
                 float tickWidth = -min[axis]/tickCount[axis];
-                max[axis] = ceil(max[axis]/tickWidth)*tickWidth;
+                max[axis] = -floor(-max[axis]/tickWidth)*tickWidth;
                 tickCount[axis] += max[axis]/tickWidth;
             }
         }
@@ -62,15 +62,14 @@ void Plot::render(int2 position, int2 size) {
     struct Tick : Text { float value; Tick(float value, const string& label):Text(label), value(value) {} };
     array<Tick> ticks[2]; int2 tickLabelSize = 0;
     for(uint axis: range(2)) {
-        int precision = ::max(0., ceil(-log10(max[axis]/tickCount[axis])));
+        int precision = ::max(0., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
         for(uint i: range(tickCount[axis]+1)) {
             float lmin = log[axis] ? log2(min[axis]) : min[axis];
             float lmax = log[axis] ? log2(max[axis]) : max[axis];
             real value = lmin+(lmax-lmin)*i/tickCount[axis];
             if(log[axis]) value = exp2(value);
-            //if(axis==0 && value==0) { ticks[axis] << Tick(0,""_); continue; } // Skips X origin tick (overlaps)
-            String label = ftoa(value, precision, 0, value>=10e5 ? 3 : 0);
-            assert_(label);
+            String label = ftoa(value, precision, 0, value>=10e5 ? 3 : value <=10e-2 ? 1 : 0);
+            assert(label);
             ticks[axis] <<Tick(value, label);
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
@@ -83,9 +82,7 @@ void Plot::render(int2 position, int2 size) {
     // Colors
     buffer<vec4> colors(dataSets.size);
     if(colors.size==1) colors[0] = black;
-    //else if(colors.size==2) colors[0] = red, colors[1] = blue;
-    //else if(colors.size==3) colors[0] = red, colors[1] = green, colors[2] = blue;
-    else for(uint i: range(colors.size)) colors[i]=vec4(LChuvtoBGR(53,179,2*PI*i/colors.size),1.f); //FIXME: constant intensity
+    else for(uint i: range(colors.size)) colors[i]=vec4(LChuvtoBGR(53,179,2*PI*i/colors.size),1.f);
 
     int2 pen=position;
     {Text text(format(Bold)+title,16,white); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
@@ -120,7 +117,7 @@ void Plot::render(int2 position, int2 size) {
             Tick& tick = ticks[0][i];
             int2 p(point(vec2(tick.value, O.y)));
             line(p, p+int2(0,-4));
-            tick.render(p + int2(-tick.textSize.x/2, 0) );
+            tick.render(p + int2(-tick.textSize.x/2, -min.y > max.y ? -tick.textSize.y : 0) );
         }
         {Text text(format(Bold)+xlabel,16,white); text.render(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
     }
@@ -143,7 +140,7 @@ void Plot::render(int2 position, int2 size) {
         buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
         if(plotPoints) for(uint i: range(data.size())) {
             int2 p = int2(round(points[i]));
-            const int pointRadius = 3;
+            const int pointRadius = 2;
             line(p-int2(pointRadius, 0), p+int2(pointRadius, 0), color);
             line(p-int2(0, pointRadius), p+int2(0, pointRadius), color);
         }

@@ -28,7 +28,7 @@ generic struct array : buffer<T> {
             assert(nextCapacity>=size);
             if(capacity) {
                 data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
-                assert_(size_t(data)%alignof(T)==0, alignof(T));
+                assert(size_t(data)%alignof(T)==0);
             } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("");
             capacity=nextCapacity;
         }

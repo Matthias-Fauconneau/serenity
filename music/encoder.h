@@ -26,10 +26,10 @@ struct Encoder {
     /// readAudio will be called back to request an \a audio frame of \a size samples as needed to follow video time
     function<uint(const mref<float2>& output)> readAudio =[](const mref<float2>&){return 0;};
 
-    uint width, height, fps, rate;
+    const uint width, height, fps, rate, audioSize = 1024;
     struct AVFormatContext* context=0;
+    struct SwsContext* swsContext=0;
     struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
     struct AVStream* audioStream=0; struct AVCodecContext* audioCodec=0;
-    struct SwsContext* swsContext=0;
-    uint videoTime = 0, videoEncodedTime = 0, audioTime = 0, audioEncodedTime;
+    uint videoTime = 0, videoEncodedTime = 0, audioTime = 0, audioEncodedTime = 0;
 };

@@ -64,7 +64,7 @@ struct Tuner {
                            assert(!sample);
                            sample = &s;
                        }
-                       assert_(sample, velocityLayer, keyIndex, velocityLayers[velocityLayer].start, velocityLayers[velocityLayer].stop, keys[keyIndex]);
+                       assert(sample, velocityLayer, keyIndex, velocityLayers[velocityLayer].start, velocityLayers[velocityLayer].stop, keys[keyIndex]);
                        sample;
                       });
 
@@ -97,7 +97,7 @@ struct Tuner {
                 for(int m: range(M)) {
                     real n0 = fMin*exp2((real)m/M*log2(fMax/fMin));
                     real n1 = fMin*exp2((real)(m+1)/M*log2(fMax/fMin));
-                    assert_(floor(n0)<ceil(n1));
+                    assert(floor(n0)<ceil(n1));
                     real sum = 0;
                     //for(uint n: range(floor(n0),ceil(n1))) sum += loudnessWeight((float)n*rate/N) * spectrum[n];
                     sum += (ceil(n0)-n0) * loudnessWeight(n0*rate/N) * spectrum[n0];
@@ -149,7 +149,7 @@ struct Tuner {
         }*/
 
         if(logSpectrums) { // Entropy-based tuning (for efficiency, spectrums are not reweighted with the correct loudness on each shift)
-            assert_(logSpectrums.size == keys.size);
+            assert(logSpectrums.size == keys.size);
             const int keyCents = (M/log2(N/2))/12; // Number of bins ("cents") for a tone (key)
             log((float)(M/8)/12, (float)(M-2*keyCents)/M);
             // Computes initial sum of all spectrums
@@ -167,7 +167,7 @@ struct Tuner {
                     previous = current;
                 }
             }
-            assert_(totalEnergy);
+            assert(totalEnergy);
             for(int m: range(M)) total[m] /= totalEnergy; // Normalizes (for entropy evaluation)
             for(int key: range(keys.size)) {
                 real* s = logSpectrums[key].begin();
@@ -184,23 +184,23 @@ struct Tuner {
                 int offset = shiftCount[key]; // Value
                 real currentEnergy = 0; real candidateEntropy = 0;
                 if(delta>0) offset++;
-                assert_(offset < keyCents, offset, keyCents); // Prevents windowing effects
+                assert(offset < keyCents, offset, keyCents); // Prevents windowing effects
                 const real* shift = logSpectrums[key] + offset;
-                assert_(shift[-offset]==0 && shift[M-offset-1]==0, offset);
+                assert(shift[-offset]==0 && shift[M-offset-1]==0, offset);
                 real shiftGain = 0;
-                for(int m: range(0, max(0,-offset))) assert_(total[m]==0);
+                for(int m: range(0, max(0,-offset))) assert(total[m]==0);
                 for(int m: range(max(0,-offset), M+min(0,-offset))) {
-                    assert_(m>=0 && m<M && offset+m>=0 && offset+m<M);
+                    assert(m>=0 && m<M && offset+m>=0 && offset+m<M);
                     real v = total[m] + delta * shift[m];
                     shiftGain += shift[m];
                     currentEnergy += v;
-                    assert_(v>=-0x1p-60, log2(-v));
+                    assert(v>=-0x1p-60, log2(-v));
                     if(v>0) candidateEntropy += v * log2(v);
                 }
-                for(int m: range(M+min(0,-offset), M)) assert_(total[m]==0);
-                assert_(abs(shiftGain)<0x1p-29, log2(abs(shiftGain)));
-                assert_(total[0]==0 && total[M-1]==0);
-                assert_(abs(1-currentEnergy) < 0x1p-26, log2(abs(1-currentEnergy))); // No need to renormalize as there is no windowing
+                for(int m: range(M+min(0,-offset), M)) assert(total[m]==0);
+                assert(abs(shiftGain)<0x1p-29, log2(abs(shiftGain)));
+                assert(total[0]==0 && total[M-1]==0);
+                assert(abs(1-currentEnergy) < 0x1p-26, log2(abs(1-currentEnergy))); // No need to renormalize as there is no windowing
                 candidateEntropy = -candidateEntropy;
                 if(candidateEntropy < entropy/**(1-0x1p-13)*/) { // Commits the change
                     int& offset = shiftCount[key]; // Reference this time

@@ -87,6 +87,7 @@ void blit(int2 target, const Image& source, vec4 color) {
                 d = t;
             }
         } else {
+            color = clip(vec4(0), color, vec4(1));
             for(int y= rect.min.y; y<rect.max.y; y++) for(int x= rect.min.x; x<rect.max.x; x++) {
                 byte4 image_sRGB = source(x-target.x,y-target.y);
                 float alpha = image_sRGB.a*color[3]/0xFF;
@@ -95,9 +96,8 @@ void blit(int2 target, const Image& source, vec4 color) {
                 int3 image_linear (inverse_sRGB_lookup[image_sRGB[0]], inverse_sRGB_lookup[image_sRGB[1]], inverse_sRGB_lookup[image_sRGB[2]]);
                 int3 target_linear(inverse_sRGB_lookup[target_sRGB[0]], inverse_sRGB_lookup[target_sRGB[1]], inverse_sRGB_lookup[target_sRGB[2]]);
                 vec3 source_linear = alpha*color.xyz()*vec3(image_linear);
-                int3 linearBlend = min(int3(0xFF), additiveBlend ?
-                                           target_linear + int3(source_linear)
-                                         : int3(round((1-alpha)*vec3(target_linear) + source_linear)) );
+                int3 linearBlend = additiveBlend ? min(int3(0xFF), target_linear + int3(source_linear))
+                                                 : int3(round((1-alpha)*vec3(target_linear) + source_linear));
                 target_sRGB = byte4(sRGB_lookup[linearBlend[0]], sRGB_lookup[linearBlend[1]], sRGB_lookup[linearBlend[2]], 0xFF);
             }
         }
@@ -153,6 +153,7 @@ void line(float x1, float y1, float x2, float y2, vec4 color) {
     if(abs(dx) < abs(dy)) { swap(x1, y1); swap(x2, y2); swap(dx, dy); transpose=true; }
     if(x2 < x1) { swap(x1, x2); swap(y1, y2); }
     if(dx==0) return; //p1==p2
+    color = clip(vec4(0), color, vec4(1));
     float gradient = dy / dx;
     int i1,i2; float intery;
     {

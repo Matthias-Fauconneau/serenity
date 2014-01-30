@@ -44,7 +44,7 @@ struct Build {
     /// Compiles a module and its dependencies as needed
     /// \return Timestamp of the last modified module implementation (deep)
     int64 processModule(const string& target) {
-        assert_(target);
+        assert(target);
         modules << unique<Node>(target);
         Node& parent = modules.last();
         File file (target+".cc"_, folder);
@@ -54,7 +54,7 @@ struct Build {
             if(s.match("#include "_)) {
                 if(s.match('"')) { // module header
                     string name = s.until('.');
-                    assert_(name);
+                    assert(name);
                     String header = find(name+".h"_);
                     if(header) lastCompileEdit = max(lastCompileEdit, parseHeader(header));
                     String module = find(name+".cc"_);
@@ -64,7 +64,7 @@ struct Build {
                 } else { // library header
                     for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
                         string library=s.identifier("_"_);
-                        if(library) { assert_(s.peek()=='\n',s.until('\n')); libraries += String(library); }
+                        if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += String(library); }
                         break;
                     }
                 }
@@ -85,7 +85,7 @@ struct Build {
             }
             if(s.match("FILE("_) || s.match("ICON("_)) {
                 string file = s.identifier("_-"_);
-                assert_(file && !files.contains(file), file);
+                assert(file && !files.contains(file), file);
                 files << String(file);
                 s.skip(")"_);
             }
@@ -126,7 +126,7 @@ struct Build {
             Folder(tmp+"files"_+(flags.contains("atom"_)?".32"_:""_), root(), true);
             for(String& file: files) {
                 String path = find(replace(file,"_"_,"/"_));
-                assert_(path, "No such file to embed", file);
+                assert(path, "No such file to embed", file);
                 Folder subfolder = Folder(section(path,'/',0,-2), folder);
                 string name = section(path,'/',-2,-1);
                 String object = tmp+"files"_+(flags.contains("atom"_)?".32"_:""_)+"/"_+name+".o"_;

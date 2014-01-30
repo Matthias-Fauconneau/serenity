@@ -62,7 +62,7 @@ struct PitchEstimation {
                 log(strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_+dec(round(100*offsetF1),2) +" c\t"_);
                 KeyData& data = keys[key];
                 data.pitch << KeyData::Pitch{estimator.F0, estimator.B};
-                assert_(estimator.spectrum.size == N/2);
+                assert(estimator.spectrum.size == N/2);
                 for(uint i: range(N/2)) data.spectrum[i] += estimator.spectrum[i];
             }
         }

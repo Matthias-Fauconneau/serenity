@@ -222,11 +222,11 @@ template<uint base> String itoa(int64 number, int pad, char padChar) {
 }
 template String itoa<10>(int64,int,char);
 
-String ftoa(double n, int precision, uint pad, int exponent, bool inf) {
+String ftoa(double n, int precision, uint pad, int exponent) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return String("NaN"_);
-    if(n==::inf) { assert_(inf); return String("inf"_); } //"∞"_
-    if(n==-::inf) { assert_(inf); return String("-inf"_); } //"-∞"_
+    if(n==::inf) return String("inf"_); //"∞"_
+    if(n==-::inf) return String("-inf"_); //"-∞"_
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';

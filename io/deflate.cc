@@ -1314,7 +1314,7 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
       ((d->m_flags & TDEFL_GREEDY_PARSING_FLAG) != 0) &&
       ((d->m_flags & (TDEFL_FILTER_MATCHES | TDEFL_FORCE_ALL_RAW_BLOCKS | TDEFL_RLE_MATCHES)) == 0))
   {
-    assert_(tdefl_compress_fast(d));
+    tdefl_compress_fast(d);
   }
   else error(d->m_flags);
 
@@ -1323,12 +1323,12 @@ tdefl_status tdefl_compress(tdefl_compressor *d, const void *pIn_buf, size_t *pI
 
   if ((flush) && (!d->m_lookahead_size) && (!d->m_src_buf_left) && (!d->m_output_flush_remaining))
   {
-    assert_(tdefl_flush_block(d, flush) >= 0);
+    tdefl_flush_block(d, flush);
     d->m_finished = (flush == TDEFL_FINISH);
     if (flush == TDEFL_FULL_FLUSH) { MZ_CLEAR_OBJ(d->m_hash); MZ_CLEAR_OBJ(d->m_next); d->m_dict_size = 0; }
   }
 
-  assert_(tdefl_flush_output_buffer(d) == TDEFL_STATUS_DONE);
+  tdefl_flush_output_buffer(d);
   return TDEFL_STATUS_DONE;
 }
 
@@ -1361,8 +1361,8 @@ mz_bool tdefl_compress_mem_to_output(const void *pBuf, size_t buf_len, tdefl_put
 {
   tdefl_compressor *pComp; assert(!(((buf_len) && (!pBuf)) || (!pPut_buf_func)));
   pComp = (tdefl_compressor*)malloc(sizeof(tdefl_compressor)); assert(pComp);
-  assert_(tdefl_init(pComp, pPut_buf_func, pPut_buf_user, flags) == TDEFL_STATUS_OKAY);
-  assert_(tdefl_compress_buffer(pComp, pBuf, buf_len, TDEFL_FINISH) == TDEFL_STATUS_DONE);
+  tdefl_init(pComp, pPut_buf_func, pPut_buf_user, flags);
+  tdefl_compress_buffer(pComp, pBuf, buf_len, TDEFL_FINISH);
   free(pComp); return true;
 }
 
@@ -1393,7 +1393,7 @@ void *tdefl_compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_
   tdefl_output_buffer out_buf; MZ_CLEAR_OBJ(out_buf);
   if (!pOut_len) return MZ_FALSE; else *pOut_len = 0;
   out_buf.m_expandable = MZ_TRUE;
-  assert_(tdefl_compress_mem_to_output(pSrc_buf, src_buf_len, tdefl_output_buffer_putter, &out_buf, flags));
+  tdefl_compress_mem_to_output(pSrc_buf, src_buf_len, tdefl_output_buffer_putter, &out_buf, flags);
   *pOut_len = out_buf.m_size; return out_buf.m_pBuf;
 }
 

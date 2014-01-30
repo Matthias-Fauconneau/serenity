@@ -39,7 +39,7 @@ struct Normalize {
                                assert(!sample);
                                sample = &s;
                            }
-                           assert_(sample, velocityLayer, keyIndex, velocityLayers[velocityLayer].start, velocityLayers[velocityLayer].stop, keys[keyIndex]);
+                           assert(sample, velocityLayer, keyIndex, velocityLayers[velocityLayer].start, velocityLayers[velocityLayer].stop, keys[keyIndex]);
                            sample;
                           });
 
@@ -67,7 +67,7 @@ struct Normalize {
                                assert(!sample);
                                sample = &s;
                            }
-                           assert_(sample);
+                           assert(sample);
                            sample;
                           });
 
@@ -89,7 +89,7 @@ struct Normalize {
                                    assert(!sample);
                                    sample = &s;
                                }
-                               assert_(sample, keys[keyIndex], releaseVelocityLayers[velocityLayer].start, releaseVelocityLayers[velocityLayer].stop);
+                               assert(sample, keys[keyIndex], releaseVelocityLayers[velocityLayer].start, releaseVelocityLayers[velocityLayer].stop);
                                sample;
                               });
                     assert(sample.hikey<=88); // Keys without dampers

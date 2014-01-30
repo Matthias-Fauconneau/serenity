@@ -36,7 +36,7 @@ struct StretchEstimation : Widget {
             data.pitch = cast<KeyData::Pitch>(readFile(name+".f0B"_, stretch));
             data.spectrum = cast<float>(readFile(name+".PSD"_, stretch));
             static constexpr uint N = 32768;
-            assert_(data.spectrum.size == N/2);
+            assert(data.spectrum.size == N/2);
             keys.insert(parseKey(name), move(data));
         }
 

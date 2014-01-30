@@ -30,7 +30,7 @@ struct Player {
             if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate /*&& !resamplerFlushed*/) {
 #if 0
                 if(file->rate != audio.rate) {
-                    assert_(!nextResampler);
+                    assert(!nextResampler);
                     nextResampler = Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
                 }
                 if(resampler) { // Flushes previous resampler using start of next file
@@ -49,7 +49,7 @@ struct Player {
                 resamplerFlushed = true;
 #else
                 //resampler = Resampler();
-                resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert_(!resampler);
+                resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
                 if(file->rate != audio.rate) new (&resampler) Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
 #endif
             }
@@ -76,7 +76,7 @@ struct Player {
             else /*if(resampler.sourceRate*audio.rate == file->rate*resampler.targetRate) */next(); // End of file
             /*else { // Previous resampler can be replaced once properly flushed
                 resampler = move(nextResampler); nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
-                assert_(!nextResampler);
+                assert(!nextResampler);
             }*/
         }
         if(!lastPeriod) for(uint i: range(output.size)) { // Fades in

@@ -17,7 +17,7 @@ template<Type V, uint N> struct list { // Small sorted list
             if(i==0) return; // New candidate would be lower than current
             if(elements[i-1].key==key) return;
             for(uint j: range(i-1)) elements[j]=move(elements[j+1]); // Shifts left
-            assert_(i>=1 && i<=size, i, size, N);
+            assert(i>=1 && i<=size);
             elements[i-1] = element(key, move(value)); // Inserts new candidate
         }
     }

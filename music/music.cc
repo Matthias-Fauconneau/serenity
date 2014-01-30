@@ -269,9 +269,9 @@ struct Music {
         this->contentChanged.connect([&contentChanged]{ contentChanged=true; });
         bool endOfFile = false;
         midi.endOfFile.connect([this,&endOfFile]{ sampler.silence.connect([&endOfFile]{ endOfFile=true; }); });
-        assert_(!play);
+        assert(!play);
         togglePlay();
-        assert_(name);
+        assert(name);
         Encoder encoder (name, {&sampler, &Sampler::read});
         int lastReport=0;
         for(Image image; !endOfFile;) { // Renders score as quickly as possible (no need for an event loop with any display, audio nor input)
@@ -311,7 +311,7 @@ struct Music {
     /// Called by score to scroll PDF as needed when playing
     void nextStaff(float top /*previous bottom, current top*/, float bottom /*current bottom, next top*/, float x) {
         if(top==bottom) return; // last staff
-        assert_(x>=0 && x<=1, x);
+        assert(x>=0 && x<=1);
         target = vec2(0, -(( (1-x)*top + x*bottom )*pdfScore.lastSize.x-pdfScore.size.y/2)); // Align center between current top and current bottom
         if(!position) position=target, pdfScore.delta=int2(round(position));
 #if MIDISCORE

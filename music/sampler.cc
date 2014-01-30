@@ -213,7 +213,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 float shift = int(key)-s.pitch_keycenter; //TODO: tune
                 Layer* layer=0;
                 for(Layer& l : layers) if(l.shift==shift) layer=&l;
-                assert_(layer);
+                assert(layer);
                 if(layer->notes.size>=layer->notes.capacity) log(layer->notes.size, layer->notes.capacity);
 
                 layer->notes.append( ::copy(s.flac) ); // Copies predecoded buffer and corresponding FLAC decoder state
@@ -302,7 +302,7 @@ uint Sampler::read(const mref<int2>& output) { // Audio thread
 uint Sampler::read(const mref<float2>& output) {
     if(!backgroundDecoder) {
         event(); // Decodes before mixing
-        for(Layer& layer: layers) for(Note& n: layer.notes) assert_(!n.flac.blockSize || n.readCount > (int)align(2,layer.resampler.need(output.size)));
+        for(Layer& layer: layers) for(Note& n: layer.notes) assert(!n.flac.blockSize || n.readCount > (int)align(2,layer.resampler.need(output.size)));
     }
     output.clear(0);
     int noteCount = 0;

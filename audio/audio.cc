@@ -157,7 +157,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
-    assert_(hparams.interval(Channels)==2);
+    assert(hparams.interval(Channels)==2);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);

@@ -640,7 +640,7 @@ void Score::expect() {
                 expected.insert(note.key, i);
                 errors = 0; showExpected = false; // Hides highlighting while succeeding
             }
-            assert_(i<positions.size);
+            assert(i<positions.size);
             while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size-1) {
                 currentStaff++;
                 currentX=0;
@@ -648,7 +648,7 @@ void Score::expect() {
             currentX = max(currentX, positions[i].x);
             i++;
         }
-        assert_(currentStaff<staffs.size);
+        assert(currentStaff<staffs.size);
         nextStaff(currentStaff>0?staffs[currentStaff-1]:0,staffs[currentStaff],currentX);
         chordSize = expected.size();
         noteIndex += chords.values[chordIndex].size;

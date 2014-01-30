@@ -95,7 +95,7 @@ void FLAC::parseFrame() {
     uint unused rate = sampleRate_[binary(4)]; assert(rate==this->rate);
     channelMode = binary(4); assert(channelMode==Independent||channelMode==LeftSide||channelMode==MidSide||channelMode==RightSide,channelMode);
     int sampleSize_[8] = {0, 8, 12, 0, 16, 20, 24, 0};
-    sampleSize = sampleSize_[binary(3)]; assert_(sampleSize==16 || sampleSize==24, binary(3));
+    sampleSize = sampleSize_[binary(3)]; assert(sampleSize==16 || sampleSize==24);
     int unused zero = bit(); assert(zero==0);
     uint unused frameNumber = utf8();
     if(blockSize<0) blockSize = binary(-blockSize)+1;

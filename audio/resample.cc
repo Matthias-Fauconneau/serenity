@@ -132,12 +132,12 @@ void Resampler::write(const ref<float2>& source) {
 
 size_t Resampler::available() {
     size_t available = ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate;
-    assert_(int(available)>=0 && (need(available)==0 || (sourceRate>targetRate && need(available)==-1)));
+    assert(int(available)>=0 && (need(available)==0 || (sourceRate>targetRate && need(available)==-1)));
     return available;
 }
 
 template<bool mix> void Resampler::read(const mref<float2>& target) {
-    assert_(target.size<=available());
+    assert(target.size<=available());
     for(uint i: range(target.size)) {
         for(uint channel=0;channel<channels;channel++) {
             if(mix) target[i][channel] += product(kernel.slice(fractionalIndex*N, N), signal[channel].slice(integerIndex, N));
