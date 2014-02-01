@@ -24,10 +24,9 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
 
 /// Computes integer medial axis
 void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter) {
-    //assert_(minimalSqDiameter>=3);
     const short3* const positionData = position;
     uint16* const targetData = target;
-    clear(targetData, target.size());
+    mref<uint16>(target, target.size()).clear(0);
     const int64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     const uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
     parallel(marginZ, Z-marginZ, [&](uint, uint z) {

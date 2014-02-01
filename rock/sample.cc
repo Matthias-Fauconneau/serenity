@@ -28,8 +28,6 @@ String toASCII(const Vector& a) { String s; for(uint i: range(a.size)) { s<<str(
 UniformSample operator*(real scalar, const UniformSample& A) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=scalar*A[i]; return R; }
 /// Computes square values
 UniformSample sq(const UniformSample& A) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=sq(A[i]); return R; }
-/// Adds two sample
-//UniformSample operator+(const UniformSample& A, const UniformSample& B) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=A[i]+B[i]; return R; }
 /// Substracts two sample
 UniformSample operator-(const UniformSample& A, const UniformSample& B) { uint N=A.size; UniformSample R(N); R.scale=A.scale; for(uint i: range(N)) R[i]=A[i]-B[i]; return R; }
 
@@ -38,12 +36,12 @@ real UniformSample::variance() const { real mean=UniformSample::mean(), ssd=0; f
 UniformSample parseUniformSample(const string& data) {
     uint sampleCount=0; for(TextData s(data);s;) { while(s.match('#')) s.until('\n'); sampleCount++; s.until('\n'); }
     UniformSample sample(sampleCount);
-    {TextData s(data); for(uint i: range(sample.size)) { while(s.match('#')) s.until('\n'); real x=s.decimal(); assert_(x==i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }}
+    {TextData s(data); for(uint i: range(sample.size)) { while(s.match('#')) s.until('\n'); real x=s.decimal(); assert_(x==i, x, i); s.skip("\t"_); sample[i]=s.decimal(); s.skip("\n"_); }}
     return sample;
 }
 String toASCII(const UniformSample& A) {
     String s;
-    for(uint i=0; i<A.size; i++) s << ftoa(A.scale*i,5,0,true) << '\t' << ftoa(A[i],5,0,true) << '\n';
+    for(uint i=0; i<A.size; i++) s << (A.scale==1?dec(i):ftoa(A.scale*i,5,0,true)) << '\t' << ftoa(A[i],5,0,true) << '\n';
     return s;
 }
 
@@ -83,7 +81,6 @@ real NonUniformSample::interpolate(real x) const {
 }
 NonUniformSample operator*(real scalar, NonUniformSample&& A) { for(real& x: A.values) x *= scalar; return move(A); }
 NonUniformSample abs(const NonUniformSample& A) { return NonUniformSample(A.keys, abs((const Vector&)A.values)); }
-bool isNumber(real n) { return !__builtin_isnan(n) && n!=__builtin_inff() && n!=-__builtin_inff(); }
 NonUniformSample scaleDistribution(real scalar, NonUniformSample&& A) { for(real& x: A.keys) x *= scalar; for(real& y: A.values) { assert_(isNumber(y/scalar), y, scalar); y /= scalar;  } return move(A); }
 
 array<UniformSample> resample(const ref<NonUniformSample>& nonUniformSamples) {
@@ -123,7 +120,7 @@ ScalarMap parseMap(const string& data) {
     for(TextData s(data);s;) {
         string key = s.until('\t');
         string value = s.until('\n');
-        dict.insert(String(key), toDecimal(value));
+        dict.insert(String(key), fromDecimal(value));
     }
     return dict;
 }

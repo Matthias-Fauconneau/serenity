@@ -3,7 +3,11 @@
 #include "array.h"
 #include "file.h"
 #include "function.h"
+#include "string.h"
 #include <pthread.h>
+
+enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
+void setExceptions(uint except);
 
 /// Logical cores count
 constexpr uint coreCount=8;
@@ -39,27 +43,34 @@ struct Condition : handle<pthread_cond_t> {
 struct Semaphore {
     Lock mutex;
     Condition condition;
-    int counter;
+    int64 counter;
     /// Creates a semaphore with \a count initial ressources
-    Semaphore(int count=0) : counter(count) {}
+    explicit Semaphore(int64 count=0) : counter(count) {}
     /// Acquires \a count ressources
-    inline void acquire(int count) {
+    inline void acquire(int64 count) {
+        mutex.lock();
         while(counter<count) pthread_cond_wait(&condition,&mutex);
-        counter-=count; assert(counter>=0);
+        __sync_sub_and_fetch(&counter,count); assert(counter>=0);
+        mutex.unlock();
     }
     /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int count) {	
-        if(counter<count) return false; counter-=count; return true;
+    inline bool tryAcquire(int64 count) {
+        mutex.lock();
+        if(counter<count) { mutex.unlock(); return false; }
+        assert(count>0);
+        __sync_sub_and_fetch(&counter,count);
+        mutex.unlock();
+        return true;
     }
     /// Releases \a count ressources
-    inline void release(int count) {
-        Locker lock(mutex);
-        counter+=count; 
+    inline void release(int64 count) {
+        __sync_add_and_fetch(&counter,count);
         pthread_cond_signal(&condition);
     }
     /// Returns available ressources \a count
     operator int() const { return counter; }
 };
+inline String str(const Semaphore& o) { return str(o.counter); }
 
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
@@ -99,6 +110,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 
     Thread(int priority=0);
     ~Thread(){Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/}
+    void setPriority(int priority);
     /// Spawns a thread running an event loop with the given \a priority
     void spawn();
     /// Processes all events on \a polls and tasks on \a queue until terminate is set
@@ -108,7 +120,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 };
 
 struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
-static void* start_routine(thread* t) {
+inline void* start_routine(thread* t) {
     for(;;) {
         uint64 i=__sync_fetch_and_add(t->counter,1);
         if(i>=t->stop) break;
@@ -131,7 +143,7 @@ template<class F> void parallel(uint64 start, uint64 stop, F f) {
         threads[i].delegate = &delegate;
         pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
     }
-    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert_(status==0); }
+    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert(status==0); }
 #endif
 }
 template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
@@ -139,7 +151,7 @@ template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 /// Runs a loop in parallel chunks
 template<class F> void chunk_parallel(uint totalSize, F f) {
     constexpr uint chunkCount = coreCount;
-    assert_(totalSize%chunkCount<chunkCount, totalSize, chunkCount, totalSize%chunkCount); //Last chunk will be smaller
+    assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
     const uint chunkSize = totalSize/chunkCount;
     parallel(chunkCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }

@@ -32,12 +32,6 @@ void downsample(Volume16& target, const Volume16& source) {
     }
 }
 
-/// Copies a volume
-void copy(Volume& target, const Volume& source) {
-    assert(target.data.size == source.data.size);
-    copy(target.data.begin(), source.data, source.data.size);
-}
-
 /// Resamples a volume using nearest neighbour (FIXME: linear, cubic)
 void resample(Volume16& target, const Volume16& source, int sourceResolution, int targetResolution) {
     assert_(targetResolution > sourceResolution && targetResolution < sourceResolution*2, sourceResolution, targetResolution);
@@ -71,7 +65,7 @@ class(Resample, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         int sourceResolution = round(TextData(otherInputs[0]->data).decimal()*1000), targetResolution = round(TextData(otherInputs[1]->data).decimal()*1000);
-        if(sourceResolution == targetResolution) { copy(outputs[0], inputs[0]); return; }
+        if(sourceResolution == targetResolution) { copy(outputs[0].data, inputs[0].data); return; }
         assert_(targetResolution > sourceResolution, targetResolution, sourceResolution); // Supports only downsampling
         const Volume* source = &inputs[0];
         int times = log2(targetResolution/sourceResolution);

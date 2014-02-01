@@ -9,31 +9,34 @@ generic struct array : buffer<T> {
     /// Default constructs an empty array
     array() {}
     /// Allocates an uninitialized buffer for \a capacity elements
-    explicit array(size_t capacity/*, size_t size=0*/) : buffer<T>(capacity, /*size*/0) {}
+    explicit array(size_t capacity) : buffer<T>(capacity, 0) {}
+    /// Moves elements from a reference
+    explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
     /// Copies elements from a reference
-    explicit array(const ref<T>& ref) : buffer<T>(ref.size) { for(size_t i: range(ref.size)) new (&at(i)) T(copy(ref[i])); }
+    explicit array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
     /// Converts a buffer to an array
     array(buffer<T>&& o) : buffer<T>(move(o)) {}
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
 
-    explicit operator const T*() const { return data; } // Explicits ref::operator const T*
     /// Compares all elements
     bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
     /// Allocates enough memory for \a capacity elements
-    void reserve(size_t capacity) {
-        if(capacity>this->capacity) {
-            assert(capacity>=size);
-            if(this->capacity) data=(T*)realloc((T*)data, capacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
-            else data=(T*)malloc(capacity*sizeof(T));
-            this->capacity=capacity;
+    void reserve(size_t nextCapacity) {
+        if(nextCapacity>capacity) {
+            assert(nextCapacity>=size);
+            if(capacity) {
+                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+                assert(size_t(data)%alignof(T)==0);
+            } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("");
+            capacity=nextCapacity;
         }
     }
     /// Resizes the array to \a size and default initialize new elements
-    void grow(size_t size) { size_t old=this->size; assert(size>=old); reserve(size); this->size=size; for(size_t i: range(old,size)) new (&at(i)) T(); }
+    void grow(size_t nextSize) { size_t previousSize=size; assert(nextSize>=previousSize); reserve(nextSize); size=nextSize; slice(previousSize,nextSize-previousSize).clear(); }
     /// Sets the array size to \a size and destroys removed elements
-    void shrink(size_t size) { assert(capacity && size<=this->size); for(size_t i: range(size,this->size)) data[i].~T(); this->size=size; }
+    void shrink(size_t nextSize) { assert(capacity && nextSize<=size); for(size_t i: range(nextSize,size)) data[i].~T(); size=nextSize; }
     /// Removes all elements
     void clear() { if(size) shrink(0); }
 
@@ -42,35 +45,30 @@ generic struct array : buffer<T> {
 
     /// \name Append operators
     array& operator<<(T&& e) { size_t s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
-    array& operator<<(array<T>&& a) {size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(move(a[i])); return *this; }
+    array& operator<<(array<T>&& a) {size_t s=size; reserve(size=s+a.size); move(slice(s,a.size), a); return *this; }
     array& operator<<(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
-    array& operator<<(const ref<T>& a) {size_t s=size; reserve(size=s+a.size); for(size_t i: range(a.size)) new (&at(s+i)) T(a[i]); return *this; }
+    array& operator<<(const ref<T>& a) {size_t s=size; reserve(size=s+a.size); copy(slice(s,a.size), a); return *this; }
     /// \}
 
     /// \name Appends once (if not already contained) operators
     array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    array& operator +=(array&& b) { for(T& v: b) *this+= move(v); return *this; }
     array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
     array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
     /// \}
 
     /// Inserts an element at \a index
-    T& insertAt(int index, T&& e) {
+    template<Type V> T& insertAt(int index, V&& e) {
         assert(index>=0);
         reserve(++size);
-        for(int i=size-2;i>=index;i--) copy((byte*)&at(i+1),(const byte*)&at(i),sizeof(T));
+        for(int i=size-2;i>=index;i--) copy(raw(at(i+1)), raw(at(i)));
         new (&at(index)) T(move(e));
         return at(index);
     }
-    /// Inserts a value at \a index
-    T& insertAt(int index, const T& v) { return insertAt(index, copy(v)); }
     /// Inserts immediately before the first element greater than or equal to the argument
-    int insertSorted(T&& e) { size_t i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
-    /// Inserts immediately before the first element greater than or equal to the argument
-    int insertSorted(const T& v) { return insertSorted(copy(v)); }
+    template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
 
     /// Removes one element at \a index
-    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy((byte*)&at(i),(byte*)&at(i+1),sizeof(T)); size--; }
+    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy(raw(at(i)), raw(at(i+1))); size--; }
     /// Removes one element at \a index and returns its value
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
@@ -78,12 +76,12 @@ generic struct array : buffer<T> {
 
     /// Removes one matching element and returns an index to its successor
     template<Type K> int tryRemove(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
-    /// Removes one matching element and returns an index to its successor, aborts if not contained
-    template<Type K> int remove(const K& key) { int i=indexOf(key); assert_(i>=0); removeAt(i); return i; }
+    /// Removes one matching element and returns an index to its successor, aborts if not sed
+    template<Type K> int remove(const K& key) { int i=indexOf(key); assert(i>=0); removeAt(i); return i; }
     /// Removes all matching elements
-    template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
+    //template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
-    template<Type F> void filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; }
+    template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
     /// Returns the index of the first occurence of \a key. Returns -1 if \a key could not be found.
     template<Type K> int indexOf(const K& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
@@ -100,7 +98,7 @@ generic struct array : buffer<T> {
             if(at(mid) < key) min = mid+1;
             else max = mid;
         }
-        assert(min == max /*&& at(min) == key*/);
+        assert(min == max);
         return min;
     }
 
@@ -109,6 +107,7 @@ generic struct array : buffer<T> {
     using buffer<T>::capacity;
     using buffer<T>::end;
     using buffer<T>::at;
+    using buffer<T>::slice;
 };
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
@@ -121,15 +120,56 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=after; return move(a);
 }
 
+/// Returns an array of the application of a function to every index up to a size
+template<class Function, class... Args> auto apply(uint size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
+    buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
+}
+
 /// Returns an array of the application of a function to every elements of a reference
-template<class Iterable, class Function, class... Args> auto apply(const Iterable& a, Function function, Args... args) -> array<decltype(function(*a.begin(), args...))> {
-    array<decltype(function(*a.begin(), args...))> r; for(const auto& e: a) r << function(e, args...); return r;
+template<class T, class Function, class... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
+    buffer<decltype(function(a[0], args...))> r(a.size); for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...)); return r;
 }
 
 /// Converts arrays to references
-generic array<ref<T>> toRefs(const ref<array<T>>& o) {
+generic array<ref<T> > toRefs(const ref<array<T>>& o) {
     array<ref<T>> r; for(const array<T>& e: o) r << (const ref<T>&)e; return r;
 }
 
 /// String is an array of bytes
 typedef array<byte> String;
+
+generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivotIndex) {
+    swap(at[pivotIndex], at[right]);
+    const T& pivot = at[right];
+    uint storeIndex = left;
+    for(uint i: range(left,right)) {
+        if(at[i] < pivot) {
+            swap(at[i], at[storeIndex]);
+            storeIndex++;
+        }
+    }
+    swap(at[storeIndex], at[right]);
+    return storeIndex;
+}
+
+generic T quickselect(const mref<T>& at, size_t left, size_t right, size_t k) {
+    for(;;) {
+        size_t pivotIndex = partition(at, left, right, (left + right)/2);
+        size_t pivotDist = pivotIndex - left + 1;
+        if(pivotDist == k) return at[pivotIndex];
+        else if(k < pivotDist) right = pivotIndex - 1;
+        else { k -= pivotDist; left = pivotIndex + 1; }
+    }
+}
+/// Quickselects the median in-place
+generic T median(const mref<T>& at) { if(at.size==1) return at[0u]; return quickselect(at, 0, at.size-1, at.size/2); }
+
+generic void quicksort(mref<T>& at, int left, int right) {
+    if(left < right) { // If the list has 2 or more items
+        int pivotIndex = partition(at, left, right, (left + right)/2);
+        if(pivotIndex) quicksort(at, left, pivotIndex-1);
+        quicksort(at, pivotIndex+1, right);
+    }
+}
+/// Quicksorts the array in-place
+generic void quicksort(mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }

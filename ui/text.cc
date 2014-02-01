@@ -59,7 +59,7 @@ struct TextLayout {
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->advance(spaceIndex); assert(spaceAdvance);
         uint16 previous=spaceIndex;
-        Format format=Regular;
+        TextFormat format=Regular;
         Text::Link link;
         Text::Cursor underlineBegin;
         Word word;
@@ -82,7 +82,7 @@ struct TextLayout {
                     link.end=current();
                     links << move(link);
                 }
-                Format newFormat = ::format(c);
+                TextFormat newFormat = ::format(c);
                 if(format&Underline && !(newFormat&Underline) && (current()>underlineBegin))
                     lines << Line{underlineBegin, current()};
                 format=newFormat;
@@ -125,7 +125,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, int size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
+Text::Text(const string& text, uint size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
 void Text::layout() {
     textSize=int2(0,size*resolution/96);
     TextLayout layout(text, size*resolution/96, wrap);

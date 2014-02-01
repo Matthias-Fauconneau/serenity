@@ -8,30 +8,33 @@
 #include "png.h"
 #include "linux.h"
 #include "x.h"
+#if GL
+#include "gl.h"
+#undef packed
+#define Time XTime
+#define Cursor XCursor
+#define Depth XXDepth
+#define Window XWindow
+#define Screen XScreen
+#define XEvent XXEvent
+#include <GL/glx.h> //X11
+#undef Time
+#undef Cursor
+#undef Depth
+#undef Window
+#undef Screen
+#undef XEvent
+#undef None
+#endif
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 int2 displaySize;
-
-Image renderToImage(Widget* widget, int2 size, int imageResolution) {
-    Image framebuffer = move(::framebuffer);
-    array<Rect> clipStack = move(::clipStack);
-    Rect currentClip = move(::currentClip);
-    int resolution = ::resolution;
-    ::framebuffer = Image(size.x, size.y);
-    ::currentClip = Rect(::framebuffer.size());
-    ::resolution = imageResolution;
-    fill(Rect(::framebuffer.size()),1);
-    assert(widget);
-    widget->render(0,::framebuffer.size());
-    Image image = move(::framebuffer);
-    ::framebuffer = move(framebuffer);
-    ::clipStack = move(clipStack);
-    ::currentClip = move(currentClip);
-    ::resolution = resolution;
-    return image;
-}
+#if GL
+Display* glDisplay;
+GLXContext glContext;
+#endif
 
 static thread_local Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
@@ -40,10 +43,12 @@ void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon, const string& type, Thread& thread)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true) {
+Window::Window(Widget* widget, int2 size, const string& title, const Image& icon,
+               Renderer renderer, const string& type, Thread& thread)
+    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true),
+      renderer(renderer) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
-    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(addr.path,path.data,path.size);
+    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home())) {
@@ -57,14 +62,16 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
         } else { warn("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
     }
-    {ConnectionSetupReply1 r=read<ConnectionSetupReply1>(); assert_(r.status==1);}
+    {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
     {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
         for(int i=0;i<r.numScreens;i++){ Screen screen=read<Screen>();
-            for(int i=0;i<screen.numDepths;i++) { Depth depth = read<Depth>();
+            for(int i=0;i<screen.numDepths;i++) { XDepth depth = read<XDepth>();
                 if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(depth.numVisualTypes)) {
-                    if(!visual && depth.depth==32) { displaySize=int2(screen.width,screen.height); root = screen.root; visual=visualType.id; }
+                    if(!visual && depth.depth==32) {
+                        displaySize=int2(screen.width,screen.height); root = screen.root; visual=visualType.id;
+                    }
                 }
             }
         }
@@ -73,10 +80,12 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     }
     assert(visual);
 
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
+    {QueryExtensionReply r=readReply<QueryExtensionReply>((
+        {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
 
-    {QueryExtensionReply r=readReply<QueryExtensionReply>(({QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"RENDER"_+pad(4,r.length));}));
+    {QueryExtensionReply r=readReply<QueryExtensionReply>((
+        {QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"RENDER"_+pad(4,r.length));}));
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>(raw(QueryPictFormats()));
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
@@ -104,19 +113,37 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     setTitle(title);
     setIcon(icon);
     setType(type);
+    if(renderer == OpenGL) {
+#if GL
+        if(glDisplay || glContext) { assert(glDisplay && glContext); return; }
+        glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert(glDisplay);
+        const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1, 0};
+        int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
+        const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
+        glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
+                (glDisplay, fbConfigs[0], 0, 1, contextAttribs);
+        assert(glContext);
+        glXMakeCurrent(glDisplay, id, glContext);
+        glEnable(GL_FRAMEBUFFER_SRGB);
+        ((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
+#else
+        error("Unsupported: OpenGL was not configured at compile-time");
+#endif
+    }
 }
 
 void Window::create() {
     assert(!created);
-    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y; r.visual=visual;
-        r.colormap=id+Colormap;
-        r.overrideRedirect=overrideRedirect;
-        r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask; send(raw(r));}
+    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y;
+        r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
+        r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
+                |EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
+        send(raw(r));
+    }
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     created = true;
-    registerPoll();
 }
 Window::~Window() { destroy(); }
 void Window::destroy() {
@@ -130,69 +157,92 @@ void Window::destroy() {
 // Render
 void Window::event() {
     window=this;
-    if(revents==IDLE) {
-        if(autoResize) {
+    if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
+        lock.lock();
+        if(!poll()) { lock.unlock(); break; }
+        uint8 type = read<uint8>();
+        XEvent e = read<XEvent>();
+        lock.unlock();
+        processEvent(type, e);
+    }
+    while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
+    if(/*revents==IDLE &&*/ needUpdate) {
+        needUpdate = false;
+        /*if(autoResize) {
             int2 hint = widget->sizeHint();
             if(hint != size) { setSize(hint); return; }
-        }
+        }*/
         assert(size);
         currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
-        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-            if(shm) {
-                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                shmdt(buffer.data);
-                shmctl(shm, IPC_RMID, 0);
-            }
-            buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
-            shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
-        }
-        framebuffer=share(buffer);
-        currentClip=Rect(size);
-
-        if(clearBackground) {
-            if(backgroundCenter==backgroundColor) {
-                fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-            } else { // Oxygen-like radial gradient background
-                const int radius=256;
-                int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                        a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                if(x0>0 || x1<w || h<size.y) fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                uint* dst=(uint*)framebuffer.data;
-                for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                    int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                    dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+        if(renderer == Raster) {
+            ::softwareRendering=true;
+            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
+                if(shm) {
+                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                    shmdt(buffer.data);
+                    shmctl(shm, IPC_RMID, 0);
                 }
+                buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
+                shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+                buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+                {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             }
-        }
-        widget->render(0,size);
-        assert(!clipStack);
+            framebuffer=share(buffer);
+            {//Locker lock(framebufferLock);
+                currentClip=Rect(size);
+                if(clearBackground) {
+                    if(backgroundCenter==backgroundColor) {
+                        fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                    } else { // Oxygen-like radial gradient background
+                        const int radius=256;
+                        int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
+                                a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
+                        if(x0>0 || x1<w || h<size.y)
+                            fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                        uint* dst=(uint*)framebuffer.data;
+                        for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
+                            int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale),
+                                    g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
+                            dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                        }
+                    }
+                }
+                widget->render(0,size);
+                assert(!clipStack);
+            }
 
-        if(featherBorder) { //feather borders
-            const bool corner = 1;
-            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-            if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-            if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            if(featherBorder) { //feather borders
+                const bool corner = 1;
+                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
+                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
+                if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
+                if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            }
+            Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+            r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
+            r.srcW=size.x; r.srcH=size.y; send(raw(r));
+            state=Server;
+        } else {
+#if GL
+            ::softwareRendering=false;
+            glXMakeCurrent(glDisplay, id, glContext);
+            viewportSize = size;
+            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
+            currentClip=Rect(size);
+            widget->render(0,size);
+            assert(!clipStack);
+            viewportSize = 0;
+            glFlush();
+            glXSwapBuffers(glDisplay, id);
+#else
+            error("Unsupported: OpenGL was not configured at compile-time");
+#endif
         }
-        Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-        r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
-        r.srcW=size.x; r.srcH=size.y; send(raw(r));
-        state=Server;
-        framebuffer=Image();
-        frameReady();
-    } else for(;;) {
-        readLock.lock();
-        if(!poll()) { readLock.unlock(); break; }
-        uint8 type = read<uint8>();
-        XEvent e = read<XEvent>();
-        readLock.unlock();
-        processEvent(type, e);
-        while(eventQueue) { readLock.lock(); QEvent e=eventQueue.take(0); readLock.unlock(); processEvent(e.type, e.event); }
-    };
+        frameSent();
+        framebuffer=Image(); // After frameSent() for capture
+    }
     window=0;
 }
 
@@ -203,24 +253,24 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             int reqSize=sizeof(XRender::requests)/sizeof(*XRender::requests);
             if(code>=XRender::errorBase && code<=XRender::errorBase+XRender::errorCount) { code-=XRender::errorBase;
                 assert(code<sizeof(XRender::errors)/sizeof(*XRender::errors));
-                log("XError",XRender::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
+                log("XError",XRender::errors[code],"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
             }
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
             if(code>=Shm::errorBase && code<=Shm::errorBase+Shm::errorCount) { code-=Shm::errorBase;
                 assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
-                log("XError",Shm::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",Shm::errors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",::errors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             }
         } else {
             assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
-            log("XError",::errors[code],"seq:",e.seq,"id",e.id,"request",e.major<reqSize?String(::requests[e.major]):dec(e.major),"minor",e.minor);
+            log("XError",::errors[code],"request",e.major<reqSize?String(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
     }
     else if(type==1) error("Unexpected reply");
@@ -230,30 +280,6 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
             else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
-            /*else if(anchor==Float) {
-                if(!(e.state&Button1Mask)) { dragStart=int2(e.rootX,e.rootY); dragPosition=position; dragSize=size; }
-                bool top = dragStart.y<dragPosition.y+1, bottom = dragStart.y>=dragPosition.y+dragSize.y-1;
-                bool left = dragStart.x<dragPosition.x+1, right = dragStart.x>=dragPosition.x+dragSize.x-1;
-                if(e.state&Button1Mask) {
-                    int2 position=dragPosition, size=dragSize, delta=int2(e.rootX,e.rootY)-dragStart;
-                    if(top && left) position+=delta, size-=delta;
-                    else if(top && right) position.y+=delta.y, size+=int2(delta.x,-delta.y);
-                    else if(bottom && left) position.x+=delta.x, size+=int2(-delta.x,delta.y);
-                    else if(bottom && right) size+=delta;
-                    else if(top) position.y+=delta.y, size.y-=delta.y;
-                    else if(bottom) size.y+=delta.y;
-                    else if(left) position.x+=delta.x, size.x-=delta.x;
-                    else if(right) size.x+=delta.x;
-                    else position+=delta;
-                    position=clip(int2(0,16),position,displaySize), size=clip(int2(16,16),size,displaySize-int2(0,16));
-                    setGeometry(position,size);
-                } else {
-                    if((top && left)||(bottom && right)) cursor=Cursor::FDiagonal;
-                    else if((top && right)||(bottom && left)) cursor=Cursor::BDiagonal;
-                    else if(top || bottom) cursor=Cursor::Vertical;
-                    else if(left || right) cursor=Cursor::Horizontal;
-                }
-            }*/
             if(cursor!=lastCursor) setCursor(cursor);
         }
         else if(type==ButtonPress) {
@@ -265,27 +291,25 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             drag=0;
             if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
         } else if(type==KeyPress) {
-            Key key = KeySym(e.key, e.state);
-            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); //normal keyPress event
+            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
+            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); // Normal keyPress event
             else {
                 signal<>* shortcut = shortcuts.find(key);
-                if(shortcut) (*shortcut)(); //local window shortcut
+                if(shortcut) (*shortcut)(); // Local window shortcut
             }
         }
         else if(type==KeyRelease) {
-            Key key = KeySym(e.key, e.state);
+            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
             if(focus && focus->keyRelease(key, (Modifiers)e.state)) render();
         }
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
-            signal<>* shortcut = shortcuts.find(Widget::Leave);
-            if(shortcut) (*shortcut)(); //local window shortcut
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                    e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
         }
         else if(type==Expose) { if(!e.expose.count) render(); }
         else if(type==UnmapNotify) mapped=false;
-        else if(type==MapNotify) mapped=true;
+        else if(type==MapNotify) { mapped=true; if(needUpdate) queue(); }
         else if(type==ReparentNotify) {}
         else if(type==ConfigureNotify) {
             position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
@@ -294,27 +318,37 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
             signal<>* shortcut = shortcuts.find(Escape);
-            if(shortcut) (*shortcut)(); //local window shortcut
-            else widget->keyPress(Escape, NoModifiers);
+            if(shortcut) (*shortcut)(); // Local window shortcut
+            else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
+            else exit(0); // Exits application by default
         }
         else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
     }
 }
-void Window::send(const ref<byte>& request) { write(request); sequence++; }
+uint Window::send(const ref<byte>& request) { write(request); return ++sequence; }
 template<class T> T Window::readReply(const ref<byte>& request) {
-    Locker lock(readLock);
-    send(request);
+    Locker lock(this->lock); // Prevents a concurrent thread from reading the reply
+    uint sequence = send(request);
+    bool pendingEvents = false;
     for(;;) { uint8 type = read<uint8>();
-        if(type==0){XError e=read<XError>(); processEvent(0,(XEvent&)e); if(e.seq==sequence) { T t; clear((byte*)&t,sizeof(T)); return t; }}
-        else if(type==1) return read<T>();
-        else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
+        if(type==0) {
+            XError e=read<XError>(); processEvent(0,(XEvent&)e);
+            if(e.seq==sequence) { if(pendingEvents) queue(); T t; raw(t).clear(); return t; }
+        }
+        else if(type==1) {
+            T reply = read<T>();
+            assert(reply.seq==sequence);
+            if(pendingEvents) queue();
+            return reply;
+        }
+        else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::render() { /*if(mapped)*/ queue(); }
+void Window::render() { needUpdate=true; if(mapped) queue(); }
 
-void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
+void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} registerPoll(); }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {
@@ -340,40 +374,45 @@ void Window::setGeometry(int2 position, int2 size) {
     if(anchor&Top && anchor&Bottom) position.y=16+(displaySize.y-16-size.y)/2;
     else if(anchor&Top) position.y=16;
     else if(anchor&Bottom) position.y=displaySize.y-size.y;
-    if(position!=this->position && size!=this->size) {SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; send(raw(r));}
+    if(position!=this->position && size!=this->size) {
+        SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; send(raw(r));
+    }
     else if(position!=this->position) {SetPosition r; r.id=id+XWindow; r.x=position.x, r.y=position.y; send(raw(r));}
     else if(size!=this->size) {SetSize r; r.id=id+XWindow; r.w=size.x, r.h=size.y; send(raw(r));}
 }
 
 // Keyboard
 Key Window::KeySym(uint8 code, uint8 state) {
+    //FIXME: not atomic
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
-    array<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-    if(!keysyms) return (Key)0;
+    ::buffer<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
+    if(!keysyms) error(code,state);
     if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
     return (Key)keysyms[state&1 && keysyms.size>=2];
 }
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
-    for(uint i: range(minKeyCode,maxKeyCode)) if(KeySym(i,0)==sym) { keycode=i; break;  }
-    if(!keycode) warn("Unknown KeySym",int(sym));
+    for(uint i: range(minKeyCode,maxKeyCode+1)) if(KeySym(i,0)==sym) { keycode=i; break;  }
+    if(!keycode) { if(sym==0x1008ff14) return 172; /*FIXME*/ log("Unknown KeySym",int(sym)); return sym; }
     return keycode;
 }
 
-signal<>& Window::localShortcut(Key key) { return shortcuts.insert((uint16)key); }
+signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
 signal<>& Window::globalShortcut(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
-    return shortcuts.insert((uint16)key);
+    return shortcuts.insert((uint)key);
 }
 
 // Properties
 uint Window::Atom(const string& name) {
-    InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4; return readReply<InternAtomReply>(String(raw(r)+name+pad(4,r.length))).atom;
+    InternAtom r; r.length=name.size; r.size+=align(4,r.length)/4;
+    return readReply<InternAtomReply>(String(raw(r)+name+pad(4,r.length))).atom;
 }
 template<class T> array<T> Window::getProperty(uint window, const string& name, uint size) {
+    //FIXME: not atomic
     GetProperty r; GetPropertyReply reply=readReply<GetPropertyReply>(({r.window=window; r.property=Atom(name); r.length=size; raw(r); }));
-    { uint size=reply.length*reply.format/8; array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
+    {uint size=reply.length*reply.format/8;  array<T> a; if(size) a=read<T>(size/sizeof(T)); int pad=align(4,size)-size; if(pad) read(pad); return a; }
 }
 template array<uint> Window::getProperty(uint window, const string& name, uint size);
 template array<byte> Window::getProperty(uint window, const string& name, uint size);
@@ -392,16 +431,20 @@ void Window::setIcon(const Image& icon) {
 }
 
 String Window::getSelection(bool clipboard) {
-    GetSelectionOwner r; uint owner = readReply<GetSelectionOwnerReply>(({ if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
+    GetSelectionOwner r;
+    uint owner = readReply<GetSelectionOwnerReply>(({ if(clipboard) r.selection=Atom("CLIPBOARD"_); raw(r); })).owner;
     if(!owner) return String();
     {ConvertSelection r; r.requestor=id; if(clipboard) r.selection=Atom("CLIPBOARD"_); r.target=Atom("UTF8_STRING"_); send(raw(r));}
-    for(;;) {
-        readLock.lock();
+    bool pendingEvents = false;
+    for(Locker lock(this->lock);;) { // Lock prevents a concurrent thread from reading the SelectionNotify
         uint8 type = read<uint8>();
-        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); readLock.unlock(); return getProperty<byte>(id,"UTF8_STRING"_); }
-        else eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; //queue events to avoid reentrance
-        readLock.unlock();
+        if((type&0b01111111)==SelectionNotify) { read<XEvent>(); break; }
+        eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())};
+        semaphore.release(1);
+        pendingEvents = true;
     }
+    if(pendingEvents) queue();
+    return getProperty<byte>(id,"UTF8_STRING"_);
 }
 
 // Cursor

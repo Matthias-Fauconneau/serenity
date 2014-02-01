@@ -36,7 +36,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
         target.sampleCount = size;
         target.field = String("μ"_);
         target.maximum = 0xFF;
-        clear<uint8>(target, target.size(), uint8(0xFF));
+        target.data.clear(0xFF);
         /// Synthesizes random oriented ellipsoids
         const uint maximumRadius = (size.x-1)/4;
         array<mat4> ellipsoids; // Oriented bounding boxes (mat4 might not be most efficient but is probably the easiest representation)
@@ -73,7 +73,7 @@ class(Synthetic, Operation), virtual VolumeOperation {
         array<Tube> tubes;
         for(const mat4& ellipsoid: ellipsoids) {
             vec3 center = ellipsoid[3].xyz();
-            mat4 nearest; float distance=FLT_MAX;
+            mat4 nearest; float distance=inf;
             for(const mat4& o: ellipsoids) if(o[3].xyz()!=center && sq(o[3].xyz()-center)<distance) distance=sq(o[3].xyz()-center), nearest = o;
             //vec4 a = ellipsoid*vec4(1,1,1,0); float aVolume = a.x*a.y*a.z;
             //vec4 b = nearest*vec4(1,1,1,0); float vVolume = b.x*b.y*b.z;

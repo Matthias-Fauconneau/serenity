@@ -2,6 +2,11 @@
 #include "operation.h"
 #include "volume.h"
 
+/// Returns floor(log2(v))
+inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+/// Computes the next highest power of 2
+inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
+
 // Converts an abstract operation Result to a volume
 inline Volume toVolume(const string& metadata, const buffer<byte>& data) {
     Volume volume;

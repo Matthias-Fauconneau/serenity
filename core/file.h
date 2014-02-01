@@ -19,7 +19,7 @@ const Folder& currentWorkingDirectory();
 /// Returns a file descriptor to the root folder
 const Folder& root();
 
-enum { Files=1<<0, Folders=1<<1, Recursive=1<<2, Sorted=1<<3, Hidden=1<<4 };
+enum { Devices=1<<0, Files=1<<1, Folders=1<<2, Recursive=1<<3, Sorted=1<<4, Hidden=1<<5 };
 struct Folder : Handle {
     /// Opens \a folderPath
     Folder(const string& folderPath, const Folder& at=root(), bool create=false);
@@ -42,9 +42,9 @@ enum { IDLE=64 };
 struct Stream : Handle {
     Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
-    void read(void* buffer, size_t size);
+    void read(byte* buffer, size_t size);
     /// Reads up to \a size bytes into \a buffer
-    int64 readUpTo(void* buffer, size_t size);
+    int64 readUpTo(byte* buffer, size_t size);
     /// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
     /// Reads up to \a size bytes
@@ -54,7 +54,7 @@ struct Stream : Handle {
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
         ::buffer<T> buffer(size); size_t byteSize=size*sizeof(T);
-        size_t offset=0; while(offset<byteSize) offset+=readUpTo(buffer.begin()+offset, byteSize-offset);
+        size_t offset=0; while(offset<byteSize) offset+=readUpTo((byte*)buffer.begin()+offset, byteSize-offset);
         assert(offset==byteSize);
         return buffer;
     }
@@ -110,7 +110,7 @@ template<uint major, uint minor, Type T> struct IOR { typedef T Args; static con
 template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 /// Handle to a device
 struct Device : File {
-    Device(const string& path, Flags flags=ReadWrite):File(path, root(), flags){}
+    Device(const string& path, const Folder& at=root(), Flags flags=ReadWrite):File(path, at, flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments

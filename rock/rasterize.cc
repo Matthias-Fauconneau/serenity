@@ -45,7 +45,7 @@ void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     assert_(source.tiled());
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
 
     Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
     assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
@@ -96,7 +96,7 @@ void rasterize(Volume16& target, const Volume& source) {
 
     uint16* const targetData = target;
     assert_(target.tiled());
-    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const ref<uint64> offsetX = target.offsetX, offsetY = target.offsetY, offsetZ = target.offsetZ;
 
     Time time; Time report;
     parallel(tileCount, [&](uint id, uint i) {
@@ -160,9 +160,9 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     uint tileCount = X/tileSide*Y/tileSide*Z/tileSide;
 
-    uint16* const targetData = target;
+    const mref<uint16> targetData = target;
     assert_(target.tiled());
-    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const ref<uint64> offsetX = target.offsetX, offsetY = target.offsetY, offsetZ = target.offsetZ;
 
     Time time; Time report;
     parallel(tileCount, [&](uint id, uint i) {
@@ -172,9 +172,9 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         uint16 tileR[tileSize] = {}; // Untiled 'R'-buffer
         int3 tileP[tileSize] = {}; // Untiled 'P'-buffer
-        clear(tileP, tileSize, int3(0));
-        uint16* const targetTile = targetData + offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ];
-        clear(targetTile, tileSize);
+        mref<int3>(tileP).clear(0);
+        const mref<uint16> targetTile = targetData.slice(offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ]);
+        targetTile.clear();
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];
             int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;

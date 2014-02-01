@@ -7,6 +7,10 @@
 #include "layout.h"
 #include "text.h"
 
+/// Configures global display context to render to an image
+// In this module because the definition depends on display and widget
+Image renderToImage(Widget& widget, int2 size, int imageResolution=::resolution);
+
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget
@@ -17,21 +21,21 @@ struct ScrollArea : Widget {
     void center(int2 target);
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
-    int2 delta=0, dragStart, flickStart;
+    bool scrollbar = false;
+    const int scrollBarWidth = 16;
+    int2 delta=0;
+    int2 dragStartCursor, dragStartDelta;
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
     void render(int2 position, int2 size) override;
     int2 size; // keep last size for ensureVisible
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
 template<class T> struct Scroll : ScrollArea, T {
-#if __clang__ || __GNUC_MINOR__ < 8
-    template<class... Args> Scroll(Args&&... args):T(forward<Args>(args)...){}
-#else
     using T::T;
-#endif
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
     Widget& widget() override { return (T&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
@@ -41,11 +45,10 @@ template<class T> struct Scroll : ScrollArea, T {
 /// Displays an image
 struct ImageWidget : virtual Widget {
     /// Displayed image
-    Image image;
+    const Image& image;
 
-    ImageWidget(){}
     /// Creates a widget displaying \a image
-    ImageWidget(Image&& image):image(move(image)){}
+    ImageWidget(const Image& image):image(move(image)){}
 
     int2 sizeHint();
     void render(int2 position, int2 size) override;
@@ -63,8 +66,7 @@ struct ImageLink : ImageWidget {
     /// User clicked on the image
     signal<const string&> linkActivated;
 
-    ImageLink(){}
-    ImageLink(Image&& image):Icon(move(image)){}
+    ImageLink(const Image& image):Icon(move(image)){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 /// \typedef ImageLink TriggerButton
@@ -74,7 +76,7 @@ typedef ImageLink TriggerButton;
 /// Togglable Icon
 struct ToggleButton : Widget {
     /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(Image&& enable, Image&& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
+    ToggleButton(const Image& enable, const Image& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
     signal<bool /*state*/> toggled;
@@ -86,8 +88,8 @@ struct ToggleButton : Widget {
     void render(int2 position, int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
-    Image enableIcon;
-    Image disableIcon;
+    const Image& enableIcon;
+    const Image& disableIcon;
 };
 
 /// Shows a bounded value
@@ -116,7 +118,7 @@ struct Slider : Progress {
 
 /// ::Icon with \ref Text "text"
 struct Item : Linear {
-    Item(){}
+    //Item(){}
     Item(Image&& icon, const string& text, int size=16, bool under=false):icon(move(icon)),text(text,size),under(under){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
@@ -129,7 +131,7 @@ struct Item : Linear {
 
 /// Clickable Item
 struct TriggerItem : Item {
-    TriggerItem(){}
+    //TriggerItem(){}
     TriggerItem(Image&& icon, String&& text, int size=16):Item(move(icon),move(text),size){}
     /// User clicked on the button
     signal<> triggered;

@@ -182,7 +182,7 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
         const ref<T> sourceZ = tiled ? sourceData.slice(offsetZ[z]) : sourceData.slice(z*X*Y, X*Y);
         const mref<uint8> targetZ = targetData.slice(offsetZ[z]);
         if(z < marginZ || z>=Z-marginZ) for(uint y: range(Y)) {
-            const mref<uint8> targetZY = targetZ.slice(offsetY[y], X);
+            const mref<uint8> targetZY = targetZ.slice(offsetY[y]);
             for(uint x: range(X)) targetZY[offsetX[x]]=1;
         }
         else for(uint y: range(Y)) {

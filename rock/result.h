@@ -7,13 +7,6 @@
 #include <typeinfo>
 #include "data.h"
 
-/// Reference counter to be inherited by shared objects
-struct shareable {
-    virtual void addUser() { ++userCount; }
-    virtual uint removeUser() { error("removeUser"); return --userCount; }
-    uint userCount = 1;
-};
-
 /// Abstract factory pattern (allows construction of class by names)
 template <class I> struct Interface {
     struct AbstractFactory {
@@ -48,8 +41,8 @@ struct Variant : String {
     explicit operator bool() const { return size; }
     operator int() const { return *this ? toInteger(*this) : 0; }
     operator uint() const { return *this ? toInteger(*this) : 0; }
-    operator float() const { return toDecimal(*this); }
-    operator double() const { return toDecimal(*this); }
+    operator float() const { return fromDecimal(*this); }
+    operator double() const { return fromDecimal(*this); }
     operator const string&() const { return *this; }
     operator const String&() const { return *this; }
     generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor

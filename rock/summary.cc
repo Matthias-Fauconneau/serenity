@@ -31,7 +31,10 @@ class(Summary, Operation) {
         }
         args.remove("z"_);
         vbox << &slices;
-        output(outputs, "slices"_, "png"_, [&]{VBox vbox (Linear::Share, Linear::Expand); vbox<<&header<<&slices; return encodePNG(renderToImage(&vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));});
+        output(outputs, "slices"_, "png"_, [&]{
+            VBox vbox (Linear::Share, Linear::Expand); vbox<<&header<<&slices;
+            return encodePNG(renderToImage(vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));
+        });
         HList<Text> properties;
         properties << Text("Porosity: "_+format(Bold)+dec(round(parseScalar(results.getResult("porosity"_, args)->data)*100))+"%"_);
         real resolution = parseScalar(results.getResult("resolution"_, args)->data);
@@ -57,7 +60,11 @@ class(Summary, Operation) {
             plots << move(plot);}
         vbox << &plots;
         vbox << &properties;
-        output(outputs, "plots"_, "png"_, [&]{VBox vbox (Linear::Share, Linear::Expand); vbox<<&plots<<&properties; return encodePNG(renderToImage(&vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));});
-        output(outputs, "summary"_, "png"_, [&]{return encodePNG(renderToImage(&vbox, 2*pageSize, 1.5*96/*dpi*/));});
+        output(outputs, "plots"_, "png"_, [&]{
+            VBox vbox (Linear::Share, Linear::Expand);
+            vbox<<&plots<<&properties;
+            return encodePNG(renderToImage(vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));
+        });
+        output(outputs, "summary"_, "png"_, [&]{ return encodePNG(renderToImage(vbox, 2*pageSize, 1.5*96/*dpi*/)); });
     }
 };

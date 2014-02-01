@@ -8,10 +8,7 @@ void featureTransformX(Volume16& target, const Volume8& source) {
     uint16* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     bool tiled = source.tiled(); assert_(tiled);
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    //const int64 marginX=source.margin.x-1, marginY=floor(width/2,source.margin.y), marginZ=source.margin.z;
-    //assert_(source.margin.x>=1 /*&& (Y-2*marginY)%width == 0*/);
-    //target.margin.x = max(1, source.margin.x);
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     parallel(0,Z, [&](uint, uint z) {
         const uint8* const sourceZ = sourceData + (tiled ? offsetZ[z] : z*X*Y);
         uint16* const targetZ = targetData + z*Y;

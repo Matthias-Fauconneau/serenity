@@ -7,7 +7,7 @@
 #include <sys/timerfd.h>
 
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
-int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ul+ts.tv_nsec; }
+int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 
 static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year=0) {
@@ -119,7 +119,7 @@ String str(Date date, const string& format) {
     return r;
 }
 
-Date parse(TextData& s) {
+Date parseDate(TextData& s) {
     Date date;
     {
         if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
@@ -157,7 +157,7 @@ Date parse(TextData& s) {
     return date;
 }
 
-Timer::Timer():Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)){registerPoll();}
+Timer::Timer(Thread& thread):Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC), POLLIN, thread){registerPoll();}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(long sec, long nsec) {
     timespec time[2]={{0,0},{sec,nsec}};

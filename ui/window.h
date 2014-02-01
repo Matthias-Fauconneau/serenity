@@ -12,20 +12,13 @@ enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom
 
 extern int2 displaySize;
 
-extern int resolution;
-/// Configures global display context to render to an image
-Image renderToImage(Widget* widget, int2 size, int imageResolution=::resolution);
-
 /// Interfaces \a widget as a window on an X11 display server
 struct Window : Socket, Poll {
+    enum Renderer { Raster, OpenGL };
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image(),
+    Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image(), Renderer renderer=Raster,
            const string& type="_NET_WM_WINDOW_TYPE_NORMAL"_,Thread& thread=mainThread);
-    /// Creates an initially hidden window for \a widget, use \a show to display
-    /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size, const string& name,  const Image& icon) :
-        Window(widget, size, name, icon, "_NET_WM_WINDOW_TYPE_NORMAL"_,mainThread){}
     virtual ~Window();
 
     /// Creates window.
@@ -97,27 +90,33 @@ struct Window : Socket, Poll {
     bool created = false;
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
+    /// Whether a render request was skipped while unmapped
+    bool needUpdate = true;
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
     /// If set, this window will not be managed by the session window manager
     bool overrideRedirect;
     /// If set, this window will resize to widget->sizeHint before any rendering
-    bool autoResize = false;
+    //bool autoResize = false;
     /// If set, this window will always be anchored to this position
     Anchor anchor = Float;
     /// Window position and size
     int2 position=0, size=0;
 
+    /// Selects between software or OpenGL rendering
+    Renderer renderer;
     /// Window background intensity and opacity
-    float backgroundColor=14./16, backgroundCenter=15./16, backgroundOpacity=1;
+    float backgroundColor=13.5/16, backgroundCenter=13.5/16, backgroundOpacity=1;
     bool clearBackground = true, featherBorder = false;
 
     /// Shortcuts triggered when a key is pressed
-    map<uint16, signal<>> shortcuts;
+    map<uint, signal<>> shortcuts;
     /// Current widget that has the keyboard input focus
     Widget* focus=0;
     /// Current widget that has the drag focus
     Widget* drag=0;
+    /// Current widget that gets keyboard events reported without modifiers (when in focus)
+    Widget* directInput=0;
 
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
@@ -126,8 +125,8 @@ struct Window : Socket, Poll {
     /// Window drag state
     int2 dragStart, dragPosition, dragSize;
 
-    /// Signals when a render request completed
-    signal<> frameReady;
+    /// Signals sent frames
+    signal<> frameSent;
 
     /// Root window
     uint root = 0;
@@ -136,8 +135,8 @@ struct Window : Socket, Poll {
     /// This window base resource id
     uint id = 0;
 
-    /// Synchronize reading from event and readReply
-    Lock readLock;
+    /// Synchronizes access to connection and event queue
+    Lock lock;
 
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;
@@ -155,10 +154,12 @@ struct Window : Socket, Poll {
     uint format=0;
 
     uint16 sequence=-1;
-    void send(const ref<byte>& request);
+    uint send(const ref<byte>& request);
 
-    struct QEvent { uint8 type; unique<XEvent> event; };
+    struct QEvent { default_move(QEvent); uint8 type; unique<XEvent> event; };
     array<QEvent> eventQueue;
+    Semaphore semaphore;
+
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);
 };

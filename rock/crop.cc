@@ -87,7 +87,7 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     target.data.size = target.size()*target.sampleSize;
     const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z;
     const uint marginX=target.margin.x, marginY=target.margin.y, marginZ=target.margin.z;
-    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const ref<uint64> offsetX = target.offsetX, offsetY = target.offsetY, offsetZ = target.offsetZ;
     const uint16* const sourceData = source;
     uint16* const targetData = target;
     for(uint z=0; z<marginZ; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;

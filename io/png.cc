@@ -7,16 +7,12 @@ generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255};
 generic struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
 generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
 
-typedef vector<rgb,uint8,3> rgb3;
+typedef vec<rgb,uint8,3> rgb3;
 
 template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
-    typedef vector<T,uint8,N> S;
-    typedef vector<T,int,N> V;
-#if __clang__
-    byte prior_[width*sizeof(S)]; clear(prior_,sizeof(prior_)); S* prior = (S*)prior_;
-#else
-    S prior[width]; clear(prior,width,S(0));
-#endif
+    typedef vec<T,uint8,N> S;
+    typedef vec<T,int,N> V;
+    buffer<S> prior(width); prior.clear(0);
     for(uint y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
         uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
         S* src = (S*)raw;
@@ -45,23 +41,24 @@ template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint hei
 
 Image decodePNG(const ref<byte>& file) {
     BinaryData s(file, true);
-    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { warn("Invalid PNG"); return Image(); }
-    array<byte> buffer;
+    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { error("Invalid PNG"); return Image(); }
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
     uint palette[256]; bool alpha=false;
+    array<byte> buffer;
     for(;;) {
         uint32 size = s.read();
         string tag = s.read<byte>(4);
         if(tag == "IHDR"_) {
             width = s.read(), height = s.read();
-            bitDepth = s.read(); if(bitDepth!=8 && bitDepth != 4){ log("Unsupported PNG depth"_,bitDepth,width,height); return Image(); }
+            bitDepth = s.read(); assert(bitDepth==8 || bitDepth == 4 || bitDepth == 1);
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             alpha = depth==2||depth==4;
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             interlace = s.read();
         } else if(tag == "IDAT"_) {
-            buffer << s.read<byte>(size);
+            /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
+            else*/ buffer << s.read<byte>(size); // Explicitly concatenates chunks (FIXME: stream inflate)
         } else if(tag == "IEND"_) {
             assert(size==0);
             s.advance(4); //CRC
@@ -82,21 +79,23 @@ Image decodePNG(const ref<byte>& file) {
         assert(s);
     }
     ::buffer<byte> data = inflate(buffer, true);
-    if(bitDepth==4) {
+    if(bitDepth==1 || bitDepth==4) {
+        assert(type==3);
         assert(depth==1,depth);
-        assert(width%2==0);
-        if(data.size != height*(1+width*depth*bitDepth/8)) { warn("Invalid PNG",data.size,height*(1+width*depth)); return Image(); }
+        assert(width%(8/bitDepth)==0);
+        assert(data.size == height*(1+width*depth*bitDepth/8));
         const byte* src = data.data;
         ::buffer<byte> bytes(height*(1+width*depth));
         byte* dst = bytes.begin();
         for(uint y=0;y<height;y++) {
             dst[0] = src[0]; src++; dst++;
-            for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
-            src+=width/2; dst += width;
+            if(bitDepth==1) for(uint x=0;x<width/8;x++) for(uint b: range(8)) dst[8*x+b] = (src[x]&(1<<(7-b))) ? 1 : 0;
+            if(bitDepth==4) for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
+            src+=width/(8/bitDepth); dst += width;
         }
         data = move(bytes);
     }
-    if(data.size < height*(1+width*depth)) { warn("Invalid PNG",data.size,height*(1+width*depth),width,height,depth); return Image(); }
+    if(data.size < height*(1+width*depth)) { warn("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
     Image image(width,height,alpha);
     byte4* dst = image.data;
     int w=width,h=height;
@@ -129,7 +128,8 @@ Image decodePNG(const ref<byte>& file) {
 
 uint32 crc32(const ref<byte>& data) {
     static uint crc_table[256];
-    static bool unused once = ({for(uint n: range(256)){ uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } true;});
+    static int unused once = ({ for(uint n: range(256)) {
+                                     uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
     uint crc = 0xFFFFFFFF;
     for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
     return ~crc;
@@ -152,25 +152,11 @@ buffer<byte> filter(const Image& image) {
     byte* dst = data.begin(); const byte* src = (byte*)image.data;
     for(uint unused y: range(h)) {
         *dst++ = 0;
-        for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],src[x*4+3]);
+        for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],image.alpha?src[x*4+3]:0xFF);
         dst+=w*4, src+=image.stride*4;
     }
     return data;
 }
-
-#if 0
-array<byte> deflate(array<byte> data) {
-    array<byte> zlib;
-    zlib << "\x78\x01"_; //zlib header: method=8, window=7, check=0, level=1
-    for(uint i=0; i<data.size;) {
-        uint16 len = min(data.size-i,65535u), nlen = ~len;
-        zlib << (i+len==data.size) << raw(len) << raw(nlen) << data.slice(i,len);
-        i+=len;
-    }
-    zlib<< raw(big32(adler32(data)));
-    return zlib;
-}
-#endif
 
 buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n"_);
@@ -178,7 +164,7 @@ buffer<byte> encodePNG(const Image& image) {
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
 
-    array<byte> IDAT = "IDAT"_+deflate(filter(image));
+    array<byte> IDAT = "IDAT"_+deflate(filter(image),true);
     file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
 
     file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));

@@ -13,6 +13,11 @@ bool BinaryData::seekLast(const ref<byte>& key) {
     return false;
 }
 
+void TextData::advance(uint step) {
+    assert(index<buffer.size, index, buffer.size);
+    for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
+}
+
 bool TextData::match(char key) {
     if(available(1) && peek() == key) { advance(1); return true; }
     else return false;
@@ -37,7 +42,7 @@ bool TextData::matchNo(const string& any) {
 }
 
 void TextData::skip(const string& key) {
-    assert_(match(key), "'"_+key+"'"_, "'"_+untilEnd()+"'"_);
+    if(!match(key)) error("'"_+key+"'"_, "'"_+line()+"'"_);
 }
 
 string TextData::whileNot(char key) {
@@ -130,13 +135,13 @@ string TextData::whileInteger(bool sign) {
 
 int TextData::integer(bool sign) {
     string s = whileInteger(sign);
-    assert_(s, untilEnd());
+    if(!s) error("Expected integer", line(), lineIndex);
     return toInteger(s, 10);
 }
 
-uint TextData::mayInteger(bool sign) {
-    string s = whileInteger(sign);
-    return s?toInteger(s, 10):-1;
+int TextData::mayInteger(int defaultValue) {
+    string s = whileInteger(true);
+    return s ? toInteger(s, 10): defaultValue;
 }
 
 string TextData::whileHexadecimal() {
@@ -157,7 +162,7 @@ string TextData::whileDecimal() {
     matchAny("-+"_);
     if(!match("∞"_)) for(bool gotDot=false, gotE=false;available(1);) {
         byte c=peek();
-        /***/ if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
+        /**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
         else if(c=='e') { if(gotE) break; gotE=true; advance(1); if(peek()=='-') advance(1); }
         else if(c>='0'&&c<='9') advance(1);
         else break;
@@ -165,4 +170,4 @@ string TextData::whileDecimal() {
     return slice(start,index-start);
 }
 
-double TextData::decimal() { return toDecimal(whileDecimal()); }
+double TextData::decimal() { return fromDecimal(whileDecimal()); }

@@ -5,32 +5,30 @@
 #include "crop.h"
 
 /// Computes lists of positions for each value
-buffer<array<short3>> list(const Volume16& source, CropVolume crop, uint16 minimum) {
+buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 minimum) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     uint radiusSq = crop.cylinder ? sq(crop.size.x/2) : -1;
     int2 center = ((crop.min+crop.max)/2).xy();
     assert_(source.tiled());
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    const uint16* sourceData = source;
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
+    const ref<uint16> sourceData = source;
     buffer<array<short3>> lists[coreCount];
-    for(uint id: range(coreCount)) lists[id] = buffer<array<short3>>(source.maximum+1, source.maximum+1, array<short3>());
+    for(uint id: range(coreCount)) lists[id] = buffer<array<short3>>(source.maximum+1, source.maximum+1, 0);
     parallel(crop.min.z, crop.max.z, [&](uint id, uint z) {
         buffer<array<short3>>& list = lists[id];
-        const uint16* sourceZ = sourceData + offsetZ[z];
+        const ref<uint16> sourceZ = sourceData.slice(offsetZ[z]);
         for(int y=crop.min.y; y<crop.max.y; y++) {
-            const uint16* sourceZY = sourceZ + offsetY[y];
+            const ref<uint16> sourceZY = sourceZ.slice(offsetY[y]);
             for(int x=crop.min.x; x<crop.max.x; x++) {
-                const uint16* sourceZYX = sourceZY + offsetX[x];
-                if(uint(sq(x-center.x)+sq(y-center.y)) <= radiusSq) {
-                    uint value = sourceZYX[0];
-                    if(value<=minimum) continue; // Ignores small radii (and background minimum>=0)
-                    assert(value <= source.maximum);
-                    list[value] << short3(x,y,z);
-                }
+                uint value = sourceZY[offsetX[x]];
+                if(uint(sq(x-center.x)+sq(y-center.y)) > radiusSq) continue;
+                if(value<=minimum) continue; // Ignores small radii (and background minimum>=0)
+                assert(value <= source.maximum, value, source.maximum);
+                list[value] << short3(x,y,z);
             }
         }
     });
-    buffer<array<short3>> list(source.maximum+1, source.maximum+1, array<short3>());
+    buffer<array<short3>> list(source.maximum+1, source.maximum+1, 0);
     for(uint value: range(source.maximum+1)) { // Merges lists
         uint size = 0; for(uint id: range(coreCount)) size += lists[id][value].size;
         list[value].reserve(size); // Avoids unnecessary reallocations (i.e copies)

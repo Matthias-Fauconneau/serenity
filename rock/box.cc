@@ -15,8 +15,7 @@ array<mat4> parseBoxes(const string& data) {
 }
 
 void rasterizeBox(Volume16& target, const ref<mat4>& boxes) {
-    uint16* const targetData = target;
-    clear(targetData,target.size());
+    target.clear();
     target.maximum = boxes.size; // 0 = background
     target.maximum++; // maximum = Multiple family index (e.g throats)
     uint i=0; for(const mat4& box: boxes) {
@@ -73,7 +72,7 @@ array<real> nearestDistance(const ref<mat4>& boxes) {
     array<real> nearestDistances (boxes.size);
     for(const mat4& box: boxes) {
         vec3 origin = box[3].xyz();
-        float distance = FLT_MAX;
+        float distance = inf;
         for(const mat4& b: boxes) {
             vec3 o = b[3].xyz();
             if(o!=origin) distance = min(distance, sq(o-origin));

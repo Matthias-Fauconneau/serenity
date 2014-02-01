@@ -48,8 +48,8 @@ string section(const string& s, byte separator, int begin, int end) {
 
 string trim(const string& s) {
     int begin=0,end=s.size;
-    for(;begin<end;begin++) { byte c=s[begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
-    for(;end>begin;end--) { uint c=s[end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
+    for(;begin<end;begin++) { byte c=s[(uint)begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
+    for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
     return s.slice(begin, end-begin);
 }
 
@@ -61,9 +61,9 @@ bool isASCII(const string& s) {
 bool isUTF8(const string& s) {
     for(uint i=0; i<s.size;i++) {
         /**/  if((s[i]&0b10000000)==0b00000000) {}
-        else if((s[i]&0b11100000)==0b11000000) for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false;
-        else if((s[i]&0b11110000)==0b11100000) for(uint j unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false;
-        else if((s[i]&0b11111000)==0b11110000) for(uint j unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false;
+        else if((s[i]&0b11100000)==0b11000000) { for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11110000)==0b11100000) { for(uint j unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11111000)==0b11110000) { for(uint j unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false; }
         else return false;
     }
     return true;
@@ -75,7 +75,7 @@ bool isInteger(const string& s) {
 
 int64 toInteger(const string& number, int base) {
     assert(base>=2 && base<=16);
-    assert_(number);
+    assert(number);
     int sign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
@@ -98,24 +98,24 @@ bool isDecimal(const string& number) {
     const byte* i = number.begin();
     if(*i == '-' || *i == '+') ++i;
     for(bool gotDot=false, gotE=false;i!=number.end();++i) {
-        /***/ if(!gotDot && *i == '.') gotDot=true;
+        /**/  if(!gotDot && *i == '.') gotDot=true;
         else if(!gotE && *i == 'e') gotE=true;
         else if(*i<'0' || *i>'9') return false;
     }
     return true;
 }
 
-double toDecimal(const string& number) { //FIXME: fromDecimal
+double fromDecimal(const string& number) {
     if(!number) return __builtin_nan("");
-    if(number == "∞"_) return __builtin_inf();
-    double sign=1, eSign=1;
+    if(number == "∞"_) return inf;
+    int sign=1, eSign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
-    double significand=0, decimal=0, exponent=0;
+    uint64 significand=0; int decimal=0, exponent=0;
     for(bool gotDot=false, gotE=false;i!=number.end();) {
         if(!gotDot && *i == '.') { ++i; gotDot=true; continue; }
         if(!gotE && *i == 'e') { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
-        if(*i<'0' || *i>'9') { error("toDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
+        if(*i<'0' || *i>'9') { error("fromDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
         int n = *i-'0';
         if(gotE) {
             exponent *= 10;
@@ -127,7 +127,10 @@ double toDecimal(const string& number) { //FIXME: fromDecimal
         }
         ++i;
     }
-    return sign*significand*exp10(eSign*exponent-decimal);
+    int64 value = sign*significand;
+    int e = eSign*exponent-decimal;
+    if(e>=0) { for(int unused i : range(e)) value *= 10; return value; }
+    else { double decimal = value; for(int unused i : range(-e)) decimal /= 10; return decimal; }
 }
 
 /// String
@@ -148,11 +151,11 @@ String replace(const string& s, const string& before, const string& after) {
     return r;
 }
 
-String toLower(const string& s) {
-    String lower;
-    for(char c: s) if(c>='A'&&c<='Z') lower<<'a'+c-'A'; else lower << c;
-    return lower;
-}
+char toLower(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
+String toLower(const string& s) { String lower(s.size); for(char c: s) lower<<toLower(c); return lower; }
+
+char toUpper(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
+String toUpper(const string& s) { String upper(s.size); for(char c: s) upper<<toUpper(c); return upper; }
 
 String simplify(String&& s) {
     for(uint i=0; i<s.size;) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
@@ -162,7 +165,7 @@ String simplify(String&& s) {
         i++;
         if(c==' '||c=='\t'||c=='\n') while(i<s.size) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //Simplify whitespace
     }
-    for(int i=s.size-1;i>0;i--) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim trailing
+    for(size_t i=s.size-1;i>0;i--) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim trailing
     return move(s);
 }
 
@@ -170,9 +173,10 @@ String repeat(const string& s, uint times) {
     String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
 }
 
-String pad(const string& s, uint length, const string& pad) { return repeat(pad, max(0ul,length-s.size/pad.size))+s; }
+String pad(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
+String left(const string& s, uint length, const string& pad) { return s+repeat(pad, max<int>(0,length-s.size/pad.size)); }
 
-stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r<<s<<0; return r; }
+stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r << s; r << '\0'; return r; }
 
 /// array<string>
 
@@ -194,19 +198,20 @@ array<string> split(const string& str, byte separator) {
 
 /// Number conversions
 
-template<uint base> String utoa(uint64 n, int pad) {
+template<uint base> String utoa(uint64 n, int pad, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
-    while(64-i<pad) buf[--i] = '0';
+    while(64-i<pad) buf[--i] = padChar;
     return String(string(buf+i,64-i));
 }
-template String utoa<16>(uint64,int);
+template String utoa<2>(uint64,int, char padChar);
+template String utoa<16>(uint64,int, char padChar);
 
-template<uint base> String itoa(int64 number, int pad) {
+template<uint base> String itoa(int64 number, int pad, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);
@@ -215,30 +220,31 @@ template<uint base> String itoa(int64 number, int pad) {
         n /= base;
     } while( n!=0 );
     if(number<0) buf[--i]='-';
-    while(64-i<pad) buf[--i] = '0';
+    while(64-i<pad) buf[--i] = padChar;
     return String(string(buf+i,64-i));
 }
-template String itoa<10>(int64,int);
+template String itoa<10>(int64,int,char);
 
-String ftoa(double n, int precision, int pad, int exponent, bool inf) {
+String ftoa(double n, int precision, uint pad, int exponent) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return String("NaN"_);
-    if(n==__builtin_inff()) { assert_(inf); return String("∞"_); }
-    if(n==-__builtin_inff()) { assert_(inf); return String("-∞"_); }
+    if(n==::inf) return String("inf"_); //"∞"_
+    if(n==-::inf) return String("-inf"_); //"-∞"_
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';
-    if(precision && n!=round(n)) {
+    if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);
         uint decimal = round(fract*exp10(precision));
-        if(decimal==(uint)exp10(precision)) integer++, decimal=0; // Rounds to ceiling integer
-        s<<utoa(integer,pad)<<'.'<< utoa<10>(decimal,precision);
+        uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
+        if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
+        s<<utoa(integer)<<'.'<< utoa<10>(decimal,precision,'0');
     } else s<<utoa(round(n));
     if(exponent==3 && e==3) s<<'K';
     else if(exponent==3 && e==6) s<<'M';
     else if(exponent==3 && e==9) s<<'G';
     else if(e) s<<'e'<<itoa<10>(e);
-    return move(s);
+    return pad>s.size ? repeat(" "_,pad-s.size)+s : move(s);
 }
 
 String binaryPrefix(size_t value, string unit) {

@@ -35,7 +35,7 @@ int64 toInteger(const string& str, int base=10);
 /// Returns true if s matches [0-9]*.?[0-9]*
 bool isDecimal(const string& s);
 /// Parses a decimal value
-double toDecimal(const string& str);
+double fromDecimal(const string& str);
 
 /// Forwards string
 inline const string& str(const string& s) { return s; }
@@ -58,13 +58,19 @@ String join(const ref<String>& list, const string& separator);
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string& s, const string& before, const string& after);
 /// Lowers case
+char toLower(char c);
+/// Lowers case
 String toLower(const string& s);
+/// Uppers case
+String toUpper(const string& s);
 /// Removes duplicate whitespace
 String simplify(String&& s);
 /// Repeats a string
 String repeat(const string& s, uint times);
 /// Pads a string
 String pad(const string& s, uint length, const string& pad=" "_);
+/// Pads a string to the left
+String left(const string& s, uint length, const string& pad=" "_);
 
 /// Forwards string
 inline const String& str(const String& s) { return s; }
@@ -77,9 +83,9 @@ stringz strz(const string& s);
 array<string> split(const string& str, byte separator=' ');
 
 /// Converts integers
-template<uint base=10> String utoa(uint64 number, int pad=0);
-template<uint base=10> String itoa(int64 number, int pad=0);
-inline String dec(int64 n, int pad=0) { return itoa<10>(n,pad); }
+template<uint base=10> String utoa(uint64 number, int pad=0, char padChar='0');
+template<uint base=10> String itoa(int64 number, int pad=0, char padChar=' ');
+inline String dec(int64 n, int pad=0, char padChar=' ') { return itoa<10>(n,pad,padChar); }
 inline String str(const uint8& n) { return dec(n); }
 inline String str(const int8& n) { return dec(n); }
 inline String str(const uint16& n) { return dec(n); }
@@ -91,14 +97,12 @@ inline String str(const long& n) { return dec(n); }
 inline String str(const uint64& n) { return dec(n); }
 inline String str(const int64& n) { return dec(n); }
 inline String hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
-inline String str(void* const& p) { return "0x"_+hex(ptr(p)); }
-//generic String str(T* const& p) { return "0x"_+hex(ptr(p)); }
-generic String str(T* const& p) { return str(*p); }
+generic inline String str(T* const& p) { return "0x"_+hex(ptr(p)); }
 generic String str(const unique<T>& t) { return str(*t.pointer); }
 generic String str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
-String ftoa(double number, int precision=2, int pad=0, int exponent=0, bool inf=false);
+String ftoa(double number, int precision=2, uint pad=0, int exponent=0);
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 
@@ -122,5 +126,6 @@ template<Type A, Type... Args> String str(const A& a, const Args&... args) { ret
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }
+#define warn log
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }

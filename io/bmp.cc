@@ -3,7 +3,7 @@
 #include "data.h"
 
 generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
-typedef vector<rgb,uint8,3> rgb3;
+typedef vec<rgb,uint8,3> rgb3;
 
 /// Decodes Windows device independent bitmap (DIB) headers
 Image decodeBMP(const ref<byte>& file) {

@@ -10,7 +10,7 @@ long currentTime();
 /// Returns Unix real-time in nanoseconds
 int64 realTime();
 
-#if __x86_64__
+#if __x86_64__ || __i386__
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
@@ -21,10 +21,11 @@ struct Time {
     uint64 startTime=realTime(), stopTime=0;
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset(){ stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
-    operator uint64(){ return ((stopTime?:realTime()) - startTime)/1000000; }
+    String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
+    operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
+    float toFloat() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
 };
-inline String str(Time s) { return s.reset(); }
+inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
@@ -61,11 +62,11 @@ String str(Date date, const string& format="dddd, dd MMMM yyyy hh:mm:ss"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy
-Date parse(TextData& s);
-inline Date parse(const string& s) { TextData t(s); return parse(t); }
+Date parseDate(TextData& s);
+inline Date parseDate(const string& s) { TextData t(s); return parseDate(t); }
 
 struct Timer : Poll {
-    Timer();
+    Timer(Thread& thread=mainThread);
     ~Timer();
     void setAbsolute(long sec, long nsec=0);
     void setRelative(long msec);

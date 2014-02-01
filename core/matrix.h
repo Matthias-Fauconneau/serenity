@@ -2,12 +2,27 @@
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
 
+/// 2D affine transformation
+struct mat3x2 {
+    float data[3*2];
+    mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
+    mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
+    mat3x2(float m00, float m01, float m10, float m11, float dx, float dy):data{m00,m10,m01,m11, dx,dy}{assert(m01==0 && m10==0);}
+
+    float M(int i, int j) const {assert(i<2 && j<3); return data[j*2+i]; }
+    float& M(int i, int j) {assert(i<2 && j<3); return data[j*2+i]; }
+    float operator()(int i, int j) const { return M(i,j); }
+    float& operator()(int i, int j) { return M(i,j); }
+
+    mat3x2 operator*(mat3x2 b) const {mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r; }
+    vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
+};
+
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
 struct mat3 {
     float data[3*3];
     mat3(vec3 d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
-    mat3(float dx, float dy) : mat3(vec3(1,0,0),vec3(0,1,0),vec3(dx,dy,1)){}
     mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
     float M(int i, int j) const { return data[j*3+i]; }
@@ -45,22 +60,6 @@ struct mat3 {
     void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
 inline mat3 operator*(float s, mat3 M) {mat3 r; for(int j=0;j<3;j++) for(int i=0;i<3;i++) r.M(i,j)=s*M(i,j); return r; }
-
-template<int M, int N> inline String str(const float a[M*N]) {
-    String s; s<<"\n["_;
-    for(int i=0;i<M;i++) {
-        if(N==1) s = s+"\t"_+str(a[i]);
-        else {
-            for(int j=0;j<N;j++) {
-                s = s+"\t"_+str(a[j*M+i]);
-            }
-            if(i<M-1) s=s+"\n"_;
-        }
-    }
-    s<<" ]"_;
-    return s;
-}
-inline String str(const mat3& M) { return str<3,3>(M.data); }
 
 struct mat4; inline mat4 operator*(float s, mat4 M);
 /// 3D projective transformation
@@ -131,5 +130,21 @@ struct mat4 {
     void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
-inline bool operator ==( mat4 a, mat4 b ) { for(int i=0;i<16;i++) if(a.data[i]!=b.data[i]) return false; return true; }
+
+template<int N, int M, Type T> inline String str(const T a[M*N]) {
+    String s; s<<"\n["_;
+    for(int i=0;i<M;i++) {
+        if(N==1) s = s+"\t"_+ftoa(a[i],4);
+        else {
+            for(int j=0;j<N;j++) {
+                s = s+"\t"_+ftoa(a[j*M+i],4);
+            }
+            if(i<M-1) s=s+"\n"_;
+        }
+    }
+    s<<" ]"_;
+    return s;
+}
+inline String str(const mat3x2& M) { return str<3,2>(M.data); }
+inline String str(const mat3& M) { return str<3,3>(M.data); }
 inline String str(const mat4& M) { return str<4,4>(M.data); }

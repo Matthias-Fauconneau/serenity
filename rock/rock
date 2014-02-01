@@ -112,7 +112,9 @@ histogram-skeleton = Slice histogram begin=1 # Excluding background
 maximum-balls-lists = List connected-skeleton
 
 # Generates a list of pores from the skeleton volume
-last-root-index pores throats = Cluster connected-skeleton maximum-balls-lists
+#last-root-index pores throats = Cluster connected-skeleton maximum-balls-lists
+pores = List approximate-pore-index
+throats = List approximate-throat-index
 
 # Bounds pores/throats with bounding boxes
 pore-bounding-boxes = Bound pores
@@ -168,6 +170,8 @@ maximum-mask = Binary maximum threshold=1
 approximate-throats = Intersect maximum-mask not-approximate-pores # Removes background
 approximate-pore-index = FloodFillSplit approximate-pores
 approximate-colored-pores = ColorizeIndex approximate-pore-index
+approximate-colored-pores-throats = Add approximate-colored-pores approximate-throats
+approximate-throat-index = FloodFillSplit approximate-throats
 
 # Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
 volume-connect-pore = Sum histogram-squaredRadius

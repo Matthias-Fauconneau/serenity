@@ -52,8 +52,8 @@ class(KernelDensityEstimation, Operation), virtual Pass {
         for(uint i: range(H.size())) if(H.keys[i] != i) { uniform=false; break; }
         bool normalize = args.value("normalize"_,"1"_)!="0"_;
         target.data = uniform ?
-                    toASCII(kernelDensityEstimation(copy(H.values), toDecimal(args.value("bandwidth"_)), normalize)) :
-                    toASCII(kernelDensityEstimation(H, toDecimal(args.value("bandwidth"_)), normalize)); // Non uniform KDE
+                    toASCII(kernelDensityEstimation(copy(H.values), fromDecimal(args.value("bandwidth"_)), normalize)) :
+                    toASCII(kernelDensityEstimation(H, fromDecimal(args.value("bandwidth"_)), normalize)); // Non uniform KDE
         string xlabel,ylabel; { TextData s(source.metadata); ylabel = s.until('('); xlabel = s.until(')'); }
         target.metadata = (normalize?"σ"_:ylabel)+"("_+xlabel+").tsv"_;
     }

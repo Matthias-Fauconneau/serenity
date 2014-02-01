@@ -31,6 +31,7 @@ struct Widgets : virtual Layout, array<Widget*> {
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
 template<class T> struct Array : virtual Layout, array<T> {
     Array(){}
+    Array(const mref<T>& items) : array<T>(items){}
     Array(array<T>&& items) : array<T>(move(items)){}
     uint count() const { return array<T>::size; }
     Widget& at(int i) { return array<T>::at(i); }
@@ -76,7 +77,7 @@ struct Vertical : virtual Linear {
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : virtual Horizontal, virtual Widgets {
-    HBox(const ref<Widget*>& widgets):Widgets(widgets){}
+    HBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
     HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets
@@ -91,6 +92,7 @@ template<class T> struct HList : Horizontal, Array<T> {
 };
 /// Vertical layout of homogenous items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
+    //VList(const mref<T>& widgets):Array<T>(move(widgets)){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
@@ -113,7 +115,8 @@ struct WidgetGrid : Grid, Widgets {
     WidgetGrid(const ref<Widget*>& widgets):Widgets(widgets){}
 };
 template<class T> struct UniformGrid : Grid,  Array<T> {
-    UniformGrid(int width=0, int height=0, int margin=0):Grid(width,height,margin){}
+    UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
+    //UniformGrid(int width=0, int height=0, int margin=0):Grid(width,height,margin){}
 };
 
 /// Implements selection of active widget/item for a \a Layout

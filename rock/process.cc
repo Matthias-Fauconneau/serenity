@@ -205,7 +205,7 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
     for(const string& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
         if(!sameSince(input, queryTime, arguments)) return false;
     }
-    if(rule.operation && parse(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
+    if(rule.operation && parseDate(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
     /*if(Interface<Tool>::factories.contains(rule.operation)) { // Let high level operations reports its custom input for correct cache behavior
         for(Interface<Tool>::instance(rule.operation)->inputs()
     }*/
@@ -223,7 +223,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
         log("Storing metadata in auxiliary files (instead of file names)");
         ResultFile::indirectID=1;
         for(const String& file: storageFolder.list(Files|Folders|Sorted)) { // Starts from the highest ID to avoid collisions with previous runs
-            TextData s(file); ResultFile::indirectID=max(ResultFile::indirectID,s.mayInteger()+1);
+            TextData s(file); ResultFile::indirectID=max<uint>(ResultFile::indirectID,s.mayInteger()+1);
         }
     }
     for(const String& file: storageFolder.list(Files|Folders|Sorted)) {
@@ -243,7 +243,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
         TextData s (id); string name = s.whileNot('{');
         if(id==name || !&ruleForOutput(name, arguments)) { removeFileOrFolder(dataFile,storageFolder); continue; } // Removes invalid data
         Dict arguments = parseDict(s); s.mayInteger(); s.skip("."_); string metadata = s.untilEnd();
-        shared<ResultFile> result;
+        shared<ResultFile> result = nullptr;
         if(!existsFolder(dataFile, storageFolder)) {
             File file = File(dataFile, storageFolder, ReadWrite);
             if(file.size()<(1<<16)) { // Small file (<64K)

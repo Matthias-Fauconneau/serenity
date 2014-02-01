@@ -25,8 +25,8 @@ array<Family> parseFamilies(const string& data) {
 }
 
 void rootIndex(Volume16& target, const ref<Family>& families) {
-    uint16* const targetData = target;
-    clear(targetData,target.size());
+    const mref<uint16> targetData = target;
+    targetData.clear();
     target.maximum = families.size; // 0 = background
     target.maximum++; // maximum = Multiple family index (e.g throats)
     uint i=0; for(const Family& family: families) {
@@ -52,25 +52,24 @@ class(RootIndex, Operation), virtual VolumeOperation {
 };
 
 void colorizeIndex(Volume24& target, const Volume16& source) {
-    bgr* const targetData = target;
-    clear(targetData,target.size(),{0,0,0});
-    bgr colors[target.maximum+1];
+    const mref<byte3> targetData = target;
+    targetData.clear(0);
+    byte3 colors[target.maximum+1];
     for(uint i: range(target.maximum)) {
-        vec3 rgb = HSVtoRGB(float((i*(target.maximum-1)/3)%target.maximum)/float(target.maximum), 1, 1);
-        colors[i] = bgr{sRGB(rgb.x),sRGB(rgb.y),sRGB(rgb.z)};
+        colors[i] = byte3(clip<vec3>(0, float(0xFF)*LChuvtoBGR(53,179, float((i*(target.maximum-1)/3)%target.maximum)/float(target.maximum)), 0xFF));
     }
-    colors[0]={0,0,0};
-    colors[target.maximum]={0xFF,0xFF,0xFF};
+    colors[0] = 0;
+    colors[target.maximum] = 0xFF;
     chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
         const uint16* const sourceData = source + offset;
-        bgr* const targetData = target + offset;
+        byte3* const targetData = target + offset;
         for(uint i : range(size)) targetData[i] = colors[sourceData[i]];
     });
     target.maximum = 0xFF;
 }
 /// Colorizes each index in a different color
 class(ColorizeIndex, Operation), virtual VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(bgr); }
+    uint outputSampleSize(uint) override { return sizeof(byte3); }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         colorizeIndex(outputs[0], inputs[0]);
     }

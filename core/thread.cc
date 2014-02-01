@@ -1,4 +1,5 @@
 #include "thread.h"
+#include "memory.h"
 #include "string.h"
 #include "linux.h"
 #include "data.h"
@@ -13,6 +14,9 @@
 #include <sys/wait.h>
 #include <pwd.h>
 
+// Memory
+uint64 traceMemoryAllocation = -1;
+
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const string& buffer) { log_(buffer+"\n"_); }
@@ -20,9 +24,9 @@ template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 // Poll
 void Poll::registerPoll() {
     Locker lock(thread.lock);
-    if(thread.unregistered.contains(this)) { thread.unregistered.removeAll(this); }
-    else { assert(!thread.contains(this)); thread<<this; }
-    thread.post();
+    if(thread.unregistered.contains(this)) { thread.unregistered.remove(this); }
+    else if(!thread.contains(this)) thread<<this;
+    thread.post(); // Reset poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}
@@ -48,15 +52,16 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     Locker lock(threadsLock); threads<<this; // Adds this thread to global thread list
     this->priority=priority;
 }
+void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 
 void Thread::run() {
     tid=gettid();
-    //if(priority!=20) check_(setpriority(0,0,priority)); //(PERM error if unprivileged)
+    if(priority) setpriority(0,0,priority);
     while(!terminate) {
         uint size=this->size;
-        if(size==1) break; // Terminates when no Poll objects are registered
+        if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main)
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
@@ -70,9 +75,9 @@ void Thread::run() {
                 }
             }
         }
-        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); removeAll(poll); queue.removeAll(poll);}
+        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); remove(poll); queue.remove(poll);}
     }
-    Locker lock(threadsLock); threads.removeAll(this);
+    Locker lock(threadsLock); threads.remove(this);
     thread = 0;
 }
 
@@ -98,8 +103,8 @@ void traceAllThreads() {
         if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
     }
 }
-static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_, "Underflow"_, "Precision"_,
-                                         "Invalid"_, "Denormal"_};
+static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
+                                      "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 static void handler(int sig, siginfo_t* info, void* ctx) {
 #if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
@@ -123,23 +128,36 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 }
 #if __x86_64
 // Configures floating-point exceptions
-enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
-void setExceptions(int except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
 void __attribute((constructor(102))) setup_signals() {
     /// Limit stack size to avoid locking system by exhausting memory with recursive calls
     //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
-    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={0};
-    check_(sigaction(SIGFPE, &sa, 0));
+    struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
     check_(sigaction(SIGABRT, &sa, 0));
     check_(sigaction(SIGSEGV, &sa, 0));
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
-    //setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); //FIXME: KDE
+    check_(sigaction(SIGFPE, &sa, 0));
+#if __x86_64
+    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
+#endif
 }
 
+/*template<> void warn(const string& message) {
+    static bool reentrant = false;
+    if(!reentrant) { // Avoid hangs if tracing errors
+        reentrant = true;
+        String s = trace(1,0);
+        log_(s);
+        reentrant = false;
+    }
+    log(message);
+}*/
+
 template<> void __attribute((noreturn)) error(const string& message) {
+    log(message); // In case, tracing crashes
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
@@ -150,7 +168,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
     }
     log(message);
     exit(-1); // Signals all threads to terminate
-    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.removeAll(thread); break; } } // Removes this thread from list
+    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
     __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(-1); // Exits this thread
 }
@@ -158,9 +176,9 @@ template<> void __attribute((noreturn)) error(const string& message) {
 static int exitStatus;
 // Entry point
 int main() {
-    mainThread.run();
+    if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
     exit(0); // Signals all threads to terminate
-    for(Thread* thread: threads) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
+    for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
@@ -171,14 +189,8 @@ void exit(int status) {
 }
 
 // Environment
-int execute(const string& name, const ref<string>& args, bool wait, const Folder& workingDirectory) {
-    String path (name);
-    if(!existsFile(path,currentWorkingDirectory())) {
-        static array<string> PATH = split(getenv("PATH"_)?getenv("PATH"_):":/bin:/usr/bin"_, ':');
-        for(string folder: PATH) if(existsFile(folder+"/"_+name,currentWorkingDirectory())) { path=folder+"/"_+name; goto found_; }
-        /*else*/ warn("Executable not found",path); return -1;
-        found_:;
-    }
+int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
+    if(!existsFile(path)) { warn("Executable not found",path); return -1; }
 
     array<String> args0(1+args.size);
     args0 << strz(path);
@@ -188,7 +200,7 @@ int execute(const string& name, const ref<string>& args, bool wait, const Folder
     argv[args0.size]=0;
 
     array<string> env0;
-    static String environ = File("proc/self/environ"_).readUpTo(8192);
+    static String environ = File("proc/self/environ"_).readUpTo(4096);
     for(TextData s(environ);s;) env0 << s.until('\0');
 
     const char* envp[env0.size+1];
@@ -197,7 +209,11 @@ int execute(const string& name, const ref<string>& args, bool wait, const Folder
 
     int cwd = workingDirectory.fd;
     int pid = fork();
-    if(pid==0) { if(cwd!=AT_FDCWD) check_( fchdir(cwd) ); if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1); __builtin_unreachable(); }
+    if(pid==0) {
+        if(cwd!=AT_FDCWD) check_(fchdir(cwd));
+        if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1);
+        __builtin_unreachable();
+    }
     else if(wait) return ::wait(pid);
     else { wait4(pid,0,WNOHANG,0); return pid; }
 }
@@ -216,7 +232,7 @@ string getenv(const string& name, string value) {
 
 array<string> arguments() {
     static String cmdline = File("proc/self/cmdline"_).readUpTo(4096);
-    assert_(cmdline.size<4096);
+    assert(cmdline.size<4096);
     return split(section(cmdline,0,1,-1),0);
 }
 

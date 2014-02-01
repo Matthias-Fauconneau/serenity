@@ -12,6 +12,18 @@ template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
+/// Reinterpret cast a buffer to another type
+template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
+    buffer<T> buffer;
+    buffer.data = (const T*)o.data;
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    buffer.size = o.size*sizeof(O)/sizeof(T);
+    assert((o.capacity*sizeof(O))%sizeof(T) == 0);
+    buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
+    o.capacity = 0;
+    return buffer;
+}
+
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
@@ -38,14 +50,14 @@ struct Data {
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    void advance(uint count) {assert(index+count<=buffer.size); index+=count; }
+    void advance(uint step) {assert(index+step<=buffer.size,index,step,buffer.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
     ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
 
     ::buffer<byte> buffer;
-    uint64 index=0;
+    uint index=0;
 };
 
 /// Provides a convenient interface to parse binary inputs
@@ -103,22 +115,15 @@ struct BinaryData : virtual Data {
    ArrayReadOperator read(uint size) { return {this,size}; }
 
    /// Reads \a size \a T elements (swap as needed)
-   //generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
-   //template<Type T, size_t N> void read(const T (&buffer)[N]) { for(uint i: range(N)) buffer[i]=(T)read(); }
+   generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
 
    bool isBigEndian = false;
 };
 
 /// Provides a convenient interface to parse text streams
 struct TextData : virtual Data {
-/*#if __clang__ || __GNUC_MINOR__ < 8
-    TextData(){}
-    default_move(TextData);
-    TextData(buffer<byte>&& array) : Data(move(array)){}
-    explicit TextData(const string& reference):Data(reference){}
-#else*/
     using Data::Data;
-//#endif
+    void advance(uint step) /*override*/;
 
     /// If input match \a key, advances \a pos by \a key size
     bool match(char key);
@@ -163,8 +168,8 @@ struct TextData : virtual Data {
     string whileInteger(bool sign=false);
     /// Reads an integer
     int integer(bool sign=false);
-    /// Reads an unsigned integer, return -1 if fails
-    uint mayInteger(bool sign=false);
+    /// Reads a signed integer, return defaultValue if fails
+    int mayInteger(int defaultValue=-1);
     /// Matches [0-9a-fA-F]*
     string whileHexadecimal();
     /// Reads an hexadecimal integer
@@ -173,4 +178,6 @@ struct TextData : virtual Data {
     string whileDecimal();
     /// Reads a decimal number
     double decimal();
+
+    uint lineIndex = 1;
 };

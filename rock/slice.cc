@@ -2,7 +2,7 @@
 #include "slice.h"
 #include "volume-operation.h"
 #include "display.h"
-#include "render.h"
+//include "render.h" //FIXME
 
 float SliceView::sliceZ = 1./2;
 
@@ -54,11 +54,15 @@ int2 SliceView::sizeHint() {
 void SliceView::render(int2 position, int2 size) {
     if(renderVolume) {
         assert_(position==int2(0) && size == framebuffer.size());
+#if 0
         mat3 view;
         view.rotateX(rotation.y); // pitch
         view.rotateZ(rotation.x); // yaw
         assert_(volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1);
         ::render(framebuffer, volumes[0], volumes[1], view);
+#else
+        error("FIXME");
+#endif
     } else {
         Image image = slice(volumes[currentIndex], sliceZ, true, true, true);
         const Volume& volume = volumes[currentIndex];

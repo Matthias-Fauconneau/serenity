@@ -109,7 +109,7 @@ class(HistogramMedian, Operation), virtual Pass {
         NonUniformHistogram histogram = parseNonUniformSample(source.data);
         uint64 sampleCount = histogram.sampleCount();
         uint64 sum = 0; real median = 0;
-        for(const_pair<real,real> value_count: histogram) {
+        for(pair<real,real> value_count: histogram) {
             real value = value_count.key, count = value_count.value;
             sum += count;
             if(sum >= sampleCount) { median = value; break; } // FIXME: bias, TODO: linear interpolation

@@ -10,7 +10,7 @@ buffer<array<short3> > parseLists(const string& data) {
     TextData s(data);
     while(s) {
         s.skip("["_); uint value = s.integer(); s.skip("]:\n"_);
-        if(!lists) lists = buffer<array<short3>>(value+1, value+1, array<short3>());
+        if(!lists) lists = buffer<array<short3>>(value+1, value+1, 0);
         array<short3>& list = lists[value];
         while(s && s.peek()!='[') {
             uint x=s.integer(); s.skip();
@@ -39,13 +39,13 @@ struct MultipleReturnValues {
     array<unique<FamilySet>> familySets;
 };
 MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
-    uint32* const targetData = target;
-    clear(targetData, target.size());
+    const mref<uint32> targetData = target;
+    targetData.clear();
 
     assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
     const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     array<unique<Family>> families;
     array<unique<FamilySet>> familySets;
     familySets << unique<FamilySet>(); // index 0 is no families (background or yet unassigned)

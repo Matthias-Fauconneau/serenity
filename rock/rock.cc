@@ -125,7 +125,7 @@ struct Rock : virtual PersistentProcess {
             if(slides) {
                 for(array<unique<View>>& views : viewers.values) for(unique<View>& view: views) { // one slide per view element
                     titles << String(view->name());
-                    newWindow(view.pointer, int2(1080,1080*3/4), view->name());
+                    newWindow(view, int2(1080,1080*3/4), view->name());
                 }
             } else {
                 for(array<unique<View>>& views : viewers.values) {
@@ -138,7 +138,7 @@ struct Rock : virtual PersistentProcess {
                 }
                 String title = join(titles,"; "_);
                 if(title.size > 256) title = join(targets, "; "_);
-                newWindow(&grids, -1, title);
+                newWindow(grids, -1, title);
             }
             if(specialArguments.contains("pdf"_)) {
                 String pdf = join(titles,"; "_)+".pdf"_;
@@ -148,15 +148,15 @@ struct Rock : virtual PersistentProcess {
         }
     }
 
-    void newWindow(Widget* widget, int2 sizeHint, string title) {
+    void newWindow(Widget& widget, int2 sizeHint, string title) {
         if(specialArguments.contains("png"_)) {
             writeFile(title+".png"_, encodePNG(renderToImage(widget, sizeHint)), home());
             images << title+".png"_;
         } else {
-            unique<Window> window(widget, sizeHint, title);
+            unique<Window> window(&widget, sizeHint, title);
             window->localShortcut(Escape).connect([]{exit();});
             String* name = new String(title+".png"_);
-            window->localShortcut(PrintScreen).connect([=]{writeFile(*name, encodePNG(renderToImage(widget, int2(1024,768))), home());});
+            window->localShortcut(PrintScreen).connect([&]{writeFile(*name, encodePNG(renderToImage(widget, int2(1024,768))), home());});
             window->backgroundColor = 1;
             window->show();
             windows << move(window);

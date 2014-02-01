@@ -47,9 +47,9 @@ void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, ui
     if(seed[4]=='1') for(uint z: range(marginZ,Z-marginZ)) for(uint x: range(marginX,X-marginX)) stack[stackSize++] = short3(x,Y-1-marginY-margin,z);
     if(seed[5]=='1') for(uint y: range(marginY,Y-marginY)) for(uint x: range(marginX,X-marginX)) stack[stackSize++] = short3(x,y,Z-1-marginZ-margin);
 
-    uint8* const targetData = target;
-    clear(targetData, target.size());
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const mref<uint8> targetData = target;
+    targetData.clear(0);
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
 
     while(stackSize) {
         const short3& p = stack[--stackSize];
@@ -82,12 +82,13 @@ void floodFillSplit(Volume16& target, const Volume8& source) {
     assert_(source.tiled() && target.tiled());
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
-    const uint8* const sourceData = source;
-    uint16* const targetData = target;
-    clear(targetData, target.size());
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
+    const ref<uint8> sourceData = source;
+    const mref<uint16> targetData = target;
+    targetData.clear(0);
 
-    for(uint64 regionIndex=1, seedIndex=0;;regionIndex++) {
+    uint64 regionIndex=1;
+    for(uint64 seedIndex=0;;) {
         buffer<short3> stackBuffer( X*Y*Z ); // 1024^3 ~ 6GiB
         short3* const stack = stackBuffer.begin();
         uint64 stackSize=0;
@@ -102,7 +103,8 @@ void floodFillSplit(Volume16& target, const Volume8& source) {
                 break;
             }
         }
-        assert_(regionIndex<1<<16);
+        regionIndex++;
+        assert_(regionIndex < 1<<16);
 
         while(stackSize) {
             const short3& p = stack[--stackSize];
@@ -119,6 +121,7 @@ void floodFillSplit(Volume16& target, const Volume8& source) {
             }
         }
     }
+    target.maximum = regionIndex;
 }
 class(FloodFillSplit, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }

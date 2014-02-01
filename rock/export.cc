@@ -118,7 +118,7 @@ class(Mask, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         assert_(args.contains("value"_),"Missing mandatory argument 'value' for mask");
-        float value = toDecimal(args.value("value"_,"0"_));
+        float value = fromDecimal(args.value("value"_,"0"_));
         uint16 integerValue = value <= 1 ? round( value*inputs[0].maximum ) : round(value);
         mask(outputs[0], inputs[0], inputs[1], integerValue, args.value("invert"_,"0"_)!="0"_);
     }
@@ -129,17 +129,17 @@ generic void colorize(Volume24& target, const VolumeT<T>& source, uint16 thresho
     const uint maximum = source.maximum;
     chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
         const T* const sourceData = source + offset;
-        bgr* const targetData = target + offset;
+        const mref<byte3> targetData = target.slice(offset, size);
         for(uint i : range(size)) {
             uint8 c = 0xFF*sourceData[i]/maximum;
-            targetData[i] = sourceData[i]<threshold ? bgr{0,c,0} : bgr{c,0,0};
+            targetData[i] = sourceData[i]<threshold ? byte3(0,c,0) : byte3(c,0,0);
         }
     });
     target.maximum=0xFF;
 }
 class(Colorize, Operation), virtual VolumeOperation {
     string parameters() const override { return "threshold"_; }
-    uint outputSampleSize(uint) override { return sizeof(bgr); }
+    uint outputSampleSize(uint) override { return sizeof(byte3); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         real threshold = TextData( (args.contains("threshold"_) && isDecimal(args.at("threshold"_))) ? (string)args.at("threshold"_) : (string)otherInputs[0]->data ).decimal();
         uint16 integerThreshold = threshold<1 ? round( threshold*inputs[0].maximum ) : round(threshold);
@@ -210,7 +210,7 @@ template<uint pad> inline void itoa(byte*& target, uint n) {
 static buffer<byte> toASCII(const Volume& source) {
     const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     buffer<byte> target (X*Y*Z*(3*5+6)); assert_(X<=1e4 && Y<=1e4 && Z<=1e4 && source.maximum < 1e5);
     byte *targetPtr = target.begin();
     for(uint z=marginZ; z<Z-marginZ; z++) {
@@ -243,7 +243,7 @@ FILE(CDL)
 static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
     uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     constexpr uint positionSize="8191"_.size; buffer<byte> positions (X*Y*Z*3*(positionSize+1)); assert_(X<=1e4 && Y<=1e4 && Z<=1e4);
     constexpr uint valueSize="65535"_.size; buffer<byte> values (X*Y*Z*(valueSize+1)); assert_(source.maximum < 1e5);
     byte *positionIndex = positions.begin(), *valueIndex = values.begin();
@@ -255,7 +255,7 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
                 if(source.sampleSize==1) value = ((byte*)source.data.data)[index];
                 else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
                 else if(source.sampleSize==3 && !source.floatingPoint) { //FIXME: colored CDL output
-                    bgr color = ((bgr*)source.data.data)[index];
+                    byte3 color = ((byte3*)source.data.data)[index];
                     value = (int(color.r)+int(color.g)+int(color.b))/3;
                 }
                 else if(source.sampleSize==4 && !source.floatingPoint) value = ((uint32*)source.data.data)[index];

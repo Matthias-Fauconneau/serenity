@@ -96,7 +96,7 @@ String demangle(TextData& s, bool function=true) {
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
     } else {
-        l=s.mayInteger();
+        l=s.mayInteger(-1);
         if(l<=s.available(l)) {
             r<<s.read(l); //struct
             if(s && s.peek()=='I') r<< demangle(s);
@@ -114,7 +114,7 @@ Symbol findSymbol(void* find) {
     const byte* elf = exe.data;
     const Ehdr& hdr = *(const Ehdr*)elf;
     ref<Shdr> sections = ref<Shdr>((const Shdr*)(elf+hdr.shoff),hdr.shnum);
-    const char* shstrtab = elf+sections[hdr.shstrndx].offset;
+    const char* shstrtab = elf+sections[(uint)hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; BinaryData debug_line;
     for(const Shdr& s: sections)  {
         if(str(shstrtab+s.name)==".debug_line"_) new (&debug_line) BinaryData(ref<byte>(elf+s.offset,s.size));
