@@ -114,14 +114,14 @@ int Resampler::need(uint targetSize) {
 }
 
 void Resampler::write(const ref<float2>& source) {
-    if(writeIndex+source.size>bufferSize-N-1) { // Wraps buffer (FIXME: map ring buffer)
+    if(N-1+writeIndex+source.size>bufferSize) { // Wraps buffer (FIXME: map ring buffer)
         writeIndex -= integerIndex;
-        assert(writeIndex+source.size<bufferSize-N-1);
         for(uint channel=0;channel<channels;channel++) {
             for(uint i: range(N-1+writeIndex)) signal[channel][i] = signal[channel][integerIndex+i];
         }
         integerIndex = 0;
     }
+    assert(N-1+writeIndex+source.size<=bufferSize);
     for(uint i: range(source.size)) { // Deinterleaves source to buffers
         signal[0][N-1+writeIndex+i]=source[i][0];
         signal[1][N-1+writeIndex+i]=source[i][1];

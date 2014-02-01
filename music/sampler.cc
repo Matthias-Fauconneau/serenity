@@ -262,7 +262,7 @@ void Sampler::event() { // Main thread event posted every period from Sampler::r
         }
         int size=note->flac.blockSize; note->writeCount.acquire(size); note->flac.decodeFrame(); note->readCount.release(size);
     }
-    if(backgroundDecoder && time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI (while in main thread)
+    if(backgroundDecoder) timeChanged(time); // read MIDI file / update UI (while in main thread)
 }
 
 /// Audio mixer (realtime thread)
@@ -302,7 +302,7 @@ uint Sampler::read(const mref<int2>& output) { // Audio thread
 uint Sampler::read(const mref<float2>& output) {
     if(!backgroundDecoder) {
         event(); // Decodes before mixing
-        for(Layer& layer: layers) for(Note& n: layer.notes) assert(!n.flac.blockSize || n.readCount > (int)align(2,layer.resampler.need(output.size)));
+        //for(Layer& layer: layers) for(Note& n: layer.notes) assert_(!n.flac.blockSize || n.readCount > (int)align(2,layer.resampler.need(output.size)));
     }
     output.clear(0);
     int noteCount = 0;
@@ -376,7 +376,7 @@ uint Sampler::read(const mref<float2>& output) {
     time += output.size;
     //frameSent(output, size);
     if(backgroundDecoder) queue(); // Queues background decoder in main thread
-    else if(time>lastTime) { int time=this->time; timeChanged(time-lastTime); lastTime=time; } // read MIDI file / update UI (while in main thread)
+    else timeChanged(time); // read MIDI file / update UI
     return output.size;
 }
 

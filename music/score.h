@@ -12,7 +12,7 @@ struct Score {
     void onGlyph(int, vec2, float,const string&, int, int);
 
     array<float> staffs; array<float> keys;
-    vec2 previousClef=0, lastClef=0, lastPos=0; float maxStaffDistance=100;
+    vec2 previousClef=0, lastClef=0, lastPos=0; //float maxStaffDistance=100_px;
     uint staffCount=0;
     array<vec2> repeats;
 
@@ -39,9 +39,10 @@ struct Score {
     //map<vec2,Note> nearStaffLimit;
 
     void parse();
-    void synchronize(const map<uint,MidiChord>& MIDI);
+    /// Synchronize notes to MIDI track
+    void synchronize(const ref<MidiNote>& notes);
 
-    map<uint,MidiChord> chords; // chronological MIDI notes key values
+    map<uint, array<MidiNote>> chords; // chronological MIDI notes key values
     array<vec2> positions; // MIDI-synchronized note positions in associated PDF
     array<int> indices; // MIDI-synchronized character indices in associated PDF
     array<int> durations; // MIDI-synchronized character indices in associated PDF
@@ -72,10 +73,10 @@ struct Score {
     int pass=-1;
     int msScore=0; //HACK
     map<int,int> histogram;
-    int quarter=0, half=0, whole=0;
+    const int quarter=9, half=11, whole=16;
 
     void clear() {
-        staffs.clear(); keys.clear(); previousClef=lastClef=lastPos=0; maxStaffDistance=100; staffCount=0;
+        staffs.clear(); keys.clear(); previousClef=lastClef=lastPos=0; /*maxStaffDistance=100;*/ staffCount=0;
         repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
         notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
         active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear(); errors=0;

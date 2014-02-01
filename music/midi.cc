@@ -55,10 +55,9 @@ void MidiFile::read(Track& track, uint time, State state) {
             MidiNote note = active.take(active.indexOf(key));
             if(state==Sort) {
                 uint nearest = 0;
-                for(pair<uint, MidiChord> e: notes) { if(abs(int(e.key-note.time))<abs(int(note.time-nearest))) nearest=e.key; }
+                for(const MidiNote& o: notes) { if(abs(int(o.time-note.time))<abs(int(note.time-nearest))) nearest=o.time; }
                 if(abs(int(note.time-nearest))<ticksPerBeat/8) note.time=nearest; // Merges dates under an eighth note at 120 (~62ms, ~16Hz)
-                if(!notes.sorted(note.time).contains(key))
-                    notes.sorted(note.time).insertSorted(MidiNote{note.time*8/ticksPerBeat, note.key, note.velocity});
+                notes.insertSorted(MidiNote{note.time, note.key, note.velocity});
             }
         }
         if(type==NoteOn && vel) {
@@ -83,7 +82,8 @@ void MidiFile::seek(uint time) {
     }
     this->time=time;
 }
-void MidiFile::update(uint delta) {
-    this->time+=delta;
-    for(Track& track: tracks) read(track,time,Play);
+
+void MidiFile::read(uint time) {
+    for(Track& track: tracks) read(track, time, Play);
+    this->time = time;
 }

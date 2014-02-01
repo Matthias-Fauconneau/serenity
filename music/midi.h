@@ -6,8 +6,7 @@
 
 struct MidiNote { uint time, key, velocity; };
 inline bool operator ==(const MidiNote& a, uint key) { return a.key == key; }
-inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.key < b.key; }
-typedef array<MidiNote> MidiChord;
+inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {
@@ -24,7 +23,7 @@ struct MidiFile {
     uint16 ticksPerBeat=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
     array<MidiNote> active;
-    map<uint,MidiChord> notes;
+    array<MidiNote> notes;
     signal<uint, uint> noteEvent;
     signal<> endOfFile;
     uint time=0; // Current time in 48KHz samples
@@ -33,6 +32,6 @@ struct MidiFile {
     enum State { Seek=0, Play=1, Sort=2 };
     void read(Track& track, uint time, State state);
     void seek(uint time);
-    void update(uint delta);
+    void read(uint sinceStart);
     void clear() { tracks.clear(); trackCount=0; ticksPerBeat=0; notes.clear(); active.clear(); duration=0; time=0; }
 };

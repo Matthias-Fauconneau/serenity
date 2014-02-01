@@ -54,8 +54,8 @@ struct Sampler : Poll {
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
-    static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
-    //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
+    //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
+    static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
 
     /// Convolution reverb
     //bool enableReverb=false; // Disable reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
@@ -75,7 +75,7 @@ struct Sampler : Poll {
 
     /// Emits period time to trigger MIDI file input and update the interface
     signal<uint /*delta*/> timeChanged;
-    uint64 lastTime=0, time=0, recordStart=0, stopTime=0;
+    uint64 time=0, stopTime=0;
 
     /// Whether decoding is run in advance in main thread (prevents underruns when latency is much lower than FLAC frame sizes (FLAC frames need to be fully decoded in order to get both channels))
     bool backgroundDecoder;

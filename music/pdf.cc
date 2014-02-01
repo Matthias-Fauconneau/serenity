@@ -459,7 +459,7 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
         //if(path.size > 5) continue; //FIXME: triangulate concave polygons
         for(vec2 p : path) if(p > boxMin && p < boxMax) extend(p); // FIXME: clip
         array<vec2> polyline;
-        for(uint i=0; i<path.size-3; i+=3) {
+        if(path.size>=4) for(uint i=0; i<path.size-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
                 polyline << copy(path[i]);
             } else {
@@ -601,7 +601,7 @@ void PDF::render(int2 position, int2 size) {
             int2 pos = position+int2(text.key*scale);
             if(pos.y<=currentClip.min.y) continue;
             if(pos.y>=currentClip.max.y) continue; //break;
-            Text(text.value,12,vec4(1,0,0,1)).render(pos,int2(0,0));
+            Text(text.value,12,red).render(pos,int2(0,0));
         }
         return;
     }
@@ -658,6 +658,6 @@ void PDF::render(int2 position, int2 size) {
         int2 pos = position+int2(round(scale*text.key));
         if(pos.y<=currentClip.min.y) continue;
         if(pos.y>=currentClip.max.y) continue; //break;
-        Text(text.value,12,vec4(1,0,0,1)).render(pos,int2(0,0));
+        Text(text.value,14,red).render(pos,int2(0,0));
     }
 }

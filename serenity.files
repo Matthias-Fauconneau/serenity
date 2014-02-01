@@ -79,6 +79,10 @@ music/music.cc
 music/pdf.cc
 music/encoder.cc
 music/encoder.h
+music/score.cc
+music/score.h
+music/midi.cc
+music/midi.h
 
 player.cc
 

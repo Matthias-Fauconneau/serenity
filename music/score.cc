@@ -32,18 +32,18 @@ void Score::onPath(const ref<vec2>& p) {
     }
 }
 
-void Score::onGlyph(int index, vec2 pos, float size,const string& font, int, int fontIndex) {
+void Score::onGlyph(int index, vec2 pos, float size,const string& font, int code, int unused fontIndex) {
     if(!font) return;
     if(index == 0) {
         pass++;
-        if(histogram) { //TODO: OCR
+        /*if(histogram) { //TODO: OCR
             map<int, int> sorted;
             for(const_pair<int,int> sample: (const map<int,int>&)histogram) if(!sorted.contains(sample.value)) sorted.insertSorted(sample.value, sample.key); //insertion sort
             quarter = sorted.values.last();
             if(sorted.values[sorted.values.size-3]==9) half = 9;
             else half = sorted.values[sorted.values.size-4];
             if(sorted.values.contains(16)) whole=16;
-        }
+        }*/
     }
     //TODO: factorize, OCR
     if(pass==0) { // 1st pass: split score in staves
@@ -55,38 +55,40 @@ void Score::onGlyph(int index, vec2 pos, float size,const string& font, int, int
                 if(code==12 || code==13) msScore=1;
             }
         } else if(find(font,"LilyPond"_)) {
-          if((code==147/*treble*/||code==145/*bass*/) && pos.x<200_px) {
+            if((code==147/*treble*/||code==145/*bass*/) && pos.x<200_px) {
                 if(pos.y-lastClef.y>201_px) staffs << (lastClef.y+pos.y)/2;
                 if(pos.y>lastClef.y) lastClef=pos;
             }
-        } else if(font=="OpusStd"_) {
-            if((code==3||code==6 ||code==5) && pos.x<200_px) {
-                if(pos.y-lastClef.y>maxStaffDistance*1.1 && staffCount!=1) {
+        } else
+#endif
+        if(font=="OpusStd"_) {
+            //(code==3||code==6 ||code==5)
+            if((code==4||code==6) && pos.x<200_px) { //TODO: OCR
+                if(pos.y-lastClef.y>80_px/*maxStaffDistance*1.1*/ && staffCount!=1) {
                     staffs << (lastClef.y+pos.y)/2+12_px;
                     staffCount=1;
                 } else {
                     staffCount++;
-                    maxStaffDistance = max(maxStaffDistance, pos.y-lastClef.y);
+                    //maxStaffDistance = max(maxStaffDistance, pos.y-lastClef.y);
                 }
                 lastClef=pos; keys<<pos.y;
             }
             histogram[code]++;
-        } else
-#endif
-            if(endsWith(font,"Opus"_)) {
-            if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200_px) {
-                if(pos.y-lastClef.y>130_px/*148*/ && staffCount!=1) {
-                    staffs << (lastClef.y+pos.y)/2; //+14_px;
-                    staffCount=1;
-                } else if(staffCount==3) {
-                    staffs << (previousClef.y+lastClef.y)/2; //-14_px;
-                    staffCount=2;
-                } else staffCount++;
-                previousClef = lastClef;
-                lastClef=pos;
-            }
-         }
+        }
 #if 0
+        else if(endsWith(font,"Opus"_)) {
+                if((fontIndex==71/*treble*/||fontIndex==11/*bass*/) && pos.x<200_px) {
+                    if(pos.y-lastClef.y>130_px/*148*/ && staffCount!=1) {
+                        staffs << (lastClef.y+pos.y)/2; //+14_px;
+                        staffCount=1;
+                    } else if(staffCount==3) {
+                        staffs << (previousClef.y+lastClef.y)/2; //-14_px;
+                        staffCount=2;
+                    } else staffCount++;
+                    previousClef = lastClef;
+                    lastClef=pos;
+                }
+            }
             else if(find(font,"DUCRGK"_)) {
             if(code==1/*treble*/||code==5/*bass*/) {
                 if(lastClef.y != 0 && pos.y-lastClef.y>128_px) staffs << (lastClef.y+pos.y)/2;
@@ -154,25 +156,27 @@ void Score::onGlyph(int index, vec2 pos, float size,const string& font, int, int
             }
             else if(code==61) duration = 8; //half
             else if(code==60) duration = 16; //whole
-        } else if(font=="OpusStd"_) { //FIXME: OCR
-                if(code == quarter) {
-                    if(size<34) duration= 0; //grace
-                    else duration = 4; //quarter
-                }
-                else if(code == half) duration = 8; //half
-                else if(code == whole) duration = 16; //whole
-            } else
+        } //else
 #endif
-            if(endsWith(font,"Opus"_)) {
-                if(fontIndex==53) {
-                    if(size<29_px) duration= 0; //grace
-                    else duration = 4; //quarter
-                }
-                else if(fontIndex==66) duration = 8; //half
-                else if(fontIndex==39) duration = 16; //whole
+        //assert(fontIndex==code); debug[pos]=str(code);
+        if(font=="OpusStd"_) { //FIXME: OCR
+            if(code == quarter) {
+                if(size<34) duration= 0; //grace
+                else duration = 4; //quarter
             }
+            else if(code == half) duration = 8; //half
+            else if(code == whole) duration = 16; //whole
+        }
 #if 0
-            if(code==41 && trills && abs(trills.last().b.y-pos.y)<16_px) trills.last().b=pos; //trill tail
+        else if(endsWith(font,"Opus"_)) {
+            if(fontIndex==53) {
+                if(size<29_px) duration= 0; //grace
+                else duration = 4; //quarter
+            }
+            else if(fontIndex==66) duration = 8; //half
+            else if(fontIndex==39) duration = 16; //whole
+        }
+        if(code==41 && trills && abs(trills.last().b.y-pos.y)<16_px) trills.last().b=pos; //trill tail
             else if(code==56) trills << Line(pos,pos); //trill head
             else if(code==58 || (font=="OpusSpecialStd"_ && code==1)) { //dot
                 dots[i] << pos;
@@ -356,7 +360,7 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
                             for(Tie t2 : tied) if(t2.li==i && t2.lx==x && t2.ly==y) { /*debug[vec2(x,-y)]<<"D"_<<str(t2.dy,ly);*/ goto alreadyTied; }
                             t.li=i; t.lx=x; t.ly=y; t.dy=ly;
                         } else if(lx<4_px && lx>=-32_px && ly>=-30_px && ly<32_px && rx<1_px) {
-                            debug[vec2(x,-y)]<<"!L"_+str(round(lx/1_px),round(ly/1_px));
+                            //debug[vec2(x,-y)]<<"!L"_+str(round(lx/1_px),round(ly/1_px));
                         }
                     }
 alreadyTied: ;
@@ -494,11 +498,7 @@ continueTie: ;
     for(int i: range(staffs.size)) debug[vec2(0,staffs[i])]=str(i,"________"_);
 }
 
-void Score::synchronize(const map<uint,MidiChord>& MIDI) {
-    /// Synchronize notes to MIDI track
-    array<MidiNote> notes; // Flatten chords for robust MIDI synchronization (FIXME)
-    for(const MidiChord& chord: MIDI.values) notes<<chord;
-
+void Score::synchronize(const ref<MidiNote>& notes) {
 #if 0
     // Removes graces both in MIDI and score (separately as they are not ordered correctly)
     for(uint i=0; i<notes.size;) if(notes[i].duration==0) notes.removeAt(i); else i++;
@@ -510,12 +510,12 @@ void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     vec2 lastPos=vec2(0,0); uint lastKey=0;
     for(uint i=0; i<notes.size && i<positions.size;) {
         vec2 pos=positions[i]; const MidiNote& note = notes[i];
-        if(i>0 && lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) // downward chord in MIDI
-                if(notes[i].time-notes[i-1].time<4) { debug[pos]<<"~"_; swap(notes[i-1], notes[i]); lastKey=note.key; }
-        if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // Missing note in MIDI
+        /*if(i>0 && lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) // downward chord in MIDI
+                if(notes[i].time-notes[i-1].time<4) { debug[pos]<<"~"_; swap(notes[i-1], notes[i]); lastKey=note.key; }*/
+        /*if(lastPos && lastKey && pos.x==lastPos.x && pos.y<lastPos.y && note.key<lastKey) { // Missing note in MIDI
             debug[pos]<<"-"_<<str(note.time);
             positions.removeAt(i); indices.removeAt(i);
-        } else { i++; lastKey=note.key; }
+        } else*/ { i++; lastKey=note.key; }
         lastPos=pos;
     }
 #endif
@@ -523,7 +523,7 @@ void Score::synchronize(const map<uint,MidiChord>& MIDI) {
     chords.clear();
     uint t=-1; for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
         if(i==0 || (positions[i-1].x != positions[i].x && notes[i].time-notes[i-1].time > 0)) chords.insert(++t);
-        debug[positions[i]]<<str(notes[i].key)<<" "_<<str(chords.at(t).size)<<" "_<<str(notes[i].time-notes[i?i-1:0].time);
+        debug[positions[i]]<<str(notes[i].key); //<<" "_<<str(chords.at(t).size)<<" "_<<str(notes[i].time-notes[i?i-1:0].time);
         chords.at(t) << notes[i];
     }
 }

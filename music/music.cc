@@ -6,11 +6,14 @@
 
 #define SCORE 1
 #define KEYBOARD 1
-#define ENCODE 0
+#define ENCODE 1
 #if !ENCODE
 #define WINDOW 1
-#define AUDIO 1
+#define SAMPLE 1
+#define AUDIO 0
 #define THREAD 1
+#else
+#define SAMPLE 0
 #endif
 
 #if AUDIO
@@ -120,7 +123,9 @@ struct Music {
     Sequencer input{thread};
 #endif
 #else
+#if SAMPLE
     Sampler sampler {false}; // Decodes as needed in same consumer thread
+#endif
 #if AUDIO
     AudioOutput audio{{&sampler, &Sampler::read}, rate, Sampler::periodSize};
 #endif
@@ -156,6 +161,7 @@ struct Music {
 #endif
 
     Music() {
+#if SAMPLE
         // Sampler
         if(arguments() && endsWith(arguments()[0],".sfz"_)) {
             sampler.open(rate, arguments()[0], Folder("Samples"_));
@@ -163,6 +169,7 @@ struct Music {
             sampler.open(rate, "Salamander.sfz"_, Folder("Samples"_));
         }
         midi.noteEvent.connect(&sampler,&Sampler::noteEvent);
+#endif
 #if INPUT
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
 #endif
@@ -234,7 +241,9 @@ struct Music {
 #if KEYBOARD
         layout<<&keyboard;
         midi.noteEvent.connect(&keyboard,&Keyboard::midiNoteEvent);
+#if SAMPLE
         keyboard.noteEvent.connect(&sampler,&Sampler::noteEvent);
+#endif
         keyboard.noteEvent.connect(&score,&Score::noteEvent);
         keyboard.noteEvent.connect(&keyboard,&Keyboard::inputNoteEvent);
 #if INPUT
@@ -267,14 +276,16 @@ struct Music {
         pdfScore.contentChanged.connect([&contentChanged]{ contentChanged=true; });
         keyboard.contentChanged.connect([&contentChanged]{ contentChanged=true; });
         this->contentChanged.connect([&contentChanged]{ contentChanged=true; });
-        bool endOfFile = false;
+#if SAMPLE
         midi.endOfFile.connect([this,&endOfFile]{ sampler.silence.connect([&endOfFile]{ endOfFile=true; }); });
+#endif
         assert(!play);
         togglePlay();
         assert(name);
-        Encoder encoder (name, {&sampler, &Sampler::read});
+        Encoder encoder (name /*, {&sampler, &Sampler::read}*/);
         int lastReport=0;
-        for(Image image; !endOfFile;) { // Renders score as quickly as possible (no need for an event loop with any display, audio nor input)
+        for(Image image; midi.time <= midi.duration;) { // Renders score as quickly as possible
+            midi.read(encoder.videoTime*encoder.rate/encoder.fps);
             smoothScroll();
             if(contentChanged) {
                 image = renderToImage(layout, encoder.size()); contentChanged=false;
@@ -296,7 +307,10 @@ struct Music {
             score.seek(0);
             score.showActive=true;
 #endif
-            sampler.timeChanged.connect(&midi,&MidiFile::update);
+#if SAMPLE
+            sampler.time = midi.time;
+            sampler.timeChanged.connect(&midi,&MidiFile::read);
+#endif
 #if WINDOW
         window.focus=0;
 #endif
@@ -304,7 +318,10 @@ struct Music {
 #if SCORE
             score.showActive=false;
 #endif
-            sampler.timeChanged.delegates.clear(); }
+#if SAMPLE
+            sampler.timeChanged.delegates.clear();
+#endif
+        }
     }
 
 #if SCORE

@@ -39,6 +39,7 @@ Encoder::Encoder(const string& name, bool audio, int width, int height, int fps,
     if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     AVDictionary* options=0;
     av_dict_set(&options, "qp","0",0);
+    //av_dict_set(&options, "preset","ultrafast",0);
     avcodec_open2(videoCodec, codec, &options);
     assert_(!av_dict_count(options));
 

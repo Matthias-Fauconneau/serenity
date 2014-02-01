@@ -31,7 +31,7 @@ struct OffsetPlot : Widget {
             float offset = offsets[key];
             int y0 = position.y + size.y * (maximumOffset-target) / (maximumOffset-minimumOffset);
             int y1 = position.y + size.y * (maximumOffset-offset) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, offset>target ? vec4(1,0,0,1) : vec4(0,0,1,1));
+            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, offset>target ? red : blue);
 #else
             float p0 = stretch(21+key)*12;
             int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
@@ -43,22 +43,22 @@ struct OffsetPlot : Widget {
             // High confidence between zero and max(0, |offset|-deviation)
             float p1 = max(0.f, abs(offset)-deviation);
             int y1 = position.y + size.y * (maximumOffset-sign*p1-p0) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, sign*p1>0 ? vec4(1,0,0,1) : vec4(0,0,1,1));
+            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, sign*p1>0 ? red : blue);
 
             // Mid confidence between max(0,|offset|-deviation) and |offset|
             float p2 = abs(offset);
             int y2 = position.y + size.y * (maximumOffset-sign*p2-p0) / (maximumOffset-minimumOffset);
-            fill(x0,y1<y2?y1:y2,x1,y1<y2?y2:y1, sign*p2>0 ? vec4(3./4,0,0,1) : vec4(0,0,3./4,1));
+            fill(x0,y1<y2?y1:y2,x1,y1<y2?y2:y1, sign*p2>0 ? vec4(0,0,3./4,1) : vec4(3./4,0,0,1));
 
             // Low confidence between |offset| and |offset|+deviation
             float p3 = abs(offset)+deviation;
             int y3 = position.y + size.y * (maximumOffset-sign*p3-p0) / (maximumOffset-minimumOffset);
-            fill(x0,y2<y3?y2:y3,x1,y2<y3?y3:y2, sign*p3>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
+            fill(x0,y2<y3?y2:y3,x1,y2<y3?y3:y2, sign*p3>0 ? vec4(0,0,1./2,1) : vec4(1./2,0,0,1));
 
             // Low confidence between min(|offset|-deviation, 0) and zero
             float p4 = min(0.f, abs(offset)-deviation);
             int y4 = position.y + size.y * (maximumOffset-sign*p4-p0) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(1./2,0,0,1) : vec4(0,0,1./2,1));
+            fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(0,0,1./2,1) : vec4(1./2,0,0,1));
 #endif
         }
     }
