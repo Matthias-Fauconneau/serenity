@@ -61,7 +61,7 @@ void resample(Volume16& target, const Volume16& source, int sourceResolution, in
 }
 
 /// Resamples data
-class(Resample, Operation), virtual VolumeOperation {
+struct Resample : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         int sourceResolution = round(TextData(otherInputs[0]->data).decimal()*1000), targetResolution = round(TextData(otherInputs[1]->data).decimal()*1000);
@@ -86,3 +86,4 @@ class(Resample, Operation), virtual VolumeOperation {
         assert_(outputs[0].data.size == outputs[0].size() * outputs[0].sampleSize, outputs[0].size(), outputs[0].sampleSize, outputs[0].sampleCount, outputs[0].data.size, outputs[0].size() * outputs[0].sampleSize);
     }
 };
+template struct Interface<Operation>::Factory<Resample>;

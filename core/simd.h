@@ -19,6 +19,9 @@ inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_lddqu((
 inline void storea(uint16* const ptr, v8hi a) { *(v8hi*)ptr = a; }
 inline v8hi packss(v4si a, v4si b) { return __builtin_ia32_packssdw128(a,b); }
 inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, imm); }
+inline v8hi select(v8hi a, v8hi b, v8hi mask) { return (b & mask) | (a & ~mask); }
+inline v8hi min(v8hi a, v8hi b) { return select(a, b, b<a); }
+inline v8hi max(v8hi a, v8hi b) { return select(a, b, b>a); }
 
 // v16qi
 typedef byte v16qi  __attribute((__vector_size__ (16)));

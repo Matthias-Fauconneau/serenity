@@ -4,7 +4,7 @@
 #include "widget.h"
 
 /// Displays volume as slices
-class(SliceView, View), virtual Widget {
+struct SliceView : View, Widget {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override;
     string name() override;
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) override;
@@ -19,3 +19,4 @@ class(SliceView, View), virtual Widget {
     int2 lastPos; float lastZ;
     vec2 rotation = vec2(PI/3,-PI/3); // Current view angles (yaw,pitch)
 };
+template struct Interface<View>::Factory<SliceView>;

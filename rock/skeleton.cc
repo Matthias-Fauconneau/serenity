@@ -22,8 +22,9 @@ inline void compare(uint16* const skel, const short3* const pos, int x, int y, i
     }
 }
 
-/// Computes integer medial axis
-void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter) {
+/// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
+/// \note minimalSqDiameter >= 3 will remove artifacts due to discrete background but may also round corners
+void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimalSqDiameter=1) {
     const short3* const positionData = position;
     uint16* const targetData = target;
     mref<uint16>(target, target.size()).clear(0);
@@ -50,11 +51,4 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
     target.maximum = maximum(target), target.squared=true;
     target.field = String("r"_); // Radius
 }
-
-/// Keeps only voxels on the medial axis of the pore space (integer medial axis skeleton ~ centers of maximal spheres)
-class(Skeleton, Operation), virtual VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        integerMedialAxis(outputs[0],inputs[0], /*λ²=*/1); // 3 will remove artifacts due to discrete background but may also round corners
-    }
-};
+defineVolumePass(Skeleton, uint16, integerMedialAxis);

@@ -8,13 +8,15 @@
 struct Ball { uint64 index; uint16 sqRadius; };
 typedef array<Ball> Family;
 
-/// Converts text file formatted as ((x y z r2):( x y z r2)+)*\n to families
+/// Converts text file formatted as (value:( x y z r2)+)* to families
 array<Family> parseFamilies(const string& data) {
     array<Family> families;
     TextData s(data);
     while(s) {
         Family family;
+        s.until(':');
         for(;;) {
+            s.whileAny(" "_);
             uint64 index = zOrder(parse3(s)); uint16 sqRadius = s.integer();
             family << Ball{index, sqRadius};
             if(!s || s.match('\n')) break;
@@ -40,7 +42,7 @@ void rootIndex(Volume16& target, const ref<Family>& families) {
     }
 }
 /// Writes root index of each voxel
-class(RootIndex, Operation), virtual VolumeOperation {
+struct RootIndex : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint index) override {
         int3 size = parse3(inputs[1]->data); assert_(size);
@@ -51,11 +53,12 @@ class(RootIndex, Operation), virtual VolumeOperation {
         rootIndex(outputs[0],parseFamilies(inputs[0]->data));
     }
 };
+template struct Interface<Operation>::Factory<RootIndex>;
 
 void colorizeIndex(Volume24& target, const Volume16& source) {
     const mref<byte3> targetData = target;
     targetData.clear(0);
-    byte3 colors[target.maximum+1];
+    buffer<byte3> colors(target.maximum+1);
     Random random; // Unseeded to always keep same sequence
     for(uint i: range(target.maximum)) {
         colors[i] = byte3(clip<vec3>(0, float(0xFF)*LChuvtoBGR(53,135,2*PI*random()), 0xFF));
@@ -70,12 +73,13 @@ void colorizeIndex(Volume24& target, const Volume16& source) {
     target.maximum = 0xFF;
 }
 /// Colorizes each index in a different color
-class(ColorizeIndex, Operation), virtual VolumeOperation {
+struct ColorizeIndex : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(byte3); }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         colorizeIndex(outputs[0], inputs[0]);
     }
 };
+template struct Interface<Operation>::Factory<ColorizeIndex>;
 
 /// Converts boxes to a text file formatted as "x y z sx sy sz"
 String toASCII(const ref<mat4>& boxes) {
@@ -102,9 +106,10 @@ array<mat4> bound(const ref<Family>& families) {
 }
 
 /// Bounds each familiy with an axis-aligned bounding box
-class(Bound, Operation) {
+struct Bound : Operation {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         outputs[0]->metadata = String("boxes"_);
         outputs[0]->data = toASCII(bound(parseFamilies(inputs[0]->data)));
     }
 };
+template struct Interface<Operation>::Factory<Bound>;

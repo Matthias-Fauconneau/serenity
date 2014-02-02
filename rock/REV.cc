@@ -2,7 +2,7 @@
 #include "sample.h"
 
 /// Returns relative deviation versus cylinder radius of 8 volume samples
-class(REV, Operation) {
+struct REV : Operation {
     string parameters() const override { return "path"_; }
     void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
         real resolution = parseScalar(results.getResult("resolution"_, arguments)->data);
@@ -64,3 +64,4 @@ class(REV, Operation) {
         }
     }
 };
+template struct Interface<Operation>::Factory<REV>;

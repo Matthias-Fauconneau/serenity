@@ -20,7 +20,7 @@ inline Volume toVolume(const string& metadata, const buffer<byte>& data) {
 inline Volume toVolume(const Result& result) { return toVolume(result.metadata, result.data); }
 
 /// Convenience class to help define volume operations
-struct VolumeOperation : virtual Operation {
+struct VolumeOperation : Operation {
     /// Overriden by implementation to return required output sample size (or 0 for non-volume output)
     virtual uint outputSampleSize(uint index unused) { return 0; } // No volume output by default
     virtual uint outputSampleSize(const Dict&, const ref<const Result*>&, uint index) { return this->outputSampleSize(index); }
@@ -84,13 +84,16 @@ struct VolumeOperation : virtual Operation {
 };
 
 /// Convenience class to define a single input, single output volume operation
-template<Type O> struct VolumePass : virtual VolumeOperation {
+template<Type O> struct VolumePass : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(O); }
     virtual void execute(const Dict& args, VolumeT<O>& target, const Volume& source) abstract;
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override { execute(args, outputs[0], inputs[0]); }
 };
 #define defineVolumePass(name, type, function) \
-    class(name, Operation), virtual VolumePass<type> { void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } }
+    struct name : VolumePass<type> { \
+     void execute(const Dict&, VolumeT<type>& target, const Volume& source) override { function(target, source); } \
+    }; \
+    template struct Interface<Operation>::Factory<name>
 
 // Convenience helpers to parse 3 components vectors
 /// Parses 3 integers

@@ -9,10 +9,10 @@ generic void zOrder(VolumeT<T>& target, const VolumeT<T>& source) {
     const T* const sourceData = source;
     T* const targetData = target;
     interleavedLookup(target);
-    const uint64* const offsetX = target.offsetX, *offsetY = target.offsetY, *offsetZ = target.offsetZ;
+    const ref<uint64> offsetX = target.offsetX, offsetY = target.offsetY, offsetZ = target.offsetZ;
     for(uint z=0; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]] = sourceData[z*X*Y + y*X + x];
 }
-class(ZOrder, Operation), virtual VolumeOperation {
+struct ZOrder : VolumeOperation {
     uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         assert_(outputs);
@@ -21,6 +21,7 @@ class(ZOrder, Operation), virtual VolumeOperation {
         else error(inputs[0].sampleSize);
     }
 };
+template struct Interface<Operation>::Factory<ZOrder>;
 
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles)
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
@@ -83,10 +84,11 @@ void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
 #endif
     target.maximum=attribute.maximum;
 }
-class(Bin, Operation), virtual VolumeOperation {
+struct Bin : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(Tile)/tileSide/tileSide/tileSide; }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { bin(outputs[0], inputs[0], inputs[1]); }
 };
+template struct Interface<Operation>::Factory<Bin>;
 
 /// Rasterizes each skeleton voxel as a ball (with maximum blending)
 void rasterize(Volume16& target, const Volume& source) {

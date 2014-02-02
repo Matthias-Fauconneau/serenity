@@ -38,7 +38,7 @@ void rasterizeBox(Volume16& target, const ref<mat4>& boxes) {
 }
 
 /// Writes root index of each voxel
-class(RasterizeBox, Operation), virtual VolumeOperation {
+struct RasterizeBox : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint index) override {
         int3 size = parse3(inputs[1]->data); assert_(size);
@@ -49,6 +49,7 @@ class(RasterizeBox, Operation), virtual VolumeOperation {
         rasterizeBox(outputs[0],parseBoxes(inputs[0]->data));
     }
 };
+template struct Interface<Operation>::Factory<RasterizeBox>;
 
 /// Computes aspect ratio
 array<real> aspectRatio(const ref<mat4>& boxes) {
@@ -60,12 +61,13 @@ array<real> aspectRatio(const ref<mat4>& boxes) {
     return aspectRatios;
 }
 
-class(AspectRatio, Operation) {
+struct AspectRatio : Operation {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         outputs[0]->metadata = String("vector"_);
         outputs[0]->data = toASCII(aspectRatio(parseBoxes(inputs[0]->data)));
     }
 };
+template struct Interface<Operation>::Factory<AspectRatio>;
 
 /// Computes distance to nearest box
 array<real> nearestDistance(const ref<mat4>& boxes) {
@@ -82,9 +84,10 @@ array<real> nearestDistance(const ref<mat4>& boxes) {
     return nearestDistances;
 }
 
-class(NearestDistance, Operation) {
+struct NearestDistance : Operation {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         outputs[0]->metadata = String("vector"_);
         outputs[0]->data = toASCII(nearestDistance(parseBoxes(inputs[0]->data)));
     }
 };
+template struct Interface<Operation>::Factory<NearestDistance>;

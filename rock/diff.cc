@@ -10,15 +10,16 @@ static void diff(Volume24& target, const Volume16& A, const Volume16& B) {
         target(x,y,z) = a==b ? c : a<b ? byte3(0xFF,0,0) : byte3(0,0,0xFF);
     }
 }
-class(Diff, Operation), virtual VolumeOperation {
+struct Diff : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(byte3); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         diff(outputs[0], inputs[0], inputs[1]);
     }
 };
+template struct Interface<Operation>::Factory<Diff>;
 
 /// Compares results of enabling a given parameter when generating a given target
-class(Compare, Operation) {
+struct Compare : Operation {
     virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return -1; } // Prevent output allocation (will be done in custom ResultManager::compute call)
     string parameters() const override { return "target parameter A B hold"_; }
     void execute(const Dict& arguments, const Dict& localArguments, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
@@ -34,9 +35,10 @@ class(Compare, Operation) {
         results.compute("Diff"_, {move(A),move(B)}, {outputs[0]->name}, arguments, localArguments, Dict());
     }
 };
+template struct Interface<Operation>::Factory<Compare>;
 
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
-class(Sweep, Operation) {
+struct Sweep : Operation {
     string parameters() const override { return "target parameter hold"_; }
     void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& process) override {
         shared<Result> hold = nullptr;
@@ -55,3 +57,4 @@ class(Sweep, Operation) {
         });
     }
 };
+template struct Interface<Operation>::Factory<Sweep>;

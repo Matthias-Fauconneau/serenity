@@ -17,7 +17,7 @@ struct Build {
     array<string> flags;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
-    const string CXX = /*existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ :*/ existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
+    const string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -102,12 +102,12 @@ struct Build {
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             log(target);
-            while(pids.size>=1) { // Waits for a job to finish before launching a new unit
+            while(pids.size>=3) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
-            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -o"_);
+            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -Wno-overloaded-virtual -I/usr/include/freetype2 -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
         }
         return lastLinkEdit;

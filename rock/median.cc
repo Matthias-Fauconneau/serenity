@@ -53,7 +53,7 @@
     });
     target.maximum = max(ref<uint>(maximum));
 }
-class(Median, Operation), virtual VolumePass<uint16> {
+struct Median : VolumePass<uint16> {
     string parameters() const override { return "radius"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
         int radius = args.value("radius"_,1);
@@ -62,3 +62,4 @@ class(Median, Operation), virtual VolumePass<uint16> {
         else error("Unsupported radius",radius);
     }
 };
+template struct Interface<Operation>::Factory<Median>;

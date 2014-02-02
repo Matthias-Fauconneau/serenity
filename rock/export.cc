@@ -19,12 +19,13 @@ static void add(Volume8& target, const Volume8& A, const Volume8& B) {
     for(uint index: range(target.size())) targetData[index] = aData[index] + bData[index];
     target.maximum= A.maximum + B.maximum;
 }
-class(Add, Operation), virtual VolumeOperation {
+struct Add : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         add(outputs[0], inputs[0], inputs[1]);
     }
 };
+template struct Interface<Operation>::Factory<Add>;
 
 /// Square roots all values
 void squareRoot(VolumeFloat& target, const Volume16& source) {
@@ -43,12 +44,13 @@ static void scaleValues(VolumeFloat& target, const VolumeFloat& source, const fl
     const float* const sourceData = source; float* const targetData = target;
     for(uint index: range(source.size())) targetData[index] = scale*sourceData[index];
 }
-class(ScaleValues, Operation), virtual VolumeOperation {
+struct ScaleValues : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(float); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         scaleValues(outputs[0], inputs[0], parseScalar(otherInputs[0]->data));
     }
 };
+template struct Interface<Operation>::Factory<ScaleValues>;
 
 /// Normalizes to 8bit
 void normalize8(Volume8& target, const Volume& source) {
@@ -79,24 +81,26 @@ static void maximum(Volume16& target, const Volume16& source, uint16 maximum) {
     for(uint index: range(source.size())) targetData[index] = min(sourceData[index], maximum);
     target.maximum = min<uint>(source.maximum, maximum);
 }
-class(Maximum, Operation), virtual VolumeOperation {
+struct Maximum : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         maximum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
     }
 };
+template struct Interface<Operation>::Factory<Maximum>;
 
 /// Clips voxels to minimum
 static void minimum(Volume16& target, const Volume16& source, uint16 minimum) {
     const uint16* const sourceData = source; uint16* const targetData = target;
     for(uint index: range(source.size())) targetData[index] = max(sourceData[index], minimum);
 }
-class(Minimum, Operation), virtual VolumeOperation {
+struct Minimum : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         minimum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
     }
 };
+template struct Interface<Operation>::Factory<Minimum>;
 
 /// Sets masked (mask=0) voxels where source is under/over masked value to masked value
 static void mask(Volume16& target, const Volume8& mask, const Volume16& source, uint16 value, bool invert) {
@@ -113,7 +117,7 @@ static void mask(Volume16& target, const Volume8& mask, const Volume16& source, 
     }
     target.maximum = source.maximum; target.squared=source.squared;
 }
-class(Mask, Operation), virtual VolumeOperation {
+struct Mask : VolumeOperation {
     virtual string parameters() const { return "value invert"_; }
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
@@ -123,6 +127,7 @@ class(Mask, Operation), virtual VolumeOperation {
         mask(outputs[0], inputs[0], inputs[1], integerValue, args.value("invert"_,"0"_)!="0"_);
     }
 };
+template struct Interface<Operation>::Factory<Mask>;
 
 /// Maps intensity to either blue or green channel depending on binary classification
 generic void colorize(Volume24& target, const VolumeT<T>& source, uint16 threshold) {
@@ -137,7 +142,7 @@ generic void colorize(Volume24& target, const VolumeT<T>& source, uint16 thresho
     });
     target.maximum=0xFF;
 }
-class(Colorize, Operation), virtual VolumeOperation {
+struct Colorize : VolumeOperation {
     string parameters() const override { return "threshold"_; }
     uint outputSampleSize(uint) override { return sizeof(byte3); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
@@ -148,9 +153,10 @@ class(Colorize, Operation), virtual VolumeOperation {
         else error(inputs[0].sampleSize);
     }
 };
+template struct Interface<Operation>::Factory<Colorize>;
 
 /// Exports volume to 8bit PNGs for visualization (normalized and gamma corrected)
-class(ToPNG, Operation), virtual VolumeOperation {
+struct ToPNG : VolumeOperation {
     virtual string parameters() const { return "z invert binary"_; }
     void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
@@ -167,9 +173,10 @@ class(ToPNG, Operation), virtual VolumeOperation {
         }
     }
 };
+template struct Interface<Operation>::Factory<ToPNG>;
 
 /// Exports volume to 8bit BMPs for interoperation (deprecated: use ToTIFF instead)
-class(ToBMP, Operation), virtual VolumeOperation {
+struct ToBMP : VolumeOperation {
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("bmp"_);
@@ -181,9 +188,10 @@ class(ToBMP, Operation), virtual VolumeOperation {
         }
     }
 };
+template struct Interface<Operation>::Factory<ToBMP>;
 
 /// Exports volume to 16bit TIFFs  for interoperation
-class(ToTIFF, Operation), virtual VolumeOperation {
+struct ToTIFF : VolumeOperation {
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("tiff"_);
@@ -196,6 +204,7 @@ class(ToTIFF, Operation), virtual VolumeOperation {
         }
     }
 };
+template struct Interface<Operation>::Factory<ToTIFF>;
 
 /// Converts integers to ASCII decimal
 template<uint pad> inline void itoa(byte*& target, uint n) {
@@ -231,12 +240,13 @@ static buffer<byte> toASCII(const Volume& source) {
     target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
     return target;
 }
-class(ToASCII, Operation), virtual VolumeOperation {
+struct ToASCII : VolumeOperation {
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         outputs[0]->metadata = String("ascii"_);
         outputs[0]->data = toASCII(inputs[0]);
     }
 };
+template struct Interface<Operation>::Factory<ToASCII>;
 
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
@@ -286,7 +296,7 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
     data.capacity = 0; // Actually not heap allocated
     outputBuffer.size = data.size;
 }
-class(ToCDL, Operation), virtual VolumeOperation {
+struct ToCDL : VolumeOperation {
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint) override {
         assert_(inputs);
         assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);

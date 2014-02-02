@@ -22,7 +22,7 @@ bool overlaps(const mat4& a, const mat4& b) {
 }
 bool intersects(const mat4& a, const mat4& b) { return overlaps(a, b) && overlaps(b, a); }
 
-class(Synthetic, Operation), virtual VolumeOperation {
+struct Synthetic : VolumeOperation {
     const int3 size = 128;
 
     uint outputSampleSize(uint index) override { if(index) return 0; /*Extra outputs*/ return sizeof(uint8); }
@@ -94,3 +94,4 @@ class(Synthetic, Operation), virtual VolumeOperation {
         output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z) + " voxels"_;});
     }
 };
+template struct Interface<Operation>::Factory<Synthetic>;

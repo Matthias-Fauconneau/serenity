@@ -37,23 +37,23 @@ buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 mini
     return list;
 }
 
-/// Converts lists to a text file formatted as ([value]:\n(x y z\t)+)*
+/// Converts lists to a text file formatted as (value:\n(x y z 1\t)+)*
 String toASCII(const buffer<array<short3>>& lists) {
     uint size = 0; // Estimates data size to avoid unnecessary reallocations
     for(const array<short3>& list: lists) if(list.size) size += 8 + (list.size)*(3*5+1);
     String text (size);
     for(int value=lists.size-1; value>=0; value--) { // Sort values in descending order
-        const array<short3>& list =  lists[value];
+        const array<short3>& list = lists[value];
         if(!list.size) continue;
-        text << "["_+str(value)+"]:\n"_;
-        for(uint i: range(list.size)) { short3 p = list[i]; text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ((i+1)%16?"  "_:"\n"_); }
+        text << str(value) << ": "_;
+        for(uint i: range(list.size)) { short3 p = list[i]; text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << " 1"_ << (i<list.size-1?" "_:""_); }
         text << "\n"_;
     }
     return text;
 }
 
 /// Computes lists of positions for each value
-class(List, Operation) {
+struct List : Operation {
     string parameters() const override { return "cylinder downsample minimum"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
@@ -64,3 +64,4 @@ class(List, Operation) {
         outputs[0]->data = toASCII(lists);
     }
 };
+template struct Interface<Operation>::Factory<List>;

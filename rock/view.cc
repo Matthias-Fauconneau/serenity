@@ -5,7 +5,7 @@
 #include "sample.h"
 #include "plot.h"
 
-class(TextView, View), virtual Text {
+struct TextView : View, Text {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
         if(text) return false;
         if(endsWith(metadata, "scalar"_)) { setText(name+": "_+data); title = String(name); return true; }
@@ -17,8 +17,9 @@ class(TextView, View), virtual Text {
     string name() override { return title; }
     String title;
 };
+template struct Interface<View>::Factory<TextView>;
 
-class(ImageView, View), virtual ImageWidget {
+struct ImageView : View, ImageWidget {
     Image image;
     ImageView():ImageWidget(image){}
     bool view(const string&, const string& name, const buffer<byte>& data) override {
@@ -31,8 +32,9 @@ class(ImageView, View), virtual ImageWidget {
     string name() override { return title; }
     String title;
 };
+template struct Interface<View>::Factory<ImageView>;
 
-class(PlotView, View), virtual Plot {
+struct PlotView : View, Plot {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
         if(!endsWith(metadata,"tsv"_)) return false;
         string xlabel,ylabel; { TextData s(metadata); ylabel = s.until('('); xlabel = s.until(')'); }
@@ -49,3 +51,4 @@ class(PlotView, View), virtual Plot {
     int2 sizeHint() override { return int2(1080,1080*3/4); }
     string name() override { return title; }
 };
+template struct Interface<View>::Factory<PlotView>;

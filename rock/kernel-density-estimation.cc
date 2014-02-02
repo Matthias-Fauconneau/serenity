@@ -35,13 +35,13 @@ UniformSample kernelDensityEstimation(const NonUniformHistogram& histogram, real
     chunk_parallel(pdf.size, [&](uint, uint offset, uint size) { for(uint i : range(offset, offset+size)) {
         const real x0 = i*delta;
         real sum = 0;
-        for(auto sample: histogram) sum += real(sample.value) * exp(-1./2*sq((x0-sample.key)/h));
+        for(auto sample: histogram) { real x = -1./2*sq((x0-sample.key)/h); if(x>expUnderflow) sum += real(sample.value) * exp(x); }
         pdf[i] = scale * sum;
     }});
     return pdf;
 }
 
-class(KernelDensityEstimation, Operation), virtual Pass {
+struct KernelDensityEstimation : Pass {
     virtual string parameters() const { return "ignore-clip bandwidth normalize"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         NonUniformHistogram H;
@@ -58,3 +58,4 @@ class(KernelDensityEstimation, Operation), virtual Pass {
         target.metadata = (normalize?"σ"_:ylabel)+"("_+xlabel+").tsv"_;
     }
 };
+template struct Interface<Operation>::Factory<KernelDensityEstimation>;

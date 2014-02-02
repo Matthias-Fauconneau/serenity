@@ -14,7 +14,7 @@ UniformSample squareRoot(const UniformSample& A) {
 UniformSample normalize(const UniformSample& A) { return (1./(A.scale*A.sum()))*A; }
 
 /// Exhaustively search for inter-class variance maximum ω₁ω₂(μ₁ - μ₂)² (shown by Otsu to be equivalent to intra-class variance minimum ω₁σ₁² + ω₂σ₂²)
-class(Otsu, Operation) {
+struct Otsu : Operation {
     string parameters() const override { return "ignore-clip normalize"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
@@ -55,6 +55,7 @@ class(Otsu, Operation) {
         output(outputs, "otsu-interclass-deviation"_, "σ(μ).tsv"_, [&]{ return "#Otsu Interclass Deviation\n"_+toASCII(normalize(squareRoot(interclassVariance))); } );
     }
 };
+template struct Interface<Operation>::Factory<Otsu>;
 
 #if 1
 // Lorentz
@@ -87,7 +88,7 @@ UniformSample sample(const Lorentz& lorentz, uint size) {
     return sample;
 }
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
-class(LorentzianMixtureModel, Operation) {
+struct LorentzianMixtureModel : Operation {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         UniformHistogram density = parseUniformSample( inputs[0]->data );
         const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
@@ -111,12 +112,13 @@ class(LorentzianMixtureModel, Operation) {
         output(outputs, "lorentz-notpore"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(notpore); });
     }
 };
+template struct Interface<Operation>::Factory<LorentzianMixtureModel>;
 #endif
 
 #if 1
 /// Computes the mean gradient for each set of voxels with the same density, and defines threshold as the density of the set of voxels with the maximum mean gradient
 /// \note Provided for backward compatibility only
-class(MaximumMeanGradient, Operation) {
+struct MaximumMeanGradient : Operation {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         const Volume16& source = toVolume(*inputs[0]);
         const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
@@ -157,6 +159,7 @@ class(MaximumMeanGradient, Operation) {
         output(outputs, "gradient-mean"_, "tsv"_, [&]{ return toASCII(gradientMean); } );
     }
 };
+template struct Interface<Operation>::Factory<MaximumMeanGradient>;
 #endif
 
 /// Segments by setting values over a fixed threshold
@@ -203,7 +206,7 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
 }
 
 /// Segments pore space by comparing density against a uniform threshold
-class(Binary, Operation), virtual VolumeOperation {
+struct Binary : VolumeOperation {
     string parameters() const override { return "threshold invert mask box"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
@@ -221,3 +224,4 @@ class(Binary, Operation), virtual VolumeOperation {
         else error(inputs[0].sampleSize);
     }
 };
+template struct Interface<Operation>::Factory<Binary>;

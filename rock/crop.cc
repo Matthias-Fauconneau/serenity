@@ -106,7 +106,7 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     }
     for(uint z=Z-marginZ; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
 }
-class(Crop,Operation), virtual VolumePass<uint16> {
+struct Crop : VolumePass<uint16> {
     string parameters() const override { return "cylinder box downsample"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
         CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
@@ -115,3 +115,4 @@ class(Crop,Operation), virtual VolumePass<uint16> {
         target.origin = crop.min;
     }
 };
+template struct Interface<Operation>::Factory<Crop>;

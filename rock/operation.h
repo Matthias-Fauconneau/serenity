@@ -47,7 +47,7 @@ template<Type F> bool outputElements(const ref<Result*>& outputs, const string& 
     return false;
 }
 /// Convenience class to define a single input, single output operation
-struct Pass : virtual Operation {
+struct Pass : Operation {
     virtual void execute(const Dict& args, Result& output, const Result& source) abstract;
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override { execute(args, *outputs[0], *inputs[0]); }
 };

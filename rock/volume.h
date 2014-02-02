@@ -56,8 +56,8 @@ generic struct VolumeT : Volume {
     operator const mref<T>() { assert(data.size==sizeof(T)*size()); return mref<T>((T*)data.data, data.size/sizeof(T)); }
     operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
     operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
-    mref<T> slice(size_t pos, size_t size) { return ((mref<T>)*this).slice(pos, size); }
-    template<Type... Args> void clear(Args... args) { ((mref<T>)*this).clear(args...); }
+    mref<T> slice(size_t pos, size_t size) { return operator const mref<T>().slice(pos, size); }
+    template<Type... Args> void clear(Args... args) { operator const mref<T>().clear(args...); }
     T operator()(uint x, uint y, uint z) const { return ((const T*)data.data)[index(x,y,z)]; }
     T& operator()(uint x, uint y, uint z) { return ((T*)data.data)[index(x,y,z)]; }
 };

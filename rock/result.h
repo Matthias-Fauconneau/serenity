@@ -24,12 +24,9 @@ template <class I> struct Interface {
     static string version(const string& name) { return factories.at(name)->version(); }
     static unique<I> instance(const string& name) { return factories.at(name)->constructNewInstance(); }
 };
-template <class I> map<string,typename Interface<I>::AbstractFactory*> Interface<I>::factories __attribute((init_priority(1000)));
-template <class I> template <class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory __attribute((init_priority(1001)));
-#define class(C,I) \
-    struct C; \
-    template struct Interface<I>::Factory<C>; \
-    struct C : virtual I
+template <class I> map<string,typename Interface<I>::AbstractFactory*> Interface<I>::factories;
+template <class I> template <class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
+//template struct Interface<I>::Factory<C>;
 
 /// Dynamic-typed value
 /// \note Implemented as a String with implicit conversions and copy
@@ -37,14 +34,12 @@ struct Variant : String {
     Variant(){}
     default_move(Variant);
     Variant(String&& s) : String(move(s)) {}
-    Variant(int integer) : String(dec(integer)){}
+    Variant(double decimal) : String(ftoa(decimal)){}
     explicit operator bool() const { return size; }
     operator int() const { return *this ? toInteger(*this) : 0; }
     operator uint() const { return *this ? toInteger(*this) : 0; }
     operator float() const { return fromDecimal(*this); }
     operator double() const { return fromDecimal(*this); }
-    operator const string&() const { return *this; }
-    operator const String&() const { return *this; }
     generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
 };
 template<> inline Variant copy(const Variant& o) { return copy((const String&)o); }

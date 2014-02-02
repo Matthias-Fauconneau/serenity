@@ -9,7 +9,7 @@ generic UniformHistogram histogram(const VolumeT<T>& source, CropVolume crop) {
     uint radiusSq = crop.cylinder ? sq(crop.size.x/2) : -1;
     int2 center = ((crop.min+crop.max)/2).xy();
     bool tiled=source.tiled();
-    const uint64* const offsetX = source.offsetX, *offsetY = source.offsetY, *offsetZ = source.offsetZ;
+    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     const T* sourceData = source;
     buffer<uint> histograms[coreCount];
     for(uint id: range(coreCount)) histograms[id] = buffer<uint>(source.maximum+1, source.maximum+1, 0);
@@ -53,7 +53,7 @@ generic UniformHistogram histogram(const VolumeT<T>& source, CropVolume crop) {
 }
 
 /// Computes histogram using uniform integer bins
-class(Histogram, Operation) {
+struct Histogram : Operation {
     string parameters() const override { return "cylinder downsample"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
@@ -67,3 +67,4 @@ class(Histogram, Operation) {
         outputs[0]->data = toASCII(histogram);
     }
 };
+template struct Interface<Operation>::Factory<Histogram>;

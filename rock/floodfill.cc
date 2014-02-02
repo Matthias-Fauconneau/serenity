@@ -20,13 +20,14 @@ void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
         for(uint i : range(size)) targetData[i] = sourceData[i] > threshold ? sourceData[i] : 0;
     });
 }
-class(ThresholdClip, Operation), virtual VolumeOperation {
+struct ThresholdClip : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         uint clipThreshold = TextData(otherInputs[0]->data).integer();
         thresholdClip(outputs[0], inputs[0], clipThreshold);
     }
 };
+template struct Interface<Operation>::Factory<ThresholdClip>;
 
 /// Marks all volume voxels connected to the seeded faces
 void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, uint margin=0) {
@@ -66,7 +67,7 @@ void floodFill(Volume8& target, const Volume8& source, string seed="111111"_, ui
         }
     }
 }
-class(FloodFill, Operation), virtual VolumeOperation {
+struct FloodFill : VolumeOperation {
     string parameters() const override { return "seed"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override { floodFill(outputs[0], inputs[0], args.value("seed"_,"111111"_)); }
@@ -76,6 +77,7 @@ class(FloodFill, Operation), virtual VolumeOperation {
         floodFill(outputs[0], inputs[0], args.value("seed"_,"111111"_), margin);
     }
 };
+template struct Interface<Operation>::Factory<FloodFill>;
 
 /// Marks each connected subset of the volume with a unique index
 void floodFillSplit(Volume16& target, const Volume8& source) {
@@ -118,10 +120,7 @@ void floodFillSplit(Volume16& target, const Volume8& source) {
         }
     }
 }
-class(FloodFillSplit, Operation), virtual VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { floodFillSplit(outputs[0], inputs[0]); }
-};
+defineVolumePass(FloodFillSplit, uint16, floodFillSplit);
 
 void intersect(Volume8& target, const Volume8& A, const Volume8& B) {
     assert(A.size() == B.size() && A.tiled() == B.tiled() && A.maximum==1 && B.maximum==1);
@@ -132,7 +131,7 @@ void intersect(Volume8& target, const Volume8& A, const Volume8& B) {
         for(uint i : range(size)) targetData[i] = aData[i] && bData[i];
     });
 }
-class(Intersect, Operation), virtual VolumeOperation {
+struct Intersect : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         assert_(inputs[0].sampleSize, "Expected 8bit mask");
@@ -140,3 +139,4 @@ class(Intersect, Operation), virtual VolumeOperation {
         intersect(outputs[0], inputs[0], inputs[1]);
     }
 };
+template struct Interface<Operation>::Factory<Intersect>;

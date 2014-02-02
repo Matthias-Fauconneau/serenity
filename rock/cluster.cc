@@ -190,7 +190,7 @@ String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
 }
 
 /// Computes trees of overlapping balls
-class(Cluster, Operation), virtual VolumeOperation {
+struct Cluster : VolumeOperation {
     string parameters() const override { return "minimum"_; }
     uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint32) : 0; }
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs, const ref<const Result*>& otherInputs) override {
@@ -201,3 +201,4 @@ class(Cluster, Operation), virtual VolumeOperation {
         otherOutputs[1]->data = toASCII(move(multipleReturnValues.familySets), inputs[0]);
     }
 };
+template struct Interface<Operation>::Factory<Cluster>;

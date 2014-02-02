@@ -2,7 +2,7 @@
 #include "sample.h"
 
 /// Computes the unconnected and connected pore space volume versus pruning radius and the largest pruning radius keeping both Z faces connected
-class(Prune, Operation) {
+struct Prune : Operation {
     string parameters() const override { return "path connect-pore"_; } //FIXME: get parameters from target (recursive dependency)
     void execute(const Dict& arguments, const Dict&, const ref<Result*>& outputs, const ref<const Result*>&, ResultManager& results) override {
         real resolution = parseScalar(results.getResult("resolution"_, arguments)->data);
@@ -47,3 +47,4 @@ class(Prune, Operation) {
         });
     }
 };
+template struct Interface<Operation>::Factory<Prune>;

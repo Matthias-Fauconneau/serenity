@@ -6,7 +6,7 @@
 
 /// Concatenates image slice files in a volume
 /// \note Parses physical resolution from source path
-class(Source, Operation), virtual VolumeOperation {
+struct Source : VolumeOperation {
     CropVolume crop;
 
     string parameters() const override { return "path resolution cylinder box downsample extra"_; }
@@ -197,3 +197,4 @@ class(Source, Operation), virtual VolumeOperation {
         }
     }
 };
+template struct Interface<Operation>::Factory<Source>;
