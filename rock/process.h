@@ -51,22 +51,6 @@ struct Process : ResultManager {
     array<shared<Result>> results; // Generated intermediate (and target) data
 };
 
-/*/// High level operation with direct access to query new results from process
-/// \note as inputs are unknown, results are not regenerated on input changes
-struct Tool {
-    /// Returns which parameters affects this operation output
-    virtual string parameters() const { return ""_; }
-    /// Returns the desired intermediate data size in bytes for each outputs
-    virtual size_t outputSize(const Dict& args unused, const ref<Result*>& inputs unused, uint index unused) { return 0; } // Unknown sizes by default
-    /// Executes the tool computing data results using process
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs, Process& results) abstract;
-    /// Executes the tool computing data results using process
-    //FIXME: fix Compare and revert full Process access to a single getResult method
-    virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<Result*>& inputs, Process& results) abstract;
-    /// Virtual destructor
-    virtual ~Tool() {}
-};*/
-
 /// Mirrors results on a filesystem
 struct ResultFile : Result {
     ResultFile(const string& name, long timestamp, Dict&& arguments, String&& metadata, String&& data, const string& id, const string& folder)
@@ -97,7 +81,7 @@ struct ResultFile : Result {
 };
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
-struct PersistentProcess : virtual Process {
+struct PersistentProcess : Process {
      PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("var/tmp"_),true) { specialParameters += "storageFolder"_; specialParameters += "indirect"_; }
     ~PersistentProcess();
 

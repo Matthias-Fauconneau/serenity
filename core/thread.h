@@ -151,7 +151,7 @@ template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 /// Runs a loop in parallel chunks
 template<class F> void chunk_parallel(uint totalSize, F f) {
     constexpr uint chunkCount = coreCount;
-    assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
+    assert(totalSize%chunkCount<chunkCount); // Last chunk will be smaller
     const uint chunkSize = totalSize/chunkCount;
     parallel(chunkCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }

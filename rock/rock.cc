@@ -39,23 +39,23 @@
 //#include "diff.h
 
 /// Command-line interface for rock volume data processing
-struct Rock : virtual PersistentProcess {
+struct Rock : PersistentProcess, Poll {
     FILE(rock) // Rock process definition (embedded in binary)
-    Rock(const ref<string>& args) : PersistentProcess("rock"_) {
-        specialParameters += "dump"_; specialParameters += "view"_; specialParameters += "slides"_; specialParameters += "png"_; specialParameters += "pdf"_;
+    Rock() : PersistentProcess("rock"_) {
+        specialParameters += {"dump"_,"view"_,"slides"_,"png"_,"pdf"_};
+        queue(); // Lets all implementations (Operations, Views) register before execution
+    }
+    void event() {
         String process;
-        for(const string& arg: args) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
-        array<string> targets = configure(args, process? : rock());
+        for(const string& arg: ::arguments() ) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
+        array<string> targets = configure(::arguments() , process? : rock());
         if(targetPaths.size>targets.size)
             warn("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                   "\nHint: An unknown (mistyped?) target might be interpreted as target path");
         if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
             warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size), targetPaths?str("using", map<string,string>(targetPaths, targets.slice(0,targetPaths.size))):""_);
-#ifndef BUILD
-#define BUILD "undefined"
-#endif
         if(specialArguments.contains("dump"_)) {
-            log("Binary built on " __DATE__ " " __TIME__ " (" BUILD ")");
+            log(__DATE__ " " __TIME__);
             log("Operations:",Interface<Operation>::factories.keys);
             log("Results:",resultNames);
             log("Targets:",targets);
@@ -196,4 +196,4 @@ struct Rock : virtual PersistentProcess {
     array<unique<Window>> windows;
     array<String> titles;
     array<String> images;
-} app ( arguments() );
+} app;

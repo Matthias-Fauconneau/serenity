@@ -4,18 +4,20 @@
 #include "thread.h"
 #include "crop.h"
 
-/// Converts text file formatted as ([value]:\n(x y z\t)+)* to lists
+/// Converts text file formatted as ([value]:\n(x y z r\t)+)* to lists
 buffer<array<short3> > parseLists(const string& data) {
     buffer<array<short3>> lists;
     TextData s(data);
     while(s) {
-        s.skip("["_); uint value = s.integer(); s.skip("]:\n"_);
+        s.whileAny(" "_); uint value = s.integer(); s.skip(":"_);
         if(!lists) lists = buffer<array<short3>>(value+1, value+1, 0);
         array<short3>& list = lists[value];
-        while(s && s.peek()!='[') {
-            uint x=s.integer(); s.skip();
-            uint y=s.integer(); s.skip();
-            uint z=s.integer(); s.skip();
+        while(s) {
+            if(s.match('\n')) break;
+            s.whileAny(" "_); uint x=s.integer();
+            s.whileAny(" "_); uint y=s.integer();
+            s.whileAny(" "_); uint z=s.integer();
+            s.whileAny(" "_); s.integer();
             list << short3(x,y,z);
         }
     }

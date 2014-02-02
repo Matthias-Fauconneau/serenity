@@ -14,15 +14,17 @@ static void negate(Volume8& target, const Volume8& source) {
 defineVolumePass(Negate, uint8, negate);
 
 /// Adds two volumes
-static void add(Volume8& target, const Volume8& A, const Volume8& B) {
-    const uint8* const aData = A; const uint8* const bData = B; uint8* const targetData = target;
-    for(uint index: range(target.size())) targetData[index] = aData[index] + bData[index];
+template<Type T> void add(VolumeT<T>& target, const VolumeT<T>& A, const Volume8& B) {
+    const ref<T> aData = A; const ref<uint8> bData = B; const mref<T> targetData = target;
+    for(uint index: range(target.size())) targetData[index] = aData[index] + T(bData[index]);
     target.maximum= A.maximum + B.maximum;
 }
 struct Add : VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(uint8); }
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) { return toVolume(*inputs[0]).sampleSize; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        add(outputs[0], inputs[0], inputs[1]);
+        if(inputs[0].sampleSize==sizeof(uint8)) add<uint8>(outputs[0], inputs[0], inputs[1]);
+        else if(inputs[0].sampleSize==sizeof(byte3)) add<byte3>(outputs[0], inputs[0], inputs[1]);
+        else error("Unsupported sample size",inputs[0].sampleSize);
     }
 };
 template struct Interface<Operation>::Factory<Add>;

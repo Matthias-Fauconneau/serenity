@@ -26,7 +26,6 @@ template <class I> struct Interface {
 };
 template <class I> map<string,typename Interface<I>::AbstractFactory*> Interface<I>::factories;
 template <class I> template <class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
-//template struct Interface<I>::Factory<C>;
 
 /// Dynamic-typed value
 /// \note Implemented as a String with implicit conversions and copy

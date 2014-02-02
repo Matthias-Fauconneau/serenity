@@ -14,7 +14,6 @@ array<Family> parseFamilies(const string& data) {
     TextData s(data);
     while(s) {
         Family family;
-        s.until(':');
         for(;;) {
             s.whileAny(" "_);
             uint64 index = zOrder(parse3(s)); uint16 sqRadius = s.integer();
@@ -30,6 +29,7 @@ array<Family> parseFamilies(const string& data) {
 void rootIndex(Volume16& target, const ref<Family>& families) {
     const mref<uint16> targetData = target;
     targetData.clear();
+    interleavedLookup(target);
     target.maximum = families.size; // 0 = background
     target.maximum++; // maximum = Multiple family index (e.g throats)
     uint i=0; for(const Family& family: families) {

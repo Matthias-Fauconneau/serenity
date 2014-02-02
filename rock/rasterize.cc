@@ -174,8 +174,7 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
         const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         uint16 tileR[tileSize] = {}; // Untiled 'R'-buffer
         int3 tileP[tileSize] = {}; // Untiled 'P'-buffer
-        mref<int3>(tileP).clear(0);
-        const mref<uint16> targetTile = targetData.slice(offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ]);
+        const mref<uint16> targetTile = targetData.slice(offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ], tileSize);
         targetTile.clear();
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
             const Ball& ball = balls.balls[i];

@@ -128,7 +128,7 @@ void intersect(Volume8& target, const Volume8& A, const Volume8& B) {
         const uint8* const aData = A + offset;
         const uint8* const bData = B + offset;
         uint8* const targetData = target + offset;
-        for(uint i : range(size)) targetData[i] = aData[i] && bData[i];
+        for(uint i : range(size)) targetData[i] = aData[i] && bData[i] ? 0xFF : 0;
     });
 }
 struct Intersect : VolumeOperation {

@@ -11,7 +11,7 @@ struct Plot : virtual Widget {
     bool log[2] = {false, false};
     array<String> legends;
     array<map<real,real>> dataSets;
-    bool plotPoints = true, plotLines = false;
+    bool plotPoints = false, plotLines = true;
     enum { TopLeft, TopRight, BottomLeft, BottomRight } legendPosition = TopRight;
     vec2 min = 0, max = 0;
 };

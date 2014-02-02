@@ -6,7 +6,7 @@
 /// Square roots samples
 UniformSample squareRoot(const UniformSample& A) {
     uint N=A.size; UniformSample R(N); R.scale=A.scale;
-    for(uint i: range(N)) { R[i]=sqrt(A[i]); assert(!__builtin_isnanf(R[i]) && R[i]!=__builtin_inff()); }
+    for(uint i: range(N)) R[i]=sqrt(A[i]);
     return R;
 }
 
@@ -214,7 +214,7 @@ struct Binary : VolumeOperation {
         execute(args, outputs, inputs, (real)args.at("threshold"_));
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
-        assert_(!args.contains("threshold"_) || !isDecimal(args.at("threshold"_)) || args.at("threshold"_)==otherInputs[0]->data);
+        //assert_(!args.contains("threshold"_) || !isDecimal(args.at("threshold"_)) || args.at("threshold"_)==otherInputs[0]->data);
         execute(args, outputs, inputs, TextData(otherInputs[0]->data).decimal());
     }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, real threshold) {
