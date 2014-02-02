@@ -143,15 +143,16 @@ struct Player {
             string file = section(last,'/',1,-1);
             if(existsFolder(folder,"Music"_)) {
                 if(section(mark,'\0',2,3)) {
-                    setRandom(true);
                     queueFile(folder, file, true);
+                    next();
+                    setRandom(true);
                 } else {
                     albums.index = folders.indexOf(folder);
                     array<String> files = Folder(folder,"Music"_).list(Recursive|Files|Sorted);
                     uint i=0; for(;i<files.size;i++) if(files[i]==file) break;
                     for(;i<files.size;i++) queueFile(folder, files[i], false);
+                    next();
                 }
-                next();
                 seek(toInteger(section(mark,'\0',1,2)));
             }
         } else {
@@ -161,7 +162,7 @@ struct Player {
         window.show();
         mainThread.setPriority(-20);
     }
-    ~Player() { writeFile("/Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_)); }
+    ~Player() { setPlaying(false); /*Records last position*/ }
     void queueFile(const string& folder, const string& file, bool withAlbumName) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
@@ -209,6 +210,8 @@ struct Player {
             randomSequence.reserve(files.size);
             Random random; // Unseeded so that the random sequence only depends on collection
             while(files) randomSequence << files.take(random%files.size);
+            titles.shrink(titles.index+1); this->files.shrink(titles.index+1); // Replaces all queued titles with the next tracks drawn from the random sequence
+            updatePlaylist();
         } else main<<&albums.area()<<&titles.area(); // Show albums
     }
     void updatePlaylist() {
@@ -243,7 +246,7 @@ struct Player {
         }
         playButton.enabled=play;
         window.render();
-        writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file->position/file->rate)));
+        writeFile("/Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_));
     }
     void seek(int position) {
         if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); resampler.clear(); audio.cancel(); }
