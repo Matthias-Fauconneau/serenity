@@ -48,22 +48,21 @@ struct Tuner : Poll {
     int lastKey = -1;
     float keyOffset = 0;
     bool record = true;
-    int worstKey = 0;
+    int minWorstKey = 1, maxWorstKey = keyCount;
 
     // UI
-    const uint textSize = 64;
-    Text key {""_, textSize, white};
-    Text fOffset {""_, textSize, white};
-    Text B {""_, textSize/2, white};
-    HBox status {{&key, &fOffset, &B}};
+    Text currentKey {""_, 64, white};
+    Text fOffset {""_, 64, white};
+    Text worstKey {""_, 64, white};
+    HBox status {{&currentKey, &fOffset, &worstKey}, HBox::Even};
     OffsetPlot profile;
     VBox layout {{&status, &profile}};
     Window window{&layout, int2(1024,600), "Tuner"};
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
-        if(arguments().size>0 && isInteger(arguments()[0])) confidenceThreshold=toInteger(arguments()[0]);
-        if(arguments().size>1 && isInteger(arguments()[1])) ambiguityThreshold=toInteger(arguments()[1]);
+        if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=toInteger(arguments()[0]);
+        if(arguments().size>1 && isInteger(arguments()[1])) maxWorstKey=toInteger(arguments()[1]);
 
         window.backgroundColor=window.backgroundCenter=0;
         window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
@@ -135,26 +134,20 @@ struct Tuner : Poll {
         if(confidence > 1./confidenceThreshold/2 && 1-ambiguity > 1./ambiguityThreshold/2 && confidence*(1-ambiguity) > 1./threshold/2
                 && abs(offset)<offsetThreshold ) {
 
-            this->key.setText(strKey(key));
-            {if(key!=lastKey) keyOffset = offset; // Resets on key change
-                keyOffset = (keyOffset+offset)/2; // Running average
-                this->fOffset.setText(dec(round(100*keyOffset)));}
-            const int B = round(100*12*log2(1+estimator.B));
-            this->B.setText(B?dec(B):strKey(21+worstKey));
+            currentKey.setText(strKey(key));
+            if(key!=lastKey) keyOffset = offset; // Resets on key change
+            keyOffset = (keyOffset+offset)/2; // Running average
+            fOffset.setText(dec(round(100*keyOffset)));
 
             if(record && confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
                     && key>=21 && key<21+keyCount) {
                 const float alpha = 1./16;
                 float& keyOffset = profile.offsets[key-21]; keyOffset = (1-alpha)*keyOffset + alpha*offset;
                 float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
-                {int k = this->worstKey;
-                    for(uint i: range(keyCount))
-                        if(  k<0 ||
-                             abs(profile.offsets[i ] - stretch(i)*12) /*+ sqrt(profile.variances[i ])*/ >
-                             abs(profile.offsets[k] - stretch(k)*12) /*+ sqrt(profile.variances[k])*/ ) k = i;
-                    if(k != this->worstKey) { this->worstKey=k; window.setTitle(strKey(21+k)); }
-                }
-                this->fOffset.setText(dec(round(100*keyOffset)));
+                int k = -1;
+                for(uint i: range(minWorstKey, maxWorstKey)) if(k<0 || abs(profile.offsets[i] - stretch(i)*12) > abs(profile.offsets[k] - stretch(k)*12)) k = i;
+                worstKey.setText(strKey(21+k));
+                fOffset.setText(dec(round(100*keyOffset)));
             }
         }
 

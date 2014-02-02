@@ -99,12 +99,13 @@ struct Player {
     }
 
 // Interface
-    ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
+    ICON(random) ICON(random2) ToggleButton randomButton {randomIcon(), random2Icon()};
     ICON(next) TriggerButton nextButton{nextIcon()};
+    ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
     Text elapsed = "00:00"_;
     Slider slider;
     Text remaining = "00:00"_;
-    HBox toolbar {{&playButton, &nextButton, &elapsed, &slider, &remaining}};
+    HBox toolbar {{&randomButton, &playButton, &nextButton, &elapsed, &slider, &remaining}};
     Scroll< List<Text>> albums;
     Scroll< List<Text>> titles;
     HBox main {{ &albums.area(), &titles.area() }};
@@ -124,7 +125,7 @@ struct Player {
         window.localShortcut(Escape).connect([]{exit();});
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         window.globalShortcut(Play).connect(this, &Player::togglePlay);
-        //randomButton.toggled.connect(this, &Player::setRandom);
+        randomButton.toggled.connect(this, &Player::setRandom);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
         slider.valueChanged.connect(this, &Player::seek);
@@ -134,24 +135,24 @@ struct Player {
         folders = Folder("Music"_).list(Folders|Sorted);
         assert(folders);
         for(String& folder : folders) albums << String(section(folder,'/',-2,-1));
-        setRandom(true);
 
         if(existsFile("Music/.last"_)) {
             String mark = readFile("Music/.last"_);
-            string last = section(mark,0);
+            string last = section(mark,'\0');
             string folder = section(last,'/',0,1);
             string file = section(last,'/',1,-1);
             if(existsFolder(folder,"Music"_)) {
-                /*albums.index = folders.indexOf(folder);
-                array<String> files = Folder(folder,"Music"_).list(Recursive|Files|Sorted);
-                uint i=0; for(;i<files.size;i++) if(files[i]==file) break;
-                for(;i<files.size;i++) queueFile(folder, files[i]);
-                if(files)*/
-                queueFile(folder, file);   // FIXME: Assumes random play
-                {
-                    next();
-                    seek(toInteger(section(mark,0,1,2)));
+                if(section(mark,'\0',2,3)) {
+                    setRandom(true);
+                    queueFile(folder, file, true);
+                } else {
+                    albums.index = folders.indexOf(folder);
+                    array<String> files = Folder(folder,"Music"_).list(Recursive|Files|Sorted);
+                    uint i=0; for(;i<files.size;i++) if(files[i]==file) break;
+                    for(;i<files.size;i++) queueFile(folder, files[i], false);
                 }
+                next();
+                seek(toInteger(section(mark,'\0',1,2)));
             }
         } else {
             updatePlaylist();
@@ -160,8 +161,8 @@ struct Player {
         window.show();
         mainThread.setPriority(-20);
     }
-    ~Player() { writeFile("/Music/.last"_,String(files[titles.index]+"\0"_+dec(file->position/file->rate))); }
-    void queueFile(const string& folder, const string& file, bool withAlbumName=true) {
+    ~Player() { writeFile("/Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_)); }
+    void queueFile(const string& folder, const string& file, bool withAlbumName) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
@@ -174,7 +175,7 @@ struct Player {
     void playAlbum(const string& album) {
         assert(existsFolder(album,"Music"_),album);
         array<String> files = Folder(album,"Music"_).list(Recursive|Files|Sorted);
-        for(const String& file: files) queueFile(album, file);
+        for(const String& file: files) queueFile(album, file, false);
         window.setSize(int2(-512,-512));
         titles.index=-1; next();
     }
@@ -194,12 +195,13 @@ struct Player {
         if(titles.index+1<titles.count()) playTitle(++titles.index);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
-        else { setPlaying(false); file->close(); return; }
+        else { setPlaying(false); if(file) file->close(); return; }
         updatePlaylist();
     }
     void setRandom(bool random) {
         main.clear();
         randomSequence.clear();
+        randomButton.enabled = random;
         if(random) {
             main << &titles.area(); // Hide albums
             // Explicits random sequence to: resume the sequence from the last played file, ensure files are played once in the sequence.

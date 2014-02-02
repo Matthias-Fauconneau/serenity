@@ -67,8 +67,7 @@ const Glyph& Font::glyph(uint16 index, int) {
         Image image(width,height,false);
         for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
             uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
-            image(x,y) = byte4(0xFF-rgb[0],0xFF-rgb[1],0xFF-rgb[2],/*min(255,rgb[0]+rgb[1]+rgb[2])*/0xFF);
-            //image(x,y) = byte4(rgb[2],rgb[1],rgb[0],/*min(255,rgb[0]+rgb[1]+rgb[2])*/0xFF);
+            image(x,y) = byte4(0xFF-rgb[0],0xFF-rgb[1],0xFF-rgb[2], 0xFF); // To be used with multiply blend
         }
         glyph.image = move(image);
     } else {
@@ -78,12 +77,7 @@ const Glyph& Font::glyph(uint16 index, int) {
         if(!bitmap.buffer) return glyph;
         int width = bitmap.width, height = bitmap.rows;
         Image image(width,height,true);
-        for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
-            uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x];
-            extern uint8 sRGB_lookup[256];
-            uint8 g = sRGB_lookup[rgb[0]];
-            image(x,y) = byte4(g,g,g,rgb[0]);
-        }
+        for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0,0,0,bitmap.buffer[y*bitmap.pitch+x]);
         glyph.image = move(image);
     }
     return glyph;

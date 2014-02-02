@@ -23,7 +23,7 @@ struct StretchEstimation : Widget {
     };
     map<int, KeyData> keys;
 
-    float sB = 33, sT = 150;
+    float sB = 54, sT = 129;
     float& variable = sT;
 
     StretchEstimation() {
@@ -35,9 +35,8 @@ struct StretchEstimation : Widget {
             KeyData data;
             data.pitch = cast<KeyData::Pitch>(readFile(name+".f0B"_, stretch));
             data.spectrum = cast<float>(readFile(name+".PSD"_, stretch));
-            static constexpr uint N = 32768;
-            assert(data.spectrum.size == N/2);
-            keys.insert(parseKey(name), move(data));
+            assert(data.spectrum.size == 32768/2);
+            keys.insert(parseKey(name)-21, move(data));
         }
 
         window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;

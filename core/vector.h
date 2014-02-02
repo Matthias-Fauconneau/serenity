@@ -116,6 +116,10 @@ inline vec3 normal(vec3 v) {
     return normalize(cross(v, t));
 }
 
+generic struct bgr {
+    T b,g,r;
+};
+
 generic struct xyzw {
     T x,y,z,w;
     vec< ::xyz,T,3> xyz() const { return vec< ::xyz,T,3>(x,y,z); }
@@ -125,7 +129,10 @@ generic struct xyzw {
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4;
 
-generic struct bgra { T b,g,r,a; };
+generic struct bgra {
+    T b,g,r,a;
+    vec< ::bgr,T,3> bgr() const { return vec< ::bgr,T,3>(b,g,r); }
+};
 /// Integer b,g,r,a vector (8bit)
 typedef vec<bgra,uint8,4> byte4;
 /// Integer b,g,r,a vector (32bit)

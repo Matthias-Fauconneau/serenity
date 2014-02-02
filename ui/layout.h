@@ -77,7 +77,7 @@ struct Vertical : virtual Linear {
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : virtual Horizontal, virtual Widgets {
-    HBox(const ref<Widget*>& widgets):Widgets(widgets){}
+    HBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
     HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets

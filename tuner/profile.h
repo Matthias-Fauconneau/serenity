@@ -2,7 +2,7 @@
 #include "widget.h"
 
 const int keyCount = 85;
-float stretch(int m) { return -exp((-33 - m)/12.) + exp((m - 150)/12.); }
+float stretch(int m) { return -exp((-54 - m)/12.) + exp((m - 129)/12.); }
 
 struct OffsetPlot : Widget {
     float offsets[keyCount] = {};
@@ -26,14 +26,7 @@ struct OffsetPlot : Widget {
             int x0 = position.x + key * size.x / keyCount;
             int x1 = position.x + (key+1) * size.x / keyCount;
 
-#if 0
-            float target = stretch(21+key)*12;
-            float offset = offsets[key];
-            int y0 = position.y + size.y * (maximumOffset-target) / (maximumOffset-minimumOffset);
-            int y1 = position.y + size.y * (maximumOffset-offset) / (maximumOffset-minimumOffset);
-            fill(x0,y0<y1?y0:y1,x1,y0<y1?y1:y0, offset>target ? red : blue);
-#else
-            float p0 = stretch(21+key)*12;
+            float p0 = stretch(key)*12;
             int y0 = position.y + size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
 
             float offset = offsets[key]-p0;
@@ -59,7 +52,6 @@ struct OffsetPlot : Widget {
             float p4 = min(0.f, abs(offset)-deviation);
             int y4 = position.y + size.y * (maximumOffset-sign*p4-p0) / (maximumOffset-minimumOffset);
             fill(x0,y0<y4?y0:y4,x1,y0<y4?y4:y0, sign*p4>0 ? vec4(0,0,1./2,1) : vec4(1./2,0,0,1));
-#endif
         }
     }
 };

@@ -119,6 +119,12 @@ uint AudioFile::read(const mref<float2>& output) {
                         floatBuffer[i][1] = ((int16*)frame->data[1])[i]*0x1.0p-15;
                     }
                 }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    for(uint i : range(bufferSize)) {
+                        floatBuffer[i][0] = ((int16*)frame->data[0])[i*2+0]*0x1.0p-15;
+                        floatBuffer[i][1] = ((int16*)frame->data[0])[i*2+1]*0x1.0p-15;
+                    }
+                }
                 else error("Unimplemented conversion to float32 from", (int)audio->sample_fmt);
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }

@@ -93,12 +93,15 @@ void blit(int2 target, const Image& source, vec4 color) {
                 float alpha = image_sRGB.a*color[3]/0xFF;
                 byte4& target_sRGB = framebuffer(x,y);
                 extern uint8 sRGB_lookup[256], inverse_sRGB_lookup[256];
-                int3 image_linear (inverse_sRGB_lookup[image_sRGB[0]], inverse_sRGB_lookup[image_sRGB[1]], inverse_sRGB_lookup[image_sRGB[2]]);
-                int3 target_linear(inverse_sRGB_lookup[target_sRGB[0]], inverse_sRGB_lookup[target_sRGB[1]], inverse_sRGB_lookup[target_sRGB[2]]);
+                int3 image_linear = int3(image_sRGB.bgr());
+                int3 target_linear = int3(target_sRGB.bgr());
+                //int3 image_linear (inverse_sRGB_lookup[image_sRGB[0]], inverse_sRGB_lookup[image_sRGB[1]], inverse_sRGB_lookup[image_sRGB[2]]);
+                //int3 target_linear(inverse_sRGB_lookup[target_sRGB[0]], inverse_sRGB_lookup[target_sRGB[1]], inverse_sRGB_lookup[target_sRGB[2]]);
                 vec3 source_linear = alpha*color.xyz()*vec3(image_linear);
                 int3 linearBlend = additiveBlend ? min(int3(0xFF), target_linear + int3(source_linear))
                                                  : int3(round((1-alpha)*vec3(target_linear) + source_linear));
-                target_sRGB = byte4(sRGB_lookup[linearBlend[0]], sRGB_lookup[linearBlend[1]], sRGB_lookup[linearBlend[2]], 0xFF);
+                //target_sRGB = byte4(sRGB_lookup[linearBlend[0]], sRGB_lookup[linearBlend[1]], sRGB_lookup[linearBlend[2]], 0xFF);
+                target_sRGB = byte4(linearBlend[0], linearBlend[1], linearBlend[2], 0xFF);
             }
         }
     } else {
