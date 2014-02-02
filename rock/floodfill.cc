@@ -87,41 +87,36 @@ void floodFillSplit(Volume16& target, const Volume8& source) {
     const mref<uint16> targetData = target;
     targetData.clear(0);
 
-    uint64 regionIndex=1;
+    uint64 regionIndex=0;
     for(uint64 seedIndex=0;;) {
-        buffer<short3> stackBuffer( X*Y*Z ); // 1024^3 ~ 6GiB
-        short3* const stack = stackBuffer.begin();
-        uint64 stackSize=0;
+        array<short3> stack( X*Y*Z ); // 1024^3 ~ 6GiB
 
         // S first unprocessed voxel
         for(;;seedIndex++) {
-            if(seedIndex >= X*Y*Z) return; // End of volume: All regions have been processed
+            if(seedIndex >= X*Y*Z) { target.maximum = regionIndex; return; } // End of volume: All regions have been processed
             int3 p = zOrder(seedIndex); uint x=p.x, y=p.y, z=p.z;
             if(x<marginX || x>=X-marginX || y<marginY || y>=Y-marginY || z<marginZ || z>=Z-marginZ) continue;
             if(sourceData[seedIndex] && !targetData[seedIndex]) { // Next unprocessed region
-                stack[stackSize++] = short3(p);
+                stack << short3(p);
                 break;
             }
         }
         regionIndex++;
         assert_(regionIndex < 1<<16);
 
-        while(stackSize) {
-            const short3& p = stack[--stackSize];
-            uint x=p.x, y=p.y, z=p.z;
+        while(stack) {
+            const short3 p = stack.pop();
             for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) { // 26-way connectivity
-                uint nx=x+dx, ny=y+dy, nz=z+dz;
+                uint nx=p.x+dx, ny=p.y+dy, nz=p.z+dz;
                 if(nx<marginX || nx>=X-marginX || ny<marginY || ny>=Y-marginY || nz<marginZ || nz>=Z-marginZ) continue;
                 uint64 index = offsetX[nx]+offsetY[ny]+offsetZ[nz];
                 if(sourceData[index] && !targetData[index]) {
                     targetData[index] = regionIndex; // Marks previously unvisited skeleton voxel
-                    stack[stackSize++] = short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
-                    assert_(stackSize<stackBuffer.capacity);
+                    stack << short3(nx,ny,nz); // Pushes on stack to remember to visit its neighbours later
                 }
             }
         }
     }
-    target.maximum = regionIndex;
 }
 class(FloodFillSplit, Operation), virtual VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }

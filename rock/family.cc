@@ -3,6 +3,7 @@
 #include "thread.h"
 #include "display.h"
 #include "matrix.h"
+#include "time.h"
 
 struct Ball { uint64 index; uint16 sqRadius; };
 typedef array<Ball> Family;
@@ -55,8 +56,9 @@ void colorizeIndex(Volume24& target, const Volume16& source) {
     const mref<byte3> targetData = target;
     targetData.clear(0);
     byte3 colors[target.maximum+1];
+    Random random; // Unseeded to always keep same sequence
     for(uint i: range(target.maximum)) {
-        colors[i] = byte3(clip<vec3>(0, float(0xFF)*LChuvtoBGR(53,179, float((i*(target.maximum-1)/3)%target.maximum)/float(target.maximum)), 0xFF));
+        colors[i] = byte3(clip<vec3>(0, float(0xFF)*LChuvtoBGR(53,135,2*PI*random()), 0xFF));
     }
     colors[0] = 0;
     colors[target.maximum] = 0xFF;

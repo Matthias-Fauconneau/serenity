@@ -143,6 +143,8 @@ void Window::create() {
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+    {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
+        r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
     created = true;
 }
 Window::~Window() { destroy(); }
