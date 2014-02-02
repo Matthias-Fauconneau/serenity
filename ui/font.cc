@@ -76,7 +76,7 @@ const Glyph& Font::glyph(uint16 index, int) {
         FT_Bitmap bitmap=face->glyph->bitmap;
         if(!bitmap.buffer) return glyph;
         int width = bitmap.width, height = bitmap.rows;
-        Image image(width,height,true);
+        Image image(width, height, true, false);
         for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0,0,0,bitmap.buffer[y*bitmap.pitch+x]);
         glyph.image = move(image);
     }

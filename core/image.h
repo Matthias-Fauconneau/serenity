@@ -4,8 +4,9 @@
 
 struct Image {
     Image(){}
-    Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha) : buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha){}
-    Image(uint width, uint height, bool alpha=false, uint stride=0) : width(width), height(height), stride(stride?:width), alpha(alpha) {
+    Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha, bool sRGB) :
+        buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha),sRGB(sRGB){}
+    Image(uint width, uint height, bool alpha=false, bool sRGB=true) : width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
         assert(width); assert(height);
         buffer=::buffer<byte4>(height*(stride?:width)); data=buffer.begin();
     }
@@ -20,15 +21,15 @@ struct Image {
     ::buffer<byte4> buffer; //FIXME: shared
     byte4* data=0; // First pixel
     uint width=0, height=0, stride=0;
-    bool own=false, alpha=false;
+    bool own=false, alpha=false, sRGB=true;
 };
 inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha); }
+inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha,o.sRGB); }
 
 /// Copies the image buffer
-template<> inline Image copy(const Image& src) { return Image(copy(src.buffer), src.data, src.width,src.height,src.stride,src.alpha); }
+template<> inline Image copy(const Image& o) { return Image(copy(o.buffer), o.data, o.width, o.height, o.stride, o.alpha, o.sRGB); }
 
 /// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, int2 origin, int2 size);

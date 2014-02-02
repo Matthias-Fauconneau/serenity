@@ -9,12 +9,12 @@ Image flip(Image&& image) {
 
 Image clip(const Image& image, int2 origin, int2 size) {
     origin=min(origin,image.size()), size=min(size,image.size()-origin);
-    return Image(unsafeReference(image.buffer), image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha);
+    return Image(unsafeReference(image.buffer), image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha, image.sRGB);
 }
 
 Image crop(Image&& image, int2 origin, int2 size) {
     origin=min(origin,image.size()), size=min(size,image.size()-origin);
-    return Image(move(image.buffer), image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha);
+    return Image(move(image.buffer), image.data+origin.y*image.stride+origin.x, size.x, size.y, image.stride, image.alpha, image.sRGB);
 }
 
 // SSE bilinear interpolation adapted from http://fastcpp.blogspot.fr/2011/06/bilinear-pixel-interpolation-using-sse.html
