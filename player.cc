@@ -246,7 +246,7 @@ struct Player {
         }
         playButton.enabled=play;
         window.render();
-        writeFile("/Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_));
+        writeFile("Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), root());
     }
     void seek(int position) {
         if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); resampler.clear(); audio.cancel(); }
