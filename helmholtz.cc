@@ -235,9 +235,7 @@ struct Helmholtz : Widget {
 
 struct Application {
     UniformGrid<Helmholtz> problems {{Helmholtz(false, false), Helmholtz(false, true), Helmholtz(true, false), Helmholtz(true, true)}};
-    Plot plot { apply(problems, [](const Helmholtz& problem){ return
-                    (problem.regularGrid ? "Regular"_:"Irregular"_)
-                    +" - "_+(problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_); })};
+    Plot plot;
     HBox layout {{&plot, &problems}};
 
     /// Solves Helmholtz problems at resolution NxN
@@ -245,7 +243,8 @@ struct Application {
         real maxE = 0;
         for(uint i: range(problems.size)) {
             real e = problems[i].solve(N);
-            plot.dataSets[i].insertMulti(N, log2(e));
+            String name = (problem.regularGrid ? "Regular"_:"Irregular"_)+" - "_+(problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_);
+            plot.dataSets[name].insertMulti(N, log2(e));
             maxE = max(maxE, e);
         }
         for(Helmholtz& problem: problems) problem.eMax = maxE; // Normalizes all problems display with the same maximum error

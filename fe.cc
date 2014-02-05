@@ -19,24 +19,21 @@ map<real, real> solve(const real e, const ref<real>& x) {
     }
     A(0,0) = 1; b[0] = 0; // u|0 = 0
     A(N-1,N-1) = 1; b[N-1] = 0; // u|1 = 0
-    return {x, UMFPACK(A).solve(b) };
+    return {x, UMFPACK(A).solve(b)};
 }
 
 struct Application {
-    Plot plot {"-εu'' + u' = 1"_, {"Analytic"_, "Regular"_, "Refined"_}, true, Plot::TopLeft};
+    Plot plot {"-εu'' + u' = 1"_, true, Plot::TopLeft};
     Window window {&plot, int2(-1), plot.title};
 
     Application() {
         const real e = 0.01;
-        map<real,real>& analytic = plot.dataSets.first();
-        for(uint i: range(window.size.x)) {
-            real x = (real) i / (window.size.x-1);
-            real y = x - (exp(x/e) - 1) / (exp(1/e) - 1);
-            analytic.insert(x,y);
-        }
+        const uint n = window.size.x;
+        auto X = apply(n, [n](const int i){ return (real) i / (n-1); });
+        plot.dataSets["Analytic"_] = {X, apply(X, [e](const real x){ return  x - (exp(x/e) - 1) / (exp(1/e) - 1); })};
         const uint N = 10;
-        plot.dataSets[1] = solve(e, apply(N,[](const int i){ return (real) i / (N-1); }));
-        plot.dataSets[2] = solve(e, apply(N,[](const int i){ return pow((real) i / (N-1) , 0.1); }) );
+        plot.dataSets["Regular"_] = solve(e, apply(N,[](const int i){ return (real) i / (N-1); }));
+        plot.dataSets["Refined"_] = solve(e, apply(N,[](const int i){ return pow((real) i / (N-1) , 0.1); }) );
         window.backgroundColor = window.backgroundCenter = 1;
         window.localShortcut(Escape).connect([]{exit();});
         window.show();

@@ -19,7 +19,7 @@ void Plot::render(int2 position, int2 size) {
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
     else {  // Computes axis scales
         assert(dataSets);
-        for(const auto& data: dataSets) {
+        for(const auto& data: dataSets.values) {
             for(auto point: data) {
                 vec2 p(point.key,point.value);
                 assert(isNumber(p.x) && isNumber(p.y), p);
@@ -80,23 +80,22 @@ void Plot::render(int2 position, int2 size) {
     const int tickLength = 4;
 
     // Colors
-    buffer<vec4> colors(dataSets.size);
+    buffer<vec4> colors(dataSets.size());
     if(colors.size==1) colors[0] = black;
     else for(uint i: range(colors.size)) colors[i]=vec4(LChuvtoBGR(53,179,2*PI*i/colors.size),1.f);
 
     int2 pen = position;
     {Text text(format(Bold)+title,16); text.render(pen+int2((size.x-text.sizeHint().x)/2,top)); pen.y+=text.sizeHint().y; } // Title
-    assert(legends.size==0 || legends.size == dataSets.size);
     if(legendPosition&1) pen.x += size.x-right;
     else pen.x += left+2*tickLength;
     if(legendPosition&2) {
         pen.y += size.y-bottom-tickLabelSize.y/2;
-        for(uint i: range(legends.size)) pen.y -= Text(legends[i], 16).sizeHint().y;
+        for(uint i: range(dataSets.size())) pen.y -= Text(dataSets.keys[i], 16).sizeHint().y;
     } else {
         pen.y += top;
     }
-    for(uint i: range(legends.size)) { // Legend
-        Text text(legends[i], 16, colors[i]); text.render(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)); pen.y+=text.sizeHint().y;
+    for(uint i: range(dataSets.size())) { // Legend
+        Text text(dataSets.keys[i], 16, colors[i]); text.render(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)); pen.y+=text.sizeHint().y;
     }
 
     // Transforms data positions to render positions
@@ -135,9 +134,9 @@ void Plot::render(int2 position, int2 size) {
     }
 
     // Plots data points
-    for(uint i: range(dataSets.size)) {
+    for(uint i: range(dataSets.size())) {
         vec4 color = colors[i];
-        const auto& data = dataSets[i];
+        const auto& data = dataSets.values[i];
         buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
         if(plotPoints) for(uint i: range(data.size())) {
             int2 p = int2(round(points[i]));
