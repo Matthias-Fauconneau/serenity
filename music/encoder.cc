@@ -24,7 +24,7 @@ Encoder::Encoder(const string& name, bool audio, int width, int height, int fps,
     avformat_alloc_output_context2(&context, 0, 0, strz(path));
 
     // Video
-    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV444P, SWS_FAST_BILINEAR, 0, 0, 0);
+    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
     AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     videoStream = avformat_new_stream(context, codec);
     videoStream->id = 0;
@@ -35,11 +35,9 @@ Encoder::Encoder(const string& name, bool audio, int width, int height, int fps,
     videoCodec->height = height;
     videoStream->time_base.num = videoCodec->time_base.num = 1;
     videoStream->time_base.den = videoCodec->time_base.den = fps;
-    videoCodec->pix_fmt = AV_PIX_FMT_YUV444P;
+    videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
     if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     AVDictionary* options=0;
-    av_dict_set(&options, "qp","0",0);
-    //av_dict_set(&options, "preset","ultrafast",0);
     avcodec_open2(videoCodec, codec, &options);
     assert_(!av_dict_count(options));
 
@@ -68,7 +66,7 @@ void Encoder::writeVideoFrame(const Image& image) {
     assert(videoStream && image.size()==int2(width,height));
     ///AVFrame* frame = avcodec_alloc_frame();
     AVFrame frame; avcodec_get_frame_defaults(&frame);
-    avpicture_alloc((AVPicture*)&frame, AV_PIX_FMT_YUV444P, width, height);
+    avpicture_alloc((AVPicture*)&frame, AV_PIX_FMT_YUV420P, width, height);
     int stride = image.stride*4; sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame.data, frame.linesize);
 
     frame.pts = videoTime*videoStream->time_base.den/(fps*videoStream->time_base.num);

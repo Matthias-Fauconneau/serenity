@@ -93,3 +93,4 @@ lu.cc
 helmholtz.cc
 sparse.cc
 sparse.h
+fe.cc
