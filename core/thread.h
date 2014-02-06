@@ -4,6 +4,7 @@
 #include "file.h"
 #include "function.h"
 #include "string.h"
+#include <poll.h>
 #include <pthread.h>
 
 enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
@@ -20,11 +21,11 @@ struct Lock : handle<pthread_mutex_t> {
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
-    inline void lock() { pthread_mutex_lock(&pointer); }
+    void lock() { pthread_mutex_lock(&pointer); }
     /// Atomically lock the mutex only if unlocked.
-    inline bool tryLock() { return !pthread_mutex_trylock(&pointer); }
+    bool tryLock() { return !pthread_mutex_trylock(&pointer); }
     /// Unlocks the mutex.
-    inline void unlock() { pthread_mutex_unlock(&pointer); }
+    void unlock() { pthread_mutex_unlock(&pointer); }
 };
 
 /// Convenience class to automatically unlock a mutex
@@ -47,14 +48,14 @@ struct Semaphore {
     /// Creates a semaphore with \a count initial ressources
     explicit Semaphore(int64 count=0) : counter(count) {}
     /// Acquires \a count ressources
-    inline void acquire(int64 count) {
+    void acquire(int64 count) {
         mutex.lock();
         while(counter<count) pthread_cond_wait(&condition,&mutex);
         __sync_sub_and_fetch(&counter,count); assert(counter>=0);
         mutex.unlock();
     }
     /// Atomically tries to acquires \a count ressources only if available
-    inline bool tryAcquire(int64 count) {
+    bool tryAcquire(int64 count) {
         mutex.lock();
         if(counter<count) { mutex.unlock(); return false; }
         assert(count>0);
@@ -63,7 +64,7 @@ struct Semaphore {
         return true;
     }
     /// Releases \a count ressources
-    inline void release(int64 count) {
+    void release(int64 count) {
         __sync_add_and_fetch(&counter,count);
         pthread_cond_signal(&condition);
     }
@@ -89,6 +90,7 @@ struct Poll : pollfd {
     void queue();
     /// Callback on new poll events (or when thread is idle when triggered by \a wait)
     virtual void event() =0;
+    enum { IDLE=64 };
 };
 
 /// Pollable semaphore

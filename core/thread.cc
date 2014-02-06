@@ -4,18 +4,17 @@
 #include "linux.h"
 #include "data.h"
 #include "trace.h"
-#include <pthread.h> //pthread
+#include <unistd.h>
 #include <sys/eventfd.h>
-#include <sched.h>
+#include <sys/resource.h>
 #define signal signal_
 #include <signal.h>
-#include <sys/resource.h>
-#include <sys/syscall.h>
+#undef signal
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <pwd.h>
-
-// Memory
-uint64 traceMemoryAllocation = -1;
+#include <sys/syscall.h>
+#include <pthread.h> //pthread
 
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
@@ -108,7 +107,7 @@ static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflo
 static void handler(int sig, siginfo_t* info, void* ctx) {
 #if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
-#elif __arm
+#elif __arm__
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.arm_pc;
 #elif __i386
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
@@ -124,15 +123,12 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
     pthread_exit((void*)-1);
-    exit_thread(-1);
 }
 #if __x86_64
 // Configures floating-point exceptions
 void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
 void __attribute((constructor(102))) setup_signals() {
-    /// Limit stack size to avoid locking system by exhausting memory with recursive calls
-    //rlimit limit = {1<<20,1<<20}; setrlimit(RLIMIT_STACK,&limit);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
     check_(sigaction(SIGABRT, &sa, 0));
@@ -168,7 +164,8 @@ template<> void __attribute((noreturn)) error(const string& message) {
     }
     log(message);
     exit(-1); // Signals all threads to terminate
-    {Locker lock(threadsLock); for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
+    {Locker lock(threadsLock);
+        for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
     __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(-1); // Exits this thread
 }

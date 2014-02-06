@@ -11,6 +11,7 @@ long currentTime();
 int64 realTime();
 
 #if __x86_64__ || __i386__
+#define USE_TSC 1
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
@@ -79,7 +80,9 @@ struct Random {
     uint sz=1,sw=1;
     uint z,w;
     Random() { /*seed();*/ reset(); }
+#if USE_TSC
     void seed() { sz=rdtsc(); sw=rdtsc(); }
+#endif
     void reset() { z=sz; w=sw; }
     uint64 next() {
         z = 36969 * (z & 0xFFFF) + (z >> 16);

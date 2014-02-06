@@ -17,7 +17,7 @@ struct Build {
     array<string> flags;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
-    const string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
+    string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -95,7 +95,8 @@ struct Build {
             array<String> args;
             args << copy(object) << target+".cc"_;
             if(flags.contains("atom"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
-            else args << String("-march=native"_);
+            else if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-gnueabihf/sysroot/usr/include/freetype2"_);
+            else args << String("-march=native"_) << String("-I/usr/include/freetype2"_);
             if(!flags.contains("release"_)) args << String("-g"_);
             if(flags.contains("debug"_)) args << String("-fno-omit-frame-pointer"_);
             else args << String("-O3"_);
@@ -107,7 +108,7 @@ struct Build {
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
-            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -I/usr/include/freetype2 -o"_);
+            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
         }
         return lastLinkEdit;
@@ -118,6 +119,7 @@ struct Build {
     Build() {
         string install;
         for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << arg;
+        if(flags.contains("arm"_)) CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-g++"_;
 
         Folder(tmp+join(flags," "_), root(), true);
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+join(flags," "_)+"/"_+subfolder, root(), true);
@@ -151,6 +153,6 @@ struct Build {
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
             if(execute(CXX, toRefs(args))) fail();
         }
-        if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) copy(root(), binary, install, name);
+        if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) rename(root(), binary, install, name);
     }
 } build;

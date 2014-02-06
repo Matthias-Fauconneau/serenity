@@ -2,9 +2,8 @@
 #include "linux.h"
 #include "data.h"
 #include "string.h"
-
-#include <time.h> //rt
 #include <sys/timerfd.h>
+#include <time.h> //rt
 
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }

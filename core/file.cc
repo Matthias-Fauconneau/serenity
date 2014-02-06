@@ -1,15 +1,20 @@
 #include "file.h"
 #include "linux.h"
 #include "string.h"
-
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <sys/sendfile.h>
+#include <sys/statvfs.h>
 #include <sys/syscall.h>
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
 struct dirent { long ino, off; short len; char name[]; };
 enum {DT_BLK=1<<0, DT_CHR=1<<1, DT_DIR=1<<2, DT_REG=1<<3};
-
-#include <stdio.h>
-#include <sys/sendfile.h>
-#include <sys/statvfs.h>
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
@@ -113,7 +118,10 @@ void symlink(const string& from,const string& to, const Folder& at) {
     remove(from,at);
     check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
-void touchFile(const string& path, const Folder& at, bool setModified) { timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}}; check_(utimensat(at.fd, strz(path), times, 0), path); }
+void touchFile(const string& path, const Folder& at, bool setModified) {
+    timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}};
+    check_(utimensat(at.fd, strz(path), times, 0), path);
+}
 void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate)); //FIXME: preserve executable flag
     for(size_t offset=0, size=oldFile.size(); offset<size;) offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);

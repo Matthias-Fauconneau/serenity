@@ -94,3 +94,4 @@ helmholtz.cc
 sparse.cc
 sparse.h
 fe.cc
+test.cc

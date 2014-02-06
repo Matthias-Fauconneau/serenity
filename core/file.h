@@ -35,9 +35,6 @@ struct Folder : Handle {
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const string& folder, const Folder& at=root());
 
-enum { IDLE=64 };
-#include <poll.h>
-
 /// Handle to an Unix I/O stream
 struct Stream : Handle {
     Stream(int fd):Handle(fd){}
@@ -122,7 +119,7 @@ struct Device : File {
     /// Sends ioctl request with \a reference argument
     template<Type IOWR> int iowr(typename IOWR::Args& reference) { return ioctl(IOWR::iowr, &reference); }
 };
-#include <sys/mman.h>
+
 /// Managed memory mapping
 struct Map {
     enum Prot {Read=1, Write=2};

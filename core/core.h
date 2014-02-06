@@ -73,7 +73,6 @@ generic struct initializer_list {
     constexpr size_t size() const { return len; }
 };
 }
-//#include <initializer_list>
 generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;

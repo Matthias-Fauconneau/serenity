@@ -1,6 +1,6 @@
 #include "score.h"
 
-float operator "" _px(unsigned long long length) { return length/1050.f; }
+float operator "" _px(uint64 length) { return length/1050.f; }
 
 void Score::onPath(const ref<vec2>& p) {
     vec2 min=p[0], max=p[0]; for(vec2 a: p) min=::min(min,a), max=::max(max,a);
