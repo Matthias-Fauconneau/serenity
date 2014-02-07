@@ -73,7 +73,7 @@ bool isInteger(const string& s) {
     if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
 }
 
-int64 toInteger(const string& number, int base) {
+int64 fromInteger(const string& number, int base) {
     assert(base>=2 && base<=16);
     assert(number);
     int sign=1;
@@ -105,7 +105,7 @@ bool isDecimal(const string& number) {
     return true;
 }
 
-double toDecimal(const string& number) { //FIXME: fromDecimal
+double fromDecimal(const string& number) {
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
     double sign=1, eSign=1;
@@ -115,7 +115,7 @@ double toDecimal(const string& number) { //FIXME: fromDecimal
     for(bool gotDot=false, gotE=false;i!=number.end();) {
         if(!gotDot && *i == '.') { ++i; gotDot=true; continue; }
         if(!gotE && *i == 'e') { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
-        if(*i<'0' || *i>'9') { error("toDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
+        if(*i<'0' || *i>'9') { error("fromDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
         int n = *i-'0';
         if(gotE) {
             exponent *= 10;

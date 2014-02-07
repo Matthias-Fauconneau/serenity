@@ -8,7 +8,6 @@ extern "C" {
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h>
 #include <libavformat/avformat.h> //avformat
-#include <libswscale/swscale.h> //swscale
 #include <libavcodec/avcodec.h> //avcodec
 #include <libavutil/avutil.h> //avutil
 }

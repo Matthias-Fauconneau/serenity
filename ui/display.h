@@ -6,24 +6,13 @@
 #include "thread.h"
 
 //FIXME: thread_local
-extern bool softwareRendering;
 /// Framebuffer of the window being rendered (X11 shared memory to be used only under Window::render)
 extern Image framebuffer;
-//extern Lock framebufferLock;
-extern int resolution; /// Device resolution in dots per inch (dpi)
 extern bool additiveBlend;
 extern array<Rect> clipStack;
 extern Rect currentClip;
 inline void push(Rect clip) { clipStack << currentClip; currentClip=currentClip & clip; }
 inline void pop() { currentClip=clipStack.pop(); }
-
-#if GL
-extern int2 viewportSize;
-vec2 vertex(float x, float y);
-vec2 vertex(vec2 v);
-struct Vertex { vec2 position, texCoord; };
-Vertex vertex(Rect r, float x, float y);
-#endif
 
 // Colors
 constexpr vec4 black(0, 0, 0, 1);
@@ -45,9 +34,6 @@ inline void fill(int x1, int y1, int x2, int y2, vec4 color=black) { fill(Rect(i
 
 /// Blits \a source at \a target (with per pixel opacity if \a source.alpha is set)
 void blit(int2 target, const Image& source, vec4 color=white);
-
-/// Resizes \a source to \a size and blits at \a target
-void blit(int2 target, const Image& source, int2 size);
 
 /// Blends linear \a color to sRGB pixel at \a x,y
 void blend(int x, int y, vec4 color, float alpha=1);

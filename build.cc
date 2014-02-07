@@ -18,6 +18,7 @@ struct Build {
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
     string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
+    string LD = "/usr/bin/ld"_;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -119,7 +120,10 @@ struct Build {
     Build() {
         string install;
         for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << arg;
-        if(flags.contains("arm"_)) CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-g++"_;
+        if(flags.contains("arm"_)) {
+            CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-g++"_;
+            LD = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-ld"_;
+        }
 
         Folder(tmp+join(flags," "_), root(), true);
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+join(flags," "_)+"/"_+subfolder, root(), true);
@@ -135,7 +139,7 @@ struct Build {
                 int64 lastFileEdit = File(name, subfolder).modifiedTime();
                 if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
                     log(name);
-                    if(execute("/usr/bin/ld"_,split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<name, true, subfolder))
+                    if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<name, true, subfolder))
                         fail();
                 }
                 lastEdit = max(lastEdit, lastFileEdit);

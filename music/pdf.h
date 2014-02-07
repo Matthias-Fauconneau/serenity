@@ -48,9 +48,6 @@ struct PDF : Widget {
         String name;
         unique< ::Font> font;
         array<float> widths;
-#if GL
-        map<uint, map<uint16, unique<GLTexture>>> cache;
-#endif
     };
     map<string, Font> fonts;
     struct Character {
@@ -69,19 +66,8 @@ struct PDF : Widget {
 
     struct Polygon {
         vec2 min,max; array<Line> edges;
-#if GL
-        array<vec2> vertices;
-#endif
     };
     array<Polygon> polygons;
-
-#if GL
-    float scale = 0;
-    GLVertexBuffer glLines;
-    GLVertexBuffer glTriangles;
-    struct GLBlit { vec2 min,max; const GLTexture& texture; };
-    array<GLBlit> glBlits;
-#endif
 
     // Document height (normalized by width=1]
     float height;

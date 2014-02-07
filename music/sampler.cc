@@ -94,10 +94,10 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
             else if(key=="hikey"_) sample->hikey=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
             else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
-            else if(key=="ampeg_release"_) {} /*sample->releaseTime=toDecimal(value);*/
-            else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=toDecimal(value)/100;*/
+            else if(key=="ampeg_release"_) {} /*sample->releaseTime=fromDecimal(value);*/
+            else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=fromDecimal(value)/100;*/
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);
-            else if(key=="volume"_) sample->volume = exp10(toDecimal(value)/20.0); // 20 to go from dB (energy) to amplitide
+            else if(key=="volume"_) sample->volume = exp10(fromDecimal(value)/20.0); // 20 to go from dB (energy) to amplitide
             else if(key=="tune"_) {} //FIXME
             else if(key=="ampeg_attack"_) {} //FIXME
             else if(key=="ampeg_vel2attack"_) {} //FIXME

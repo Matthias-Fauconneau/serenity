@@ -2,6 +2,7 @@
 #include "linux.h"
 #include "data.h"
 #include "string.h"
+#include <unistd.h>
 #include <sys/timerfd.h>
 #include <time.h> //rt
 

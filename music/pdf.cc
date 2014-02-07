@@ -4,9 +4,6 @@
 #include "deflate.h"
 #include "display.h"
 #include "text.h" //annotations
-#if GL
-FILE(pdf)
-#endif
 
 struct Variant { //TODO: union
     enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
@@ -40,7 +37,7 @@ static Variant parseVariant(TextData& s) {
     if("0123456789.-"_.contains(s.peek())) {
         string number = s.whileDecimal();
         if(s[0]==' '&&(s[1]>='0'&&s[1]<='9')&&s[2]==' '&&s[3]=='R') s.advance(4); //FIXME: regexp
-        return number.contains('.') ? Variant(toDecimal(number)) : Variant(toInteger(number));
+        return number.contains('.') ? Variant(fromDecimal(number)) : Variant(fromInteger(number));
     }
     if(s.match('/')) return String(s.identifier("-+."_));
     if(s.match('(')) {
@@ -231,11 +228,7 @@ void PDF::open(const string& data) {
                 auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
                 Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
                 if(!fontFile) continue;
-#if GL
-                Font& font = fonts.insert(e.key, Font{move(name), unique<::Font>(parseVariant(xref[fontFile->integer()]).data), {}, {}});
-#else
                 Font& font = fonts.insert(e.key, Font{move(name), unique< ::Font>(parseVariant(xref[fontFile->integer()]).data), {}});
-#endif
                 Variant* firstChar = fontDict.find("FirstChar"_);
                 if(firstChar) font.widths.grow(firstChar->integer());
                 Variant* widths = fontDict.find("Widths"_);
@@ -437,9 +430,6 @@ void PDF::open(const string& data) {
     for(Polygon& polygon: polygons) {
         { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
         for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
-#if GL
-        for(vec2& pos: polygon.vertices) pos=m*pos;
-#endif
     }
     height = (documentMax.y-documentMin.y)/width;
 
@@ -491,9 +481,6 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
                 area += cross(polyline[(i+1)%polyline.size]-polyline[i], polyline[(i+2)%polyline.size]-polyline[i]);
             }
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b); // Converts to CCW winding in top-left coordinate system
-#if GL
-            polygon.vertices = move(polyline);
-#endif
             polygons << move(polygon);
         }
         if(flags&Trace) this->paths << move(path);
@@ -524,88 +511,6 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 int2 PDF::sizeHint() { return lastSize ? int2(-lastSize.x, lastSize.x*height) : int2(-1); }
 void PDF::render(int2 position, int2 size) {
     lastSize = size;
-#if GL
-    if(!softwareRendering) {
-        float newScale = size.x; // Fit width
-        if(newScale != scale) {
-            scale = newScale;
-            glLines = GLVertexBuffer();
-            array<vec2> lineVertices;
-            for(const Line& l: lines) {
-                vec2 a = scale*l.a, b = scale*l.b;
-                //if(a.x==b.x) a.x=b.x=floor(a.x)+0.5; if(a.y==b.y) a.y=b.y=floor(a.y)+0.5;
-                lineVertices << vertex(a) << vertex(b);
-            }
-            glLines.upload(lineVertices);
-
-            array<vec2> vertices;
-            for(const Polygon& polygon: polygons) {
-                const array<vec2>& p = polygon.vertices;
-                if(p.size > 5) continue; //FIXME: triangulate concave polygons
-                vec2 p0 = vertex(scale*p[0]);
-                for(uint i: range(1,p.size-1))
-                    vertices << p0 << vertex(scale*p[i]) << vertex(scale*p[i+1]);
-            }
-            glTriangles.upload(vertices);
-
-            for(Font& font: fonts.values) font.cache.clear();
-            glBlits.clear();
-            glBlits.reserve(characters.size);
-            for(Character& c: characters) {
-                GLTexture& texture = c.font->cache[scale*c.size][c.index];
-                c.font->font->setSize(scale*c.size);
-                const Glyph& glyph = c.font->font->glyph(c.index);
-                //if(!glyph.image) continue;
-                if(!texture) texture = GLTexture(glyph.image);
-                vec2 min = round(vec2(scale*c.position)+vec2(glyph.offset));
-                vec2 max = min+vec2(texture.size());
-                glBlits << GLBlit{vertex(min), vertex(max), texture};
-            }
-        }
-        //FIXME: clip, VFC
-        assert(!blits); //FIXME
-
-        glBlendSubstract(); // Assumes black on white render
-
-        // Render lines
-        GLShader fill (pdf());
-        vec2 offset = vec2(2.*position.x/viewportSize.x,-2.*position.y/viewportSize.y);
-        fill["offset"_] = offset;
-        fill["color"] = vec4(1);
-        glLines.bindAttribute(fill, "position"_, 2);
-        glLines.draw(Lines); // No VFC cull
-
-        // Render triangles
-        glTriangles.bindAttribute(fill, "position"_, 2);
-        //glTriangles.draw(Triangles);  // No VFC cull
-
-        // Render glyphs, TODO: texture array + VBO
-        GLShader blit (pdf(), {"blit"_});
-        blit["offset"_] = offset;
-        blit["sampler"_] = 0;
-        int i = 0; for(GLBlit b: glBlits) { // No VFC vcull
-            vec2 min = b.min, max = b.max;
-            if(offset.x+max.x <= -1 || offset.y+min.y <=-1 || offset.x+min.x >= 1 || offset.y+max.y >= 1) { i++; continue; }
-            blit["color"_] = vec4(1)-colors.value(i,black);
-            b.texture.bind(0);
-            GLVertexBuffer vertexBuffer;
-            vertexBuffer.upload<Vertex>({{vec2(min.x,min.y),vec2(0,0)}, {vec2(max.x,min.y),vec2(1,0)},
-                                         {vec2(min.x,max.y),vec2(0,1)}, {vec2(max.x,max.y),vec2(1,1)}});
-            vertexBuffer.bindAttribute(blit, "position"_, 2, offsetof(Vertex, position));
-            vertexBuffer.bindAttribute(blit, "texCoord"_, 2, offsetof(Vertex, texCoord));
-            vertexBuffer.draw(TriangleStrip);
-            i++;
-        }
-
-        for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
-            int2 pos = position+int2(text.key*scale);
-            if(pos.y<=currentClip.min.y) continue;
-            if(pos.y>=currentClip.max.y) continue; //break;
-            Text(text.value,12,red).render(pos,int2(0,0));
-        }
-        return;
-    }
-#endif
     const float scale = size.x; // Fit width
 
     for(Blit& blit: blits) {

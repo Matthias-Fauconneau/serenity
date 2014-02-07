@@ -31,11 +31,11 @@ bool isUTF8(const string& s);
 /// Returns true if s contains only [0-9]
 bool isInteger(const string& s);
 /// Parses an integer value
-int64 toInteger(const string& str, int base=10);
+int64 fromInteger(const string& str, int base=10);
 /// Returns true if s matches [0-9]*.?[0-9]*
 bool isDecimal(const string& s);
 /// Parses a decimal value
-double toDecimal(const string& str);
+double fromDecimal(const string& str);
 
 /// Forwards string
 inline const string& str(const string& s) { return s; }

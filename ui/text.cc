@@ -127,8 +127,8 @@ struct TextLayout {
 
 Text::Text(const string& text, uint size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
 void Text::layout() {
-    textSize=int2(0,size*resolution/96);
-    TextLayout layout(text, size*resolution/96, wrap);
+    textSize=int2(0,size);
+    TextLayout layout(text, size, wrap);
 
     textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;
@@ -145,7 +145,7 @@ void Text::layout() {
                 textSize=max(textSize,int2(c.pos)+c.image.size());
                 textLine << move(c);
             } else { //format character
-                textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size*resolution/96, int(o.advance)};
+                textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size, int(o.advance)};
             }
         }
         currentIndex++;

@@ -153,7 +153,7 @@ struct Player {
                     for(;i<files.size;i++) queueFile(folder, files[i], false);
                     next();
                 }
-                seek(toInteger(section(mark,'\0',1,2)));
+                seek(fromInteger(section(mark,'\0',1,2)));
             }
         } else {
             updatePlaylist();

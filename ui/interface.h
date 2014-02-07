@@ -9,7 +9,7 @@
 
 /// Configures global display context to render to an image
 // In this module because the definition depends on display and widget
-Image renderToImage(Widget& widget, int2 size, int imageResolution=::resolution);
+Image renderToImage(Widget& widget, int2 size);
 
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {

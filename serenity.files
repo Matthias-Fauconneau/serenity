@@ -83,6 +83,7 @@ music/score.cc
 music/score.h
 music/midi.cc
 music/midi.h
+audio/ffmpeg.cc
 
 player.cc
 

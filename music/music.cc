@@ -138,11 +138,7 @@ struct Music {
     VBox layout;
 #if WINDOW
     ICON(music)
-#if GL
-    Window window {&layout,int2(0,0),"Piano"_,musicIcon(), Window::OpenGL};
-#else
     Window window {&layout,int2(0,720),"Piano"_,musicIcon()};
-#endif
     List<Text> scores;
 #endif
 
