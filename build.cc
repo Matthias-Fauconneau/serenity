@@ -129,13 +129,14 @@ struct Build {
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+join(flags," "_)+"/"_+subfolder, root(), true);
         int64 lastEdit = processModule( find(target+".cc"_) );
         if(files) {
-            Folder(tmp+"files"_+(flags.contains("atom"_)?".32"_:""_), root(), true);
+            String filesPath = tmp+"files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
+            Folder(filesPath, root(), true);
             for(String& file: files) {
                 String path = find(replace(file,"_"_,"/"_));
                 assert(path, "No such file to embed", file);
                 Folder subfolder = Folder(section(path,'/',0,-2), folder);
                 string name = section(path,'/',-2,-1);
-                String object = tmp+"files"_+(flags.contains("atom"_)?".32"_:""_)+"/"_+name+".o"_;
+                String object = filesPath+"/"_+name+".o"_;
                 int64 lastFileEdit = File(name, subfolder).modifiedTime();
                 if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
                     log(name);

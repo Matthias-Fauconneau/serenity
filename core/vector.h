@@ -20,7 +20,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     /// Initializes first components from another vec \a o and initializes remaining components with args...
     template<template<typename> class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
         for(int i: range(N-sizeof...(Args))) at(i)=o[i];
-        T unpacked[]={args...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i]; //FIXME
+        T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
     }
     /// Initializes components from another vec \a o casting from \a T2 to \a T
     template<template<typename> class W, Type F> explicit vec(const vec<W,F,N>& o) { for(uint i=0;i<N;i++) at(i)=(T)o[i]; }

@@ -1,12 +1,20 @@
 #include "graphics.h"
 
-static uint8 sRGB_lookup[256];
-static float inverse_sRGB_lookup[256];
-void __attribute((constructor)) compute_sRGB_lookup() {
+static uint8 sRGB_forward[256];
+void __attribute((constructor)) generate_sRGB_forward() {
     for(uint index: range(0x100)) {
         float linear = (float) index / 0xFF;
-        uint8 sRGB = round(0xFF*( linear>=0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear ));
-        sRGB_lookup[index] = sRGB, inverse_sRGB_lookup[sRGB] = linear;
+        float sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
+        sRGB_forward[index] = round(0xFF*sRGB);
+    }
+}
+
+float sRGB_reverse[256];
+void __attribute((constructor)) generate_sRGB_reverse() {
+    for(uint index: range(0x100)) {
+        float sRGB = (float) index / 0xFF;
+        float linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
+        sRGB_reverse[index] = linear;
     }
 }
 
@@ -35,10 +43,11 @@ vec3 LChuvtoBGR(float L, float C, float h) { return XYZtoBGR(LuvtoXYZ(LChuvtoLuv
 
 void blend(const Image& target, uint x, uint y, vec3 color, float alpha) {
     byte4& target_sRGB = target(x,y);
-    vec3 target_linear(inverse_sRGB_lookup[target_sRGB[0]], inverse_sRGB_lookup[target_sRGB[1]], inverse_sRGB_lookup[target_sRGB[2]]);
-    vec3 source_linear = clip(vec3(0), color, vec3(1))*vec3(0xFF);
-    int3 linearBlend = int3(round((1-alpha)*vec3(target_linear) + alpha*source_linear));
-    target_sRGB.bgr() = byte3(sRGB_lookup[linearBlend[0]], sRGB_lookup[linearBlend[1]], sRGB_lookup[linearBlend[2]]);
+    vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
+    vec3 source_linear = clip(vec3(0), color, vec3(1));
+    int3 linearBlend = int3(round(float(0xFF)*((1-alpha)*vec3(target_linear) + alpha*source_linear)));
+    target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
+            min(0xFF,target_sRGB.a+int(round(0xFF*alpha)))); // Additive alpha accumulation
 }
 
 void fill(const Image& target, Rect rect, vec3 color, float alpha) {
@@ -50,8 +59,7 @@ void blit(const Image& target, int2 position, const Image& source, vec3 color, f
     Rect rect = (position+Rect(source.size())) & Rect(target.size());
     for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
         byte4 RGBA = source(x-position.x,y-position.y);
-        vec3 linear = source.sRGB ? vec3(inverse_sRGB_lookup[RGBA[0]], inverse_sRGB_lookup[RGBA[1]], inverse_sRGB_lookup[RGBA[2]]) :
-            vec3(RGBA.bgr())/float(0xFF);
+        vec3 linear = source.sRGB ? vec3(sRGB_reverse[RGBA[0]], sRGB_reverse[RGBA[1]], sRGB_reverse[RGBA[2]]) : vec3(RGBA.bgr())/float(0xFF);
         blend(target, x, y, color*linear, alpha*RGBA.a/0xFF);
     }
 }

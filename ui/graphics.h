@@ -20,6 +20,10 @@ constexpr vec3 red (0, 0, 1);
 vec3 LChuvtoBGR(float L, float C, float h);
 
 // Primitives
+
+/// Blends pixel at \a x, \a y with \a color
+void blend(const Image& target, uint x, uint y, vec3 color, float alpha);
+
 /// Fills pixels inside \a rect with \a color
 void fill(const Image& target, Rect rect, vec3 color=black, float alpha=1);
 

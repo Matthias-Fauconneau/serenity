@@ -85,7 +85,7 @@ array<Rect> Linear::layout(int2 size) {
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];
-        widgets<< Rect(xy(pen+int2(0,y)),xy(int2(widths[i],heights[i])));
+        widgets<< xy(pen+int2(0,y))+Rect(xy(int2(widths[i],heights[i])));
         pen.x += widths[i]+margin;
     }
     return widgets;

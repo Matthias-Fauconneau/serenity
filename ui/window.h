@@ -101,10 +101,7 @@ struct Window : Socket, Poll {
     /// Window position and size
     int2 position=0, size=0;
 
-    /// Window background intensity and opacity
-    float backgroundColor=14./16, backgroundCenter=15./16, backgroundOpacity=1;
-    bool clearBackground = true, featherBorder = false;
-
+    bool oxygenBackground = true;
     /// Shortcuts triggered when a key is pressed
     map<uint, signal<>> shortcuts;
     /// Current widget that has the keyboard input focus

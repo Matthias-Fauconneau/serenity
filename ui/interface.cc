@@ -26,6 +26,7 @@ void ScrollArea::render(const Image& target) {
     if(view <= size) widget().render(target);
     else { //FIXME: direct rendering
         Image buffer (view.x, view.y);
+        buffer.buffer.clear(0);
         widget().render(buffer);
         blit(target, offset, buffer);
     }

@@ -7,10 +7,7 @@ struct Rect {
     int2 min,max;
     Rect(int2 min, int2 max):min(min),max(max){}
     explicit Rect(int2 max):min(0,0),max(max){}
-    //Rect(int x, int y):min(0,0),max(x,y){}
     bool contains(int2 p) { return p>=min && p<max; }
-    //bool contains(Rect r) { return r.min>=min && r.max<=max; }
-    //explicit operator bool() { return (max-min)>int2(0,0); }
     int2 position() { return min; }
     int2 size() { return max-min; }
 };
