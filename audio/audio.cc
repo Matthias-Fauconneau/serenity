@@ -138,7 +138,9 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     hparams.interval(Rate) = rate; assert(rate);
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize).max = periodSize?:-1;
-    iowr<HW_REFINE>(hparams);
+    log("refine");
+    /*iowr<HW_REFINE>(hparams);
+    log("ok");
     if(!sampleBits) {
         if(hparams.mask(Format).get(S32_LE)) {
             hparams.mask(Format).clear(S16_LE);
@@ -161,7 +163,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
-    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);*/
 }
 void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
 void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
@@ -170,7 +172,7 @@ void AudioInput::event() {
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
-        if(sampleBits==16) readSize=write16(((int16*)buffer)+(control->swPointer%bufferSize)*channels, periodSize);
+        if(sampleBits==16) readSize=write16(ref<short2>(((short2*)buffer)+(control->swPointer%bufferSize), periodSize));
         else if(sampleBits==32) readSize=write32(ref<int2>(((int2*)buffer)+(control->swPointer%bufferSize), periodSize));
         else error(sampleBits);
         assert(readSize<=periodSize);

@@ -18,14 +18,14 @@ extern struct Thread mainThread;
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock : handle<pthread_mutex_t> {
-    Lock() { pthread_mutex_init(&pointer,0); }
-    ~Lock() { pthread_mutex_destroy(&pointer); }
+    Lock();
+    ~Lock();
     /// Locks the mutex.
-    void lock() { pthread_mutex_lock(&pointer); }
+    void lock();
     /// Atomically lock the mutex only if unlocked.
-    bool tryLock() { return !pthread_mutex_trylock(&pointer); }
+    bool tryLock();
     /// Unlocks the mutex.
-    void unlock() { pthread_mutex_unlock(&pointer); }
+    void unlock();
 };
 
 /// Convenience class to automatically unlock a mutex

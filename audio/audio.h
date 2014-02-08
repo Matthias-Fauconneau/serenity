@@ -6,8 +6,9 @@
 
 /// Audio output through ALSA PCM interface
 struct AudioOutput : Device, Poll {
+    static constexpr uint channels = 2;
     uint sampleBits = 0;
-    uint channels = 2, rate = 0;
+    uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
 
     /// Configures PCM output

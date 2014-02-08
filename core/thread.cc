@@ -14,7 +14,21 @@
 #include <sys/wait.h>
 #include <pwd.h>
 #include <sys/syscall.h>
+#if THREAD
 #include <pthread.h> //pthread
+Lock::Lock() { pthread_mutex_init(&pointer,0); }
+Lock::~Lock() { pthread_mutex_destroy(&pointer); }
+void Lock::lock() { pthread_mutex_lock(&pointer); }
+bool Lock::tryLock() { return !pthread_mutex_trylock(&pointer); }
+void Lock::unlock() { pthread_mutex_unlock(&pointer); }
+#else
+#include <pthread.h>
+Lock::Lock() {}
+Lock::~Lock() {}
+void Lock::lock() {}
+bool Lock::tryLock() { return true; }
+void Lock::unlock() {}
+#endif
 
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
@@ -52,8 +66,10 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     this->priority=priority;
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
+#if THREAD
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
+#endif
 
 void Thread::run() {
     tid=gettid();
@@ -122,7 +138,11 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 #endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
+#if THREAD
     pthread_exit((void*)-1);
+#else
+    exit_group(-1);
+#endif
 }
 #if __x86_64
 // Configures floating-point exceptions
@@ -140,17 +160,6 @@ void __attribute((constructor(102))) setup_signals() {
     setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
 #endif
 }
-
-/*template<> void warn(const string& message) {
-    static bool reentrant = false;
-    if(!reentrant) { // Avoid hangs if tracing errors
-        reentrant = true;
-        String s = trace(1,0);
-        log_(s);
-        reentrant = false;
-    }
-    log(message);
-}*/
 
 template<> void __attribute((noreturn)) error(const string& message) {
     log(message); // In case, tracing crashes
@@ -174,8 +183,10 @@ static int exitStatus;
 // Entry point
 int main() {
     if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
+#if THREAD
     exit(0); // Signals all threads to terminate
     for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
+#endif
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
@@ -187,7 +198,7 @@ void exit(int status) {
 
 // Environment
 int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
-    if(!existsFile(path)) { warn("Executable not found",path); return -1; }
+    if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
     array<String> args0(1+args.size);
     args0 << strz(path);
@@ -223,7 +234,7 @@ string getenv(const string& name, string value) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
     }
-    if(!value) warn("Undefined environment variable"_, name);
+    if(!value) error("Undefined environment variable"_, name);
     return value;
 }
 
@@ -233,7 +244,7 @@ array<string> arguments() {
     return split(section(cmdline,0,1,-1),0);
 }
 
-string homePath() { return getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir)); }
+string homePath() { return getenv("HOME"_/*,str((const char*)getpwuid(geteuid())->pw_dir)*/); }
 const Folder& home() { static Folder home(homePath()); return home; }
 const Folder& config() { static Folder config(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache(".cache"_,home(),true); return cache; }

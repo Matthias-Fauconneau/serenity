@@ -86,8 +86,6 @@ struct File : Stream {
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
-    /// Returns file name
-    String name() const;
 
     /// Resizes file
     void resize(int64 size);

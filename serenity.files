@@ -3,6 +3,11 @@ README.md
 TODO
 build.sh
 build.cc
+algebra.h
+algebra.cc
+helmholtz.cc
+player.cc
+test.cc
 
 core/array.h
 core/core.h
@@ -64,14 +69,9 @@ ui/x.h
 ui/plot.cc
 ui/plot.h
 
-tuner/fft.cc
-tuner/pitch.cc
-tuner/test.cc
-tuner/stretch.cc
-tuner/tuner.cc
-tuner/profile.h
-tuner/estimate.cc
-tuner/normalize.cc
+audio/audio.h
+audio/audio.cc
+audio/ffmpeg.cc
 
 music/sampler.cc
 music/music.cc
@@ -82,16 +82,11 @@ music/score.cc
 music/score.h
 music/midi.cc
 music/midi.h
-audio/ffmpeg.cc
 
-player.cc
-
-algebra.h
-algebra.cc
-lu.h
-lu.cc
-helmholtz.cc
-sparse.cc
-sparse.h
-fe.cc
-test.cc
+tuner/fft.cc
+tuner/pitch.cc
+tuner/stretch.cc
+tuner/tuner.cc
+tuner/profile.h
+tuner/estimate.cc
+tuner/normalize.cc
