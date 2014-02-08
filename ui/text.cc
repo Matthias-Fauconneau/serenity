@@ -171,9 +171,9 @@ int2 Text::sizeHint() {
     if(!textSize) layout();
     return max(minSize,textSize);
 }
-void Text::render(const Image& target) {
+void Text::render(const Image& target) { render(target, max(int2(0),(target.size()-textSize)/2)); }
+void Text::render(const Image& target, int2 offset) {
     if(!textSize) layout();
-    int2 offset = max(int2(0),(target.size()-textSize)/2);
     for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(target, offset+b.pos, b.image, color);
     for(const Line& l: lines) fill(target, offset+Rect(l.min,l.max), black);
 }

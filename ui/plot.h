@@ -4,10 +4,10 @@
 
 struct Plot : virtual Widget {
     enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
-    Plot(const string& title, bool plotLines=false, LegendPosition legendPosition=TopRight)
+    Plot(const string& title=""_, bool plotLines=false, LegendPosition legendPosition=TopRight)
         : title(title), plotPoints(!plotLines), plotLines(plotLines), legendPosition(legendPosition) {}
     int2 sizeHint() override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 
     String title, xlabel, ylabel;
     bool log[2] = {false, false};

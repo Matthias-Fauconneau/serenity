@@ -12,12 +12,10 @@
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
-// Gapless playback
+// Playback
     static constexpr uint channels = 2;
     unique<AudioFile> file = 0;
     Resampler resampler;
-    //bool resamplerFlushed = false;
-    //Resampler nextResampler;
     const uint rate = 48000;
     AudioOutput audio{{this,&Player::read16}, {this,&Player::read}, rate, 8192};
     mref<int2> lastPeriod;
@@ -27,39 +25,15 @@ struct Player {
             if(!file) break;
             assert(readSize<output.size);
             size_t read = 0;
-            if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate /*&& !resamplerFlushed*/) {
-#if 0
-                if(file->rate != audio.rate) {
-                    assert(!nextResampler);
-                    nextResampler = Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
-                }
-                if(resampler) { // Flushes previous resampler using start of next file
-                    uint previousNeed = resampler.need(resampler.N/2*resampler.sourceRate/resampler.targetRate);
-                    Resampler nextToPrevious(resampler.channels, file->rate, resampler.sourceRate, previousNeed);
-                    uint sourceNeed = nextToPrevious.need(previousNeed);
-                    {float source[sourceNeed*2];
-                        uint sourceRead = file->read(source, sourceNeed); // Ignores the corner case of file smaller than a resampler half filter size
-                        nextToPrevious.write(source, sourceRead);
-                        if(nextResampler) nextResampler.write(source, sourceRead);} // Also writes into next resampler (FIXME: skipped if no next resampler)
-                    uint read = nextToPrevious.available();
-                    float nextToPreviousBuffer[read*2];
-                    nextToPrevious.read(nextToPreviousBuffer, read); // Resamples file rate to previous resampler source rate
-                    resampler.write(nextToPreviousBuffer, read); // And feeds to the previous resampler in order to flush it
-                }
-                resamplerFlushed = true;
-#else
-                //resampler = Resampler();
+            if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate && !resamplerFlushed) {
                 resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
                 if(file->rate != audio.rate) new (&resampler) Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
-#endif
             }
             if(resampler) {
-                //if(resampler.sourceRate*audio.rate == file->rate*resampler.targetRate) {
                     uint sourceNeed = resampler.need(chunk.size);
                     buffer<float2> source(sourceNeed);
                     uint sourceRead = file->read(source);
                     resampler.write(source.slice(0, sourceRead));
-                //}
                 read = min(chunk.size, resampler.available());
                 if(read) {
                     buffer<float2> target(read);
@@ -69,15 +43,11 @@ struct Player {
                         chunk[i][1] = target[i][1]*(1<<29); // 3dB headroom
                     }
                 }
-            } else /*if(!nextResampler)*/ read = file->read(chunk);
+            } else read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
             if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk
-            else /*if(resampler.sourceRate*audio.rate == file->rate*resampler.targetRate) */next(); // End of file
-            /*else { // Previous resampler can be replaced once properly flushed
-                resampler = move(nextResampler); nextResampler.sourceRate=1; nextResampler.targetRate=1; resamplerFlushed=false;
-                assert(!nextResampler);
-            }*/
+            else next(); // End of file
         }
         if(!lastPeriod) for(uint i: range(output.size)) { // Fades in
             float level = exp(12. * ((float) i / output.size - 1) ); // Linear perceived sound level
@@ -118,6 +88,7 @@ struct Player {
     array<String> randomSequence;
 
     Player() {
+        log("Hello World !"_);
         albums.always=titles.always=true;
         elapsed.minSize.x=remaining.minSize.x=64;
 

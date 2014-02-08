@@ -216,17 +216,16 @@ struct Helmholtz : Widget {
         return eMax;
     }
     int2 sizeHint() { return int2(720/2); }
-    void render(int2 position, int2 size) override {
+    void render(const Image& target) override {
         for(uint i: range(e.m-1)) for(uint j: range(e.n-1)) {
-            for(uint y: range(round(size.y*Y[j]),round(size.y*Y[j+1]))) {
-                for(uint x: range(round(size.x*X[i]),round(size.x*X[i+1]))) {
-                    real u = ((x+1./2)/size.x-X[i])/(X[i+1]-X[i]);
-                    real v = ((y+1./2)/size.y-Y[j])/(Y[j+1]-Y[j]);
+            for(uint y: range(round(target.size().y*Y[j]),round(target.size().y*Y[j+1]))) {
+                for(uint x: range(round(target.size().x*X[i]),round(target.size().x*X[i+1]))) {
+                    real u = ((x+1./2)/target.size().x-X[i])/(X[i+1]-X[i]);
+                    real v = ((y+1./2)/target.size().y-Y[j])/(Y[j+1]-Y[j]);
                     real s =
                             (1-v) * ((1-u) * e(i,j  ) + u * e(i+1,j  )) +
                             v     * ((1-u) * e(i,j+1) + u * e(i+1,j+1));
-                    uint8 intensity = clip<real>(0,round((1+s/eMax)/2*0xFF),0xFF);
-                    framebuffer(position.x + x, position.y + y) = byte4(intensity, intensity, intensity, 0xFF);
+                    target(x,y) = byte4(byte3(clip<int>(0,round((1+s/eMax)/2*0xFF),0xFF)), 0xFF);
                 }
             }
         }
@@ -241,10 +240,10 @@ struct Application {
     /// Solves Helmholtz problems at resolution NxN
     void solve(uint N) {
         real maxE = 0;
-        for(uint i: range(problems.size)) {
-            real e = problems[i].solve(N);
-            String name = (problem.regularGrid ? "Regular"_:"Irregular"_)+" - "_+(problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_);
-            plot.dataSets[name].insertMulti(N, log2(e));
+        for(auto& problem: problems) {
+            real e = problem.solve(N);
+            plot.dataSets[(problem.regularGrid ? "Regular"_:"Irregular"_)+" - "_+(problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)].
+                    insertMulti(N, log2(e));
             maxE = max(maxE, e);
         }
         for(Helmholtz& problem: problems) problem.eMax = maxE; // Normalizes all problems display with the same maximum error
@@ -261,7 +260,7 @@ struct Application {
             writeFile("Helmholtz.png"_,encodePNG(renderToImage(layout, window.size)), home());
             log(total);
         } else {
-            window.backgroundColor = window.backgroundCenter = 1;
+            //window.oxygenBackground = false;
             window.localShortcut(Escape).connect([]{exit();});
             window.frameSent.connect([this](){
                 N++;
