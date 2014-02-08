@@ -25,7 +25,7 @@ struct Player {
             if(!file) break;
             assert(readSize<output.size);
             size_t read = 0;
-            if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate && !resamplerFlushed) {
+            if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate) {
                 resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
                 if(file->rate != audio.rate) new (&resampler) Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
             }

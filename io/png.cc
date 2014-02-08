@@ -95,7 +95,7 @@ Image decodePNG(const ref<byte>& file) {
         }
         data = move(bytes);
     }
-    if(data.size < height*(1+width*depth)) { warn("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
+    if(data.size < height*(1+width*depth)) { error("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
     Image image(width,height,alpha);
     byte4* dst = image.data;
     int w=width,h=height;

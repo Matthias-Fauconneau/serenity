@@ -60,7 +60,7 @@ Device getPlaybackDevice() {
 }
 
 AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
-    : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread) { //FIXME: list devices
+    : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
@@ -138,9 +138,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     hparams.interval(Rate) = rate; assert(rate);
     hparams.interval(Periods) = 2;
     hparams.interval(PeriodSize).max = periodSize?:-1;
-    log("refine");
-    /*iowr<HW_REFINE>(hparams);
-    log("ok");
+    iowr<HW_REFINE>(hparams);
     if(!sampleBits) {
         if(hparams.mask(Format).get(S32_LE)) {
             hparams.mask(Format).clear(S16_LE);
@@ -163,7 +161,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
-    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);*/
+    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
 }
 void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
 void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }

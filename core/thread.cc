@@ -175,7 +175,9 @@ template<> void __attribute((noreturn)) error(const string& message) {
     exit(-1); // Signals all threads to terminate
     {Locker lock(threadsLock);
         for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
+#if !__arm__
     __builtin_trap(); //TODO: detect if running under debugger
+#endif
     exit_thread(-1); // Exits this thread
 }
 

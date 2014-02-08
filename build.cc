@@ -139,7 +139,6 @@ struct Build {
                 String object = filesPath+"/"_+name+".o"_;
                 int64 lastFileEdit = File(name, subfolder).modifiedTime();
                 if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-                    log(name);
                     if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<name, true, subfolder))
                         fail();
                 }
@@ -156,7 +155,6 @@ struct Build {
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-            log(CXX, toRefs(args));
             if(execute(CXX, toRefs(args))) fail();
         }
         if(install && (!existsFile(name, install) || File(binary).modifiedTime() > File(name, install).modifiedTime())) rename(root(), binary, install, name);
