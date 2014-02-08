@@ -39,54 +39,50 @@ struct SpectrumPlot : Widget {
         float sMin = periodPower;
 
         {float y = (logy ? (log2(PitchEstimator::noiseThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
-            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
+            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5, green);}
         {float y = (logy ? (log2(PitchEstimator::highPeakThreshold*sMin) - log2(sMin)) / (log2(sMax)-log2(sMin)) : (2*sMin / sMax)) * size.y;
-            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5,vec4(0,1,0,1));}
+            line(position.x,position.y+size.y-y-0.5,position.x+size.x,position.y+size.y-y+0.5, green);}
 
         for(uint i: range(iMin, iMax)) { // Unfiltered energy density
             float x0 = x(i) * size.x;
             float x1 = x(i+1) * size.x;
             float y = (logy ? (unfilteredSpectrum[i] ? (log2(unfilteredSpectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) :
                               (unfilteredSpectrum[i] / sMax)) * size.y;
-            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,0.5));
+            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y, white, 0.5);
         }
 
         for(uint i: range(iMin, iMax)) { // Energy density
             float x0 = x(i) * size.x;
             float x1 = x(i+1) * size.x;
             float y = (logy ? (spectrum[i] ? (log2(spectrum[i]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0) : (spectrum[i] / sMax)) * size.y;
-            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y,vec4(1,1,1,1));
+            fill(position.x+x0,position.y+size.y-y,position.x+x1,position.y+size.y, white);
         }
 
         for(PitchEstimator::Peak peak: peaks) { // Peaks
             float f = peak.f;
             float x = this->x(f+0.5)*size.x;
-            line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1./4));
-            Text label("·",16, vec4(1,1,1,1));
-            label.render(int2(position.x+x,position.y+16));
+            line(position.x+x,position.y,position.x+x,position.y+size.y, white, 1./4);
+            Text("·",16,white).render(int2(position.x+x,position.y+16));
         }
 
         { // F1
             float f = F1;
             float x = this->x(f+0.5)*size.x;
-            //line(position.x+x,position.y,position.x+x,position.y+size.y,vec4(1,1,1,1));
-            Text label(str(nHigh),16, vec4(1,1,1,1));
-            label.render(int2(position.x+x,position.y+16));
+            Text(str(nHigh),16,white).render(int2(position.x+x,position.y+16));
         }
 
         for(uint i: range(candidates.size)) {
             const auto& candidate = candidates[i];
             bool best = i==candidates.size-1;
-            vec4 color(!best,best,0,1);
+            vec3 color(!best,best,0);
 
-            Text label(dec(candidate.f0)+" "_+dec(round(1000*12*2*log2(1+3*(candidate.B>-1?candidate.B:0))))+" m\t"_, 16,  vec4(color.xyz(),1.f));
+            Text label(dec(candidate.f0)+" "_+dec(round(1000*12*2*log2(1+3*(candidate.B>-1?candidate.B:0))))+" m\t"_, 16,  color);
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
             for(uint n: range(candidate.peaks.size)) {
                 uint f = candidate.peaks[n];
                 float x = this->x(f+0.5)*size.x;
-                line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(color.xyz(),1.f/2));
-                Text label(dec(n+1),16, vec4(color.xyz(),1.f));
-                label.render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
+                line(position.x+x,position.y,position.x+x,position.y+size.y, color, 1./2);
+                Text(dec(n+1),16,color).render(int2(position.x+x,position.y+16+(i)*48+(n%2)*16));
             }
         }
 
@@ -97,8 +93,7 @@ struct SpectrumPlot : Widget {
             float v = i==1 ? 1 : min(1., 2 * (spectrum[f] ? (log2(spectrum[f]) - log2(sMin)) / (log2(sMax)-log2(sMin)) : 0));
             v = max(1.f/2, v);
             line(position.x+x,position.y,position.x+x,position.y+size.y, vec4(0,0,1,v));
-            Text label(dec(i),16,vec4(1,1,1,1));
-            label.render(int2(position.x+x,position.y));
+            Text(dec(i),16,white).render(int2(position.x+x,position.y));
         }
     }
 };

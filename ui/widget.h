@@ -1,7 +1,7 @@
 #pragma once
 /// \file widget.h Widget interface to compose user interfaces
 #include "vector.h"
-#include "rect.h"
+#include "image.h"
 
 /// Key symbols
 enum Key {
@@ -22,10 +22,7 @@ struct Widget {
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint() { return -1; }
     /// Renders this widget.
-    virtual void render(int2 position, int2 size)=0;
-    /// Renders this widget.
-    /// \arg rect is the absolute region for the widget
-    void render(Rect rect) { render(rect.position(),rect.size()); }
+    virtual void render(const Image& target)=0;
 
 // Event
     /// Mouse event type
@@ -37,7 +34,7 @@ struct Widget {
     /// \return Whether the mouse event was accepted
     virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { (void)cursor, (void)size, (void)event, (void)button; return false; }
     /// Convenience overload for layout implementation
-    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.min,rect.size(),event,button); }
+    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.position(),rect.size(),event,button); }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted

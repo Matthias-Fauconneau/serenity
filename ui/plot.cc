@@ -14,7 +14,6 @@ uint subExponent(float& value) {
 
 int2 Plot::sizeHint() { return int2(512, 512); }
 void Plot::render(int2 position, int2 size) {
-    int resolution = ::resolution; ::resolution = 1.5*96; // Scales the size of all text labels
     vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
     else {  // Computes axis scales
@@ -146,6 +145,5 @@ void Plot::render(int2 position, int2 size) {
         }
         if(plotLines) for(uint i: range(data.size()-1)) line(points[i], points[i+1], color);
     }
-    ::resolution = resolution;
 }
 

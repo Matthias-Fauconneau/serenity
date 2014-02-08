@@ -2,7 +2,6 @@
 /// \file interface.h %Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, ::TabBar)
 #include "function.h"
 #include "image.h"
-#include "display.h"
 #include "widget.h"
 #include "layout.h"
 #include "text.h"
@@ -23,13 +22,13 @@ struct ScrollArea : Widget {
     bool horizontal=false, vertical=true;
     bool scrollbar = false;
     const int scrollBarWidth = 16;
-    int2 delta=0;
+    int2 offset=0;
     int2 dragStartCursor, dragStartDelta;
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     int2 size; // keep last size for ensureVisible
 };
 
@@ -52,7 +51,7 @@ struct ImageWidget : virtual Widget {
     ImageWidget(const Image& image):image(move(image)){}
 
     int2 sizeHint();
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 };
 /// \typedef ImageView Icon
 /// Displays an icon
@@ -87,7 +86,7 @@ struct ToggleButton : Widget {
     bool enabled = false;
 
     int2 sizeHint();
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     const Image& enableIcon;
@@ -103,7 +102,7 @@ struct Progress : Widget {
     Progress(int minimum=0, int maximum=0, int value=-1):minimum(minimum),maximum(maximum),value(value){}
 
     int2 sizeHint();
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 
     static constexpr int height = 32;
 };

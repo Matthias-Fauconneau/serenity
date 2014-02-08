@@ -14,9 +14,7 @@ inline TextFormat format(uint f) { assert(f<32); return TextFormat(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, uint size=16, vec4 color=vec4(0,0,0,1), uint wrap=0);
-    // Resolves cat overloading
-    //Text(const String& text, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text((string)text,size,color,wrap){}
+    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=0, uint wrap=0);
 
     void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
@@ -26,7 +24,8 @@ struct Text : Widget {
     /// Font size
     int size;
     /// Text color
-    vec4 color;
+    vec3 color;
+    float alpha;
     /// Line wrap limit in pixels (0: no wrap)
     uint wrap=0;
     /// User clicked on this Text
@@ -36,7 +35,7 @@ struct Text : Widget {
 
     int2 sizeHint();
     void layout();
-    void render(int2 position, int2 size=int2(0,0)) override;
+    void render(const Image& target) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     // Layout bounding box
@@ -71,7 +70,6 @@ struct Text : Widget {
 
 /// TextInput is an editable \a Text
 struct TextInput : Text {
-    TextInput(const string& text=""_, int size=16, vec4 color=vec4(0,0,0,1), uint wrap=0):Text(text,size,color,wrap){} //FIXME: inherit
     /// User edited this text
     signal<const string&> textChanged;
     /// User pressed enter
@@ -81,5 +79,5 @@ struct TextInput : Text {
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 };

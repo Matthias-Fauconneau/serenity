@@ -1,0 +1,93 @@
+#include "graphics.h"
+
+static uint8 sRGB_lookup[256];
+static float inverse_sRGB_lookup[256];
+void __attribute((constructor)) compute_sRGB_lookup() {
+    for(uint index: range(0x100)) {
+        float linear = (float) index / 0xFF;
+        uint8 sRGB = round(0xFF*( linear>=0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear ));
+        sRGB_lookup[index] = sRGB, inverse_sRGB_lookup[sRGB] = linear;
+    }
+}
+
+vec3 LChuvtoLuv(float L, float C, float h) {
+    return vec3(L, C*cos(h) , C*sin(h));
+}
+vec3 LuvtoXYZ(float L, float u, float v) {
+    const float xn=0.3127, yn=0.3290; // D65 white point (2° observer)
+    const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
+    float u2 = un + u / (13*L);
+    float v2 = vn + v / (13*L);
+    float Y = L<=8 ? L * cb(3./29) : cb((L+16)/116);
+    float X = Y * (9*u2)/(4*v2);
+    float Z = Y * (12-3*u2-20*v2)/(4*v2);
+    return vec3(X, Y, Z);
+}
+vec3 LuvtoXYZ(vec3 Luv) { return LuvtoXYZ(Luv[0], Luv[1], Luv[2]); }
+vec3 XYZtoBGR(float X, float Y, float Z) {
+    float R = + 3.240479 * X - 1.53715 * Y - 0.498535 * Z;
+    float G = - 0.969256 * X + 1.875992 * Y + 0.041556 * Z;
+    float B	= + 0.055648 * X - 0.204043 * Y + 1.057311 * Z;
+    return vec3(B, G, R);
+}
+vec3 XYZtoBGR(vec3 XYZ) { return XYZtoBGR(XYZ[0], XYZ[1], XYZ[2]); }
+vec3 LChuvtoBGR(float L, float C, float h) { return XYZtoBGR(LuvtoXYZ(LChuvtoLuv(L, C, h))); }
+
+void blend(const Image& target, uint x, uint y, vec3 color, float alpha) {
+    byte4& target_sRGB = target(x,y);
+    vec3 target_linear(inverse_sRGB_lookup[target_sRGB[0]], inverse_sRGB_lookup[target_sRGB[1]], inverse_sRGB_lookup[target_sRGB[2]]);
+    vec3 source_linear = clip(vec3(0), color, vec3(1))*vec3(0xFF);
+    int3 linearBlend = int3(round((1-alpha)*vec3(target_linear) + alpha*source_linear));
+    target_sRGB.bgr() = byte3(sRGB_lookup[linearBlend[0]], sRGB_lookup[linearBlend[1]], sRGB_lookup[linearBlend[2]]);
+}
+
+void fill(const Image& target, Rect rect, vec3 color, float alpha) {
+    rect = rect & Rect(target.size());
+    for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) blend(target, x, y, color, alpha);
+}
+
+void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
+    Rect rect = (position+Rect(source.size())) & Rect(target.size());
+    for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
+        byte4 RGBA = source(x-position.x,y-position.y);
+        vec3 linear = source.sRGB ? vec3(inverse_sRGB_lookup[RGBA[0]], inverse_sRGB_lookup[RGBA[1]], inverse_sRGB_lookup[RGBA[2]]) :
+            vec3(RGBA.bgr())/float(0xFF);
+        blend(target, x, y, color*linear, alpha*RGBA.a/0xFF);
+    }
+}
+
+void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool transpose) {
+    if(transpose) swap(x,y);
+    if(x>=target.width || y>=target.height) return;
+    blend(target, x,y,color, alpha);
+}
+
+void line(const Image& target, float x1, float y1, float x2, float y2, vec3 color, float alpha) {
+    float dx = x2 - x1, dy = y2 - y1;
+    bool transpose=false;
+    if(abs(dx) < abs(dy)) { swap(x1, y1); swap(x2, y2); swap(dx, dy); transpose=true; }
+    if(x2 < x1) { swap(x1, x2); swap(y1, y2); }
+    if(dx==0) return; //p1==p2
+    float gradient = dy / dx;
+    int i1,i2; float intery;
+    {
+        float xend = round(x1), yend = y1 + gradient * (xend - x1);
+        float xgap = 1 - fract(x1 + 1./2);
+        blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
+        blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
+        i1 = int(xend);
+        intery = yend + gradient;
+    }
+    {
+        float xend = round(x2), yend = y2 + gradient * (xend - x2);
+        float xgap = fract(x2 + 1./2);
+        blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
+        blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
+        i2 = int(xend);
+    }
+    for(int x=i1+1;x<i2;x++) {
+        blend(target, x, intery, color, (1-fract(intery)) * alpha, transpose);
+        blend(target, x, intery+1, color, fract(intery) * alpha, transpose);
+        intery += gradient;
+    }
+}

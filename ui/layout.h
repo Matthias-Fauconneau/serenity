@@ -10,10 +10,10 @@ struct Layout : Widget {
     virtual Widget& at(int) =0;
 
     /// Computes widgets layout
-    virtual array<Rect> layout(int2 position, int2 size)=0;
+    virtual array<Rect> layout(int2 size)=0;
 
     /// Renders all visible child widgets
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
@@ -61,7 +61,7 @@ struct Linear: virtual Layout {
     Linear(Extra main=Share, Extra side=AlignCenter):main(main),side(side){}
 
     int2 sizeHint() override;
-    array<Rect> layout(int2 position, int2 size) override;
+    array<Rect> layout(int2 size) override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
     virtual int2 xy(int2 xy) =0;
 };
@@ -107,7 +107,7 @@ struct Grid : virtual Layout {
     int2 margin;
     Grid(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
     int2 sizeHint();
-    array<Rect> layout(int2 position, int2 size) override;
+    array<Rect> layout(int2 size) override;
 };
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : Grid, Widgets {
@@ -138,12 +138,12 @@ struct Selection : virtual Layout {
 struct HighlightSelection : virtual Selection {
     /// Whether to always display the highlight or only when focused
     bool always=false;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 };
 
 /// Displays a selection using horizontal tabs
 struct TabSelection : virtual Selection {
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 };
 
 /// Array with Selection

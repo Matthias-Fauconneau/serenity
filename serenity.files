@@ -43,9 +43,8 @@ io/tiff.h
 io/xml.h
 io/xml.cc
 
-ui/display.cc
-ui/display.h
-ui/display
+ui/graphics.cc
+ui/graphics.h
 ui/font.cc
 ui/font.h
 ui/gl.cc
@@ -53,11 +52,11 @@ ui/gl.h
 ui/interface.h
 ui/interface.cc
 ui/layout.h
+ui/layout.cc
 ui/text.cc
 ui/text.h
 ui/utf8.cc
 ui/utf8.h
-ui/rect.h
 ui/widget.h
 ui/window.cc
 ui/window.h

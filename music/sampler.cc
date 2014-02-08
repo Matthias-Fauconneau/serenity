@@ -374,7 +374,6 @@ uint Sampler::read(const mref<float2>& output) {
     }
 
     time += output.size;
-    //frameSent(output, size);
     if(backgroundDecoder) queue(); // Queues background decoder in main thread
     else timeChanged(time); // read MIDI file / update UI
     return output.size;

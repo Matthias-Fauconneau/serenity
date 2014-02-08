@@ -116,22 +116,24 @@ inline vec3 normal(vec3 v) {
     return normalize(cross(v, t));
 }
 
-generic struct bgr {
-    T b,g,r;
-};
-
 generic struct xyzw {
     T x,y,z,w;
-    vec< ::xyz,T,3> xyz() const { return vec< ::xyz,T,3>(x,y,z); }
+    vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
-    vec< ::xy,T,2> xy()const{ return vec< ::xy,T,2>(x,y); }
+    vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4;
 
+generic struct bgr {
+    T b,g,r;
+};
+/// Integer b,g,r vector (8bit)
+typedef vec<bgr,uint8,3> byte3;
+
 generic struct bgra {
     T b,g,r,a;
-    vec< ::bgr,T,3> bgr() const { return vec< ::bgr,T,3>(b,g,r); }
+    vec< ::bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
 };
 /// Integer b,g,r,a vector (8bit)
 typedef vec<bgra,uint8,4> byte4;

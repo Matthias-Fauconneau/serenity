@@ -142,7 +142,7 @@ struct Window : Socket, Poll {
     /// System V shared memory
     int shm = 0;
     /// Shared window back buffer
-    Image buffer;
+    Image target;
     /// Shared window buffer state
     enum { Idle, Server, Wait } state = Idle;
 

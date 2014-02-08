@@ -1,5 +1,5 @@
 #include "window.h"
-#include "display.h"
+#include "graphics.h"
 #include "widget.h"
 #include "file.h"
 #include "data.h"
@@ -128,62 +128,50 @@ void Window::event() {
         processEvent(type, e);
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
-    if(/*revents==IDLE &&*/ needUpdate) {
+    if(needUpdate) {
         needUpdate = false;
-        /*if(autoResize) {
-            int2 hint = widget->sizeHint();
-            if(hint != size) { setSize(hint); return; }
-        }*/
         assert(size);
-        currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
-        if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
+        if(target.width != (uint)size.x || target.height != (uint)size.y) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                shmdt(buffer.data);
+                shmdt(target.data);
                 shmctl(shm, IPC_RMID, 0);
             }
-            buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
-            shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
+            target.width=size.x, target.height=size.y, target.stride=align(16,size.x);
+            shm = check( shmget(0, target.height*target.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+            target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
-        framebuffer=share(buffer);
-        currentClip=Rect(size);
         if(clearBackground) {
             if(backgroundCenter==backgroundColor) {
-                fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
+                fill(target, Rect(size), backgroundColor, backgroundOpacity);
             } else { // Oxygen-like radial gradient background
                 const int radius=256;
                 int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
                         a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                if(x0>0 || x1<w || h<size.y)
-                    fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                uint* dst=(uint*)framebuffer.data;
-                for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                    int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale),
-                            g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                    dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
+                if(x0>0 || x1<w || h<size.y) fill(target, Rect(size),backgroundColor, backgroundOpacity);
+                for(int y: range(0,h)) for(int x: range(x0,x1)) {
+                    int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale), intensity = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
+                    ((uint*)target.data)[y*target.stride+x]= a<<24 | intensity<<16 | intensity<<8 | intensity;
                 }
             }
         }
-        widget->render(0,size);
-        assert(!clipStack);
+        widget->render(target);
 
         if(featherBorder) { //feather borders
             const bool corner = 1;
-            if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-            if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-            if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-            if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
+            if(position.y>16) for(int x=0;x<size.x;x++) target(x,0) /= 2;
+            if(position.x>0) for(int y=corner;y<size.y-corner;y++) target(0,y) /= 2;
+            if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) target(size.x-1,y) /= 2;
+            if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) target(x,size.y-1) /= 2;
         }
         Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-        r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
+        r.totalW=target.stride; r.totalH=target.height;
         r.srcW=size.x; r.srcH=size.y; send(raw(r));
         state=Server;
         frameSent();
-        framebuffer=Image(); // After frameSent() for capture
     }
     window=0;
 }
