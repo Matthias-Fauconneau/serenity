@@ -101,7 +101,6 @@ struct Build {
             else args << String("-march=native"_) << String("-I/usr/include/freetype2"_);
             if(!flags.contains("release"_)) args << String("-g"_);
             if(!flags.contains("debug"_)) args << String("-O3"_);
-            //if(flags.contains("arm"_)) args << String("-fasynchronous-unwid-tables"_) << String("-rdynamic"_);
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             log(target);

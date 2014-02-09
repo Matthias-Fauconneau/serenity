@@ -10,6 +10,7 @@
 #include "text.h"
 #include "time.h"
 #include "image.h"
+#include "png.h"
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
@@ -17,7 +18,7 @@ struct Player {
     static constexpr uint channels = 2;
     unique<AudioFile> file = 0;
     Resampler resampler;
-    const uint rate = 48000;
+    const uint rate = 44100;
     AudioOutput audio{{this,&Player::read16}, {this,&Player::read}, rate, 8192};
     mref<int2> lastPeriod;
     uint read(const mref<int2>& output) {
@@ -89,7 +90,6 @@ struct Player {
     array<String> randomSequence;
 
     Player() {
-        log("Hello World !"_);
         albums.always=titles.always=true;
         elapsed.minSize.x=remaining.minSize.x=64;
 

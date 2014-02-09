@@ -33,12 +33,6 @@ struct Window : Device /*, Poll TODO:evdev input*/ {
     /// Registers global shortcut on \a key
     signal<>& globalShortcut(Key);
 
-    /// Gets current text selection
-    /// \note The selection owner might lock this process if it fails to notify
-    String getSelection(bool clipboard=false);
-    /// Sets window cursor if cursor is inside region
-    void setCursor(Rect region, Cursor cursor);
-
     /// Display size
     int2 displaySize=0;
     /// Widget managed by this window
@@ -160,4 +154,11 @@ struct Window : Device /*, Poll TODO:evdev input*/ {
     uint stride=0, bytesPerPixel=0;
     Map framebuffer;
 #endif
+    /// Renders window background to \a target
+    void renderBackground(Image& target);
+    /// Gets current text selection
+    /// \note The selection owner might lock this process if it fails to notify
+    String getSelection(bool clipboard=false);
+    /// Sets window cursor if cursor is inside region
+    void setCursor(Rect region, Cursor cursor);
 };

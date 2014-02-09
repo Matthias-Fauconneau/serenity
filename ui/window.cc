@@ -1,4 +1,5 @@
 #include "window.h"
+#include "graphics.h"
 
 static thread_local Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
@@ -8,8 +9,6 @@ String getSelection(bool clipboard) { assert(window); return window->getSelectio
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
 #if X11
-#include "graphics.h"
-#include "widget.h"
 #include "file.h"
 #include "data.h"
 #include "time.h"
@@ -136,38 +135,7 @@ void Window::event() {
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
 
-        if(oxygenBackground) { // Oxygen-like radial gradient background
-            const int y0 = -32-8, splitY = min(300, 3*size.y/4);
-            const vec3 radial = vec3(246); // linear
-            const vec3 top = vec3(221, 223, 225); // sRGB
-            const vec3 bottom = vec3(184, 187, 194); // sRGB
-            const vec3 middle = (bottom+top)/2.f; //FIXME
-            // Draws upper linear gradient
-            for(int y: range(0, min(size.y, y0+splitY/2))) {
-                float t = (float) (y-y0) / (splitY/2);
-                for(int x: range(size.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
-            }
-            for(int y: range(max(0, y0+splitY/2), min(size.y, y0+splitY))) {
-                float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
-                byte4 verticalGradient (byte3((1-t)*middle + t*bottom), 0xFF); // mid -> dark
-                for(int x: range(size.x)) target(x,y) = verticalGradient;
-            }
-            // Draws lower flat part
-            for(int y: range(max(0, y0+splitY), size.y)) for(int x: range(size.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
-            // Draws upper radial gradient (600x64)
-            const int w = min(600, size.x), h = 64;
-            for(int y: range(0, min(size.y, y0+h))) for(int x: range((size.x-w)/2, (size.x+w)/2)) {
-                const float cx = size.x/2, cy = y0+h/2;
-                float r = sqrt(sq((x-cx)/(w/2)) + sq((y-cy)/(h/2)));
-                const float r0 = 0./4, r1 = 2./4, r2 = 3./4, r3 = 4./4;
-                const float a0 = 255./255, a1 = 101./255, a2 = 37./255, a3 = 0./255;
-                /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }
-                else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
-                else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
-            }
-        }
-        else for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
-
+        renderBackground(target);
         widget->render(target);
 
         Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
@@ -425,7 +393,7 @@ Image Window::getSnapshot() {
 
 #include <linux/fb.h>
 
-Window::Window(Widget* widget, int2, const string& unused title, const Image& unused icon) : Device("/dev/fb0"_), widget(widget) {
+Window::Window(Widget* widget, int2, const string& title unused, const Image& icon unused) : Device("/dev/fb0"_), widget(widget) {
     fb_var_screeninfo var; ioctl(FBIOGET_VSCREENINFO, &var);
     fb_fix_screeninfo fix; ioctl(FBIOGET_FSCREENINFO, &fix);
     this->size = int2(var.xres_virtual, var.yres_virtual);
@@ -439,12 +407,11 @@ Window::Window(Widget* widget, int2, const string& unused title, const Image& un
 void Window::render() {
     if(!mapped) return;
     Image target(size.x, size.y);
-    target.buffer.clear(0xFF);
+    renderBackground(target);
     assert(&widget);
     widget->render(target);
     if(bytesPerPixel==4) {
         byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
-        log(size, stride, bytesPerPixel, hex(ptr(framebuffer.data.pointer)));
         for(uint y: range(size.y)) for(uint x: range(size.x)) BGRX8888[y*stride+x] = target(x,y);
     } else if(bytesPerPixel==2) {
         uint16* RGB565 = (uint16*)framebuffer.data.pointer;
@@ -462,11 +429,46 @@ void Window::render() {
 
 void Window::show() { if(!mapped) { mapped=true; render(); } }
 void Window::hide() { mapped=false; }
-void Window::setTitle(const string& unused title) {}
-void Window::setIcon(const Image& unused icon) {}
+void Window::setTitle(const string& title unused) {}
+void Window::setIcon(const Image& icon unused) {}
 String Window::getSelection(bool unused clipboard) { return String(); }
 signal<>& Window::globalShortcut(Key key) { return localShortcut(key); }
 #endif
 
+void Window::renderBackground(Image& target) {
+    if(oxygenBackground) { // Oxygen-like radial gradient background
+        const int y0 = -32-8, splitY = min(300, 3*size.y/4);
+        const vec3 radial = vec3(246); // linear
+        const vec3 top = vec3(221, 223, 225); // sRGB
+        const vec3 bottom = vec3(184, 187, 194); // sRGB
+        const vec3 middle = (bottom+top)/2.f; //FIXME
+        // Draws upper linear gradient
+        for(int y: range(0, min(size.y, y0+splitY/2))) {
+            float t = (float) (y-y0) / (splitY/2);
+            for(int x: range(size.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
+        }
+        for(int y: range(max(0, y0+splitY/2), min(size.y, y0+splitY))) {
+            float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
+            byte4 verticalGradient (byte3((1-t)*middle + t*bottom), 0xFF); // mid -> dark
+            for(int x: range(size.x)) target(x,y) = verticalGradient;
+        }
+        // Draws lower flat part
+        for(int y: range(max(0, y0+splitY), size.y)) for(int x: range(size.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
+        // Draws upper radial gradient (600x64)
+        const int w = min(600, size.x), h = 64;
+        for(int y: range(0, min(size.y, y0+h))) for(int x: range((size.x-w)/2, (size.x+w)/2)) {
+            const float cx = size.x/2, cy = y0+h/2;
+            float r = sqrt(sq((x-cx)/(w/2)) + sq((y-cy)/(h/2)));
+            const float r0 = 0./4, r1 = 2./4, r2 = 3./4, r3 = 4./4;
+            const float a0 = 255./255, a1 = 101./255, a2 = 37./255, a3 = 0./255;
+            /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }
+            else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
+            else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
+        }
+    }
+    else for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
+}
+
 signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
+
 void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
