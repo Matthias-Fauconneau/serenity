@@ -1,4 +1,13 @@
 #include "window.h"
+
+static thread_local Window* window; // Current window for Widget event and render methods
+void setFocus(Widget* widget) { assert(window); window->focus=widget; }
+bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
+void setDrag(Widget* widget) { assert(window); window->drag=widget; }
+String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
+void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
+
+#if X11
 #include "graphics.h"
 #include "widget.h"
 #include "file.h"
@@ -14,17 +23,9 @@
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
-int2 displaySize;
 
-static thread_local Window* window; // Current window for Widget event and render methods
-void setFocus(Widget* widget) { assert(window); window->focus=widget; }
-bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
-void setDrag(Widget* widget) { assert(window); window->drag=widget; }
-String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
-void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
-
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget), overrideRedirect(title.size?false:true) {
+Window::Window(Widget* widget, int2 size, const string& unused title, const Image& unused icon) :
+    Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
@@ -87,13 +88,6 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     if(size.y==0) size.y=displaySize.y-16;
     if(anchor==Bottom) position.y=displaySize.y-size.y;
     this->size=size;
-    create();
-    setTitle(title);
-    setIcon(icon);
-}
-
-void Window::create() {
-    assert(!created);
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y;
         r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
@@ -105,15 +99,12 @@ void Window::create() {
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
-    created = true;
+    setTitle(title);
+    setIcon(icon);
 }
-Window::~Window() { destroy(); }
-void Window::destroy() {
-    if(!created) return;
+Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
-    created = false;
-    unregisterPoll();
 }
 
 // Render
@@ -152,17 +143,17 @@ void Window::event() {
             const vec3 bottom = vec3(184, 187, 194); // sRGB
             const vec3 middle = (bottom+top)/2.f; //FIXME
             // Draws upper linear gradient
-            for(int y: range(0, y0+splitY/2)) {
+            for(int y: range(0, min(size.y, y0+splitY/2))) {
                 float t = (float) (y-y0) / (splitY/2);
                 for(int x: range(size.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
             }
-            for(int y: range(y0+splitY/2, y0+splitY)) {
+            for(int y: range(max(0, y0+splitY/2), min(size.y, y0+splitY))) {
                 float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
                 byte4 verticalGradient (byte3((1-t)*middle + t*bottom), 0xFF); // mid -> dark
                 for(int x: range(size.x)) target(x,y) = verticalGradient;
             }
             // Draws lower flat part
-            for(int y: range(y0+splitY, size.y)) for(int x: range(size.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
+            for(int y: range(max(0, y0+splitY), size.y)) for(int x: range(size.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
             // Draws upper radial gradient (600x64)
             const int w = min(600, size.x), h = 64;
             for(int y: range(0, min(size.y, y0+h))) for(int x: range((size.x-w)/2, (size.x+w)/2)) {
@@ -175,7 +166,7 @@ void Window::event() {
                 else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
             }
         }
-        else target.buffer.clear(0xFF);
+        else for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
 
         widget->render(target);
 
@@ -339,7 +330,6 @@ uint Window::KeyCode(Key sym) {
     return keycode;
 }
 
-signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
 signal<>& Window::globalShortcut(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
@@ -415,7 +405,6 @@ void Window::setCursor(Cursor cursor, uint window) {
     {FreePicture r; r.picture=id+Picture; send(raw(r));}
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
 }
-void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
 
 // Snapshot
 Image Window::getSnapshot() {
@@ -432,3 +421,52 @@ Image Window::getSnapshot() {
     shmctl(shm, IPC_RMID, 0);
     return image;
 }
+#else
+
+#include <linux/fb.h>
+
+Window::Window(Widget* widget, int2, const string& unused title, const Image& unused icon) : Device("/dev/fb0"_), widget(widget) {
+    fb_var_screeninfo var; ioctl(FBIOGET_VSCREENINFO, &var);
+    fb_fix_screeninfo fix; ioctl(FBIOGET_FSCREENINFO, &fix);
+    this->size = int2(var.xres_virtual, var.yres_virtual);
+    assert_(var.bits_per_pixel % 8 == 0);
+    bytesPerPixel = var.bits_per_pixel/8;
+    assert_(fix.line_length % bytesPerPixel == 0);
+    stride = fix.line_length / bytesPerPixel;
+    framebuffer = Map(Device::fd, 0, var.yres_virtual * fix.line_length, Map::Prot(Map::Read|Map::Write));
+}
+
+void Window::render() {
+    if(!mapped) return;
+    Image target(size.x, size.y);
+    target.buffer.clear(0xFF);
+    assert(&widget);
+    widget->render(target);
+    if(bytesPerPixel==4) {
+        byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
+        log(size, stride, bytesPerPixel, hex(ptr(framebuffer.data.pointer)));
+        for(uint y: range(size.y)) for(uint x: range(size.x)) BGRX8888[y*stride+x] = target(x,y);
+    } else if(bytesPerPixel==2) {
+        uint16* RGB565 = (uint16*)framebuffer.data.pointer;
+        for(uint y: range(size.y)) for(uint x: range(size.x)) {
+            byte4 BGRA8 = target(x,y);
+            uint B8 = BGRA8.b, G8 = BGRA8.g, R8 = BGRA8.r;
+            uint B5 = (B8 * 249 + 1014 ) >> 11;
+            uint G6 = (G8 * 253 +  505 ) >> 10;
+            uint R5 = (R8 * 249 + 1014 ) >> 11;
+            RGB565[y*stride+x] = (R5 << 11) | (G6 << 5) | B5;
+        }
+    }
+    else error("Unsupported format", bytesPerPixel);
+}
+
+void Window::show() { if(!mapped) { mapped=true; render(); } }
+void Window::hide() { mapped=false; }
+void Window::setTitle(const string& unused title) {}
+void Window::setIcon(const Image& unused icon) {}
+String Window::getSelection(bool unused clipboard) { return String(); }
+signal<>& Window::globalShortcut(Key key) { return localShortcut(key); }
+#endif
+
+signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
+void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }

@@ -43,6 +43,7 @@ vec3 LChuvtoBGR(float L, float C, float h) { return XYZtoBGR(LuvtoXYZ(LChuvtoLuv
 
 void blend(const Image& target, uint x, uint y, vec3 color, float alpha) {
     byte4& target_sRGB = target(x,y);
+    assert(target.sRGB);
     vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
     vec3 source_linear = clip(vec3(0), color, vec3(1));
     int3 linearBlend = int3(round(float(0xFF)*((1-alpha)*vec3(target_linear) + alpha*source_linear)));

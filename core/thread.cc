@@ -246,7 +246,7 @@ array<string> arguments() {
     return split(section(cmdline,0,1,-1),0);
 }
 
-string homePath() { return getenv("HOME"_/*,str((const char*)getpwuid(geteuid())->pw_dir)*/); }
+string homePath() { return getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir)); }
 const Folder& home() { static Folder home(homePath()); return home; }
 const Folder& config() { static Folder config(".config"_,home(),true); return config; }
 const Folder& cache() { static Folder cache(".cache"_,home(),true); return cache; }

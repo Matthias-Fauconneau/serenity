@@ -9,6 +9,7 @@
 #include "window.h"
 #include "text.h"
 #include "time.h"
+#include "image.h"
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
@@ -148,7 +149,6 @@ struct Player {
         assert(existsFolder(album,"Music"_),album);
         array<String> files = Folder(album,"Music"_).list(Recursive|Files|Sorted);
         for(const String& file: files) queueFile(album, file, false);
-        window.setSize(int2(-512,-512));
         titles.index=-1; next();
     }
     void playAlbum(uint index) {

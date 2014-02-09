@@ -3,6 +3,15 @@
 #include "thread.h"
 #include "vector.h"
 #include "function.h"
+struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
+struct Control { ptr swPointer; long availableMinimum; };
+#if !MMAP
+struct SyncPtr {
+    uint flags;
+    union { Status status; byte pad1[64]; };
+    union { Control control; byte pad2[64]; };
+};
+#endif
 
 /// Audio output through ALSA PCM interface
 struct AudioOutput : Device, Poll {
@@ -29,6 +38,7 @@ struct AudioOutput : Device, Poll {
     AudioOutput(function<uint(const mref<short2>&)> read16, function<uint(const mref<int2>&)> read32,
                 uint rate=0, uint periodSize=0, Thread& thread=mainThread):
     AudioOutput(0,rate,periodSize,thread) { this->read16=read16; this->read32=read32; }
+    ~AudioOutput();
 
     /// Starts audio output, will require data periodically from \a read callback
     void start();
@@ -46,8 +56,12 @@ struct AudioOutput : Device, Poll {
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
+#if !MMAP
+    SyncPtr syncPtr;
+#endif
 };
 
+#if AUDIO_INPUT
 struct AudioInput : Device, Poll {
     uint sampleBits = 0;
     uint channels = 2, rate = 0;
@@ -88,4 +102,8 @@ private:
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
+#if !MMAP
+    SyncPtr syncPtr;
+#endif
 };
+#endif

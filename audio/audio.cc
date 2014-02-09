@@ -40,8 +40,6 @@ struct SWParams {
  long avail_min=0, xfer_align=0, start_threshold=0, stop_threshold=0, silence_threshold=0, silence_size=0, boundary=0;
  byte reserved[64];
 };
-struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
-struct Control { ptr swPointer; long availableMinimum; };
 
 typedef IOWR<'A', 0x10,HWParams> HW_REFINE;
 typedef IOWR<'A', 0x11,HWParams> HW_PARAMS;
@@ -49,6 +47,12 @@ typedef IOWR<'A', 0x13,SWParams> SW_PARAMS;
 typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x44> DRAIN;
+
+#if !MMAP
+// No direct memory access support on OMAP
+enum { HWSYNC=1<<0, APPL=1<<1, AVAIL_MIN=1<<2 };
+typedef IOWR<'A', 0x23,SyncPtr> SYNC_PTR;
+#endif
 
 Device getPlaybackDevice() {
     Folder snd("/dev/snd");
@@ -95,14 +99,27 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     this->periodSize = hparams.interval(PeriodSize);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
+#if MMAP
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+#else
+    status = &syncPtr.status;
+    control = &syncPtr.control;
+#endif
 }
+AudioOutput::~AudioOutput(){}
 
 void AudioOutput::start() { if(status->state != Prepared && status->state != Running) { io<PREPARE>(); registerPoll(); } }
 void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
-    if(status->state == XRun) { log("Underrun"_); io<PREPARE>(); }
+#ifndef MMAP
+    syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
+#endif
+    if(status->state == XRun) { log("Underrun"_); io<PREPARE>();
+#ifndef MMAP
+        syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
+#endif
+    }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
@@ -111,6 +128,9 @@ void AudioOutput::event() {
         else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
+#ifndef MMAP
+        syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
+#endif
         if(readSize<periodSize) { stop(); return; }
     }
     if(status->state == Prepared) io<START>();
@@ -126,6 +146,7 @@ Device getCaptureDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
+#if AUDIO_INPUT
 AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
@@ -160,12 +181,20 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     assert(hparams.interval(Channels)==2);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
+#if MMAP
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+#else
+    status = &syncPtr.status;
+    control = &syncPtr.control;
+#endif
 }
 void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
 void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioInput::event() {
+#ifndef MMAP
+    syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
+#endif
     if(status->state == XRun) { overruns++; log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns); io<PREPARE>(); io<START>(); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
@@ -175,7 +204,11 @@ void AudioInput::event() {
         else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
+#ifndef MMAP
+        syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
+#endif
         if(readSize<periodSize) { stop(); return; }
         periods++;
     }
 }
+#endif

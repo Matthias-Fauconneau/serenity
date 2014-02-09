@@ -79,7 +79,8 @@ struct Build {
                 bool condition = !s.match('!');
                 string id = s.identifier("_"_);
                 bool value = false;
-                if(id=="__x86_64"_ && !flags.contains("atom"_)) value=true;
+                if(id=="1"_) value=true;
+                else if(id=="__x86_64"_ && !flags.contains("atom"_)) value=true;
                 else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
                 else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
                 if(value != condition) s.until("#endif"_); // FIXME: Nesting unsupported
@@ -91,15 +92,16 @@ struct Build {
                 s.skip(")"_);
             }
         }
-        String object = tmp+join(flags," "_)+"/"_+target+".o"_;
+        String object = tmp+join(flags,"-"_)+"/"_+target+".o"_;
         if(!existsFile(object, folder) || lastCompileEdit >= File(object).modifiedTime()) {
             array<String> args;
             args << copy(object) << target+".cc"_;
             if(flags.contains("atom"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
-            else if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-gnueabihf/sysroot/usr/include/freetype2"_);
+            else if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
             else args << String("-march=native"_) << String("-I/usr/include/freetype2"_);
             if(!flags.contains("release"_)) args << String("-g"_);
             if(!flags.contains("debug"_)) args << String("-O3"_);
+            //if(flags.contains("arm"_)) args << String("-fasynchronous-unwid-tables"_) << String("-rdynamic"_);
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             log(target);
@@ -109,7 +111,6 @@ struct Build {
                 pids.remove(pid);
             }
             {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -o"_);
-                log(CXX, flags+toRefs(args));
                 pids << execute(CXX, flags+toRefs(args), false);}
         }
         return lastLinkEdit;
@@ -119,14 +120,16 @@ struct Build {
 
     Build() {
         string install;
-        for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << arg;
+        for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-');
         if(flags.contains("arm"_)) {
-            CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-g++"_;
-            LD = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-ld"_;
+            //CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-g++"_;
+            CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-uclibcgnueabihf-g++"_;
+            //LD = "/buildroot/output/host/usr/bin/arm-buildroot-linux-gnueabihf-ld"_;
+            LD = "/buildroot/output/host/usr/bin/arm-buildroot-linux-uclibcgnueabihf-ld"_;
         }
 
-        Folder(tmp+join(flags," "_), root(), true);
-        for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+join(flags," "_)+"/"_+subfolder, root(), true);
+        Folder(tmp+join(flags,"-"_), root(), true);
+        for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+join(flags,"-"_)+"/"_+subfolder, root(), true);
         int64 lastEdit = processModule( find(target+".cc"_) );
         if(files) {
             String filesPath = tmp+"files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
@@ -147,11 +150,11 @@ struct Build {
             }
         }
         string name = target;
-        String binary = tmp+join(flags," "_)+"/"_+name+"."_+join(flags," "_);
+        String binary = tmp+join(flags,"-"_)+"/"_+name+"."_+join(flags,"-"_);
         if(!existsFile(binary) || lastEdit >= File(binary).modifiedTime()) {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
-            args << apply(modules, [this](const unique<Node>& module){ return tmp+join(flags," "_)+"/"_+module->name+".o"_; });
+            args << apply(modules, [this](const unique<Node>& module){ return tmp+join(flags,"-"_)+"/"_+module->name+".o"_; });
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
