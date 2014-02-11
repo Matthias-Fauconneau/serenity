@@ -13,6 +13,7 @@ struct Rect {
 };
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
 struct Image {
     Image(){}
@@ -35,8 +36,17 @@ struct Image {
 };
 inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
-/// Copies the image buffer
-template<> inline Image copy(const Image& o) { return Image(copy(o.buffer), o.data, o.width, o.height, o.stride, o.alpha, o.sRGB); }
+/// Copies an image
+inline void copy(const Image& target, const Image& source) {
+    for(uint y: range(source.height)) for(uint x: range(source.width)) target(x,y) = source(x,y);
+}
+
+/// Copies an image
+inline Image copy(const Image& source) {
+    Image target(source.width, source.height, source.alpha, source.sRGB);
+    copy(target, source);
+    return target;
+}
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha,o.sRGB); }

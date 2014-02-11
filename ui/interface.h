@@ -42,11 +42,10 @@ template<class T> struct Scroll : ScrollArea, T {
 };
 
 /// Displays an image
-struct ImageWidget : virtual Widget {
+struct ImageWidget : Widget {
     /// Displayed image
     const Image& image;
 
-    //ImageWidget(){}
     /// Creates a widget displaying \a image
     ImageWidget(const Image& image):image(move(image)){}
 
@@ -66,7 +65,6 @@ struct ImageLink : ImageWidget {
     /// User clicked on the image
     signal<const string&> linkActivated;
 
-    //ImageLink(){}
     ImageLink(const Image& image):Icon(move(image)){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
@@ -119,7 +117,6 @@ struct Slider : Progress {
 
 /// ::Icon with \ref Text "text"
 struct Item : Linear {
-    //Item(){}
     Item(Image&& icon, const string& text, int size=16, bool under=false):icon(move(icon)),text(text,size),under(under){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
@@ -132,7 +129,6 @@ struct Item : Linear {
 
 /// Clickable Item
 struct TriggerItem : Item {
-    //TriggerItem(){}
     TriggerItem(Image&& icon, String&& text, int size=16):Item(move(icon),move(text),size){}
     /// User clicked on the button
     signal<> triggered;

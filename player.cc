@@ -12,6 +12,36 @@
 #include "image.h"
 #include "png.h"
 
+/// Stores target on every full window render to allow partial updates
+template<Type T> struct BackingStore : T {
+    using T::T;
+    Image backingStore;
+    Image target;
+    void render(const Image& target) override {
+        this->target = share(target);
+        backingStore = copy(target);
+        T::render(target);
+    }
+    /// Directly renders partial update to last known target
+    /// \note Assumes \a target is still a valid rendering target since last full window render
+    void render() {
+        if(!target) return;
+        copy(target, backingStore);
+        render(target);
+    }
+    /// Sends a partial update
+    void putImage(Window& window) {
+        if(!target) return;
+        assert(target.buffer.data);
+        uint offset = target.data - target.buffer.data;
+        uint y = offset/target.stride, x = offset%target.stride;
+        window.putImage(int2(x,y), target.size());
+    }
+    /// Directly renders partial update to last known target and sends a partial update for \a window
+    /// \note Assumes last known target is the rendering target for \a window
+    void render(Window& window) { render(); putImage(window); }
+};
+
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Playback
@@ -79,12 +109,13 @@ struct Player {
     Text elapsed = "00:00"_;
     Slider slider;
     Text remaining = "00:00"_;
-    HBox toolbar {{&randomButton, &playButton, &nextButton, &elapsed, &slider, &remaining}};
+    BackingStore<HBox> backingStore {{&elapsed, &slider, &remaining}, "backingStore"};
+    HBox toolbar {{&randomButton, &playButton, &nextButton, &backingStore}, "toolbar"_};
     Scroll< List<Text>> albums;
     Scroll< List<Text>> titles;
-    HBox main {{ &albums.area(), &titles.area() }};
-    VBox layout {{ &toolbar, &main }};
-    Window window {&layout, int2(-600,-1120), "Player"_, pauseIcon()};
+    HBox main {{ &albums.area(), &titles.area() }, "main"_};
+    VBox layout {{ &toolbar, &main }, "layout"_};
+    Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
 
 // Content
     array<String> folders;
@@ -236,6 +267,6 @@ struct Player {
         slider.value = position; slider.maximum=duration;
         elapsed.setText(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
         remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
-        window.render();
+        backingStore.render(window);
     }
 } application;

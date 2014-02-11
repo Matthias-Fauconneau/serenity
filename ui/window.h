@@ -42,6 +42,9 @@ struct Window : Device {
     /// Registers global shortcut on \a key
     signal<>& globalShortcut(Key);
 
+    /// Sends a partial update
+    void putImage(int2 position, int2 size);
+
     /// Display size
     int2 displaySize=0;
     /// Widget managed by this window

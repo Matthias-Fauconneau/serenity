@@ -64,7 +64,7 @@ struct Data {
 };
 
 /// Provides a convenient interface to parse binary inputs
-struct BinaryData : virtual Data {
+struct BinaryData : Data {
     BinaryData(){}
     /// Creates a BinaryData interface to an \a array
     BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
@@ -124,7 +124,7 @@ struct BinaryData : virtual Data {
 };
 
 /// Provides a convenient interface to parse text streams
-struct TextData : virtual Data {
+struct TextData : Data {
     using Data::Data;
     void advance(uint step) /*override*/;
 

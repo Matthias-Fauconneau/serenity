@@ -19,7 +19,7 @@ struct Build {
     const string tmp = "/var/tmp/"_;
     string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
     string LD = "/usr/bin/ld"_;
-    int64 lastLinkEdit = 0;
+    bool needLink = false;
     array<unique<Node>> modules;
     array<String> libraries;
     array<String> files;
@@ -63,8 +63,8 @@ struct Build {
             for(; !s.match("#endif"_); s.line()) tryParseConditions(s);
         }
     }
-    void tryParseFiles(TextData& s) {
-        if(!s.match("FILE("_) && !s.match("ICON("_)) return;
+    bool tryParseFiles(TextData& s) {
+        if(!s.match("FILE("_) && !s.match("ICON("_)) return false;
         string name = s.identifier("_-"_);
         s.skip(")"_);
 
@@ -78,16 +78,16 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder))
-                fail();
+            if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();
+            needLink = true;
         }
-        lastLinkEdit = max(lastLinkEdit, lastFileEdit);
         files << move(object);
+        return true;
     }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
     int64 parse(const string& name, Node& parent) {
-        File file (name, folder);
+        File file(name, folder);
         int64 lastEdit = file.modifiedTime();
         for(TextData s = file.read(file.size()); s; s.line()) {
             string name = tryParseIncludes(s);
@@ -101,7 +101,7 @@ struct Build {
             }
             tryParseDefines(s);
             tryParseConditions(s);
-            tryParseFiles(s);
+            do { s.whileAny(" "_); } while(tryParseFiles(s));
         }
         return lastEdit;
     }
@@ -134,6 +134,7 @@ struct Build {
             }
             {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
+            needLink = true;
         }
     }
 
@@ -153,7 +154,7 @@ struct Build {
         compileModule( find(target+".cc"_) );
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));
         String binary = tmp+join(flags,"-"_)+"/"_+target+"."_+join(flags,"-"_);
-        if(!existsFile(binary) || lastLinkEdit >= File(binary).modifiedTime()) {
+        if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
             args << apply(modules, [this](const unique<Node>& module){ return tmp+join(flags,"-"_)+"/"_+module->name+".o"_; });

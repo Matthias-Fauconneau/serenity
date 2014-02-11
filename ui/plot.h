@@ -2,7 +2,7 @@
 #include "widget.h"
 #include "map.h"
 
-struct Plot : virtual Widget {
+struct Plot : Widget {
     enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
     Plot(const string& title=""_, bool plotLines=false, LegendPosition legendPosition=TopRight)
         : title(title), plotPoints(!plotLines), plotLines(plotLines), legendPosition(legendPosition) {}

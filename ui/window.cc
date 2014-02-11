@@ -130,19 +130,25 @@ void Window::event() {
             }
             target.width=size.x, target.height=size.y, target.stride=align(16,size.x);
             shm = check( shmget(0, target.height*target.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
+            target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
 
         renderBackground(target);
         widget->render(target);
 
-        Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-        r.totalW=target.stride; r.totalH=target.height;
-        r.srcW=size.x; r.srcH=size.y; send(raw(r));
+        putImage(0, size);
         state=Server;
         frameSent();
     }
+}
+
+void Window::putImage(int2 position, int2 size) {
+    Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+    r.totalW=target.stride; r.totalH=target.height;
+    r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
+    r.dstX = position.x, r.dstY = position.y;
+    send(raw(r));
 }
 
 // Events
@@ -488,6 +494,7 @@ void Window::setTitle(const string& title unused) {}
 void Window::setIcon(const Image& icon unused) {}
 String Window::getSelection(bool unused clipboard) { return String(); }
 signal<>& Window::globalShortcut(Key key) { return localShortcut(key); }
+void Window::putImage(int2 position, int2 size) {}
 #endif
 
 void Window::renderBackground(Image& target) {
