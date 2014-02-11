@@ -19,7 +19,8 @@ struct Player {
     unique<AudioFile> file = 0;
     Resampler resampler;
     const uint rate = 44100;
-    AudioOutput audio{{this,&Player::read16}, {this,&Player::read}, rate, 8192};
+    //AudioOutput audio{{this,&Player::read16}, {this,&Player::read}, rate, 8192};
+    AudioOutput* audio = 0;
     mref<int2> lastPeriod;
     uint read(const mref<int2>& output) {
         uint readSize = 0;
@@ -27,9 +28,9 @@ struct Player {
             if(!file) break;
             assert(readSize<output.size);
             size_t read = 0;
-            if(resampler.sourceRate*audio.rate != file->rate*resampler.targetRate) {
+            if(resampler.sourceRate*audio->rate != file->rate*resampler.targetRate) {
                 resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
-                if(file->rate != audio.rate) new (&resampler) Resampler(audio.channels, file->rate, audio.rate, audio.periodSize);
+                if(file->rate != audio->rate) new (&resampler) Resampler(audio->channels, file->rate, audio->rate, audio->periodSize);
             }
             if(resampler) {
                     uint sourceNeed = resampler.need(chunk.size);
@@ -57,6 +58,7 @@ struct Player {
             output[i][1] *= level;
         }
         lastPeriod = output;
+        assert_(readSize == output.size);
         return readSize;
     }
     uint read16(const mref<short2>& output) {
@@ -95,8 +97,12 @@ struct Player {
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.localShortcut(Escape).connect([]{exit();});
+        window.localShortcut(Power).connect([]{exit();}); // FIXME: brief -> next, long -> poweroff
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         window.globalShortcut(Play).connect(this, &Player::togglePlay);
+#if __arm__
+        window.globalShortcut(Extra).connect(this, &Player::togglePlay); // FIXME: brief -> toggle, long -> next
+#endif
         randomButton.toggled.connect(this, &Player::setRandom);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
@@ -160,7 +166,7 @@ struct Player {
         window.setTitle(toUTF8(titles[index].text));
         file = unique<AudioFile>("/Music/"_+files[index]);
         if(!file->file) { file=0; return; }
-        assert(audio.channels==file->channels);
+        assert(file->channels==AudioOutput::channels);
         setPlaying(true);
     }
     void next() {
@@ -203,7 +209,10 @@ struct Player {
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
-        if(play) { audio.start(); window.setIcon(playIcon()); }
+        if(play) {
+            audio = new AudioOutput({this,&Player::read}, rate, 8192);
+            //audio->start();
+            window.setIcon(playIcon()); }
         else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
             for(uint i: range(lastPeriod.size)) {
@@ -212,7 +221,7 @@ struct Player {
             }
             file->seek(max(0, int(file->position-lastPeriod.size)));
             lastPeriod=mref<int2>();
-            audio.stop();
+            delete audio; audio=0;
             window.setIcon(pauseIcon());
         }
         playButton.enabled=play;
@@ -220,7 +229,7 @@ struct Player {
         writeFile("Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), root());
     }
     void seek(int position) {
-        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); resampler.clear(); audio.cancel(); }
+        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); resampler.clear(); /*audio->cancel();*/ }
     }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;

@@ -4,15 +4,24 @@
 #include "widget.h"
 #include "function.h"
 #include "map.h"
+#if !__arm__
+#define X11 1
+#endif
 #if X11
 union XEvent;
+#else
+struct PollDevice : Device, Poll {
+    PollDevice(const string &path):Device(path,root(),Flags(ReadWrite|NonBlocking)),Poll(Device::fd){}
+    void event() override { eventReceived(); }
+    signal<> eventReceived;
+};
 #endif
 
 /// Interfaces \a widget as a window on an X11 display server
 #if X11
 struct Window : Socket, Poll {
 #else
-struct Window : Device /*, Poll TODO:evdev input*/ {
+struct Window : Device {
 #endif
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
@@ -52,11 +61,25 @@ struct Window : Device /*, Poll TODO:evdev input*/ {
     /// Current widget that gets keyboard events reported without modifiers (when in focus)
     Widget* directInput=0;
     /// Current cursor position
-    int2 cursorPosition;
+    int2 cursorPosition=0;
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
     bool oxygenBackground = true;
+
+    /// Renders window background to \a target
+    void renderBackground(Image& target);
+    /// Gets current text selection
+    /// \note The selection owner might lock this process if it fails to notify
+    String getSelection(bool clipboard=false);
+    /// Sets window cursor if cursor is inside region
+    void setCursor(Rect region, Cursor cursor);
+
+    /// Window drag state
+    int2 dragStart, dragPosition, dragSize;
+    /// Whether a render request was skipped while unmapped
+    bool needUpdate = true;
+
 #if X11
     /// Properly destroys X GC and Window
     ~Window();
@@ -96,8 +119,6 @@ struct Window : Device /*, Poll TODO:evdev input*/ {
     /// Returns a snapshot of the root window
     Image getSnapshot();
 
-    /// Whether a render request was skipped while unmapped
-    bool needUpdate = true;
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
     /// If set, this window will not be managed by the session window manager
@@ -106,9 +127,6 @@ struct Window : Device /*, Poll TODO:evdev input*/ {
                   Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
     /// If set, this window will always be anchored to this position
     Anchor anchor = Float;
-
-    /// Window drag state
-    int2 dragStart, dragPosition, dragSize;
 
     /// Signals sent frames
     signal<> frameSent;
@@ -150,15 +168,15 @@ struct Window : Device /*, Poll TODO:evdev input*/ {
 #else
     /// Renders immediately current widget to framebuffer
     void render();
+    /// Touchscreen event handler
+    void touchscreenEvent();
+    /// Buttons event handler
+    void buttonEvent();
 
     uint stride=0, bytesPerPixel=0;
     Map framebuffer;
+    PollDevice touchscreen {"/dev/input/event0"_};
+    PollDevice buttons {"/dev/input/event4"_};
+    int previousState = 0, state = 0;
 #endif
-    /// Renders window background to \a target
-    void renderBackground(Image& target);
-    /// Gets current text selection
-    /// \note The selection owner might lock this process if it fails to notify
-    String getSelection(bool clipboard=false);
-    /// Sets window cursor if cursor is inside region
-    void setCursor(Rect region, Cursor cursor);
 };

@@ -14,21 +14,11 @@
 #include <sys/wait.h>
 #include <pwd.h>
 #include <sys/syscall.h>
-#if THREAD
-#include <pthread.h> //pthread
-Lock::Lock() { pthread_mutex_init(&pointer,0); }
-Lock::~Lock() { pthread_mutex_destroy(&pointer); }
-void Lock::lock() { pthread_mutex_lock(&pointer); }
-bool Lock::tryLock() { return !pthread_mutex_trylock(&pointer); }
-void Lock::unlock() { pthread_mutex_unlock(&pointer); }
-#else
-#include <pthread.h>
-Lock::Lock() {}
-Lock::~Lock() {}
-void Lock::lock() {}
-bool Lock::tryLock() { return true; }
-void Lock::unlock() {}
-#endif
+
+void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
+int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
+int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
+int gettid() { return syscall(SYS_gettid); }
 
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
@@ -37,28 +27,30 @@ template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 // Poll
 void Poll::registerPoll() {
     Locker lock(thread.lock);
-    if(thread.unregistered.contains(this)) { thread.unregistered.remove(this); }
-    else if(!thread.contains(this)) thread<<this;
+    assert_(!thread.contains(*this));
+    assert_(!thread.unregistered.contains(*this));
+    //if(thread.unregistered.contains(this)) { thread.unregistered.remove(this); }
+    //else if(!thread.contains(this)) thread<<this;
+    thread<<this;
     thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
-void Poll::unregisterPoll() {Locker lock(thread.lock); if(fd) thread.unregistered<<this;}
+void Poll::unregisterPoll() {Locker lock(thread.lock); if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}
+
+EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
 // Threads
 
 // Lock access to thread list
-static Lock threadsLock __attribute((init_priority(103)));
+static Lock threadsLock __attribute((init_priority(102)));
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
-static array<Thread*> threads __attribute((init_priority(104)));
+static array<Thread*> threads __attribute((init_priority(102)));
 // Handle for the main thread (group leader)
-Thread mainThread __attribute((init_priority(105))) (20);
-
-void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
-int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
-int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
-int gettid() { return syscall(SYS_gettid); }
-
-EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
+Thread mainThread __attribute((init_priority(102))) (20);
+// Flag to cleanly terminate all threads
+static bool terminate = false;
+// Exit status to return for process (group)
+static int exitStatus = 0;
 
 Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
@@ -66,10 +58,8 @@ Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
     this->priority=priority;
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
-#if THREAD
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
-#endif
 
 void Thread::run() {
     tid=gettid();
@@ -90,7 +80,7 @@ void Thread::run() {
                 }
             }
         }
-        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); remove(poll); queue.remove(poll);}
+        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
     }
     Locker lock(threadsLock); threads.remove(this);
     thread = 0;
@@ -113,10 +103,7 @@ void Thread::event() {
 String trace(int skip, void* ip);
 void traceAllThreads() {
     Locker lock(threadsLock);
-    for(Thread* thread: threads) {
-        thread->terminate=true; // Tries to terminate all other threads cleanly
-        if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
-    }
+    for(Thread* thread: threads) if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
 }
 static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
                                       "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
@@ -138,11 +125,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 #endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
-#if THREAD
     pthread_exit((void*)-1);
-#else
-    exit_group(-1);
-#endif
 }
 #if __x86_64
 // Configures floating-point exceptions
@@ -181,21 +164,19 @@ template<> void __attribute((noreturn)) error(const string& message) {
     exit_thread(-1); // Exits this thread
 }
 
-static int exitStatus;
 // Entry point
 int main() {
     if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
-#if THREAD
-    exit(0); // Signals all threads to terminate
     for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
-#endif
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
 void exit(int status) {
-    Locker lock(threadsLock);
-    for(Thread* thread: threads) { thread->terminate=true; thread->post(); }
     exitStatus = status;
+    terminate = true;
+    Locker lock(threadsLock);
+    assert_(threads);
+    for(Thread* thread: threads) thread->post();
 }
 
 // Environment

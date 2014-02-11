@@ -108,7 +108,6 @@ Window::~Window() {
 
 // Render
 void Window::event() {
-    window=this;
     if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
         lock.lock();
         if(!poll()) { lock.unlock(); break; }
@@ -144,7 +143,6 @@ void Window::event() {
         state=Server;
         frameSent();
     }
-    window=0;
 }
 
 // Events
@@ -176,6 +174,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     }
     else if(type==1) error("Unexpected reply");
     else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
+        window=this;
         /**/ if(type==MotionNotify) {
             cursorPosition = int2(e.x,e.y);
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
@@ -226,6 +225,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
+        window=0;
     }
 }
 uint Window::send(const ref<byte>& request) { write(request); return ++sequence; }
@@ -391,21 +391,69 @@ Image Window::getSnapshot() {
 }
 #else
 
+#include <unistd.h>
 #include <linux/fb.h>
+#include <linux/input.h>
 
 Window::Window(Widget* widget, int2, const string& title unused, const Image& icon unused) : Device("/dev/fb0"_), widget(widget) {
     fb_var_screeninfo var; ioctl(FBIOGET_VSCREENINFO, &var);
     fb_fix_screeninfo fix; ioctl(FBIOGET_FSCREENINFO, &fix);
-    this->size = int2(var.xres_virtual, var.yres_virtual);
+    this->size = this->displaySize = int2(var.xres_virtual, var.yres_virtual);
     assert_(var.bits_per_pixel % 8 == 0);
     bytesPerPixel = var.bits_per_pixel/8;
     assert_(fix.line_length % bytesPerPixel == 0);
     stride = fix.line_length / bytesPerPixel;
     framebuffer = Map(Device::fd, 0, var.yres_virtual * fix.line_length, Map::Prot(Map::Read|Map::Write));
+    touchscreen.eventReceived.connect(this, &Window::touchscreenEvent); touchscreen.registerPoll();
+    buttons.eventReceived.connect(this, &Window::buttonEvent); buttons.registerPoll();
+}
+
+void Window::touchscreenEvent() {
+    window=this;
+    for(input_event e; ::read(touchscreen.Device::fd, &e, sizeof(e)) > 0;) {
+        if(e.type == EV_ABS && e.code<2) {
+            int i = e.code, v = e.value;
+            static int min[]={130,210}, max[2]={3920,3790}; // Touchbook calibration
+            if(v<min[i]) min[i]=v; else if(v>max[i]) max[i]=v;
+            cursorPosition[i] = displaySize[i]*(max[i]-v)/uint(max[i]-min[i]);
+        }
+        if(e.type == EV_KEY && e.code==BTN_TOUCH) { state = e.value; log(state); }
+        if(e.type == EV_SYN) {
+            if(state != previousState) {
+                if(state==1) {
+                    Widget* focus=this->focus; this->focus=0;
+                    dragStart=cursorPosition, dragPosition=position, dragSize=size;
+                    if(widget->mouseEvent(cursorPosition, size, Widget::Press, Widget::LeftButton) || this->focus!=focus) needUpdate=true;
+                }
+                if(state==0) {
+                    drag=0;
+                    if(widget->mouseEvent(cursorPosition, size, Widget::Release, Widget::LeftButton)) needUpdate=true;
+                }
+                previousState = state;
+            }
+            if(drag && state==1 && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true;
+            else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, state==1?Widget::LeftButton:Widget::None)) needUpdate=true;
+        }
+    }
+    window=0;
+    if(needUpdate) render();
+}
+
+void Window::buttonEvent() {
+    window=this;
+    for(input_event e; ::read(buttons.Device::fd, &e, sizeof(e)) > 0;) {
+        if(e.type == EV_KEY && e.value==0) {
+            signal<>* shortcut = shortcuts.find(e.code);
+            if(shortcut) (*shortcut)(); // Local window shortcut
+        }
+    }
+    window=0;
+    if(needUpdate) render();
 }
 
 void Window::render() {
     if(!mapped) return;
+    needUpdate = false;
     Image target(size.x, size.y);
     renderBackground(target);
     assert(&widget);
@@ -427,8 +475,15 @@ void Window::render() {
     else error("Unsupported format", bytesPerPixel);
 }
 
-void Window::show() { if(!mapped) { mapped=true; render(); } }
-void Window::hide() { mapped=false; }
+void Window::show() {
+    if(mapped) return;
+    writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
+    mapped=true;
+    render();
+}
+void Window::hide() {
+    mapped=false;
+}
 void Window::setTitle(const string& title unused) {}
 void Window::setIcon(const Image& icon unused) {}
 String Window::getSelection(bool unused clipboard) { return String(); }

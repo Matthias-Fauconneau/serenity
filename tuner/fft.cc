@@ -3,7 +3,7 @@
 #include <fftw3.h> //fftw3f
 #if __x86_64 // app-emulation/emul-linux-x86-soundlibs does not contain libfftw3f_threads
 #include <fftw3.h> //fftw3f_threads
-void __attribute((constructor(10000))) initialize_FFTW() {
+void __attribute((constructor(1001))) initialize_FFTW() {
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
 }

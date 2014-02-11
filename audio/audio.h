@@ -21,33 +21,31 @@ struct AudioOutput : Device, Poll {
     uint periodSize = 0, bufferSize = 0;
 
     /// Configures PCM output
+    /// Starts audio output, will require data periodically from \a read callback
     AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread);
     /// Configures PCM for 16bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
     AudioOutput(function<uint(const mref<short2>& output)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
-	AudioOutput(16,rate,periodSize,thread) { read16=read; }
+    AudioOutput(16,rate,periodSize,thread) { read16=read; }
     /// Configures PCM for 32bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
     AudioOutput(function<uint(const mref<int2>& output)> read, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
-	AudioOutput(32,rate,periodSize,thread) { read32=read; }
+    AudioOutput(32,rate,periodSize,thread) { read32=read; }
     /// Configures PCM for either 16bit or 32bit output depending on driver capability
     /// \note read will be called back periodically to request an \a output frame of \a size samples
     /// \note 0 means maximum
     AudioOutput(function<uint(const mref<short2>&)> read16, function<uint(const mref<int2>&)> read32,
                 uint rate=0, uint periodSize=0, Thread& thread=mainThread):
     AudioOutput(0,rate,periodSize,thread) { this->read16=read16; this->read32=read32; }
-    ~AudioOutput();
-
-    /// Starts audio output, will require data periodically from \a read callback
-    void start();
     /// Drains audio output and stops requiring data from \a read callback
-    void stop();
+    virtual ~AudioOutput();
+
     /// Callback for poll events
     void event();
     /// Cancels last period, event() will be called again to replace the period
-    void cancel();
+    //void cancel();
 
     function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
     function<uint(const mref<int2>&)> read32 = [](const mref<int2>&){return 0;};

@@ -106,16 +106,22 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     status = &syncPtr.status;
     control = &syncPtr.control;
 #endif
+    io<PREPARE>();
+    registerPoll();
 }
-AudioOutput::~AudioOutput(){}
+AudioOutput::~AudioOutput(){
+     io<DRAIN>();
+}
 
-void AudioOutput::start() { if(status->state != Prepared && status->state != Running) { io<PREPARE>(); registerPoll(); } }
-void AudioOutput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioOutput::event() {
 #ifndef MMAP
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
-    if(status->state == XRun) { log("Underrun"_); io<PREPARE>();
+    if(status->state == XRun) {
+#if DEBUG
+        log("Underrun"_);
+#endif
+        io<PREPARE>();
 #ifndef MMAP
         syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
@@ -131,11 +137,12 @@ void AudioOutput::event() {
 #ifndef MMAP
         syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
 #endif
-        if(readSize<periodSize) { stop(); return; }
+        //if(readSize<periodSize) { stop(); return; }
+        assert_(readSize==periodSize, readSize, periodSize);
     }
     if(status->state == Prepared) io<START>();
 }
-void AudioOutput::cancel() { if(status->state == Running) { control->swPointer -= periodSize; event(); } }
+//void AudioOutput::cancel() { if(status->state == Running) { control->swPointer -= periodSize; event(); } }
 
 Device getCaptureDevice() {
     Folder snd("/dev/snd");

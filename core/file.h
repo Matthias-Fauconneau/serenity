@@ -70,7 +70,7 @@ struct Socket : Stream {
     Socket(int domain, int type);
 };
 
-enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, Asynchronous=020000};
+enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000};
 /// Handle to a file
 struct File : Stream {
     File(int fd):Stream(fd){}

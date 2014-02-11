@@ -1,7 +1,7 @@
 #include "graphics.h"
 
 static uint8 sRGB_forward[256];
-void __attribute((constructor(101))) generate_sRGB_forward() {
+void __attribute((constructor(1001))) generate_sRGB_forward() {
     for(uint index: range(0x100)) {
         float linear = (float) index / 0xFF;
         float sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
@@ -10,7 +10,7 @@ void __attribute((constructor(101))) generate_sRGB_forward() {
 }
 
 float sRGB_reverse[256];
-void __attribute((constructor(101))) generate_sRGB_reverse() {
+void __attribute((constructor(1001))) generate_sRGB_reverse() {
     for(uint index: range(0x100)) {
         float sRGB = (float) index / 0xFF;
         float linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
