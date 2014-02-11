@@ -26,7 +26,7 @@ struct Image {
 
     explicit operator bool() const { return data; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
-    byte4& operator()(uint x, uint y) const {assert(x<stride && y<height,int(x),int(y),stride,width,height); return data[y*stride+x]; }
+    byte4& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
 
     ::buffer<byte4> buffer; //FIXME: shared

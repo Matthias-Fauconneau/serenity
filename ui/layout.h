@@ -61,7 +61,7 @@ struct Linear : virtual Layout {
 
     /// Constructs a linear layout
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
-    Linear(Extra main=Share, Extra side=AlignCenter, string name=""_):main(main),side(side),name(name){}
+    Linear(Extra main=Share, Extra side=AlignCenter):main(main),side(side){}
 
     int2 sizeHint() override;
     array<Rect> layout(int2 size) override;
@@ -80,12 +80,12 @@ struct Vertical : virtual Linear {
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : Horizontal, Widgets {
-    HBox(const ref<Widget*>& widgets, string name, Extra main=Share, Extra side=AlignCenter):Linear(main,side,name),Widgets(widgets){}
+    HBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
     HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
-    VBox(const ref<Widget*>& widgets, string name, Extra main=Share, Extra side=AlignCenter):Linear(main,side,name),Widgets(widgets){}
+    VBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
     VBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Horizontal layout of homogenous items. \sa Array

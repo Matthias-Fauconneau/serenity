@@ -122,7 +122,7 @@ void Window::event() {
         assert(size);
 
         if(state!=Idle) { state=Wait; return; }
-        if(target.width != (uint)size.x || target.height != (uint)size.y) {
+        if(target.size() != size) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
                 shmdt(target.data);
@@ -459,26 +459,12 @@ void Window::buttonEvent() {
 
 void Window::render() {
     if(!mapped) return;
+    if(target.size() != size) target = Image(size.x, size.y);
     needUpdate = false;
-    Image target(size.x, size.y);
     renderBackground(target);
     assert(&widget);
     widget->render(target);
-    if(bytesPerPixel==4) {
-        byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
-        for(uint y: range(size.y)) for(uint x: range(size.x)) BGRX8888[y*stride+x] = target(x,y);
-    } else if(bytesPerPixel==2) {
-        uint16* RGB565 = (uint16*)framebuffer.data.pointer;
-        for(uint y: range(size.y)) for(uint x: range(size.x)) {
-            byte4 BGRA8 = target(x,y);
-            uint B8 = BGRA8.b, G8 = BGRA8.g, R8 = BGRA8.r;
-            uint B5 = (B8 * 249 + 1014 ) >> 11;
-            uint G6 = (G8 * 253 +  505 ) >> 10;
-            uint R5 = (R8 * 249 + 1014 ) >> 11;
-            RGB565[y*stride+x] = (R5 << 11) | (G6 << 5) | B5;
-        }
-    }
-    else error("Unsupported format", bytesPerPixel);
+    putImage(0, size);
 }
 
 void Window::show() {
@@ -494,18 +480,34 @@ void Window::setTitle(const string& title unused) {}
 void Window::setIcon(const Image& icon unused) {}
 String Window::getSelection(bool unused clipboard) { return String(); }
 signal<>& Window::globalShortcut(Key key) { return localShortcut(key); }
-void Window::putImage(int2 position, int2 size) {}
+void Window::putImage(int2 position, int2 size) {
+    if(bytesPerPixel==4) {
+        byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
+        for(uint y: range(position.y, position.y+size.y)) for(uint x: range(position.x, position.x+size.x)) BGRX8888[y*stride+x] = target(x,y);
+    } else if(bytesPerPixel==2) {
+        uint16* RGB565 = (uint16*)framebuffer.data.pointer;
+        for(uint y: range(position.y, position.y+size.y)) for(uint x: range(position.x, position.x+size.x)) {
+            byte4 BGRA8 = target(x,y);
+            uint B8 = BGRA8.b, G8 = BGRA8.g, R8 = BGRA8.r;
+            uint B5 = (B8 * 249 + 1014 ) >> 11;
+            uint G6 = (G8 * 253 +  505 ) >> 10;
+            uint R5 = (R8 * 249 + 1014 ) >> 11;
+            RGB565[y*stride+x] = (R5 << 11) | (G6 << 5) | B5;
+        }
+    }
+    else error("Unsupported format", bytesPerPixel);
+}
 #endif
 
 void Window::renderBackground(Image& target) {
     if(oxygenBackground) { // Oxygen-like radial gradient background
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
-        const vec3 radial = vec3(246); // linear
+        const vec3 radial = vec3(246./255); // linear
         const vec3 top = vec3(221, 223, 225); // sRGB
         const vec3 bottom = vec3(184, 187, 194); // sRGB
         const vec3 middle = (bottom+top)/2.f; //FIXME
         // Draws upper linear gradient
-        for(int y: range(0, min(size.y, y0+splitY/2))) {
+        for(int y: range(0, max(0, y0+splitY/2))) {
             float t = (float) (y-y0) / (splitY/2);
             for(int x: range(size.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
         }

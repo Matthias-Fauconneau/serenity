@@ -105,6 +105,7 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
 #else
     status = &syncPtr.status;
     control = &syncPtr.control;
+    control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
 #endif
     io<PREPARE>();
     registerPoll();
@@ -114,15 +115,13 @@ AudioOutput::~AudioOutput(){
 }
 
 void AudioOutput::event() {
-#ifndef MMAP
+#if !MMAP
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
     if(status->state == XRun) {
-#if DEBUG
         log("Underrun"_);
-#endif
         io<PREPARE>();
-#ifndef MMAP
+#if !MMAP
         syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
     }
@@ -134,16 +133,16 @@ void AudioOutput::event() {
         else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
-#ifndef MMAP
+#if !MMAP
         syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
 #endif
-        //if(readSize<periodSize) { stop(); return; }
-        assert_(readSize==periodSize, readSize, periodSize);
+        assert_(readSize==periodSize);
     }
     if(status->state == Prepared) io<START>();
 }
-//void AudioOutput::cancel() { if(status->state == Running) { control->swPointer -= periodSize; event(); } }
-
+#if MMAP
+void AudioOutput::cancel() { if(status->state == Running) { control->swPointer -= periodSize; event(); } }
+#endif
 Device getCaptureDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
@@ -199,7 +198,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
 void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
 void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
 void AudioInput::event() {
-#ifndef MMAP
+#if !MMAP
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
     if(status->state == XRun) { overruns++; log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns); io<PREPARE>(); io<START>(); }
@@ -211,7 +210,7 @@ void AudioInput::event() {
         else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
-#ifndef MMAP
+#if !MMAP
         syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
 #endif
         if(readSize<periodSize) { stop(); return; }

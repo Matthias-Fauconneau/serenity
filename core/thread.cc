@@ -120,7 +120,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
-#ifndef __arm
+#if !__arm
     if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->si_code],")", *(float*)info->si_addr);
 #endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));

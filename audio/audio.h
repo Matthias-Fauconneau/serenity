@@ -44,8 +44,10 @@ struct AudioOutput : Device, Poll {
 
     /// Callback for poll events
     void event();
+#if MMAP
     /// Cancels last period, event() will be called again to replace the period
-    //void cancel();
+    void cancel();
+#endif
 
     function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
     function<uint(const mref<int2>&)> read32 = [](const mref<int2>&){return 0;};

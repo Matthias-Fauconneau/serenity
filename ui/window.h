@@ -51,10 +51,8 @@ struct Window : Device {
     Widget* widget;
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
-    /// Window position
-    int2 position=0;
-    /// Window size
-    int2 size=0;
+    /// Geometry
+    int2 position=0, size=0;
     /// Shortcuts triggered when a key is pressed
     map<uint, signal<>> shortcuts;
     /// Current widget that has the keyboard input focus
@@ -78,7 +76,9 @@ struct Window : Device {
     /// Sets window cursor if cursor is inside region
     void setCursor(Rect region, Cursor cursor);
 
-    /// Window drag state
+    /// Rendering target
+    Image target;
+    /// Drag state
     int2 dragStart, dragPosition, dragSize;
     /// Whether a render request was skipped while unmapped
     bool needUpdate = true;
@@ -151,8 +151,6 @@ struct Window : Device {
 
     /// System V shared memory
     int shm = 0;
-    /// Shared window back buffer
-    Image target;
     /// Shared window buffer state
     enum { Idle, Server, Wait } state = Idle;
 

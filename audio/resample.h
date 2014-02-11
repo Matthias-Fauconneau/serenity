@@ -6,7 +6,7 @@ struct Resampler {
     Resampler(){}
     /// Allocates buffers and generates filter to resample from \a sourceRate to \a targetRate
     /// \note bufferSize will be the maximum size which can be given at once to filter
-    Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize=0);
+    Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize=1024);
     /// Returns needed input size to produce a given target size
     int need(uint targetSize);
     /// Stores \a sourceSize samples to the resampling buffer

@@ -46,10 +46,9 @@ template<Type T> struct BackingStore : T {
 struct Player {
 // Playback
     static constexpr uint channels = 2;
+    static constexpr uint periodSize = 8192;
     unique<AudioFile> file = 0;
     Resampler resampler;
-    const uint rate = 44100;
-    //AudioOutput audio{{this,&Player::read16}, {this,&Player::read}, rate, 8192};
     AudioOutput* audio = 0;
     mref<int2> lastPeriod;
     uint read(const mref<int2>& output) {
@@ -60,13 +59,16 @@ struct Player {
             size_t read = 0;
             if(resampler.sourceRate*audio->rate != file->rate*resampler.targetRate) {
                 resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
-                if(file->rate != audio->rate) new (&resampler) Resampler(audio->channels, file->rate, audio->rate, audio->periodSize);
+                if(file->rate != audio->rate) {
+                    //new (&resampler) Resampler(audio->channels, file->rate, audio->rate, audio->periodSize);
+                    delete audio; audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
+                }
             }
             if(resampler) {
-                    uint sourceNeed = resampler.need(chunk.size);
-                    buffer<float2> source(sourceNeed);
-                    uint sourceRead = file->read(source);
-                    resampler.write(source.slice(0, sourceRead));
+                uint sourceNeed = resampler.need(chunk.size);
+                buffer<float2> source(sourceNeed);
+                uint sourceRead = file->read(source);
+                resampler.write(source.slice(0, sourceRead));
                 read = min(chunk.size, resampler.available());
                 if(read) {
                     buffer<float2> target(read);
@@ -109,12 +111,12 @@ struct Player {
     Text elapsed = "00:00"_;
     Slider slider;
     Text remaining = "00:00"_;
-    BackingStore<HBox> backingStore {{&elapsed, &slider, &remaining}, "backingStore"};
-    HBox toolbar {{&randomButton, &playButton, &nextButton, &backingStore}, "toolbar"_};
+    BackingStore<HBox> backingStore {{&elapsed, &slider, &remaining}};
+    HBox toolbar {{&randomButton, &playButton, &nextButton, &backingStore}};
     Scroll< List<Text>> albums;
     Scroll< List<Text>> titles;
-    HBox main {{ &albums.area(), &titles.area() }, "main"_};
-    VBox layout {{ &toolbar, &main }, "layout"_};
+    HBox main {{ &albums.area(), &titles.area() }};
+    VBox layout {{ &toolbar, &main }};
     Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
 
 // Content
@@ -241,10 +243,11 @@ struct Player {
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {
         if(play) {
-            audio = new AudioOutput({this,&Player::read}, rate, 8192);
+            assert_(file);
+            audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
             //audio->start();
-            window.setIcon(playIcon()); }
-        else {
+            window.setIcon(playIcon());
+        } else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
             for(uint i: range(lastPeriod.size)) {
                 float level = exp2(-12. * i / lastPeriod.size); // Linear perceived sound level

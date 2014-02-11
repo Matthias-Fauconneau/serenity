@@ -4,6 +4,7 @@
 // Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
+#define notrace __attribute((no_instrument_function))
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
