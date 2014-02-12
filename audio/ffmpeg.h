@@ -14,6 +14,7 @@ struct AudioFile {
     struct AVCodecContext* audio=0;
     struct AVFrame* frame=0;
 
+    buffer<short2> shortBuffer;
     buffer<int2> intBuffer;
     buffer<float2> floatBuffer;
     size_t bufferIndex=0, bufferSize=0;
@@ -25,6 +26,7 @@ struct AudioFile {
     bool open();
     void close();
 
+    uint read(const mref<short2>& output);
     uint read(const mref<int2>& output);
     uint read(const mref<float2>& output);
 

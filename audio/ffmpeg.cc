@@ -26,6 +26,7 @@ bool AudioFile::open() {
         if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
             audioStream = file->streams[i];
             audio = audioStream->codec;
+            audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
                 rate = audio->sample_rate;
@@ -38,6 +39,34 @@ bool AudioFile::open() {
             (audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S16P ||
              audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32));
     return true;
+}
+
+uint AudioFile::read(const mref<short2>& output) {
+    uint readSize = 0;
+    while(readSize<output.size) {
+        if(!bufferSize) {
+            AVPacket packet;
+            if(av_read_frame(file, &packet) < 0) return readSize;
+            if(file->streams[packet.stream_index]==audioStream) {
+                shortBuffer = buffer<short2>();
+                if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
+                int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
+                if(used < 0 || !gotFrame) continue;
+                bufferIndex=0, bufferSize = frame->nb_samples;
+                if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+                    shortBuffer = unsafeReference(ref<short2>((short2*)frame->data[0], bufferSize)); // Valid until next frame
+                }
+                else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
+                position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+            }
+            av_free_packet(&packet);
+        }
+        uint size = min(bufferSize, output.size-readSize);
+        copy(output.slice(readSize, size), shortBuffer.slice(bufferIndex, size));
+        bufferSize -= size; bufferIndex += size; readSize += size;
+    }
+    assert(readSize == output.size);
+    return readSize;
 }
 
 uint AudioFile::read(const mref<int2>& output) {

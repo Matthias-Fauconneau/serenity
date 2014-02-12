@@ -48,23 +48,24 @@ struct Player {
     static constexpr uint channels = 2;
     static constexpr uint periodSize = 8192;
     unique<AudioFile> file = 0;
-    Resampler resampler;
+    //Resampler resampler;
     AudioOutput* audio = 0;
-    mref<int2> lastPeriod;
-    uint read(const mref<int2>& output) {
+    mref<short2> lastPeriod;
+    uint read(const mref<short2>& output) {
         uint readSize = 0;
-        for(mref<int2> chunk=output;;) {
+        for(mref<short2> chunk=output;;) {
             if(!file) break;
             assert(readSize<output.size);
             size_t read = 0;
-            if(resampler.sourceRate*audio->rate != file->rate*resampler.targetRate) {
-                resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
+            //if(resampler.sourceRate*audio->rate != file->rate*resampler.targetRate) {
+            if(audio->rate != file->rate) {
+                //resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
                 if(file->rate != audio->rate) {
                     //new (&resampler) Resampler(audio->channels, file->rate, audio->rate, audio->periodSize);
                     delete audio; audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
                 }
             }
-            if(resampler) {
+            /*if(resampler) {
                 uint sourceNeed = resampler.need(chunk.size);
                 buffer<float2> source(sourceNeed);
                 uint sourceRead = file->read(source);
@@ -78,7 +79,7 @@ struct Player {
                         chunk[i][1] = target[i][1]*(1<<29); // 3dB headroom
                     }
                 }
-            } else read = file->read(chunk);
+            } else*/ read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
             if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk
@@ -91,16 +92,6 @@ struct Player {
         }
         lastPeriod = output;
         assert_(readSize == output.size);
-        return readSize;
-    }
-    uint read16(const mref<short2>& output) {
-        buffer<int2> buffer(output.size);
-        uint readSize = read(buffer);
-        lastPeriod=mref<int2>(); //FIXME: 16bit fade out
-        for(uint i: range(output.size)) {
-            output[i][0]=buffer[i][0]>>16; // Truncates 32bit to 16bit
-            output[i][1]=buffer[i][1]>>16; // Truncates 32bit to 16bit
-        }
         return readSize;
     }
 
@@ -130,11 +121,11 @@ struct Player {
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(Power).connect([]{exit();}); // FIXME: brief -> next, long -> poweroff
+        window.localShortcut(Power).connect([]{exit();}); // FIXME: brief -> toggle display, long -> power off system
         window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
         window.globalShortcut(Play).connect(this, &Player::togglePlay);
 #if __arm__
-        window.globalShortcut(Extra).connect(this, &Player::togglePlay); // FIXME: brief -> toggle, long -> next
+        window.globalShortcut(Extra).connect(this, &Player::togglePlay); // FIXME: brief -> toggle playback, long -> next track
 #endif
         randomButton.toggled.connect(this, &Player::setRandom);
         playButton.toggled.connect(this, &Player::setPlaying);
@@ -244,8 +235,7 @@ struct Player {
     void setPlaying(bool play) {
         if(play) {
             assert_(file);
-            audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
-            //audio->start();
+            if(!audio) audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
             window.setIcon(playIcon());
         } else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
@@ -254,7 +244,7 @@ struct Player {
                 lastPeriod[i] *= level;
             }
             file->seek(max(0, int(file->position-lastPeriod.size)));
-            lastPeriod=mref<int2>();
+            lastPeriod=mref<short2>();
             delete audio; audio=0;
             window.setIcon(pauseIcon());
         }
@@ -263,13 +253,13 @@ struct Player {
         writeFile("Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), root());
     }
     void seek(int position) {
-        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); resampler.clear(); /*audio->cancel();*/ }
+        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*resampler.clear();*/ /*audio->cancel();*/ }
     }
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
         slider.value = position; slider.maximum=duration;
         elapsed.setText(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
-        remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
+        if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         backingStore.render(window);
     }
 } application;
