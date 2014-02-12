@@ -30,7 +30,7 @@ struct Build {
     String find(const string& file) { for(String& path: sources) if(section(path,'/',-2,-1)==file) return String(path.contains('.')?section(path,'.',0,-2):path); return String(); }
 
     string tryParseIncludes(TextData& s) {
-        if(!s.match("#include "_)) return ""_;
+        if(!s.match("#include "_) && !s.match("//#include "_)) return ""_;
         if(s.match('"')) { // module header
             string name = s.until('.');
             return name;

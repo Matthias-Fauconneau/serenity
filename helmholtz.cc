@@ -75,46 +75,35 @@ inline String str(const Matrix2D& M, const Vector2D& v) {
     return s;
 }
 
-// Resolution (1/dt - L)T = T0/dt - S
-struct Helmholtz : Widget {
-    const real L = 1;
-    const real kx = 2*PI/L, ky = 2*PI/L;
-    real Ta(real x, real y) { return sin(kx*x) * cos(ky*y); }
-    real LTa(real x, real y) { return - (sq(kx) + sq(ky)) * Ta(x,y); }
-    real DxTa(real x, real y) { return + kx * cos(kx*x) * cos(ky*y); }
-    real DyTa(real x, real y) { return - ky * sin(kx*x) * sin(ky*y); }
-    const bool regularGrid; // Spatial discretisation
-    const bool dirichletBoundaryCondition; // Boundary condition
-    const real dt; // Time step
-    Helmholtz(bool regularGrid = true, bool dirichletBoundaryCondition = true, const real dt = 1) :
-        regularGrid(regularGrid), dirichletBoundaryCondition(dirichletBoundaryCondition), dt(dt) {}
-
-    Vector X, Y;
-    Vector2D e;
-    real eMax;
-
-    real solve(uint N) {
-        // Maillage
-        const uint Nx=N, Ny=Nx;
-        X = Vector(Nx), Y = Vector(Ny);
-        if(regularGrid) {
-            for(uint i: range(Nx)) X[i] = L * i / (Nx-1);
-            for(uint j: range(Ny)) Y[j] = L * j / (Ny-1);
+struct Grid {
+    const uint Nx, Ny;
+    const Vector X, Y;
+    enum GridType { Regular, Irregular } type; // Spatial discretisation
+    Grid(uint Nx, uint Ny, GridType type) : Nx(Nx), Ny(Ny), X(Nx), Y(Ny), type(type) {
+        if(type==Regular) {
+            for(uint i: range(Nx)) X[i] = i / (Nx-1);
+            for(uint j: range(Ny)) Y[j] = j / (Ny-1);
         } else { // Refines near boundaries
-            for(uint i: range(Nx)) X[i] = L/2 * (1 - cos(i*PI/(Nx-1)));
-            for(uint j: range(Ny)) Y[j] = L/2 * (1 - cos(j*PI/(Ny-1)));
+            for(uint i: range(Nx)) X[i] = 1 - cos(i*PI/(Nx-1));
+            for(uint j: range(Ny)) Y[j] = 1 - cos(j*PI/(Ny-1));
         }
+    }
+};
 
-        // Solution analytique
-        Vector2D T (Nx,Ny);
-        for(uint i: range(Nx)) for(uint j: range(Ny)) T(i,j) = Ta(X[i], Y[j]);
+// Solves (H - L)u = S
+struct Helmholtz {
+    const real H;
+    const uint Nx, Ny;
+    const Vector& X; const Vector& Y;
+    enum ConditionType { Dirichlet, Neumann } type; // Boundary conditions (homogeneous)
+    enum { Top, Bottom, Left, Right };
+    const vec4 boundaryValues; // [Top, Bottom, Left, Right] values for Dirichlet or Neumann boundary conditions
+    UMFPACK A;
+    Helmholtz(real H, const Grid& grid, ConditionType type, vec4 boundaryValues) :
+        H(H), Nx(grid.Nx), Ny(grid.Ny), X(grid.X), Y(grid.Y), type(type), boundaryValues(boundaryValues) {
 
-        // Champ solution
-        Vector2D u (Nx,Ny);
-        u.clear(0); // Condition initial
-
-        // Systeme MT=S
         Matrix2D M (Nx, Ny);
+        // Interior matrix
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real xm = (X[i-1]+X[i])/2;
             real xp = (X[i]+X[i+1])/2;
@@ -124,24 +113,25 @@ struct Helmholtz : Widget {
             real right = (yp-ym)/(X[i+1]-X[i]);
             real top = (xp-xm)/(Y[j]-Y[j-1]);
             real bottom = (xp-xm)/(Y[j+1]-Y[j]);
-            real H = (xp-xm)*(yp-ym)/dt;
+            real h = (xp-xm)*(yp-ym)*h;
             M(i,j, i-1,j)   =    -left;
             M(i,j, i+1,j)   =         -right;
             M(i,j, i,  j-1) =                     -top;
             M(i,j, i,  j+1) =                           -bottom;
             M(i,j, i,  j  ) = H+left+right+top+bottom;
         }
-        Vector2D S (Nx,Ny); // Constante
-        if(dirichletBoundaryCondition) {
+        // Borders
+        if(type==Dirichlet) {
             for(uint i: range(Nx)) {
-                M(i, 0,    i, 0)    = 1, S(i, 0   ) = T(i, 0);
-                M(i, Ny-1, i, Ny-1) = 1, S(i, Ny-1) = T(i, Ny-1);
+                M(i, 0,    i, 0)    = 1;
+                M(i, Ny-1, i, Ny-1) = 1;
             }
             for(uint j: range(Ny)) {
-                M(0,   j, 0,   j) = 1, S(0, j)    = T(0, j);
-                M(Nx-1,j, Nx-1,j) = 1, S(Nx-1, j) = T(Nx-1, j);
+                M(0,   j, 0,   j) = 1;
+                M(Nx-1,j, Nx-1,j) = 1;
             }
-        } else {
+        }
+        if(type==Neumann) {
             auto bord = [&](bool transpose, int i0, int i1, int i) {
                 const auto& x = !transpose ? X : Y;
                 const auto& y = !transpose ? Y : X;
@@ -151,12 +141,12 @@ struct Helmholtz : Widget {
                 real left  = (y12-y[i0])/(x[i]-x[i-1]);
                 real right = (y12-y[i0])/(x[i+1]-x[i]);
                 real bottom = (xp-xm)/(y[i1]-y[i0]);
-                real H = (xp-xm)*(y12-y[i0])/dt;
+                real h = (xp-xm)*(y12-y[i0])*H;
                 auto m = [&](int i, int j, int k, int l) -> real& { return !transpose ? M(i,j,k,l) : M(j,i,l,k); };
                 m(i,i0, i-1,i0) =  -left; // -Laplacian
                 m(i,i0, i+1,i0) =       -right; // -Laplacian
                 m(i,i0, i,  i1) =                   -bottom; // Flux
-                m(i,i0, i  ,i0) = H+left+right+bottom;
+                m(i,i0, i  ,i0) = h+left+right+bottom;
             };
             for(uint i: range(1,Nx-1)) {
                 bord(false, 0,    1,      i);
@@ -167,65 +157,142 @@ struct Helmholtz : Widget {
                 bord(true,  Nx-1, Nx-1-1, j);
             }
             // Dirichlet au coins
-            M(0, 0,    0, 0)          = 1, S(0,    0)    = T(0,    0);
-            M(Nx-1, 0,    Nx-1, 0)    = 1, S(Nx-1, 0)    = T(Nx-1, 0);
-            M(0,    Ny-1, 0, Ny-1)    = 1, S(0, Ny-1)    = T(0,    Ny-1);
-            M(Nx-1, Ny-1, Nx-1, Ny-1) = 1, S(Nx-1, Ny-1) = T(Nx-1, Ny-1);
+            M(0, 0,    0, 0)          = 1;
+            M(Nx-1, 0,    Nx-1, 0)    = 1;
+            M(0,    Ny-1, 0, Ny-1)    = 1;
+            M(Nx-1, Ny-1, Nx-1, Ny-1) = 1;
         }
-        log_((regularGrid ? "Regular"_:"Irregular"_)+" - "_+(dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)+" N="_+str(Nx)+"x"_+str(Ny)+" "_);
-        Time time;
-        UMFPACK A = M;
-        log_("T="_+str(time)+" "_);
-        eMax = inf;
-        for(uint unused t: range(2/dt +1)) {
-            for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) { // Source interieur
-                real xm = (X[i-1]+X[i])/2;
-                real xp = (X[i]+X[i+1])/2;
-                real ym = (Y[j-1]+Y[j])/2;
-                real yp = (Y[j]+Y[j+1])/2;
-                S(i,j) = (xp-xm)*(yp-ym) * (u(i,j)/dt - LTa(X[i],Y[j]));
-            }
-            if(!dirichletBoundaryCondition) {
-                auto bord = [&](bool transpose, int i0, int i1, int i) {
-                    const auto& x = !transpose ? X : Y;
-                    const auto& y = !transpose ? Y : X;
-                    real xm = (x[i-1]+x[i])/2;
-                    real xp = (x[i]+x[i+1])/2;
-                    real y12 = (y[i0]+y[i1])/2;
-                    auto source = [&](int i, int j) -> real { return !transpose ? u(i,j)/dt - LTa(X[i],Y[j]) : u(j,i)/dt - LTa(X[j],Y[i]); };
-                    real b = source(i, i0);
-                    auto s = [&](int i, int j) -> real& { return !transpose ? S(i,j) : S(j,i); };
-                    real f = !transpose ? DyTa(X[i], Y[i0]) : DxTa(X[i0], Y[i]);
-                    s(i,i0) = (xp-xm) * ((y12-y[i0]) * b - f);
-                };
-                for(uint i: range(1,Nx-1)) {
-                    bord(false, 0,    1,      i);
-                    bord(false, Ny-1, Ny-1-1, i);
-                }
-                for(uint j: range(1,Ny-1)) {
-                    bord(true,  0,    1,      j);
-                    bord(true,  Nx-1, Nx-1-1, j);
-                }
-            }
-            u = Vector2D(A.solve(S), Nx, Ny);
-            e = u-T;
-            real eMaxt = maxabs(e);
-            eMax = eMaxt;
-        }
-        log("e=2^"_+ftoa(log2(eMax)));
-        return eMax;
+        // LU Factorization
+        A = M;
     }
+
+    /// Solves (H - L)u = S
+    Vector2D solve(const Vector2D& S) {
+        Vector2D b (Nx,Ny);
+        // Interior
+        for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real xm = (X[i-1]+X[i])/2;
+            real xp = (X[i]+X[i+1])/2;
+            real ym = (Y[j-1]+Y[j])/2;
+            real yp = (Y[j]+Y[j+1])/2;
+            b(i,j) = (xp-xm)*(yp-ym) * S(i,j);
+        }
+        if(type==Dirichlet) {
+            for(uint i: range(Nx)) {
+                b(i, 0   ) = boundaryValues[Top];
+                b(i, Ny-1) = boundaryValues[Bottom];
+            }
+            for(uint j: range(Ny)) {
+                b(0, j)    = boundaryValues[Left];
+                b(Nx-1, j) = boundaryValues[Right];
+            }
+        }
+        if(type==Neumann) {
+            auto bord = [&](bool transpose, int i0, int i1, int i) {
+                const auto& x = !transpose ? X : Y;
+                const auto& y = !transpose ? Y : X;
+                real xm = (x[i-1]+x[i])/2;
+                real xp = (x[i]+x[i+1])/2;
+                real y12 = (y[i0]+y[i1])/2;
+                real s = !transpose ? S(i,i0) : S(i0,i);
+                real f = boundaryValues[ !transpose ? (i0==0 ? Top : Bottom) : (i0==0 ? Left : Right) ];
+                (!transpose ? b(i,i0) : b(i0,i)) = (xp-xm) * ((y12-y[i0]) * s - f);
+            };
+            for(uint i: range(1,Nx-1)) {
+                bord(false, 0,    1,      i);
+                bord(false, Ny-1, Ny-1-1, i);
+            }
+            for(uint j: range(1,Ny-1)) {
+                bord(true,  0,    1,      j);
+                bord(true,  Nx-1, Nx-1-1, j);
+            }
+            // Homogeneous Neumann needs Dirichlet corners to set the constant
+            b(0,    0)    = 0;
+            b(Nx-1, 0)    = 0;
+            b(0, Ny-1)    = 0;
+            b(Nx-1, Ny-1) = 0;
+        }
+        return Vector2D(A.solve(b), Nx, Ny);
+    }
+};
+
+// Solves D.u = 0, dt u + (u.D)u = -Dp + (1/Re)Lu
+struct Chorin {
+    const uint N, Nx=N, Ny=N;
+    const real U = 1; // Boundary speed
+    const real L = 1; // Domain size
+    const real nu = 1; // Fluid viscosity
+    const real Re = U*L/nu; // Reynolds
+    const real dt = 1; // Time step
+    Grid grid {Nx,Ny, Grid::Regular};
+    const Vector& X = grid.X; const Vector& Y = grid.Y;
+    Chorin(uint N):N(N) {}
+
+    Helmholtz prediction {Re/dt, grid, Helmholtz::Dirichlet, vec4(U,0,0,0)}; // Dirichlet conditions with top u = U
+    Vector2D predict(const Vector2D& U, const Vector2D& Ux, const Vector2D& Uy) {
+        Vector2D S(Nx, Ny);
+        for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real u = U(i,j), ux = Ux(i,j), uy = Uy(i,j);
+            real dxU = ( U(i+1,j) - U(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyU = ( U(i,j+1) - U(i,j-1) ) / ( Y[j+1] - X[j-1] );
+            S(i,j) = Re*(u/dt - (ux*dxU + uy*dyU)); // b = Lx*Ly*S
+        }
+        // Dirichlet conditions are set with Helmholtz::boundaryValues
+        return prediction.solve(S);
+    }
+
+    Helmholtz correction {0, grid, Helmholtz::Neumann, 0}; // Poisson with homogeneous Neumann conditions (Dp=0)
+    Vector2D correct(const Vector2D& ux, const Vector2D& uy) {
+        Vector2D S(Nx, Ny);
+        for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real dxU = ( ux(i+1,j) - ux(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyU = ( uy(i,j+1) - uy(i,j-1) ) / ( Y[j+1] - X[j-1] );
+            S(i,j) = /*(1/dt)**/(dxU + dyU);
+        }
+        // Neumann conditions are set with Helmholtz::boundaryValues
+        return correction.solve(S);
+    }
+
+    // Current state vector
+    Vector2D ux {Nx,Ny}, uy{Nx,Ny};
+
+    // Solves one iteration of Chorin
+    void solve() {
+        Vector2D nux = predict(ux, ux,uy);
+        Vector2D nuy = predict(uy, ux,uy);
+        Vector2D psi = correct(nux, nuy);
+        for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real dxP = ( psi(i+1,j) - psi(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyP = ( psi(i,j+1) - psi(i,j-1) ) / ( Y[j+1] - X[j-1] );
+            ux(i,j) = nux(i,j) - /*dt**/dxP;
+            uy(i,j) = nuy(i,j) - /*dt**/dyP;
+        }
+    }
+};
+
+
+/// Displays scalar fields as blue,green,red components
+struct FieldView : Widget {
+    const Vector& X; const Vector& Y;
+    const Vector2D& B; const Vector2D& G; const Vector2D& R;
+    FieldView(const Grid& grid, const Vector2D& B,const Vector2D& G, const Vector2D& R):X(grid.X),Y(grid.Y),B(B),G(G),R(R){}
     int2 sizeHint() { return int2(720/2); }
     void render(const Image& target) override {
-        for(uint i: range(e.m-1)) for(uint j: range(e.n-1)) {
+        vec3 cMax (maxabs(B), maxabs(G), maxabs(R));
+        for(uint i: range(X.size-1)) for(uint j: range(Y.size-1)) {
             for(uint y: range(round(target.size().y*Y[j]),round(target.size().y*Y[j+1]))) {
                 for(uint x: range(round(target.size().x*X[i]),round(target.size().x*X[i+1]))) {
                     real u = ((x+1./2)/target.size().x-X[i])/(X[i+1]-X[i]);
                     real v = ((y+1./2)/target.size().y-Y[j])/(Y[j+1]-Y[j]);
-                    real s =
-                            (1-v) * ((1-u) * e(i,j  ) + u * e(i+1,j  )) +
-                            v     * ((1-u) * e(i,j+1) + u * e(i+1,j+1));
-                    target(x,y) = byte4(byte3(clip<int>(0,round((1+s/eMax)/2*0xFF),0xFF)), 0xFF);
+                    vec3 c;
+                    for(uint i : range(3)) {
+                        const Vector2D& C = *(ref<const Vector2D*>{&B,&G,&R}[i]);
+                        c[i] = (1-v) * ((1-u) * C(i,j  ) + u * C(i+1,j  )) +
+                                v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
+                    }
+                    int3 linear = int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2))));
+                    extern uint8 sRGB_forward[0x1000];
+                    target(x,y) = byte4(sRGB_forward[linear.x], sRGB_forward[linear.y], sRGB_forward[linear.z], 0xFF);
                 }
             }
         }
@@ -233,40 +300,22 @@ struct Helmholtz : Widget {
 };
 
 struct Application {
-    UniformGrid<Helmholtz> problems {{Helmholtz(false, false), Helmholtz(false, true), Helmholtz(true, false), Helmholtz(true, true)}};
-    Plot plot;
-    HBox layout {{&plot, &problems}};
-
-    /// Solves Helmholtz problems at resolution NxN
-    void solve(uint N) {
-        real maxE = 0;
-        for(auto& problem: problems) {
-            real e = problem.solve(N);
-            plot.dataSets[(problem.regularGrid ? "Regular"_:"Irregular"_)+" - "_+(problem.dirichletBoundaryCondition ? "Dirichlet"_:"Neumann"_)].
-                    insertMulti(N, log2(e));
-            maxE = max(maxE, e);
-        }
-        for(Helmholtz& problem: problems) problem.eMax = maxE; // Normalizes all problems display with the same maximum error
-    }
-
-    uint N = 8;
-    Window window {&layout, int2(1280,720), str(N)};
+    const uint N = 8;
+    Chorin chorin {N};
+    uint t = 0;
+    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, chorin.ux};
+    Window window {&fieldView, int2(1280,720), str(N)};
     Application() {
-        plot.log[0] = true, plot.log[1] = false; // Linear Y plot of log(error) (i.e log(error) ticks)
-        solve(N); N++; solve(N); // Log plot requires at least two points
+        chorin.solve();
         if(arguments().contains("video"_)) {
-            Time total;
-            while(N <= 64) solve(++N);
-            writeFile("Helmholtz.png"_,encodePNG(renderToImage(layout, window.size)), home());
-            log(total);
+            writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());
         } else {
-            //window.oxygenBackground = false;
+            window.oxygenBackground = false;
             window.localShortcut(Escape).connect([]{exit();});
             window.frameSent.connect([this](){
-                N++;
-                solve(N);
+                chorin.solve();
                 window.render();
-                window.setTitle(str(N));
+                window.setTitle(str(t++));
             });
             window.show();
         }

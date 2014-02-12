@@ -92,14 +92,14 @@ array<Rect> Linear::layout(int2 size) {
 }
 
 // Grid
-int2 Grid::sizeHint() {
+int2 GridLayout::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 max(0,0);
     for(uint i: range(count())) max = ::max(max,at(i).sizeHint());
     return int2(w,h)*(max+margin);
 }
 
-array<Rect> Grid::layout(int2 size) {
+array<Rect> GridLayout::layout(int2 size) {
     array<Rect> widgets(count());
     if(count()) {
         uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }

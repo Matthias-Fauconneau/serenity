@@ -1,6 +1,6 @@
 #include "graphics.h"
 
-static uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
+uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
 void __attribute((constructor(1001))) generate_sRGB_forward() {
     for(uint index: range(sizeof(sRGB_forward))) {
         real linear = (real) index / (sizeof(sRGB_forward)-1);

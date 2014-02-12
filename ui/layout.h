@@ -101,23 +101,23 @@ template<class T> struct VList : Vertical, Array<T> {
 };
 
 /// Layouts items on an uniform #width x #height grid
-struct Grid : virtual Layout {
+struct GridLayout : virtual Layout {
     /// Horizontal element count, 0 means automatic
     int width;
     /// Vertical element count, 0 means automatic
     int height;
     /// Margin between elements
     int2 margin;
-    Grid(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
+    GridLayout(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
     int2 sizeHint();
     array<Rect> layout(int2 size) override;
 };
 /// Grid of heterogenous widgets. \sa Widgets
-struct WidgetGrid : Grid, Widgets {
+struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(){}
     WidgetGrid(const ref<Widget*>& widgets):Widgets(widgets){}
 };
-template<class T> struct UniformGrid : Grid,  Array<T> {
+template<class T> struct UniformGrid : GridLayout,  Array<T> {
     UniformGrid(const mref<T>& items) : Array<T>(items) {}
     //UniformGrid(int width=0, int height=0, int margin=0):Grid(width,height,margin){}
 };
@@ -168,7 +168,7 @@ template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
     Bar(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
 /// GridSelection is a Grid layout of selectable items. \sa ArraySelection
-template<class T> struct GridSelection : Grid, ArraySelection<T>, HighlightSelection {
-    GridSelection(int width=0, int height=0, int margin=0) : Grid(width,height,margin){}
+template<class T> struct GridSelection : GridLayout, ArraySelection<T>, HighlightSelection {
+    GridSelection(int width=0, int height=0, int margin=0) : GridLayout(width,height,margin){}
     GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
