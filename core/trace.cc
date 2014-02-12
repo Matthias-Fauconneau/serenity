@@ -111,7 +111,7 @@ String demangle(TextData& s, bool function=true) {
 String demangle(const string& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findSymbol(void* find) {
-#if ARM // qemu-user only fakes /proc/self/exe for readlink
+#if 0 // qemu-user only fakes /proc/self/exe for readlink
     String s(256); s.size=readlink(strz("/proc/self/exe"_), s.begin(), s.capacity);
     static Map exe(s);
 #else

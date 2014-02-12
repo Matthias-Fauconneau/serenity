@@ -4,7 +4,8 @@
 #include "widget.h"
 #include "function.h"
 #include "map.h"
-#if !__arm__
+#include "time.h"
+#if !__arm__ && __GXX_EXPERIMENTAL_CXX0X__ /*!QtCreator*/
 #define X11 1
 #endif
 #if X11
@@ -13,7 +14,7 @@ union XEvent;
 struct PollDevice : Device, Poll {
     PollDevice(const string &path):Device(path,root(),Flags(ReadWrite|NonBlocking)),Poll(Device::fd){}
     void event() override { eventReceived(); }
-    signal<> eventReceived;
+    function<void()> eventReceived;
 };
 #endif
 
@@ -37,13 +38,16 @@ struct Window : Device {
     /// Sets window icon to \a icon
     void setIcon(const Image& icon);
 
-    /// Registers local shortcut on \a key
-    signal<>& localShortcut(Key);
-    /// Registers global shortcut on \a key
-    signal<>& globalShortcut(Key);
+    /// Registers global action on \a key
+    function<void()>& globalAction(Key);
 
     /// Sends a partial update
     void putImage(int2 position, int2 size);
+
+    /// Sets display state
+    void setDisplay(bool displayState);
+    /// Toggles display state
+    inline void toggleDisplay() { setDisplay(!displayState); }
 
     /// Display size
     int2 displaySize=0;
@@ -53,8 +57,10 @@ struct Window : Device {
     bool mapped = false;
     /// Geometry
     int2 position=0, size=0;
-    /// Shortcuts triggered when a key is pressed
-    map<uint, signal<>> shortcuts;
+    /// Actions triggered when a key is pressed (or on release for key mapped with a long action)
+    map<Key, function<void()>> actions;
+    /// Actions triggered when a key is pressed for a long time
+    map<Key, function<void()>> longActions;
     /// Current widget that has the keyboard input focus
     Widget* focus=0;
     /// Current widget that has the drag focus
@@ -76,13 +82,19 @@ struct Window : Device {
     /// Sets window cursor if cursor is inside region
     void setCursor(Rect region, Cursor cursor);
 
+    void keyPress(Key key, Modifiers modifiers);
+    void keyRelease(Key key, Modifiers modifiers);
+
     /// Rendering target
     Image target;
     /// Drag state
     int2 dragStart, dragPosition, dragSize;
     /// Whether a render request was skipped while unmapped
     bool needUpdate = true;
-
+    /// Whether the current display is active
+    bool displayState = true;
+    /// Pending long actions
+    map<uint, unique<Timer>> longActionTimers;
 #if X11
     /// Properly destroys X GC and Window
     ~Window();
@@ -178,6 +190,6 @@ struct Window : Device {
     Map framebuffer;
     PollDevice touchscreen {"/dev/input/event0"_};
     PollDevice buttons {"/dev/input/event4"_};
-    int previousState = 0, state = 0;
+    int previousPressState = 0, pressState = 0;
 #endif
 };

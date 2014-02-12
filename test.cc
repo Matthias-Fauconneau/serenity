@@ -3,18 +3,6 @@
 #include "window.h"
 #include "text.h"
 
-#if 0
-#include <unistd.h>
-#include <linux/input.h>
-struct Test : PollDevice {
-    Test():PollDevice("/dev/input/event0"_){registerPoll();}
-    void event() override {
-        for(input_event e; ::read(Device::fd, &e, sizeof(e)) > 0;) {
-            log(e.type, e.code, e.value);
-        }
-    }
-} test;
-#else
 struct Test : Text {
     Window window {this, int2(1050), "Test"_};
 
@@ -42,4 +30,3 @@ struct Test : Text {
         audio.start();
     }
 } test;
-#endif

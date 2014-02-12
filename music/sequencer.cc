@@ -11,7 +11,7 @@ Device getMIDIDevice() {
     error("No MIDI device found"); //FIXME: Block and watch folder until connected
 }
 
-Sequencer::Sequencer(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread) { registerPoll(); }
+Sequencer::Sequencer(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread) {}
 
 void Sequencer::event() {
     if(!(revents&POLLIN)) return;

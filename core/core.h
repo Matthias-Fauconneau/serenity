@@ -71,6 +71,7 @@ generic struct initializer_list {
     const T* data; size_t len;
     constexpr initializer_list(const T* data, size_t len) : data(data), len(len) {}
     constexpr const T* begin() const { return data; }
+    constexpr const T* end() const { return data+len; }
     constexpr size_t size() const { return len; }
 };
 }
@@ -78,7 +79,7 @@ generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;
 inline constexpr string operator "" _(const char* data, size_t size);
-#ifndef __GXX_EXPERIMENTAL_CXX0X__
+#if !__GXX_EXPERIMENTAL_CXX0X__
 #define _ // QtCreator doesn't parse custom literal operators (""_)
 #endif
 

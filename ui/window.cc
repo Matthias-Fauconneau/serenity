@@ -14,7 +14,6 @@ void setCursor(Rect region, Cursor cursor) { assert(window); return window->setC
 #include "time.h"
 #include "image.h"
 #include "png.h"
-#include "linux.h"
 #include "x.h"
 #include <sys/socket.h>
 #include <sys/shm.h>
@@ -196,18 +195,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==ButtonRelease) {
             drag=0;
             if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
-        } else if(type==KeyPress) {
-            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
-            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); // Normal keyPress event
-            else {
-                signal<>* shortcut = shortcuts.find(key);
-                if(shortcut) (*shortcut)(); // Local window shortcut
-            }
         }
-        else if(type==KeyRelease) {
-            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
-            if(focus && focus->keyRelease(key, (Modifiers)e.state)) render();
-        }
+        else if(type==KeyPress) keyPress(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
+        else if(type==KeyRelease) keyRelease(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
@@ -223,8 +213,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
-            signal<>* shortcut = shortcuts.find(Escape);
-            if(shortcut) (*shortcut)(); // Local window shortcut
+            function<void()>* action = actions.find(Escape);
+            if(action) (*action)(); // Local window action
             else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
             else exit(0); // Exits application by default
         }
@@ -255,7 +245,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
 }
 void Window::render() { needUpdate=true; if(mapped) queue(); }
 
-void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} registerPoll(); }
+void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {
@@ -304,10 +294,10 @@ uint Window::KeyCode(Key sym) {
     return keycode;
 }
 
-signal<>& Window::globalShortcut(Key key) {
+function<void()>& Window::globalAction(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
-    return shortcuts.insert((uint)key);
+    return actions.insert(key, []{});
 }
 
 // Properties
@@ -395,6 +385,8 @@ Image Window::getSnapshot() {
     shmctl(shm, IPC_RMID, 0);
     return image;
 }
+
+void Window::setDisplay(bool displayState) { log("Unimplemented X11 setDisplay", displayState); }
 #else
 
 #include <unistd.h>
@@ -410,8 +402,8 @@ Window::Window(Widget* widget, int2, const string& title unused, const Image& ic
     assert_(fix.line_length % bytesPerPixel == 0);
     stride = fix.line_length / bytesPerPixel;
     framebuffer = Map(Device::fd, 0, var.yres_virtual * fix.line_length, Map::Prot(Map::Read|Map::Write));
-    touchscreen.eventReceived.connect(this, &Window::touchscreenEvent); touchscreen.registerPoll();
-    buttons.eventReceived.connect(this, &Window::buttonEvent); buttons.registerPoll();
+    touchscreen.eventReceived = {this, &Window::touchscreenEvent};
+    buttons.eventReceived = {this, &Window::buttonEvent};
 }
 
 void Window::touchscreenEvent() {
@@ -423,22 +415,22 @@ void Window::touchscreenEvent() {
             if(v<min[i]) min[i]=v; else if(v>max[i]) max[i]=v;
             cursorPosition[i] = displaySize[i]*(max[i]-v)/uint(max[i]-min[i]);
         }
-        if(e.type == EV_KEY && e.code==BTN_TOUCH) { state = e.value; log(state); }
+        if(e.type == EV_KEY && e.code==BTN_TOUCH) pressState = e.value;
         if(e.type == EV_SYN) {
-            if(state != previousState) {
-                if(state==1) {
+            if(pressState != previousPressState) {
+                if(pressState==1) {
                     Widget* focus=this->focus; this->focus=0;
                     dragStart=cursorPosition, dragPosition=position, dragSize=size;
                     if(widget->mouseEvent(cursorPosition, size, Widget::Press, Widget::LeftButton) || this->focus!=focus) needUpdate=true;
                 }
-                if(state==0) {
+                if(pressState==0) {
                     drag=0;
                     if(widget->mouseEvent(cursorPosition, size, Widget::Release, Widget::LeftButton)) needUpdate=true;
                 }
-                previousState = state;
+                previousPressState = pressState;
             }
-            if(drag && state==1 && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true;
-            else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, state==1?Widget::LeftButton:Widget::None)) needUpdate=true;
+            if(drag && pressState==1 && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true;
+            else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, pressState==1?Widget::LeftButton:Widget::None)) needUpdate=true;
         }
     }
     window=0;
@@ -448,14 +440,13 @@ void Window::touchscreenEvent() {
 void Window::buttonEvent() {
     window=this;
     for(input_event e; ::read(buttons.Device::fd, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY && e.value==0) {
-            signal<>* shortcut = shortcuts.find(e.code);
-            if(shortcut) (*shortcut)(); // Local window shortcut
-        }
+        if(e.type == EV_KEY && e.value==0) keyPress(e.code);
+        if(e.type == EV_KEY && e.value==1) keyRelease(e.code);
     }
     window=0;
     if(needUpdate) render();
 }
+
 
 void Window::render() {
     if(!mapped) return;
@@ -479,7 +470,7 @@ void Window::hide() {
 void Window::setTitle(const string& title unused) {}
 void Window::setIcon(const Image& icon unused) {}
 String Window::getSelection(bool unused clipboard) { return String(); }
-signal<>& Window::globalShortcut(Key key) { return localShortcut(key); }
+function<void()>& Window::globalAction(Key key) { return actions.insert(key); }
 void Window::putImage(int2 position, int2 size) {
     if(bytesPerPixel==4) {
         byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
@@ -497,6 +488,13 @@ void Window::putImage(int2 position, int2 size) {
     }
     else error("Unsupported format", bytesPerPixel);
 }
+
+void Window::setDisplay(bool displayState) {
+    this->displayState = displayState;
+    int blank_level = displayState ? FB_BLANK_NORMAL : FB_BLANK_POWERDOWN;
+    ioctl(FBIOBLANK, &blank_level);
+}
+
 #endif
 
 void Window::renderBackground(Image& target) {
@@ -533,6 +531,26 @@ void Window::renderBackground(Image& target) {
     else for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
 }
 
-signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
-
 void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
+
+void Window::keyPress(Key key, Modifiers modifiers) {
+    if(focus && focus->keyPress(key, modifiers)) render(); // Normal keyPress event
+    else {
+        function<void()>* action = actions.find(key);
+        function<void()>* longAction = longActions.find(key);
+        if(longAction) { // Schedules long action
+            longActionTimers.insert(key, unique<Timer>(1000, [this,key,longAction]{longActionTimers.remove(key); (*longAction)();}));
+        }
+        else if(action) (*action)(); // Local window action
+    }
+}
+
+
+void Window::keyRelease(Key key, Modifiers modifiers) {
+    if(focus && focus->keyRelease(key, modifiers)) render();
+    else if(longActionTimers.contains(key)) {
+        longActionTimers.remove(key); // Removes long action before it triggers
+        function<void()>* action = actions.find(key);
+        if(action) (*action)(); // Executes any short action instead
+    }
+}

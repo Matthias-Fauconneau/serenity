@@ -14,6 +14,7 @@ enum Key {
     Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19,
     Power=116 /*KEY_POWER*/, Extra=0x114 /*BTN_EXTRA*/ // Touchbook buttons
 };
+inline String str(Key key) { return str(uint(key)); }
 enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4/*, Meta=1<<6*/ };
 
 /// Abstract component to compose user interfaces

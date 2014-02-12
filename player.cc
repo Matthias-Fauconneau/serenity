@@ -11,6 +11,26 @@
 #include "time.h"
 #include "image.h"
 #include "png.h"
+#include <sys/inotify.h>
+#include <sys/mount.h>
+
+/// Watches a folder for new files
+struct FileWatcher : File, Poll {
+    FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted)
+        : File(inotify_init()),Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
+          fileCreated(fileCreated), fileDeleted(fileDeleted) {}
+    void event() override {
+        struct inotify_event { uint wd, mask, cookie, len; };
+        inotify_event e = read<inotify_event>();
+        String namez = read(e.len);
+        string name = namez.slice(0,namez.size-1);
+        if(e.mask&IN_CREATE) fileCreated(name);
+        if(e.mask&IN_DELETE) fileDeleted(name);
+    }
+    const uint watch;
+    function<void(string)> fileCreated;
+    function<void(string)> fileDeleted;
+};
 
 /// Stores target on every full window render to allow partial updates
 template<Type T> struct BackingStore : T {
@@ -111,22 +131,25 @@ struct Player {
     Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
 
 // Content
+    Folder folder;
     array<String> folders;
     array<String> files;
     array<String> randomSequence;
+    FileWatcher fileWatcher {"/dev"_,{this, &Player::fileCreated}, {this,&Player::fileDeleted}};
 
     Player() {
         albums.always=titles.always=true;
         elapsed.minSize.x=remaining.minSize.x=64;
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
-        window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(Power).connect([]{exit();}); // FIXME: brief -> toggle display, long -> power off system
-        window.localShortcut(Key(' ')).connect(this, &Player::togglePlay);
-        window.globalShortcut(Play).connect(this, &Player::togglePlay);
-#if __arm__
-        window.globalShortcut(Extra).connect(this, &Player::togglePlay); // FIXME: brief -> toggle playback, long -> next track
-#endif
+        window.actions[Escape] = []{exit();};
+        window.actions[Key(' ')] = {this, &Player::togglePlay};
+        window.globalAction(Play) = {this, &Player::togglePlay};
+        window.longActions[Play] = {this, &Player::next};
+        window.globalAction(Extra) = {this, &Player::togglePlay};
+        window.longActions[Extra]= {this, &Player::next};
+        window.actions[Power] = {&window, &Window::toggleDisplay};
+        window.actions[Power] = [](){execute("/sbin/poweroff"_);};
         randomButton.toggled.connect(this, &Player::setRandom);
         playButton.toggled.connect(this, &Player::setPlaying);
         nextButton.triggered.connect(this, &Player::next);
@@ -134,25 +157,32 @@ struct Player {
         albums.activeChanged.connect(this, &Player::playAlbum);
         titles.activeChanged.connect(this, &Player::playTitle);
 
-        folders = Folder("Music"_).list(Folders|Sorted);
-        assert(folders);
-        for(String& folder : folders) albums << String(section(folder,'/',-2,-1));
+        setFolder(arguments() ? arguments().first() : "Music"_);
 
-        if(existsFile("Music/.last"_)) {
-            String mark = readFile("Music/.last"_);
-            string last = section(mark,'\0');
-            string folder = section(last,'/',0,1);
-            string file = section(last,'/',1,-1);
-            if(existsFolder(folder,"Music"_)) {
+        window.show();
+        mainThread.setPriority(-20);
+    }
+    ~Player() { setPlaying(false); /*Records last position*/ }
+    void setFolder(string path) {
+        folder = path;
+        folders = folder.list(Folders|Sorted);
+        albums.clear();
+        for(string folder: folders) albums << String(section(folder,'/',-2,-1));
+        if(existsFile(".last"_, folder)) {
+            String mark = readFile(".last"_, folder);
+            string last = section(mark, '\0');
+            string album = section(last, '/', 0, 1);
+            string file = section(last, '/', 1, -1);
+            if(existsFolder(album, folder)) {
                 if(section(mark,'\0',2,3)) {
-                    queueFile(folder, file, true);
+                    queueFile(album, file, true);
                     next();
                     setRandom(true);
                 } else {
-                    albums.index = folders.indexOf(folder);
-                    array<String> files = Folder(folder,"Music"_).list(Recursive|Files|Sorted);
+                    albums.index = folders.indexOf(album);
+                    array<String> files = Folder(album, folder).list(Recursive|Files|Sorted);
                     uint i=0; for(;i<files.size;i++) if(files[i]==file) break;
-                    for(;i<files.size;i++) queueFile(folder, files[i], false);
+                    for(;i<files.size;i++) queueFile(album, files[i], false);
                     next();
                 }
                 seek(fromInteger(section(mark,'\0',1,2)));
@@ -161,10 +191,7 @@ struct Player {
             updatePlaylist();
             next();
         }
-        window.show();
-        mainThread.setPriority(-20);
     }
-    ~Player() { setPlaying(false); /*Records last position*/ }
     void queueFile(const string& folder, const string& file, bool withAlbumName) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
@@ -176,8 +203,8 @@ struct Player {
         files <<  folder+"/"_+file;
     }
     void playAlbum(const string& album) {
-        assert(existsFolder(album,"Music"_),album);
-        array<String> files = Folder(album,"Music"_).list(Recursive|Files|Sorted);
+        assert(existsFolder(album,folder),album);
+        array<String> files = Folder(album,folder).list(Recursive|Files|Sorted);
         for(const String& file: files) queueFile(album, file, false);
         titles.index=-1; next();
     }
@@ -188,7 +215,7 @@ struct Player {
     }
     void playTitle(uint index) {
         window.setTitle(toUTF8(titles[index].text));
-        file = unique<AudioFile>("/Music/"_+files[index]);
+        file = unique<AudioFile>(folder.name()+"/"_+files[index]);
         if(!file->file) { file=0; return; }
         assert(file->channels==AudioOutput::channels);
         setPlaying(true);
@@ -207,7 +234,7 @@ struct Player {
         if(random) {
             main << &titles.area(); // Hide albums
             // Explicits random sequence to: resume the sequence from the last played file, ensure files are played once in the sequence.
-            array<String> files = Folder("Music"_).list(Recursive|Files|Sorted); // Lists all files
+            array<String> files = folder.list(Recursive|Files|Sorted); // Lists all files
             randomSequence.reserve(files.size);
             Random random; // Unseeded so that the random sequence only depends on collection
             while(files) randomSequence << files.take(random%files.size);
@@ -250,7 +277,7 @@ struct Player {
         }
         playButton.enabled=play;
         window.render();
-        writeFile("Music/.last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), root());
+        writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
     }
     void seek(int position) {
         if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*resampler.clear();*/ /*audio->cancel();*/ }
@@ -261,5 +288,25 @@ struct Player {
         elapsed.setText(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
         if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         backingStore.render(window);
+    }
+    void fileCreated(string name) {
+        if(!startsWith(name,"sd"_)) return; // Only acts on new SATA/USB devices
+        log(name);
+        string source = "/dev/"_+name;
+        string target = "/media/"_+name;
+        log_(str("Mounting ",source,"on",target));
+        folder = Folder(target, root(), true);
+        for(string fs: {"vfat"_,"ext4"_}) if( mount(strz(source),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC|MS_RDONLY,0) == OK ) {
+            log(" succeeded");
+            setFolder(target);
+            return;
+        }
+        log(" failed");
+    }
+    void fileDeleted(string name) {
+        if(folder.name() == "/dev/"_+name) {
+            setFolder(arguments() ? arguments().first() : "Music"_);
+            removeFolder("/media/"_+name);
+        }
     }
 } application;

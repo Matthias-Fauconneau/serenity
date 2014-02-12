@@ -18,7 +18,6 @@ core/file.h
 core/function.h
 core/image.h
 core/image.cc
-core/linux.h
 core/map.h
 core/math.h
 core/matrix.h

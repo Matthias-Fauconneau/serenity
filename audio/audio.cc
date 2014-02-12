@@ -1,6 +1,5 @@
 #include "audio.h"
 #include "string.h"
-#include "linux.h"
 
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
@@ -108,7 +107,6 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
     control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
 #endif
     io<PREPARE>();
-    registerPoll();
 }
 AudioOutput::~AudioOutput(){
      io<DRAIN>();

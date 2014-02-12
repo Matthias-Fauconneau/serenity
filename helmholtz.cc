@@ -330,7 +330,7 @@ struct Application {
             writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());
         } else {
             window.oxygenBackground = false;
-            window.localShortcut(Escape).connect([]{exit();});
+            window.actions[Escape] = []{exit();};
             window.frameSent.connect([this](){
                 chorin.solve();
                 window.render();

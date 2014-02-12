@@ -189,20 +189,20 @@ struct Music {
         window.frameSent.connect(this,&Music::smoothScroll);
 
 
-        window.localShortcut(Escape).connect([]{exit();});
-        window.localShortcut(Key(' ')).connect(this,&Music::togglePlay);
-        window.localShortcut(Key('o')).connect(this,&Music::showScoreList);
-        window.localShortcut(Key('r')).connect([this]{ sampler.enableReverb=!sampler.enableReverb; });
+        window.actions[Escape] = []{exit();};
+        window.actions[Key(' ')] = {this,&Music::togglePlay);
+        window.actions[Key('o')] = {this,&Music::showScoreList);
+        window.actions[Key('r')] = {[this]{ sampler.enableReverb=!sampler.enableReverb; });
 #if AUDIO
-        window.localShortcut(Key('1')).connect([this]{
+        window.actions[Key('1')] = [this]{
             sampler.open(rate, "Salamander.raw.sfz"_, Folder("Samples"_));
             window.setTitle("Salamander - Raw"_);
         });
-        window.localShortcut(Key('2')).connect([this]{
+        window.actions[Key('2')] = [this]{
             sampler.open(rate, "Salamander.flat.sfz"_, Folder("Samples"_));
             window.setTitle("Salamander - Flat"_);
         });
-        window.localShortcut(Key('3')).connect([this]{
+        window.actions[Key('3')] = [this]{
             sampler.open(rate, "Blanchet.raw.sfz"_, Folder("Samples"_));
             window.setTitle("Blanchet"_);
         });
@@ -214,14 +214,14 @@ struct Music {
 #if ANNOTATION
         //pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
         score.annotationsChanged.connect(this,&Music::annotationsChanged);
-        window.localShortcut(Key('e')).connect(&score,&Score::toggleEdit);
-        window.localShortcut(Key('p')).connect(&pdfScore,&PDFScore::toggleEdit);
-        window.localShortcut(LeftArrow).connect(&score,&Score::previous);
-        window.localShortcut(RightArrow).connect(&score,&Score::next);
-        window.localShortcut(Insert).connect(&score,&Score::insert);
-        window.localShortcut(Delete).connect(&score,&Score::remove);
+        window.actions[Key('e')] = {&score,&Score::toggleEdit);
+        window.actions[Key('p')] = {&pdfScore,&PDFScore::toggleEdit);
+        window.actions[LeftArrow] = {&score,&Score::previous);
+        window.actions[RightArrow] = {&score,&Score::next);
+        window.actions[Insert] = {&score,&Score::insert);
+        window.actions[Delete] = {&score,&Score::remove);
 #endif
-        window.localShortcut(Return).connect(this,&Music::toggleDebug);
+        window.actions[Return] = {this,&Music::toggleDebug);
         array<String> files = folder.list(Files);
         for(String& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {

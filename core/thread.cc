@@ -1,7 +1,5 @@
 #include "thread.h"
-#include "memory.h"
 #include "string.h"
-#include "linux.h"
 #include "data.h"
 #include "trace.h"
 #include <unistd.h>
@@ -29,10 +27,8 @@ void Poll::registerPoll() {
     Locker lock(thread.lock);
     assert_(!thread.contains(*this));
     assert_(!thread.unregistered.contains(*this));
-    //if(thread.unregistered.contains(this)) { thread.unregistered.remove(this); }
-    //else if(!thread.contains(this)) thread<<this;
-    thread<<this;
-    thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
+    thread << this;
+    if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}
@@ -52,10 +48,8 @@ static bool terminate = false;
 // Exit status to return for process (group)
 static int exitStatus = 0;
 
-Thread::Thread(int priority):Poll(EventFD::fd,POLLIN,*this) {
-    *this<<(Poll*)this; // Adds eventfd semaphore to this thread's monitored pollfds
+Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
     Locker lock(threadsLock); threads<<this; // Adds this thread to global thread list
-    this->priority=priority;
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
@@ -65,7 +59,6 @@ void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority);
     while(!terminate) {
-        uint size=this->size;
         if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main)
 
         pollfd pollfds[size];
@@ -80,7 +73,7 @@ void Thread::run() {
                 }
             }
         }
-        while(unregistered){Locker lock(this->lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
+        while(unregistered){Locker locker(lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
     }
     Locker lock(threadsLock); threads.remove(this);
     thread = 0;
@@ -90,7 +83,7 @@ void Thread::event() {
     EventFD::read();
     if(queue){
         Poll* poll;
-        {Locker lock(this->lock);
+        {Locker locker(lock);
             poll=queue.take(0);
             if(unregistered.contains(poll)) return;
         }
