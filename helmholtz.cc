@@ -242,11 +242,29 @@ struct Chorin {
     }
 
     Helmholtz correction {0, grid, Helmholtz::Neumann, 0}; // Poisson with homogeneous Neumann conditions (Dp=0)
-    Vector2D correct(const Vector2D& ux, const Vector2D& uy) {
+    Vector2D correct(const Vector2D& Ux, const Vector2D& Uy) {
         Vector2D S(Nx, Ny);
+        auto bord = [&](bool transpose, int i0, int i1, int i) {
+            const auto& x = !transpose ? X : Y;
+            const auto& y = !transpose ? Y : X;
+            real xm = (x[i-1]+x[i])/2;
+            real xp = (x[i]+x[i+1])/2;
+            real y12 = (y[i0]+y[i1])/2;
+            auto ux = [&](int i, int j) -> real& { return !transpose ? Ux(i,j) : Ux(j,i); };
+            auto uy = [&](int i, int j) -> real& { return !transpose ? Ux(i,j) : Ux(j,i); };
+            (!transpose ? S(i,i0) : S(i0,i)) = (xp-xm) * (y12-y[i0]) * ((Ux(i,i1)-Ux(i,i0))/(x[i1]-x[i0]) + (Uy(i,i1)-Uy(i,i0))/(y[i1]-y[i0]));
+        };
+        for(uint i: range(1,Nx-1)) {
+            bord(false, 0,    1,      i);
+            bord(false, Ny-1, Ny-1-1, i);
+        }
+        for(uint j: range(1,Ny-1)) {
+            bord(true,  0,    1,      j);
+            bord(true,  Nx-1, Nx-1-1, j);
+        }
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
-            real dxU = ( ux(i+1,j) - ux(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyU = ( uy(i,j+1) - uy(i,j-1) ) / ( Y[j+1] - X[j-1] );
+            real dxU = ( Ux(i+1,j) - Ux(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyU = ( Uy(i,j+1) - Uy(i,j-1) ) / ( Y[j+1] - X[j-1] );
             S(i,j) = /*(1/dt)**/(dxU + dyU);
         }
         // Neumann conditions are set with Helmholtz::boundaryValues
@@ -291,6 +309,7 @@ struct FieldView : Widget {
                                 v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
                     }
                     int3 linear = int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2))));
+                    assert_(linear >= int3(0) && linear < int3(0x1000), linear, c, cMax);
                     extern uint8 sRGB_forward[0x1000];
                     target(x,y) = byte4(sRGB_forward[linear.x], sRGB_forward[linear.y], sRGB_forward[linear.z], 0xFF);
                 }
