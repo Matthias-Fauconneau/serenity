@@ -27,7 +27,7 @@ const Folder& currentWorkingDirectory();
 /// Returns a file descriptor to the root folder
 const Folder& root();
 
-enum { Devices=1<<0, Files=1<<1, Folders=1<<2, Recursive=1<<3, Sorted=1<<4, Hidden=1<<5 };
+enum { Drives=1<<0, Devices=1<<1, Folders=1<<2, Files=1<<3, Recursive=1<<4, Sorted=1<<5, Hidden=1<<6 };
 struct Folder : Handle {
     Folder() : Handle(0) {}
     /// Opens \a folderPath
@@ -79,7 +79,8 @@ struct Socket : Stream {
     Socket(int domain, int type);
 };
 
-enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000};
+enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000, Path=010000000};
+enum class FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 };
 /// Handle to a file
 struct File : Stream {
     File(int fd):Stream(fd){}
@@ -89,6 +90,8 @@ struct File : Stream {
     File(const string& path, const Folder& at=root(), Flags flags=ReadOnly);
     /// Returns file properties
     struct stat stat() const;
+    /// Returns file type
+    FileType type() const;
     /// Returns file size
     int64 size() const;
     /// Returns the last access Unix timestamp (in nanoseconds)

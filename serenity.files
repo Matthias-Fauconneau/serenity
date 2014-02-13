@@ -46,6 +46,8 @@ io/tiff.cc
 io/tiff.h
 io/xml.h
 io/xml.cc
+io/dbus.h
+io/dbus.cc
 
 ui/graphics.cc
 ui/graphics.h

@@ -13,17 +13,21 @@
 #include "png.h"
 #include <sys/inotify.h>
 #include <sys/mount.h>
+#if !__arm__
+#define DBUS 1
+#if DBUS
+#include "dbus.h"
+#endif
 
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
     FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted)
-        : File(inotify_init()),Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
+        : File(inotify_init()), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
           fileCreated(fileCreated), fileDeleted(fileDeleted) {}
     void event() override {
-        struct inotify_event { uint wd, mask, cookie, len; };
-        inotify_event e = read<inotify_event>();
-        String namez = read(e.len);
-        string name = namez.slice(0,namez.size-1);
+        ::buffer<byte> buffer = readUpTo(align(16, sizeof(inotify_event)));
+        inotify_event e = *(inotify_event*)buffer.data;
+        string name = buffer.slice(__builtin_offsetof(inotify_event, name), e.len);
         if(e.mask&IN_CREATE) fileCreated(name);
         if(e.mask&IN_DELETE) fileDeleted(name);
     }
@@ -135,7 +139,7 @@ struct Player {
     array<String> folders;
     array<String> files;
     array<String> randomSequence;
-    FileWatcher fileWatcher {"/dev"_,{this, &Player::fileCreated}, {this,&Player::fileDeleted}};
+    FileWatcher fileWatcher {"/dev"_,{this, &Player::deviceCreated}, {this,&Player::deviceDeleted}};
 
     Player() {
         albums.always=titles.always=true;
@@ -146,7 +150,9 @@ struct Player {
         window.actions[Key(' ')] = {this, &Player::togglePlay};
         window.globalAction(Play) = {this, &Player::togglePlay};
         window.longActions[Play] = {this, &Player::next};
+#if ARM
         window.globalAction(Extra) = {this, &Player::togglePlay};
+#endif
         window.longActions[Extra]= {this, &Player::next};
         window.actions[Power] = {&window, &Window::toggleDisplay};
         window.actions[Power] = [](){execute("/sbin/poweroff"_);};
@@ -157,7 +163,11 @@ struct Player {
         albums.activeChanged.connect(this, &Player::playAlbum);
         titles.activeChanged.connect(this, &Player::playTitle);
 
-        setFolder(arguments() ? arguments().first() : "Music"_);
+        if(arguments()) setFolder(arguments().first());
+        else {
+            for(string device: Folder("dev"_).list(Drives)) if(mount(device)) break;
+            if(!folder) setFolder("/Music"_);
+        }
 
         window.show();
         mainThread.setPriority(-20);
@@ -289,24 +299,36 @@ struct Player {
         if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         backingStore.render(window);
     }
-    void fileCreated(string name) {
-        if(!startsWith(name,"sd"_)) return; // Only acts on new SATA/USB devices
-        log(name);
-        string source = "/dev/"_+name;
-        string target = "/media/"_+name;
-        log_(str("Mounting ",source,"on",target));
+    String mounts = File("proc/self/mounts"_).readUpTo(2048);
+    String cmdline = File("proc/cmdline"_).readUpTo(256);
+    void deviceCreated(string name) { mount(name); }
+    bool mount(string name) {
+        TextData s (name);
+        if(!s.match("sd"_)) return false; // Only acts on new SATA/USB drives
+        if(!s.word()) return false;
+        if(!s.whileInteger()) return false; // Only acts on partitions
+        String device = "/dev/"_+name;
+        if(File(device,root(),Path).type() != FileType::Drive) return false; // Only acts on drives
+        if(find(mounts, device)) return false; // Only acts on unmounted drives
+        if(find(cmdline, device)) return false; // Do not act on root drive
+        String target = "/media/"_+name;
+        log_(str("Mounting ",device,"on",target));
         folder = Folder(target, root(), true);
-        for(string fs: {"vfat"_,"ext4"_}) if( mount(strz(source),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC|MS_RDONLY,0) == OK ) {
+        for(string fs: {"vfat"_,"ext4"_}) if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC|MS_RDONLY,0) == OK ) {
             log(" succeeded");
-            setFolder(target);
-            return;
+            if(existsFolder("Music"_,target)) setFolder(target+"/Music"_);
+            else setFolder(target);
+            return true;
         }
         log(" failed");
+        return false;
     }
-    void fileDeleted(string name) {
-        if(folder.name() == "/dev/"_+name) {
+    void deviceDeleted(string name) {
+        String target = "/media/"_+name;
+        if(folder.name() == target) {
             setFolder(arguments() ? arguments().first() : "Music"_);
-            removeFolder("/media/"_+name);
+            umount2(strz(target), 0);
+            removeFolder(target);
         }
     }
 } application;

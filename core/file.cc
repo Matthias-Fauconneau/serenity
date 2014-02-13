@@ -13,7 +13,8 @@
 #include <sys/syscall.h>
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
 struct dirent { long ino, off; short len; char name[]; };
-enum {DT_BLK=1<<0, DT_CHR=1<<1, DT_DIR=1<<2, DT_REG=1<<3};
+enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK = 10, DT_SOCK = 12, DT_WHT = 14 };
+
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
@@ -43,10 +44,15 @@ array<String> Folder::list(uint flags) const {
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
             //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
-            if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==0/*HACK!*/) && flags&Files) || (type==DT_CHR && flags&Devices)) {
+            if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==DT_UNKNOWN/*NFS*/) && flags&Files) || (type==DT_CHR && flags&Devices)
+                    || (type==DT_BLK && flags&Drives)) {
                 if(flags&Sorted) list.insertSorted(String(name)); else list << String(name);
             }
-            if(type==DT_DIR && flags&Recursive) for(const String& file: Folder(name,*this).list(flags)) { if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file; }
+            if(type==DT_DIR && flags&Recursive) {
+                for(const String& file: Folder(name,*this).list(flags)) {
+                    if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file;
+                }
+            }
         }
     }
     return list;
@@ -75,13 +81,14 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
 // File
 File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, int(flags))){ assert(path.size<0x100); }
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
+FileType File::type() const { return FileType(stat().st_mode&__S_IFMT); }
 int64 File::size() const { return stat().st_size; }
 int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ull + stat.st_atim.tv_nsec; }
 int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
 void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
-bool existsFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_RDONLY, 0); if(fd>0) close(fd); return fd>0; }
+bool existsFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_PATH, 0); if(fd>0) close(fd); return fd>0; }
 buffer<byte> readFile(const string& path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 void writeFile(const string& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
 
