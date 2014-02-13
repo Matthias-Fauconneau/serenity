@@ -79,7 +79,7 @@ struct Socket : Stream {
     Socket(int domain, int type);
 };
 
-enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000, Path=010000000};
+enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000, Descriptor=010000000};
 enum class FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 };
 /// Handle to a file
 struct File : Stream {

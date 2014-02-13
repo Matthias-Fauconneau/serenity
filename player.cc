@@ -15,9 +15,12 @@
 #include <sys/mount.h>
 #if !__arm__
 #define DBUS 1
+#endif
 #if DBUS
 #include "dbus.h"
 #endif
+
+DBus dbus;
 
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
@@ -308,7 +311,7 @@ struct Player {
         if(!s.word()) return false;
         if(!s.whileInteger()) return false; // Only acts on partitions
         String device = "/dev/"_+name;
-        if(File(device,root(),Path).type() != FileType::Drive) return false; // Only acts on drives
+        if(File(device,root(), Descriptor).type() != FileType::Drive) return false; // Only acts on drives
         if(find(mounts, device)) return false; // Only acts on unmounted drives
         if(find(cmdline, device)) return false; // Do not act on root drive
         String target = "/media/"_+name;

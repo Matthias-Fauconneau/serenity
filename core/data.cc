@@ -90,8 +90,6 @@ string TextData::untilAny(const string& any) {
     return slice(start,end-start);
 }
 
-string TextData::untilEnd() { uint size=available(-1); return read(size); }
-
 void TextData::skip() { whileAny(" \t\n\r"_); }
 
 string TextData::line() { return until('\n'); }

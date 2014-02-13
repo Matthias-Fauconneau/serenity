@@ -59,6 +59,9 @@ struct Data {
     /// Returns a reference to the next \a size bytes and advances \a size bytes
     ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
 
+    /// Reads until the end of input
+    ref<byte> untilEnd() { uint size=available(-1); return read(size); }
+
     ::buffer<byte> buffer;
     uint index=0;
 };
@@ -155,8 +158,6 @@ struct TextData : Data {
     string until(const string& key);
     /// Reads until input match any character of \a key
     string untilAny(const string& any);
-    /// Reads until the end of input
-    string untilEnd();
     /// Skips whitespaces
     void skip();
     /// Reads until end of line
