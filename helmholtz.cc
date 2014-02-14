@@ -4,7 +4,7 @@
 #include "time.h"
 #include "window.h"
 #include "interface.h"
-#include "plot.h"
+#include "graphics.h"
 #include "png.h"
 
 real maxabs(const ref<real>& v) { real y=0; for(real x: v) if(abs(x)>y) y=abs(x); return y; }
@@ -81,8 +81,8 @@ struct Grid {
     enum GridType { Regular, Irregular } type; // Spatial discretisation
     Grid(uint Nx, uint Ny, GridType type) : Nx(Nx), Ny(Ny), X(Nx), Y(Ny), type(type) {
         if(type==Regular) {
-            for(uint i: range(Nx)) X[i] = i / (Nx-1);
-            for(uint j: range(Ny)) Y[j] = j / (Ny-1);
+            for(uint i: range(Nx)) X[i] = (real) i / (Nx-1);
+            for(uint j: range(Ny)) Y[j] = (real) j / (Ny-1);
         } else { // Refines near boundaries
             for(uint i: range(Nx)) X[i] = 1 - cos(i*PI/(Nx-1));
             for(uint j: range(Ny)) Y[j] = 1 - cos(j*PI/(Ny-1));
@@ -97,9 +97,10 @@ struct Helmholtz {
     const Vector& X; const Vector& Y;
     enum ConditionType { Dirichlet, Neumann } type; // Boundary conditions (homogeneous)
     enum { Top, Bottom, Left, Right };
-    const vec4 boundaryValues; // [Top, Bottom, Left, Right] values for Dirichlet or Neumann boundary conditions
+    vec4 boundaryValues; // [Top, Bottom, Left, Right] values for Dirichlet or Neumann boundary conditions
+    //Matrix2D M {Nx, Ny}; //DEBUG
     UMFPACK A;
-    Helmholtz(real H, const Grid& grid, ConditionType type, vec4 boundaryValues) :
+    Helmholtz(real H, const Grid& grid, ConditionType type, vec4 boundaryValues=0) :
         H(H), Nx(grid.Nx), Ny(grid.Ny), X(grid.X), Y(grid.Y), type(type), boundaryValues(boundaryValues) {
 
         Matrix2D M (Nx, Ny);
@@ -162,6 +163,10 @@ struct Helmholtz {
             M(0,    Ny-1, 0, Ny-1)    = 1;
             M(Nx-1, Ny-1, Nx-1, Ny-1) = 1;
         }
+#if DEBUG
+        // Asserts valid system
+        for(auto& column: M.columns) for(auto& element: column) assert(isNumber(element.value), H, '\n', X, '\n', Y, '\n', M);
+#endif
         // LU Factorization
         A = M;
     }
@@ -212,6 +217,7 @@ struct Helmholtz {
             b(0, Ny-1)    = 0;
             b(Nx-1, Ny-1) = 0;
         }
+        //log(M, b);
         return Vector2D(A.solve(b), Nx, Ny);
     }
 };
@@ -221,20 +227,20 @@ struct Chorin {
     const uint N, Nx=N, Ny=N;
     const real U = 1; // Boundary speed
     const real L = 1; // Domain size
-    const real nu = 1; // Fluid viscosity
+    const real nu = 1e-3; // Fluid viscosity
     const real Re = U*L/nu; // Reynolds
-    const real dt = 1; // Time step
+    const real dt = 1./(min(Nx,Ny)*U); // Time step
     Grid grid {Nx,Ny, Grid::Regular};
     const Vector& X = grid.X; const Vector& Y = grid.Y;
     Chorin(uint N):N(N) {}
 
-    Helmholtz prediction {Re/dt, grid, Helmholtz::Dirichlet, vec4(U,0,0,0)}; // Dirichlet conditions with top u = U
+    Helmholtz prediction {Re/dt, grid, Helmholtz::Dirichlet}; // Dirichlet conditions with top u = U
     Vector2D predict(const Vector2D& U, const Vector2D& Ux, const Vector2D& Uy) {
         Vector2D S(Nx, Ny);
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real u = U(i,j), ux = Ux(i,j), uy = Uy(i,j);
             real dxU = ( U(i+1,j) - U(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyU = ( U(i,j+1) - U(i,j-1) ) / ( Y[j+1] - X[j-1] );
+            real dyU = ( U(i,j+1) - U(i,j-1) ) / ( Y[j+1] - Y[j-1] );
             S(i,j) = Re*(u/dt - (ux*dxU + uy*dyU)); // b = Lx*Ly*S
         }
         // Dirichlet conditions are set with Helmholtz::boundaryValues
@@ -250,9 +256,11 @@ struct Chorin {
             real xm = (x[i-1]+x[i])/2;
             real xp = (x[i]+x[i+1])/2;
             real y12 = (y[i0]+y[i1])/2;
-            auto ux = [&](int i, int j) -> real& { return !transpose ? Ux(i,j) : Ux(j,i); };
-            auto uy = [&](int i, int j) -> real& { return !transpose ? Ux(i,j) : Ux(j,i); };
-            (!transpose ? S(i,i0) : S(i0,i)) = (xp-xm) * (y12-y[i0]) * ((Ux(i,i1)-Ux(i,i0))/(x[i1]-x[i0]) + (Uy(i,i1)-Uy(i,i0))/(y[i1]-y[i0]));
+            auto ux = [&](int i, int j) -> real { return !transpose ? Ux(i,j) : Ux(j,i); };
+            auto uy = [&](int i, int j) -> real { return !transpose ? Uy(i,j) : Uy(j,i); };
+            real dxU = (ux(i+1,i0) - ux(i-1,i0)) / (x[i+1] - x[i-1]);
+            real dyU = (uy(i,  i1) - uy(i,  i0)) / (y[i1 ] - y[i0 ]);
+            (!transpose ? S(i,i0) : S(i0,i)) = (xp-xm) * (y12-y[i0]) * (dxU + dyU);
         };
         for(uint i: range(1,Nx-1)) {
             bord(false, 0,    1,      i);
@@ -264,27 +272,33 @@ struct Chorin {
         }
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real dxU = ( Ux(i+1,j) - Ux(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyU = ( Uy(i,j+1) - Uy(i,j-1) ) / ( Y[j+1] - X[j-1] );
-            S(i,j) = /*(1/dt)**/(dxU + dyU);
+            real dyU = ( Uy(i,j+1) - Uy(i,j-1) ) / ( Y[j+1] - Y[j-1] );
+            S(i,j) = dxU + dyU;
         }
         // Neumann conditions are set with Helmholtz::boundaryValues
         return correction.solve(S);
     }
 
     // Current state vector
-    Vector2D ux {Nx,Ny}, uy{Nx,Ny};
+    Vector2D ux{Nx,Ny}, uy{Nx,Ny};
 
     // Solves one iteration of Chorin
     void solve() {
+        prediction.boundaryValues = vec4(U,0,0,0);
         Vector2D nux = predict(ux, ux,uy);
+        prediction.boundaryValues = 0;
         Vector2D nuy = predict(uy, ux,uy);
+#if 1
         Vector2D psi = correct(nux, nuy);
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real dxP = ( psi(i+1,j) - psi(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyP = ( psi(i,j+1) - psi(i,j-1) ) / ( Y[j+1] - X[j-1] );
-            ux(i,j) = nux(i,j) - /*dt**/dxP;
-            uy(i,j) = nuy(i,j) - /*dt**/dyP;
+            real dyP = ( psi(i,j+1) - psi(i,j-1) ) / ( Y[j+1] - Y[j-1] );
+            ux(i,j) = nux(i,j) - dxP;
+            uy(i,j) = nuy(i,j) - dyP;
         }
+#else
+        ux = move(nux), uy = move(nuy);
+#endif
     }
 };
 
@@ -292,39 +306,58 @@ struct Chorin {
 /// Displays scalar fields as blue,green,red components
 struct FieldView : Widget {
     const Vector& X; const Vector& Y;
-    const Vector2D& B; const Vector2D& G; const Vector2D& R;
-    FieldView(const Grid& grid, const Vector2D& B,const Vector2D& G, const Vector2D& R):X(grid.X),Y(grid.Y),B(B),G(G),R(R){}
+    const Vector2D& Ux; const Vector2D& Uy;
+    FieldView(const Grid& grid, const Vector2D& Ux,const Vector2D& Uy):X(grid.X),Y(grid.Y),Ux(Ux),Uy(Uy){}
     int2 sizeHint() { return int2(720/2); }
     void render(const Image& target) override {
-        vec3 cMax (maxabs(B), maxabs(G), maxabs(R));
+        vec2 size (target.size());
+        const real uMax = max(maxabs(Ux), maxabs(Uy));
+#if COLOR
         for(uint i: range(X.size-1)) for(uint j: range(Y.size-1)) {
-            for(uint y: range(round(target.size().y*Y[j]),round(target.size().y*Y[j+1]))) {
-                for(uint x: range(round(target.size().x*X[i]),round(target.size().x*X[i+1]))) {
-                    real u = ((x+1./2)/target.size().x-X[i])/(X[i+1]-X[i]);
-                    real v = ((y+1./2)/target.size().y-Y[j])/(Y[j+1]-Y[j]);
-                    vec3 c;
-                    for(uint i : range(3)) {
-                        const Vector2D& C = *(ref<const Vector2D*>{&B,&G,&R}[i]);
-                        c[i] = (1-v) * ((1-u) * C(i,j  ) + u * C(i+1,j  )) +
-                                v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
-                    }
-                    int3 linear = int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2))));
-                    assert_(linear >= int3(0) && linear < int3(0x1000), linear, c, cMax);
-                    extern uint8 sRGB_forward[0x1000];
-                    target(x,y) = byte4(sRGB_forward[linear.x], sRGB_forward[linear.y], sRGB_forward[linear.z], 0xFF);
+            int y0 = round(size.y*Y[j]), y1 = round(size.y*Y[j+1]);
+            int x0 = round(size.x*X[i]), x1 = round(size.x*X[i+1]);
+            for(uint y: range(y0, y1)) for(uint x: range(x0, x1)) {
+                real u = ((x+1./2)/size.x-X[i])/(X[i+1]-X[i]);
+                real v = ((y+1./2)/size.y-Y[j])/(Y[j+1]-Y[j]);
+                vec3 c = 0;
+                for(uint componentIndex : range(2)) {
+                    const Vector2D& C = *(ref<const Vector2D*>{&Ux,&Uy}[componentIndex]);
+                    c[componentIndex] = (1-v) * ((1-u) * C(i,j  ) + u * C(i+1,j  )) +
+                            v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
                 }
+                int3 linear = int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2))));
+                assert_(linear >= int3(0) && linear < int3(0x1000), linear, c, cMax);
+                extern uint8 sRGB_forward[0x1000];
+                target(x,y) = byte4(sRGB_forward[linear.x], sRGB_forward[linear.y], sRGB_forward[linear.z], 0xFF);
             }
         }
+#endif
+#define ARROW 1
+#if ARROW
+        real minX=inf; for(uint i: range(1,X.size)) minX=min(minX, X[i]-X[i-1]);
+        real minY=inf; for(uint i: range(1,Y.size)) minY=min(minY, Y[i]-Y[i-1]);
+        const float minCellSize = min(size.x*minX, size.y*minY);
+        for(real x: X) line(target, size*vec2(x,0),size*vec2(x,1));
+        for(real y: Y) line(target, size*vec2(0,y),size*vec2(1,y));
+        for(uint i: range(X.size)) for(uint j: range(Y.size)) {
+            vec2 center = vec2(target.size())*vec2(X[i], Y[j]);
+            vec2 scale = minCellSize * vec2(Ux(i,j),Uy(i,j) / float(uMax));
+            line(target, center + scale*vec2(0,    0   ), center + scale*vec2(1,1));
+            line(target, center + scale*vec2(1./2, 1   ), center + scale*vec2(1,1));
+            line(target, center + scale*vec2(1,    1./2), center + scale*vec2(1,1));
+        }
+#endif
     }
 };
 
 struct Application {
-    const uint N = 8;
+    const uint N = 32;
     Chorin chorin {N};
     uint t = 0;
-    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, chorin.ux};
-    Window window {&fieldView, int2(1280,720), str(N)};
+    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy};
+    Window window {&fieldView, int2(720,720), str(N)};
     Application() {
+        log("");
         chorin.solve();
         if(arguments().contains("video"_)) {
             writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());

@@ -224,9 +224,9 @@ template String itoa<10>(int64,int,char);
 
 String ftoa(double n, int precision, uint pad, int exponent) {
     bool sign = n<0; n=abs(n);
-    if(__builtin_isnan(n)) return String("NaN"_);
-    if(n==::inf) return String("inf"_); //"∞"_
-    if(n==-::inf) return String("-inf"_); //"-∞"_
+    if(__builtin_isnan(n)) return ::pad("NaN"_, pad);
+    if(n==::inf) return ::pad("∞"_, pad+2);
+    if(n==-::inf) return ::pad("-∞"_, pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';
