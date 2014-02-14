@@ -2,15 +2,67 @@
 #include "thread.h"
 #include "map.h"
 #include "function.h"
+#include "data.h"
+
+/// Aligns array size appending default elements
+inline void align(array<byte>& a, int width) { int s=a.size, n=align(width, s); if(n>s) a.grow(n); }
 
 /// D-Bus
 
 template<class T> struct variant : T { variant(){} variant(T&& t):T(move(t)){} operator const T&() const { return *this; } };
+template<> struct variant<bool> { bool t; variant(){} variant(bool t):t(t){} operator const bool&() const { return t; } };
 template<> struct variant<int> { int t; variant(){} variant(int t):t(t){} operator const int&() const { return t; } };
 template<> struct variant<uint> { uint t; variant(){} variant(uint t):t(t){} operator const uint&() const { return t; } };
 
+// D-Bus argument parsers
+template<class T> void read(BinaryData& s, variant<T>& output) {
+    uint8 size = s.read(); s.advance(size+1); //TODO: type checking
+    read(s,(T&)output);
+}
+template<class T> void read(BinaryData& s, array<T>& output) {
+    s.align(4); uint size = s.read();
+    for(uint start=s.index;s.index<start+size;) { T e; read(s,e); output << move(e); }
+}
+inline void read(BinaryData& s, String& output) { s.align(4); uint size=s.read(); output = String(s.Data::read(size)); s.advance(1);/*0*/ }
+inline void read(BinaryData&) {}
+template<class Arg, class... Args> void read(BinaryData& s, Arg& arg, Args&... args) { read(s,arg); read(s, args ...); }
+
+// D-Bus signature serializer
+template<class... Args> struct Signature { operator bool() { return true; } };
+template<> struct Signature<> { operator bool() { return false; } };
+struct ObjectPath : String {};
+
+template<class Arg, class... Args> void sign(String& s) { sign<Arg>(s); sign<Args...>(s); }
+//template<class A> void sign(String&) { static_assert(sizeof(A) && 0,"No signature defined for type"); } //function template partial specialization
+template<> inline void sign<string>(String& s) { s<<"s"_; }
+template<> inline void sign<String>(String& s) { s<<"s"_; }
+template<> inline void sign<int>(String& s) { s<<"i"_; }
+template<> inline void sign<uint>(String& s) { s<<"u"_; }
+template<> inline void sign<ObjectPath>(String& s) { s<<"o"_; }
+//template<class T> void sign< Signature<T> >(String& s) { s<<"g"_; } //function template partial specialization is not allowed
+//template<class T> void sign< variant<T> >(String& s) { s<<"v"_; sign<T>(s); } //function template partial specialization is not allowed
+template<> inline void sign< variant<String> >(String& s) { s<<"v"_; }
+template<> inline void sign< variant<int> >(String& s) { s<<"v"_; }
+
+//  D-Bus arguments serializer
+template<class A> void serialize(array<byte>&, const A&) { static_assert(sizeof(A) & 0,"No serializer defined for type"); }
+template<class Arg, class... Args> void serialize(array<byte>& s, const Arg& arg, const Args&... args) { serialize(s,arg); serialize(s, args ...); }
+inline void serialize(array<byte>&) {}
+
+inline void serialize(array<byte>& s, const string& input) { align(s, 4); s << raw<uint>(input.size) << input << 0; }
+inline void serialize(array<byte>& s, uint8 byte) { s << byte; }
+inline void serialize(array<byte>& s, int integer) { align(s, 4); s << raw<int>(integer); }
+inline void serialize(array<byte>& s, uint integer) { align(s, 4); s << raw<uint>(integer); }
+template<class T> void serialize(array<byte>& s, const variant<T>& variant) { serialize(s, Signature<T>()); serialize(s,(T&)variant); }
+template<class... Args> void serialize(array<byte>& s, Signature<Args...>) {
+    String signature; sign<Args...>(signature); assert(signature); s << (uint8)signature.size << move(signature) << 0;
+}
+template<> inline void serialize(array<byte>& s, Signature<>) { s << 0 << 0; }
+
 /// Session bus
 struct DBus : Socket, Poll {
+    enum Message { InvalidType, MethodCall, MethodReturn, Error, Signal };
+
     String name; // Instance name given by DBus
     uint32 serial = 0; // Serial number to match messages and their replies
     /// DBus read loop is able to dynamically dispatch notifications on signals and methods call
@@ -22,11 +74,21 @@ struct DBus : Socket, Poll {
     map<String, function<void()> > delegates; // Actual methods/signals implementations by delegates
 
     /// Reads messages and parse \a outputs from first reply (without type checking)
-    template<class... Outputs> void readMessage(uint32 serial, Outputs&... outputs);
+    void readMessage(uint32 serial, function<void(BinaryData&)> readOutputs);
+    template<class... Outputs> void readMessage(uint32 serial, Outputs&... outputs) {
+        readMessage(serial,  [&outputs...](BinaryData& s){::read(s, outputs...); });
+    }
+
 
     /// Writes a message of type \a type using \a Args as arguments
+    uint32 writeSerializedMessage(uint8 type, int32 replySerial, const string& target, const string& object,
+                        const string& interface, const string& member,  const ref<byte>& signature, const ref<byte>& arguments);
     template<class... Args> uint32 writeMessage(uint8 type, int32 replySerial, const string& target, const string& object,
-                                           const string& interface, const string& member, const Args&... args);
+                                           const string& interface, const string& member, const Args&... arguments) {
+        ::Signature<Args...> signature; array<byte> serializedSignature; if(signature) serialize(serializedSignature, signature);
+        array<byte> serializedArguments; serialize(serializedArguments, arguments...);
+        return writeSerializedMessage(type, replySerial, target, object, interface, member, serializedSignature, serializedArguments);
+    }
 
     struct Reply {
         handle<DBus*> dbus; uint32 serial;
@@ -39,18 +101,23 @@ struct DBus : Socket, Poll {
     };
 
     struct Object {
-        handle<DBus*> dbus;
+        DBus* dbus;
         String target;
         String object;
         /// MethodCall \a method with \a args. Returns a handle to read the reply.
         /// \note \a Reply must be read before interleaving any call
-        template<class... Args> Reply operator ()(const string& method, const Args&... args);
-        /*Reply operator ()(const string& method);
-        template<class A> Reply operator ()(const string& method, const A& a);
-        template<class A, class B> Reply operator()(const string& method, const A&, const B&);*/
+        template<class... Args> DBus::Reply operator ()(const string& method, const Args&... args) {
+            string interface = section(method,'.',0,-2)?:target, member=section(method,'.',-2,-1);
+            return {dbus, dbus->writeMessage(MethodCall, -1, target, object, interface, member, args ...)};
+        }
         template<class A> void noreply(const string& method, const A&);
         template<class A, class B> void noreply(const string& method, const A&, const B&);
-        template<class T> T get(const string& property);
+        template<class T> T get(const string& property)  {
+            uint32 serial = dbus->writeMessage(MethodCall,-1, target, object,"org.freedesktop.DBus.Properties"_,"Get"_,""_,property);
+            variant<T> t; dbus->readMessage(serial, t); return move(t);
+        }
+        array<String> children();
+        Object node(string name);
     };
 
     /// Gets a handle to a D-Bus object
@@ -90,6 +157,9 @@ struct DBus : Socket, Poll {
         delegates.insert(name, {object, (void (C::*)())signal});
     }
 
-    DBus();
+    enum Scope { Session, System };
+    DBus(Scope scope=Session);
     void event() override;
 };
+
+inline String str(const DBus::Object& o) { return str(o.target, o.object); }

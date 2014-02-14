@@ -20,7 +20,14 @@
 #include "dbus.h"
 #endif
 
-DBus dbus;
+DBus system (DBus::System);
+
+struct Drives : DBus::Object {
+    Drives() : DBus::Object{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/drives"_)} {
+        for(string name: children()) { log(name); log(node(name)); log(node(name).get<bool>("MediaRemovable"_)); }
+        error("plop");
+    }
+} drives;
 
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {

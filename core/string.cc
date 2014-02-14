@@ -206,6 +206,7 @@ template<uint base> String utoa(uint64 n, int pad, char padChar) {
     return String(string(buf+i,64-i));
 }
 template String utoa<2>(uint64,int, char padChar);
+template String utoa<8>(uint64,int, char padChar);
 template String utoa<16>(uint64,int, char padChar);
 
 template<uint base> String itoa(int64 number, int pad, char padChar) {

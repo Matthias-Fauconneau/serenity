@@ -60,7 +60,7 @@ array<String> Folder::list(uint flags) const {
 bool existsFolder(const string& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
 
 // Stream
-void Stream::read(byte* buffer, size_t size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size); }
+void Stream::read(byte* buffer, size_t size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size, read, size); }
 int64 Stream::readUpTo(byte* buffer, size_t size) { return check( ::read(fd, buffer, size), (int)fd, buffer, size); }
 buffer<byte> Stream::read(size_t size) {
     buffer<byte> buffer(size);
@@ -76,7 +76,7 @@ buffer<byte> Stream::readUpTo(size_t capacity) {
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 void Stream::write(const byte* data, size_t size) { assert(data); for(size_t offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), name()); }
 void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
-Socket::Socket(int domain, int type):Stream(check(socket(domain,type,0))){}
+Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXEC,0))){}
 
 // File
 File::File(const string& path, const Folder& at, Flags flags):Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, int(flags))){ assert(path.size<0x100); }
