@@ -14,7 +14,7 @@ struct Vector2D : Vector {
     uint m, n;
     Vector2D():m(0),n(0){}
     Vector2D(Vector&& v, uint m, uint n):Vector(move(v)),m(m),n(n){}
-    Vector2D(uint m, uint n):Vector(m*n),m(m),n(n){}
+    Vector2D(uint m, uint n, real value):Vector(m*n,value),m(m),n(n){}
     real& operator ()(uint i, uint j) { return at(j*m+i); }
     const real& operator ()(uint i, uint j) const { return at(j*m+i); }
 };
@@ -114,12 +114,12 @@ struct Helmholtz {
             real right = (yp-ym)/(X[i+1]-X[i]);
             real top = (xp-xm)/(Y[j]-Y[j-1]);
             real bottom = (xp-xm)/(Y[j+1]-Y[j]);
-            real h = (xp-xm)*(yp-ym)*h;
+            real h = (xp-xm)*(yp-ym)*H;
             M(i,j, i-1,j)   =    -left;
             M(i,j, i+1,j)   =         -right;
             M(i,j, i,  j-1) =                     -top;
             M(i,j, i,  j+1) =                           -bottom;
-            M(i,j, i,  j  ) = H+left+right+top+bottom;
+            M(i,j, i,  j  ) = h+left+right+top+bottom;
         }
         // Borders
         if(type==Dirichlet) {
@@ -173,7 +173,7 @@ struct Helmholtz {
 
     /// Solves (H - L)u = S
     Vector2D solve(const Vector2D& S) {
-        Vector2D b (Nx,Ny);
+        Vector2D b (Nx,Ny,nan);
         // Interior
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real xm = (X[i-1]+X[i])/2;
@@ -212,9 +212,9 @@ struct Helmholtz {
                 bord(true,  Nx-1, Nx-1-1, j);
             }
             // Homogeneous Neumann needs Dirichlet corners to set the constant
-            b(0,    0)    = 0;
-            b(Nx-1, 0)    = 0;
-            b(0, Ny-1)    = 0;
+            b(0,       0)    = 0;
+            b(Nx-1,    0)    = 0;
+            b(0,    Ny-1)    = 0;
             b(Nx-1, Ny-1) = 0;
         }
         //log(M, b);
@@ -227,16 +227,16 @@ struct Chorin {
     const uint N, Nx=N, Ny=N;
     const real U = 1; // Boundary speed
     const real L = 1; // Domain size
-    const real nu = 1e-3; // Fluid viscosity
+    const real nu = 1; // Fluid viscosity
     const real Re = U*L/nu; // Reynolds
-    const real dt = 1./(min(Nx,Ny)*U); // Time step
+    const real dt = 1./64; //L/(max(Nx,Ny)*U); // Time step
     Grid grid {Nx,Ny, Grid::Regular};
     const Vector& X = grid.X; const Vector& Y = grid.Y;
     Chorin(uint N):N(N) {}
 
     Helmholtz prediction {Re/dt, grid, Helmholtz::Dirichlet}; // Dirichlet conditions with top u = U
     Vector2D predict(const Vector2D& U, const Vector2D& Ux, const Vector2D& Uy) {
-        Vector2D S(Nx, Ny);
+        Vector2D S(Nx, Ny, nan);
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real u = U(i,j), ux = Ux(i,j), uy = Uy(i,j);
             real dxU = ( U(i+1,j) - U(i-1,j) ) / ( X[i+1] - X[i-1] );
@@ -249,7 +249,7 @@ struct Chorin {
 
     Helmholtz correction {0, grid, Helmholtz::Neumann, 0}; // Poisson with homogeneous Neumann conditions (Dp=0)
     Vector2D correct(const Vector2D& Ux, const Vector2D& Uy) {
-        Vector2D S(Nx, Ny);
+        Vector2D S(Nx, Ny, nan);
         auto bord = [&](bool transpose, int i0, int i1, int i) {
             const auto& x = !transpose ? X : Y;
             const auto& y = !transpose ? Y : X;
@@ -258,12 +258,15 @@ struct Chorin {
             real y12 = (y[i0]+y[i1])/2;
             auto ux = [&](int i, int j) -> real { return !transpose ? Ux(i,j) : Ux(j,i); };
             auto uy = [&](int i, int j) -> real { return !transpose ? Uy(i,j) : Uy(j,i); };
-            real dxU = (ux(i+1,i0) - ux(i-1,i0)) / (x[i+1] - x[i-1]);
-            real dyU = (uy(i,  i1) - uy(i,  i0)) / (y[i1 ] - y[i0 ]);
-            (!transpose ? S(i,i0) : S(i0,i)) = (xp-xm) * (y12-y[i0]) * (dxU + dyU);
+            real dxUx = (ux(i+1,i0) - ux(i-1,i0)) / (x[i+1] - x[i-1]);
+            real dyUy = (uy(i,  i1) - uy(i,  i0)) / (y[i1 ] - y[i0 ]);
+            (!transpose ? S(i,i0) : S(i0,i)) = (xp-xm) * (y12-y[i0]) * (dxUx + dyUy);
         };
         for(uint i: range(1,Nx-1)) {
             bord(false, 0,    1,      i);
+            real xm = (X[i-1]+X[i])/2;
+            real xp = (X[i]+X[i+1])/2;
+            S(i, 0) += (xp-xm) * U / ((xp-xm) * (Y[1] - Y[0]));
             bord(false, Ny-1, Ny-1-1, i);
         }
         for(uint j: range(1,Ny-1)) {
@@ -271,16 +274,16 @@ struct Chorin {
             bord(true,  Nx-1, Nx-1-1, j);
         }
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
-            real dxU = ( Ux(i+1,j) - Ux(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyU = ( Uy(i,j+1) - Uy(i,j-1) ) / ( Y[j+1] - Y[j-1] );
-            S(i,j) = dxU + dyU;
+            real dxUx = ( Ux(i+1,j) - Ux(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyUy = ( Uy(i,j+1) - Uy(i,j-1) ) / ( Y[j+1] - Y[j-1] );
+            S(i,j) = dxUx + dyUy;
         }
         // Neumann conditions are set with Helmholtz::boundaryValues
         return correction.solve(S);
     }
 
     // Current state vector
-    Vector2D ux{Nx,Ny}, uy{Nx,Ny};
+    Vector2D ux{Nx,Ny,0}, uy{Nx,Ny,0}, P;
 
     // Solves one iteration of Chorin
     void solve() {
@@ -289,14 +292,15 @@ struct Chorin {
         prediction.boundaryValues = 0;
         Vector2D nuy = predict(uy, ux,uy);
 #if 1
-        Vector2D psi = correct(nux, nuy);
+        P = correct(nux, nuy);
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
-            real dxP = ( psi(i+1,j) - psi(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyP = ( psi(i,j+1) - psi(i,j-1) ) / ( Y[j+1] - Y[j-1] );
+            real dxP = ( P(i+1,j) - P(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyP = ( P(i,j+1) - P(i,j-1) ) / ( Y[j+1] - Y[j-1] );
             ux(i,j) = nux(i,j) - dxP;
             uy(i,j) = nuy(i,j) - dyP;
         }
 #else
+        P = Vector2D(Nx, Ny, 1);
         ux = move(nux), uy = move(nuy);
 #endif
     }
@@ -306,13 +310,14 @@ struct Chorin {
 /// Displays scalar fields as blue,green,red components
 struct FieldView : Widget {
     const Vector& X; const Vector& Y;
-    const Vector2D& Ux; const Vector2D& Uy;
-    FieldView(const Grid& grid, const Vector2D& Ux,const Vector2D& Uy):X(grid.X),Y(grid.Y),Ux(Ux),Uy(Uy){}
+    const Vector2D& Ux; const Vector2D& Uy; const Vector2D& P;
+    FieldView(const Grid& grid, const Vector2D& Ux, const Vector2D& Uy, const Vector2D& P):X(grid.X),Y(grid.Y),Ux(Ux),Uy(Uy),P(P){}
     int2 sizeHint() { return int2(720/2); }
-    void render(const Image& target) override {
+    void render(const Image& target) override {\
         vec2 size (target.size());
         const real uMax = max(maxabs(Ux), maxabs(Uy));
-#if COLOR
+#if 1
+        vec3 cMax (uMax, uMax, max(P));
         for(uint i: range(X.size-1)) for(uint j: range(Y.size-1)) {
             int y0 = round(size.y*Y[j]), y1 = round(size.y*Y[j+1]);
             int x0 = round(size.x*X[i]), x1 = round(size.x*X[i+1]);
@@ -320,25 +325,24 @@ struct FieldView : Widget {
                 real u = ((x+1./2)/size.x-X[i])/(X[i+1]-X[i]);
                 real v = ((y+1./2)/size.y-Y[j])/(Y[j+1]-Y[j]);
                 vec3 c = 0;
-                for(uint componentIndex : range(2)) {
-                    const Vector2D& C = *(ref<const Vector2D*>{&Ux,&Uy}[componentIndex]);
+                for(uint componentIndex : range(3)) {
+                    const Vector2D& C = *(ref<const Vector2D*>{&Ux,&Uy,&P}[componentIndex]);
                     c[componentIndex] = (1-v) * ((1-u) * C(i,j  ) + u * C(i+1,j  )) +
                             v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
                 }
-                int3 linear = int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2))));
+                int3 linear = max(int3(0),int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2)))));
                 assert_(linear >= int3(0) && linear < int3(0x1000), linear, c, cMax);
                 extern uint8 sRGB_forward[0x1000];
                 target(x,y) = byte4(sRGB_forward[linear.x], sRGB_forward[linear.y], sRGB_forward[linear.z], 0xFF);
             }
         }
 #endif
-#define ARROW 1
-#if ARROW
+#if 0
         real minX=inf; for(uint i: range(1,X.size)) minX=min(minX, X[i]-X[i-1]);
         real minY=inf; for(uint i: range(1,Y.size)) minY=min(minY, Y[i]-Y[i-1]);
         const float minCellSize = min(size.x*minX, size.y*minY);
-        for(real x: X) line(target, size*vec2(x,0),size*vec2(x,1));
-        for(real y: Y) line(target, size*vec2(0,y),size*vec2(1,y));
+        //for(real x: X) line(target, int2(size*vec2(x,0)), int2(size*vec2(x,1)));
+        //for(real y: Y) line(target, int2(size*vec2(0,y)), int2(size*vec2(1,y)));
         for(uint i: range(X.size)) for(uint j: range(Y.size)) {
             vec2 center = vec2(target.size())*vec2(X[i], Y[j]);
             vec2 scale = minCellSize * vec2(Ux(i,j),Uy(i,j) / float(uMax));
@@ -351,24 +355,26 @@ struct FieldView : Widget {
 };
 
 struct Application {
-    const uint N = 32;
+    const uint N = 16;
     Chorin chorin {N};
     uint t = 0;
-    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy};
-    Window window {&fieldView, int2(720,720), str(N)};
+    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, chorin.P};
+    Window window {&fieldView, int2(1024,1024), str(N)};
     Application() {
         log("");
         chorin.solve();
         if(arguments().contains("video"_)) {
             writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());
         } else {
-            window.oxygenBackground = false;
+            window.background = Window::None;
             window.actions[Escape] = []{exit();};
-            window.frameSent.connect([this](){
+            window.frameSent
+            //window.actions[Key(' ')]
+                    = [this]{
                 chorin.solve();
                 window.render();
-                window.setTitle(str(t++));
-            });
+                window.setTitle(str(t++,'/', chorin.Re * chorin.N));
+            };
             window.show();
         }
     }

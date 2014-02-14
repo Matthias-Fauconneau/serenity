@@ -33,7 +33,7 @@ template<Type R, Type... Args> struct function;
 /// Provides a common interface to store functions, methods (delegates) and anonymous functions (lambdas)
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
     long any[22]; //always store functor inline
-    function(){} // Invalid function (segfaults)
+    function():any{0}{} // Invalid function (segfaults)
     template<Type F> function(F f) {
         static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");
         new (any) anonymous_function<F,R(Args...)>(f);
@@ -48,6 +48,7 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
     }
 #pragma GCC system_header //-Wstrict-aliasing
     virtual R operator()(Args... args) const override { return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
+    explicit operator bool() { return any[0]; }
 };
 
 /// Helps modularization by binding unrelated objects through persistent connections

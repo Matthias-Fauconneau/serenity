@@ -2,14 +2,14 @@
 /// Numeric linear algebra (matrix operations, linear solver)
 #include "string.h"
 #include "time.h"
-typedef double real;
+#include "math.h"
 typedef ref<real> vector;
 
 /// Dense vector
 struct Vector : buffer<real> {
     Vector(){}
-    /// Allocates and initializes to zero
-    Vector(uint size):buffer<real>(size,size,0.0){}
+    /// Allocates and initializes to NaN
+    Vector(uint size, real value=nan):buffer<real>(size,size,value){}
 };
 inline String str(const Vector& a, char separator=' ') { return str((const ref<real>&)a, separator); }
 inline Vector operator*(real a, const vector& x) {

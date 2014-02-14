@@ -72,7 +72,7 @@ struct Window : Device {
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
-    bool oxygenBackground = true;
+    enum Background { None, White, Oxygen } background = Oxygen;
 
     /// Renders window background to \a target
     void renderBackground(Image& target);
@@ -144,7 +144,7 @@ struct Window : Device {
     Anchor anchor = Float;
 
     /// Signals sent frames
-    signal<> frameSent;
+    function<void()> frameSent;
 
     /// Root window
     uint root = 0;

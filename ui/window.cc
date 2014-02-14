@@ -138,7 +138,7 @@ void Window::event() {
 
         putImage(0, size);
         state=Server;
-        frameSent();
+        if(frameSent) frameSent();
     }
 }
 
@@ -498,7 +498,7 @@ void Window::setDisplay(bool displayState) {
 #endif
 
 void Window::renderBackground(Image& target) {
-    if(oxygenBackground) { // Oxygen-like radial gradient background
+    if(background==Oxygen) { // Oxygen-like radial gradient background
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
         const vec3 radial = vec3(246./255); // linear
         const vec3 top = vec3(221, 223, 225); // sRGB
@@ -528,7 +528,9 @@ void Window::renderBackground(Image& target) {
             else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
         }
     }
-    else for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
+    else if(background==White) {
+        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
+    }
 }
 
 void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
