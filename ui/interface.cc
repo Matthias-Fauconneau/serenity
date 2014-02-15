@@ -77,7 +77,7 @@ void Progress::render(const Image& target) {
 bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     if((event == Motion || event==Press) && button==LeftButton) {
         value = minimum+cursor.x*uint(maximum-minimum)/size.x;
-        valueChanged(value);
+        if(valueChanged) valueChanged(value);
         return true;
     }
     return false;
@@ -109,7 +109,7 @@ bool Selection::keyPress(Key key, Modifiers modifiers) {
 }
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
-    index=i; if(index!=uint(-1)) activeChanged(index);
+    index=i; if(index!=uint(-1)) if(activeChanged) activeChanged(index);
 }
 
 // HighlightSelection
@@ -135,7 +135,7 @@ void TabSelection::render(const Image& target) {
 }
 
 // ImageWidget
-int2 ImageWidget::sizeHint() { return image.size(); }
+int2 ImageWidget::sizeHint() { return hidden ? 0 : image.size(); }
 void ImageWidget::render(const Image& target) {
     if(!image) return;
     int2 offset = (target.size()-image.size())/2;
@@ -144,7 +144,7 @@ void ImageWidget::render(const Image& target) {
 
 // ImageLink
 bool ImageLink::mouseEvent(int2, int2, Event event, Button) {
-    if(event==Press) { triggered(); linkActivated(link); return true; }
+    if(event==Press) { if(triggered) triggered(); linkActivated(link); return true; }
     return false;
 }
 

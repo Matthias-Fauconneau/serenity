@@ -13,26 +13,29 @@
 #include "png.h"
 #include <sys/inotify.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #if !__arm__
 #define DBUS 1
 #endif
 #if DBUS
 #include "dbus.h"
-#endif
 
 DBus system (DBus::System);
+#endif
 
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
     FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted)
-        : File(inotify_init()), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
+        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
           fileCreated(fileCreated), fileDeleted(fileDeleted) {}
     void event() override {
-        ::buffer<byte> buffer = readUpTo(0x100);
-        inotify_event e = *(inotify_event*)buffer.data;
-        string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
-        if(e.mask&IN_CREATE && fileCreated) fileCreated(name);
-        if(e.mask&IN_DELETE && fileDeleted) fileDeleted(name);
+        while(poll()) {
+            ::buffer<byte> buffer = readUpTo(2*sizeof(inotify_event)+4); // Maximum size fitting only a single event (FIXME)
+            inotify_event e = *(inotify_event*)buffer.data;
+            string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
+            if((e.mask&IN_CREATE) && fileCreated) fileCreated(name);
+            if((e.mask&IN_DELETE) && fileDeleted) fileDeleted(name);
+        }
     }
     const uint watch;
     function<void(string)> fileCreated;
@@ -66,7 +69,7 @@ template<Type T> struct BackingStore : T {
     }
     /// Directly renders partial update to last known target and sends a partial update for \a window
     /// \note Assumes last known target is the rendering target for \a window
-    void render(Window& window) { render(); putImage(window); }
+    void render(Window& window) { if(!window.displayState) return; render(); putImage(window); }
 };
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
@@ -126,11 +129,12 @@ struct Player {
     ICON(random) ICON(random2) ToggleButton randomButton {randomIcon(), random2Icon()};
     ICON(next) TriggerButton nextButton{nextIcon()};
     ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
+    ICON(eject) TriggerButton ejectButton{ejectIcon(), true};
     Text elapsed = "00:00"_;
     Slider slider;
     Text remaining = "00:00"_;
     BackingStore<HBox> backingStore {{&elapsed, &slider, &remaining}};
-    HBox toolbar {{&randomButton, &playButton, &nextButton, &backingStore}};
+    HBox toolbar {{&randomButton, &playButton, &nextButton, &ejectButton, &backingStore}};
     Scroll< List<Text>> albums;
     Scroll< List<Text>> titles;
     HBox main {{ &albums.area(), &titles.area() }};
@@ -151,21 +155,23 @@ struct Player {
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.actions[Escape] = []{exit();};
-        window.actions[Key(' ')] = {this, &Player::togglePlay};
-        window.globalAction(Play) = {this, &Player::togglePlay};
-        window.longActions[Play] = {this, &Player::next};
+        window.actions[Space] = {this, &Player::togglePlay};
 #if ARM
-        window.globalAction(Extra) = {this, &Player::togglePlay};
-#endif
+        window.actions[Extra] = {this, &Player::togglePlay};
         window.longActions[Extra]= {this, &Player::next};
         window.actions[Power] = {&window, &Window::toggleDisplay};
-        window.actions[Power] = [](){execute("/sbin/poweroff"_);};
-        randomButton.toggled.connect(this, &Player::setRandom);
-        playButton.toggled.connect(this, &Player::setPlaying);
-        nextButton.triggered.connect(this, &Player::next);
-        slider.valueChanged.connect(this, &Player::seek);
-        albums.activeChanged.connect(this, &Player::playAlbum);
-        titles.activeChanged.connect(this, &Player::playTitle);
+        window.longActions[Power] = [this](){ window.setDisplay(false); execute("/sbin/poweroff"_); };
+#else
+        window.actions[Play] = {this, &Player::togglePlay};
+        window.longActions[Play] = {this, &Player::next};
+#endif
+        randomButton.toggled = {this, &Player::setRandom};
+        playButton.toggled = {this, &Player::setPlaying};
+        nextButton.triggered = {this, &Player::next};
+        ejectButton.triggered = {this, &Player::eject};
+        slider.valueChanged = {this, &Player::seek};
+        albums.activeChanged = {this, &Player::playAlbum};
+        titles.activeChanged = {this, &Player::playTitle};
 
         if(arguments()) setFolder(arguments().first());
         else {
@@ -178,10 +184,11 @@ struct Player {
     }
     ~Player() { setPlaying(false); /*Records last position*/ }
     void setFolder(string path) {
+        assert(folder.name() != path);
+        if(folder.name() == path) return;
+        folders.clear(); albums.clear(); files.clear(); titles.clear(); randomSequence.clear();
         folder = path;
         folders = folder.list(Folders|Sorted);
-        log(folders);
-        albums.clear();
         for(string folder: folders) albums << String(section(folder,'/',-2,-1));
         if(existsFile(".last"_, folder)) {
             String mark = readFile(".last"_, folder);
@@ -191,20 +198,23 @@ struct Player {
             if(existsFolder(album, folder)) {
                 if(section(mark,'\0',2,3)) {
                     queueFile(album, file, true);
-                    next();
+                    assert(files);
+                    playTitle(0);
                     setRandom(true);
                 } else {
                     albums.index = folders.indexOf(album);
                     array<String> files = Folder(album, folder).list(Recursive|Files|Sorted);
                     uint i=0; for(;i<files.size;i++) if(files[i]==file) break;
                     for(;i<files.size;i++) queueFile(album, files[i], false);
-                    next();
+                    assert(this->files);
+                    playTitle(0);
                 }
                 seek(fromInteger(section(mark,'\0',1,2)));
             }
         } else {
+            if(randomButton.enabled) setRandom(true); // Regenerates random sequence for folder
             updatePlaylist();
-            next();
+            if(files) playTitle(0);
         }
     }
     void queueFile(const string& folder, const string& file, bool withAlbumName) {
@@ -229,6 +239,7 @@ struct Player {
         playAlbum(folders[index]);
     }
     void playTitle(uint index) {
+        titles.index = index;
         window.setTitle(toUTF8(titles[index].text));
         file = unique<AudioFile>(folder.name()+"/"_+files[index]);
         if(!file->file) { file=0; return; }
@@ -236,7 +247,7 @@ struct Player {
         setPlaying(true);
     }
     void next() {
-        if(titles.index+1<titles.count()) playTitle(++titles.index);
+        if(titles.index+1<titles.count()) playTitle(titles.index+1);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
         else { setPlaying(false); if(file) file->close(); return; }
@@ -292,7 +303,7 @@ struct Player {
         }
         playButton.enabled=play;
         window.render();
-        if(writableFile(".last"_, folder))
+        if(writableFile(".last"_, folder) && titles.index<files.size && file)
             writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
     }
     void seek(int position) {
@@ -305,7 +316,6 @@ struct Player {
         if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         backingStore.render(window);
     }
-    String mounts = File("proc/self/mounts"_).readUpTo(2048);
     String cmdline = File("proc/cmdline"_).readUpTo(256);
     void deviceCreated(string name) { mount(name); }
     bool mount(string name) {
@@ -314,7 +324,8 @@ struct Player {
         if(!s.word()) return false;
         if(!s.whileInteger()) return false; // Only acts on partitions
         String device = "/dev/"_+name;
-        if(File(device,root(), Descriptor).type() != FileType::Drive) return false; // Only acts on drives
+        //if(File(device,root(), Descriptor).type() != FileType::Drive) return false; // Only acts on drives
+        struct stat stat; ::stat(strz(device),&stat); if((stat.st_mode&__S_IFMT) !=__S_IFBLK) return false; // Only acts on drives
         if(find(cmdline, device)) return false; // Do not act on root drive
 #if DBUS
         DBus::Object uDevices{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/block_devices"_)};
@@ -324,7 +335,10 @@ struct Player {
         if(!uDrive.get<uint>("org.freedesktop.UDisks2.Drive.Removable"_)) return false; // Only acts on removable drives
 #endif
         String target;
+        String mounts = File("proc/self/mounts"_).readUpTo(2048);
         for(TextData s(mounts); s; s.line()) if(s.match(device)) { s.skip(" "_); target = String(s.until(' ')); break; }
+        bool wasPlaying = playButton.enabled;
+        if(wasPlaying) setPlaying(false);
         if(!target) { // Mounts drive
             log_(str("Mounting ",device));
 #if DBUS
@@ -333,7 +347,7 @@ struct Player {
             log_(str(" on", target));
 #else
             target = "/media/"_+name;
-            log_(" on",target);
+            log_(str(" on",target));
             folder = Folder(target, root(), true);
             auto mount = [](string device, string target) {
                 for(string fs: {"vfat"_,"ext4"_}) {
@@ -347,19 +361,24 @@ struct Player {
             log(" succeeded");
         }
         this->device = String(name);
+        ejectButton.hidden = false;
         if(existsFolder("Music"_,target)) setFolder(target+"/Music"_);
         else setFolder(target);
+        if(wasPlaying) setPlaying(true);
         return true;
     }
-    void deviceDeleted(string name) {
-        log(name, device);
-        if(name == device) {
-            setFolder(arguments() ? arguments().first() : "Music"_);
+    void deviceDeleted(string name) { if(name == device) eject(); }
+    void eject() {
+        ejectButton.hidden = true;
+        bool wasPlaying = playButton.enabled;
+        if(wasPlaying) setPlaying(false);
+        setFolder(arguments() ? arguments().first() : "Music"_);
 #if !DBUS
-            String target = "/media/"_+name;
-            umount2(strz(target), 0);
-            removeFolder(target);
+        String target = "/media/"_+device;
+        umount2(strz(target), 0);
+        removeFolder(target);
 #endif
-        }
+        device.clear();
+        if(wasPlaying) setPlaying(true);
     }
 } application;

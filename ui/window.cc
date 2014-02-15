@@ -390,6 +390,8 @@ void Window::setDisplay(bool displayState) { log("Unimplemented X11 setDisplay",
 #else
 
 #include <unistd.h>
+#include <linux/vt.h>
+#include <linux/kd.h>
 #include <linux/fb.h>
 #include <linux/input.h>
 
@@ -404,6 +406,8 @@ Window::Window(Widget* widget, int2, const string& title unused, const Image& ic
     framebuffer = Map(Device::fd, 0, var.yres_virtual * fix.line_length, Map::Prot(Map::Read|Map::Write));
     touchscreen.eventReceived = {this, &Window::touchscreenEvent};
     buttons.eventReceived = {this, &Window::buttonEvent};
+    if(existsFile("/dev/input/event5"_)) new (&keyboard) PollDevice("/dev/input/event5"_); // FIXME: Watch /dev and opens keyboard device on plug
+    keyboard.eventReceived = {this, &Window::keyboardEvent};
 }
 
 void Window::touchscreenEvent() {
@@ -440,8 +444,19 @@ void Window::touchscreenEvent() {
 void Window::buttonEvent() {
     window=this;
     for(input_event e; ::read(buttons.Device::fd, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY && e.value==0) keyPress(e.code);
-        if(e.type == EV_KEY && e.value==1) keyRelease(e.code);
+        if(e.code == Power) e.value = !e.value; // Touchbook power button seems to be wired in reverse
+        if(e.type == EV_KEY && e.value==1) keyPress(Key(e.code), NoModifiers);
+        if(e.type == EV_KEY && e.value==0) keyRelease(Key(e.code), NoModifiers);
+    }
+    window=0;
+    if(needUpdate) render();
+}
+
+void Window::keyboardEvent() {
+    window=this;
+    for(input_event e; ::read(keyboard.Device::fd, &e, sizeof(e)) > 0;) {
+        if(e.type == EV_KEY && e.value==1) keyPress(Key(e.code), NoModifiers);
+        if(e.type == EV_KEY && e.value==0) keyRelease(Key(e.code), NoModifiers);
     }
     window=0;
     if(needUpdate) render();
@@ -449,6 +464,7 @@ void Window::buttonEvent() {
 
 
 void Window::render() {
+    if(!displayState) return;
     if(!mapped) return;
     if(target.size() != size) target = Image(size.x, size.y);
     needUpdate = false;
@@ -460,11 +476,21 @@ void Window::render() {
 
 void Window::show() {
     if(mapped) return;
+    int index=2;
+    vt.ioctl(VT_OPENQRY, &index);
+    vt = Device("/dev/tty"_+dec(index));
+    vt_stat vts;  vt.ioctl(VT_GETSTATE, &vts); previousVT = vts.v_active;
+    vt.ioctl(VT_ACTIVATE, (void*)index);
+    vt.ioctl(VT_WAITACTIVE, (void*)index);
+    //vt.ioctl(KDSETMODE, (void*)KD_GRAPHICS);
     writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
+    writeFile("/proc/sys/kernel/printk"_,"3 4 1 3"_);
     mapped=true;
     render();
 }
 void Window::hide() {
+    vt.ioctl(KDSETMODE, KD_TEXT);
+    vt.ioctl(VT_ACTIVATE, (void*)previousVT);
     mapped=false;
 }
 void Window::setTitle(const string& title unused) {}
@@ -472,6 +498,8 @@ void Window::setIcon(const Image& icon unused) {}
 String Window::getSelection(bool unused clipboard) { return String(); }
 function<void()>& Window::globalAction(Key key) { return actions.insert(key); }
 void Window::putImage(int2 position, int2 size) {
+    assert(displayState);
+    if(!displayState) return;
     if(bytesPerPixel==4) {
         byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
         for(uint y: range(position.y, position.y+size.y)) for(uint x: range(position.x, position.x+size.x)) BGRX8888[y*stride+x] = target(x,y);
@@ -491,8 +519,9 @@ void Window::putImage(int2 position, int2 size) {
 
 void Window::setDisplay(bool displayState) {
     this->displayState = displayState;
-    int blank_level = displayState ? FB_BLANK_NORMAL : FB_BLANK_POWERDOWN;
-    ioctl(FBIOBLANK, &blank_level);
+    int blank_level = displayState ? VESA_NO_BLANKING : VESA_POWERDOWN;
+    ioctl(FBIOBLANK, (void*)blank_level);
+    if(displayState) render();
 }
 
 #endif

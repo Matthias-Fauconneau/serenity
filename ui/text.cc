@@ -278,7 +278,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
                 text.removeAt(editIndex=index()); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
-        else if(key==BackSpace) { //LeftArrow+Delete
+        else if(key==Backspace) { //LeftArrow+Delete
             if(cursor.column>0) cursor.column--;
             else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size;
             else return false;
@@ -293,10 +293,11 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
             }
         }
         else {
+            ref<uint> keypadNumbers = {KP_0, KP_1, KP_2, KP_3, KP_4, KP_5, KP_6, KP_7, KP_8, KP_9};
             char c=0;
             if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
-            else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
-            else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Sub) c='-'; else if(key==KP_Divide) c='/';
+            else if(keypadNumbers.contains(key)) c='0'+keypadNumbers.indexOf(key);
+            else if(key==KP_Asterisk) c='*'; else if(key==KP_Plus) c='+'; else if(key==KP_Minus) c='-'; else if(key==KP_Slash) c='/';
             else return false;
             editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c, editIndex=1; layout(); if(textChanged) textChanged(toUTF8(text));
         }

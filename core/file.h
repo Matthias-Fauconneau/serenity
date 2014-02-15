@@ -9,10 +9,13 @@ constexpr string errno[] = {"OK"_, "PERM"_, "NOENT"_, "SRCH"_, "INTR"_, "IO"_, "
 #define check(expr, message...) ({ long e=(long)expr; if(e<0 && -e<LAST) error(#expr ""_, errno[-e], ##message); e; })
 /// Aborts if \a expr is negative and logs corresponding error code (unused result)
 #define check_(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) error(#expr ""_, errno[-e], ##message); })
+/// Does not abort if \a expr is negative and logs corresponding error code (unused result)
+#define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) log(#expr ""_, errno[-e], ##message); })
 
 /// Unix file descriptor
 struct Handle {
     handle<int> fd;
+    Handle():fd(0){}
     Handle(int fd):fd(fd){}
     default_move(Handle);
     ~Handle();
@@ -46,6 +49,7 @@ bool existsFolder(const string& folder, const Folder& at=root());
 
 /// Handle to an Unix I/O stream
 struct Stream : Handle {
+    Stream(){}
     Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
     void read(byte* buffer, size_t size);
@@ -83,6 +87,7 @@ enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=
 enum class FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 };
 /// Handle to a file
 struct File : Stream {
+    File(){}
     File(int fd):Stream(fd){}
     /// Opens \a path
     /// If read only, fails if not existing
@@ -119,6 +124,7 @@ template<uint major, uint minor, Type T> struct IOR { typedef T Args; static con
 template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 /// Handle to a device
 struct Device : File {
+    Device(){}
     Device(const string& path, const Folder& at=root(), Flags flags=ReadWrite):File(path, at, flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);

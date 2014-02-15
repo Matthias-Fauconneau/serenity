@@ -4,12 +4,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-inline void dump(const ref<byte>& raw) {
-    String ascii;
-    for(char c: raw) { if(c=='"') ascii<<'\\'; if(c>=' '&&c<='~') ascii<<c; else ascii<<'\\'<<utoa<8>(uint8(c)); }
-    log(ascii);
-}
-
 /// Definitions
 
 struct Header {
@@ -99,9 +93,6 @@ uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string&
     int bodyStart = out.size;
     out << arguments;
     *(uint32*)(&out.at(offsetof(Header,length))) = out.size-bodyStart;
-    //strace -e sendmsg -s 222 dbus-send --system --print-reply --dest=
-    log(target, object, interface+"."_+member);
-    dump(out);
     write(out);
     return serial;
 }

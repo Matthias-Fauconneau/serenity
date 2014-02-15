@@ -117,7 +117,6 @@ void AudioOutput::event() {
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
     if(status->state == XRun) {
-        log("Underrun"_);
         io<PREPARE>();
 #if !MMAP
         syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);

@@ -5,15 +5,13 @@
 #include "function.h"
 #include "map.h"
 #include "time.h"
-#if !__arm__ && __GXX_EXPERIMENTAL_CXX0X__ /*!QtCreator*/
-#define X11 1
-#endif
 #if X11
 union XEvent;
 #else
 struct PollDevice : Device, Poll {
-    PollDevice(const string &path):Device(path,root(),Flags(ReadWrite|NonBlocking)),Poll(Device::fd){}
-    void event() override { eventReceived(); }
+    PollDevice() {}
+    PollDevice(const string &path) : Device(path,root(),Flags(ReadWrite|NonBlocking)), Poll(Device::fd){}
+    void event() override { if(eventReceived) eventReceived(); }
     function<void()> eventReceived;
 };
 #endif
@@ -185,11 +183,16 @@ struct Window : Device {
     void touchscreenEvent();
     /// Buttons event handler
     void buttonEvent();
+    /// Keyboard event handler
+    void keyboardEvent();
 
+    Device vt {"/dev/console"_};
+    uint previousVT = 1;
     uint stride=0, bytesPerPixel=0;
     Map framebuffer;
     PollDevice touchscreen {"/dev/input/event0"_};
     PollDevice buttons {"/dev/input/event4"_};
+    PollDevice keyboard;
     int previousPressState = 0, pressState = 0;
 #endif
 };

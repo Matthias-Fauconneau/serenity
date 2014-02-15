@@ -45,9 +45,11 @@ template<class T> struct Scroll : ScrollArea, T {
 struct ImageWidget : Widget {
     /// Displayed image
     const Image& image;
+    /// Hides button
+    bool hidden = false;
 
     /// Creates a widget displaying \a image
-    ImageWidget(const Image& image):image(move(image)){}
+    ImageWidget(const Image& image, bool hidden=false):image(move(image)),hidden(hidden){}
 
     int2 sizeHint();
     void render(const Image& target) override;
@@ -61,11 +63,11 @@ struct ImageLink : ImageWidget {
     /// Argument given to triggered
     String link;
     /// User clicked on the image
-    signal<> triggered;
+    function<void()> triggered;
     /// User clicked on the image
     signal<const string&> linkActivated;
 
-    ImageLink(const Image& image):Icon(move(image)){}
+    ImageLink(const Image& image, bool hidden=false) : ImageWidget(move(image),hidden){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 /// \typedef ImageLink TriggerButton
@@ -78,7 +80,7 @@ struct ToggleButton : Widget {
     ToggleButton(const Image& enable, const Image& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
-    signal<bool /*state*/> toggled;
+    function<void(bool state)> toggled;
 
     /// Current button state
     bool enabled = false;
@@ -108,7 +110,7 @@ struct Progress : Widget {
 /// Shows and controls a bounded value
 struct Slider : Progress {
     /// User edited the \a value
-    signal<int> valueChanged;
+    function<void(int)> valueChanged;
 
     Slider(int minimum=0, int maximum=0, int value=-1):Progress(minimum,maximum,value){}
 

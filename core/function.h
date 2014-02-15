@@ -47,7 +47,7 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
 #pragma GCC system_header //-Wstrict-aliasing
-    virtual R operator()(Args... args) const override { return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
+    virtual R operator()(Args... args) const override { assert(any[0]); return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
     explicit operator bool() { return any[0]; }
 };
 

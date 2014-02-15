@@ -125,7 +125,7 @@ template<class T> struct UniformGrid : GridLayout,  Array<T> {
 /// Implements selection of active widget/item for a \a Layout
 struct Selection : virtual Layout {
     /// User changed active index.
-    signal<uint /*index*/> activeChanged;
+    function<void(uint index)> activeChanged;
     /// Active index
     uint index = -1;
     /// Set active index and emit activeChanged
@@ -155,6 +155,8 @@ template<class T> struct ArraySelection : Array<T>, virtual Selection {
     ArraySelection(array<T>&& items) : Array<T>(move(items)){}
     /// Return active item (last selection)
     T& active() { return array<T>::at(this->index); }
+    /// Clears array and resets index
+    void clear() { Array<T>::clear(); index=-1; }
 };
 
 /// Vertical layout of selectable items. \sa ArraySelection

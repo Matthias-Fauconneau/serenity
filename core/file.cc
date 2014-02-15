@@ -88,7 +88,11 @@ int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.
 void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
+#if __arm__
+bool existsFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), 0, 0); if(fd>0) close(fd); return fd>0; }
+#else
 bool existsFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_PATH, 0); if(fd>0) close(fd); return fd>0; }
+#endif
 bool writableFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_WRONLY, 0); if(fd>0) close(fd); return fd>0; }
 buffer<byte> readFile(const string& path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 void writeFile(const string& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
@@ -112,7 +116,7 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { assert(oldName!=newName); rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
-void removeFolder(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
+void removeFolder(const string& name, const Folder& at) { check__( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
 void remove(const Folder& folder) { int fd=check(openat(folder.fd, strz("."_), O_WRONLY|O_DIRECTORY, 0), folder.name()); check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); close(fd); }
 void removeFileOrFolder(const string& name, const Folder& at) {
     if(existsFolder(name,at)) {
