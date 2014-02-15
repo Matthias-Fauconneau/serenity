@@ -28,11 +28,11 @@ struct FileWatcher : File, Poll {
         : File(inotify_init()), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
           fileCreated(fileCreated), fileDeleted(fileDeleted) {}
     void event() override {
-        ::buffer<byte> buffer = readUpTo(align(16, sizeof(inotify_event)));
+        ::buffer<byte> buffer = readUpTo(0x100);
         inotify_event e = *(inotify_event*)buffer.data;
-        string name = buffer.slice(__builtin_offsetof(inotify_event, name), e.len);
-        if(e.mask&IN_CREATE) fileCreated(name);
-        if(e.mask&IN_DELETE) fileDeleted(name);
+        string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
+        if(e.mask&IN_CREATE && fileCreated) fileCreated(name);
+        if(e.mask&IN_DELETE && fileDeleted) fileDeleted(name);
     }
     const uint watch;
     function<void(string)> fileCreated;
@@ -138,6 +138,7 @@ struct Player {
     Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
 
 // Content
+    String device; // Device underlying folder
     Folder folder;
     array<String> folders;
     array<String> files;
@@ -169,7 +170,7 @@ struct Player {
         if(arguments()) setFolder(arguments().first());
         else {
             for(string device: Folder("dev"_).list(Drives)) if(mount(device)) break;
-            if(!folder) setFolder("/Music"_);
+            if(!folder) setFolder("Music"_);
         }
 
         window.show();
@@ -179,6 +180,7 @@ struct Player {
     void setFolder(string path) {
         folder = path;
         folders = folder.list(Folders|Sorted);
+        log(folders);
         albums.clear();
         for(string folder: folders) albums << String(section(folder,'/',-2,-1));
         if(existsFile(".last"_, folder)) {
@@ -290,7 +292,8 @@ struct Player {
         }
         playButton.enabled=play;
         window.render();
-        writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
+        if(writableFile(".last"_, folder))
+            writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
     }
     void seek(int position) {
         if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*resampler.clear();*/ /*audio->cancel();*/ }
@@ -314,7 +317,9 @@ struct Player {
         if(File(device,root(), Descriptor).type() != FileType::Drive) return false; // Only acts on drives
         if(find(cmdline, device)) return false; // Do not act on root drive
 #if DBUS
-        DBus::Object uDevice{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/block_devices/"_+name)};
+        DBus::Object uDevices{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/block_devices"_)};
+        while(!uDevices.children().contains(name)) sched_yield(); // FIXME: connect to InterfaceAdded instead of busy looping
+        DBus::Object uDevice{&system, String("org.freedesktop.UDisks2"_),"/org/freedesktop/UDisks2/block_devices/"_+name};
         DBus::Object uDrive{&system, String("org.freedesktop.UDisks2"_),uDevice.get<String>("org.freedesktop.UDisks2.Block.Drive"_)};
         if(!uDrive.get<uint>("org.freedesktop.UDisks2.Drive.Removable"_)) return false; // Only acts on removable drives
 #endif
@@ -332,7 +337,7 @@ struct Player {
             folder = Folder(target, root(), true);
             auto mount = [](string device, string target) {
                 for(string fs: {"vfat"_,"ext4"_}) {
-                    if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC|MS_RDONLY,0) == OK )
+                    if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC,0) == OK ) // not MS_RDONLY to allow writing .last mark
                         return true;
                 }
                 return false;
@@ -341,16 +346,20 @@ struct Player {
 #endif
             log(" succeeded");
         }
+        this->device = String(name);
         if(existsFolder("Music"_,target)) setFolder(target+"/Music"_);
         else setFolder(target);
         return true;
     }
     void deviceDeleted(string name) {
-        String target = "/media/"_+name;
-        if(folder.name() == target) {
+        log(name, device);
+        if(name == device) {
             setFolder(arguments() ? arguments().first() : "Music"_);
+#if !DBUS
+            String target = "/media/"_+name;
             umount2(strz(target), 0);
             removeFolder(target);
+#endif
         }
     }
 } application;

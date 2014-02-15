@@ -99,7 +99,9 @@ uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string&
     int bodyStart = out.size;
     out << arguments;
     *(uint32*)(&out.at(offsetof(Header,length))) = out.size-bodyStart;
-    //dump(out);
+    //strace -e sendmsg -s 222 dbus-send --system --print-reply --dest=
+    log(target, object, interface+"."_+member);
+    dump(out);
     write(out);
     return serial;
 }

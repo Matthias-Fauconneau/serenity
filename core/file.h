@@ -106,6 +106,8 @@ struct File : Stream {
 };
 /// Returns whether \a path exists (as a file or a folder)
 bool existsFile(const string& path, const Folder& at=root());
+/// Returns whether \a path is writable (as a file or a folder)
+bool writableFile(const string& path, const Folder& at);
 /// Reads whole \a file content
 buffer<byte> readFile(const string& path, const Folder& at=root());
 /// Writes \a content into \a file (overwrites any existing file)
