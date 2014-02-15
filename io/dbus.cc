@@ -6,7 +6,7 @@
 
 inline void dump(const ref<byte>& raw) {
     String ascii;
-    for(char c: raw) { if(c>=' '&&c<='~') ascii<<c; else ascii<<'\\'<<utoa<8>(uint8(c)); }
+    for(char c: raw) { if(c=='"') ascii<<'\\'; if(c>=' '&&c<='~') ascii<<c; else ascii<<'\\'<<utoa<8>(uint8(c)); }
     log(ascii);
 }
 
@@ -79,8 +79,6 @@ uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string&
     assert( !(type==MethodCall||type==Signal) || (object && !endsWith(object,"/"_)), object);
 #define field(type, field, value) if(value) { align(out, 8); serialize(out, uint8(field)); serialize(out, Signature<type>()); serialize(out, value); }
     field(ObjectPath, Path, object);
-    // Destination
-    if(target=="org.freedesktop.DBus"_ || interface!=target) field(String, Destination, target);
     // Interface
     assert( !(type==Signal) || interface );
     field(String, Interface, interface);
@@ -90,17 +88,18 @@ uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string&
     // ReplySerial
     assert( (type==MethodReturn) ^ (replySerial<0) );
     if(replySerial>=0) { align(out, 8); serialize(out, uint8(ReplySerial)); serialize(out, Signature<uint>()); serialize(out, replySerial); }
-    // signature
-    if(signature) { align(out, 8); serialize(out, (uint8)SignatureField); out<<1<<"g"_<<0<<signature; }
-    //if(signature<Args...>()) { align(out, 8); serialize(out, (uint8)Signature); out<<1<<"g"_<<0; serialize(out, signature<Args...>()); }
+    // Destination
+    if(target=="org.freedesktop.DBus"_ || interface!=target) field(String, Destination, target);
+    // Signature
+    if(signature) { align(out, 8); serialize(out, (uint8)SignatureField); out<<1<<'g'<<0<<signature; }
     //Fields size
     *(uint32*)(&out.at(offsetof(Header,fieldsSize))) = out.size-sizeof(Header);
     // Body
     align(out, 8);
     int bodyStart = out.size;
-    //serialize(out, args ...);
     out << arguments;
     *(uint32*)(&out.at(offsetof(Header,length))) = out.size-bodyStart;
+    //dump(out);
     write(out);
     return serial;
 }

@@ -22,13 +22,6 @@
 
 DBus system (DBus::System);
 
-struct Drives : DBus::Object {
-    Drives() : DBus::Object{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/drives"_)} {
-        for(string name: children()) { log(name); log(node(name)); log(node(name).get<bool>("MediaRemovable"_)); }
-        error("plop");
-    }
-} drives;
-
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
     FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted)
@@ -319,19 +312,38 @@ struct Player {
         if(!s.whileInteger()) return false; // Only acts on partitions
         String device = "/dev/"_+name;
         if(File(device,root(), Descriptor).type() != FileType::Drive) return false; // Only acts on drives
-        if(find(mounts, device)) return false; // Only acts on unmounted drives
         if(find(cmdline, device)) return false; // Do not act on root drive
-        String target = "/media/"_+name;
-        log_(str("Mounting ",device,"on",target));
-        folder = Folder(target, root(), true);
-        for(string fs: {"vfat"_,"ext4"_}) if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC|MS_RDONLY,0) == OK ) {
+#if DBUS
+        DBus::Object uDevice{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/block_devices/"_+name)};
+        DBus::Object uDrive{&system, String("org.freedesktop.UDisks2"_),uDevice.get<String>("org.freedesktop.UDisks2.Block.Drive"_)};
+        if(!uDrive.get<uint>("org.freedesktop.UDisks2.Drive.Removable"_)) return false; // Only acts on removable drives
+#endif
+        String target;
+        for(TextData s(mounts); s; s.line()) if(s.match(device)) { s.skip(" "_); target = String(s.until(' ')); break; }
+        if(!target) { // Mounts drive
+            log_(str("Mounting ",device));
+#if DBUS
+            target = uDevice("org.freedesktop.UDisks2.Filesystem.Mount"_, Dict());
+            if(!target) { log(" failed"); return false; }
+            log_(str(" on", target));
+#else
+            target = "/media/"_+name;
+            log_(" on",target);
+            folder = Folder(target, root(), true);
+            auto mount = [](string device, string target) {
+                for(string fs: {"vfat"_,"ext4"_}) {
+                    if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC|MS_RDONLY,0) == OK )
+                        return true;
+                }
+                return false;
+            };
+            if(!mount(device, target)) { log(" failed"); return false; }
+#endif
             log(" succeeded");
-            if(existsFolder("Music"_,target)) setFolder(target+"/Music"_);
-            else setFolder(target);
-            return true;
         }
-        log(" failed");
-        return false;
+        if(existsFolder("Music"_,target)) setFolder(target+"/Music"_);
+        else setFolder(target);
+        return true;
     }
     void deviceDeleted(string name) {
         String target = "/media/"_+name;

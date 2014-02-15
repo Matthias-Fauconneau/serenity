@@ -76,6 +76,9 @@ struct BinaryData : Data {
 
     /// Slices a reference to the buffer from \a pos to \a pos + \a size
     BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
+    /// Slices a reference to the buffer from \a pos to \a pos + \a size
+    BinaryData slice(uint pos) { return BinaryData(Data::slice(pos),isBigEndian); }
+
     /// Seeks to /a index
     void seek(uint index) { assert(index<buffer.size); this->index=index; }
     /// Seeks last match for \a key.

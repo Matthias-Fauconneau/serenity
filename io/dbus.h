@@ -3,6 +3,7 @@
 #include "map.h"
 #include "function.h"
 #include "data.h"
+#include <typeinfo>
 
 /// Aligns array size appending default elements
 inline void align(array<byte>& a, int width) { int s=a.size, n=align(width, s); if(n>s) a.grow(n); }
@@ -10,20 +11,22 @@ inline void align(array<byte>& a, int width) { int s=a.size, n=align(width, s); 
 /// D-Bus
 
 template<class T> struct variant : T { variant(){} variant(T&& t):T(move(t)){} operator const T&() const { return *this; } };
-template<> struct variant<bool> { bool t; variant(){} variant(bool t):t(t){} operator const bool&() const { return t; } };
 template<> struct variant<int> { int t; variant(){} variant(int t):t(t){} operator const int&() const { return t; } };
 template<> struct variant<uint> { uint t; variant(){} variant(uint t):t(t){} operator const uint&() const { return t; } };
 
 // D-Bus argument parsers
 template<class T> void read(BinaryData& s, variant<T>& output) {
     uint8 size = s.read(); s.advance(size+1); //TODO: type checking
-    read(s,(T&)output);
+    read(s, (T&)output);
 }
 template<class T> void read(BinaryData& s, array<T>& output) {
     s.align(4); uint size = s.read();
     for(uint start=s.index;s.index<start+size;) { T e; read(s,e); output << move(e); }
 }
 inline void read(BinaryData& s, String& output) { s.align(4); uint size=s.read(); output = String(s.Data::read(size)); s.advance(1);/*0*/ }
+template<Type T> void readRaw(BinaryData& s, T& output) { s.align(alignof(T)); output = s.read<T>(); }
+inline void read(BinaryData& s, int& output) { readRaw(s, output); }
+inline void read(BinaryData& s, uint& output) { readRaw(s, output); }
 inline void read(BinaryData&) {}
 template<class Arg, class... Args> void read(BinaryData& s, Arg& arg, Args&... args) { read(s,arg); read(s, args ...); }
 
@@ -31,33 +34,54 @@ template<class Arg, class... Args> void read(BinaryData& s, Arg& arg, Args&... a
 template<class... Args> struct Signature { operator bool() { return true; } };
 template<> struct Signature<> { operator bool() { return false; } };
 struct ObjectPath : String {};
+template<Type K, Type V> struct DictEntry { K k; V v; };
 
+template<class A> void sign() { static_assert(sizeof(A) & 0,"No signature serializer defined for type"); }
 template<class Arg, class... Args> void sign(String& s) { sign<Arg>(s); sign<Args...>(s); }
-//template<class A> void sign(String&) { static_assert(sizeof(A) && 0,"No signature defined for type"); } //function template partial specialization
-template<> inline void sign<string>(String& s) { s<<"s"_; }
-template<> inline void sign<String>(String& s) { s<<"s"_; }
-template<> inline void sign<int>(String& s) { s<<"i"_; }
-template<> inline void sign<uint>(String& s) { s<<"u"_; }
-template<> inline void sign<ObjectPath>(String& s) { s<<"o"_; }
-//template<class T> void sign< Signature<T> >(String& s) { s<<"g"_; } //function template partial specialization is not allowed
-//template<class T> void sign< variant<T> >(String& s) { s<<"v"_; sign<T>(s); } //function template partial specialization is not allowed
-template<> inline void sign< variant<String> >(String& s) { s<<"v"_; }
-template<> inline void sign< variant<int> >(String& s) { s<<"v"_; }
+
+template<> inline void sign<int>(String& s) { s<<'i'; }
+template<> inline void sign<uint>(String& s) { s<<'u'; }
+
+template<> inline void sign<string>(String& s) { s<<'s'; }
+template<> inline void sign<String>(String& s) { s<<'s'; }
+
+template<> inline void sign<ObjectPath>(String& s) { s<<'o'; }
+
+//template<class T> void sign< Signature<T> >(String& s) { s<<'g'; } //function template partial specialization is not allowed
+
+//template<class T> void sign< variant<T> >(String& s) { s<<'v'; sign<T>(s); } //function template partial specialization is not allowed
+template<> inline void sign< variant<String> >(String& s) { s<<'v'; }
+template<> inline void sign< variant<int> >(String& s) { s<<'v'; }
+
+//template<Type K, Type V> inline void sign<DictEntry<K,V>>(String& s) { s<<'{'; sign<K>(s); sign<V>(s); s<<"}"; } //function template partial specialization is not allowed
+template<> inline void sign<DictEntry<String,variant<String>>>(String& s) { s<<'{'; sign<String>(s); sign<variant<String>>(s); s<<'}'; }
+
+//template<Type T> inline void sign<array<T>>(String& s) { s<<'a'; sign<T>(s); } //function template partial specialization is not allowed
+template<> inline void sign<array<DictEntry<String,variant<String>>>>(String& s) { s<<'a'; sign<DictEntry<String,variant<String>>>(s); }
+typedef array<DictEntry<String,variant<String>>> Dict;
 
 //  D-Bus arguments serializer
-template<class A> void serialize(array<byte>&, const A&) { static_assert(sizeof(A) & 0,"No serializer defined for type"); }
+template<class A> void serialize(array<byte>&, const A&) { static_assert(sizeof(A) & 0,"No argument serializer defined for type"); }
 template<class Arg, class... Args> void serialize(array<byte>& s, const Arg& arg, const Args&... args) { serialize(s,arg); serialize(s, args ...); }
 inline void serialize(array<byte>&) {}
 
-inline void serialize(array<byte>& s, const string& input) { align(s, 4); s << raw<uint>(input.size) << input << 0; }
 inline void serialize(array<byte>& s, uint8 byte) { s << byte; }
 inline void serialize(array<byte>& s, int integer) { align(s, 4); s << raw<int>(integer); }
 inline void serialize(array<byte>& s, uint integer) { align(s, 4); s << raw<uint>(integer); }
+
 template<class T> void serialize(array<byte>& s, const variant<T>& variant) { serialize(s, Signature<T>()); serialize(s,(T&)variant); }
 template<class... Args> void serialize(array<byte>& s, Signature<Args...>) {
     String signature; sign<Args...>(signature); assert(signature); s << (uint8)signature.size << move(signature) << 0;
 }
 template<> inline void serialize(array<byte>& s, Signature<>) { s << 0 << 0; }
+
+template<class K, class V> void serialize(array<byte>& s, const DictEntry<K,V>& entry) { align(s, 8); serialize(s, entry.k); serialize(s, entry.v); }
+
+template<class T> void serialize(array<byte>& s, const ref<T>& array) { serialize(s, uint(s.size*sizeof(T))); align(s, alignof(T)); for(const auto& e: array) serialize(s, e); }
+template<class T> void serialize(array<byte>& s, const array<T>& array) { serialize(s, uint(s.size*sizeof(T))); align(s, alignof(T)); for(const auto& e: array) serialize(s, e); }
+
+inline void serialize(array<byte>& s, const string& input) { serialize(s, uint(input.size)); s << input << 0; }
+inline void serialize(array<byte>& s, const String& input) { serialize(s, uint(input.size)); s << input << 0; }
 
 /// Session bus
 struct DBus : Socket, Poll {
@@ -113,7 +137,8 @@ struct DBus : Socket, Poll {
         template<class A> void noreply(const string& method, const A&);
         template<class A, class B> void noreply(const string& method, const A&, const B&);
         template<class T> T get(const string& property)  {
-            uint32 serial = dbus->writeMessage(MethodCall,-1, target, object,"org.freedesktop.DBus.Properties"_,"Get"_,""_,property);
+            string interface = section(property,'.',0,-2)?:target, member=section(property,'.',-2,-1);
+            uint32 serial = dbus->writeMessage(MethodCall,-1, target, object, "org.freedesktop.DBus.Properties"_, "Get"_, interface, member);
             variant<T> t; dbus->readMessage(serial, t); return move(t);
         }
         array<String> children();
