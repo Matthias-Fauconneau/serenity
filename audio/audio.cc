@@ -149,7 +149,6 @@ Device getCaptureDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-#if AUDIO_INPUT
 AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
@@ -202,8 +201,7 @@ void AudioInput::event() {
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
-        if(sampleBits==16) readSize=write16(ref<short2>(((short2*)buffer)+(control->swPointer%bufferSize), periodSize));
-        else if(sampleBits==32) readSize=write32(ref<int2>(((int2*)buffer)+(control->swPointer%bufferSize), periodSize));
+        if(sampleBits==32) readSize=write32(ref<int2>(((int2*)buffer)+(control->swPointer%bufferSize), periodSize));
         else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
@@ -214,4 +212,3 @@ void AudioInput::event() {
         periods++;
     }
 }
-#endif

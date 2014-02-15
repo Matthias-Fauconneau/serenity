@@ -560,6 +560,9 @@ void Window::renderBackground(Image& target) {
     else if(background==White) {
         for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
     }
+    else if(background==Black) {
+        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
+    }
 }
 
 void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }

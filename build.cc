@@ -117,9 +117,12 @@ struct Build {
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
             array<String> args;
             args << copy(object) << target+".cc"_;
-            if(flags.contains("atom"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
-            else if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
-            else args << String("-march=native"_) << String("-I/usr/include/freetype2"_);
+            if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
+            else args << String("-I/usr/include/freetype2"_);
+            if(flags.contains("arm"_)) {}
+            else if(flags.contains("atom"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
+            else args << String("-march=native"_);
+
             if(!flags.contains("release"_)) args << String("-g"_);
             if(!flags.contains("debug"_)) args << String("-O3"_);
             if(flags.contains("profile"_)) args << String("-finstrument-functions"_)

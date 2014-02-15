@@ -4,7 +4,7 @@
 #include <fftw3.h> //fftw3f
 #include "pitch.h"
 #include "audio.h"
-#include "display.h"
+#include "graphics.h"
 #include "text.h"
 #include "layout.h"
 #include "window.h"
@@ -61,12 +61,12 @@ struct Tuner : Poll {
 
     Tuner() {
         log(__TIME__, input.sampleBits, input.rate, input.periodSize);
-        if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=toInteger(arguments()[0]);
-        if(arguments().size>1 && isInteger(arguments()[1])) maxWorstKey=toInteger(arguments()[1]);
+        if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=fromInteger(arguments()[0]);
+        if(arguments().size>1 && isInteger(arguments()[1])) maxWorstKey=fromInteger(arguments()[1]);
 
-        window.backgroundColor=window.backgroundCenter=0;
-        window.localShortcut(Escape).connect([]{exit();}); //FIXME: threads waiting on semaphores will be stuck
-        window.localShortcut(Key(' ')).connect([this]{record=!record;}); //FIXME: threads waiting on semaphores will be stuck
+        window.background = Window::Black;
+        window.actions[Escape] = []{exit();}; //FIXME: threads waiting on semaphores will be stuck
+        window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
         window.show();
 #if TEST
         timer.timeout.connect(this, &Tuner::feed);
