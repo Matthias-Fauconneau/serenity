@@ -117,10 +117,13 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
 #endif
         control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
     }
-    Poll::fd = Device::fd; registerPoll();
-    io<PREPARE>();
+    if(!thread.contains(this)) { Poll::fd = Device::fd; registerPoll(); }
+#if !MMAP
+    syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
+#endif
+    if(status->state < Prepared) io<PREPARE>();
     event();
-    io<START>();
+    if(status->state < Running) io<START>();
 }
 void AudioOutput::stop(){
      io<DRAIN>();
