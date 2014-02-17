@@ -268,9 +268,10 @@ struct Player {
                 float level = exp2(-12. * i / lastPeriod.size); // Linear perceived sound level
                 lastPeriod[i] *= level;
             }
-            file->seek(max(0, int(file->position-lastPeriod.size)));
             lastPeriod=mref<short2>();
+            audio.stop();
             window.setIcon(pauseIcon());
+            file->seek(max(0, int(file->position-lastPeriod.size)));
         }
         playButton.enabled=play;
         window.render();

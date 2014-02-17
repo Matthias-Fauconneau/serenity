@@ -67,63 +67,67 @@ Device getPlaybackDevice() {
 }
 
 AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread)
-    : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread), read16(read) {
+    : Device(getPlaybackDevice()), Poll(0, POLLOUT, thread), read16(read) {
 }
 
-void AudioOutput::start(uint rate, uint periodSize) {
-    sampleBits = 16;
-    HWParams hparams;
-    hparams.mask(Access).set(MMapInterleaved);
-    if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
-    else hparams.mask(Format).set(S16_LE).set(S32_LE);
-    hparams.mask(SubFormat).set(Standard);
-    hparams.interval(SampleBits) = sampleBits;
-    hparams.interval(FrameBits) = sampleBits*channels;
-    hparams.interval(Channels) = channels;
-    hparams.interval(Rate) = rate; assert(rate);
-    hparams.interval(Periods) = 2;
-    hparams.interval(PeriodSize) = periodSize;
-    if(!sampleBits || !rate || !periodSize) {
-        iowr<HW_REFINE>(hparams);
-        if(!sampleBits) {
-            if(hparams.mask(Format).get(S32_LE)) {
-                hparams.mask(Format).clear(S16_LE);
-                hparams.interval(SampleBits) = 32;
-                hparams.interval(FrameBits) = 32*channels;
-            } else {
-                hparams.interval(SampleBits) = 16;
-                hparams.interval(FrameBits) = 16*channels;
-            }
-            hparams.rmask=~0;
+void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
+    if(this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
+        HWParams hparams;
+        hparams.mask(Access).set(MMapInterleaved);
+        if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
+        else hparams.mask(Format).set(S16_LE).set(S32_LE);
+        hparams.mask(SubFormat).set(Standard);
+        hparams.interval(SampleBits) = sampleBits;
+        hparams.interval(FrameBits) = sampleBits*channels;
+        hparams.interval(Channels) = channels;
+        hparams.interval(Rate) = rate; assert(rate);
+        hparams.interval(Periods) = 2;
+        hparams.interval(PeriodSize) = periodSize;
+        if(!sampleBits || !rate || !periodSize) {
             iowr<HW_REFINE>(hparams);
+            if(!sampleBits) {
+                if(hparams.mask(Format).get(S32_LE)) {
+                    hparams.mask(Format).clear(S16_LE);
+                    hparams.interval(SampleBits) = 32;
+                    hparams.interval(FrameBits) = 32*channels;
+                } else {
+                    hparams.interval(SampleBits) = 16;
+                    hparams.interval(FrameBits) = 16*channels;
+                }
+                hparams.rmask=~0;
+                iowr<HW_REFINE>(hparams);
+            }
+            hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
+            hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
         }
-        hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
-        hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
-    }
-    if(status && status->state > Prepared) io<DRAIN>();
-    maps[0].unmap(); maps[1].unmap(); maps[2].unmap(); // Releases any memory mappings
-    iowr<HW_PARAMS>(hparams);
-    this->sampleBits = hparams.interval(SampleBits);
-    this->rate = hparams.interval(Rate);
-    this->periodSize = hparams.interval(PeriodSize);
-    bufferSize = hparams.interval(Periods) * this->periodSize;
-    buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
+        if(status && status->state > Prepared) io<DRAIN>();
+        maps[0].unmap(); maps[1].unmap(); maps[2].unmap(); // Releases any memory mappings
+        iowr<HW_PARAMS>(hparams);
+        this->sampleBits = hparams.interval(SampleBits);
+        this->rate = hparams.interval(Rate);
+        this->periodSize = hparams.interval(PeriodSize);
+        bufferSize = hparams.interval(Periods) * this->periodSize;
+        buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
 #if MMAP
-    status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
-    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+        status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
+        control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
 #else
-    status = &syncPtr.status;
-    control = &syncPtr.control;
+        status = &syncPtr.status;
+        control = &syncPtr.control;
 #endif
-    control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
+        control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
+    }
+    Poll::fd = Device::fd; registerPoll();
     io<PREPARE>();
+    event();
+    io<START>();
 }
 void AudioOutput::stop(){
      io<DRAIN>();
+     unregisterPoll();
 }
 
 void AudioOutput::event() {
-    if(!sampleBits) return;
 #if !MMAP
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
@@ -146,7 +150,6 @@ void AudioOutput::event() {
 #endif
         if(readSize<periodSize) return;
     }
-    if(status->state == Prepared) io<START>();
 }
 
 /// Capture
