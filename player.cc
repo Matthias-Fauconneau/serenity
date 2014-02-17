@@ -14,12 +14,8 @@
 #include <sys/inotify.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
-#if !__arm__
-#define DBUS 1
-#endif
 #if DBUS
 #include "dbus.h"
-
 DBus system (DBus::System);
 #endif
 
@@ -78,8 +74,7 @@ struct Player {
     static constexpr uint channels = 2;
     static constexpr uint periodSize = 8192;
     unique<AudioFile> file = 0;
-    //Resampler resampler;
-    AudioOutput* audio = 0;
+    AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
     uint read(const mref<short2>& output) {
         uint readSize = 0;
@@ -87,29 +82,8 @@ struct Player {
             if(!file) break;
             assert(readSize<output.size);
             size_t read = 0;
-            //if(resampler.sourceRate*audio->rate != file->rate*resampler.targetRate) {
-            if(audio->rate != file->rate) {
-                //resampler.~Resampler(); resampler.sourceRate=1; resampler.targetRate=1; assert(!resampler);
-                if(file->rate != audio->rate) {
-                    //new (&resampler) Resampler(audio->channels, file->rate, audio->rate, audio->periodSize);
-                    delete audio; audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
-                }
-            }
-            /*if(resampler) {
-                uint sourceNeed = resampler.need(chunk.size);
-                buffer<float2> source(sourceNeed);
-                uint sourceRead = file->read(source);
-                resampler.write(source.slice(0, sourceRead));
-                read = min(chunk.size, resampler.available());
-                if(read) {
-                    buffer<float2> target(read);
-                    resampler.read(target);
-                    for(uint i: range(read)) {
-                        chunk[i][0] = target[i][0]*(1<<29); // 3dB headroom
-                        chunk[i][1] = target[i][1]*(1<<29); // 3dB headroom
-                    }
-                }
-            } else*/ read = file->read(chunk);
+            if(audio.rate != file->rate) audio.start(file->rate, periodSize);
+            read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
             if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk
@@ -198,24 +172,22 @@ struct Player {
             if(existsFolder(album, folder)) {
                 if(section(mark,'\0',2,3)) {
                     queueFile(album, file, true);
-                    assert(files);
-                    playTitle(0);
+                    if(files) playTitle(0);
                     setRandom(true);
                 } else {
                     albums.index = folders.indexOf(album);
                     array<String> files = Folder(album, folder).list(Recursive|Files|Sorted);
                     uint i=0; for(;i<files.size;i++) if(files[i]==file) break;
                     for(;i<files.size;i++) queueFile(album, files[i], false);
-                    assert(this->files);
-                    playTitle(0);
+                    if(this->files) playTitle(0);
                 }
                 seek(fromInteger(section(mark,'\0',1,2)));
             }
-        } else {
-            if(randomButton.enabled) setRandom(true); // Regenerates random sequence for folder
-            updatePlaylist();
-            if(files) playTitle(0);
+            return;
         }
+        if(randomButton.enabled) setRandom(true); // Regenerates random sequence for folder
+        updatePlaylist();
+        if(files) playTitle(0);
     }
     void queueFile(const string& folder, const string& file, bool withAlbumName) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
@@ -242,7 +214,7 @@ struct Player {
         titles.index = index;
         window.setTitle(toUTF8(titles[index].text));
         file = unique<AudioFile>(folder.name()+"/"_+files[index]);
-        if(!file->file) { file=0; return; }
+        if(!file->file) { file=0; log("Error reading", folder.name()+"/"_+files[index]); return; }
         assert(file->channels==AudioOutput::channels);
         setPlaying(true);
     }
@@ -288,7 +260,7 @@ struct Player {
     void setPlaying(bool play) {
         if(play) {
             assert_(file);
-            if(!audio) audio = new AudioOutput({this,&Player::read}, file->rate, periodSize);
+            audio.start(file->rate, periodSize);
             window.setIcon(playIcon());
         } else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
@@ -298,7 +270,6 @@ struct Player {
             }
             file->seek(max(0, int(file->position-lastPeriod.size)));
             lastPeriod=mref<short2>();
-            delete audio; audio=0;
             window.setIcon(pauseIcon());
         }
         playButton.enabled=play;
@@ -340,6 +311,7 @@ struct Player {
         bool wasPlaying = playButton.enabled;
         if(wasPlaying) setPlaying(false);
         if(!target) { // Mounts drive
+#if MOUNT
             log_(str("Mounting ",device));
 #if DBUS
             target = uDevice("org.freedesktop.UDisks2.Filesystem.Mount"_, Dict());
@@ -348,7 +320,7 @@ struct Player {
 #else
             target = "/media/"_+name;
             log_(str(" on",target));
-            folder = Folder(target, root(), true);
+            Folder(target, root(), true);
             auto mount = [](string device, string target) {
                 for(string fs: {"vfat"_,"ext4"_}) {
                     if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC,0) == OK ) // not MS_RDONLY to allow writing .last mark
@@ -359,6 +331,9 @@ struct Player {
             if(!mount(device, target)) { log(" failed"); return false; }
 #endif
             log(" succeeded");
+#else
+            return false;
+#endif
         }
         this->device = String(name);
         ejectButton.hidden = false;

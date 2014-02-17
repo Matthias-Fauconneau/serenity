@@ -24,7 +24,7 @@ struct Time {
     void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    operator float() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    float toFloat() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
 };
 inline String str(const Time& t) { return str((float)t)+"s"_; }
 

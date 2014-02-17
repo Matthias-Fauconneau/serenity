@@ -6,6 +6,8 @@
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
 
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 

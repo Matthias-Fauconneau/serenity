@@ -8,6 +8,24 @@ Image clip(const Image& image, Rect r) {
                  image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
 }
 
+Image upsample(const Image& source) {
+    int w=source.width, h=source.height;
+    Image target(w*2,h*2);
+    for(int y=0; y<h; y++) for(int x=0; x<w; x++) {
+        target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
+    }
+    return target;
+}
+
+string imageFileFormat(const ref<byte>& file) {
+    if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
+    else if(startsWith(file,"\x89PNG"_)) return "PNG"_;
+    else if(startsWith(file,"\x00\x00\x01\x00"_)) return "ICO"_;
+    else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return "TIFF"_;
+    else if(startsWith(file,"BM"_)) return "BMP"_;
+    else return ""_;
+}
+
 Image  __attribute((weak)) decodePNG(const ref<byte>&) { error("PNG support not linked"_); }
 Image  __attribute((weak)) decodeJPEG(const ref<byte>&) { error("JPEG support not linked"_); }
 Image  __attribute((weak)) decodeICO(const ref<byte>&) { error("ICO support not linked"_); }

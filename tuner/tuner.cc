@@ -73,8 +73,6 @@ struct Tuner : Poll {
         timer.setRelative(1);
         assert(audio.rate == input.rate);
         //profile.reset();
-#else
-        input.start();
 #endif
         thread.spawn();
         readCount.acquire(N-periodSize);

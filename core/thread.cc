@@ -25,11 +25,11 @@ template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 // Poll
 void Poll::registerPoll() {
     Locker lock(thread.lock);
-    if(thread.contains(*this)) {
-        thread.unregistered.remove(*this);
+    if(thread.contains(this)) {
+        thread.unregistered.remove(this);
         return;
     }
-    assert_(!thread.unregistered.contains(*this));
+    assert_(!thread.unregistered.contains(this));
     thread << this;
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }

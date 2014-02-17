@@ -118,7 +118,7 @@ String str(Date date, const string& format) {
     return r;
 }
 
-Date parse(TextData& s) {
+Date parseDate(TextData& s) {
     Date date;
     {
         if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;

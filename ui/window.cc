@@ -156,8 +156,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         if(e.major==XRender::EXT) {
             int reqSize=sizeof(XRender::requests)/sizeof(*XRender::requests);
             if(code>=XRender::errorBase && code<=XRender::errorBase+XRender::errorCount) { code-=XRender::errorBase;
-                assert(code<sizeof(XRender::errors)/sizeof(*XRender::errors));
-                log("XError",XRender::errors[code],"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
+                assert(code<sizeof(XRender::xErrors)/sizeof(*XRender::xErrors));
+                log("XError",XRender::xErrors[code],"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
                 log("XError",::errors[code],"request",e.minor<reqSize?String(XRender::requests[e.minor]):dec(e.minor));
@@ -165,16 +165,16 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         } else if(e.major==Shm::EXT) {
             int reqSize=sizeof(Shm::requests)/sizeof(*Shm::requests);
             if(code>=Shm::errorBase && code<=Shm::errorBase+Shm::errorCount) { code-=Shm::errorBase;
-                assert(code<sizeof(Shm::errors)/sizeof(*Shm::errors));
-                log("XError",Shm::errors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
+                assert(code<sizeof(Shm::xErrors)/sizeof(*Shm::xErrors));
+                log("XError",Shm::xErrors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             } else {
                 assert(code<sizeof(::errors)/sizeof(*::errors));
-                log("XError",::errors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
+                log("XError",::xErrors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             }
         } else {
             assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
-            log("XError",::errors[code],"request",e.major<reqSize?String(::requests[e.major]):dec(e.major),"minor",e.minor);
+            log("XError",::xErrors[code],"request",e.major<reqSize?String(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
     }
     else if(type==1) error("Unexpected reply");

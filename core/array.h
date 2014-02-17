@@ -53,6 +53,7 @@ generic struct array : buffer<T> {
     /// \name Appends once (if not already contained) operators
     array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
     array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
+    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
     /// \}
 
     /// Inserts an element at \a index

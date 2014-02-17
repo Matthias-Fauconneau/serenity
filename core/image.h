@@ -54,6 +54,12 @@ inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.da
 /// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, Rect region);
 
+/// Upsamples an image by duplicating samples
+Image upsample(const Image& source);
+
+/// Returns the image file format if valid
+string imageFileFormat(const ref<byte>& file);
+
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 
@@ -64,3 +70,10 @@ static const Image& name ## Icon() { \
     static Image icon = decodeImage(ref<byte>(_binary_## name ##_start, _binary_## name ##_end)); \
     return icon; \
 }
+
+struct Image16 {
+    Image16(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<uint16>(height*width); }
+    uint16& operator()(uint x, uint y) {assert(x<width && y<height); return data[y*width+x]; }
+    buffer<uint16> data;
+    uint width, height;
+};

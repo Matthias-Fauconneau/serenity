@@ -44,7 +44,9 @@ typedef IOWR<'A', 0x10,HWParams> HW_REFINE;
 typedef IOWR<'A', 0x11,HWParams> HW_PARAMS;
 typedef IOWR<'A', 0x13,SWParams> SW_PARAMS;
 typedef IO<'A', 0x40> PREPARE;
+typedef IO<'A', 0x41> RESET;
 typedef IO<'A', 0x42> START;
+typedef IO<'A', 0x43> DROP;
 typedef IO<'A', 0x44> DRAIN;
 
 #if !MMAP
@@ -52,6 +54,8 @@ typedef IO<'A', 0x44> DRAIN;
 enum { HWSYNC=1<<0, APPL=1<<1, AVAIL_MIN=1<<2 };
 typedef IOWR<'A', 0x23,SyncPtr> SYNC_PTR;
 #endif
+
+/// Playback
 
 Device getPlaybackDevice() {
     Folder snd("/dev/snd");
@@ -62,8 +66,12 @@ Device getPlaybackDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& thread)
-    : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread) {
+AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread)
+    : Device(getPlaybackDevice()), Poll(Device::fd,POLLOUT,thread), read16(read) {
+}
+
+void AudioOutput::start(uint rate, uint periodSize) {
+    sampleBits = 16;
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
@@ -92,6 +100,8 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
         hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
         hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
     }
+    if(status && status->state > Prepared) io<DRAIN>();
+    maps[0].unmap(); maps[1].unmap(); maps[2].unmap(); // Releases any memory mappings
     iowr<HW_PARAMS>(hparams);
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
@@ -104,15 +114,16 @@ AudioOutput::AudioOutput(uint sampleBits, uint rate, uint periodSize, Thread& th
 #else
     status = &syncPtr.status;
     control = &syncPtr.control;
-    control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
 #endif
+    control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
     io<PREPARE>();
 }
-AudioOutput::~AudioOutput(){
+void AudioOutput::stop(){
      io<DRAIN>();
 }
 
 void AudioOutput::event() {
+    if(!sampleBits) return;
 #if !MMAP
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
@@ -126,20 +137,20 @@ void AudioOutput::event() {
     if(available>=(int)periodSize) {
         uint readSize;
         if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
-        else if(sampleBits==32) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
-        else error(sampleBits);
+        //else if(sampleBits==32) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
+        else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
 #if !MMAP
         syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
 #endif
-        assert_(readSize==periodSize);
+        if(readSize<periodSize) return;
     }
     if(status->state == Prepared) io<START>();
 }
-#if MMAP
-void AudioOutput::cancel() { if(status->state == Running) { control->swPointer -= periodSize; event(); } }
-#endif
+
+/// Capture
+
 Device getCaptureDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
@@ -189,15 +200,28 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
 #else
     status = &syncPtr.status;
     control = &syncPtr.control;
+    control->availableMinimum = periodSize; // Minimum available space to trigger POLLIN
+    io<PREPARE>();
+    io<START>();
 #endif
 }
-void AudioInput::start() { if(status->state != Running) { io<PREPARE>(); registerPoll(); io<START>(); } }
-void AudioInput::stop() { if(status->state == Running) io<DRAIN>(); unregisterPoll(); }
+AudioInput::~AudioInput(){
+     io<DRAIN>();
+}
+
 void AudioInput::event() {
 #if !MMAP
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
-    if(status->state == XRun) { overruns++; log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns); io<PREPARE>(); io<START>(); }
+    if(status->state == XRun) {
+        overruns++;
+        log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns);
+        io<PREPARE>();
+        io<START>();
+#if !MMAP
+        syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
+#endif
+    }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
@@ -208,7 +232,7 @@ void AudioInput::event() {
 #if !MMAP
         syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
 #endif
-        if(readSize<periodSize) { stop(); return; }
+        assert_(readSize==periodSize);
         periods++;
     }
 }

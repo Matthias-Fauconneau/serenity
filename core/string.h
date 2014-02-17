@@ -97,8 +97,6 @@ inline String str(const long& n) { return dec(n); }
 inline String str(const uint64& n) { return dec(n); }
 inline String str(const int64& n) { return dec(n); }
 inline String hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
-//inline String str(void* const& p) { return "0x"_+hex(ptr(p)); }
-//generic inline String str(T* const& p) { return String(str(*p)); }
 generic inline String str(T* const& p) { return "0x"_+hex(ptr(p)); }
 generic String str(const unique<T>& t) { return str(*t.pointer); }
 generic String str(const shared<T>& t) { return str(*t.pointer); }
@@ -107,6 +105,9 @@ generic String str(const shared<T>& t) { return str(*t.pointer); }
 String ftoa(double number, int precision=2, uint pad=0, int exponent=0);
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
+
+/// Formats value using best binary prefix
+String binaryPrefix(size_t value, string unit="B"_);
 
 /// Converts arrays
 generic String str(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
