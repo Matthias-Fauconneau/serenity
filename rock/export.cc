@@ -309,3 +309,4 @@ struct ToCDL : VolumeOperation {
         toCDL(outputs[0]->data, inputs[0]);
     }
 };
+template struct Interface<Operation>::Factory<ToCDL>;
