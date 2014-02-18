@@ -169,6 +169,6 @@ struct Build {
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
             if(execute(CXX, toRefs(args))) fail();
         }
-        if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(root(), binary, install, target);
+        if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(root(), binary, install, target+"."_+join(flags,"-"_));
     }
 } build;
