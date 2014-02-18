@@ -17,7 +17,10 @@ struct Build {
     array<string> flags;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
-    string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
+    string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ :
+                        existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ :
+                        existsFile("/ptmp/bin/g++"_) ? "/ptmp/bin/g++"_ :
+                        "/usr/bin/g++"_;
     string LD = "/usr/bin/ld"_;
     bool needLink = false;
     array<unique<Node>> modules;
