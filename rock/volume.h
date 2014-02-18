@@ -6,11 +6,6 @@ static_assert(sizeof(size_t)==8,"");
 generic struct VolumeT;
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
-generic struct bgr {
-    T b,g,r;
-    operator byte4() const { return byte4(b,g,r,0xFF); }
-} packed;
-typedef vec<bgr,uint8,3> byte3;
 typedef VolumeT<byte3> Volume24;
 typedef VolumeT<uint32> Volume32;
 typedef VolumeT<float> VolumeFloat;

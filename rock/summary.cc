@@ -1,11 +1,10 @@
 #include "process.h"
 #include "volume-operation.h"
 #include "sample.h"
-#include "widget.h"
-#include "display.h"
+#include "layout.h"
+#include "interface.h"
 #include "window.h"
 #include "text.h"
-#include "interface.h"
 #include "plot.h"
 #include "png.h"
 
@@ -20,20 +19,23 @@ struct Summary : Operation {
         for(string result : (string[]){"name"_, "resolution"_, "voxelSize"_, "physicalSize"_}) header << Text(format(Bold)+results.getResult(result, args)->data);
         vbox << &header;
         UniformGrid<Item> slices;
-        int scale=0;
         args.insert(String("z"_),0.5);
         for(auto target: map<string, string>({"png-denoised"_, "png-background"_, "png-connected"_, "png-maximum"_},{"Density"_,"Pore"_,"Skeleton"_,"Maximum"_})) {
             shared<Result> result = results.getResult(target.key, args);
             Image slice = decodeImage(result->data);
             assert_(slice);
+#if RESIZE
             if(!scale) scale = max(2.,ceil(real(slice.size().x)/(2*pageSize.x/2)));
             slices << Item(resize(slice,slice.size()/scale), target.value, 16, true);
+#else
+            slices << Item(move(slice), target.value, 16, true);
+#endif
         }
         args.remove("z"_);
         vbox << &slices;
         output(outputs, "slices"_, "png"_, [&]{
             VBox vbox (Linear::Share, Linear::Expand); vbox<<&header<<&slices;
-            return encodePNG(renderToImage(vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));
+            return encodePNG(renderToImage(vbox, int2(2,1)*pageSize/*, 1.5*96dpi*/));
         });
         HList<Text> properties;
         properties << Text("Porosity: "_+format(Bold)+dec(round(parseScalar(results.getResult("porosity"_, args)->data)*100))+"%"_);
@@ -45,27 +47,27 @@ struct Summary : Operation {
         UniformGrid<Plot> plots;
         assert_(args.at("threshold"_)=="otsu"_);
         {Plot otsu; otsu.title = String("Interclass deviation versus threshold"_), otsu.xlabel=String("μ"_), otsu.ylabel=String("σ"_);
-            otsu.legends << String("Radiodensity probability"_); otsu.dataSets << parseNonUniformSample(results.getResult("distribution-radiodensity"_, args)->data);
-            otsu.legends << String("Interclass deviation (Otsu)"_); otsu.dataSets << parseNonUniformSample(results.getResult("otsu-interclass-deviation-normalized"_, args)->data);
+            otsu["Radiodensity probability"_] = parseNonUniformSample(results.getResult("distribution-radiodensity"_, args)->data);
+            otsu["Interclass deviation (Otsu)"_] = parseNonUniformSample(results.getResult("otsu-interclass-deviation-normalized"_, args)->data);
             plots << move(otsu);}
         {Plot plot; plot.title = String("Pore size distribution"_), plot.xlabel=String("r [μm]"_), plot.ylabel=String("V"_);
-            plot.legends << String("Probability density estimation"); plot.dataSets << parseNonUniformSample(results.getResult("distribution-radius-scaled"_, args)->data);
+            plot["Probability density estimation"] = parseNonUniformSample(results.getResult("distribution-radius-scaled"_, args)->data);
             plots << move(plot);}
         {Plot plot; plot.title = String("Representative elementary volume"_), plot.xlabel=String("R [μm]"_), plot.ylabel=String("ε"_);
-            plot.legends << String("Pore size distribution deviation"); plot.dataSets << parseNonUniformSample(results.getResult("ε(R)"_, args)->data);
+            plot["Pore size distribution deviation"] = parseNonUniformSample(results.getResult("ε(R)"_, args)->data);
             plots << move(plot);}
         {Plot plot; plot.title = String("Bottleneck radius"_), plot.xlabel=String("r [μm]"_), plot.ylabel=String("V"_);
-            plot.legends << String("Unconnected volume"); plot.dataSets << parseNonUniformSample(results.getResult("unconnected(λ)"_, args)->data);
-            plot.legends << String("Connected volume"); plot.dataSets << parseNonUniformSample(results.getResult("connected(λ)"_, args)->data);
+            plot["Unconnected volume"] = parseNonUniformSample(results.getResult("unconnected(λ)"_, args)->data);
+            plot["Connected volume"] = parseNonUniformSample(results.getResult("connected(λ)"_, args)->data);
             plots << move(plot);}
         vbox << &plots;
         vbox << &properties;
         output(outputs, "plots"_, "png"_, [&]{
             VBox vbox (Linear::Share, Linear::Expand);
             vbox<<&plots<<&properties;
-            return encodePNG(renderToImage(vbox, int2(2,1)*pageSize, 1.5*96/*dpi*/));
+            return encodePNG(renderToImage(vbox, int2(2,1)*pageSize /*, 1.5*96dpi*/));
         });
-        output(outputs, "summary"_, "png"_, [&]{ return encodePNG(renderToImage(vbox, 2*pageSize, 1.5*96/*dpi*/)); });
+        output(outputs, "summary"_, "png"_, [&]{ return encodePNG(renderToImage(vbox, 2*pageSize /*, 1.5*96dpi*/)); });
     }
 };
 template struct Interface<Operation>::Factory<Summary>;

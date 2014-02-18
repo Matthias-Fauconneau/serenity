@@ -90,8 +90,6 @@ string TextData::untilAny(const string& any) {
     return slice(start,end-start);
 }
 
-string TextData::untilEnd() { uint size=available(-1); return read(size); }
-
 void TextData::skip() { whileAny(" \t\n\r"_); }
 
 string TextData::line() { return until('\n'); }
@@ -136,12 +134,12 @@ string TextData::whileInteger(bool sign) {
 int TextData::integer(bool sign) {
     string s = whileInteger(sign);
     if(!s) error("Expected integer", line(), lineIndex);
-    return toInteger(s, 10);
+    return fromInteger(s, 10);
 }
 
 int TextData::mayInteger(int defaultValue) {
     string s = whileInteger(true);
-    return s ? toInteger(s, 10): defaultValue;
+    return s ? fromInteger(s, 10): defaultValue;
 }
 
 string TextData::whileHexadecimal() {
@@ -154,7 +152,7 @@ string TextData::whileHexadecimal() {
 }
 
 uint TextData::hexadecimal() {
-    return toInteger(whileHexadecimal(), 16);
+    return fromInteger(whileHexadecimal(), 16);
 }
 
 string TextData::whileDecimal() {

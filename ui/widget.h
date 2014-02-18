@@ -1,18 +1,31 @@
 #pragma once
 /// \file widget.h Widget interface to compose user interfaces
 #include "vector.h"
-#include "rect.h"
+#include "image.h"
+#if !__arm__ && __GXX_EXPERIMENTAL_CXX0X__ /*!QtCreator*/
+#define X11 1
+#endif
 
 /// Key symbols
 enum Key {
-    Escape=0xff1b, BackSpace=0xff08, Tab, Return=0xff0d,
+#if X11
+    Space=' ',
+    Escape=0xff1b, Backspace=0xff08, Tab, Return=0xff0d,
     Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, PageUp, PageDown, End, PrintScreen=0xff61,
     Execute, Insert,
-    KP_Enter=0xff8d, KP_Multiply=0xffaa, KP_Add, KP_Separator, KP_Sub, KP_Decimal, KP_Divide, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
+    KP_Enter=0xff8d, KP_Asterisk=0xffaa, KP_Plus, KP_Separator, KP_Minus, KP_Decimal, KP_Slash, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
     ShiftKey=0xffe1, ControlKey=0xffe3,
     Delete=0xffff,
-    Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19 //, Power=0x1008ff2a
+    Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19,
+#else
+    None, Escape, _1,_2,_3,_4,_5,_6,_7,_8,_9,_0, Minus, Equal, Backspace, Tab, Q,W,E,R,T,Y,U,I,O,P, LeftBrace, RightBrace, Return, LeftCtrl,
+    A,S,D,F,G,H,J,K,L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z,X,C,V,B,N,M, Comma, Dot, Slash, RightShift, KP_Asterisk, LeftAlt,
+    Space, KP_7 = 71, KP_8, KP_9, KP_Minus, KP_4, KP_5, KP_6, KP_Plus, KP_1, KP_2, KP_3, KP_0, KP_Slash=98,
+    Home=102, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp,
+    Power=116, Left=0x110, Right, Middle, Side, Extra, WheelDown=0x150, WheelUp,
+#endif
 };
+inline String str(Key key) { return str(uint(key)); }
 enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4/*, Meta=1<<6*/ };
 
 /// Abstract component to compose user interfaces
@@ -22,10 +35,7 @@ struct Widget {
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint() { return -1; }
     /// Renders this widget.
-    virtual void render(int2 position, int2 size)=0;
-    /// Renders this widget.
-    /// \arg rect is the absolute region for the widget
-    void render(Rect rect) { render(rect.position(),rect.size()); }
+    virtual void render(const Image& target)=0;
 
 // Event
     /// Mouse event type
@@ -37,7 +47,7 @@ struct Widget {
     /// \return Whether the mouse event was accepted
     virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { (void)cursor, (void)size, (void)event, (void)button; return false; }
     /// Convenience overload for layout implementation
-    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.min,rect.size(),event,button); }
+    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.position(),rect.size(),event,button); }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
@@ -58,3 +68,6 @@ String getSelection(bool clipboard=false);
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
 /// Sets cursor to be shown when mouse is in the given rectangle
 void setCursor(Rect region, Cursor cursor);
+
+/// Configures global display context to render to an image
+Image renderToImage(Widget& widget, int2 size);

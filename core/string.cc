@@ -73,7 +73,7 @@ bool isInteger(const string& s) {
     if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
 }
 
-int64 toInteger(const string& number, int base) {
+int64 fromInteger(const string& number, int base) {
     assert(base>=2 && base<=16);
     assert(number);
     int sign=1;
@@ -107,11 +107,11 @@ bool isDecimal(const string& number) {
 
 double fromDecimal(const string& number) {
     if(!number) return __builtin_nan("");
-    if(number == "∞"_) return inf;
-    int sign=1, eSign=1;
+    if(number == "∞"_) return __builtin_inf();
+    double sign=1, eSign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
-    uint64 significand=0; int decimal=0, exponent=0;
+    double significand=0, decimal=0, exponent=0;
     for(bool gotDot=false, gotE=false;i!=number.end();) {
         if(!gotDot && *i == '.') { ++i; gotDot=true; continue; }
         if(!gotE && *i == 'e') { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
@@ -127,10 +127,7 @@ double fromDecimal(const string& number) {
         }
         ++i;
     }
-    int64 value = sign*significand;
-    int e = eSign*exponent-decimal;
-    if(e>=0) { for(int unused i : range(e)) value *= 10; return value; }
-    else { double decimal = value; for(int unused i : range(-e)) decimal /= 10; return decimal; }
+    return sign*significand*exp10(eSign*exponent-decimal);
 }
 
 /// String
@@ -209,6 +206,7 @@ template<uint base> String utoa(uint64 n, int pad, char padChar) {
     return String(string(buf+i,64-i));
 }
 template String utoa<2>(uint64,int, char padChar);
+template String utoa<8>(uint64,int, char padChar);
 template String utoa<16>(uint64,int, char padChar);
 
 template<uint base> String itoa(int64 number, int pad, char padChar) {
@@ -227,9 +225,9 @@ template String itoa<10>(int64,int,char);
 
 String ftoa(double n, int precision, uint pad, int exponent) {
     bool sign = n<0; n=abs(n);
-    if(__builtin_isnan(n)) return String("NaN"_);
-    if(n==::inf) return String("inf"_); //"∞"_
-    if(n==-::inf) return String("-inf"_); //"-∞"_
+    if(__builtin_isnan(n)) return ::pad("NaN"_, pad);
+    if(n==::inf) return ::pad("∞"_, pad+2);
+    if(n==-::inf) return ::pad("-∞"_, pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';

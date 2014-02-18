@@ -127,7 +127,9 @@ template<class Function, class... Args> auto apply(uint size, Function function,
 
 /// Returns an array of the application of a function to every elements of a reference
 template<class T, class Function, class... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
-    buffer<decltype(function(a[0], args...))> r(a.size); for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...)); return r;
+    buffer<decltype(function(a[0], args...))> r(a.size);
+    for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...));
+    return r;
 }
 
 /// Converts arrays to references

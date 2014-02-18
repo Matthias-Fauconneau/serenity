@@ -3,16 +3,17 @@
 #include "map.h"
 
 struct Plot : virtual Widget {
-    Plot(array<String>&& legends={}):legends(move(legends)){dataSets.grow(this->legends.size);}
+    enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
+    Plot(const string& title=""_, bool plotLines=false, LegendPosition legendPosition=TopRight)
+        : title(title), plotPoints(!plotLines), plotLines(plotLines), legendPosition(legendPosition) {}
+    map<real,real>& operator[](const string& name) { return dataSets[name]; }
     int2 sizeHint() override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 
     String title, xlabel, ylabel;
     bool log[2] = {false, false};
-    array<String> legends;
-    array<map<real,real>> dataSets;
-    bool plotPoints = false, plotLines = true;
-    enum { TopLeft, TopRight, BottomLeft, BottomRight } legendPosition = TopRight;
+    map<String, map<real,real>> dataSets;
+    bool plotPoints = true, plotLines = false;
+    LegendPosition legendPosition;
     vec2 min = 0, max = 0;
 };
-

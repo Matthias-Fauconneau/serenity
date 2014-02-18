@@ -35,8 +35,8 @@ struct Variant : String {
     Variant(String&& s) : String(move(s)) {}
     Variant(double decimal) : String(ftoa(decimal)){}
     explicit operator bool() const { return size; }
-    operator int() const { return *this ? toInteger(*this) : 0; }
-    operator uint() const { return *this ? toInteger(*this) : 0; }
+    operator int() const { return *this ? fromInteger(*this) : 0; }
+    operator uint() const { return *this ? fromInteger(*this) : 0; }
     operator float() const { return fromDecimal(*this); }
     operator double() const { return fromDecimal(*this); }
     generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor

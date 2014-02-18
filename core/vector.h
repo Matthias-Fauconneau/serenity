@@ -20,7 +20,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     /// Initializes first components from another vec \a o and initializes remaining components with args...
     template<template<typename> class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
         for(int i: range(N-sizeof...(Args))) at(i)=o[i];
-        T unpacked[]={args...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i]; //FIXME
+        T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
     }
     /// Initializes components from another vec \a o casting from \a T2 to \a T
     template<template<typename> class W, Type F> explicit vec(const vec<W,F,N>& o) { for(uint i=0;i<N;i++) at(i)=(T)o[i]; }
@@ -118,14 +118,23 @@ inline vec3 normal(vec3 v) {
 
 generic struct xyzw {
     T x,y,z,w;
-    vec< ::xyz,T,3> xyz() const { return vec< ::xyz,T,3>(x,y,z); }
+    vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
-    vec< ::xy,T,2> xy()const{ return vec< ::xy,T,2>(x,y); }
+    vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4;
 
-generic struct bgra { T b,g,r,a; };
+generic struct bgr {
+    T b,g,r;
+};
+/// Integer b,g,r vector (8bit)
+typedef vec<bgr,uint8,3> byte3;
+
+generic struct bgra {
+    T b,g,r,a;
+    vec< ::bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
+};
 /// Integer b,g,r,a vector (8bit)
 typedef vec<bgra,uint8,4> byte4;
 /// Integer b,g,r,a vector (32bit)

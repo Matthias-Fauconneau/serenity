@@ -7,7 +7,7 @@ struct Slice : Pass {
     virtual string parameters() const { return "begin"_; }
     virtual void execute(const Dict& args, Result& target, const Result& source) override {
         target.metadata = copy(source.metadata);
-        target.data = toASCII(UniformSample(parseUniformSample(source.data).slice(toInteger(args.at("begin"_)))));
+        target.data = toASCII(UniformSample(parseUniformSample(source.data).slice(fromInteger(args.at("begin"_)))));
     }
 };
 template struct Interface<Operation>::Factory<Slice>;

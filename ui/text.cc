@@ -1,5 +1,5 @@
 #include "text.h"
-#include "display.h"
+#include "graphics.h"
 #include "font.h"
 #include "utf8.h"
 
@@ -125,10 +125,10 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, uint size, vec4 color, uint wrap) : text(toUTF32(text)), size(size), color(color), wrap(wrap) {}
+Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap) : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap) {}
 void Text::layout() {
-    textSize=int2(0,size*resolution/96);
-    TextLayout layout(text, size*resolution/96, wrap);
+    textSize=int2(0,size);
+    TextLayout layout(text, size, wrap);
 
     textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;
@@ -145,7 +145,7 @@ void Text::layout() {
                 textSize=max(textSize,int2(c.pos)+c.image.size());
                 textLine << move(c);
             } else { //format character
-                textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size*resolution/96, int(o.advance)};
+                textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size, int(o.advance)};
             }
         }
         currentIndex++;
@@ -171,11 +171,11 @@ int2 Text::sizeHint() {
     if(!textSize) layout();
     return max(minSize,textSize);
 }
-void Text::render(int2 position, int2 size) {
+void Text::render(const Image& target) { render(target, max(int2(0),(target.size()-textSize)/2)); }
+void Text::render(const Image& target, int2 offset) {
     if(!textSize) layout();
-    int2 offset = position+max(int2(0),(size-textSize)/2);
-    for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(offset+b.pos, b.image, color);
-    for(const Line& l: lines) fill(offset+Rect(l.min,l.max), black);
+    for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(target, offset+b.pos, b.image, color);
+    for(const Line& l: lines) fill(target, offset+Rect(l.min,l.max), black);
 }
 
 bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
@@ -278,7 +278,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
                 text.removeAt(editIndex=index()); layout(); if(textChanged) textChanged(toUTF8(text));
             }
         }
-        else if(key==BackSpace) { //LeftArrow+Delete
+        else if(key==Backspace) { //LeftArrow+Delete
             if(cursor.column>0) cursor.column--;
             else if(cursor.line>0) cursor.line--, cursor.column=textLines[cursor.line].size;
             else return false;
@@ -293,10 +293,11 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
             }
         }
         else {
+            ref<uint> keypadNumbers = {KP_0, KP_1, KP_2, KP_3, KP_4, KP_5, KP_6, KP_7, KP_8, KP_9};
             char c=0;
             if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
-            else if(key>=KP_0 && key<=KP_9) c=key-KP_0+'0';
-            else if(key==KP_Multiply) c='*'; else if(key==KP_Add) c='+'; else if(key==KP_Sub) c='-'; else if(key==KP_Divide) c='/';
+            else if(keypadNumbers.contains(key)) c='0'+keypadNumbers.indexOf(key);
+            else if(key==KP_Asterisk) c='*'; else if(key==KP_Plus) c='+'; else if(key==KP_Minus) c='-'; else if(key==KP_Slash) c='/';
             else return false;
             editIndex=index()+1; if(text) text.insertAt(index(), c); else text<<c, editIndex=1; layout(); if(textChanged) textChanged(toUTF8(text));
         }
@@ -305,15 +306,15 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
     return true;
 }
 
-void TextInput::render(int2 position, int2 size) {
-    Text::render(position, size);
+void TextInput::render(const Image& target) {
+    Text::render(target);
     if(hasFocus(this)) {
         assert(cursor.line < textLines.size, cursor.line, textLines.size);
         const TextLine& textLine = textLines[cursor.line];
         int x = 0;
         if(cursor.column<textLine.size) x= textLine[cursor.column].pos.x;
         else if(textLine) x=textLine.last().pos.x+textLine.last().advance;
-        int2 offset = position+max(int2(0),(size-textSize)/2);
-        fill(offset+int2(x,cursor.line*this->size)+Rect(2,this->size), black);
+        int2 offset = max(int2(0),(target.size()-textSize)/2);
+        fill(target, offset+int2(x,cursor.line*size)+Rect(2,size), black);
     }
 }

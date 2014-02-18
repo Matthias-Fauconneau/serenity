@@ -31,7 +31,7 @@ bool isUTF8(const string& s);
 /// Returns true if s contains only [0-9]
 bool isInteger(const string& s);
 /// Parses an integer value
-int64 toInteger(const string& str, int base=10);
+int64 fromInteger(const string& str, int base=10);
 /// Returns true if s matches [0-9]*.?[0-9]*
 bool isDecimal(const string& s);
 /// Parses a decimal value
@@ -126,6 +126,5 @@ template<Type A, Type... Args> String str(const A& a, const Args&... args) { ret
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }
-#define warn log
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }

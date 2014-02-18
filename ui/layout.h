@@ -10,10 +10,10 @@ struct Layout : Widget {
     virtual Widget& at(int) =0;
 
     /// Computes widgets layout
-    virtual array<Rect> layout(int2 position, int2 size)=0;
+    virtual array<Rect> layout(int2 size)=0;
 
     /// Renders all visible child widgets
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
@@ -39,7 +39,7 @@ template<class T> struct Array : virtual Layout, array<T> {
 
 /// Layouts widgets on an axis
 /// \note This is an abstract class, use \a Horizontal or \a Vertical
-struct Linear: virtual Layout {
+struct Linear : virtual Layout {
     /// Expands main axis even when no widget is expanding
     bool expanding = false;
     /// How to use any extra space when no widget is expanding
@@ -56,12 +56,15 @@ struct Linear: virtual Layout {
         Expand /// For side axis, sets all widgets side size to layout available side size
     };
     Extra main, side;
+    /// Identifier to help understand layout behaviour.
+    string name;
+
     /// Constructs a linear layout
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
     Linear(Extra main=Share, Extra side=AlignCenter):main(main),side(side){}
 
     int2 sizeHint() override;
-    array<Rect> layout(int2 position, int2 size) override;
+    array<Rect> layout(int2 size) override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
     virtual int2 xy(int2 xy) =0;
 };
@@ -76,13 +79,13 @@ struct Vertical : virtual Linear {
 };
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
-struct HBox : virtual Horizontal, virtual Widgets {
+struct HBox : Horizontal, Widgets {
     HBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
     HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
-    VBox(const ref<Widget*>& widgets):Widgets(widgets){}
+    VBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
     VBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Horizontal layout of homogenous items. \sa Array
@@ -92,80 +95,27 @@ template<class T> struct HList : Horizontal, Array<T> {
 };
 /// Vertical layout of homogenous items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
-    //VList(const mref<T>& widgets):Array<T>(move(widgets)){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
 /// Layouts items on an uniform #width x #height grid
-struct Grid : virtual Layout {
+struct GridLayout : virtual Layout {
     /// Horizontal element count, 0 means automatic
     int width;
     /// Vertical element count, 0 means automatic
     int height;
     /// Margin between elements
     int2 margin;
-    Grid(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
+    GridLayout(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
     int2 sizeHint();
-    array<Rect> layout(int2 position, int2 size) override;
+    array<Rect> layout(int2 size) override;
 };
 /// Grid of heterogenous widgets. \sa Widgets
-struct WidgetGrid : Grid, Widgets {
+struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(){}
     WidgetGrid(const ref<Widget*>& widgets):Widgets(widgets){}
 };
-template<class T> struct UniformGrid : Grid,  Array<T> {
+template<class T> struct UniformGrid : GridLayout,  Array<T> {
     UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
-    //UniformGrid(int width=0, int height=0, int margin=0):Grid(width,height,margin){}
-};
-
-/// Implements selection of active widget/item for a \a Layout
-struct Selection : virtual Layout {
-    /// User changed active index.
-    signal<uint /*index*/> activeChanged;
-    /// Active index
-    uint index = -1;
-    /// Set active index and emit activeChanged
-    void setActive(uint index);
-    /// User clicked on an item.
-    signal<uint /*index*/> itemPressed;
-
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-    bool keyPress(Key key, Modifiers modifiers) override;
-};
-
-/// Displays a selection using a blue highlight
-struct HighlightSelection : virtual Selection {
-    /// Whether to always display the highlight or only when focused
-    bool always=false;
-    void render(int2 position, int2 size) override;
-};
-
-/// Displays a selection using horizontal tabs
-struct TabSelection : virtual Selection {
-    void render(int2 position, int2 size) override;
-};
-
-/// Array with Selection
-template<class T> struct ArraySelection : Array<T>, virtual Selection {
-    ArraySelection(){}
-    ArraySelection(array<T>&& items) : Array<T>(move(items)){}
-    /// Return active item (last selection)
-    T& active() { return array<T>::at(this->index); }
-};
-
-/// Vertical layout of selectable items. \sa ArraySelection
-template<class T> struct List : Vertical, ArraySelection<T>, HighlightSelection {
-    List(){}
-    List(array<T>&& items) : ArraySelection<T>(move(items)){}
-};
-/// Horizontal layout of selectable items. \sa ArraySelection
-template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
-    Bar(){}
-    Bar(array<T>&& items) : ArraySelection<T>(move(items)){}
-};
-/// GridSelection is a Grid layout of selectable items. \sa ArraySelection
-template<class T> struct GridSelection : Grid, ArraySelection<T>, HighlightSelection {
-    GridSelection(int width=0, int height=0, int margin=0) : Grid(width,height,margin){}
-    GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
 };

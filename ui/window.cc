@@ -1,40 +1,13 @@
 #include "window.h"
-#include "display.h"
-#include "widget.h"
+#include "graphics.h"
 #include "file.h"
 #include "data.h"
 #include "time.h"
 #include "image.h"
 #include "png.h"
-#include "linux.h"
 #include "x.h"
-#if GL
-#include "gl.h"
-#undef packed
-#define Time XTime
-#define Cursor XCursor
-#define Depth XXDepth
-#define Window XWindow
-#define Screen XScreen
-#define XEvent XXEvent
-#include <GL/glx.h> //X11
-#undef Time
-#undef Cursor
-#undef Depth
-#undef Window
-#undef Screen
-#undef XEvent
-#undef None
-#endif
-
-// Globals
-namespace Shm { int EXT, event, errorBase; } using namespace Shm;
-namespace XRender { int EXT, event, errorBase; } using namespace XRender;
-int2 displaySize;
-#if GL
-Display* glDisplay;
-GLXContext glContext;
-#endif
+#include <sys/socket.h>
+#include <sys/shm.h>
 
 static thread_local Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
@@ -43,10 +16,12 @@ void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
 
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon,
-               Renderer renderer, const string& type, Thread& thread)
-    : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread), widget(widget), overrideRedirect(title.size?false:true),
-      renderer(renderer) {
+// Globals
+namespace Shm { int EXT, event, errorBase; } using namespace Shm;
+namespace XRender { int EXT, event, errorBase; } using namespace XRender;
+
+Window::Window(Widget* widget, int2 size, const string& unused title, const Image& unused icon) :
+    Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
@@ -60,7 +35,7 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
             {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
             {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
-        } else { warn("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
+        } else { error("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
     }
     {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
     {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();
@@ -109,31 +84,6 @@ Window::Window(Widget* widget, int2 size, const string& title, const Image& icon
     if(size.y==0) size.y=displaySize.y-16;
     if(anchor==Bottom) position.y=displaySize.y-size.y;
     this->size=size;
-    create();
-    setTitle(title);
-    setIcon(icon);
-    setType(type);
-    if(renderer == OpenGL) {
-#if GL
-        if(glDisplay || glContext) { assert(glDisplay && glContext); return; }
-        glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert(glDisplay);
-        const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1, 0};
-        int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
-        const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0};
-        glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
-                (glDisplay, fbConfigs[0], 0, 1, contextAttribs);
-        assert(glContext);
-        glXMakeCurrent(glDisplay, id, glContext);
-        glEnable(GL_FRAMEBUFFER_SRGB);
-        ((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
-#else
-        error("Unsupported: OpenGL was not configured at compile-time");
-#endif
-    }
-}
-
-void Window::create() {
-    assert(!created);
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y;
         r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
@@ -145,20 +95,16 @@ void Window::create() {
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
-    created = true;
+    setTitle(title);
+    setIcon(icon);
 }
-Window::~Window() { destroy(); }
-void Window::destroy() {
-    if(!created) return;
+Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
     {DestroyWindow r; r.id=id+XWindow; send(raw(r));}
-    created = false;
-    unregisterPoll();
 }
 
 // Render
 void Window::event() {
-    window=this;
     if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
         lock.lock();
         if(!poll()) { lock.unlock(); break; }
@@ -168,84 +114,38 @@ void Window::event() {
         processEvent(type, e);
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
-    if(/*revents==IDLE &&*/ needUpdate) {
+    if(needUpdate) {
         needUpdate = false;
-        /*if(autoResize) {
-            int2 hint = widget->sizeHint();
-            if(hint != size) { setSize(hint); return; }
-        }*/
         assert(size);
-        currentClip=Rect(size);
 
         if(state!=Idle) { state=Wait; return; }
-        if(renderer == Raster) {
-            ::softwareRendering=true;
-            if(buffer.width != (uint)size.x || buffer.height != (uint)size.y) {
-                if(shm) {
-                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                    shmdt(buffer.data);
-                    shmctl(shm, IPC_RMID, 0);
-                }
-                buffer.width=size.x, buffer.height=size.y, buffer.stride=align(16,size.x);
-                shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
-                buffer.data = (byte4*)check( shmat(shm, 0, 0) ); assert(buffer.data);
-                {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+        if(target.size() != size) {
+            if(shm) {
+                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                shmdt(target.data);
+                shmctl(shm, IPC_RMID, 0);
             }
-            framebuffer=share(buffer);
-            {//Locker lock(framebufferLock);
-                currentClip=Rect(size);
-                if(clearBackground) {
-                    if(backgroundCenter==backgroundColor) {
-                        fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                    } else { // Oxygen-like radial gradient background
-                        const int radius=256;
-                        int w=size.x, cx=w/2, x0=max(0,cx-radius), x1=min(w,cx+radius), h=min(radius,size.y),
-                                a=0xFF*backgroundOpacity, scale = (radius*radius)/a;
-                        if(x0>0 || x1<w || h<size.y)
-                            fill(Rect(size),vec4(backgroundColor,backgroundColor,backgroundColor,backgroundOpacity));
-                        uint* dst=(uint*)framebuffer.data;
-                        for(int y=0;y<h;y++) for(int x=x0;x<x1;x++) {
-                            int X=x-cx, Y=y, d=(X*X+Y*Y), t=min(0xFF,d/scale),
-                                    g = (0xFF*backgroundColor*t+0xFF*backgroundCenter*(0xFF-t))/0xFF;
-                            dst[y*framebuffer.stride+x]= a<<24 | g<<16 | g<<8 | g;
-                        }
-                    }
-                }
-                widget->render(0,size);
-                assert(!clipStack);
-            }
-
-            if(featherBorder) { //feather borders
-                const bool corner = 1;
-                if(position.y>16) for(int x=0;x<size.x;x++) framebuffer(x,0) /= 2;
-                if(position.x>0) for(int y=corner;y<size.y-corner;y++) framebuffer(0,y) /= 2;
-                if(position.x+size.x<displaySize.x-1) for(int y=corner;y<size.y-corner;y++) framebuffer(size.x-1,y) /= 2;
-                if(position.y+size.y>16 && position.y+size.y<displaySize.y-1) for(int x=0;x<size.x;x++) framebuffer(x,size.y-1) /= 2;
-            }
-            Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-            r.totalW=framebuffer.stride; r.totalH=framebuffer.height;
-            r.srcW=size.x; r.srcH=size.y; send(raw(r));
-            state=Server;
-        } else {
-#if GL
-            ::softwareRendering=false;
-            glXMakeCurrent(glDisplay, id, glContext);
-            viewportSize = size;
-            if(clearBackground) GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(vec3(backgroundColor),backgroundOpacity));
-            currentClip=Rect(size);
-            widget->render(0,size);
-            assert(!clipStack);
-            viewportSize = 0;
-            glFlush();
-            glXSwapBuffers(glDisplay, id);
-#else
-            error("Unsupported: OpenGL was not configured at compile-time");
-#endif
+            target.width=size.x, target.height=size.y, target.stride=align(16,size.x);
+            shm = check( shmget(0, target.height*target.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+            target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
+            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
-        frameSent();
-        framebuffer=Image(); // After frameSent() for capture
+
+        renderBackground(target);
+        widget->render(target);
+
+        putImage(0, size);
+        state=Server;
+        if(frameSent) frameSent();
     }
-    window=0;
+}
+
+void Window::putImage(int2 position, int2 size) {
+    Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+    r.totalW=target.stride; r.totalH=target.height;
+    r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
+    r.dstX = position.x, r.dstY = position.y;
+    send(raw(r));
 }
 
 // Events
@@ -277,6 +177,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     }
     else if(type==1) error("Unexpected reply");
     else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
+        window=this;
         /**/ if(type==MotionNotify) {
             cursorPosition = int2(e.x,e.y);
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
@@ -292,18 +193,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==ButtonRelease) {
             drag=0;
             if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
-        } else if(type==KeyPress) {
-            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
-            if(focus && focus->keyPress(key, (Modifiers)e.state)) render(); // Normal keyPress event
-            else {
-                signal<>* shortcut = shortcuts.find(key);
-                if(shortcut) (*shortcut)(); // Local window shortcut
-            }
         }
-        else if(type==KeyRelease) {
-            Key key = KeySym(e.key, focus==directInput ? 0 : e.state);
-            if(focus && focus->keyRelease(key, (Modifiers)e.state)) render();
-        }
+        else if(type==KeyPress) keyPress(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
+        else if(type==KeyRelease) keyRelease(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
@@ -319,14 +211,15 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         }
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
-            signal<>* shortcut = shortcuts.find(Escape);
-            if(shortcut) (*shortcut)(); // Local window shortcut
+            function<void()>* action = actions.find(Escape);
+            if(action) (*action)(); // Local window action
             else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
             else exit(0); // Exits application by default
         }
         else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
+        window=0;
     }
 }
 uint Window::send(const ref<byte>& request) { write(request); return ++sequence; }
@@ -350,7 +243,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
 }
 void Window::render() { needUpdate=true; if(mapped) queue(); }
 
-void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} registerPoll(); }
+void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {
@@ -399,11 +292,10 @@ uint Window::KeyCode(Key sym) {
     return keycode;
 }
 
-signal<>& Window::localShortcut(Key key) { return shortcuts[(uint)key]; }
-signal<>& Window::globalShortcut(Key key) {
+function<void()>& Window::globalAction(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
-    return shortcuts.insert((uint)key);
+    return actions.insert(key, []{});
 }
 
 // Properties
@@ -475,7 +367,6 @@ void Window::setCursor(Cursor cursor, uint window) {
     {FreePicture r; r.picture=id+Picture; send(raw(r));}
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
 }
-void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
 
 // Snapshot
 Image Window::getSnapshot() {
@@ -491,4 +382,67 @@ Image Window::getSnapshot() {
     shmdt(buffer.data);
     shmctl(shm, IPC_RMID, 0);
     return image;
+}
+
+void Window::renderBackground(Image& target) {
+    if(background==Oxygen) { // Oxygen-like radial gradient background
+        const int y0 = -32-8, splitY = min(300, 3*size.y/4);
+        const vec3 radial = vec3(246./255); // linear
+        const vec3 top = vec3(221, 223, 225); // sRGB
+        const vec3 bottom = vec3(184, 187, 194); // sRGB
+        const vec3 middle = (bottom+top)/2.f; //FIXME
+        // Draws upper linear gradient
+        for(int y: range(0, max(0, y0+splitY/2))) {
+            float t = (float) (y-y0) / (splitY/2);
+            for(int x: range(size.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
+        }
+        for(int y: range(max(0, y0+splitY/2), min(size.y, y0+splitY))) {
+            float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
+            byte4 verticalGradient (byte3((1-t)*middle + t*bottom), 0xFF); // mid -> dark
+            for(int x: range(size.x)) target(x,y) = verticalGradient;
+        }
+        // Draws lower flat part
+        for(int y: range(max(0, y0+splitY), size.y)) for(int x: range(size.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
+        // Draws upper radial gradient (600x64)
+        const int w = min(600, size.x), h = 64;
+        for(int y: range(0, min(size.y, y0+h))) for(int x: range((size.x-w)/2, (size.x+w)/2)) {
+            const float cx = size.x/2, cy = y0+h/2;
+            float r = sqrt(sq((x-cx)/(w/2)) + sq((y-cy)/(h/2)));
+            const float r0 = 0./4, r1 = 2./4, r2 = 3./4, r3 = 4./4;
+            const float a0 = 255./255, a1 = 101./255, a2 = 37./255, a3 = 0./255;
+            /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }
+            else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
+            else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
+        }
+    }
+    else if(background==White) {
+        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
+    }
+    else if(background==Black) {
+        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
+    }
+}
+
+void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
+
+void Window::keyPress(Key key, Modifiers modifiers) {
+    if(focus && focus->keyPress(key, modifiers)) render(); // Normal keyPress event
+    else {
+        function<void()>* action = actions.find(key);
+        function<void()>* longAction = longActions.find(key);
+        if(longAction) { // Schedules long action
+            longActionTimers.insert(key, unique<Timer>(1000, [this,key,longAction]{longActionTimers.remove(key); (*longAction)();}));
+        }
+        else if(action) (*action)(); // Local window action
+    }
+}
+
+
+void Window::keyRelease(Key key, Modifiers modifiers) {
+    if(focus && focus->keyRelease(key, modifiers)) render();
+    else if(longActionTimers.contains(key)) {
+        longActionTimers.remove(key); // Removes long action before it triggers
+        function<void()>* action = actions.find(key);
+        if(action) (*action)(); // Executes any short action instead
+    }
 }

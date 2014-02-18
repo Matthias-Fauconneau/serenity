@@ -1,7 +1,7 @@
 /// \file family.cc Operations on families (pores)
 #include "volume-operation.h"
 #include "thread.h"
-#include "display.h"
+#include "graphics.h"
 #include "matrix.h"
 #include "time.h"
 

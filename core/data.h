@@ -6,6 +6,11 @@
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
 
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
 /// Reinterpret cast a const reference to another type
 template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
@@ -56,12 +61,15 @@ struct Data {
     /// Returns a reference to the next \a size bytes and advances \a size bytes
     ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
 
+    /// Reads until the end of input
+    ref<byte> untilEnd() { uint size=available(-1); return read(size); }
+
     ::buffer<byte> buffer;
     uint index=0;
 };
 
 /// Provides a convenient interface to parse binary inputs
-struct BinaryData : virtual Data {
+struct BinaryData : Data {
     BinaryData(){}
     /// Creates a BinaryData interface to an \a array
     BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
@@ -70,6 +78,9 @@ struct BinaryData : virtual Data {
 
     /// Slices a reference to the buffer from \a pos to \a pos + \a size
     BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
+    /// Slices a reference to the buffer from \a pos to \a pos + \a size
+    BinaryData slice(uint pos) { return BinaryData(Data::slice(pos),isBigEndian); }
+
     /// Seeks to /a index
     void seek(uint index) { assert(index<buffer.size); this->index=index; }
     /// Seeks last match for \a key.
@@ -121,7 +132,7 @@ struct BinaryData : virtual Data {
 };
 
 /// Provides a convenient interface to parse text streams
-struct TextData : virtual Data {
+struct TextData : Data {
     using Data::Data;
     void advance(uint step) /*override*/;
 
@@ -152,8 +163,6 @@ struct TextData : virtual Data {
     string until(const string& key);
     /// Reads until input match any character of \a key
     string untilAny(const string& any);
-    /// Reads until the end of input
-    string untilEnd();
     /// Skips whitespaces
     void skip();
     /// Reads until end of line

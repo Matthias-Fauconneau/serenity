@@ -1,6 +1,7 @@
 #include "trace.h"
 #include "file.h"
 #include "data.h"
+#include <unistd.h>
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
@@ -110,7 +111,12 @@ String demangle(TextData& s, bool function=true) {
 String demangle(const string& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findSymbol(void* find) {
+#if 0 // qemu-user only fakes /proc/self/exe for readlink
+    String s(256); s.size=readlink(strz("/proc/self/exe"_), s.begin(), s.capacity);
+    static Map exe(s);
+#else
     static Map exe("/proc/self/exe"_);
+#endif
     const byte* elf = exe.data;
     const Ehdr& hdr = *(const Ehdr*)elf;
     ref<Shdr> sections = ref<Shdr>((const Shdr*)(elf+hdr.shoff),hdr.shnum);
@@ -157,7 +163,7 @@ Symbol findSymbol(void* find) {
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else { warn("unknown opcode"_,opcode); s.advance(size); }
+                else { error("unknown opcode"_,opcode); s.advance(size); }
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
@@ -192,17 +198,18 @@ Symbol findSymbol(void* find) {
 #if __x86_64 || __i386
 void* caller_frame(void* fp) { return *(void**)fp; }
 void* return_address(void* fp) { return *((void**)fp+1); }
-#elif __arm__ // Assumes APCS stack layout (i.e works only when compiled with GCC's -mapcs flag)
-void* caller_frame(void* fp) { return *((void**)fp-3); }
-void* return_address(void* fp) { return *((void**)fp-1); }
 #else
-#error Unsupported architecture
+#include <execinfo.h>
 #endif
 
 String trace(int skip, void* ip) {
+    String log;
     void* stack[32];
-    void* frame = __builtin_frame_address(0);
+#if __arm__
+    int i = backtrace(stack, 32);
+#else
     int i=0;
+    void* frame = __builtin_frame_address(0);
     for(;i<32;i++) {
 #if __x86_64
         if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
@@ -212,8 +219,16 @@ String trace(int skip, void* ip) {
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }
-    String r;
-    for(i=i-4; i>=skip; i--) { Symbol s = findSymbol(stack[i]); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<"0x"_+hex(ptr(stack[i]))<<"\n"_; }
-    if(ip) { Symbol s = findSymbol(ip); if(s.function||s.file||s.line) r<<(s.file+":"_+str(s.line)+"     \t"_+s.function+"\n"_); else r<<"0x"_+hex(ptr(ip))<<"\n"_; }
-    return r;
+#endif
+    for(i=i-4; i>=skip; i--) {
+        Symbol s = findSymbol(stack[i]);
+        if(s.function||s.file||s.line) log<<(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
+        else log<<"0x"_+hex(ptr(stack[i]))<<"\n"_;
+    }
+    if(ip) {
+        Symbol s = findSymbol(ip);
+        if(s.function||s.file||s.line) log<<(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
+        else log<<"0x"_+hex(ptr(ip))<<"\n"_;
+    }
+    return log;
 }

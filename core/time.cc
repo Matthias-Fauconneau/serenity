@@ -1,10 +1,9 @@
 #include "time.h"
-#include "linux.h"
 #include "data.h"
 #include "string.h"
-
-#include <time.h> //rt
+#include <unistd.h>
 #include <sys/timerfd.h>
+#include <time.h> //rt
 
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
@@ -157,7 +156,10 @@ Date parseDate(TextData& s) {
     return date;
 }
 
-Timer::Timer(Thread& thread):Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC), POLLIN, thread){registerPoll();}
+Timer::Timer(long msec, function<void()> timeout, Thread& thread)
+    : Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC), POLLIN, thread), timeout(timeout) {
+    setRelative(msec);
+}
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(long sec, long nsec) {
     timespec time[2]={{0,0},{sec,nsec}};

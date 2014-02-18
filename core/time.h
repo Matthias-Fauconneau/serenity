@@ -11,6 +11,7 @@ long currentTime();
 int64 realTime();
 
 #if __x86_64__ || __i386__
+#define USE_TSC 1
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
@@ -25,7 +26,7 @@ struct Time {
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     float toFloat() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
 };
-inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
+inline String str(const Time& t) { return str((float)t)+"s"_; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
@@ -66,11 +67,11 @@ Date parseDate(TextData& s);
 inline Date parseDate(const string& s) { TextData t(s); return parseDate(t); }
 
 struct Timer : Poll {
-    Timer(Thread& thread=mainThread);
-    ~Timer();
+    Timer(long msec, function<void()> timeout, Thread& thread=mainThread);
+    virtual ~Timer();
     void setAbsolute(long sec, long nsec=0);
     void setRelative(long msec);
-    signal<> timeout;
+    const function<void()> timeout;
     virtual void event() { timeout(); }
 };
 
@@ -79,7 +80,9 @@ struct Random {
     uint sz=1,sw=1;
     uint z,w;
     Random() { /*seed();*/ reset(); }
+#if USE_TSC
     void seed() { sz=rdtsc(); sw=rdtsc(); }
+#endif
     void reset() { z=sz; w=sw; }
     uint64 next() {
         z = 36969 * (z & 0xFFFF) + (z >> 16);

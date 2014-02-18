@@ -2,14 +2,62 @@
 /// \file interface.h %Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, ::TabBar)
 #include "function.h"
 #include "image.h"
-#include "display.h"
 #include "widget.h"
 #include "layout.h"
 #include "text.h"
 
-/// Configures global display context to render to an image
-// In this module because the definition depends on display and widget
-Image renderToImage(Widget& widget, int2 size, int imageResolution=::resolution);
+/// Implements selection of active widget/item for a \a Layout
+struct Selection : virtual Layout {
+    /// User changed active index.
+    function<void(uint index)> activeChanged;
+    /// Active index
+    uint index = -1;
+    /// Set active index and emit activeChanged
+    void setActive(uint index);
+    /// User clicked on an item.
+    signal<uint /*index*/> itemPressed;
+
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
+};
+
+/// Displays a selection using a blue highlight
+struct HighlightSelection : virtual Selection {
+    /// Whether to always display the highlight or only when focused
+    bool always=false;
+    void render(const Image& target) override;
+};
+
+/// Displays a selection using horizontal tabs
+struct TabSelection : virtual Selection {
+    void render(const Image& target) override;
+};
+
+/// Array with Selection
+template<class T> struct ArraySelection : Array<T>, virtual Selection {
+    ArraySelection(){}
+    ArraySelection(array<T>&& items) : Array<T>(move(items)){}
+    /// Return active item (last selection)
+    T& active() { return array<T>::at(this->index); }
+    /// Clears array and resets index
+    void clear() { Array<T>::clear(); index=-1; }
+};
+
+/// Vertical layout of selectable items. \sa ArraySelection
+template<class T> struct List : Vertical, ArraySelection<T>, HighlightSelection {
+    List(){}
+    List(array<T>&& items) : ArraySelection<T>(move(items)){}
+};
+/// Horizontal layout of selectable items. \sa ArraySelection
+template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
+    Bar(){}
+    Bar(array<T>&& items) : ArraySelection<T>(move(items)){}
+};
+/// GridSelection is a Grid layout of selectable items. \sa ArraySelection
+template<class T> struct GridSelection : GridLayout, ArraySelection<T>, HighlightSelection {
+    GridSelection(int width=0, int height=0, int margin=0) : GridLayout(width,height,margin){}
+    GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
+};
 
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
@@ -23,13 +71,13 @@ struct ScrollArea : Widget {
     bool horizontal=false, vertical=true;
     bool scrollbar = false;
     const int scrollBarWidth = 16;
-    int2 delta=0;
+    int2 offset=0;
     int2 dragStartCursor, dragStartDelta;
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     int2 size; // keep last size for ensureVisible
 };
 
@@ -46,12 +94,14 @@ template<class T> struct Scroll : ScrollArea, T {
 struct ImageWidget : virtual Widget {
     /// Displayed image
     const Image& image;
+    /// Hides button
+    bool hidden = false;
 
     /// Creates a widget displaying \a image
-    ImageWidget(const Image& image):image(move(image)){}
+    ImageWidget(const Image& image, bool hidden=false):image(move(image)),hidden(hidden){}
 
     int2 sizeHint();
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 };
 /// \typedef ImageView Icon
 /// Displays an icon
@@ -62,11 +112,11 @@ struct ImageLink : ImageWidget {
     /// Argument given to triggered
     String link;
     /// User clicked on the image
-    signal<> triggered;
+    function<void()> triggered;
     /// User clicked on the image
     signal<const string&> linkActivated;
 
-    ImageLink(const Image& image):Icon(move(image)){}
+    ImageLink(const Image& image, bool hidden=false) : ImageWidget(move(image),hidden){}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
 /// \typedef ImageLink TriggerButton
@@ -79,13 +129,13 @@ struct ToggleButton : Widget {
     ToggleButton(const Image& enable, const Image& disable) : enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
-    signal<bool /*state*/> toggled;
+    function<void(bool state)> toggled;
 
     /// Current button state
     bool enabled = false;
 
     int2 sizeHint();
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     const Image& enableIcon;
@@ -101,7 +151,7 @@ struct Progress : Widget {
     Progress(int minimum=0, int maximum=0, int value=-1):minimum(minimum),maximum(maximum),value(value){}
 
     int2 sizeHint();
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 
     static constexpr int height = 32;
 };
@@ -109,7 +159,7 @@ struct Progress : Widget {
 /// Shows and controls a bounded value
 struct Slider : Progress {
     /// User edited the \a value
-    signal<int> valueChanged;
+    function<void(int)> valueChanged;
 
     Slider(int minimum=0, int maximum=0, int value=-1):Progress(minimum,maximum,value){}
 
@@ -118,7 +168,6 @@ struct Slider : Progress {
 
 /// ::Icon with \ref Text "text"
 struct Item : Linear {
-    //Item(){}
     Item(Image&& icon, const string& text, int size=16, bool under=false):icon(move(icon)),text(text,size),under(under){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
@@ -131,7 +180,6 @@ struct Item : Linear {
 
 /// Clickable Item
 struct TriggerItem : Item {
-    //TriggerItem(){}
     TriggerItem(Image&& icon, String&& text, int size=16):Item(move(icon),move(text),size){}
     /// User clicked on the button
     signal<> triggered;

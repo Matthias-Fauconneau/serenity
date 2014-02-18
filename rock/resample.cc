@@ -64,7 +64,7 @@ void resample(Volume16& target, const Volume16& source, int sourceResolution, in
 struct Resample : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
-        int sourceResolution = round(TextData(otherInputs[0]->data).decimal()*1000), targetResolution = round(TextData(otherInputs[1]->data).decimal()*1000);
+        uint sourceResolution = round(TextData(otherInputs[0]->data).decimal()*1000), targetResolution = round(TextData(otherInputs[1]->data).decimal()*1000);
         if(sourceResolution == targetResolution) { copy(outputs[0].data, inputs[0].data); return; }
         assert_(targetResolution > sourceResolution, targetResolution, sourceResolution); // Supports only downsampling
         const Volume* source = &inputs[0];

@@ -40,13 +40,14 @@ io/tiff.h
 io/bmp.cc
 io/bmp.h
 
-ui/display.cc
-ui/display.h
+ui/graphics.cc
+ui/graphics.h
 ui/font.cc
 ui/font.h
 ui/interface.h
 ui/interface.cc
 ui/layout.h
+ui/layout.cc
 ui/plot.cc
 ui/plot.h
 ui/text.cc
@@ -101,3 +102,4 @@ rock/cluster.cc
 rock/family.cc
 rock/synthetic.cc
 rock/box.cc
+ui/widget.cc

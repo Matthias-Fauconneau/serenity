@@ -46,45 +46,28 @@ uint16 Font::index(uint16 code) {
     return code;
 }
 
-constexpr auto FT_LOAD_TARGET = FT_LOAD_TARGET_NORMAL; //FT_LOAD_TARGET_LCD
-float Font::kerning(uint16 leftIndex, uint16 rightIndex) { FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6; }
-float Font::advance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET); return face->glyph->advance.x*0x1p-6; }
-float Font::linearAdvance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET); return face->glyph->linearHoriAdvance*0x1p-16; }
-vec2 Font::size(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6); }
+float Font::kerning(uint16 leftIndex, uint16 rightIndex) {
+    FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6;
+}
+float Font::advance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->advance.x*0x1p-6; }
+float Font::linearAdvance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->linearHoriAdvance*0x1p-16; }
+vec2 Font::size(uint16 index) {
+    FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
+}
 
 const Glyph& Font::glyph(uint16 index, int) {
     Glyph& glyph = cache[uint(fontSize)][index];
     if(glyph.valid) return glyph;
     glyph.valid=true;
 
-    FT_Load_Glyph(face, index, FT_LOAD_TARGET);
-    if(FT_LOAD_TARGET == FT_LOAD_TARGET_LCD) {
-        FT_Render_Glyph(face->glyph, FT_RENDER_MODE_LCD);
-        glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
-        FT_Bitmap bitmap=face->glyph->bitmap;
-        if(!bitmap.buffer) return glyph;
-        int width = bitmap.width/3, height = bitmap.rows;
-        Image image(width,height,false);
-        for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
-            uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x*3];
-            image(x,y) = byte4(0xFF-rgb[0],0xFF-rgb[1],0xFF-rgb[2],/*min(255,rgb[0]+rgb[1]+rgb[2])*/0xFF);
-            //image(x,y) = byte4(rgb[2],rgb[1],rgb[0],/*min(255,rgb[0]+rgb[1]+rgb[2])*/0xFF);
-        }
-        glyph.image = move(image);
-    } else {
-        FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
-        glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
-        FT_Bitmap bitmap=face->glyph->bitmap;
-        if(!bitmap.buffer) return glyph;
-        int width = bitmap.width, height = bitmap.rows;
-        Image image(width,height,true);
-        for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
-            uint8* rgb = &bitmap.buffer[y*bitmap.pitch+x];
-            extern uint8 sRGB_lookup[256];
-            uint8 g = sRGB_lookup[rgb[0]];
-            image(x,y) = byte4(g,g,g,rgb[0]);
-        }
-        glyph.image = move(image);
-    }
+    FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL);
+    FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+    glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
+    FT_Bitmap bitmap=face->glyph->bitmap;
+    if(!bitmap.buffer) return glyph;
+    int width = bitmap.width, height = bitmap.rows;
+    Image image(width, height, true, false);
+    for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0xFF,0xFF,0xFF,bitmap.buffer[y*bitmap.pitch+x]);
+    glyph.image = move(image);
     return glyph;
 }

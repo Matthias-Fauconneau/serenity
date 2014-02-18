@@ -22,7 +22,7 @@ Image decodeBMP(const ref<byte>& file) {
 
     uint w=header.width, stride=align(4,w), h=header.height;
     uint size = header.depth*stride*h/8;
-    if(size>s.available(size)) { warn("Invalid BMP"); return Image(); }
+    if(size>s.available(size)) { error("Invalid BMP"); return Image(); }
 
     Image image(w,h);
     byte4* dst = (byte4*)image.data;

@@ -28,7 +28,7 @@ struct ImageView : View, ImageWidget {
         title = String(name);
         return image ? true : false;
     }
-    int2 sizeHint() override { while(!(image.size()<displaySize)) image=resize(image,image.size()/2); return ImageWidget::sizeHint(); }
+    int2 sizeHint() override { return ImageWidget::sizeHint(); }
     string name() override { return title; }
     String title;
 };
@@ -44,8 +44,7 @@ struct PlotView : View, Plot {
         if(!this->title) this->title=String(title), this->xlabel=String(xlabel), this->ylabel=String(ylabel), this->log[0]=logx, this->log[1]=logy;
         if((this->title && this->title!=title) && !(this->xlabel == xlabel && this->ylabel == ylabel && this->log[0]==logx && this->log[1]==logy)) return false;
         assert_(this->xlabel == xlabel && this->ylabel == ylabel && this->log[0]==logx && this->log[1]==logy);
-        dataSets << move(dataSet);
-        legends << String(legend);
+        dataSets.insert(String(legend), move(dataSet));
         return true;
     }
     int2 sizeHint() override { return int2(1080,1080*3/4); }

@@ -110,7 +110,7 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
     Image target(X-2*marginX,Y-2*marginY, true);
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;
-    if(!normalize && maximum>0x8000) { normalizeFactor=0xFF00; static int unused once = (warn("16bit volume truncated to 8bit image slices"_),0); }
+    if(!normalize && maximum>0x8000) { normalizeFactor=0xFF00; static int unused once = (log("16bit volume truncated to 8bit image slices"_),0); }
     assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum<=0x8000");
     float radiusSq = ((X-1)/2.0-marginX)*((Y-1)/2.0-marginY);
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
@@ -119,16 +119,26 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((uint8*)source.data.data)[index];
         else if(source.sampleSize==2) value = ((uint16*)source.data.data)[index];
-        else if(source.sampleSize==3) { target(x-marginX,y-marginY) = ((byte3*)source.data.data)[index]; continue; } //FIXME: sRGB
-        //else if(source.sampleSize==4) value = ((uint32*)source.data.data)[index];
-        else if(source.sampleSize==4) { short2 xyz=((short2*)source.data.data)[index]; target(x-marginX,y-marginY) = byte3{uint8(xyz.x/2),uint8(xyz.y/2),0}; continue; } //FIXME: sRGB
-        else if(source.sampleSize==6) { short3 xyz=((short3*)source.data.data)[index]; target(x-marginX,y-marginY) = byte3{uint8(xyz.x/2),uint8(xyz.y/2),uint8(xyz.z/2)}; continue; } //FIXME: sRGB
+        else if(source.sampleSize==3) {
+            target(x-marginX,y-marginY) = byte4(((byte3*)source.data.data)[index], 0xFF); //FIXME: sRGB
+            continue;
+        }
+        else if(source.sampleSize==4) {
+            short2 xyz=((short2*)source.data.data)[index];
+            target(x-marginX,y-marginY) = byte4(uint8(xyz.x/2), uint8(xyz.y/2), 0, 0xFF); //FIXME: sRGB
+            continue;
+        }
+        else if(source.sampleSize==6) {
+            short3 xyz=((short3*)source.data.data)[index];
+            target(x-marginX,y-marginY) = byte4(uint8(xyz.x/2), uint8(xyz.y/2), uint8(xyz.z/2), 0xFF);  //FIXME: sRGB
+            continue;
+        }
         else error("source.sampleSize"_,source.sampleSize);
         uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
         if(binary) linear8 = linear8 ? 0xFF : 0;
         if(invert) linear8 = 0xFF-linear8;
-        extern uint8 sRGB_lookup[256]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
-        uint sRGB8 = gamma ? sRGB_lookup[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values
+        extern uint8 sRGB_forward[0x1000]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
+        uint sRGB8 = gamma ? sRGB_forward[linear8*0x100] : linear8; // !gamma: abusing sRGB standard to store linear values
         target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
@@ -137,7 +147,6 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
 Image16 slice(const Volume& source, int z) {
     assert_(source.maximum);
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
-    //const int marginX=source.margin.x, marginY=source.margin.y;
     const int marginX=0, marginY=0;
     Image16 target(X-2*marginX,Y-2*marginY);
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {

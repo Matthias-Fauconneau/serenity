@@ -201,7 +201,7 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
             }
         }
     });
-    if(!(count[0] && count[1])) warn("Empty segmentation using threshold", threshold);
+    if(!(count[0] && count[1])) log("Empty segmentation using threshold", threshold);
     target.maximum=1;
 }
 

@@ -9,7 +9,7 @@ struct SliceView : View, Widget {
     string name() override;
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) override;
     int2 sizeHint() override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
     array<String> names;
     array<Volume> volumes;
     int currentIndex=0;

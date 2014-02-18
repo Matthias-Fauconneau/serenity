@@ -3,8 +3,8 @@
 #include "time.h"
 #include "process.h"
 #include "view.h"
+#include "layout.h"
 #include "window.h"
-#include "interface.h"
 #include "png.h"
 
 // Includes all operators, tools and views
@@ -50,10 +50,10 @@ struct Rock : PersistentProcess, Poll {
         for(const string& arg: ::arguments() ) if(endsWith(arg, ".process"_)) { assert_(!process); process = readFile(arg,cwd); }
         array<string> targets = configure(::arguments() , process? : rock());
         if(targetPaths.size>targets.size)
-            warn("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
+            log("Expected less names, skipped names"_, "["_+str(targetPaths.slice(targets.size))+"]"_, "using", map<string,string>(targetPaths.slice(0,targets.size), targets),
                   "\nHint: An unknown (mistyped?) target might be interpreted as target path");
         if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
-            warn("Expected more names, skipped targets"_, targets.slice(targetPaths.size), targetPaths?str("using", map<string,string>(targetPaths, targets.slice(0,targetPaths.size))):""_);
+            log("Expected more names, skipped targets"_, targets.slice(targetPaths.size), targetPaths?str("using", map<string,string>(targetPaths, targets.slice(0,targetPaths.size))):""_);
         if(specialArguments.contains("dump"_)) {
             log(__DATE__ " " __TIME__);
             log("Operations:",Interface<Operation>::factories.keys);
@@ -154,9 +154,9 @@ struct Rock : PersistentProcess, Poll {
             images << title+".png"_;
         } else {
             unique<Window> window(&widget, sizeHint, title);
-            window->localShortcut(Escape).connect([]{exit();});
+            window->actions[Escape] = []{exit();};
             String* name = new String(title+".png"_);
-            window->localShortcut(PrintScreen).connect([&]{writeFile(*name, encodePNG(renderToImage(widget, int2(1024,768))), home());});
+            window->actions[PrintScreen] = [&]{writeFile(*name, encodePNG(renderToImage(widget, int2(1024,768))), home());};
             window->show();
             windows << move(window);
         }
@@ -183,7 +183,7 @@ struct Rock : PersistentProcess, Poll {
              unique<View> view  = viewer.value->constructNewInstance();
              if( view->view(metadata, name, data) ) { viewers[viewer.key] << move(view); return true; }
          }
-         warn("Unknown format",metadata, name);
+         log("Unknown format",metadata, name);
          return false;
      }
 

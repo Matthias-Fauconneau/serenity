@@ -2,11 +2,6 @@
 /// \file math.h Floating-point builtins
 #include "core.h"
 
-// ref<Arithmetic> operations
-generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
-generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
-generic T sum(const ref<T>& a) { T sum=0; for(const T& e: a) sum += e; return sum; }
-
 // Arithmetic functions
 generic T abs(T x) { return x>=0 ? x : -x; }
 generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
@@ -17,12 +12,17 @@ generic inline constexpr T cb(const T& x) { return x*x*x; }
 typedef double real;
 
 constexpr real nan = __builtin_nan("");
+inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }
-const real inf = __builtin_inf();
-inline bool isNumber(real x) { return !isNaN(x) && x !=inf && x != -inf; }
+const float inf = __builtin_inff();
+inline bool isNumber(float x) { return !isNaN(x) && x !=inf && x !=-inf; }
 
+inline float floor(float x) { return __builtin_floorf(x); }
 inline real floor(real x) { return __builtin_floor(x); }
+inline float fract(float x) { return x - floor(x); }
+inline float round(float x) { return __builtin_roundf(x); }
 inline real round(real x) { return __builtin_round(x); }
+inline float ceil(float x) { return __builtin_ceilf(x); }
 inline real ceil(real x) { return __builtin_ceil(x); }
 inline real mod(real q, real d) { return __builtin_fmod(q, d); }
 inline real sqrt(real f) { return __builtin_sqrt(f); }
@@ -31,7 +31,7 @@ inline real pow(real x, real y) { return __builtin_pow(x,y); }
 const real e = 2.71828;
 const real expUnderflow = -7.45133219101941108420e+02;
 const real expOverflow = 7.09782712893383973096e+02;
-inline real exp(real x) { assert(x>expUnderflow && x<expOverflow, x); return __builtin_exp(x); }
+inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 inline real ln(real x) { return __builtin_log(x); }
 
 inline real cos(real t) { return __builtin_cos(t); }
@@ -45,5 +45,7 @@ inline real sinh(real x) { return __builtin_sinh(x); }
 const real PI = 3.14159265358979323846;
 inline real rad(real t) { return t/180*PI; }
 inline real deg(real t) { return t/PI*180; }
+inline real exp2(real x) { return __builtin_exp2(x); }
+inline real log2(real x) { return __builtin_log2(x); }
 inline real exp10(real x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline real log10(real x) { return __builtin_log10(x); }

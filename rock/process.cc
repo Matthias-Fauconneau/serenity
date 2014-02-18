@@ -232,7 +232,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
             if(!endsWith(file,".data"_) && !endsWith(file,".meta"_)) { removeFileOrFolder(file, storageFolder); continue; }
             string fileID = file.slice(0,file.size-".data"_.size);
             dataFile=fileID+".data"_;
-            if(!existsFile(fileID+".meta"_, storageFolder)) { warn("Missing metadata", fileID); removeFileOrFolder(dataFile,storageFolder); continue; }
+            if(!existsFile(fileID+".meta"_, storageFolder)) { log("Missing metadata", fileID); removeFileOrFolder(dataFile,storageFolder); continue; }
             if(!existsFile(fileID+".data"_, storageFolder)) { removeFileOrFolder(file,storageFolder); continue; }
             if(!endsWith(file,"meta"_)) continue; // Skips load when listing data file to load once listing the metadata file
             id=readFile(fileID+".meta"_, storageFolder);

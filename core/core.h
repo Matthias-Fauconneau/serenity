@@ -4,6 +4,7 @@
 // Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
+#define notrace __attribute((no_instrument_function))
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
@@ -70,15 +71,15 @@ generic struct initializer_list {
     const T* data; size_t len;
     constexpr initializer_list(const T* data, size_t len) : data(data), len(len) {}
     constexpr const T* begin() const { return data; }
+    constexpr const T* end() const { return data+len; }
     constexpr size_t size() const { return len; }
 };
 }
-//#include <initializer_list>
 generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;
 inline constexpr string operator "" _(const char* data, size_t size);
-#ifndef __GXX_EXPERIMENTAL_CXX0X__
+#if !__GXX_EXPERIMENTAL_CXX0X__
 #define _ // QtCreator doesn't parse custom literal operators (""_)
 #endif
 
@@ -88,9 +89,6 @@ void log_(const string& message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
 template<> void log(const string& message);
-/// Logs a message to standard output and signals all threads to log their stack trace
-template<Type... Args> void warn(const Args&... args);
-template<> void warn(const string& message);
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const string& message) __attribute((noreturn));
@@ -176,8 +174,7 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
     return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end); \
 }
 
-// Integer operations
-/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
-inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+// ref<Arithmetic> operations
+generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
+generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
+generic T sum(const ref<T>& a) { T sum=0; for(const T& e: a) sum += e; return sum; }
