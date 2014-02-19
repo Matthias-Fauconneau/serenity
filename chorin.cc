@@ -430,12 +430,12 @@ struct FieldView : Widget {
 };
 
 struct Application {
-    const uint N = 128;
+    const uint N = 64;
     Chorin chorin {N};
     Vector2D flow;
-    //Vector2D textures[2] = {{N,N,nan},{N,N,nan}};
+    Vector2D textures[2] = {{N,N,nan},{N,N,nan}};
     uint t = 0;
-    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, flow, flow, flow};
+    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, /*textures[0], textures[1],*/ flow, flow, flow};
     Window window {&fieldView, int2(1024,1024), str(N)};
 
     map<real, real> ux_y;
@@ -444,7 +444,7 @@ struct Application {
     void step() {
         chorin.solve();
         flow = chorin.flow();
-        //for(Vector2D& texture: textures) texture = chorin.advect(texture);
+        for(Vector2D& texture: textures) texture = chorin.advect(texture);
         {real x = 1./2; for(real y: ux_y.keys) fieldView.labels[vec2(x,y)] = str(y, ux_y[y], chorin.velocity(x,y).x); }
     }
 
@@ -464,20 +464,19 @@ struct Application {
         ux_y = parseProfile("profile_u_fct_y_cavity.csv"_, "u_Re1000"_);
         for(real& y: ux_y.keys) y=1-y; // Top-left origin
         uy_x = parseProfile("profile_v_fct_x_cavity.csv"_, "v_Re1000"_);
-        //for(uint i: range(chorin.Nx)) for(uint j: range(chorin.Ny)) textures[0](i,j) = chorin.X[i], textures[1](i,j) = chorin.Y[j];
+        for(uint i: range(chorin.Nx)) for(uint j: range(chorin.Ny)) textures[0](i,j) = chorin.X[i], textures[1](i,j) = chorin.Y[j];
         step();
-        if(arguments().contains("video"_)) {
-            writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());
-        } else {
-            window.background = Window::None;
-            window.actions[Escape] = []{exit();};
-            window.frameSent
-                    = [this]{
-                step();
-                window.render();
-                window.setTitle(str(t++,'/', chorin.Re * chorin.N));
-            };
-            window.show();
-        }
+        window.background = Window::None;
+        window.actions[Escape] = []{exit();};
+        window.frameSent
+                = [this]{
+            step();
+            window.render();
+            window.setTitle(str(t++));
+        };
+        window.actions[Return] = [this]{
+            writeFile("Re="_+str(chorin.Re)+",t="_+str(t)+".png"_,encodePNG(renderToImage(fieldView, window.size)), home());
+        };
+        window.show();
     }
 } app;
