@@ -212,9 +212,9 @@ struct Helmholtz {
                 bord(true,  Nx-1, Nx-1-1, j);
             }
             // Homogeneous Neumann needs Dirichlet corners to set the constant
-            b(0,       0)    = 0;
-            b(Nx-1,    0)    = 0;
-            b(0,    Ny-1)    = 0;
+            b(0,       0) = 0;
+            b(Nx-1,    0) = 0;
+            b(0,    Ny-1) = 0;
             b(Nx-1, Ny-1) = 0;
         }
         //log(M, b);
@@ -227,9 +227,9 @@ struct Chorin {
     const uint N, Nx=N, Ny=N;
     const real U = 1; // Boundary speed
     const real L = 1; // Domain size
-    const real nu = 1; // Fluid viscosity
+    const real nu = 1e-3; // Fluid viscosity
     const real Re = U*L/nu; // Reynolds
-    const real dt = 1./64; //L/(max(Nx,Ny)*U); // Time step
+    const real dt = L/(max(Nx,Ny)*U); // Time step
     Grid grid {Nx,Ny, Grid::Regular};
     const Vector& X = grid.X; const Vector& Y = grid.Y;
     Chorin(uint N):N(N) {}
@@ -253,20 +253,14 @@ struct Chorin {
         auto bord = [&](bool transpose, int i0, int i1, int i) {
             const auto& x = !transpose ? X : Y;
             const auto& y = !transpose ? Y : X;
-            real xm = (x[i-1]+x[i])/2;
-            real xp = (x[i]+x[i+1])/2;
-            real y12 = (y[i0]+y[i1])/2;
             auto ux = [&](int i, int j) -> real { return !transpose ? Ux(i,j) : Ux(j,i); };
             auto uy = [&](int i, int j) -> real { return !transpose ? Uy(i,j) : Uy(j,i); };
             real dxUx = (ux(i+1,i0) - ux(i-1,i0)) / (x[i+1] - x[i-1]);
             real dyUy = (uy(i,  i1) - uy(i,  i0)) / (y[i1 ] - y[i0 ]);
-            (!transpose ? S(i,i0) : S(i0,i)) = (xp-xm) * (y12-y[i0]) * (dxUx + dyUy);
+            (!transpose ? S(i,i0) : S(i0,i)) = -(dxUx + dyUy); // -Lu = S
         };
         for(uint i: range(1,Nx-1)) {
             bord(false, 0,    1,      i);
-            real xm = (X[i-1]+X[i])/2;
-            real xp = (X[i]+X[i+1])/2;
-            S(i, 0) += (xp-xm) * U / ((xp-xm) * (Y[1] - Y[0]));
             bord(false, Ny-1, Ny-1-1, i);
         }
         for(uint j: range(1,Ny-1)) {
@@ -276,7 +270,7 @@ struct Chorin {
         for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
             real dxUx = ( Ux(i+1,j) - Ux(i-1,j) ) / ( X[i+1] - X[i-1] );
             real dyUy = ( Uy(i,j+1) - Uy(i,j-1) ) / ( Y[j+1] - Y[j-1] );
-            S(i,j) = dxUx + dyUy;
+            S(i,j) = - (dxUx + dyUy); // -Lu = S
         }
         // Neumann conditions are set with Helmholtz::boundaryValues
         return correction.solve(S);
@@ -317,6 +311,7 @@ struct FieldView : Widget {
         vec2 size (target.size());
         const real uMax = max(maxabs(Ux), maxabs(Uy));
 #if 1
+        vec3 cMin (-uMax, -uMax, min(P));
         vec3 cMax (uMax, uMax, max(P));
         for(uint i: range(X.size-1)) for(uint j: range(Y.size-1)) {
             int y0 = round(size.y*Y[j]), y1 = round(size.y*Y[j+1]);
@@ -328,16 +323,17 @@ struct FieldView : Widget {
                 for(uint componentIndex : range(3)) {
                     const Vector2D& C = *(ref<const Vector2D*>{&Ux,&Uy,&P}[componentIndex]);
                     c[componentIndex] = (1-v) * ((1-u) * C(i,j  ) + u * C(i+1,j  )) +
-                            v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
+                                         v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
                 }
-                int3 linear = max(int3(0),int3(round(float(0xFFF)*((vec3(1)+c/cMax)/float(2)))));
+                c = c[2], cMin=cMin[2], cMax=cMax[2]; // DEBUG
+                int3 linear = max(int3(0),int3(round(float(0xFFF)*(c-cMin)/(cMax-cMin))));
                 assert_(linear >= int3(0) && linear < int3(0x1000), linear, c, cMax);
                 extern uint8 sRGB_forward[0x1000];
                 target(x,y) = byte4(sRGB_forward[linear.x], sRGB_forward[linear.y], sRGB_forward[linear.z], 0xFF);
             }
         }
 #endif
-#if 0
+#if 1
         real minX=inf; for(uint i: range(1,X.size)) minX=min(minX, X[i]-X[i-1]);
         real minY=inf; for(uint i: range(1,Y.size)) minY=min(minY, Y[i]-Y[i-1]);
         const float minCellSize = min(size.x*minX, size.y*minY);
@@ -355,13 +351,12 @@ struct FieldView : Widget {
 };
 
 struct Application {
-    const uint N = 16;
+    const uint N = 64;
     Chorin chorin {N};
     uint t = 0;
     FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, chorin.P};
     Window window {&fieldView, int2(1024,1024), str(N)};
     Application() {
-        log("");
         chorin.solve();
         if(arguments().contains("video"_)) {
             writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());
