@@ -131,7 +131,7 @@ template<Type K, Type V> String str(const map<K,V>& m) {
     String s; s<<'{';
     for(uint i: range(m.size())) {
         s<<str(m.keys[i]);
-        if(m.values[i]) s<<": "_<<str(m.values[i]);
+        s<<": "_<<str(m.values[i]);
         if(i<m.size()-1) s<<", "_;
     }
     s<<'}'; return s;

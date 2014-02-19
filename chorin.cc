@@ -2,6 +2,7 @@
 #include "algebra.h"
 #include "math.h"
 #include "time.h"
+#include "data.h"
 #include "window.h"
 #include "interface.h"
 #include "graphics.h"
@@ -83,10 +84,20 @@ struct Grid {
         if(type==Regular) {
             for(uint i: range(Nx)) X[i] = (real) i / (Nx-1);
             for(uint j: range(Ny)) Y[j] = (real) j / (Ny-1);
-        } else { // Refines near boundaries
-            for(uint i: range(Nx)) X[i] = 1 - cos(i*PI/(Nx-1));
-            for(uint j: range(Ny)) Y[j] = 1 - cos(j*PI/(Ny-1));
+        } else { // Refines near boundaries //FIXME: max/min ratio parameter
+            for(uint i: range(Nx)) X[i] = (1 - cos(PI*i/(Nx-1))) / 2;
+            for(uint j: range(Ny)) Y[j] = (1 - cos(PI*j/(Ny-1))) / 2;
+            log("1/(min dx)",1/(X[1]-X[0]), "1/(max dx)",1/(X[Nx/2+1]-X[Nx/2]));
         }
+    }
+
+    real sample(const Vector2D& U, real x, real y) {
+        uint i=0; while(i+1<X.size && X[i+1] <= x) i++;
+        uint j=0; while(j+1<Y.size && Y[j+1] <= y) j++;
+        real u = i+1<X.size ? (x-X[i])/(X[i+1]-X[i]) : 0;
+        real v = j+1<Y.size ? (y-Y[j])/(Y[j+1]-Y[j]) : 0;
+        return (1-v) * ((1-u) * U(i,j  ) + (u? u * U(i+1,j  ) :0)) +
+               (v? v * ((1-u) * U(i,j+1) + (u? u * U(i+1,j+1) :0)) :0);
     }
 };
 
@@ -165,7 +176,7 @@ struct Helmholtz {
         }
 #if DEBUG
         // Asserts valid system
-        for(auto& column: M.columns) for(auto& element: column) assert(isNumber(element.value), H, '\n', X, '\n', Y, '\n', M);
+        for(auto& column: M.columns) for(auto& element: column) assert(isNumber(element.value), element.value, H, '\n', X, '\n', Y, '\n', M);
 #endif
         // LU Factorization
         A = M;
@@ -230,7 +241,7 @@ struct Chorin {
     const real nu = 1e-3; // Fluid viscosity
     const real Re = U*L/nu; // Reynolds
     const real dt = L/(max(Nx,Ny)*U); // Time step
-    Grid grid {Nx,Ny, Grid::Regular};
+    Grid grid {Nx,Ny, Grid::Irregular};
     const Vector& X = grid.X; const Vector& Y = grid.Y;
     Chorin(uint N):N(N) {}
 
@@ -247,7 +258,7 @@ struct Chorin {
         return prediction.solve(S);
     }
 
-    Helmholtz correction {0, grid, Helmholtz::Neumann, 0}; // Poisson with homogeneous Neumann conditions (Dp=0)
+    Helmholtz poisson {0, grid, Helmholtz::Neumann, 0}; // Poisson with homogeneous Neumann conditions (Dp=0)
     Vector2D correct(const Vector2D& Ux, const Vector2D& Uy) {
         Vector2D S(Nx, Ny, nan);
         auto bord = [&](bool transpose, int i0, int i1, int i) {
@@ -273,7 +284,7 @@ struct Chorin {
             S(i,j) = - (dxUx + dyUy); // -Lu = S
         }
         // Neumann conditions are set with Helmholtz::boundaryValues
-        return correction.solve(S);
+        return poisson.solve(S);
     }
 
     // Current state vector
@@ -298,21 +309,77 @@ struct Chorin {
         ux = move(nux), uy = move(nuy);
 #endif
     }
-};
 
+    // Solves for flow function L phi =  - dy u + dx v
+    Vector2D flow(const Vector2D& Ux, const Vector2D& Uy) {
+        Vector2D S(Nx, Ny, nan);
+        auto bord = [&](bool transpose, int i0, int i1, int i) {
+            const auto& x = !transpose ? X : Y;
+            const auto& y = !transpose ? Y : X;
+            auto ux = [&](int i, int j) -> real { return !transpose ? Ux(i,j) : Ux(j,i); };
+            auto uy = [&](int i, int j) -> real { return !transpose ? Uy(i,j) : Uy(j,i); };
+            real dxUy = (uy(i+1,i0) - uy(i-1,i0)) / (x[i+1] - x[i-1]);
+            real dyUx = (ux(i,  i1) - ux(i,  i0)) / (y[i1 ] - y[i0 ]);
+            (!transpose ? S(i,i0) : S(i0,i)) = -(dxUy - dyUx); // -Lu = S
+        };
+        for(uint i: range(1,Nx-1)) {
+            bord(false, 0,    1,      i);
+            bord(false, Ny-1, Ny-1-1, i);
+        }
+        for(uint j: range(1,Ny-1)) {
+            bord(true,  0,    1,      j);
+            bord(true,  Nx-1, Nx-1-1, j);
+        }
+        for(uint i: range(1,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real dxUy = ( Uy(i+1,j) - Uy(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyUx = ( Ux(i,j+1) - Ux(i,j-1) ) / ( Y[j+1] - Y[j-1] );
+            S(i,j) = - (dxUy - dyUx); // -Lu = S
+        }
+        // Neumann conditions are set with Helmholtz::boundaryValues
+        return poisson.solve(S);
+    }
+    // Returns flow field for current state
+    Vector2D flow() { return flow(ux, uy); }
+
+    Vector2D advect(const Vector2D& U, const Vector2D& Ux, const Vector2D& Uy) {
+        Vector2D S(Nx, Ny, nan);
+        for(uint i: range(0,Nx-1)) for(uint j: range(1,Ny-1)) {
+            real u = U(i,j), ux = Ux(i,j), uy = Uy(i,j);
+            real dxU = ( U(i+1,j) - U(i-1,j) ) / ( X[i+1] - X[i-1] );
+            real dyU = ( U(i,j+1) - U(i,j-1) ) / ( Y[j+1] - Y[j-1] );
+            S(i,j) = u - dt*(ux*dxU + uy*dyU);
+        }
+        for(uint i: range(Nx)) {
+            S(i, 0   ) = U(i,    0);
+            S(i, Ny-1) = U(i, Ny-1);
+        }
+        for(uint j: range(Ny)) {
+            S(0, j)    = U(0,    j);
+            S(Nx-1, j) = U(Nx-1, j);
+        }
+        return S;
+    }
+    // Advects U with the current velocity field
+    Vector2D advect(const Vector2D& U) { return advect(U, ux, uy); }
+
+    // Samples velocity field at (x, y)
+    vec2 velocity(real x, real y) { return vec2(grid.sample(ux, x, y), grid.sample(uy, x, y)); }
+};
 
 /// Displays scalar fields as blue,green,red components
 struct FieldView : Widget {
     const Vector& X; const Vector& Y;
-    const Vector2D& Ux; const Vector2D& Uy; const Vector2D& P;
-    FieldView(const Grid& grid, const Vector2D& Ux, const Vector2D& Uy, const Vector2D& P):X(grid.X),Y(grid.Y),Ux(Ux),Uy(Uy),P(P){}
+    const Vector2D& Ux; const Vector2D& Uy;
+    const Vector2D& B; const Vector2D& G; const Vector2D& R;
+    map<vec2, Text> labels;
+    FieldView(const Grid& grid, const Vector2D& Ux, const Vector2D& Uy, const Vector2D& B, const Vector2D& G, const Vector2D& R)
+        : X(grid.X), Y(grid.Y), Ux(Ux), Uy(Uy), B(B), G(G), R(R) {}
     int2 sizeHint() { return int2(720/2); }
     void render(const Image& target) override {\
         vec2 size (target.size());
-        const real uMax = max(maxabs(Ux), maxabs(Uy));
 #if 1
-        vec3 cMin (-uMax, -uMax, min(P));
-        vec3 cMax (uMax, uMax, max(P));
+        vec3 cMin (min(B), min(G), min(R));
+        vec3 cMax (max(B), max(G), max(R));
         for(uint i: range(X.size-1)) for(uint j: range(Y.size-1)) {
             int y0 = round(size.y*Y[j]), y1 = round(size.y*Y[j+1]);
             int x0 = round(size.x*X[i]), x1 = round(size.x*X[i+1]);
@@ -321,11 +388,10 @@ struct FieldView : Widget {
                 real v = ((y+1./2)/size.y-Y[j])/(Y[j+1]-Y[j]);
                 vec3 c = 0;
                 for(uint componentIndex : range(3)) {
-                    const Vector2D& C = *(ref<const Vector2D*>{&Ux,&Uy,&P}[componentIndex]);
+                    const Vector2D& C = *ref<const Vector2D*>{&B,&G,&R}[componentIndex];
                     c[componentIndex] = (1-v) * ((1-u) * C(i,j  ) + u * C(i+1,j  )) +
                                          v    * ((1-u) * C(i,j+1) + u * C(i+1,j+1));
                 }
-                c = c[2], cMin=cMin[2], cMax=cMax[2]; // DEBUG
                 int3 linear = max(int3(0),int3(round(float(0xFFF)*(c-cMin)/(cMax-cMin))));
                 assert_(linear >= int3(0) && linear < int3(0x1000), linear, c, cMax);
                 extern uint8 sRGB_forward[0x1000];
@@ -333,40 +399,81 @@ struct FieldView : Widget {
             }
         }
 #endif
-#if 1
-        real minX=inf; for(uint i: range(1,X.size)) minX=min(minX, X[i]-X[i-1]);
+#if 0
+        const real uMax = max(maxabs(Ux), maxabs(Uy));
+        const uint S = 4; // Downsampling factor
+        /*real minX=inf; for(uint i: range(1,X.size)) minX=min(minX, X[i]-X[i-1]);
         real minY=inf; for(uint i: range(1,Y.size)) minY=min(minY, Y[i]-Y[i-1]);
-        const float minCellSize = min(size.x*minX, size.y*minY);
+        const float cellSize = S*min(size.x*minX, size.y*minY);*/
+        const float cellSize = S*min(size.x/X.size, size.y/Y.size);
         //for(real x: X) line(target, int2(size*vec2(x,0)), int2(size*vec2(x,1)));
         //for(real y: Y) line(target, int2(size*vec2(0,y)), int2(size*vec2(1,y)));
-        for(uint i: range(X.size)) for(uint j: range(Y.size)) {
-            vec2 center = vec2(target.size())*vec2(X[i], Y[j]);
-            vec2 scale = minCellSize * vec2(Ux(i,j),Uy(i,j) / float(uMax));
+        for(uint x: range(X.size/S)) for(uint y: range(Y.size/S)) {
+            uint N = 0; vec2 P = 0, U = 0;
+            for(uint i: range(x*S,(x+1)*S)) for(uint j: range(y*S,(y+1)*S)) { //FIXME: weight by cell sizes
+                N++;
+                P += vec2(X[i], Y[j]);
+                U += vec2(Ux(i,j),Uy(i,j));
+            }
+            P /= N, U /= N;
+            vec2 center = vec2(target.size()) * P;
+            vec2 scale = cellSize * U / float(uMax);
             line(target, center + scale*vec2(0,    0   ), center + scale*vec2(1,1));
             line(target, center + scale*vec2(1./2, 1   ), center + scale*vec2(1,1));
             line(target, center + scale*vec2(1,    1./2), center + scale*vec2(1,1));
         }
 #endif
+#if 1
+        for(auto label: labels) label.value.render(target, int2(round(size*label.key)));
+#endif
     }
 };
 
 struct Application {
-    const uint N = 64;
+    const uint N = 128;
     Chorin chorin {N};
+    Vector2D flow;
+    //Vector2D textures[2] = {{N,N,nan},{N,N,nan}};
     uint t = 0;
-    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, chorin.P};
+    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, flow, flow, flow};
     Window window {&fieldView, int2(1024,1024), str(N)};
-    Application() {
+
+    map<real, real> ux_y;
+    map<real, real> uy_x;
+
+    void step() {
         chorin.solve();
+        flow = chorin.flow();
+        //for(Vector2D& texture: textures) texture = chorin.advect(texture);
+        {real x = 1./2; for(real y: ux_y.keys) fieldView.labels[vec2(x,y)] = str(y, ux_y[y], chorin.velocity(x,y).x); }
+    }
+
+    map<real, real> parseProfile(const string& name, const string& columnName) {
+        map<real, real> profile;
+        TextData s = readFile(name,home());
+        auto keys = split(s.line(), ';');
+        uint column = keys.indexOf(columnName);
+        while(s) {
+            auto values = split(s.line(),';');
+            profile.insert(fromDecimal(values[0]), fromDecimal(values[column]));
+        }
+        return profile;
+    }
+
+    Application() {
+        ux_y = parseProfile("profile_u_fct_y_cavity.csv"_, "u_Re1000"_);
+        for(real& y: ux_y.keys) y=1-y; // Top-left origin
+        uy_x = parseProfile("profile_v_fct_x_cavity.csv"_, "v_Re1000"_);
+        //for(uint i: range(chorin.Nx)) for(uint j: range(chorin.Ny)) textures[0](i,j) = chorin.X[i], textures[1](i,j) = chorin.Y[j];
+        step();
         if(arguments().contains("video"_)) {
             writeFile("Helmholtz.png"_,encodePNG(renderToImage(fieldView, window.size)), home());
         } else {
             window.background = Window::None;
             window.actions[Escape] = []{exit();};
             window.frameSent
-            //window.actions[Key(' ')]
                     = [this]{
-                chorin.solve();
+                step();
                 window.render();
                 window.setTitle(str(t++,'/', chorin.Re * chorin.N));
             };
