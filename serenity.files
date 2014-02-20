@@ -5,7 +5,7 @@ build.sh
 build.cc
 algebra.h
 algebra.cc
-helmholtz.cc
+chorin.cc
 player.cc
 test.cc
 
