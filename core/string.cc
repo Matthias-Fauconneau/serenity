@@ -99,7 +99,7 @@ bool isDecimal(const string& number) {
     if(*i == '-' || *i == '+') ++i;
     for(bool gotDot=false, gotE=false;i!=number.end();++i) {
         /**/  if(!gotDot && *i == '.') gotDot=true;
-        else if(!gotE && *i == 'e') gotE=true;
+        else if(!gotE && (*i == 'e' || *i == 'E')) gotE=true;
         else if(*i<'0' || *i>'9') return false;
     }
     return true;
@@ -114,7 +114,7 @@ double fromDecimal(const string& number) {
     double significand=0, decimal=0, exponent=0;
     for(bool gotDot=false, gotE=false;i!=number.end();) {
         if(!gotDot && *i == '.') { ++i; gotDot=true; continue; }
-        if(!gotE && *i == 'e') { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
+        if(!gotE && (*i == 'e' || *i=='E')) { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
         if(*i<'0' || *i>'9') { error("fromDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
         int n = *i-'0';
         if(gotE) {

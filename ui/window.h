@@ -70,7 +70,7 @@ struct Window : Device {
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
-    enum Background { None, Black, White, Oxygen } background = Oxygen;
+    enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
 
     /// Renders window background to \a target
     void renderBackground(Image& target);

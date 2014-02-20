@@ -187,7 +187,7 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
     argv[args0.size]=0;
 
     array<string> env0;
-    static String environ = File("proc/self/environ"_).readUpTo(4096);
+    static String environ = File("/proc/self/environ"_).readUpTo(4096);
     for(TextData s(environ);s;) env0 << s.until('\0');
 
     const char* envp[env0.size+1];
@@ -208,7 +208,7 @@ int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
 string getenv(const string& name, string value) {
-    static String environ = File("proc/self/environ"_).readUpTo(8192);
+    static String environ = File("/proc/self/environ"_).readUpTo(8192);
     for(TextData s(environ);s;) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
@@ -218,7 +218,7 @@ string getenv(const string& name, string value) {
 }
 
 array<string> arguments() {
-    static String cmdline = File("proc/self/cmdline"_).readUpTo(4096);
+    static String cmdline = File("/proc/self/cmdline"_).readUpTo(4096);
     assert(cmdline.size<4096);
     return split(section(cmdline,0,1,-1),0);
 }
