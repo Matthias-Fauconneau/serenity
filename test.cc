@@ -10,6 +10,7 @@ const real vMax = 3e-2; // Valeur maximum du signal (pour saturer)
 const bool slice = false; // Restreint le traitement a [tMin, tMax]
 const real tMin = 21e-6; // Pour couper le debut (us)
 const real tMax = 35e-6; // Pour couper la fin (us)
+const bool graph = false; // Affiche un graphe de la première image (sinon correlogramme)
 
 struct Correlogram : Widget {
     array<array<real>> dataSets;
@@ -41,7 +42,6 @@ struct Correlogram : Widget {
 
 struct Test {
     Folder folder = replace(arguments()[0],"~"_,homePath());
-    const bool graph = false;
     Plot plot;
     Correlogram correlogram;
     Window window {graph ? (Widget*)&plot : &correlogram, int2(768), arguments()[0]};

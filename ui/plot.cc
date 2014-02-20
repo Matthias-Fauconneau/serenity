@@ -25,7 +25,7 @@ void Plot::render(const Image& target) {
                 max=::max(max,p);
             }
         }
-        for(uint i: range(2)) if(!log[i]) { if(min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
+        for(uint i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
     }
     assert(min.x < max.x && min.y < max.y, min, max);
 
