@@ -106,6 +106,10 @@ UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
 }
 
 Vector UMFPACK::solve(const Vector& b) {
+#if 1
+        // Asserts valid constant
+        for(real e: b) assert_(isNumber(e));
+#endif
     Vector x(m);
     umfpack_di_solve(UMFPACK_A, columnPointers.data, rowIndices.data, values.data, (real*)x.data, b.data, numeric.pointer, 0, 0);
     return x;
