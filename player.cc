@@ -136,8 +136,7 @@ struct Player {
         window.actions[Power] = {&window, &Window::toggleDisplay};
         window.longActions[Power] = [this](){ window.setDisplay(false); execute("/sbin/poweroff"_); };
 #else
-        window.actions[Play] = {this, &Player::togglePlay};
-        window.longActions[Play] = {this, &Player::next};
+        window.globalAction(Play) = {this, &Player::togglePlay};
 #endif
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};
@@ -149,8 +148,8 @@ struct Player {
 
         if(arguments()) setFolder(arguments().first());
         else {
-            for(string device: Folder("dev"_).list(Drives)) if(mount(device)) break;
-            if(!folder) setFolder("Music"_);
+            for(string device: Folder("/dev"_).list(Drives)) if(mount(device)) break;
+            if(!folder) setFolder("/Music"_);
         }
 
         window.show();
@@ -288,7 +287,7 @@ struct Player {
         if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         backingStore.render(window);
     }
-    String cmdline = File("proc/cmdline"_).readUpTo(256);
+    String cmdline = File("/proc/cmdline"_).readUpTo(256);
     void deviceCreated(string name) { mount(name); }
     bool mount(string name) {
         TextData s (name);
@@ -307,7 +306,7 @@ struct Player {
         if(!uDrive.get<uint>("org.freedesktop.UDisks2.Drive.Removable"_)) return false; // Only acts on removable drives
 #endif
         String target;
-        String mounts = File("proc/self/mounts"_).readUpTo(2048);
+        String mounts = File("/proc/self/mounts"_).readUpTo(2048);
         for(TextData s(mounts); s; s.line()) if(s.match(device)) { s.skip(" "_); target = String(s.until(' ')); break; }
         bool wasPlaying = playButton.enabled;
         if(wasPlaying) setPlaying(false);
@@ -348,7 +347,7 @@ struct Player {
         ejectButton.hidden = true;
         bool wasPlaying = playButton.enabled;
         if(wasPlaying) setPlaying(false);
-        setFolder(arguments() ? arguments().first() : "Music"_);
+        setFolder(arguments() ? arguments().first() : "/Music"_);
 #if !DBUS
         String target = "/media/"_+device;
         umount2(strz(target), 0);

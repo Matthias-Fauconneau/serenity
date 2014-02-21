@@ -79,6 +79,10 @@ template<Type K, Type V> struct map {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         return values.insertAt(keys.insertSorted(key),value);
     }
+    template<Type KK> V& insertSorted(const KK& key, V&& value) {
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        return values.insertAt(keys.insertSorted(key),move(value));
+    }
     template<Type KK> V& insertSortedMulti(const KK& key, const V& value) {
         return values.insertAt(keys.insertSorted(key),value);
     }
