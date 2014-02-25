@@ -156,7 +156,7 @@ struct Build {
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+join(flags,"-"_)+"/"_+subfolder, root(), true);
         compileModule( find(target+".cc"_) );
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));
-        String binary = tmp+join(flags,"-"_)+"/"_+target+"."_+join(flags,"-"_);
+        String binary = tmp+join(flags,"-"_)+"/"_+target; //+(flags?"."_:""_)+join(flags,"-"_);
         if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);

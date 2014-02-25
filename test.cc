@@ -147,7 +147,7 @@ struct Experiment {
                 }
 
                 const uint N = frameSize;
-                if(!existsFile(name, cache) || File(name, cache).size() != N) {
+                if((!existsFile(name, cache) || File(name, cache).size() != N*sizeof(float)) && File(name, folder).size() != N*sizeof(float)) {
                     Map file(name, folder);
                     TextData s (file);
                     buffer<real> frame(N);
@@ -173,7 +173,7 @@ struct Experiment {
                     mref<float> output = mcast<float,byte>(map);
                     for(uint i: range(N)) output[i] = scale*frame[i];
                 }
-                Map map (name, cache);
+                Map map (name, existsFile(name, cache) ? cache : folder);
                 ref<float> input = cast<float,byte>(map);
                 buffer<float> frame(N);
                 LowPass filter ( lowPassFrequency );
