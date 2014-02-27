@@ -161,7 +161,7 @@ string TextData::whileDecimal() {
     if(!match("∞"_)) for(bool gotDot=false, gotE=false;available(1);) {
         byte c=peek();
         /**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
-        else if(c=='e') { if(gotE) break; gotE=true; advance(1); if(peek()=='-') advance(1); }
+        else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
         else if(c>='0'&&c<='9') advance(1);
         else break;
     }

@@ -52,7 +52,7 @@ bool Date::summerTime() const { //FIXME: always European Summer Time
 int Date::localTimeOffset(int64 utc) const {
     assert(year>=0);
     // Parses /etc/localtime to get local time zone offset (without DST)
-    static buffer<byte> localtime = readFile("etc/localtime");
+    static buffer<byte> localtime = readFile("/etc/localtime");
     BinaryData s (localtime, true);
     s.advance(20);
     uint unused gmtCount = s.read(), unused stdCount = s.read(), unused leapCount = s.read(), transitionCount = s.read(), infoCount = s.read(), nameCount = s.read();

@@ -25,11 +25,11 @@ template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 // Poll
 void Poll::registerPoll() {
     Locker lock(thread.lock);
-    if(thread.contains(*this)) {
-        thread.unregistered.remove(*this);
+    if(thread.contains(this)) {
+        thread.unregistered.remove(this);
         return;
     }
-    assert_(!thread.unregistered.contains(*this));
+    assert_(!thread.unregistered.contains(this));
     thread << this;
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
@@ -136,7 +136,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
 #if __x86_64
-    setExceptions(Invalid | /*Denormal (FIXME: exp) |*/ DivisionByZero | Overflow /*| Underflow (FIXME: exp)*/);
+    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
 #endif
 }
 
@@ -187,7 +187,7 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
     argv[args0.size]=0;
 
     array<string> env0;
-    static String environ = File("proc/self/environ"_).readUpTo(4096);
+    static String environ = File("/proc/self/environ"_).readUpTo(4096);
     for(TextData s(environ);s;) env0 << s.until('\0');
 
     const char* envp[env0.size+1];
@@ -208,17 +208,16 @@ int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
 string getenv(const string& name, string value) {
-    static String environ = File("proc/self/environ"_).readUpTo(8192);
+    static String environ = File("/proc/self/environ"_).readUpTo(8192);
     for(TextData s(environ);s;) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
     }
-    if(!value) error("Undefined environment variable"_, name);
     return value;
 }
 
 array<string> arguments() {
-    static String cmdline = File("proc/self/cmdline"_).readUpTo(4096);
+    static String cmdline = File("/proc/self/cmdline"_).readUpTo(4096);
     assert(cmdline.size<4096);
     return split(section(cmdline,0,1,-1),0);
 }

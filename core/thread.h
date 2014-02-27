@@ -91,7 +91,7 @@ struct Poll : pollfd {
     virtual void event() =0;
     enum { IDLE=64 };
 };
-inline bool operator==(const Poll* a, const Poll& b) { return a->fd==b.fd; }
+//inline bool operator==(const Poll* a, const Poll& b) { return a->fd==b.fd; }
 
 /// Pollable semaphore
 struct EventFD : Stream {

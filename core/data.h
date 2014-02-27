@@ -17,6 +17,12 @@ template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
 
+/// Reinterpret cast a mutable reference to another type
+template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    return mref<T>((T*)o.data,o.size*sizeof(O)/sizeof(T));
+}
+
 /// Reinterpret cast a buffer to another type
 template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
     buffer<T> buffer;

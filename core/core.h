@@ -114,6 +114,7 @@ struct range {
     };
     iterator begin() const { return {start}; }
     iterator end() const { return {stop}; }
+    explicit operator bool() const { return start < stop; }
     int start, stop;
 };
 

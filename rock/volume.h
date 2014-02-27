@@ -1,8 +1,6 @@
 #pragma once
 #include "image.h"
 
-static_assert(sizeof(size_t)==8,"");
-
 generic struct VolumeT;
 typedef VolumeT<uint8> Volume8;
 typedef VolumeT<uint16> Volume16;
