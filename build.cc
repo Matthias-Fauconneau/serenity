@@ -11,14 +11,20 @@ struct Node {
 bool operator ==(const Node& a, const Node& b) { return a.name==b.name; }
 bool operator ==(const Node& a, const string& b) { return a.name==b; }
 
+// Locates an executable
+String which(string name) {
+    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFile(name, folder)) return folder+"/"_+name;
+    return {};
+}
+
 struct Build {
     string target = arguments().size>=1?arguments()[0]:"test"_;
     array<String> defines;
     array<string> flags;
     const Folder& folder = currentWorkingDirectory();
     const string tmp = "/var/tmp/"_;
-    string CXX = existsFile("/usr/bin/clang++"_) ? "/usr/bin/clang++"_ : existsFile("/usr/bin/g++-4.8"_) ? "/usr/bin/g++-4.8"_ : "/usr/bin/g++"_;
-    string LD = "/usr/bin/ld"_;
+    String CXX = which("clang++"_) ?: which("g++-4.8"_) ?: which("g++"_);
+    String LD = which("ld"_);
     bool needLink = false;
     array<unique<Node>> modules;
     array<String> libraries;
@@ -146,10 +152,10 @@ struct Build {
     Build() {
         string install;
         for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-');
-        if(flags.contains("profile"_)) CXX="/usr/bin/g++"_; //FIXME: Clang does not support instrument-functions-exclude-file-list
+        if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
         if(flags.contains("arm"_)) {
-            CXX = "/buildroot/output/host/usr/bin/arm-buildroot-linux-uclibcgnueabihf-g++"_;
-            LD = "/buildroot/output/host/usr/bin/arm-buildroot-linux-uclibcgnueabihf-ld"_;
+            CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_);
+            LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
         }
 
         Folder(tmp+join(flags,"-"_), root(), true);
