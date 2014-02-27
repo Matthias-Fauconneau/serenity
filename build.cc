@@ -65,10 +65,22 @@ struct Build {
         string id = s.identifier("_"_);
         bool value = false;
         if(id=="1"_) value=true;
-        else if(id=="__arm__"_ && flags.contains("arm"_)) value=true;
+        else if(id=="__arm__"_ && arch=="arm"_) value=true;
+        else if(id=="__i386"_ && arch=="atom"_) value=true;
         else if(id=="__x86_64"_ && arch=="x64"_) value=true;
         else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
         else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
+        else if(arch=="native"_) {
+#if __i386
+            if(id=="__i386"_) value = true;
+#endif
+#if __x86_64
+            if(id=="__x86_64"_) value = true;
+#endif
+#if __arm__
+            if(id=="__arm__"_) value = true;
+#endif
+        }
         if(value != condition) {
             for(; !s.match("#endif"_); s.line()) tryParseConditions(s);
         }
@@ -164,7 +176,7 @@ struct Build {
         if(!CXX) CXX=which("g++"_);
         string install;
         if(arguments().size>1) { for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-'); }
-        string arch = flags.contains("arm"_) ? "arm"_ : flags.contains("atom"_) ? "atom"_ : "x64"_;
+        arch = flags.contains("arm"_) ? "arm"_ : flags.contains("atom"_) ? "atom"_ : "native"_;
         if(arch=="arm"_) CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_), LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
         //else if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
 

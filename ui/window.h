@@ -93,7 +93,7 @@ struct Window : Device {
     map<uint, unique<Timer>> longActionTimers;
 #if X11
     /// Properly destroys X GC and Window
-    ~Window();
+    virtual ~Window();
 
     /// Event handler
     void event();

@@ -123,7 +123,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     if(sig==SIGTERM) log("Terminated");
     pthread_exit((void*)-1);
 }
-#if __x86_64
+#if __x86_64 || __i386
 // Configures floating-point exceptions
 void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 #endif
@@ -135,7 +135,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
-#if __x86_64
+#if __x86_64 || __i386
     setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
 #endif
 }

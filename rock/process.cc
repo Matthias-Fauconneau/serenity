@@ -373,7 +373,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                     if(timestamp < minimum) minimum=timestamp, oldestMeta=move(id), oldestData=move(dataFile);
                 }
                 if(!oldestMeta) {
-                    if(outputSize<min<int64>(16l<<30,capacity(storageFolder))) {
+                    if(outputSize<capacity(storageFolder)) {
                         log("Dependency chain:", depChain);
                         log("Results:");
                         for(const shared<Result>& result: results) {
