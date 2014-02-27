@@ -2,15 +2,25 @@
 #include "map.h"
 #include "time.h"
 #include "trace.h"
+inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 inline float round(float x) { return __builtin_roundf(x); }
+template<Type K, Type V, size_t N> struct map {
+    K keys[N];
+    V values[N];
+    size_t size;
+    V& operator[](K key) {
+        for(uint i: range(size)) if(keys[i] )
+    }
+};
 
+inline
 /// Traces functions to time their execution times and displays statistics on exit
 struct Profile {
     struct Frame { void* function; uint64 time; uint64 tsc; };
     Frame stack[32] = {Frame{0,0,rdtsc()}};
     Frame* top = stack;
     struct Function { uint time=0,count=0; bool operator<(const Function& o)const{return time<o.time;} };
-    map<void*, Function> profile;
+    map<void*, Function, 0x1000> profile;
 
     ~Profile() {
         map<Function, void*> sort;
@@ -32,7 +42,8 @@ struct Profile {
     void exit() {
         uint64 tsc = rdtsc();
         top->time += tsc-top->tsc;
-        Function& f = profile[top->function];
+        for(Function& f: profile) {
+            profile[top->function];
         f.count++;
         f.time += top->time;
         top--;

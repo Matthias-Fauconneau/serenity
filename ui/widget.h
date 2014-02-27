@@ -70,4 +70,5 @@ enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Tex
 void setCursor(Rect region, Cursor cursor);
 
 /// Configures global display context to render to an image
+// In this module because the definition depends on display and widget
 Image renderToImage(Widget& widget, int2 size);

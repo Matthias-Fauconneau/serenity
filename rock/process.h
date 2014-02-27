@@ -82,7 +82,7 @@ struct ResultFile : Result {
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : Process {
-     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("var/tmp"_),true) { specialParameters += "storageFolder"_; specialParameters += "indirect"_; }
+     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("/var/tmp"_),true) { specialParameters += "storageFolder"_; specialParameters += "indirect"_; }
     ~PersistentProcess();
 
      /// Maps intermediate results from file system

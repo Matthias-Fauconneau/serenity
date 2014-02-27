@@ -92,7 +92,7 @@ constexpr string events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"Button
                                 "CreateNotify"_,"DestroyNotify"_,"UnmapNotify"_,"MapNotify"_,"MapRequest"_,"ReparentNotify"_,"ConfigureNotify"_,
                                 "ConfigureRequest"_,"GravityNotify"_,"ResizeRequest"_,"CirculateNotify"_,"CirculateRequest"_,"PropertyNotify"_,
                                 "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_,"MappingNotify"_};
-constexpr string errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
+constexpr string xErrors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
                                   "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
 
 namespace Shm {
@@ -107,8 +107,8 @@ struct GetImage { int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=
 struct GetImageReply { uint8 depth; uint16 seq; uint length; uint visual, size, pad[4]; } fixed(GetImageReply);
 enum { Completion };
 constexpr string requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_,"GetImage"_};
-constexpr string errors[] = {"BadSeg"_};
-constexpr int errorCount = sizeof(errors)/sizeof(*errors);
+constexpr string xErrors[] = {"BadSeg"_};
+constexpr int errorCount = sizeof(errors)/sizeof(*xErrors);
 }
 
 namespace XRender {
@@ -128,8 +128,8 @@ struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
 struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
 struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
 constexpr string requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPictIndexValues"_, "QueryFilters"_, "CreatePicture"_, "ChangePicture"_, "SetPictureClipRectangles"_, "SetPictureTransform"_, "SetPictureFilter"_, "FreePicture"_, "Composite"_};
-constexpr string errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
-constexpr int errorCount = sizeof(errors)/sizeof(*errors);
+constexpr string xErrors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
+constexpr int errorCount = sizeof(errors)/sizeof(*xErrors);
 }
 
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width

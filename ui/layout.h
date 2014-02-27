@@ -119,3 +119,56 @@ struct WidgetGrid : GridLayout, Widgets {
 template<class T> struct UniformGrid : GridLayout,  Array<T> {
     UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
 };
+
+/// Implements selection of active widget/item for a \a Layout
+struct Selection : virtual Layout {
+    /// User changed active index.
+    function<void(uint index)> activeChanged;
+    /// Active index
+    uint index = -1;
+    /// Set active index and emit activeChanged
+    void setActive(uint index);
+    /// User clicked on an item.
+    signal<uint /*index*/> itemPressed;
+
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
+};
+
+/// Displays a selection using a blue highlight
+struct HighlightSelection : virtual Selection {
+    /// Whether to always display the highlight or only when focused
+    bool always=false;
+    void render(const Image& target) override;
+};
+
+/// Displays a selection using horizontal tabs
+struct TabSelection : virtual Selection {
+    void render(const Image& target) override;
+};
+
+/// Array with Selection
+template<class T> struct ArraySelection : Array<T>, virtual Selection {
+    ArraySelection(){}
+    ArraySelection(array<T>&& items) : Array<T>(move(items)){}
+    /// Return active item (last selection)
+    T& active() { return array<T>::at(this->index); }
+    /// Clears array and resets index
+    void clear() { Array<T>::clear(); index=-1; }
+};
+
+/// Vertical layout of selectable items. \sa ArraySelection
+template<class T> struct List : Vertical, ArraySelection<T>, HighlightSelection {
+    List(){}
+    List(array<T>&& items) : ArraySelection<T>(move(items)){}
+};
+/// Horizontal layout of selectable items. \sa ArraySelection
+template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
+    Bar(){}
+    Bar(array<T>&& items) : ArraySelection<T>(move(items)){}
+};
+/// GridSelection is a Grid layout of selectable items. \sa ArraySelection
+template<class T> struct GridSelection : GridLayout, ArraySelection<T>, HighlightSelection {
+    GridSelection(int width=0, int height=0, int margin=0) : GridLayout(width,height,margin){}
+    GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
+};

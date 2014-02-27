@@ -3,12 +3,6 @@
 #include "text.h"
 #include "graphics.h"
 
-// Provides weak symbols in case an application links interface only to render to image
-__attribute((weak)) void setFocus(Widget*) { error("Window support not linked"_); }
- __attribute((weak)) bool hasFocus(Widget*) { error("Window support not linked"_); }
- __attribute((weak)) void setDrag(Widget*) { error("Window support not linked"_); }
- __attribute((weak)) String getSelection(bool) { error("Window support not linked"_); }
-__attribute((weak)) void setCursor(Rect, Cursor) { error("Window support not linked"_); }
 
 // ScrollArea
 void ScrollArea::render(const Image& target) {
@@ -101,7 +95,7 @@ bool Selection::keyPress(Key key, Modifiers modifiers) {
 }
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
-    index=i; //if(index!=uint(-1)) if(activeChanged) activeChanged(index);
+    index=i; if(index!=uint(-1)) if(activeChanged) activeChanged(index);
 }
 
 // HighlightSelection

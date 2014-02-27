@@ -5,10 +5,23 @@
 #include "function.h"
 #include "map.h"
 #include "time.h"
+#if X11
 union XEvent;
+#else
+struct PollDevice : Device, Poll {
+    PollDevice() {}
+    PollDevice(const string &path) : Device(path,root(),Flags(ReadWrite|NonBlocking)), Poll(Device::fd){}
+    void event() override { if(eventReceived) eventReceived(); }
+    function<void()> eventReceived;
+};
+#endif
 
 /// Interfaces \a widget as a window on an X11 display server
+#if X11
 struct Window : Socket, Poll {
+#else
+struct Window : Device {
+#endif
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image());
@@ -28,6 +41,11 @@ struct Window : Socket, Poll {
 
     /// Sends a partial update
     void putImage(int2 position, int2 size);
+
+    /// Sets display state
+    void setDisplay(bool displayState);
+    /// Toggles display state
+    inline void toggleDisplay() { setDisplay(!displayState); }
 
     /// Display size
     int2 displaySize=0;
@@ -52,15 +70,13 @@ struct Window : Socket, Poll {
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
-    enum Background { None, Black, White, Oxygen } background = Oxygen;
+    enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
 
     /// Renders window background to \a target
     void renderBackground(Image& target);
     /// Gets current text selection
     /// \note The selection owner might lock this process if it fails to notify
     String getSelection(bool clipboard=false);
-    /// Sets window cursor if cursor is inside region
-    void setCursor(Rect region, Cursor cursor);
 
     void keyPress(Key key, Modifiers modifiers);
     void keyRelease(Key key, Modifiers modifiers);
@@ -75,9 +91,9 @@ struct Window : Socket, Poll {
     bool displayState = true;
     /// Pending long actions
     map<uint, unique<Timer>> longActionTimers;
-
+#if X11
     /// Properly destroys X GC and Window
-    virtual ~Window();
+    ~Window();
 
     /// Event handler
     void event();
@@ -103,13 +119,8 @@ struct Window : Socket, Poll {
     void setGeometry(int2 position, int2 size);
     /// Sets window type to \a type
     void setType(const string& type);
-
-    /// Returns cursor icon for \a cursor
-    const Image& cursorIcon(Cursor cursor);
-    /// Returns cursor hotspot for \a cursor
-    int2 cursorHotspot(Cursor cursor);
     /// Sets window cursor
-    void setCursor(Cursor cursor, uint window=0);
+    void setCursor(Cursor cursor);
 
     /// Returns a snapshot of the root window
     Image getSnapshot();
@@ -158,4 +169,23 @@ struct Window : Socket, Poll {
 
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);
+#else
+    /// Renders immediately current widget to framebuffer
+    void render();
+    /// Touchscreen event handler
+    void touchscreenEvent();
+    /// Buttons event handler
+    void buttonEvent();
+    /// Keyboard event handler
+    void keyboardEvent();
+
+    Device vt {"/dev/console"_};
+    uint previousVT = 1;
+    uint stride=0, bytesPerPixel=0;
+    Map framebuffer;
+    PollDevice touchscreen {"/dev/input/event0"_};
+    PollDevice buttons {"/dev/input/event4"_};
+    PollDevice keyboard;
+    int previousPressState = 0, pressState = 0;
+#endif
 };
