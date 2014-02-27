@@ -213,7 +213,6 @@ string getenv(const string& name, string value) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
     }
-    if(!value) error("Undefined environment variable"_, name);
     return value;
 }
 

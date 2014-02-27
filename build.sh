@@ -1,5 +1,5 @@
 #!/bin/sh
-D=/var/tmp/build
+D=/var/tmp/$(basename $(pwd))
 mkdir -p $D
 test -z "$CC" -a -e `which clang++` && CC=`which clang++`
 test -z "$CC" -a -e `which g++-4.8` && CC=`which g++-4.8`
