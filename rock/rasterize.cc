@@ -190,22 +190,22 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
                             uint tileIndex = dz*tileSide*tileSide + dy*tileSide + dx;
                             uint16& R = tileR[tileIndex];
                             uint16& A =  targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]]; // Might be faster to use an untiled buffer here
-                            int3 voxel = int3(dx,dy,dz);
-                            int3& p = tileP[tileIndex];
+                            int3 voxelPosition = int3(dx,dy,dz);
+                            int3& center = tileP[tileIndex];
                             if(attribute==target.maximum) {
-                                if(!p || sq(voxel-tileBall)<sq(voxel-p)) { // Records closest throat
+                                if(!center || sq(voxelPosition-tileBall)<sq(voxelPosition-center)) { // Records closest throat
                                     R = sqRadius;
                                     A = attribute;
-                                    p = tileBall;
+                                    center = tileBall;
                                 }
                             }
                             else if(sqRadius > R) {
 #if 0
-                                if(p) { // Resolve pore throats collision by taking relative nearest (flat section border)
+                                if(center) { // Resolve pore throats collision by taking relative nearest (flat section border)
                                     //uint16 throatR = R;
-                                    uint throatD = sq(voxel-p);
+                                    uint throatD = sq(voxelPosition-center);
                                     //uint16 poreR = sqRadius;
-                                    uint poreD = sq(voxel-tileBall);
+                                    uint poreD = sq(voxelPosition-tileBall);
                                     if(poreD < throatD) { // Pore is nearest
                                         R = sqRadius;
                                         A = attribute;
