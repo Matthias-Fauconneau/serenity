@@ -20,13 +20,13 @@ String which(string name) {
 }
 
 struct Build {
-    const Folder& folder = currentWorkingDirectory();
-    const String base = String(section(folder.name(),'/',-2,-1));
+    const Folder folder {"."_};
+    const String base { section(folder.name(),'/',-2,-1) };
     const String target = arguments().size>=1 ? String(arguments()[0]) : copy(base);
     array<String> defines;
     array<string> flags;
-    const String tmp = "/var/tmp/"_+base;
-    String CXX {which(getenv("CC"_)) ?: which("clang++"_) ?: which("g++-4.8"_) ?: which("g++"_)};
+    const String tmp {"/var/tmp/"_+base};
+    String CXX;
     String LD = which("ld"_);
     bool needLink = false;
     array<unique<Node>> modules;
@@ -153,6 +153,11 @@ struct Build {
     void fail() { log("Build failed"_); exit(-1); exit_thread(-1); }
 
     Build() {
+        CXX = which(getenv("CC"_));
+        if(!CXX) CXX=which("clang++"_);
+        if(!CXX) CXX=which("g++4.8"_);
+        if(!CXX) CXX=which("g++"_);
+
         string install;
         for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-');
         if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
