@@ -164,18 +164,18 @@ struct Rock : PersistentProcess, Poll {
 
      void parseSpecialArguments(const ref<string>& specialArguments) override {
          targetPaths.clear();
-        for(const string& argument: specialArguments) {
-            /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
-            else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) targetPaths << argument;
-            else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
-                if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments);
-                else assert_(File(argument,cwd).size()>=64*64*64);
-                arguments.insert(String("path"_), String(argument));
-            }
-            else if(!argument.contains('=')) targetPaths << argument;
-            else error("Invalid argument", argument);
-        }
-    }
+         for(const string& argument: specialArguments) {
+             /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
+             else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) targetPaths << argument;
+             else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
+                 if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments);
+                 else assert_(File(argument,cwd).size()>=64*64*64);
+                 arguments.insert(String("path"_), String(argument));
+             }
+             else if(!argument.contains('=')) targetPaths << argument;
+             else error("Invalid argument", argument);
+         }
+     }
 
      bool view(const string& metadata, const string& name, const buffer<byte>& data) {
          for(array<unique<View>>& views: viewers.values) for(unique<View>& view: views) if( view->view(metadata, name, data) ) return true; // Tries to append to existing view first

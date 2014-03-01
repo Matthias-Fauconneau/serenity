@@ -25,6 +25,7 @@ bool intersects(const mat4& a, const mat4& b) { return overlaps(a, b) && overlap
 struct Synthetic : VolumeOperation {
     const int3 size = 128;
 
+    string parameters() const { return "cylinder"_; }
     uint outputSampleSize(uint index) override { if(index) return 0; /*Extra outputs*/ return sizeof(uint8); }
     size_t outputSize(const Dict&, const ref<const Result*>&, uint index) override {
         if(index) return 0; //Extra outputs
