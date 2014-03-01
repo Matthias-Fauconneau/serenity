@@ -21,9 +21,8 @@ String which(string name) {
 
 struct Build {
     const Folder folder {"."_};
-    const String base { section(folder.name(),'/',-2,-1) };
-    const String tmp {"/var/tmp/"_+base};
-    const String target = arguments().size>=1 ? String(arguments()[0]) : copy(base);
+    String tmp;
+    String target;
     array<String> defines;
     array<string> flags;
     string arch;
@@ -174,14 +173,27 @@ struct Build {
         if(!CXX) CXX=which("clang++"_);
         if(!CXX) CXX=which("g++4.8"_);
         if(!CXX) CXX=which("g++"_);
+
         string install;
-        if(arguments().size>1) { for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-'); }
+        for(string arg: arguments()) {
+            if(startsWith(arg,"/"_)) install=arg;
+            else if(find(arg+".cc"_)) {
+                if(target) log("Multiple targets unsupported, building last target:",arg);
+                target = String(arg);
+            } else flags << split(arg,'-');
+        }
+
         arch = flags.contains("arm"_) ? "arm"_ : flags.contains("atom"_) ? "atom"_ : "native"_;
         if(arch=="arm"_) CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_), LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
         //else if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
+        const String base (section(folder.name(),'/',-2,-1));
+        if(!target) target = copy(base);
+
+        tmp = "/var/tmp/"_+base+"."_+section(CXX,'/',-2,-1);
+        Folder(tmp, root(), true);
+        Folder(tmp+"/"_+join(flags,"-"_), root(), true);
 
         // Compiles
-        Folder(tmp+"/"_+join(flags,"-"_), root(), true);
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));
         compileModule( find(target+".cc"_) );
 
