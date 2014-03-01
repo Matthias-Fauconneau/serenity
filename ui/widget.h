@@ -68,3 +68,7 @@ String getSelection(bool clipboard=false);
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
 /// Sets cursor to be shown when mouse is in the given rectangle
 void setCursor(Rect region, Cursor cursor);
+
+/// Configures global display context to render to an image
+// In this module because the definition depends on display and widget
+Image renderToImage(Widget& widget, int2 size);

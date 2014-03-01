@@ -20,13 +20,13 @@ String which(string name) {
 }
 
 struct Build {
-    const Folder& folder = currentWorkingDirectory();
-    const String base = String(section(folder.name(),'/',-2,-1));
+    const Folder folder {"."_};
+    const String base { section(folder.name(),'/',-2,-1) };
     const String target = arguments().size>=1 ? String(arguments()[0]) : copy(base);
     array<String> defines;
     array<string> flags;
-    const String tmp = "/var/tmp/"_+base;
-    String CXX {which(getenv("CC"_)) ?: which("clang++"_) ?: which("g++-4.8"_) ?: which("g++"_)};
+    const String tmp {"/var/tmp/"_+base};
+    String CXX;
     String LD = which("ld"_);
     bool needLink = false;
     array<unique<Node>> modules;
@@ -134,8 +134,10 @@ struct Build {
 
             if(!flags.contains("release"_)) args << String("-g"_);
             if(!flags.contains("debug"_)) args << String("-O3"_);
-            if(flags.contains("profile"_)) args << String("-finstrument-functions"_)
-                                                << String("-finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile"_);
+            if(flags.contains("profile"_)) {
+                args << String("-finstrument-functions"_);
+                if(!endsWith(CXX,"clang++"_)) args << String("-finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile"_);
+            }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             log(target);
@@ -144,7 +146,7 @@ struct Build {
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
-            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -o"_);
+            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -Wno-overloaded-virtual -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }
@@ -153,9 +155,14 @@ struct Build {
     void fail() { log("Build failed"_); exit(-1); exit_thread(-1); }
 
     Build() {
+        CXX = which(getenv("CC"_));
+        if(!CXX) CXX=which("clang++"_);
+        if(!CXX) CXX=which("g++4.8"_);
+        if(!CXX) CXX=which("g++"_);
+
         string install;
-        for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-');
-        if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
+        if(arguments().size>1) { for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-'); }
+        //if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
         if(flags.contains("arm"_)) {
             CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_);
             LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
@@ -163,8 +170,8 @@ struct Build {
 
         Folder(tmp+"/"_+join(flags,"-"_), root(), true);
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+"/"_+join(flags,"-"_)+"/"_+subfolder, root(), true);
-        compileModule( find(target+".cc"_) );
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));
+        compileModule( find(target+".cc"_) );
         String binary = tmp+"/"_+join(flags,"-"_)+"/"_+target; //+(flags?"."_:""_)+join(flags,"-"_);
         if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<copy(binary);

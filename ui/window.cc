@@ -6,14 +6,13 @@ void setFocus(Widget* widget) { assert(window); window->focus=widget; }
 bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
-void setCursor(Rect region, Cursor cursor) { assert(window); return window->setCursor(region,cursor); }
+void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(window->cursorPosition)) window->cursor=cursor; }
 
 #if X11
 #include "file.h"
 #include "data.h"
 #include "time.h"
 #include "image.h"
-#include "png.h"
 #include "x.h"
 #include <sys/socket.h>
 #include <sys/shm.h>
@@ -343,32 +342,31 @@ String Window::getSelection(bool clipboard) {
     return getProperty<byte>(id,"UTF8_STRING"_);
 }
 
-// Cursor
+#if CURSOR
+#include "png.h"
 ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move) ICON(text)
-const Image& Window::cursorIcon(Cursor cursor) {
+void Window::setCursor(Cursor cursor) {
     static const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon, textIcon };
-    return icons[(uint)cursor]();
-}
-int2 Window::cursorHotspot(Cursor cursor) {
+    const Image& icon = icons[uint(cursor)]();
     static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15), int2(4,9) };
-    return hotspots[(uint)cursor];
-}
-void Window::setCursor(Cursor cursor, uint window) {
-    const Image& image = cursorIcon(cursor); int2 hotspot = cursorHotspot(cursor);
-    Image premultiplied(image.width,image.height);
-    for(uint y: range(image.height)) for(uint x: range(image.width)) {
-        byte4 p=image(x,y); premultiplied(x,y)=byte4(p.b*p.a/255,p.g*p.a/255,p.r*p.a/255,p.a);
+    int2 hotspot = hotspots[uint(cursor)];
+    Image premultiplied(icon.width,icon.height);
+    for(uint y: range(icon.height)) for(uint x: range(icon.width)) {
+        byte4 p=icon(x,y); premultiplied(x,y)=byte4(p.b*p.a/255,p.g*p.a/255,p.r*p.a/255,p.a);
     }
-    {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=image.width, r.h=image.height; send(raw(r));}
-    {::PutImage r; r.drawable=id+Pixmap; r.context=id+GContext; r.w=image.width, r.h=image.height; r.size+=r.w*r.h;
+    {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=icon.width, r.h=icon.height; send(raw(r));}
+    {::PutImage r; r.drawable=id+Pixmap; r.context=id+GContext; r.w=icon.width, r.h=icon.height; r.size+=r.w*r.h;
         send(String(raw(r)+ref<byte>(premultiplied)));}
     {XRender::CreatePicture r; r.picture=id+Picture; r.drawable=id+Pixmap; r.format=format; send(raw(r));}
     {XRender::CreateCursor r; r.cursor=id+XCursor; r.picture=id+Picture; r.x=hotspot.x; r.y=hotspot.y; send(raw(r));}
-    {SetWindowCursor r; r.window=window?:id; r.cursor=id+XCursor; send(raw(r));}
+    {SetWindowCursor r; r.window=id; r.cursor=id+XCursor; send(raw(r));}
     {FreeCursor r; r.cursor=id+XCursor; send(raw(r));}
     {FreePicture r; r.picture=id+Picture; send(raw(r));}
     {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
 }
+#else
+void Window::setCursor(Cursor) {}
+#endif
 
 // Snapshot
 Image Window::getSnapshot() {
@@ -564,8 +562,6 @@ void Window::renderBackground(Image& target) {
         for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
     }
 }
-
-void Window::setCursor(Rect region, Cursor cursor) { if(region.contains(cursorPosition)) this->cursor=cursor; }
 
 void Window::keyPress(Key key, Modifiers modifiers) {
     if(focus && focus->keyPress(key, modifiers)) render(); // Normal keyPress event

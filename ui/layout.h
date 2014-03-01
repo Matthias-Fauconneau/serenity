@@ -95,7 +95,6 @@ template<class T> struct HList : Horizontal, Array<T> {
 };
 /// Vertical layout of homogenous items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
-    //VList(const mref<T>& widgets):Array<T>(move(widgets)){}
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
@@ -118,8 +117,7 @@ struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(const ref<Widget*>& widgets):Widgets(widgets){}
 };
 template<class T> struct UniformGrid : GridLayout,  Array<T> {
-    UniformGrid(const mref<T>& items) : Array<T>(items) {}
-    //UniformGrid(int width=0, int height=0, int margin=0):Grid(width,height,margin){}
+    UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
 };
 
 /// Implements selection of active widget/item for a \a Layout

@@ -53,6 +53,13 @@ void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha)
             min(0xFF,target_sRGB.a+int(round(0xFF*alpha)))); // Additive alpha accumulation
 }
 
+static void fill(uint* target, uint stride, uint w, uint h, uint value) {
+    for(uint y=0; y<h; y++) {
+        for(uint x=0; x<w; x++) target[x] = value;
+        target += stride;
+    }
+}
+
 void fill(const Image& target, Rect rect, vec3 color, float alpha) {
     rect = rect & Rect(target.size());
     color = clip(vec3(0), color, vec3(1));
@@ -63,9 +70,7 @@ void fill(const Image& target, Rect rect, vec3 color, float alpha) {
     } else { // Solid fill
         int3 linear = int3(round(float(0xFFF)*color));
         byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
-        for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
-            target(x,y) = sRGB;
-        }
+        fill((uint*)target.data+rect.min.y*target.stride+rect.min.x, target.stride, rect.max.x-rect.min.x, rect.max.y-rect.min.y, (uint&)sRGB);
     }
 }
 
