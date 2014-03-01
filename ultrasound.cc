@@ -27,7 +27,7 @@ bool enableWindowNormalization = true; // Active la normalisation local ['n' pou
 const uint windowNormalizationWindowHalfWidth =  frameSize/16; // Demi largeur des fenetres de normalization local
 
 // Graph view
-bool graph = true; // Affiche un graphe de la première image (sinon profil de mouvement) ['g' pour commuter]
+bool graph = false; // Affiche un graphe de la première image (sinon profil de mouvement) ['g' pour commuter]
 const uint graphStart = 0; // Index of the first frame to display as graphs
 const uint graphFrameCount = 1; // Number of frames to display as graphs
 
@@ -46,11 +46,12 @@ const real stopThreshold = 0.99; // Seuil de correlation pour stopper l'analyse 
 // Motion view
 const real vMax = 0; // Valeur de contraste pour l'affichage des signaux (0: automatique)
 
-bool showMotionVectors = true; // Affiche les vecteurs de déplacement ('v' pour commuter)
+bool showMotionVectors = true; // Affiche les vecteurs de déplacement ('m' pour commuter)
 const uint motionVectorSampleCount = 32; // Nombre de vecteurs de déplacement à estimer (régulièrement espacés)
 const uint motionVectorWindowHalfWidth = (frameSize/motionVectorSampleCount)/2/2; // Demi largeur des fenetres de correlation
 const uint motionVectorMaximumMotion = (frameSize/motionVectorSampleCount)/2/2; // Déplacement maximum (limite l'évaluation exhaustive)
 const real motionVectorCorrelationThreshold = 0; // Correlation minimum pour ajouter un vecteur de déplacement
+bool showVelocityProfile = true; // Affiche le profil de vitesse ('v' pour commuter)
 
 // Biquad filter
 struct Biquad {
@@ -240,7 +241,7 @@ struct MotionView : Widget {
         int2 size = target.size();
         uint profileWidth = 128;
         uint N = frames.size;
-        uint width = (size.x - profileWidth) / N * N;
+        uint width = showVelocityProfile ? (size.x - profileWidth) / N * N : size.x;
         profileWidth = size.x - width;
         float vMin=inf, vMax=-inf;
         for(const ref<float>& frame: frames) for(float v: frame) vMin=min(vMin, v), vMax=max(vMax, v);
@@ -269,27 +270,30 @@ struct MotionView : Widget {
                 }
             }
         }
-        array<uint> origins = apply(motionVectors.first(), [](const MotionVector& mv) { return mv.t0; }); // Assumes constant vector origins
-        buffer<real> motions (origins.size); motions.clear(0);
-        for(uint T: range(motionVectors.size)) {
-            for(uint i: range(motionVectors[T].size)) {
-                const MotionVector& mv = motionVectors[T][i];
-                motions[i] += int(mv.t1 - mv.t0);
+        if(showVelocityProfile) {
+            fill(target, Rect(int2(width, 0),size), white);
+            array<uint> origins = apply(motionVectors.first(), [](const MotionVector& mv) { return mv.t0; }); // Assumes constant vector origins
+            buffer<real> motions (origins.size); motions.clear(0);
+            for(uint T: range(motionVectors.size)) {
+                for(uint i: range(motionVectors[T].size)) {
+                    const MotionVector& mv = motionVectors[T][i];
+                    motions[i] += int(mv.t1 - mv.t0);
+                }
             }
-        }
-        for(real& v: motions) v /= motionVectors.size;
-        real mvMax = max(motions);
-        const uint n = frames.first().size;
-        for(uint i: range(origins.size-1)) {
-            uint t0 = origins[i+0];
-            uint t1 = origins[i+1];
-            real v0 = motions[i+0];
-            real v1 = motions[i+1];
-            real x0 = profileWidth * v0 / mvMax;
-            real x1 = profileWidth * v1 / mvMax;
-            real y0 =  size.y-1- size.y * t0 / n;
-            real y1 =  size.y-1- size.y * t1 / n;
-            line(target, int2(width+x0, y0), int2(width+x1, y1), blue);
+            for(real& v: motions) v /= motionVectors.size;
+            real mvMax = max(motions);
+            const uint n = frames.first().size;
+            for(uint i: range(origins.size-1)) {
+                uint t0 = origins[i+0];
+                uint t1 = origins[i+1];
+                real v0 = motions[i+0];
+                real v1 = motions[i+1];
+                real x0 = profileWidth * v0 / mvMax;
+                real x1 = profileWidth * v1 / mvMax;
+                real y0 =  size.y-1- size.y * t0 / n;
+                real y1 =  size.y-1- size.y * t1 / n;
+                line(target, int2(width+x0, y0), int2(width+x1, y1), blue);
+            }
         }
     }
 };
@@ -308,10 +312,13 @@ struct Application {
         window.actions['g'] = [this]{ graph=!graph; update(); };
         window.actions['l'] = [this]{ enableLowPass=!enableLowPass; reset(); update(); };
         window.actions['n'] = [this]{ enableWindowNormalization = !enableWindowNormalization; reset(); update(); };
-        window.actions['v'] = [this]{ showMotionVectors=!showMotionVectors; window.render(); };
+        window.actions['m'] = [this]{ showMotionVectors=!showMotionVectors; window.render(); };
+        window.actions['v'] = [this]{ showVelocityProfile=!showVelocityProfile; window.render(); };
         window.actions[RightArrow] = [this]{ currentExperiment = (currentExperiment+1)%experiments.size; update(); };
         window.actions[LeftArrow] = [this]{ currentExperiment = (currentExperiment+experiments.size-1)%experiments.size; update(); };
-        window.background = Window::White;
+#if PROFILE
+        window.frameSent = [this] { if(++currentExperiment < experiments.size) update(); else exit(); };
+#endif
 
         experiments = listExperiments( rootFolder  );
         if(!experiments) error("No valid experiment in", rootFolder.name());
@@ -355,6 +362,7 @@ struct Application {
     void viewExperiment(Experiment& experiment) {
         experiment.process();
         if(graph) {
+            window.background = Window::White;
             window.widget = &plot;
             plot.dataSets.clear();
             int64 T0 = experiment.files.keys.first(); // First timestamp
@@ -367,6 +375,7 @@ struct Application {
                     graph.insert(i, frame[i]);
             }
         } else {
+            window.background = Window::NoBackground;
             window.widget = &motionView;
             range r = experiment.analyzedRange;
             motionView.frames = experiment.frames.slice(r.start, r.stop-r.start);

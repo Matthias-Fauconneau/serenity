@@ -77,8 +77,6 @@ struct Window : Device {
     /// Gets current text selection
     /// \note The selection owner might lock this process if it fails to notify
     String getSelection(bool clipboard=false);
-    /// Sets window cursor if cursor is inside region
-    void setCursor(Rect region, Cursor cursor);
 
     void keyPress(Key key, Modifiers modifiers);
     void keyRelease(Key key, Modifiers modifiers);
@@ -95,7 +93,7 @@ struct Window : Device {
     map<uint, unique<Timer>> longActionTimers;
 #if X11
     /// Properly destroys X GC and Window
-    ~Window();
+    virtual ~Window();
 
     /// Event handler
     void event();
@@ -121,13 +119,8 @@ struct Window : Device {
     void setGeometry(int2 position, int2 size);
     /// Sets window type to \a type
     void setType(const string& type);
-
-    /// Returns cursor icon for \a cursor
-    const Image& cursorIcon(Cursor cursor);
-    /// Returns cursor hotspot for \a cursor
-    int2 cursorHotspot(Cursor cursor);
     /// Sets window cursor
-    void setCursor(Cursor cursor, uint window=0);
+    void setCursor(Cursor cursor);
 
     /// Returns a snapshot of the root window
     Image getSnapshot();

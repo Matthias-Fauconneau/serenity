@@ -179,3 +179,46 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
 generic T sum(const ref<T>& a) { T sum=0; for(const T& e: a) sum += e; return sum; }
+
+/// Initializes memory using a constructor (placement new)
+inline void* operator new(size_t, void* p) throw() { return p; }
+
+/// Unmanaged fixed-size mutable reference to an array of elements
+generic struct mref : ref<T> {
+    /// Default constructs an empty reference
+    mref(){}
+    /// References \a size elements from \a data pointer
+    mref(T* data, size_t size) : ref<T>(data,size) {}
+    /// Converts an std::initializer_list to mref
+    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
+    /// Converts a static array to ref
+    template<size_t N> mref(T (&a)[N]): mref(a,N) {}
+
+    explicit operator bool() const { if(size) assert(data); return size; }
+    explicit operator T*() const { return (T*)data; }
+    T* begin() const { return (T*)data; }
+    T* end() const { return (T*)data+size; }
+    T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
+    T& operator [](size_t i) const { return at(i); }
+    T& first() const { return at(0); }
+    T& last() const { return at(size-1); }
+
+    /// Slices a reference to elements from \a pos to \a pos + \a size
+    mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
+    /// Slices a reference to elements from to the end of the reference
+    mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+
+    /// Initializes reference using the same constructor for all elements
+    template<Type... Args> void clear(Args... args) const { for(size_t i: range(size)) new (&at(i)) T(args...); }
+
+    using ref<T>::data;
+    using ref<T>::size;
+};
+/// Returns mutable reference to memory used by \a t
+generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }
+
+// Memory operations
+/// Initializes \a dst from \a src using move constructor
+generic void move(const mref<T>& dst, const mref<T>& src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(move(src[i])); }
+/// Initializes \a dst from \a src using copy constructor
+generic void copy(const mref<T>& dst, const ref<T> src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(copy(src[i])); }
