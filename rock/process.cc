@@ -17,7 +17,7 @@ array<string> Rule::parameters() const {
 array<string> Process::configure(const ref<string>& allArguments, const string& definition) {
     array<string> targets;
     Dict defaultArguments; // Process-specified default arguments
-    array<string> parameters; /// All valid parameters accepted by defined rules (used by conditions or operations)
+    assert_(!parameters);
 
     for(TextData s(definition); s;) { //FIXME: use parser generator
         s.skip();
