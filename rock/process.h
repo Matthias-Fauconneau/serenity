@@ -1,6 +1,7 @@
 #pragma once
 #include "operation.h"
 #include "file.h"
+#include "thread.h"
 
 /// Defines a production rule to evaluate outputs using an operation and any associated arguments
 struct Rule {
@@ -82,7 +83,9 @@ struct ResultFile : Result {
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : Process {
-     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("/var/tmp"_),true) { specialParameters += "storageFolder"_; specialParameters += "indirect"_; }
+     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("/var/tmp/"_+section(selfPath(),'/',-2,-1), root(), true),true) {
+         specialParameters += "storageFolder"_; specialParameters += "indirect"_;
+     }
     ~PersistentProcess();
 
      /// Maps intermediate results from file system

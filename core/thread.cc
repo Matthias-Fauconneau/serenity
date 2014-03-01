@@ -216,6 +216,11 @@ string getenv(const string& name, string value) {
     return value;
 }
 
+string selfPath() {
+    static String cmdline = File("/proc/self/cmdline"_).readUpTo(4096);
+    return section(cmdline,0);
+}
+
 array<string> arguments() {
     static String cmdline = File("/proc/self/cmdline"_).readUpTo(4096);
     assert(cmdline.size<4096);

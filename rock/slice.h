@@ -4,7 +4,7 @@
 #include "widget.h"
 
 /// Displays volume as slices
-struct SliceView : View, Widget {
+struct SliceView : View {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override;
     string name() override;
     bool mouseEvent(int2 cursor, int2 size, Event unused event, Button button) override;

@@ -174,6 +174,9 @@ int64 wait(int pid);
 /// Returns value for environment variable \a name
 string getenv(const string& name, string value=""_);
 
+/// Returns path used to execute this process
+string selfPath();
+
 /// Returns command line arguments
 array<string> arguments();
 

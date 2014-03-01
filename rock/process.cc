@@ -241,7 +241,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
             dataFile=copy(file);
         }
         TextData s (id); string name = s.whileNot('{');
-        if(id==name || !&ruleForOutput(name, arguments)) { removeFileOrFolder(dataFile,storageFolder); continue; } // Removes invalid data
+        if(id==name || !&ruleForOutput(name, arguments)) { /*removeFileOrFolder(dataFile,storageFolder);*/ continue; } // Removes invalid data
         Dict arguments = parseDict(s); s.mayInteger(); s.skip("."_); string metadata = s.untilEnd();
         shared<ResultFile> result = nullptr;
         if(!existsFolder(dataFile, storageFolder)) {
