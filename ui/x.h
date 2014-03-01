@@ -40,7 +40,7 @@ struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red
 
 struct CreateWindow { int8 req=1, depth=32; uint16 size=15; uint id=0,parent=0; uint16 x,y,width,height,border=0,class_=1; uint visual;
                       uint mask=BackgroundPixmap|BorderPixel|BitGravity|WinGravity|OverrideRedirect|EventMask|ColorMap;
-                                        uint backgroundPixmap=0,borderPixel=0, bitGravity=10, winGravity=10, overrideRedirect, eventMask, colormap; };
+                                        uint backgroundPixmap=0,borderPixel=0, bitGravity=10, winGravity=10, overrideRedirect=0, eventMask, colormap; };
 struct SetWindowEventMask { int8 req=2; uint16 size=4; uint window, mask=EventMask; uint eventMask; };
 struct SetWindowCursor { int8 req=2, pad=0; uint16 size=4; uint window, mask=CursorMask; uint cursor; };
 struct GetWindowAttributes { int8 req=3; uint16 size=2; uint window; };
