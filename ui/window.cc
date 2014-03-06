@@ -86,7 +86,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     if(anchor==Bottom) position.y=displaySize.y-size.y;
     this->size=size;
     {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y;
-        r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
+        r.visual=visual; r.colormap=id+Colormap;
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
                 |EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
         send(raw(r));

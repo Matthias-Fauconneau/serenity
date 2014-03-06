@@ -17,7 +17,6 @@ template<> inline String str(const Rule& rule) { return str(rule.outputs,"=",rul
 
 /// Manages a process defined a direct acyclic graph of production rules
 struct Process : ResultManager {
-
     /// Configures process using given arguments and definition (which can depends on the arguments)
     virtual array<string> configure(const ref<string>& allArguments, const string& definition);
 
@@ -47,6 +46,7 @@ struct Process : ResultManager {
     Dict specialArguments; // User-specified special arguments
     array<Rule> rules; // Production rules
     array<string> resultNames; // Valid result names defined by process
+    array<string> parameters; /// All valid parameters accepted by defined rules (used by conditions or operations)
     struct Evaluation { String target; Dict input; Dict output; Evaluation(String&& target, Dict&& input, Dict&& output) : target(move(target)), input(move(input)), output(move(output)){}};
     array<unique<Evaluation>> cache; // Caches argument evaluation
     array<shared<Result>> results; // Generated intermediate (and target) data
@@ -83,9 +83,7 @@ struct ResultFile : Result {
 
 /// Mirrors a process intermediate data on the filesystem for persistence and operations using multiple processes
 struct PersistentProcess : Process {
-     PersistentProcess(const ref<byte>& name) : storageFolder(name,Folder("/var/tmp/"_+section(selfPath(),'/',-2,-1), root(), true),true) {
-         specialParameters += "storageFolder"_; specialParameters += "indirect"_;
-     }
+     PersistentProcess() { specialParameters += "storageFolder"_; specialParameters += "indirect"_; }
     ~PersistentProcess();
 
      /// Maps intermediate results from file system
@@ -97,5 +95,6 @@ struct PersistentProcess : Process {
     /// Computes result of an operation
     void compute(const string& operation, const ref<shared<Result>>& inputs, const ref<string>& outputNames, const Dict& arguments, const Dict& relevantArguments, const Dict& localArguments) override;
 
-    Folder storageFolder; // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data (TODO: rename to -> temporaryFolder ?)
+    // Should be a RAM (or local disk) filesystem large enough to hold intermediate operations of volume data
+    Folder storageFolder = Folder("/var/tmp/"_+section(selfPath(),'/',-2,-1), root(), true);
 };

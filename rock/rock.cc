@@ -41,7 +41,7 @@
 /// Command-line interface for rock volume data processing
 struct Rock : PersistentProcess, Poll {
     FILE(rock) // Rock process definition (embedded in binary)
-    Rock() : PersistentProcess("rock"_) {
+    Rock() {
         specialParameters += {"dump"_,"view"_,"slides"_,"png"_,"pdf"_};
         queue(); // Lets all implementations (Operations, Views) register before execution
     }
@@ -167,7 +167,7 @@ struct Rock : PersistentProcess, Poll {
          for(const string& argument: specialArguments) {
              /***/ if(endsWith(argument,".process"_)) {} // Already parsed extern process definition
              else if(existsFolder(argument,cwd) && !Folder(argument,cwd).list(Files|Folders|Hidden)) targetPaths << argument;
-             else if(!arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
+             else if(parameters.contains("path"_) && !arguments.contains("path"_) && (existsFolder(argument,cwd) || existsFile(argument,cwd))) {
                  if(existsFolder(argument,cwd)) for(const string& file: Folder(argument,cwd).list(Files|Folders)) assert_(!existsFolder(file,Folder(argument,cwd)), file, arguments);
                  else assert_(File(argument,cwd).size()>=64*64*64);
                  arguments.insert(String("path"_), String(argument));

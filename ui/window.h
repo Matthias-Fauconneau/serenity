@@ -127,8 +127,6 @@ struct Window : Device {
 
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
-    /// If set, this window will not be managed by the session window manager
-    bool overrideRedirect;
     enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
                   Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
     /// If set, this window will always be anchored to this position

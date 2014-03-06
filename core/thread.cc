@@ -142,15 +142,19 @@ void __attribute((constructor(102))) setup_signals() {
 
 template<> void __attribute((noreturn)) error(const string& message) {
     log(message); // In case, tracing crashes
+    bool hasTrace = false;
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
         traceAllThreads();
         String s = trace(1,0);
-        if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+        if(s) {
+            if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+            hasTrace = true;
+        }
         reentrant = false;
     }
-    log(message);
+    if(hasTrace) log(message);
     exit(-1); // Signals all threads to terminate
     {Locker lock(threadsLock);
         for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
