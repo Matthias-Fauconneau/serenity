@@ -174,6 +174,13 @@ struct Helmholtz {
                 border(true,  0,    1,      j);
                 border(true,  Nx-1, Nx-1-1, j);
             }
+#define DIRICHLET_CORNERS 1 // FIXME
+#if DIRICHLET_CORNERS // Dirichlet conditions on all corners
+            M(0, 0,       0, 0)      = 1;
+            M(Nx-1, 0, Nx-1, 0) = 1;
+            M(0, Ny-1, 0, Ny-1) = 1;
+            M(Nx-1, Ny-1, Nx-1, Ny-1) = 1;
+#else
             auto corner = [&](int x0, int x1, int y0, int y1) {
                 real x12 = (X[x0]+X[x1])/2;
                 real y12 = (Y[y0]+Y[y1])/2;
@@ -184,11 +191,11 @@ struct Helmholtz {
                 M(x0,y0, x0, y1) =       -bottom; // -Laplacian
                 M(x0,y0, x0, y0) = h+right+bottom;
             };
-            M(0, 0,    0, 0)          = 1; // Dirichlet conditions on top-left corner
-            //corner(0,    1,      0,         1);
+            M(0, 0,       0, 0)      = 1; // Dirichlet conditions on top-left corner
             corner(Nx-1, Nx-1-1, 0,         1);
             corner(0,    1,      Ny-1, Ny-1-1);
             corner(Nx-1, Nx-1-1, Ny-1, Ny-1-1);
+#endif
         }
 #if 1
         // Asserts valid system
@@ -238,6 +245,12 @@ struct Helmholtz {
                 bord(true,  0,    1,      j);
                 bord(true,  Nx-1, Nx-1-1, j);
             }
+#if DIRICHLET_CORNERS
+            b(0,           0) = 0;
+            b(Nx-1,      0) = 0;
+            b(0,      Ny-1) = 0;
+            b(Nx-1, Ny-1) = 0;
+#else
             auto corner = [&] (int x0, int x1, int y0, int y1) {
                 real x12 = (X[x0]+Y[x1])/2;
                 real y12 = (Y[y0]+Y[y1])/2;
@@ -249,6 +262,7 @@ struct Helmholtz {
             corner(Nx-1, Nx-1-1, 0,         1);
             corner(0,    1,      Ny-1, Ny-1-1);
             corner(Nx-1, Nx-1-1, Ny-1, Ny-1-1);
+#endif
         }
         if(type==Neumann && Nx*Ny<=25) log(M, b);
         return Vector2D(A.solve(b), Nx, Ny);
@@ -338,11 +352,13 @@ struct Chorin {
             real dyP = ( psi(i,j+1) - psi(i,j-1) ) / ( Y[j+1] - Y[j-1] );
             nux(i,j) -= dxP;
             nuy(i,j) -= dyP;
-            //P(i,j) += dt*psi(i, j);
+            P(i,j) += dt*psi(i, j);
         }
         // D P = 0 on borders => no correction => keep values from prediction
         ux = move(nux), uy = move(nuy);
-        //for(uint i: range(1,Nx-1)) ux(i, 0) = 0;
+#if DIRICHLET_CORNERS
+        for(uint i: range(1,Nx-1)) ux(i, 0) = 0;
+#endif
     }
 
     // Solves for flow function L phi =  - dy u + dx v
@@ -387,29 +403,6 @@ struct Chorin {
     }
     // Returns flow field for current state
     Vector2D flow() { return flow(ux, uy); }
-
-#if ADVECT
-    Vector2D advect(const Vector2D& U, const Vector2D& Ux, const Vector2D& Uy) {
-        Vector2D S(Nx, Ny, nan);
-        for(uint i: range(0,Nx-1)) for(uint j: range(1,Ny-1)) {
-            real u = U(i,j), ux = Ux(i,j), uy = Uy(i,j);
-            real dxU = ( U(i+1,j) - U(i-1,j) ) / ( X[i+1] - X[i-1] );
-            real dyU = ( U(i,j+1) - U(i,j-1) ) / ( Y[j+1] - Y[j-1] );
-            S(i,j) = u - dt*(ux*dxU + uy*dyU);
-        }
-        for(uint i: range(Nx)) {
-            S(i, 0   ) = U(i,    0);
-            S(i, Ny-1) = U(i, Ny-1);
-        }
-        for(uint j: range(Ny)) {
-            S(0, j)    = U(0,    j);
-            S(Nx-1, j) = U(Nx-1, j);
-        }
-        return S;
-    }
-    // Advects U with the current velocity field
-    Vector2D advect(const Vector2D& U) { return advect(U, ux, uy); }
-#endif
 
     // Samples velocity field at (x, y)
     vec2 velocity(real x, real y) { return vec2(grid.sample(ux, x, y), grid.sample(uy, x, y)); }
@@ -477,20 +470,13 @@ struct FieldView : Widget {
 };
 
 struct Application {
-    const uint N = 64;
+    const uint N = 128;
     Chorin chorin {N};
     uint t = 0;
 #if FLOW
     Vector2D flow;
 #endif
-#if ADVECT
-    Vector2D textures[2] = {{N,N,nan},{N,N,nan}};
-    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, textures[0], textures[1], flow};
-#elif FLOW
-    FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, flow, flow, flow};
-#else
     FieldView fieldView {chorin.grid, chorin.ux, chorin.uy, chorin.P, chorin.uy, chorin.ux};
-#endif
     Window window {&fieldView, int2(1024,1024), str(N)};
 
     map<real, real> ux_y;
@@ -501,10 +487,16 @@ struct Application {
 #if FLOW
         flow = chorin.flow();
 #endif
-#if ADVECT
-        for(Vector2D& texture: textures) texture = chorin.advect(texture);
-#endif
-        {real x = 1./2; for(real y: ux_y.keys) fieldView.labels[vec2(x,y)] = str(y, ux_y[y], chorin.velocity(x,y).x); }
+        fieldView.labels.clear();
+        {real x = 1./2, py=-inf; for(real y: ux_y.keys)
+                if(y>py+1./64) py=y, fieldView.labels.insert(vec2(x,y), Text(str(y, ux_y[y], chorin.velocity(x,y).x),12)); }
+        {real y = 1./2, px=inf; for(real x: uy_x.keys) if(x!=1./2)
+                if(x<px-1./32) px=x, fieldView.labels.insert(vec2(x,y), Text(str(x,'\n', uy_x[x],'\n', chorin.velocity(x,y).y,'\n'), 12)); }
+        vec2 position = 0; real minimum = inf;
+        const int margin = 16;
+        for(uint i: range(margin,chorin.X.size-margin)) for(uint j: range(margin,chorin.Y.size-margin))
+            if(chorin.P(i,j) < minimum) minimum = chorin.P(i,j), position = vec2((float)i/chorin.X.size,(float)j/chorin.Y.size);
+        if(position) fieldView.labels.insert(position, str(position));
     }
 
     map<real, real> parseProfile(const string& name, const string& columnName) {
@@ -519,25 +511,27 @@ struct Application {
         return profile;
     }
 
+    void snapshot() {
+        writeFile("Re="_+str(chorin.Re)+",N="_+str(N)+",t="_+str(t)+".png"_,encodePNG(renderToImage(fieldView, window.size)), home());
+    }
+
     Application() {
         ux_y = parseProfile("profile_u_fct_y_cavity.csv"_, "u_Re1000"_);
         for(real& y: ux_y.keys) y=1-y; // Top-left origin
         uy_x = parseProfile("profile_v_fct_x_cavity.csv"_, "v_Re1000"_);
-#if ADVECT
-        for(uint i: range(chorin.Nx)) for(uint j: range(chorin.Ny)) textures[0](i,j) = chorin.X[i], textures[1](i,j) = chorin.Y[j];
-#endif
+        for(real& v: uy_x.values) v=-v; // Top-left origin
         step();
         window.background = Window::NoBackground;
-        window.actions[Escape] = []{exit();};
+        window.actions[Escape] = []{ exit(); };
         window.frameSent
                 = [this]{
+            if(t>256 && !(t & (t - 1))) snapshot();
+            if(t==4096) { exit(); return; }
             step();
             window.render();
             window.setTitle(str(t++));
         };
-        window.actions[Return] = [this]{
-            writeFile("Re="_+str(chorin.Re)+",t="_+str(t)+".png"_,encodePNG(renderToImage(fieldView, window.size)), home());
-        };
+        window.actions[Return] = [this]{ snapshot(); };
         window.actions['g'] = [this]{ fieldView.showGrid = !fieldView.showGrid; };
         window.actions['v'] = [this]{ fieldView.showVectors = !fieldView.showVectors; };
         window.show();
