@@ -15,7 +15,7 @@ bool operator ==(const Node& a, const string& b) { return a.name==b; }
 String which(string name) {
     if(!name) return {};
     if(existsFile(name)) return String(name);
-    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFile(name, folder)) return folder+"/"_+name;
+    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+"/"_+name;
     return {};
 }
 
