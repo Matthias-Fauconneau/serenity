@@ -55,6 +55,7 @@ ui/text.h
 ui/utf8.cc
 ui/utf8.h
 ui/widget.h
+ui/widget.cc
 ui/window.cc
 ui/window.h
 ui/x.h
@@ -102,4 +103,3 @@ rock/cluster.cc
 rock/family.cc
 rock/synthetic.cc
 rock/box.cc
-ui/widget.cc

@@ -41,7 +41,7 @@ struct Otsu : Operation {
             }
             interclassVariance[t] = variance;
         }
-        float densityThreshold = float(threshold) / float(density.size-1);
+        real densityThreshold = real(threshold) / real(density.size-1);
         output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(threshold);});
         output(outputs, "otsu-parameters"_, "map"_, [&]{
             return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
