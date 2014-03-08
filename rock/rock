@@ -240,7 +240,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  # Exports to CDL
   cdl-flood = ToCDL flood
   cdl-maximum = ToCDL sqrt-scaled
-  cdl-colored-pores = ToCDL colored-pores
+  cdl-pore-index = ToCDL pore-index
   cdl = cdl-maximum
  # Exports to ASCII
   ascii-flood = ToASCII flood
