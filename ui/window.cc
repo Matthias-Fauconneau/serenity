@@ -36,7 +36,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
             {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
             {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
-        } else { error("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
+        } else send(raw(r));
     }
     {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
     {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();

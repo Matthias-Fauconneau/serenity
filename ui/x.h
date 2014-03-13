@@ -29,7 +29,7 @@ enum MapState { IsUnmapped, IsUnviewable, IsViewable };
 enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
 enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
 
-struct ConnectionSetup { byte bom='l', pad=0; int16 major=11,minor=0; uint16 nameSize, dataSize, pad2=0; };
+struct ConnectionSetup { byte bom='l', pad=0; int16 major=11,minor=0; uint16 nameSize=0, dataSize=0, pad2=0; };
 struct ConnectionSetupReply1 { int8 status,reason; int16 major,minor,additionnal; };
 struct ConnectionSetupReply2 { int32 release, ridBase, ridMask, motionBufferSize; int16 vendorLength, maxRequestSize; int8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode; int32 pad2; };
 struct XFormat { uint8 depth, bitsPerPixel, scanlinePad; int32 pad; };
