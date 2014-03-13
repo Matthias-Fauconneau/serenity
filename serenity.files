@@ -3,9 +3,6 @@ README.md
 TODO
 build.sh
 build.cc
-algebra.h
-algebra.cc
-chorin.cc
 player.cc
 test.cc
 
