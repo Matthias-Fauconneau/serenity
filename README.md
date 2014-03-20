@@ -1,4 +1,4 @@
- Serenity is written using [C++11][http://en.wikipedia.org/wiki/C++11]
+ Tomography is written using [C++11][http://en.wikipedia.org/wiki/C++11]
 
 ### Configuring local development environment without a package manager
 Install the scripts

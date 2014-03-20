@@ -172,7 +172,7 @@ struct Build {
         for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+"/"_+join(flags,"-"_)+"/"_+subfolder, root(), true);
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));
         compileModule( find(target+".cc"_) );
-        String binary = tmp+"/"_+join(flags,"-"_)+"/"_+target; //+(flags?"."_:""_)+join(flags,"-"_);
+        String binary = tmp+"/"_+join(flags,"-"_)+"/"_+target+(flags?"."_:""_)+join(flags,"-"_);
         if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);

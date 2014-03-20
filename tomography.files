@@ -1,10 +1,8 @@
-serenity.files
+tomography.files
 README.md
 TODO
 build.sh
 build.cc
-player.cc
-test.cc
 
 core/array.h
 core/core.h
@@ -30,21 +28,13 @@ core/time.h
 core/trace.cc
 core/trace.h
 core/vector.h
+core/interface.h
 
-io/bmp.cc
-io/bmp.h
 io/deflate.cc
 io/deflate.h
 io/jpeg.cc
 io/png.cc
 io/png.h
-io/tga.cc
-io/tiff.cc
-io/tiff.h
-io/xml.h
-io/xml.cc
-io/dbus.h
-io/dbus.cc
 
 ui/graphics.cc
 ui/graphics.h
@@ -52,8 +42,6 @@ ui/font.cc
 ui/font.h
 ui/gl.cc
 ui/gl.h
-ui/interface.h
-ui/interface.cc
 ui/layout.h
 ui/layout.cc
 ui/text.cc
@@ -67,24 +55,13 @@ ui/x.h
 ui/plot.cc
 ui/plot.h
 
-audio/audio.h
-audio/audio.cc
-audio/ffmpeg.cc
+tomography/result.h
+tomography/operation.h
+tomography/volume.cc
+tomography/volume.h
+tomography/volume-operation.h
+tomography/slice.cc
+tomography/slice.h
+tomography/synthetic.cc
+tomography/tomography.cc
 
-music/sampler.cc
-music/music.cc
-music/pdf.cc
-music/encoder.cc
-music/encoder.h
-music/score.cc
-music/score.h
-music/midi.cc
-music/midi.h
-
-tuner/fft.cc
-tuner/pitch.cc
-tuner/stretch.cc
-tuner/tuner.cc
-tuner/profile.h
-tuner/estimate.cc
-tuner/normalize.cc

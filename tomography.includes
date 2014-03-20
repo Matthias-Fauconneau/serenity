@@ -1,7 +1,5 @@
 core
 io
 ui
-audio
-music
-tuner
+tomography
 /usr/include/freetype2
