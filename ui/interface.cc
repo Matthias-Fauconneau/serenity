@@ -95,7 +95,7 @@ bool Selection::keyPress(Key key, Modifiers modifiers) {
 }
 void Selection::setActive(uint i) {
     assert(i==uint(-1) || i<count());
-    index=i; //if(index!=uint(-1)) if(activeChanged) activeChanged(index);
+    index=i; if(index!=uint(-1)) if(activeChanged) activeChanged(index);
 }
 
 // HighlightSelection

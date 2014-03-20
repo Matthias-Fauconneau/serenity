@@ -3,6 +3,14 @@
 #include "thread.h"
 #include "vector.h"
 #include "function.h"
+
+#define ASOUND 1
+#if ASOUND
+struct AudioOutput : /*Device,*/ Poll {
+    struct _snd_pcm* pcm=0;
+    bool running = false;
+#else
+
 struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
 #if !MMAP
@@ -15,6 +23,14 @@ struct SyncPtr {
 
 /// Audio output through ALSA PCM interface
 struct AudioOutput : Device, Poll {
+    Map maps[3];
+    void* buffer = 0;
+    const struct Status* status = 0;
+    struct Control* control = 0;
+#if !MMAP
+    SyncPtr syncPtr;
+#endif
+#endif
     static constexpr uint channels = 2;
     uint sampleBits = 0;
     uint rate = 0;
@@ -34,17 +50,9 @@ struct AudioOutput : Device, Poll {
     void event() override;
 
     function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
-    //function<uint(const mref<int2>&)> read32 = [](const mref<int2>&){return 0;};
-
-    Map maps[3];
-    void* buffer = 0;
-    const struct Status* status = 0;
-    struct Control* control = 0;
-#if !MMAP
-    SyncPtr syncPtr;
-#endif
 };
 
+#if !ASOUND
 struct AudioInput : Device, Poll {
     uint sampleBits = 0;
     uint channels = 2, rate = 0;
@@ -75,3 +83,4 @@ private:
     SyncPtr syncPtr;
 #endif
 };
+#endif

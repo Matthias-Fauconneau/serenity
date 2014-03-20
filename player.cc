@@ -11,6 +11,7 @@
 #include "time.h"
 #include "image.h"
 #include "png.h"
+#if REMOVABLES
 #include <sys/inotify.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -37,6 +38,7 @@ struct FileWatcher : File, Poll {
     function<void(string)> fileCreated;
     function<void(string)> fileDeleted;
 };
+#endif
 
 /// Stores target on every full window render to allow partial updates
 template<Type T> struct BackingStore : T {
@@ -121,7 +123,9 @@ struct Player {
     array<String> folders;
     array<String> files;
     array<String> randomSequence;
+#if REMOVABLES
     FileWatcher fileWatcher {"/dev"_,{this, &Player::deviceCreated}, {this,&Player::deviceDeleted}};
+#endif
 
     Player() {
         albums.always=titles.always=true;
@@ -141,14 +145,18 @@ struct Player {
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};
         nextButton.triggered = {this, &Player::next};
+#if REMOVABLES
         ejectButton.triggered = {this, &Player::eject};
+#endif
         slider.valueChanged = {this, &Player::seek};
         albums.activeChanged = {this, &Player::playAlbum};
         titles.activeChanged = {this, &Player::playTitle};
 
         if(arguments()) setFolder(arguments().first());
         else {
+#if REMOVABLES
             for(string device: Folder("/dev"_).list(Drives)) if(mount(device)) break;
+#endif
             if(!folder) setFolder("/Music"_);
         }
 
@@ -287,6 +295,7 @@ struct Player {
         if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
         backingStore.render(window);
     }
+#if REMOVABLES
     String cmdline = File("/proc/cmdline"_).readUpTo(256);
     void deviceCreated(string name) { mount(name); }
     bool mount(string name) {
@@ -356,4 +365,5 @@ struct Player {
         device.clear();
         if(wasPlaying) setPlaying(true);
     }
+#endif // REMOVABLES
 } application;
