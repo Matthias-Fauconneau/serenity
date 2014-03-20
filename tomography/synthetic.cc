@@ -84,25 +84,4 @@ break_:;
     }
 }
 
-#if INTERFACE
-#include "volume-operation.h"
-struct Synthetic : VolumeOperation {
-    const int3 size = 128;
-
-    string parameters() const { return "cylinder"_; }
-    uint outputSampleSize(uint index) override { if(index) return 0; /*Extra outputs*/ return sizeof(uint8); }
-    size_t outputSize(const Dict&, const ref<const Result*>&, uint index) override {
-        if(index) return 0; //Extra outputs
-        return (uint64)size.x*size.y*size.z;
-    }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>& otherOutputs) override {
-        Volume8& target = outputs.first();
-        synthetic(target, size);
-        output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z) + " voxels"_;});
-    }
-};
-#include "interface.h"
-template struct Interface<Operation>::Factory<Synthetic>;
-#else
 Volume8 synthetic(int3 size) { Volume8 target(size); synthetic(target, size); return target; }
-#endif

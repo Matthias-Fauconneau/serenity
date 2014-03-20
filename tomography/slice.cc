@@ -5,12 +5,9 @@
 
 float SliceView::sliceZ = 1./2;
 
-
-bool SliceView::view(Volume&& volume, const string& name) {
+bool SliceView::view(Volume&& volume) {
     if(volume.sampleSize<1 || volume.sampleSize>6) return false;
-    names << String(name);
     volumes << move(volume);
-    //renderVolume = volumes.size>=2 && volumes[0].tiled() && volumes[0].sampleSize==1 && volumes[1].tiled() && volumes[1].sampleSize==1;
     return true;
 }
 
@@ -50,13 +47,3 @@ void SliceView::render(const Image& target) {
     int2 offset = (target.size()-image.size())/2;
     blit(target, offset, image);
 }
-
-#if INTERFACE
-#include "volume-operation.h"
-bool SliceView::view(const string& metadata, const string& name, const buffer<byte>& data) {
-    return view(toVolume(metadata, data), name);
-}
-string SliceView::name() { return names[currentIndex]; }
-#include "interface.h"
-template struct Interface<View>::Factory<SliceView>;
-#endif
