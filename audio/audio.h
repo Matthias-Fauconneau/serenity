@@ -4,13 +4,6 @@
 #include "vector.h"
 #include "function.h"
 
-#define ASOUND 1
-#if ASOUND
-struct AudioOutput : /*Device,*/ Poll {
-    struct _snd_pcm* pcm=0;
-    bool running = false;
-#else
-
 struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
 #if !MMAP
@@ -21,7 +14,7 @@ struct SyncPtr {
 };
 #endif
 
-/// Audio output through ALSA PCM interface
+/// Audio output using ALSA PCM interface
 struct AudioOutput : Device, Poll {
     Map maps[3];
     void* buffer = 0;
@@ -29,7 +22,6 @@ struct AudioOutput : Device, Poll {
     struct Control* control = 0;
 #if !MMAP
     SyncPtr syncPtr;
-#endif
 #endif
     static constexpr uint channels = 2;
     uint sampleBits = 0;
@@ -52,7 +44,7 @@ struct AudioOutput : Device, Poll {
     function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
 };
 
-#if !ASOUND
+/// Audio input using ALSA PCM interface
 struct AudioInput : Device, Poll {
     uint sampleBits = 0;
     uint channels = 2, rate = 0;
@@ -83,4 +75,11 @@ private:
     SyncPtr syncPtr;
 #endif
 };
-#endif
+
+/// Audio control using ALSA Control interface
+struct AudioControl : Device {
+    uint id = 0;
+    AudioControl();
+    operator long();
+    void operator =(long value);
+};

@@ -292,6 +292,8 @@ uint Window::KeyCode(Key sym) {
     if(!keycode) {
         if(sym==Play) return 172; //FIXME
         if(sym==F8) return 74; //FIXME
+        if(sym==F9) return 75; //FIXME
+        if(sym==F10) return 76; //FIXME
         log("Unknown KeySym",int(sym)); return sym; }
     return keycode;
 }

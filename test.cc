@@ -1,8 +1,9 @@
-#include "window.h"
-#include "text.h"
+#include "thread.h"
+#include "audio.h"
 
-struct WindowTest {
-    Text text {"Hello World !"_};
-    Window window {&text, int2(-1), "Test"_};
-    WindowTest() { window.show(); }
+struct Test {
+    Test() {
+        AudioControl volume;
+        volume = volume - 1;
+    }
 } test;

@@ -73,6 +73,7 @@ template<Type T> struct BackingStore : T {
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
 // Playback
+    AudioControl volume;
     static constexpr uint channels = 2;
     static constexpr uint periodSize = 8192;
     unique<AudioFile> file = 0;
@@ -142,6 +143,8 @@ struct Player {
 #else
         window.globalAction(Play) = {this, &Player::togglePlay};
         window.globalAction(F8) = {this, &Player::togglePlay}; // Chromebook Mute
+        window.globalAction(F9) = [this]{  volume=volume-1; }; // Chromebook Decrease volume
+        window.globalAction(F10) = [this]{ volume=volume+1; }; // Chromebook Increase volume
 #endif
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};

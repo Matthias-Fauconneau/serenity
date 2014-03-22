@@ -2,72 +2,6 @@
 #include "string.h"
 #include "data.h"
 
-#if ASOUND
-#include <sys/types.h>
-#include <alsa/global.h>
-struct snd_input_t;
-struct snd_output_t;
-#include <alsa/conf.h>
-#include <alsa/pcm.h> //asound
-#include <alsa/timer.h>
-#include <alsa/control.h>
-
-AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread)
-    : Poll(0, POLLOUT, thread), read16(read) {
-    check( snd_pcm_open(&pcm,"default",SND_PCM_STREAM_PLAYBACK,SND_PCM_NO_SOFTVOL|SND_PCM_NO_AUTO_RESAMPLE) );
-}
-void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
-    if(running) return;
-    byte alloca_hw[snd_pcm_hw_params_sizeof()];
-    snd_pcm_hw_params_t* hw=(snd_pcm_hw_params_t*)alloca_hw; snd_pcm_hw_params_any(pcm,hw);
-    check( snd_pcm_hw_params_set_access(pcm,hw, SND_PCM_ACCESS_RW_INTERLEAVED) );
-    check( snd_pcm_hw_params_set_format(pcm,hw, sampleBits==16?SND_PCM_FORMAT_S16_LE:SND_PCM_FORMAT_S32_LE) );
-    snd_pcm_format_t format=SND_PCM_FORMAT_UNKNOWN; snd_pcm_hw_params_get_format(hw, &format);
-    if(format==SND_PCM_FORMAT_S16_LE) this->sampleBits=16;
-    else if(format==SND_PCM_FORMAT_S32_LE) this->sampleBits=32;
-    else error((uint)format);
-    check( snd_pcm_hw_params_set_channels(pcm,hw, 2) );
-    check( snd_pcm_hw_params_set_rate(pcm,hw, rate, 0), rate );
-    check( snd_pcm_hw_params_get_rate(hw, &rate, 0) ); this->rate=rate;
-    check( snd_pcm_hw_params_set_period_size(pcm, hw, periodSize, 0), periodSize);
-    snd_pcm_uframes_t period_size; check( snd_pcm_hw_params_get_period_size(hw, &period_size, 0) ); this->periodSize=period_size;
-    uint periods=0; check( snd_pcm_hw_params_set_periods_first(pcm, hw, &periods, 0) ); bufferSize = periods * this->periodSize;
-    check( snd_pcm_hw_params(pcm, hw) );
-    byte alloca_sw[snd_pcm_sw_params_sizeof()];
-    snd_pcm_sw_params_t *sw=(snd_pcm_sw_params_t*)alloca_sw;
-    snd_pcm_sw_params_current(pcm, sw);
-    snd_pcm_sw_params_set_avail_min(pcm, sw, this->periodSize);
-    snd_pcm_sw_params(pcm,sw);
-    snd_pcm_poll_descriptors(pcm,this,1); registerPoll(); running=true;
-}
-void AudioOutput::stop() { if(!running) return; unregisterPoll(); snd_pcm_drain(pcm); running=false; }
-void AudioOutput::event() {
-    unsigned short revents;
-    snd_pcm_poll_descriptors_revents(pcm, this, 1, &revents);
-    if(!(revents & POLLOUT)) return;
-    if( snd_pcm_state(pcm) == SND_PCM_STATE_XRUN ) { log("Underrun"_); snd_pcm_prepare(pcm); }
-    snd_pcm_uframes_t frames = (snd_pcm_uframes_t)snd_pcm_avail(pcm); //snd_pcm_avail_update(pcm); //
-    if(frames>=periodSize) {
-#if MMAP
-        const snd_pcm_channel_area_t* areas; snd_pcm_uframes_t offset;
-        frames=periodSize;
-        snd_pcm_mmap_begin(pcm, &areas, &offset, &frames);
-        assert(frames == periodSize);
-        if(sampleBits==16) frames=read16((int16*)areas[0].addr+offset*channels, periodSize);
-        else if(sampleBits==32) frames=read32((int32*)areas[0].addr+offset*channels, periodSize);
-        else error(sampleBits);
-        snd_pcm_mmap_commit(pcm, offset, frames);
-#else
-        buffer<byte> audio(periodSize*channels*sampleBits/8);
-        if(sampleBits==16) frames=read16(mcast<short2>(audio));
-        else error(sampleBits);
-        snd_pcm_writei(pcm, audio.data, frames);
-#endif
-        if(snd_pcm_state(pcm) == SND_PCM_STATE_PREPARED) snd_pcm_start(pcm);
-    }
-}
-
-#else
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
 enum Format { S16_LE=2, S32_LE=10 };
@@ -309,4 +243,122 @@ void AudioInput::event() {
         periods++;
     }
 }
-#endif
+
+/// Control
+
+#include "thread.h"
+#include "file.h"
+#include "string.h"
+
+struct snd_ctl_elem_id {
+    unsigned int numid;		/* numeric identifier, zero = invalid */
+    int iface;	/* interface identifier */
+    unsigned int device;		/* device/client number */
+    unsigned int subdevice;		/* subdevice (substream) number */
+    char name[44];		/* ASCII name of item */
+    unsigned int index;		/* index of item */
+};
+
+struct snd_ctl_elem_list {
+    unsigned int offset;		/* W: first element ID to get */
+    unsigned int space;		/* W: count of element IDs to get */
+    unsigned int used;		/* R: count of element IDs set */
+    unsigned int count;		/* R: count of all elements */
+    struct snd_ctl_elem_id *pids; /* R: IDs */
+    unsigned char reserved[50];
+};
+
+struct snd_ctl_elem_info {
+    struct snd_ctl_elem_id id;	/* W: element ID */
+    int type;	/* R: value type - SNDRV_CTL_ELEM_TYPE_* */
+    unsigned int access;		/* R: value access (bitmask) - SNDRV_CTL_ELEM_ACCESS_* */
+    unsigned int count;		/* count of values */
+    int owner;		/* owner's PID of this control */
+    union {
+        struct {
+            long min;		/* R: minimum value */
+            long max;		/* R: maximum value */
+            long step;		/* R: step (0 variable) */
+        } integer;
+        struct {
+            long long min;		/* R: minimum value */
+            long long max;		/* R: maximum value */
+            long long step;		/* R: step (0 variable) */
+        } integer64;
+        struct {
+            unsigned int items;	/* R: number of items */
+            unsigned int item;	/* W: item number */
+            char name[64];		/* R: value name */
+            uint64 names_ptr;	/* W: names list (ELEM_ADD only) */
+            unsigned int names_length;
+        } enumerated;
+        unsigned char reserved[128];
+    } value;
+    union {
+        unsigned short d[4];		/* dimensions */
+        unsigned short *d_ptr;		/* indirect - obsoleted */
+    } dimen;
+    unsigned char reserved[64-4*sizeof(unsigned short)];
+};
+
+struct snd_ctl_elem_value {
+    struct snd_ctl_elem_id id;	/* W: element ID */
+    unsigned int indirect: 1;	/* W: indirect access - obsoleted */
+    union {
+        union {
+            long value[128];
+            long *value_ptr;	/* obsoleted */
+        } integer;
+        union {
+            long long value[64];
+            long long *value_ptr;	/* obsoleted */
+        } integer64;
+        union {
+            unsigned int item[128];
+            unsigned int *item_ptr;	/* obsoleted */
+        } enumerated;
+        union {
+            unsigned char data[512];
+            unsigned char *data_ptr;	/* obsoleted */
+        } bytes;
+        struct snd_aes_iec958 {
+            unsigned char status[24];	/* AES/IEC958 channel status bits */
+            unsigned char subcode[147];	/* AES/IEC958 subcode bits */
+            unsigned char pad;		/* nothing */
+            unsigned char dig_subframe[4];	/* AES/IEC958 subframe bits */
+        } iec958;
+    } value;		/* RO */
+    unsigned char reserved[128];
+};
+
+typedef IOWR<'U', 0x10, snd_ctl_elem_list> ELEM_LIST;
+typedef IOWR<'U', 0x11, snd_ctl_elem_info> ELEM_INFO;
+typedef IOWR<'U', 0x12, snd_ctl_elem_value> ELEM_READ;
+typedef IOWR<'U', 0x13, snd_ctl_elem_value> ELEM_WRITE;
+
+AudioControl::AudioControl() : Device("/dev/snd/controlC1"_) {
+    snd_ctl_elem_list elist = {};
+    iowr<ELEM_LIST>(elist);
+    snd_ctl_elem_id eid[elist.count];
+    elist.space = elist.count;
+    elist.pids = eid;
+    iowr<ELEM_LIST>(elist);
+    for(int i: range(elist.count)) {
+        snd_ctl_elem_info ei;
+        ei.id.numid = eid[i].numid;
+        iowr<ELEM_INFO>(ei);
+        if(startsWith(string(ei.id.name),"Master Playback Volume"_)) { id=ei.id.numid; break; }
+    }
+}
+
+AudioControl::operator long() {
+    snd_ctl_elem_value ev; ev.id.numid = id;
+    iowr<ELEM_READ>(ev);
+    return ev.value.integer.value[0];
+}
+
+void AudioControl::operator =(long value) {
+    snd_ctl_elem_value ev; ev.id.numid = id;
+    ev.value.integer.value[0] = value;
+    iowr<ELEM_WRITE>(ev);
+}
