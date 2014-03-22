@@ -68,7 +68,7 @@ struct ConvertSelection { uint8 req=24,pad=0; uint16 size=6; uint requestor=0,se
 struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; XEvent event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
-struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=AnyModifier; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };
+struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=0; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };
 struct UngrabKey { int8 req=34; uint8 keycode; uint16 size=3; uint window; uint16 modifiers=AnyModifier; uint16 pad; };
 struct ReplayKeyboard { int8 req=35, mode=5; uint16 size=2; uint time=0; };
 struct ReplayPointer { int8 req=35, mode=2; uint16 size=2; uint time=0; };

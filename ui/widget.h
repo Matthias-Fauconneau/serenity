@@ -7,6 +7,7 @@
 #endif
 
 /// Key symbols
+#include "X11/keysymdef.h"
 enum Key {
 #if X11
     Space=' ',
@@ -14,6 +15,7 @@ enum Key {
     Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, PageUp, PageDown, End, PrintScreen=0xff61,
     Execute, Insert,
     KP_Enter=0xff8d, KP_Asterisk=0xffaa, KP_Plus, KP_Separator, KP_Minus, KP_Decimal, KP_Slash, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
+    F8=0xffc5,
     ShiftKey=0xffe1, ControlKey=0xffe3,
     Delete=0xffff,
     Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19,

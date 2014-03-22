@@ -289,7 +289,10 @@ Key Window::KeySym(uint8 code, uint8 state) {
 uint Window::KeyCode(Key sym) {
     uint keycode=0;
     for(uint i: range(minKeyCode,maxKeyCode+1)) if(KeySym(i,0)==sym) { keycode=i; break;  }
-    if(!keycode) { if(sym==0x1008ff14) return 172; /*FIXME*/ log("Unknown KeySym",int(sym)); return sym; }
+    if(!keycode) {
+        if(sym==Play) return 172; //FIXME
+        if(sym==F8) return 74; //FIXME
+        log("Unknown KeySym",int(sym)); return sym; }
     return keycode;
 }
 

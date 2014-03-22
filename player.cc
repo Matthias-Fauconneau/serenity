@@ -132,7 +132,7 @@ struct Player {
         elapsed.minSize.x=remaining.minSize.x=64;
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
-        window.actions[Escape] = []{exit();};
+        window.actions[Escape] = []{ exit(); };
         window.actions[Space] = {this, &Player::togglePlay};
 #if ARM
         window.actions[Extra] = {this, &Player::togglePlay};
@@ -141,6 +141,7 @@ struct Player {
         window.longActions[Power] = [this](){ window.setDisplay(false); execute("/sbin/poweroff"_); };
 #else
         window.globalAction(Play) = {this, &Player::togglePlay};
+        window.globalAction(F8) = {this, &Player::togglePlay}; // Chromebook Mute
 #endif
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};
@@ -163,7 +164,11 @@ struct Player {
         window.show();
         mainThread.setPriority(-20);
     }
-    ~Player() { setPlaying(false); /*Records last position*/ }
+    ~Player() { recordPosition(); /*Records current position*/ }
+    void recordPosition() {
+        if(/*writableFile(".last"_, folder) &&*/ titles.index<files.size && file)
+            writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
+    }
     void setFolder(string path) {
         assert(folder.name() != path);
         if(folder.name() == path) return;
@@ -282,8 +287,7 @@ struct Player {
         }
         playButton.enabled=play;
         window.render();
-        if(writableFile(".last"_, folder) && titles.index<files.size && file)
-            writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
+        recordPosition();
     }
     void seek(int position) {
         if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*resampler.clear();*/ /*audio->cancel();*/ }
