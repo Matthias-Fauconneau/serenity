@@ -4,8 +4,10 @@
 #include "vector.h"
 #include "function.h"
 
+enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused, Suspended };
 struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
+#define MMAP 1
 #if !MMAP
 struct SyncPtr {
     uint flags;

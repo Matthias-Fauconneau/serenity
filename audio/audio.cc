@@ -2,7 +2,6 @@
 #include "string.h"
 #include "data.h"
 
-enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused };
 enum Access { MMapInterleaved=0 };
 enum Format { S16_LE=2, S32_LE=10 };
 enum SubFormat { Standard=0 };
@@ -43,6 +42,7 @@ struct SWParams {
 
 typedef IOWR<'A', 0x10,HWParams> HW_REFINE;
 typedef IOWR<'A', 0x11,HWParams> HW_PARAMS;
+typedef IO<'A', 0x12> HW_FREE;
 typedef IOWR<'A', 0x13,SWParams> SW_PARAMS;
 typedef IO<'A', 0x40> PREPARE;
 typedef IO<'A', 0x41> RESET;
@@ -59,7 +59,7 @@ typedef IOWR<'A', 0x23,SyncPtr> SYNC_PTR;
 /// Playback
 
 Device getPlaybackDevice() {
-    Folder snd("/dev/snd");
+    Folder snd("/dev/snd"_);
     for(const String& device: snd.list(Devices))
         if(startsWith(device, "pcm"_) && endsWith(device,"D0p"_)) return Device(device, snd, ReadWrite);
     for(const String& device: snd.list(Devices))
@@ -67,12 +67,11 @@ Device getPlaybackDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread)
-    : Device(getPlaybackDevice()), Poll(0, POLLOUT, thread), read16(read) {
-}
+AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 
 void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
-    if(this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
+    if(!Device::fd) Device::fd = move(getPlaybackDevice().fd);
+    if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
         hparams.mask(Access).set(MMapInterleaved);
         if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
@@ -126,9 +125,14 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
     event();
     if(status->state < Running) io<START>();
 }
-void AudioOutput::stop(){
-     io<DRAIN>();
-     unregisterPoll();
+
+void AudioOutput::stop() {
+    if(status->state < Suspended) io<DRAIN>();
+    unregisterPoll();
+    int state = status->state;
+    buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps
+    if(state < Running) io<HW_FREE>(); // Releases hardware
+    close(); Poll::fd=0; // Closes file descriptor
 }
 
 void AudioOutput::event() {
@@ -250,115 +254,39 @@ void AudioInput::event() {
 #include "file.h"
 #include "string.h"
 
-struct snd_ctl_elem_id {
-    unsigned int numid;		/* numeric identifier, zero = invalid */
-    int iface;	/* interface identifier */
-    unsigned int device;		/* device/client number */
-    unsigned int subdevice;		/* subdevice (substream) number */
-    char name[44];		/* ASCII name of item */
-    unsigned int index;		/* index of item */
-};
+struct ID { uint numid, iface, device, subdevice; char name[44]; uint index; };
+struct List { uint offset, capacity, used, count; ID* pids; byte reserved[50]; };
+struct Info { ID id; uint type, access, count, owner; long min, max, step; byte reserved[128-sizeof(long[3])+64]; };
+struct Value { ID id; uint indirect; long values[128]; byte reserved[128]; };
 
-struct snd_ctl_elem_list {
-    unsigned int offset;		/* W: first element ID to get */
-    unsigned int space;		/* W: count of element IDs to get */
-    unsigned int used;		/* R: count of element IDs set */
-    unsigned int count;		/* R: count of all elements */
-    struct snd_ctl_elem_id *pids; /* R: IDs */
-    unsigned char reserved[50];
-};
-
-struct snd_ctl_elem_info {
-    struct snd_ctl_elem_id id;	/* W: element ID */
-    int type;	/* R: value type - SNDRV_CTL_ELEM_TYPE_* */
-    unsigned int access;		/* R: value access (bitmask) - SNDRV_CTL_ELEM_ACCESS_* */
-    unsigned int count;		/* count of values */
-    int owner;		/* owner's PID of this control */
-    union {
-        struct {
-            long min;		/* R: minimum value */
-            long max;		/* R: maximum value */
-            long step;		/* R: step (0 variable) */
-        } integer;
-        struct {
-            long long min;		/* R: minimum value */
-            long long max;		/* R: maximum value */
-            long long step;		/* R: step (0 variable) */
-        } integer64;
-        struct {
-            unsigned int items;	/* R: number of items */
-            unsigned int item;	/* W: item number */
-            char name[64];		/* R: value name */
-            uint64 names_ptr;	/* W: names list (ELEM_ADD only) */
-            unsigned int names_length;
-        } enumerated;
-        unsigned char reserved[128];
-    } value;
-    union {
-        unsigned short d[4];		/* dimensions */
-        unsigned short *d_ptr;		/* indirect - obsoleted */
-    } dimen;
-    unsigned char reserved[64-4*sizeof(unsigned short)];
-};
-
-struct snd_ctl_elem_value {
-    struct snd_ctl_elem_id id;	/* W: element ID */
-    unsigned int indirect: 1;	/* W: indirect access - obsoleted */
-    union {
-        union {
-            long value[128];
-            long *value_ptr;	/* obsoleted */
-        } integer;
-        union {
-            long long value[64];
-            long long *value_ptr;	/* obsoleted */
-        } integer64;
-        union {
-            unsigned int item[128];
-            unsigned int *item_ptr;	/* obsoleted */
-        } enumerated;
-        union {
-            unsigned char data[512];
-            unsigned char *data_ptr;	/* obsoleted */
-        } bytes;
-        struct snd_aes_iec958 {
-            unsigned char status[24];	/* AES/IEC958 channel status bits */
-            unsigned char subcode[147];	/* AES/IEC958 subcode bits */
-            unsigned char pad;		/* nothing */
-            unsigned char dig_subframe[4];	/* AES/IEC958 subframe bits */
-        } iec958;
-    } value;		/* RO */
-    unsigned char reserved[128];
-};
-
-typedef IOWR<'U', 0x10, snd_ctl_elem_list> ELEM_LIST;
-typedef IOWR<'U', 0x11, snd_ctl_elem_info> ELEM_INFO;
-typedef IOWR<'U', 0x12, snd_ctl_elem_value> ELEM_READ;
-typedef IOWR<'U', 0x13, snd_ctl_elem_value> ELEM_WRITE;
+typedef IOWR<'U', 0x10, List> ELEM_LIST;
+typedef IOWR<'U', 0x11, Info> ELEM_INFO;
+typedef IOWR<'U', 0x12, Value> ELEM_READ;
+typedef IOWR<'U', 0x13, Value> ELEM_WRITE;
 
 AudioControl::AudioControl() : Device("/dev/snd/controlC1"_) {
-    snd_ctl_elem_list elist = {};
-    iowr<ELEM_LIST>(elist);
-    snd_ctl_elem_id eid[elist.count];
-    elist.space = elist.count;
-    elist.pids = eid;
-    iowr<ELEM_LIST>(elist);
-    for(int i: range(elist.count)) {
-        snd_ctl_elem_info ei;
-        ei.id.numid = eid[i].numid;
-        iowr<ELEM_INFO>(ei);
-        if(startsWith(string(ei.id.name),"Master Playback Volume"_)) { id=ei.id.numid; break; }
+    List list = {};
+    iowr<ELEM_LIST>(list);
+    ID ids[list.count];
+    list.capacity = list.count;
+    list.pids = ids;
+    iowr<ELEM_LIST>(list);
+    for(int i: range(list.count)) {
+        Info info;
+        info.id.numid = ids[i].numid;
+        iowr<ELEM_INFO>(info);
+        if(startsWith(string(info.id.name),"Master Playback Volume"_)) { id=info.id.numid; break; }
     }
 }
 
 AudioControl::operator long() {
-    snd_ctl_elem_value ev; ev.id.numid = id;
-    iowr<ELEM_READ>(ev);
-    return ev.value.integer.value[0];
+    Value value; value.id.numid = id;
+    iowr<ELEM_READ>(value);
+    return value.values[0];
 }
 
-void AudioControl::operator =(long value) {
-    snd_ctl_elem_value ev; ev.id.numid = id;
-    ev.value.integer.value[0] = value;
-    iowr<ELEM_WRITE>(ev);
+void AudioControl::operator =(long v) {
+    Value value; value.id.numid = id;
+    value.values[0] = v;
+    iowr<ELEM_WRITE>(value);
 }

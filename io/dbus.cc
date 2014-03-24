@@ -22,7 +22,7 @@ enum Field { InvalidField, Path, Interface, Member, ErrorName, ReplySerial, Dest
 void DBus::readMessage(uint32 serial, function<void(BinaryData&)> readOutputs) {
     for(;;) {
         Header header = read<Header>();
-        if(header.message == MethodCall) assert(header.flag==0);
+        //if(header.message == MethodCall) assert(header.flag==0, header.flag);
         uint32 replySerial=0;
         String name;
         BinaryData s = read(align(8,header.fieldsSize)+header.length);
@@ -179,14 +179,22 @@ template<class A, class B, class C> void DBus::signalWrapper(string name, ref<by
 /// Connection
 
 DBus::DBus(Scope scope) : Socket(PF_LOCAL,SOCK_STREAM), Poll(Socket::fd) {
-     sockaddr_un addr = {};
-     addr.sun_family = AF_LOCAL;
      string path;
      if(scope == Session) path = section(section(getenv("DBUS_SESSION_BUS_ADDRESS"_),'=',1,2),',');
      else if(scope == System) path = "/var/run/dbus/system_bus_socket"_;
      else error("Unknown scope"_);
-     copy(mref<byte>((byte*)addr.sun_path,path.size+1), strz(path));
-     check_( ::connect(Socket::fd,(sockaddr*)&addr,2+path.size) );
+     if(find(getenv("DBUS_SESSION_BUS_ADDRESS"_),"abstract"_)) {
+         sockaddr_un addr = {};
+         addr.sun_family = AF_UNIX;
+         addr.sun_path[0]=0;
+         copy(mref<byte>((byte*)addr.sun_path+1,path.size+1), strz(path));
+         check_( ::connect(Socket::fd,(sockaddr*)&addr,3+path.size), path);
+     } else {
+         sockaddr_un addr = {};
+         addr.sun_family = AF_LOCAL;
+         copy(mref<byte>((byte*)addr.sun_path,path.size+1), strz(path));
+         check_( ::connect(Socket::fd,(sockaddr*)&addr,2+path.size), path);
+     }
      write("\0AUTH EXTERNAL 31303030\r\n"_); String status=read(37); assert(startsWith(status, "OK"_)); write("BEGIN \r\n"_);
      name = Object{this,String("org.freedesktop.DBus"_),String("/org/freedesktop/DBus"_)}("org.freedesktop.DBus.Hello"_);
  }

@@ -17,7 +17,7 @@ enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK =
 
 
 // Handle
-Handle::~Handle() { if(fd>0) close(fd); }
+void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 String Handle::name() const { if(fd==AT_FDCWD) return String("."_); String s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd); return s; }
 
 // Folder

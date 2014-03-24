@@ -20,8 +20,10 @@ struct Handle {
     Handle():fd(0){}
     Handle(int fd):fd(fd){}
     default_move(Handle);
-    ~Handle();
+    ~Handle() { close(); }
     explicit operator bool() const { return fd; }
+    /// Closes file descriptor
+    void close();
     /// Returns file descriptor name
     String name() const;
 };

@@ -13,6 +13,7 @@ inline void align(array<byte>& a, int width) { int s=a.size, n=align(width, s); 
 template<class T> struct variant : T { variant(){} variant(T&& t):T(move(t)){} operator const T&() const { return *this; } };
 template<> struct variant<int> { int t; variant(){} variant(int t):t(t){} operator const int&() const { return t; } };
 template<> struct variant<uint> { uint t; variant(){} variant(uint t):t(t){} operator const uint&() const { return t; } };
+template<> struct variant<String> { String t; variant(){} variant(String&& t):t(move(t)){} operator const String&() const { return t; } };
 
 // D-Bus argument parsers
 template<class T> void read(BinaryData& s, variant<T>& output) {
@@ -140,6 +141,10 @@ struct DBus : Socket, Poll {
             string interface = section(property,'.',0,-2)?:target, member=section(property,'.',-2,-1);
             uint32 serial = dbus->writeMessage(MethodCall,-1, target, object, "org.freedesktop.DBus.Properties"_, "Get"_, interface, member);
             variant<T> t; dbus->readMessage(serial, t); return move(t);
+        }
+        template<class T> void set(const string& property, variant<T> t)  {
+            string interface = section(property,'.',0,-2)?:target, member=section(property,'.',-2,-1);
+            dbus->writeMessage(MethodCall,-1, target, object, "org.freedesktop.DBus.Properties"_, "Set"_, interface, member, t);
         }
         array<String> children();
         Object node(string name);

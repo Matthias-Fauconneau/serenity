@@ -163,7 +163,6 @@ struct Player {
 #endif
             if(!folder) setFolder("/Music"_);
         }
-
         window.show();
         mainThread.setPriority(-20);
     }
