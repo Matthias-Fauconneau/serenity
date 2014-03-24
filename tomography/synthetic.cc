@@ -59,6 +59,7 @@ void synthetic(Volume8& target, int3 size) {
         }
 break_:;
     }
+#if TUBE
     /// Links each ellipsoid to its nearest neighbour (TODO: all non-intersecting links)
     struct Tube { vec3 A, B; float radius; };
     array<Tube> tubes;
@@ -82,6 +83,7 @@ break_:;
         }
         tubes << Tube{A, B, tubeRadius};
     }
+#endif
 }
 
 Volume8 synthetic(int3 size) { Volume8 target(size); synthetic(target, size); return target; }

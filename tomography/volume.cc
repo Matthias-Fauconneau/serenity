@@ -134,11 +134,11 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
             continue;
         }
         else error("source.sampleSize"_,source.sampleSize);
-        uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
-        if(binary) linear8 = linear8 ? 0xFF : 0;
-        if(invert) linear8 = 0xFF-linear8;
+        uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFFF / normalizeFactor;
+        if(binary) linear8 = linear8 ? 0xFFF : 0;
+        if(invert) linear8 = 0xFFF-linear8;
         extern uint8 sRGB_forward[0x1000]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
-        uint sRGB8 = gamma ? sRGB_forward[linear8*0x100] : linear8; // !gamma: abusing sRGB standard to store linear values
+        uint sRGB8 = gamma ? sRGB_forward[linear8] : linear8; // !gamma: abusing sRGB standard to store linear values
         target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
