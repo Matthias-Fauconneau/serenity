@@ -10,7 +10,7 @@ void project(const Image& image, const Volume8& volume, vec2 angles);
 struct View : Widget {
     const Volume8& volume;
     int2 lastPos = 0;
-    vec2 rotation = vec2(0, -PI/2);
+    vec2 rotation = vec2(0, -PI/3);
     View(const Volume8& volume) : volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
         int2 delta = cursor-lastPos;

@@ -2,6 +2,7 @@
 #include "simd.h"
 #include "volume.h"
 #include "matrix.h"
+//#define str4(v) str(#v, v[0], v[1], v[2], v[3])
 
 // SIMD constants for cylinder intersections
 static const v4sf _2f = float4( 2 );
@@ -45,7 +46,6 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
     const v4sf _m4a_4_m4a_4 = {-4*a, 4, -4*a, 4};
     const v4sf rcp_2a = float4(-1./(2*a));
 
-    float maxSum = 0;
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageX/tileSize);
         byte4* const image = imageData+tileY*tileSize*imageStride+tileX*tileSize;
@@ -74,17 +74,15 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
 
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
-            //const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-            //const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
+            const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
+            const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
             v4sf position = origin + tmin * ray;
-//#define str4(v) str(#v, v[0], v[1], v[2], v[3])
-  //          log(str4(position));
-#if 0
             v4sf accumulator = _0f;
             for(;;) {
                 // Lookups sample offsets
                 const v4si p0 = cvtps2dq(position);
                 const uint vx0 = offsetX[p0[0]], vy0 = offsetY[p0[1]], vz0 = offsetZ[p0[2]]; //FIXME: gather
+#define TRILINEAR 1
 #if TRILINEAR
                 const v4si p1 = p0 +_1i;
                 const uint vx1 = offsetX[p1[0]], vy1 = offsetY[p1[1]], vz1 = offsetZ[p1[2]]; //FIXME: gather
@@ -111,18 +109,12 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
                 if(mask(position > texit)) break; // Check for exit intersection or saturation
             }
             float sum = accumulator[0];
-            maxSum = max(maxSum, sum);
-            int linear12 = min(int(sum), 0x1000); // 8->12 (/16)
+            int linear12 = min(int(sum), 0xFFF); // 8->12 (/16)
             extern uint8 sRGB_forward[0x1000];
-            image[y*imageStride+x] = 0xFF; //byte4(sRGB_forward[linear12], sRGB_forward[linear12], sRGB_forward[linear12], 0xFF);
-#else
-            int3 linear12 = clip(int3(0), 0x1000*(int3(position[0],position[1],position[2])+int3(size.x/2))/size.x, int3(0x1000)); // 8->12 (/16)
-            extern uint8 sRGB_forward[0x1000];
-            image[y*imageStride+x] = byte4(sRGB_forward[linear12[0]], sRGB_forward[linear12[1]], sRGB_forward[linear12[2]], 0xFF);
-#endif
+            int sRGB = sRGB_forward[linear12];
+            image[y*imageStride+x] = byte4(sRGB, sRGB, sRGB, 0xFF);
         }
     } );
-    //log(maxSum);
 }
 
 

@@ -39,10 +39,11 @@ inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((b
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf bitOr(v4sf a, v4sf b) { return v4si(a) | v4si(b); } //__builtin_ia32_orps(a, b); }
-inline v4sf andNot(v4sf a, v4sf b) { return v4si(a) &~ v4si(b); } //__builtin_ia32_andnps(a, b); }
+//inline v4sf andNot(v4sf a, v4sf b) { return ~v4si(a) & v4si(b); } //__builtin_ia32_andnps(a, b); }
 
-const v4sf signBit = (v4sf)(v4si){(int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000};
-inline v4sf abs(v4sf a) { return andNot(signBit, a); }
+//const v4sf signBit = (v4sf)(v4si){(int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000};
+const v4si notSignBit = (v4si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
+inline v4sf abs(v4sf a) { return notSignBit & (v4si)a; }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
