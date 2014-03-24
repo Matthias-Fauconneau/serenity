@@ -2,6 +2,7 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
+#include "simd.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -101,6 +102,7 @@ inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 generic struct xyz {
     T x,y,z;
     vec<xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
+    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;

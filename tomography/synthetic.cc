@@ -25,9 +25,8 @@ bool intersects(const mat4& a, const mat4& b) { return overlaps(a, b) && overlap
 void synthetic(Volume8& target, int3 size) {
     assert_(target.data.data, target.data.data, target.data.size, target.data.capacity);
     target.sampleCount = size;
-    target.field = String("μ"_);
-    target.maximum = 0xFF;
-    target.data.clear(0xFF);
+    interleavedLookup(target);
+    target.data.clear(0);
     /// Synthesizes random oriented ellipsoids
     const uint maximumRadius = (size.x-1)/4;
     array<mat4> ellipsoids; // Oriented bounding boxes (mat4 might not be most efficient but is probably the easiest representation)
@@ -53,7 +52,7 @@ void synthetic(Volume8& target, int3 size) {
             mat4 worldToBox = ellipsoid.inverse();
             for(int z: range(min.z, max.z+1)) for(int y: range(min.y, max.y+1)) for(int x: range(min.x, max.x+1)) {
                 vec3 p = worldToBox*vec3(x,y,z);
-                if(sq(p) < 1) target(x,y,z) = 0;
+                if(sq(p) < 1) target(x,y,z) = 0xFF;
             }
             ellipsoids << ellipsoid;
         }

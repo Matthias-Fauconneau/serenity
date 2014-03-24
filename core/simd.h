@@ -38,25 +38,28 @@ inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
 inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
-//inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
-//inline v4sf andnot(v4sf a, v4sf b) { return __builtin_ia32_andnps(a, b); }
-//inline v4sf bitXor(v4sf a, v4sf b) { return __builtin_ia32_xorps(a, b); }
+inline v4sf bitOr(v4sf a, v4sf b) { return v4si(a) | v4si(b); } //__builtin_ia32_orps(a, b); }
+inline v4sf andNot(v4sf a, v4sf b) { return v4si(a) &~ v4si(b); } //__builtin_ia32_andnps(a, b); }
 
 const v4sf signBit = (v4sf)(v4si){(int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000};
-//inline v4sf negate(v4sf a) { return bitXor(a,  signBit); }
-//inline v4sf abs(v4sf a) { return andnot(signBit, a); }
+inline v4sf abs(v4sf a) { return andNot(signBit, a); }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
-//inline v4sf shuffle(v4sf a, v4sf b, int x, int y, int z, int w) { return __builtin_ia32_shufps(a, b, w<<6|z<<4|y<<2|x); }
+#define shuffle __builtin_shufflevector
+inline v4sf hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
+inline v4sf dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
+inline v4sf hsum(v4sf a) { return dot4(a,_1f); }
 inline v4sf rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
 inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
 
 inline int mask(v4sf a) { return __builtin_ia32_movmskps(a); }
-//inline v4sf transpose(v4sf a, v4sf b, v4sf c, v4sf d) { return shuffle(shuffle(a,b,0,0,0,0), shuffle(c,d,0,0,0,0),0,2,0,2); }
-//inline v4sf hmin(v4sf a) { a = min(a, shuffle(a, a, 1,0,3,2)); return min(a, shuffle(a, a, 2,2,0,0)); }
-//inline v4sf hmax(v4sf a) { a = max(a, shuffle(a, a, 1,0,3,2)); return max(a, shuffle(a, a, 2,2,0,0)); }
+#define blend __builtin_ia32_blendps
+inline v4sf blendv(v4sf a, v4sf b, v4sf m) { return __builtin_ia32_blendvps(a, b, m); }
+inline v4sf dot2(v4sf a, v4sf b) { v4sf sq = a*b; return hadd(sq,sq); }
+inline v4sf hmin(v4sf a) { a = min(a, shuffle(a, a, 1,0,3,2)); return min(a, shuffle(a, a, 2,2,0,0)); }
+inline v4sf hmax(v4sf a) { a = max(a, shuffle(a, a, 1,0,3,2)); return max(a, shuffle(a, a, 2,2,0,0)); }
 
 inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }

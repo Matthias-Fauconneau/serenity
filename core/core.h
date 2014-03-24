@@ -102,6 +102,9 @@ template<> void error(const string& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline uint floor(uint width, uint offset) { /*assert((width&(width-1))==0);*/ return offset & ~(width-1); }
+
 /// Numeric range
 struct range {
     range(int start, int stop) : start(start), stop(stop){}
