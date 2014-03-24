@@ -9,7 +9,7 @@ static const v4sf _2f = float4( 2 );
 static const v4sf mfloatMax = float4(-FLT_MAX);
 static const v4sf floatMax = float4(FLT_MAX);
 static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
-//static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
+static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 
 void project(const Image& target, const Volume8& volume, mat3 view) {
     assert_(volume.tiled());
@@ -20,10 +20,10 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    /*const uint8* const volumeData = volume;
+    const uint8* const volumeData = volume;
     const uint64* const offsetX = volume.offsetX.data + volume.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint64* const offsetY = volume.offsetY.data + volume.sampleCount.y/2;
-    const uint64* const offsetZ = volume.offsetZ.data + volume.sampleCount.z/2;*/
+    const uint64* const offsetZ = volume.offsetZ.data + volume.sampleCount.z/2;
 
     // Image
     #define tileSize 8
@@ -45,10 +45,6 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
     const v4sf _m4a_4_m4a_4 = {-4*a, 4, -4*a, 4};
     const v4sf rcp_2a = float4(-1./(2*a));
 
-    /*enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
-    extern void setExceptions(uint except);
-    setExceptions(Denormal | Underflow);*/ // Allows /0
-
     float maxSum = 0;
     parallel(imageX/tileSize*imageY/tileSize, [&](uint, uint i) {
         const int tileX = i%(imageX/tileSize), tileY = i/(imageX/tileSize);
@@ -56,7 +52,6 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
         const v4sf tileOrigin = worldOrigin + float4(tileX * tileSize) * viewStepX + float4(tileY * tileSize) * viewStepY;
         for(uint y=0; y<tileSize; y++) for(uint x=0; x<tileSize; x++) {
             const v4sf origin = tileOrigin + float4(x) * viewStepX + float4(y) * viewStepY;
-            log(origin[0], origin[1], origin[2], origin[3], worldRay);
 
             // Intersects cap disks
             const v4sf originZ = shuffle(origin, origin, 2,2,2,2);
@@ -73,15 +68,18 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
             const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
             const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * rcp_2a; // ? t+ ? t-
             const v4sf sideZ = abs(originZ + sideT * rayZ); // ? z+ ? z-
-            const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); //world positions for top bottom +side -side
+            const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
             const v4sf tMask = radiusSqHeight > capSideP;
             if(!mask(tMask)) { image[y*imageStride+x] = byte4(0,0,0,0xFF); continue; }
-            /*
+
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
-            const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-            const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
+            //const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
+            //const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
             v4sf position = origin + tmin * ray;
+//#define str4(v) str(#v, v[0], v[1], v[2], v[3])
+  //          log(str4(position));
+#if 0
             v4sf accumulator = _0f;
             for(;;) {
                 // Lookups sample offsets
@@ -115,17 +113,22 @@ void project(const Image& target, const Volume8& volume, mat3 view) {
             float sum = accumulator[0];
             maxSum = max(maxSum, sum);
             int linear12 = min(int(sum), 0x1000); // 8->12 (/16)
-            extern uint8 sRGB_forward[0x1000];*/
+            extern uint8 sRGB_forward[0x1000];
             image[y*imageStride+x] = 0xFF; //byte4(sRGB_forward[linear12], sRGB_forward[linear12], sRGB_forward[linear12], 0xFF);
+#else
+            int3 linear12 = clip(int3(0), 0x1000*(int3(position[0],position[1],position[2])+int3(size.x/2))/size.x, int3(0x1000)); // 8->12 (/16)
+            extern uint8 sRGB_forward[0x1000];
+            image[y*imageStride+x] = byte4(sRGB_forward[linear12[0]], sRGB_forward[linear12[1]], sRGB_forward[linear12[2]], 0xFF);
+#endif
         }
     } );
-    log(maxSum);
+    //log(maxSum);
 }
 
 
-void project(const Image& image, const Volume8& volume, real angle) {
+void project(const Image& image, const Volume8& volume, vec2 angles) {
     mat3 view;
-    view.rotateX(-PI/2);
-    view.rotateZ(angle);
+    view.rotateX(angles.y); // Pitch
+    view.rotateZ(angles.x); // Yaw
     project(image, volume, view);
 }

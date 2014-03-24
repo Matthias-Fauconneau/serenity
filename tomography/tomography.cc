@@ -5,19 +5,23 @@
 Volume8 synthetic(int3 size);
 
 //#include "project.h" // Links project.cc
-void project(const Image& image, const Volume8& volume, real angle);
+void project(const Image& image, const Volume8& volume, vec2 angles);
 
 struct View : Widget {
     const Volume8& volume;
-    real angle = 0;
+    int2 lastPos = 0;
+    vec2 rotation = vec2(0, -PI/2);
     View(const Volume8& volume) : volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
+        int2 delta = cursor-lastPos;
+        lastPos = cursor;
         if(!button) return false;
-        angle = 2*PI*cursor.x/size.x;
+        rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
+        rotation.y = clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
         return true;
     }
     void render(const Image& target) override {
-        project(target, volume, angle);
+        project(target, volume, rotation);
     }
 };
 

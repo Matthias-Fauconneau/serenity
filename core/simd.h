@@ -46,7 +46,7 @@ inline v4sf abs(v4sf a) { return andNot(signBit, a); }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
-#define shuffle __builtin_shufflevector
+#define shuffle(v1, v2, i1, i2, i3, i4) __builtin_shufflevector(v1,v2, i1,i2, 4+(i3), 4+(i4))
 inline v4sf hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
 inline v4sf dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
 inline v4sf hsum(v4sf a) { return dot4(a,_1f); }
