@@ -71,9 +71,13 @@ static const Image& name ## Icon() { \
     return icon; \
 }
 
-struct Image16 {
-    Image16(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<uint16>(height*width); }
-    uint16& operator()(uint x, uint y) {assert(x<width && y<height); return data[y*width+x]; }
-    buffer<uint16> data;
+struct Imagef {
+    Imagef(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<float>(height*width); }
+    Imagef(int2 size) : Imagef(size.x, size.y) {}
+    int2 size() const { return int2(width,height); }
+    buffer<float> data;
     uint width, height;
 };
+
+/// Converts a linear float image to sRGB
+void convert(const Image& target, const Imagef& source, float max=0);

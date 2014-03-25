@@ -17,6 +17,16 @@ Image upsample(const Image& source) {
     return target;
 }
 
+void convert(const Image& target, const Imagef& source, float max) {
+    if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
+    for(uint i: range(source.data.size)) {
+        int linear12 = 0xFFF*min(1.f, source.data[i]/max);
+        extern uint8 sRGB_forward[0x1000];
+        uint8 sRGB = sRGB_forward[linear12];
+        target.data[i] = byte4(sRGB, sRGB, sRGB, 0xFF);
+    }
+}
+
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
     else if(startsWith(file,"\x89PNG"_)) return "PNG"_;

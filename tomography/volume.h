@@ -30,12 +30,12 @@ struct Volume {
 
 generic struct VolumeT : Volume {
     // Allocates a volume in private memory
-    VolumeT(int3 sampleCount) : Volume(sizeof(T), sampleCount) {}
+    VolumeT(int3 sampleCount) : Volume(sizeof(T), sampleCount) { interleavedLookup(*this); }
 
     operator const ref<T>() const { assert(data.size==sizeof(T)*size()); return ref<T>((const T*)data.data, data.size/sizeof(T)); }
     operator const mref<T>() { assert(data.size==sizeof(T)*size()); return mref<T>((T*)data.data, data.size/sizeof(T)); }
     operator const T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (const T*)data.data; }
-    operator T*() { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
+    operator T*() const { assert(data.size==sizeof(T)*size(), data.size, sizeof(T)*size()); return (T*)data.data; }
     mref<T> slice(size_t pos, size_t size) { return operator const mref<T>().slice(pos, size); }
     template<Type... Args> void clear(Args... args) { operator const mref<T>().clear(args...); }
     T operator()(uint x, uint y, uint z) const { return ((const T*)data.data)[index(x,y,z)]; }
