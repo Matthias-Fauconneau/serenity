@@ -18,14 +18,15 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
     // Volume
     int3 size = volume.sampleCount;
     assert_(size.x == size.y);
-    const float radius = size.x/2-1, halfHeight = size.z/2-1; // Cylinder parameters
+    const float radius = size.x/2-1-1, halfHeight = size.z/2-1-1; // Cylinder parameters (FIXME: margins)
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     uint8* const volumeData = volume; //TODO: 16bit
-    const uint64* const offsetX = volume.offsetX.data + volume.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint64* const offsetY = volume.offsetY.data + volume.sampleCount.y/2;
-    const uint64* const offsetZ = volume.offsetZ.data + volume.sampleCount.z/2;
+    const v4sf center = {(float)volume.sampleCount.x/2, (float)volume.sampleCount.y/2, (float)volume.sampleCount.z/2, 0};
+    const uint64* const offsetX = volume.offsetX.data;// + volume.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
+    const uint64* const offsetY = volume.offsetY.data;// + volume.sampleCount.y/2;
+    const uint64* const offsetZ = volume.offsetZ.data;// + volume.sampleCount.z/2;
 
     // Image
     #define tileSize 8
@@ -34,7 +35,8 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
     float* const imageData = (float*)image.data;
 
     // View
-    mat3 world = view.inverse().scale(max(max(size.x,size.y),size.z)*sqrt(2.)); // Transform normalized view space to world space
+    const float scaleFactor = 1; //sqrt(2.);
+    mat3 world = view.inverse().scale(max(max(size.x,size.y),size.z)*scaleFactor); // Transform normalized view space to world space
     vec3 vViewStepX = world * vec3(1./min(imageX,imageY),0,0); v4sf viewStepX = vViewStepX;
     vec3 vViewStepY = world * vec3(0,1./min(imageX,imageY),0); v4sf viewStepY = vViewStepY;
     const v4sf worldOrigin = world * vec3(0,0,0) - float(imageX/2)*vViewStepX - float(imageY/2)*vViewStepY;
@@ -76,11 +78,13 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
             const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
             const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
             const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-            v4sf position = origin + tmin * ray;
-            const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
+            v4sf position = center + origin + tmin * ray;
+            const v4sf texit = center + max(floatMMMm, tmax); // max, max, max, tmax
             float length = tmax[0]-tmin[0]; // Ray length (in voxels)
             if(forward) {
-                assert(length>0);
+                assert_(length>=0, length);
+                v4sf l = tmax-tmin;
+                assert_(l[0]==l[1] && l[1]==l[2] && l[2]==l[3], length);
                 if(!(length>0)) continue;
             }
             float sum = 0; // Accumulates/Updates samples along the ray
@@ -90,10 +94,10 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
             }
             for(;;) {
                 // Lookups sample offsets
-                const v4si p0 = cvtps2dq(position);
-                const uint vx0 = offsetX[p0[0]], vy0 = offsetY[p0[1]], vz0 = offsetZ[p0[2]]; //FIXME: gather
-#define TRILINEAR 0
+#define TRILINEAR 1
 #if TRILINEAR
+                const v4si p0 = cvttps2dq(position);
+                const uint vx0 = offsetX[p0[0]], vy0 = offsetY[p0[1]], vz0 = offsetZ[p0[2]]; //FIXME: gather
                 const v4si p1 = p0 +_1i;
                 const uint vx1 = offsetX[p1[0]], vy1 = offsetY[p1[1]], vz1 = offsetZ[p1[2]]; //FIXME: gather
                 // Loads samples (FIXME: gather)
@@ -110,14 +114,22 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
                 const v4sf sw_yz = z0101 * y0011;
                 const v4sf cx0 = cvtdq2ps(icx0);
                 const v4sf cx1 = cvtdq2ps(icx1);
-                const v4sf dpfv = dot4(sw_yz, x0000*cx0 + x1111*cx1);
-                if(forward) sum += dpfv[0]; // Accumulates trilinearly interpolated sample
-                else static_assert(0,""); //TODO: trilinear update, 16bit
+                if(forward) {
+                    const v4sf dpfv = dot4(sw_yz, x0000*cx0 + x1111*cx1);
+                    sum += dpfv[0]; // Accumulates trilinearly interpolated sample
+                } else { //TODO: trilinear, SIMD, 16bit
+                    static_assert(add || forward,"");
+                    //const v4si p = cvtps2dq(position);
+                    //const uint vx = offsetX[p[0]], vy = offsetY[p[1]], vz = offsetZ[p[2]]; //FIXME: gather
+                    volumeData[vx0 + vy0 + vz0] += sum; // Updates nearest sample (TODO: 16bit)
+                }
 #else // NEAREST
-                if(forward) sum += volumeData[vx0 + vy0 + vz0]; // Accumulates nearest sample
+                const v4si p = cvtps2dq(position);
+                const uint vx = offsetX[p[0]], vy = offsetY[p[1]], vz = offsetZ[p[2]]; //FIXME: gather
+                if(forward) sum += volumeData[vx + vy + vz]; // Accumulates nearest sample
                 else {
                     static_assert(add || forward,"");
-                    volumeData[vx0 + vy0 + vz0] += sum; // Updates nearest sample (TODO: 16bit)
+                    volumeData[vx + vy + vz] += sum; // Updates nearest sample (TODO: 16bit)
                 }
 #endif
                 position = position + ray; // Step

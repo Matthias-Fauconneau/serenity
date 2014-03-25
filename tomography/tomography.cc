@@ -25,7 +25,7 @@ struct View : Widget {
     void render(const Image& target) override {
         Imagef linear {target.size()};
         project(linear, *volume, rotation);
-        convert(target, linear, 0xFFF);
+        convert(target, linear, 0xFF*norm(volume->sampleCount));
     }
 };
 
@@ -39,20 +39,25 @@ struct Tomography {
         window.background = Window::NoBackground;
         window.actions[Space] = [this] { if(view.volume == &source) view.volume = &target; else view.volume = &source; window.render(); };
         window.show();
-
-        // Ordered single projection (uniform angle sampling)
-        const uint projectionCount = 64;
-        for(int i: range(projectionCount)) {
-            vec2 angles (2*PI*i/projectionCount, -PI/2);
-            Imagef sourceImage {source.sampleCount.xy()}; // Reconstructs at sensor resolution
-            projectMean(sourceImage, source, angles); // Projects validation
-            Imagef targetImage {sourceImage.size()};
-            projectMean(targetImage, target, angles); // Projects reconstruction
-            constexpr bool add = true;
-            if(add) for(uint j: range(targetImage.data.size)) targetImage.data[j] = sourceImage.data[j] - targetImage.data[j]; // Algebraic
-            else for(uint j: range(targetImage.data.size)) targetImage.data[j] = targetImage.data[j] ? sourceImage.data[j] / targetImage.data[j] : 0; // MART
-            assert_(add);
-            update(target, targetImage, angles); // Backprojects error image
-        }
+        window.frameSent = {this, &Tomography::step};
+    }
+    uint level = 1, index = 0;
+    Random random;
+    void step() {
+        //vec2 angles (2*PI*index/level, -PI/2);
+        vec2 angles (2*PI*random(), -PI/2);
+        Imagef sourceImage {source.sampleCount.xy()}; // Reconstructs at sensor resolution
+        projectMean(sourceImage, source, angles); // Projects validation
+        Imagef targetImage {sourceImage.size()};
+        projectMean(targetImage, target, angles); // Projects reconstruction
+        constexpr bool add = true;
+        if(add) for(uint j: range(targetImage.data.size)) targetImage.data[j] = sourceImage.data[j] - targetImage.data[j]; // Algebraic
+        else for(uint j: range(targetImage.data.size)) targetImage.data[j] = targetImage.data[j] ? sourceImage.data[j] / targetImage.data[j] : 0; // MART
+        assert_(add);
+        update(target, targetImage, angles); // Backprojects error image
+        index++;
+        if(index == level) index=0, level*=2;
+        if(view.volume == &target) window.render();
+        //window.setTitle(str(view.rotation.x));
     }
 } tomography;

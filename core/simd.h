@@ -60,5 +60,6 @@ inline v4sf dot2(v4sf a, v4sf b) { v4sf sq = a*b; return hadd(sq,sq); }
 inline v4sf hmin(v4sf a) { a = min(a, shuffle(a, a, 1,0,3,2)); return min(a, shuffle(a, a, 2,2,0,0)); }
 inline v4sf hmax(v4sf a) { a = max(a, shuffle(a, a, 1,0,3,2)); return max(a, shuffle(a, a, 2,2,0,0)); }
 
-inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
+inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); } // Rounds
+inline v4si cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); } // Truncates
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
