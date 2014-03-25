@@ -2,18 +2,18 @@
 #include "window.h"
 
 //#include "synthetic.h" // Links synthetic.cc
-Volume8 synthetic(int3 size);
+Volume16 synthetic(int3 size);
 
 //#include "project.h" // Links project.cc
-void project(const Imagef& target, const Volume8& source, vec2 angles);
-void projectMean(const Imagef& target, const Volume8& source, vec2 angles);
-void update(const Volume8& target, const Imagef& source, vec2 angles);
+void project(const Imagef& target, const Volume16& source, vec2 angles);
+void projectMean(const Imagef& target, const Volume16& source, vec2 angles);
+void update(const Volume16& target, const Imagef& source, vec2 angles);
 
-struct View : Widget {
-    const Volume8* volume;
+template<Type T> struct View : Widget {
+    const VolumeT<T>* volume;
     int2 lastPos = 0;
     vec2 rotation = vec2(0, -PI/3);
-    View(const Volume8* volume) : volume(volume) {}
+    View(const VolumeT<T>* volume) : volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
         int2 delta = cursor-lastPos;
         lastPos = cursor;
@@ -25,14 +25,14 @@ struct View : Widget {
     void render(const Image& target) override {
         Imagef linear {target.size()};
         project(linear, *volume, rotation);
-        convert(target, linear, 0xFF*norm(volume->sampleCount));
+        convert(target, linear, 0xFFFF*norm(volume->sampleCount));
     }
 };
 
 struct Tomography {
-    Volume8 source = synthetic(128);
-    Volume8 target {128};
-    View view {&target};
+    Volume16 source = synthetic(128);
+    Volume16 target {128};
+    View<uint16> view {&target};
     Window window {&view, int2(512), "Tomography"_};
     Tomography() {
         window.actions[Escape] = []{ exit(); };

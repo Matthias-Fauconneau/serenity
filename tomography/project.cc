@@ -13,7 +13,7 @@ static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 
 /// Accumulates (i.e projects) (forward=true) or updates (i.e backprojects) (forward=false)
 /// \note accumulate: add=true divides the sum by ray length (mean); update: add=true adds, add=false multiplies
-template<bool forward, bool add=true> void projectT(const Volume8& volume, const Imagef& image, mat3 view) {
+template<bool forward, bool add=true, Type T=uint16> void projectT(const VolumeT<T>& volume, const Imagef& image, mat3 view) {
     assert_(volume.tiled());
     // Volume
     int3 size = volume.sampleCount;
@@ -22,7 +22,7 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    uint8* const volumeData = volume; //TODO: 16bit
+    T* const volumeData = volume; //TODO: 16bit
     const v4sf center = {(float)volume.sampleCount.x/2, (float)volume.sampleCount.y/2, (float)volume.sampleCount.z/2, 0};
     const uint64* const offsetX = volume.offsetX.data;// + volume.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint64* const offsetY = volume.offsetY.data;// + volume.sampleCount.y/2;
@@ -140,13 +140,13 @@ template<bool forward, bool add=true> void projectT(const Volume8& volume, const
     } );
 }
 
-template<bool forward, bool add> void projectT(const Volume8& volume, const Imagef& image, vec2 angles) {
+template<bool forward, bool add, Type T> void projectT(const VolumeT<T>& volume, const Imagef& image, vec2 angles) {
     mat3 view;
     view.rotateX(angles.y); // Pitch
     view.rotateZ(angles.x); // Yaw
     projectT<forward, add>(volume, image, view);
 }
 
-void project(const Imagef& target, const Volume8& source, vec2 angles) { return projectT<true,false>(source, target, angles); }
-void projectMean(const Imagef& target, const Volume8& source, vec2 angles) { return projectT<true,true>(source, target, angles); }
-void update(const Volume8& target, const Imagef& source, vec2 angles) { return projectT<false,true>(target, source, angles); }
+void project(const Imagef& target, const Volume16& source, vec2 angles) { return projectT<true,false,uint16>(source, target, angles); }
+void projectMean(const Imagef& target, const Volume16& source, vec2 angles) { return projectT<true,true,uint16>(source, target, angles); }
+void update(const Volume16& target, const Imagef& source, vec2 angles) { return projectT<false,true,uint16>(target, source, angles); }
