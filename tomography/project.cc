@@ -12,8 +12,8 @@ static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 
 /// Accumulates (i.e projects) (forward=true) or updates (i.e backprojects) (forward=false)
-/// \note accumulate: add=true divides the sum by ray length (mean); update: add=true adds, add=false multiplies
-template<bool forward, bool add=true, Type T=uint16> void projectT(const VolumeT<T>& volume, const Imagef& image, mat3 view) {
+/// \note update: add=true adds, add=false multiplies
+template<bool forward, bool add=true, Type T> void projectT(const VolumeT<T>& volume, const Imagef& image, mat3 view) {
     assert_(volume.tiled());
     // Volume
     int3 size = volume.sampleCount;
@@ -22,7 +22,7 @@ template<bool forward, bool add=true, Type T=uint16> void projectT(const VolumeT
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    T* const volumeData = volume; //TODO: 16bit
+    T* const volumeData = volume;
     const v4sf center = {(float)volume.sampleCount.x/2, (float)volume.sampleCount.y/2, (float)volume.sampleCount.z/2, 0};
     const uint64* const offsetX = volume.offsetX.data;// + volume.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
     const uint64* const offsetY = volume.offsetY.data;// + volume.sampleCount.y/2;
@@ -81,28 +81,22 @@ template<bool forward, bool add=true, Type T=uint16> void projectT(const VolumeT
             v4sf position = center + origin + tmin * ray;
             const v4sf texit = center + max(floatMMMm, tmax); // max, max, max, tmax
             float length = tmax[0]-tmin[0]; // Ray length (in voxels)
-            if(forward) {
-                assert_(length>=0, length);
-                v4sf l = tmax-tmin;
-                assert_(l[0]==l[1] && l[1]==l[2] && l[2]==l[3], length);
-                if(!(length>0)) continue;
-            }
             float sum = 0; // Accumulates/Updates samples along the ray
             if(!forward) {
-                sum = image[y*imageStride+x];
-                if(sum<1) continue; //TODO: 16bit
+                if(length<1) continue;
+                sum = image[y*imageStride+x] / length;
             }
             for(;;) {
                 // Lookups sample offsets
-#define TRILINEAR 1
+#define TRILINEAR 0
 #if TRILINEAR
                 const v4si p0 = cvttps2dq(position);
                 const uint vx0 = offsetX[p0[0]], vy0 = offsetY[p0[1]], vz0 = offsetZ[p0[2]]; //FIXME: gather
                 const v4si p1 = p0 +_1i;
                 const uint vx1 = offsetX[p1[0]], vy1 = offsetY[p1[1]], vz1 = offsetZ[p1[2]]; //FIXME: gather
                 // Loads samples (FIXME: gather)
-                const v4si icx0 = {volumeData[vx0 + vy0 + vz0], volumeData[vx0 + vy0 + vz1], volumeData[vx0 + vy1 + vz0], volumeData[vx0 + vy1 + vz1]};
-                const v4si icx1 = {volumeData[vx1 + vy0 + vz0], volumeData[vx1 + vy0 + vz1], volumeData[vx1 + vy1 + vz0], volumeData[vx1 + vy1 + vz1]};
+                const v4sf/*i i*/cx0 = {volumeData[vx0 + vy0 + vz0], volumeData[vx0 + vy0 + vz1], volumeData[vx0 + vy1 + vz0], volumeData[vx0 + vy1 + vz1]};
+                const v4sf/*i i*/cx1 = {volumeData[vx1 + vy0 + vz0], volumeData[vx1 + vy0 + vz1], volumeData[vx1 + vy1 + vz0], volumeData[vx1 + vy1 + vz1]};
                 // Computes trilinear interpolation coefficients
                 const v4sf pc = position - cvtdq2ps(p0);
                 const v4sf _1mpc = _1f - pc;
@@ -112,30 +106,26 @@ template<bool forward, bool add=true, Type T=uint16> void projectT(const VolumeT
                 const v4sf x0000 = shuffle(_1mpc, _1mpc, 0,0,0,0);
                 const v4sf z0101 = shuffle(z0011, z0011, 0,2,0,2);
                 const v4sf sw_yz = z0101 * y0011;
-                const v4sf cx0 = cvtdq2ps(icx0);
-                const v4sf cx1 = cvtdq2ps(icx1);
+                //const v4sf cx0 = cvtdq2ps(icx0);
+                //const v4sf cx1 = cvtdq2ps(icx1);
                 if(forward) {
                     const v4sf dpfv = dot4(sw_yz, x0000*cx0 + x1111*cx1);
                     sum += dpfv[0]; // Accumulates trilinearly interpolated sample
-                } else { //TODO: trilinear, SIMD, 16bit
-                    static_assert(add || forward,"");
-                    //const v4si p = cvtps2dq(position);
-                    //const uint vx = offsetX[p[0]], vy = offsetY[p[1]], vz = offsetZ[p[2]]; //FIXME: gather
-                    volumeData[vx0 + vy0 + vz0] += sum; // Updates nearest sample (TODO: 16bit)
+                } else { //TODO: trilinear, SIMD
+                    const v4si p = cvtps2dq(position);
+                    const uint vx = offsetX[p[0]], vy = offsetY[p[1]], vz = offsetZ[p[2]]; //FIXME: gather
+                    if(add) volumeData[vx + vy + vz] = max(0.f, volumeData[vx + vy + vz] + sum); else volumeData[vx + vy + vz] *= sum; // Updates nearest sample
                 }
 #else // NEAREST
                 const v4si p = cvtps2dq(position);
                 const uint vx = offsetX[p[0]], vy = offsetY[p[1]], vz = offsetZ[p[2]]; //FIXME: gather
                 if(forward) sum += volumeData[vx + vy + vz]; // Accumulates nearest sample
-                else {
-                    static_assert(add || forward,"");
-                    volumeData[vx + vy + vz] += sum; // Updates nearest sample (TODO: 16bit)
-                }
+                else if(add) volumeData[vx + vy + vz] = max(0.f, volumeData[vx + vy + vz] + sum); else volumeData[vx + vy + vz] *= sum; // Updates nearest sample
 #endif
                 position = position + ray; // Step
                 if(mask(position > texit)) break; // Check for exit intersection or saturation
             }
-            if(forward) image[y*imageStride+x] = add ? sum / length : sum; // Normalizes sum by ray length (for additive reconstruction)
+            if(forward) image[y*imageStride+x] = sum; //add ? sum / length : sum; // Normalizes sum by ray length (for additive reconstruction)
         }
     } );
 }
@@ -147,6 +137,7 @@ template<bool forward, bool add, Type T> void projectT(const VolumeT<T>& volume,
     projectT<forward, add>(volume, image, view);
 }
 
-void project(const Imagef& target, const Volume16& source, vec2 angles) { return projectT<true,false,uint16>(source, target, angles); }
-void projectMean(const Imagef& target, const Volume16& source, vec2 angles) { return projectT<true,true,uint16>(source, target, angles); }
-void update(const Volume16& target, const Imagef& source, vec2 angles) { return projectT<false,true,uint16>(target, source, angles); }
+void project(const Imagef& target, const VolumeF& source, vec2 angles) { return projectT<true,false,float>(source, target, angles); }
+//void projectMean(const Imagef& target, const VolumeF& source, vec2 angles) { return projectT<true,true,float>(source, target, angles); }
+void update(const VolumeF& target, const Imagef& source, vec2 angles) { return projectT<false,true,float>(target, source, angles); }
+void updateMART(const VolumeF& target, const Imagef& source, vec2 angles) { return projectT<false,false,float>(target, source, angles); }

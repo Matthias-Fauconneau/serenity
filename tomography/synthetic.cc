@@ -52,7 +52,7 @@ generic void synthetic(VolumeT<T>& target, int3 size) {
             mat4 worldToBox = ellipsoid.inverse();
             for(int z: range(min.z, max.z+1)) for(int y: range(min.y, max.y+1)) for(int x: range(min.x, max.x+1)) {
                 vec3 p = worldToBox*vec3(x,y,z);
-                if(sq(p) < 1) target(x,y,z) = ~0;
+                if(sq(p) < 1) target(x,y,z) = 1.f; //~0;
             }
             ellipsoids << ellipsoid;
         }
@@ -85,4 +85,4 @@ break_:;
 #endif
 }
 
-Volume16 synthetic(int3 size) { Volume16 target(size); synthetic(target, size); return target; }
+VolumeF synthetic(int3 size) { VolumeF target(size); synthetic(target, size); return target; }

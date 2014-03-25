@@ -127,7 +127,8 @@ void Window::event() {
                 shmctl(shm, IPC_RMID, 0);
             }
             target.width=size.x, target.height=size.y, target.stride=align(16,size.x);
-            shm = check( shmget(0, target.height*target.stride*sizeof(byte4) , IPC_CREAT | 0777) );
+            target.buffer.size = target.height*target.stride;
+            shm = check( shmget(0, target.buffer.size*sizeof(byte4), IPC_CREAT | 0777) );
             target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
