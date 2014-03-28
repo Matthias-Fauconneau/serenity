@@ -6,15 +6,17 @@ VolumeF synthetic(int3 size);
 
 //#include "project.h" // Links project.cc
 void project(const Imagef& target, const VolumeF& source, vec2 angles);
-//void projectMean(const Imagef& target, const VolumeF& source, vec2 angles);
+void projectTrilinear(const Imagef& target, const VolumeF& source, vec2 angles);
 void update(const VolumeF& target, const Imagef& source, vec2 angles);
 void updateMART(const VolumeF& target, const Imagef& source, vec2 angles);
 
-template<Type T> struct View : Widget {
-    const VolumeT<T>* volume;
+struct View : Widget {
+    const VolumeF* volume;
     int2 lastPos = 0;
     vec2 rotation = vec2(0, -PI/3);
-    View(const VolumeT<T>* volume) : volume(volume) {}
+    bool trilinear = false;
+
+    View(const VolumeF* volume) : volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
         int2 delta = cursor-lastPos;
         lastPos = cursor;
@@ -25,41 +27,41 @@ template<Type T> struct View : Widget {
     }
     void render(const Image& target) override {
         Imagef linear {target.size()};
-        project(linear, *volume, rotation);
-        convert(target, linear, /*0xFFFF**/norm(volume->sampleCount));
+        if(trilinear) projectTrilinear(linear, *volume, rotation);
+        else project(linear, *volume, rotation);
+        convert(target, linear, norm(volume->sampleCount));
     }
 };
 
 struct Tomography {
-    VolumeF source = synthetic(128);
-    VolumeF target {128};
-    View<float> view {&target};
-    Window window {&view, int2(512), "Tomography"_};
+    const int N = 256;
+    VolumeF source = synthetic(N);
+    VolumeF target {N};
+    View view {&target};
+    Window window {&view, int2(768), "Tomography"_};
     static constexpr bool MART = false;
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
+        window.actions['T'] = [this] { view.trilinear = !view.trilinear; };
         window.actions[Space] = [this] { if(view.volume == &source) view.volume = &target; else view.volume = &source; window.render(); };
         window.show();
         window.frameSent = {this, &Tomography::step};
         if(MART) target.data.clear(1);
     }
-    uint level = 1, index = 0;
     Random random;
     void step() {
-        //vec2 angles (2*PI*index/level, -PI/2);
-        vec2 angles (2*PI*random(), -PI/2);
-        Imagef sourceImage {source.sampleCount.xy()}; // Reconstructs at sensor resolution
-        project(sourceImage, source, angles); // Projects validation
-        Imagef targetImage {sourceImage.size()};
-        project(targetImage, target, angles); // Projects reconstruction
-        if(!MART) for(uint j: range(targetImage.data.size)) targetImage.data[j] = sourceImage.data[j] - targetImage.data[j]; // Algebraic
-        else for(uint j: range(targetImage.data.size)) targetImage.data[j] = targetImage.data[j] ? sourceImage.data[j] / targetImage.data[j] : 0; // MART
-        if(!MART) update(target, targetImage, angles);
-        else updateMART(target, targetImage, angles); // Backprojects error image
-        index++;
-        if(index == level) index=0, level*=2;
+        for(int unused i: range(1)) {
+            vec2 angles (2*PI*random(), -PI/2);
+            Imagef sourceImage {source.sampleCount.xy()}; // Reconstructs at sensor resolution
+            project(sourceImage, source, angles); // Projects validation
+            Imagef targetImage {sourceImage.size()};
+            project(targetImage, target, angles); // Projects reconstruction
+            if(!MART) for(uint j: range(targetImage.data.size)) targetImage.data[j] = sourceImage.data[j] - targetImage.data[j]; // Algebraic
+            else for(uint j: range(targetImage.data.size)) targetImage.data[j] = targetImage.data[j] ? sourceImage.data[j] / targetImage.data[j] : 0; // MART
+            if(!MART) update(target, targetImage, angles);
+            else updateMART(target, targetImage, angles); // Backprojects error image
+        }
         if(view.volume == &target) window.render();
-        //window.setTitle(str(view.rotation.x));
     }
 } tomography;
