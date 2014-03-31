@@ -2,8 +2,6 @@
 #include "image.h"
 
 generic struct VolumeT;
-typedef VolumeT<uint8> Volume8;
-typedef VolumeT<uint16> Volume16;
 typedef VolumeT<float> VolumeF;
 
 struct Volume {

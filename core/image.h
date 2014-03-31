@@ -26,8 +26,8 @@ struct Image {
 
     explicit operator bool() const { return data; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
-    inline byte4& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*stride+x]; }
     int2 size() const { return int2(width,height); }
+    inline byte4& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*stride+x]; }
 
     ::buffer<byte4> buffer; //FIXME: shared
     byte4* data=0; // First pixel
@@ -71,13 +71,14 @@ static const Image& name ## Icon() { \
     return icon; \
 }
 
-struct Imagef {
-    Imagef(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<float>(height*width); }
-    Imagef(int2 size) : Imagef(size.x, size.y) {}
+struct ImageF {
+    ImageF(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<float>(height*width); }
+    ImageF(int2 size) : ImageF(size.x, size.y) {}
     int2 size() const { return int2(width,height); }
+    inline float& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
     buffer<float> data;
     uint width, height;
 };
 
 /// Converts a linear float image to sRGB
-void convert(const Image& target, const Imagef& source, float max=0);
+void convert(const Image& target, const ImageF& source, float max=0);

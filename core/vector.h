@@ -2,7 +2,7 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
-#include "simd.h"
+typedef float v4sf __attribute((__vector_size__ (16)));
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -11,9 +11,9 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 
     vec(){}
     /// Initializes all components to the same value \a v
-    vec(T v){ for(uint i=0;i<N;i++) at(i)=v; }
+    constexpr vec(T v) { for(uint i=0;i<N;i++) at(i)=v; }
     /// Initializes components separately
-    template<Type... Args> explicit constexpr vec(T a, T b, Args... args):V<T>{a,b,T(args)...}{
+    template<Type... Args> constexpr vec(T a, T b, Args... args):V<T>{a,b,T(args)...}{
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array
@@ -30,7 +30,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     /// Unchecked accessor
     T& at(uint i) { return ((T*)this)[i]; }
     /// Accessor (checked in debug build, const)
-    const T& operator[](uint i) const { assert(i<N); return at(i); }
+    constexpr T operator[](uint i) const { assert(i<N); return at(i); }
     /// Accessor (checked in debug build)
     T& operator[](uint i) { assert(i<N); return at(i); }
     /// \name Operators
@@ -120,9 +120,10 @@ inline vec3 normal(vec3 v) {
 
 generic struct xyzw {
     T x,y,z,w;
+    constexpr xyzw() {}
     vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
-    vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
+    vec< ::xy,T,2> xy()const{ return *(vec< ::xy,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4;

@@ -49,8 +49,11 @@ void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha)
     byte4& target_sRGB = target(x,y);
     vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
     int3 linearBlend = int3(round((0xFFF*(1-alpha))*vec3(target_linear) + (0xFFF*alpha)*source_linear));
-    target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
-            min(0xFF,target_sRGB.a+int(round(0xFF*alpha)))); // Additive alpha accumulation
+    uint8 b = sRGB_forward[linearBlend[0]];
+    uint8 g = sRGB_forward[linearBlend[1]];
+    uint8 r = sRGB_forward[linearBlend[2]];
+    byte4 sRGBA (b,g,r,0xFF);
+    target_sRGB = sRGBA;
 }
 
 static void fill(uint* target, uint stride, uint w, uint h, uint value) {

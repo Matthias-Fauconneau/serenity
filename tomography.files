@@ -62,7 +62,9 @@ tomography/volume.h
 tomography/volume-operation.h
 tomography/slice.cc
 tomography/slice.h
-tomography/synthetic.cc
+tomography/phantom.cc
 tomography/project.cc
 tomography/tomography.cc
 
+tomography/phantom.h
+tomography/project.h

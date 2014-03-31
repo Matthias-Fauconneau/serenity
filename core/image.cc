@@ -17,7 +17,7 @@ Image upsample(const Image& source) {
     return target;
 }
 
-void convert(const Image& target, const Imagef& source, float max) {
+void convert(const Image& target, const ImageF& source, float max) {
     if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
     assert_(target.buffer.size == source.data.size, target.buffer.size, source.data.size, target.size(), source.size());
     for(uint i: range(source.data.size)) {

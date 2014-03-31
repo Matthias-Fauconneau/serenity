@@ -54,7 +54,7 @@ inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
 
 inline int mask(v4sf a) { return __builtin_ia32_movmskps(a); }
-#define blend __builtin_ia32_blendps
+#define blendps __builtin_ia32_blendps
 inline v4sf blendv(v4sf a, v4sf b, v4sf m) { return __builtin_ia32_blendvps(a, b, m); }
 inline v4sf dot2(v4sf a, v4sf b) { v4sf sq = a*b; return hadd(sq,sq); }
 inline v4sf hmin(v4sf a) { a = min(a, shuffle(a, a, 1,0,3,2)); return min(a, shuffle(a, a, 2,2,0,0)); }

@@ -1,7 +1,6 @@
-#include "thread.h"
+#include "project.h"
 #include "simd.h"
-#include "volume.h"
-#include "matrix.h"
+#include "thread.h"
 
 // SIMD constants for cylinder intersections
 static const v4sf _2f = float4( 2 );
@@ -13,11 +12,12 @@ static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 
 /// Accumulates (i.e projects) (forward=true) or updates (i.e backprojects) (forward=false)
 /// \note update: add=true adds, add=false multiplies
-template<bool forward, bool add=true, bool trilinear=false> void projectT(const VolumeF& volume, const Imagef& image, mat3 view) {
-    assert_(volume.tiled());
+template<bool forward, bool add=true, bool trilinear=false> void projectT(const VolumeF& volume, const ImageF& image, mat4 view) {
+    const float stepSize = 1; // FIXME
+
     // Volume
     int3 size = volume.sampleCount;
-    assert_(size.x == size.y);
+    assert_(volume.tiled() && size.x == size.y);
     const float radius = size.x/2-1-1, halfHeight = size.z/2-1-1; // Cylinder parameters (FIXME: margins)
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
@@ -35,13 +35,12 @@ template<bool forward, bool add=true, bool trilinear=false> void projectT(const 
     float* const imageData = (float*)image.data;
 
     // View
-    const float scaleFactor = 1; //sqrt(2.);
-    mat3 world = view.inverse().scale(max(max(size.x,size.y),size.z)*scaleFactor); // Transform normalized view space to world space
+    mat4 world = view.inverse().scale(max(max(size.x,size.y),size.z)); // Transform normalized view space to world space
     vec3 vViewStepX = world * vec3(1./min(imageX,imageY),0,0); v4sf viewStepX = vViewStepX;
     vec3 vViewStepY = world * vec3(0,1./min(imageX,imageY),0); v4sf viewStepY = vViewStepY;
     const v4sf worldOrigin = world * vec3(0,0,0) - float(imageX/2)*vViewStepX - float(imageY/2)*vViewStepY;
-    vec3 worldRay = normalize( view.transpose() * vec3(0,0,1) );
-    const v4sf ray = {worldRay.x, worldRay.y, worldRay.z, 1};
+    vec3 worldRay = stepSize * normalize( view.transpose() * vec3(0,0,1) );
+    const v4sf ray = {worldRay.x, worldRay.y, worldRay.z, stepSize};
     const v4sf rayZ = float4(worldRay.z);
     const v4sf raySlopeZ = float4(1/worldRay.z);
     const v4sf rayXYXY = {worldRay.x, worldRay.y, worldRay.x, worldRay.y};
@@ -65,7 +64,7 @@ template<bool forward, bool add=true, bool trilinear=false> void projectT(const 
             // Intersect cylinder side
             const v4sf originXYrayXY = shuffle(origin, ray, 0,1,0,1); // Ox Oy Dx Dy
             const v4sf cbcb = dot2(originXYXY, originXYrayXY); // OO OD OO OD (b=2OD)
-            const v4sf _1b1b = blend(_1f, cbcb, 0b1010); // 1 OD 1 OD
+            const v4sf _1b1b = blendps(_1f, cbcb, 0b1010); // 1 OD 1 OD
             const v4sf _4ac_bb = _m4a_4_m4a_4 * (cbcb*_1b1b - radiusR0R0); // -4ac bb -4ac bb
             const v4sf sqrtDelta = sqrt( hadd(_4ac_bb,_4ac_bb) );
             const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
@@ -80,7 +79,7 @@ template<bool forward, bool add=true, bool trilinear=false> void projectT(const 
             const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
             v4sf position = center + origin + tmin * ray;
             const v4sf texit = center + max(floatMMMm, tmax); // max, max, max, tmax
-            float length = tmax[0]-tmin[0]; // Ray length (in voxels)
+            float length = tmax[0]-tmin[0]; // Ray length (in steps)
             float sum = 0; // Accumulates/Updates samples along the ray
             if(!forward) {
                 if(length<1) continue;
@@ -108,10 +107,16 @@ template<bool forward, bool add=true, bool trilinear=false> void projectT(const 
                     if(forward) {
                         const v4sf dpfv = dot4(sw_yz, x0000*cx0 + x1111*cx1);
                         sum += dpfv[0]; // Accumulates trilinearly interpolated sample
-                    } else { //TODO: trilinear, SIMD
-                        const v4si p = cvtps2dq(position);
-                        const uint vx = offsetX[p[0]], vy = offsetY[p[1]], vz = offsetZ[p[2]]; //FIXME: gather
-                        if(add) volumeData[vx + vy + vz] = max(0.f, volumeData[vx + vy + vz] + sum); else volumeData[vx + vy + vz] *= sum; // Updates nearest sample
+                    } else { //TODO: SIMD scatter ?
+                        static_assert(add,"");
+                        volumeData[vx0 + vy0 + vz0] = max(0.f, volumeData[vx0 + vy0 + vz0] + _1mpc[0] * _1mpc[1] * _1mpc[2]*sum);
+                        volumeData[vx1 + vy0 + vz0] = max(0.f, volumeData[vx1 + vy0 + vz0] +    pc[0] * _1mpc[1] * _1mpc[2]*sum);
+                        volumeData[vx0 + vy1 + vz0] = max(0.f, volumeData[vx0 + vy1 + vz0] + _1mpc[0] *    pc[1] * _1mpc[2]*sum);
+                        volumeData[vx1 + vy1 + vz0] = max(0.f, volumeData[vx1 + vy1 + vz0] +    pc[0] *    pc[1] * _1mpc[2]*sum);
+                        volumeData[vx0 + vy0 + vz1] = max(0.f, volumeData[vx0 + vy0 + vz1] + _1mpc[0] * _1mpc[1] *    pc[2]*sum);
+                        volumeData[vx1 + vy0 + vz1] = max(0.f, volumeData[vx1 + vy0 + vz1] +    pc[0] * _1mpc[1] *    pc[2]*sum);
+                        volumeData[vx0 + vy1 + vz1] = max(0.f, volumeData[vx0 + vy1 + vz1] + _1mpc[0] *    pc[1] *    pc[2]*sum);
+                        volumeData[vx1 + vy1 + vz1] = max(0.f, volumeData[vx1 + vy1 + vz1] +    pc[0] *    pc[1] *    pc[2]*sum);
                     }
                 } else {
                     const v4si p = cvtps2dq(position);
@@ -127,14 +132,6 @@ template<bool forward, bool add=true, bool trilinear=false> void projectT(const 
     } );
 }
 
-template<bool forward, bool add, bool trilinear> void projectT(const VolumeF& volume, const Imagef& image, vec2 angles) {
-    mat3 view;
-    view.rotateX(angles.y); // Pitch
-    view.rotateZ(angles.x); // Yaw
-    projectT<forward, add, trilinear>(volume, image, view);
-}
-
-void project(const Imagef& target, const VolumeF& source, vec2 angles) { return projectT<true,false,false>(source, target, angles); }
-void projectTrilinear(const Imagef& target, const VolumeF& source, vec2 angles) { return projectT<true,false,true>(source, target, angles); }
-void update(const VolumeF& target, const Imagef& source, vec2 angles) { return projectT<false,true,false>(target, source, angles); }
-void updateMART(const VolumeF& target, const Imagef& source, vec2 angles) { return projectT<false,false,false>(target, source, angles); }
+void project(const ImageF& target, const VolumeF& source, mat4 projection) { return projectT<true,true,false>(source, target, projection); }
+void projectTrilinear(const ImageF& target, const VolumeF& source, mat4 projection) { return projectT<true,true,true>(source, target, projection); }
+void update(const VolumeF& target, const ImageF& source, mat4 projection) { return projectT<false,true,false>(target, source, projection); }
