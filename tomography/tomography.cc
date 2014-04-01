@@ -35,8 +35,8 @@ struct View : Widget {
 };
 
 struct Tomography {
-    const int N = 256;
-    Phantom phantom;
+    const uint N = 128;
+    Phantom phantom {10};
     VolumeF source = phantom.volume(N);
     VolumeF target {N};
     View view {&phantom, &source};
@@ -55,6 +55,7 @@ struct Tomography {
         for(string argument: arguments()) {
             if(argument=="view"_) view.volume = &source;
             if(argument=="compute"_) {
+                view.phantom = 0;
                 view.volume = &target;
                 window.frameSent = {this, &Tomography::step};
             }
