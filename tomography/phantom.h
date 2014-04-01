@@ -2,13 +2,13 @@
 #include "matrix.h"
 #include "volume.h"
 
-struct Ellipsoid : mat4 {
+struct Ellipsoid {
+    mat3 M;
+    vec3 center;
     float value;
-    Ellipsoid(const mat4& m, float value) : mat4(m), value(value) {}
-    Ellipsoid(float value, vec3 scale, vec3 origin, vec3 angles);
-    Ellipsoid inverse(const mat4& m) const;
-    bool contains(vec3 point) const { return norm(*this*point) < 1; }
-    bool contains(vec2 point) const { return norm(*this*point) < 1; }
+    Ellipsoid(float value, vec3 scale, vec3 center, vec3 angles);
+    bool contains(vec3 point) const;
+    float intersect(vec3 point, vec3 direction) const;
 };
 
 struct Phantom {

@@ -54,7 +54,7 @@ struct mat3 {
     mat3 inverse() const { return 1/det() * adjugate() ; }
 
     mat3 translate(vec2 v) const { mat3 r=*this; for(int i=0;i<2;i++) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
-    mat3 scale(float f) const { mat3 r=*this; for(int j=0;j<2;j++)for(int i=0;i<3;i++) r(i,j)*=f; return r; }
+    mat3 scale(vec3 v) const { mat3 r=*this; for(int j=0;j<3;j++) for(int i=0;i<3;i++) r(i,j)*=v[j]; return r; }
     mat3 rotateX(float angle) const { float c=cos(angle),s=sin(angle); mat3 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; return *this * r; }
     mat3 rotateY(float angle) const { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; return *this * r; }
     mat3 rotateZ(float angle) const { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; return *this * r; }

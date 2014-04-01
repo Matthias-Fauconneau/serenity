@@ -1,18 +1,28 @@
 #include "phantom.h"
 
-Ellipsoid::Ellipsoid(float value, vec3 scale, vec3 origin, vec3 angles) :
-    mat4(mat4().scale(scale).rotateX(angles.x).rotateY(angles.y).rotateZ(angles.z).translate(origin)),
-    //mat4(mat4().translate(origin).rotateX(angles.x).rotateY(angles.y).rotateZ(angles.z).scale(scale)),
+Ellipsoid::Ellipsoid(float value, vec3 scale, vec3 center, vec3 angles) :
+    M(mat3().scale(scale).rotateX(angles.x).rotateY(angles.y).rotateZ(angles.z).inverse()),
+    center(center),
     value(value) {}
 
-Ellipsoid Ellipsoid::inverse(const mat4& m) const { return { (m * (mat4)*this).inverse(), value}; }
+bool Ellipsoid::contains(vec3 point) const { return sq(M*(point-center)) < 1; }
+
+float Ellipsoid::intersect(vec3 point, vec3 direction) const {
+    vec3 p0 = M * direction;
+    vec3 p1 = M * (point-center);
+    float a = sq(p0);
+    float b = dot(p0, p1);
+    float c = sq(p1) - 1;
+    float d = sq(b) - a*c;
+    if(d<=0) return 0;
+    float t1 = - b - sqrt(d);
+    float t2 = - b + sqrt(d);
+    return (t2 - t1) / a;
+}
 
 Phantom::Phantom() : ellipsoids(copy(buffer<Ellipsoid>({
-//A,   { a   ,  b  ,  c  }, {    x,     y,    z}, { phi, theta, psi}
-#if 0
-{ 1,   {0.5    ,0.5    ,0.5    }, {    0,     0,    0}, {   0, 0, 0}}
-#else
 // Yu H, Ye Y, Wang G, Katsevich-Type Algorithms for Variable Radius Spiral Cone-Beam CT
+//A,   { a   ,  b  ,  c  }, {    x,     y,    z}, { phi, theta, psi}
 { 1,   {.6900, .920, .900}, {    0,     0,    0}, {   0, 0, 0}},
 {-0.8, {.6624, .874, .880}, {    0,     0,    0}, {   0, 0, 0}},
 {-0.2, {.4100, .160, .210}, { -.22,     0, -.25}, { 108, 0, 0}},
@@ -27,28 +37,20 @@ Phantom::Phantom() : ellipsoids(copy(buffer<Ellipsoid>({
 }))) {}
 
 VolumeF Phantom::volume(int3 size) const {
-    buffer<Ellipsoid> inverseEllipsoids (ellipsoids.size);
-    mat4 projection = mat4().scale(vec3(size)/2.f).translate(1);
-    for(uint i: range(ellipsoids.size)) inverseEllipsoids[i] =  ellipsoids[i].inverse(projection);
-
     VolumeF target (size);
     for(int z: range(size.z)) for(int y: range(size.y)) for(int x: range(size.x)) {
-        for(Ellipsoid e: inverseEllipsoids) if(e.contains(vec3(x,y,z))) target(x,y,z) += e.value;
+        for(Ellipsoid e: ellipsoids) if(e.contains(vec3(x,y,z)*2.f/vec3(size)-vec3(1))) target(x,y,z) += e.value;
     }
     return target;
 }
 
 ImageF Phantom::project(int2 size, mat4 projection) const {
-    buffer<Ellipsoid> inverseEllipsoids (ellipsoids.size);
-    projection = mat4().scale(vec3(vec2(min(size.x,size.y)/2),0)).translate(vec3(1,1,0)) * projection;
-    for(uint i: range(ellipsoids.size)) {
-        inverseEllipsoids[i] = ellipsoids[i].inverse(projection);
-    }
-
     ImageF target (size);
     target.data.clear();
     for(uint y: range(target.height)) for(uint x: range(target.width)) {
-        for(Ellipsoid e: inverseEllipsoids) if(e.contains(vec2(x,y))) target(x,y) += e.value;
+        vec3 origin    = projection.inverse() * (vec3(x,y,0) * (2.f/min(size.x,size.y)) - vec3(1,1,0));
+        constvec3 direction = normalize(projection.transpose() * vec3(0,0,1));
+        for(Ellipsoid e: ellipsoids) target(x,y) += e.intersect(origin, direction) * e.value;
     }
     return target;
 }

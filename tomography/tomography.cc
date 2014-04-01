@@ -22,23 +22,25 @@ struct View : Widget {
     }
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/);
-        ImageF linear {target.size()};
-        if(phantom) linear = phantom->project(target.size(), projection);
-        else {
+        if(phantom) {
+            ImageF linear = phantom->project(target.size(), projection);
+            convert(target, linear, 2);
+        } else {
+            ImageF linear {target.size()};
             if(trilinear) projectTrilinear(linear, *volume, projection);
             else project(linear, *volume, projection);
+            convert(target, linear, volume->sampleCount.x); //norm(volume->sampleCount)/norm(vec3(1)));
         }
-        convert(target, linear, norm(volume->sampleCount));
     }
 };
 
 struct Tomography {
-    const int N = 128;
+    const int N = 256;
     Phantom phantom;
     VolumeF source = phantom.volume(N);
     VolumeF target {N};
     View view {&phantom, &source};
-    Window window {&view, int2(768), "Tomography"_};
+    Window window {&view, int2(512), "Tomography"_};
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
