@@ -20,20 +20,20 @@ struct View : Widget {
         return true;
     }
     void render(const Image& target) override {
-        mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/);
+        mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
         if(phantom) {
-            ImageF linear = phantom->project(target.size(), projection.scale(vec3(volume->sampleCount/2)));
-            convert(target, linear/*, 2*/);
+            ImageF linear = (volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale((vec3(volume->sampleCount)-vec3(1))/2.f));
+            convert(target, linear, volume->sampleCount.x);
         } else {
             ImageF linear {target.size()};
             project(linear, *volume, projection);
-            convert(target, linear/*, volume->sampleCount.x*/); //norm(volume->sampleCount)/norm(vec3(1)));
+            convert(target, linear, volume->sampleCount.x); //norm(volume->sampleCount)/norm(vec3(1)));
         }
     }
 };
 
 struct Tomography {
-    const uint N = 512;
+    const uint N = 32; //512
     Phantom phantom {N};
     VolumeF source = phantom.volume(N);
     map<Projection, ImageF> projections {N};
@@ -43,7 +43,11 @@ struct Tomography {
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
-        window.actions['p'] = [this] { view.phantom = view.phantom ? 0 : &phantom; window.render(); };
+        window.actions['p'] = [this] {
+            if(view.phantom) view.phantom = 0, window.setTitle("Source");
+            else view.phantom = &phantom, window.setTitle("Phantom");
+            window.render();
+        };
         window.actions[Space] = [this] { step(); };
         window.actions[Return] = [this] {
             if(view.volume == &source) view.volume = &target; else view.volume = &source;
@@ -55,13 +59,18 @@ struct Tomography {
                 view.volume = &source;
             }
             if(argument=="compute"_) {
-                for(uint i: range(1)) {
-                    int3 size = target.sampleCount;
-                    mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/).scale(1/max(max(size.x,size.y),size.z));
-                    projections.insertMulti(projection, phantom.project(N, projection)); // Projects phantom
+                float sum = 0;
+                for(uint i: range(N)) {
+                    mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
+                    ImageF image = (target.sampleCount.x/2) * phantom.project(N, projection.scale((vec3(target.sampleCount)-vec3(1))/2.f));
+                    sum += ::sum(image.data);
+                    projections.insertMulti(projection, move(image)); // Projects phantom
                 }
+                float volume = (PI*sq((target.sampleCount.x-1)/2)*target.sampleCount.z);
+                float mean = (sum/N) / volume; // Projection energy / volume of the support
+                target.clear(mean);
                 step();
-                //window.frameSent = {this, &Tomography::step};
+                window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
                 view.volume = &target;
             }

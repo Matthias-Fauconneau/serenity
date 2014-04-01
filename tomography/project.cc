@@ -9,7 +9,7 @@ static const v4sf floatMax = float4(FLT_MAX);
 static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 
-float CylinderVolume::accumulate(const Projection& p, const v4sf origin) {
+float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& length) {
     // Intersects cap disks
     const v4sf originZ = shuffle(origin, origin, 2,2,2,2);
     const v4sf capT = (capZ - originZ) * p.raySlopeZ; // top top bottom bottom
@@ -27,11 +27,12 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin) {
     const v4sf sideZ = abs(originZ + sideT * p.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = radiusSqHeight > capSideP;
-    if(!mask(tMask)) return 0;
+    if(!mask(tMask)) { length=0; return 0; }
 
     const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
+    length = tmax[0]-tmin[0]; // Ray length (in steps)
     v4sf position = volumeOrigin + origin + tmin * p.ray;
     const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
     float sum = 0; // Accumulates/Updates samples along the ray
@@ -59,7 +60,7 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin) {
         sum += dpfv[0]; // Accumulates trilinearly interpolated sample
         position = position + p.ray; // Step
     } while(!mask(position > texit)); // Check for exit intersection
-    return sum;
+    return sum; //2 * sum / volume.sampleCount.x;
 }
 
 void project(const ImageF& image, CylinderVolume volume, Projection projection) {
@@ -78,26 +79,42 @@ void project(const ImageF& image, CylinderVolume volume, Projection projection) 
         const v4sf tileOrigin = worldOrigin + float4(tileX * tileSize) * viewStepX + float4(tileY * tileSize) * viewStepY;
         for(uint y=0; y<tileSize; y++) for(uint x=0; x<tileSize; x++) {
             const v4sf origin = tileOrigin + float4(x) * viewStepX + float4(y) * viewStepY;
-            image[y*imageStride+x] = volume.accumulate(projection, origin);
+            float length;
+            image[y*imageStride+x] = volume.accumulate(projection, origin, length);
         }
     } );
 }
 
 void updateSIRT(CylinderVolume volume, const map<Projection, ImageF>& projections) {
     chunk_parallel(volume.volume.size(), [&](uint, uint offset, uint size) {
+        const vec3 center = vec3(volume.size-int3(1))/2.f;
+        const vec2 imageCenter = vec2(projections.values[0].size())/2.f;
+        const float radiusSq = sq(center.x);
         for(uint index: range(offset, offset+size)) {
-            const vec3 origin = vec3(zOrder(index)) - vec3(volume.size)/2.f;
-            for(uint i: range(projections.size())) {
-                const Projection& projection = projections.keys[i];
+            const vec3 origin = vec3(zOrder(index)) - center;
+            if(sq(origin.xy()) >= radiusSq) continue;
+            float projectionSum = 0, lengthSum = 0;
+            float reconstructionSum = 0, pointCount = 0;
+            for(uint projectionIndex: range(projections.size())) {
+                const Projection& projection = projections.keys[projectionIndex];
                 // Accumulate
-                float sum = volume.accumulate(projection, origin);
+                float length;
+                float sum = volume.accumulate(projection, origin, length);
+                reconstructionSum += sum;
+                lengthSum += length;
+                pointCount += floor(length);
                 // Sample
-                const ImageF& image = projections.values[i];
-                vec2 xy = ( (projection.projection * origin).xy() + vec2(1) ) * vec2(image.size()/2);
-                float sample = image(xy.x, xy.y); // FIXME: bilinear
-                // Update
-                volume.volumeData[index] += sample - sum;
+                const ImageF& P = projections.values[projectionIndex];
+                vec2 xy = (projection.projection * origin).xy() + imageCenter;
+                uint i = xy.x, j = xy.y;
+                float u = fract(xy.x), v = fract(xy.y);
+                float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
+                           v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+                projectionSum += s;
             }
+            // Update
+            float& v = volume.volumeData[index];
+            v = max(0.f, v + projectionSum/lengthSum - reconstructionSum/pointCount);
         }
     });
 }

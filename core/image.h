@@ -80,5 +80,7 @@ struct ImageF {
     uint width, height;
 };
 
+inline ImageF operator*(float scale, ImageF&& image) { for(float& v: image.data) v *= scale; return move(image); }
+
 /// Converts a linear float image to sRGB
 void convert(const Image& target, const ImageF& source, float max=0);

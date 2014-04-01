@@ -32,12 +32,12 @@ struct CylinderVolume {
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const v4sf volumeOrigin = {(float)size.x/2, (float)size.y/2, (float)size.z/2, 0};
     float* const volumeData = volume;
-    const uint64* const offsetX = volume.offsetX.data;// + volume.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint64* const offsetY = volume.offsetY.data;// + volume.sampleCount.y/2;
-    const uint64* const offsetZ = volume.offsetZ.data;// + volume.sampleCount.z/2;
+    const uint64* const offsetX = volume.offsetX.data;
+    const uint64* const offsetY = volume.offsetY.data;
+    const uint64* const offsetZ = volume.offsetZ.data;
 
     CylinderVolume(const VolumeF& volume) : volume(volume) { assert_(volume.tiled() && size.x == size.y); }
-    float accumulate(const Projection& p, const v4sf origin);
+    float accumulate(const Projection& p, const v4sf origin, float& length);
 };
 
 void project(const ImageF& image, CylinderVolume volume, Projection projection);
