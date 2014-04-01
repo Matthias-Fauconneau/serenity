@@ -9,6 +9,7 @@ template<Type K, Type V> struct key_value { K key; V value; };
 /// Associates keys with values
 template<Type K, Type V> struct map {
     map(){}
+    map(size_t capacity) : keys(capacity), values(capacity) {}
     map(const ref<key_value<K,V>>& pairs) {
         for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
     }
