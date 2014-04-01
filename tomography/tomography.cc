@@ -22,12 +22,12 @@ struct View : Widget {
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
         if(phantom) {
-            ImageF linear = (volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale((vec3(volume->sampleCount)-vec3(1))/2.f));
+            ImageF linear = (volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
             convert(target, linear, volume->sampleCount.x);
         } else {
             ImageF linear {target.size()};
             project(linear, *volume, projection);
-            convert(target, linear, volume->sampleCount.x); //norm(volume->sampleCount)/norm(vec3(1)));
+            convert(target, linear, volume->sampleCount.x);
         }
     }
 };
@@ -62,7 +62,7 @@ struct Tomography {
                 float sum = 0;
                 for(uint i: range(N)) {
                     mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
-                    ImageF image = (target.sampleCount.x/2) * phantom.project(N, projection.scale((vec3(target.sampleCount)-vec3(1))/2.f));
+                    ImageF image = (target.sampleCount.x/2) * phantom.project(N, projection.scale(vec3(target.sampleCount)/2.f));
                     sum += ::sum(image.data);
                     projections.insertMulti(projection, move(image)); // Projects phantom
                 }

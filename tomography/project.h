@@ -26,7 +26,7 @@ struct CylinderVolume {
     const VolumeF& volume;
     // Precomputed parameters
     int3 size = volume.sampleCount;
-    const float radius = size.x/2-1, halfHeight = size.z/2-1/*-1*/; // Cylinder parameters (FIXME: margins)
+    const float radius = size.x/2-1, halfHeight = size.z/2-1; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};

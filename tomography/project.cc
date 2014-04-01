@@ -26,7 +26,7 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
     const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * p.rcp_2a; // ? t+ ? t-
     const v4sf sideZ = abs(originZ + sideT * p.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
-    const v4sf tMask = radiusSqHeight > capSideP;
+    const v4sf tMask = radiusSqHeight >= capSideP;
     if(!mask(tMask)) { length=0; return 0; }
 
     const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
@@ -87,12 +87,12 @@ void project(const ImageF& image, CylinderVolume volume, Projection projection) 
 
 void updateSIRT(CylinderVolume volume, const map<Projection, ImageF>& projections) {
     chunk_parallel(volume.volume.size(), [&](uint, uint offset, uint size) {
-        const vec3 center = vec3(volume.size-int3(1))/2.f;
+        const vec3 center = vec3(volume.size)/2.f;
         const vec2 imageCenter = vec2(projections.values[0].size())/2.f;
         const float radiusSq = sq(center.x);
         for(uint index: range(offset, offset+size)) {
             const vec3 origin = vec3(zOrder(index)) - center;
-            if(sq(origin.xy()) >= radiusSq) continue;
+            if(sq(origin.xy()) > radiusSq) continue;
             float projectionSum = 0, lengthSum = 0;
             float reconstructionSum = 0, pointCount = 0;
             for(uint projectionIndex: range(projections.size())) {
