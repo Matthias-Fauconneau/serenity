@@ -72,6 +72,8 @@ static const Image& name ## Icon() { \
 }
 
 struct ImageF {
+    ImageF(){}
+    ImageF(buffer<float>&& data, uint width, uint height) : data(move(data)), width(width), height(height) {}
     ImageF(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<float>(height*width); }
     ImageF(int2 size) : ImageF(size.x, size.y) {}
     int2 size() const { return int2(width,height); }
@@ -79,6 +81,9 @@ struct ImageF {
     buffer<float> data;
     uint width, height;
 };
+
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.data),o.width,o.height); }
 
 inline ImageF operator*(float scale, ImageF&& image) { for(float& v: image.data) v *= scale; return move(image); }
 

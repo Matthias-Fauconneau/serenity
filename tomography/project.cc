@@ -85,18 +85,19 @@ void project(const ImageF& image, CylinderVolume volume, Projection projection) 
     } );
 }
 
-void updateSIRT(CylinderVolume volume, const map<Projection, ImageF>& projections) {
+void update(CylinderVolume volume, const ref<Projection>& projections, const ref<ImageF>& images) {
+    assert(projections.size == images.size);
     chunk_parallel(volume.volume.size(), [&](uint, uint offset, uint size) {
         const vec3 center = vec3(volume.size)/2.f;
-        const vec2 imageCenter = vec2(projections.values[0].size())/2.f;
+        const vec2 imageCenter = vec2(images.first().size())/2.f;
         const float radiusSq = sq(center.x);
         for(uint index: range(offset, offset+size)) {
             const vec3 origin = vec3(zOrder(index)) - center;
             if(sq(origin.xy()) > radiusSq) continue;
             float projectionSum = 0, lengthSum = 0;
             float reconstructionSum = 0, pointCount = 0;
-            for(uint projectionIndex: range(projections.size())) {
-                const Projection& projection = projections.keys[projectionIndex];
+            for(uint projectionIndex: range(projections.size)) {
+                const Projection& projection = projections[projectionIndex];
                 // Accumulate
                 float length;
                 float sum = volume.accumulate(projection, origin, length);
@@ -104,7 +105,7 @@ void updateSIRT(CylinderVolume volume, const map<Projection, ImageF>& projection
                 lengthSum += length;
                 pointCount += floor(length);
                 // Sample
-                const ImageF& P = projections.values[projectionIndex];
+                const ImageF& P = images[projectionIndex];
                 vec2 xy = (projection.projection * origin).xy() + imageCenter;
                 uint i = xy.x, j = xy.y;
                 float u = fract(xy.x), v = fract(xy.y);
