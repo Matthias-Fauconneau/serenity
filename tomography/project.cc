@@ -87,36 +87,34 @@ void project(const ImageF& image, CylinderVolume volume, Projection projection) 
 
 void update(CylinderVolume volume, const ref<Projection>& projections, const ref<ImageF>& images) {
     assert(projections.size == images.size);
-    chunk_parallel(volume.volume.size(), [&](uint, uint offset, uint size) {
-        const vec3 center = vec3(volume.size)/2.f;
-        const vec2 imageCenter = vec2(images.first().size())/2.f;
-        const float radiusSq = sq(center.x);
-        for(uint index: range(offset, offset+size)) {
-            const vec3 origin = vec3(zOrder(index)) - center;
-            if(sq(origin.xy()) > radiusSq) continue;
-            float projectionSum = 0, lengthSum = 0;
-            float reconstructionSum = 0, pointCount = 0;
-            for(uint projectionIndex: range(projections.size)) {
-                const Projection& projection = projections[projectionIndex];
-                // Accumulate
-                float length;
-                float sum = volume.accumulate(projection, origin, length);
-                reconstructionSum += sum;
-                lengthSum += length;
-                pointCount += floor(length);
-                // Sample
-                const ImageF& P = images[projectionIndex];
-                vec2 xy = (projection.projection * origin).xy() + imageCenter;
-                uint i = xy.x, j = xy.y;
-                float u = fract(xy.x), v = fract(xy.y);
-                float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
-                           v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
-                projectionSum += s;
-            }
-            // Update
-            float& v = volume.volumeData[index];
-            v = max(0.f, v + projectionSum/lengthSum - reconstructionSum/pointCount);
+    const vec3 center = vec3(volume.size)/2.f;
+    const vec2 imageCenter = vec2(images.first().size())/2.f;
+    const float radiusSq = sq(center.x);
+    parallel(volume.volume.size(), [&](uint, uint index) {
+        const vec3 origin = vec3(zOrder(index)) - center;
+        if(sq(origin.xy()) > radiusSq) return;
+        float projectionSum = 0, lengthSum = 0;
+        float reconstructionSum = 0, pointCount = 0;
+        for(uint projectionIndex: range(projections.size)) {
+            const Projection& projection = projections[projectionIndex];
+            // Accumulate
+            float length;
+            float sum = volume.accumulate(projection, origin, length);
+            reconstructionSum += sum;
+            lengthSum += length;
+            pointCount += floor(length);
+            // Sample
+            const ImageF& P = images[projectionIndex];
+            vec2 xy = (projection.projection * origin).xy() + imageCenter;
+            uint i = xy.x, j = xy.y;
+            float u = fract(xy.x), v = fract(xy.y);
+            float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
+                    v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+            projectionSum += s;
         }
+        // Update
+        float& v = volume.volumeData[index];
+        v = max(0.f, v + projectionSum/lengthSum - reconstructionSum/pointCount); // Steepest descent (constrained to positive densities): -f'|x = b-Ax
     });
 }
 

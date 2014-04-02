@@ -34,10 +34,11 @@ struct View : Widget {
 
 struct Tomography {
     const uint N = 64;
+    const uint P = 64;
     Phantom phantom {N};
     VolumeF source = phantom.volume(N);
-    buffer<Projection> projections {N};
-    buffer<ImageF> images {N};
+    buffer<Projection> projections {P};
+    buffer<ImageF> images {P};
     VolumeF target {N};
     View view {&phantom, &source};
     Window window {&view, int2(704), "Tomography"_};
@@ -61,7 +62,7 @@ struct Tomography {
             }
             if(argument=="compute"_) {
                 float sum = 0;
-                for(uint i: range(N)) { // Projects phantom
+                for(uint i: range(projections.size)) { // Projects phantom
                     mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
                     projections[i] = projection;
                     ImageF image = (target.sampleCount.x/2) * phantom.project(N, projection.scale(vec3(target.sampleCount)/2.f));
@@ -80,36 +81,29 @@ struct Tomography {
         window.show();
     }
     Random random;
-    uint projectionIndex = 0;
+    uint index = 0;
     void step() {
-#if 0 // "SART" (one projection per step (i.e subset=1)
-        update(target, {projections[projectionIndex]}, images.slice(projectionIndex,1));
-#elif 1 // subset SIRT (few projection per step)
-        //const uint subsetSize = sqrt(float(projections.size));
-        uint subsetSize = 1; for(uint i=2; i <= projections.size/subsetSize; i++) if(projections.size%i==0) subsetSize = i;
-        assert_(subsetSize==sqrt(float(N)));
-        assert_(projections.size%subsetSize == 0); //FIXME: use nearest divisor (or handle partial subsets)
-        buffer<Projection> projections {subsetSize};
-        buffer<ImageF> images {subsetSize}; images.clear();
+        uint setSize = 1; // "SART" (one projection per step
+        if(1) // subset SIRT (few projection per step)
+            for(uint i=2; i <= projections.size/setSize; i++) if(projections.size%i==0) setSize = i;
+        if(0) // full SIRT (all projection per step)
+            setSize = projections.size;
+        const uint setCount = this->projections.size / setSize;
 
-        const uint subsetCount = this->projections.size / subsetSize;
-        const uint subsetIndex = projectionIndex / subsetCount;
-        for(uint i: range(subsetSize)) {
-            uint index = i*subsetCount+subsetIndex;
+        buffer<Projection> projections {setSize};
+        buffer<ImageF> images {setSize}; images.clear();
+
+        for(uint i: range(setSize)) {
+            uint setIndex = i*setCount+index;
             assert_(index<this->projections.size);
-            projections[i] = this->projections[index];
-            images[i] = share(this->images[index]);
+            projections[i] = this->projections[setIndex];
+            images[i] = share(this->images[setIndex]);
         }
         update(target, projections, images);
-#else
-        // SIRT (all projection per step (i.e subset=N)
-        update(target, projections, images);
-#endif
-#if SEQ
-        projectionIndex = (projectionIndex+1)%projections.size; // In order (FIXME: coprime stride nearest to golden ratio)
-#else
-        projectionIndex = random % projections.size;
-#endif
+
+        if(0) index = (index+1) % setCount; // Sequential order
+        if(1) index = random % setCount; // Random order
+
         if(view.volume == &target) window.render();
     }
 } tomography;
