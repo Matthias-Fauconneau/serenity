@@ -85,12 +85,14 @@ void project(const ImageF& image, CylinderVolume volume, Projection projection) 
     } );
 }
 
-void update(CylinderVolume volume, const ref<Projection>& projections, const ref<ImageF>& images) {
-    assert(projections.size == images.size);
-    const vec3 center = vec3(volume.size)/2.f;
+void update(const VolumeF& target, CylinderVolume source, const ref<Projection>& projections, const ref<ImageF>& images) {
+    assert(target.sampleCount == source.volume.sampleCount && projections.size == images.size);
+    const vec3 center = vec3(source.size)/2.f;
     const vec2 imageCenter = vec2(images.first().size())/2.f;
     const float radiusSq = sq(center.x);
-    parallel(volume.volume.size(), [&](uint, uint index) {
+    const float* sourceData = (float*)source.volumeData;
+    float* targetData = (float*)target.data.data;
+    parallel(source.volume.size(), [&](uint, uint index) {
         const vec3 origin = vec3(zOrder(index)) - center;
         if(sq(origin.xy()) > radiusSq) return;
         float projectionSum = 0, lengthSum = 0;
@@ -99,7 +101,7 @@ void update(CylinderVolume volume, const ref<Projection>& projections, const ref
             const Projection& projection = projections[projectionIndex];
             // Accumulate
             float length;
-            float sum = volume.accumulate(projection, origin, length);
+            float sum = source.accumulate(projection, origin, length);
             reconstructionSum += sum;
             lengthSum += length;
             pointCount += floor(length);
@@ -113,9 +115,7 @@ void update(CylinderVolume volume, const ref<Projection>& projections, const ref
             projectionSum += s;
         }
         // Update
-        float& v = volume.volumeData[index];
-        v = max(0.f, v + projectionSum/lengthSum - reconstructionSum/pointCount); // Steepest descent (constrained to positive densities): -f'|x = b-Ax
+        // Steepest descent (constrained to positive densities): -f'|x = b-Ax
+        targetData[index] = max(0.f, sourceData[index] + projectionSum/lengthSum - reconstructionSum/pointCount);
     });
 }
-
-//void updateSART(const VolumeF& target, const ImageF& source, mat4 projection) {}

@@ -39,6 +39,7 @@ struct Tomography {
     VolumeF source = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
+    VolumeF temporary {N};
     VolumeF target {N};
     View view {&phantom, &source};
     Window window {&view, int2(704), "Tomography"_};
@@ -99,7 +100,12 @@ struct Tomography {
             projections[i] = this->projections[setIndex];
             images[i] = share(this->images[setIndex]);
         }
-        update(target, projections, images);
+#if ART
+        update(target, target, projections, images);
+#else
+        update(temporary, target, projections, images);
+        swap(temporary, target);
+#endif
 
         if(0) index = (index+1) % setCount; // Sequential order
         if(1) index = random % setCount; // Random order

@@ -41,4 +41,4 @@ struct CylinderVolume {
 
 void project(const ImageF& image, CylinderVolume volume, Projection projection);
 
-void update(CylinderVolume volume, const ref<Projection>& projections, const ref<ImageF>& images);
+void update(const VolumeF& target, CylinderVolume volume, const ref<Projection>& projections, const ref<ImageF>& images);
