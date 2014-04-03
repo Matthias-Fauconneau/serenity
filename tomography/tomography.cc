@@ -33,14 +33,17 @@ struct View : Widget {
 };
 
 struct Tomography {
-    const uint N = 64;
-    const uint P = 64;
+    const uint N = 32;
+    const uint P = 32;
     Phantom phantom {N};
     VolumeF source = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
-    VolumeF temporary {N};
-    VolumeF target {N};
+#if SIRT
+    SIRT reconstruction{N};
+#else
+    CGNR reconstruction{N};
+#endif
     View view {&phantom, &source};
     Window window {&view, int2(704), "Tomography"_};
     Tomography() {
@@ -53,7 +56,7 @@ struct Tomography {
         };
         window.actions[Space] = [this] { step(); };
         window.actions[Return] = [this] {
-            if(view.volume == &source) view.volume = &target; else view.volume = &source;
+            if(view.volume == &source) view.volume = &reconstruction.x; else view.volume = &source;
             window.render();
         };
         for(string argument: arguments()) {
@@ -66,17 +69,17 @@ struct Tomography {
                 for(uint i: range(projections.size)) { // Projects phantom
                     mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
                     projections[i] = projection;
-                    ImageF image = (target.sampleCount.x/2) * phantom.project(N, projection.scale(vec3(target.sampleCount)/2.f));
+                    ImageF image = (N/2) * phantom.project(N, projection.scale(vec3(N)/2.f));
                     sum += ::sum(image.data);
                     images[i] = move(image);
                 }
-                float volume = (PI*sq((target.sampleCount.x-1)/2)*target.sampleCount.z);
+                float volume = PI*sq(N/2)*N;
                 float mean = (sum/N) / volume; // Projection energy / volume of the support
-                target.clear(mean);
-                step();
+                reconstruction.x.clear(mean); //FIXME: initialize with summation (Atb?) or FBP ?
+                reconstruction.initialize(projections, images);
                 window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
-                view.volume = &target;
+                view.volume = &reconstruction.x;
             }
         }
         window.show();
@@ -84,11 +87,10 @@ struct Tomography {
     Random random;
     uint index = 0;
     void step() {
-        uint setSize = 1; // "SART" (one projection per step
-        if(1) // subset SIRT (few projection per step)
-            for(uint i=2; i <= projections.size/setSize; i++) if(projections.size%i==0) setSize = i;
-        if(0) // full SIRT (all projection per step)
-            setSize = projections.size;
+        uint setSize; // one projection per step
+        /**/ if(0) setSize = 1;
+        else if(0) { setSize=1; for(uint i=2; i <= projections.size/setSize; i++) if(projections.size%i==0) setSize = i; } // few projection per step
+        else if(1) setSize = projections.size; // all projections per step
         const uint setCount = this->projections.size / setSize;
 
         buffer<Projection> projections {setSize};
@@ -100,16 +102,12 @@ struct Tomography {
             projections[i] = this->projections[setIndex];
             images[i] = share(this->images[setIndex]);
         }
-#if ART
-        update(target, target, projections, images);
-#else
-        update(temporary, target, projections, images);
-        swap(temporary, target);
-#endif
 
         if(0) index = (index+1) % setCount; // Sequential order
         if(1) index = random % setCount; // Random order
 
-        if(view.volume == &target) window.render();
+        reconstruction.step(projections);
+
+        if(view.volume == &reconstruction.x) window.render();
     }
 } tomography;

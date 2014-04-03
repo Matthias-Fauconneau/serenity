@@ -9,6 +9,24 @@ static const v4sf floatMax = float4(FLT_MAX);
 static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 
+struct CylinderVolume {
+    const VolumeF& volume;
+    // Precomputed parameters
+    int3 size = volume.sampleCount;
+    const float radius = size.x/2-1, halfHeight = size.z/2-1; // Cylinder parameters
+    const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
+    const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
+    const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
+    const v4sf volumeOrigin = {(float)size.x/2, (float)size.y/2, (float)size.z/2, 0};
+    float* const volumeData = volume;
+    const uint64* const offsetX = volume.offsetX.data;
+    const uint64* const offsetY = volume.offsetY.data;
+    const uint64* const offsetZ = volume.offsetZ.data;
+
+    CylinderVolume(const VolumeF& volume) : volume(volume) { assert_(volume.tiled() && size.x == size.y); }
+    float accumulate(const Projection& p, const v4sf origin, float& length);
+};
+
 float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& length) {
     // Intersects cap disks
     const v4sf originZ = shuffle(origin, origin, 2,2,2,2);
@@ -63,7 +81,9 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
     return sum; //2 * sum / volume.sampleCount.x;
 }
 
-void project(const ImageF& image, CylinderVolume volume, Projection projection) {
+void project(const ImageF& image, const VolumeF& volume, Projection projection) {
+    CylinderVolume source(volume);
+
     // Image
     constexpr uint tileSize = 8;
     int imageX = floor(tileSize,image.width), imageY = floor(tileSize,image.height), imageStride = image.width; // Target image size
@@ -80,32 +100,38 @@ void project(const ImageF& image, CylinderVolume volume, Projection projection) 
         for(uint y=0; y<tileSize; y++) for(uint x=0; x<tileSize; x++) {
             const v4sf origin = tileOrigin + float4(x) * viewStepX + float4(y) * viewStepY;
             float length;
-            image[y*imageStride+x] = volume.accumulate(projection, origin, length);
+            image[y*imageStride+x] = source.accumulate(projection, origin, length);
         }
     } );
 }
 
-void update(const VolumeF& target, CylinderVolume source, const ref<Projection>& projections, const ref<ImageF>& images) {
-    assert(target.sampleCount == source.volume.sampleCount && projections.size == images.size);
-    const vec3 center = vec3(source.size)/2.f;
-    const vec2 imageCenter = vec2(images.first().size())/2.f;
+/// Minimizes |Ax-b|² using constrained gradient descent: x[k+1] = max(0, x[k] + At b - At A x[k] )
+void SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
+    swap(p, x);
+    assert(x.sampleCount == p.sampleCount && projections.size == images.size);
+    const vec3 center = vec3(p.sampleCount)/2.f;
     const float radiusSq = sq(center.x);
-    const float* sourceData = (float*)source.volumeData;
-    float* targetData = (float*)target.data.data;
-    parallel(source.volume.size(), [&](uint, uint index) {
+    CylinderVolume volume (p);
+    const vec2 imageCenter = vec2(images.first().size())/2.f;
+    const float* pData = (float*)p.data.data;
+    float* xData = (float*)x.data.data;
+    parallel(p.size(), [&](uint, uint index) {
         const vec3 origin = vec3(zOrder(index)) - center;
         if(sq(origin.xy()) > radiusSq) return;
         float projectionSum = 0, lengthSum = 0;
         float reconstructionSum = 0, pointCount = 0;
+        // Projects/Accumulates: At A x
         for(uint projectionIndex: range(projections.size)) {
             const Projection& projection = projections[projectionIndex];
-            // Accumulate
             float length;
-            float sum = source.accumulate(projection, origin, length);
+            float sum = volume.accumulate(projection, origin, length);
             reconstructionSum += sum;
             lengthSum += length;
             pointCount += floor(length);
-            // Sample
+        }
+        // Samples: At b
+        for(uint projectionIndex: range(projections.size)) {
+            const Projection& projection = projections[projectionIndex];
             const ImageF& P = images[projectionIndex];
             vec2 xy = (projection.projection * origin).xy() + imageCenter;
             uint i = xy.x, j = xy.y;
@@ -114,8 +140,93 @@ void update(const VolumeF& target, CylinderVolume source, const ref<Projection>&
                     v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
             projectionSum += s;
         }
-        // Update
-        // Steepest descent (constrained to positive densities): -f'|x = b-Ax
-        targetData[index] = max(0.f, sourceData[index] + projectionSum/lengthSum - reconstructionSum/pointCount);
+        // Updates: x[k+1]|v = max(0, x[k]|v + At b - At A x)
+        xData[index] = max(0.f, pData[index] + projectionSum/lengthSum - reconstructionSum/pointCount);
     });
+}
+
+void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
+    // p0 = r0 = At b - At A x
+    assert(projections.size == images.size);
+    const vec3 center = vec3(r.sampleCount)/2.f;
+    const float radiusSq = sq(center.x);
+    CylinderVolume volume (x);
+    const vec2 imageCenter = vec2(images.first().size())/2.f;
+    float* pData = (float*)p.data.data;
+    float* rData = (float*)r.data.data;
+    float residualSum[coreCount] = {};
+    parallel(r.size(), [&](uint id, uint index) {
+        const vec3 origin = vec3(zOrder(index)) - center;
+        if(sq(origin.xy()) > radiusSq) return;
+        float projectionSum = 0, lengthSum = 0;
+        float reconstructionSum = 0, pointCount = 0;
+        // Projects/Accumulates: At A x
+        for(uint projectionIndex: range(projections.size)) {
+            const Projection& projection = projections[projectionIndex];
+            float length;
+            float sum = volume.accumulate(projection, origin, length);
+            reconstructionSum += sum;
+            lengthSum += length;
+            pointCount += floor(length);
+        }
+        // Samples: At b
+        for(uint projectionIndex: range(projections.size)) {
+            const Projection& projection = projections[projectionIndex];
+            const ImageF& P = images[projectionIndex];
+            vec2 xy = (projection.projection * origin).xy() + imageCenter;
+            uint i = xy.x, j = xy.y;
+            float u = fract(xy.x), v = fract(xy.y);
+            float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
+                    v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+            projectionSum += s;
+        }
+        // Updates: x[k+1]|v = x[k]|v + At b - At A x
+        pData[index] = rData[index] = projectionSum/lengthSum - reconstructionSum/pointCount; // Same as SIRT without constraint
+        residualSum[id] += sq(rData[index]);
+    });
+    residual = sum(residualSum);
+}
+
+/// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + At α p[k]
+void CGNR::step(const ref<Projection>& projections) {
+    const vec3 center = vec3(p.sampleCount)/2.f;
+    const float radiusSq = sq(center.x);
+    CylinderVolume volume (p);
+    float* pData = (float*)p.data.data; // p
+    float* AtApData = (float*)AtAp.data.data; // At A p
+    float pAtAp[coreCount] = {};
+    parallel(p.size(), [&](uint id, uint index) {
+        const vec3 origin = vec3(zOrder(index)) - center;
+        if(sq(origin.xy()) > radiusSq) return;
+        float reconstructionSum = 0, pointCount = 0;
+        // Projects/Accumulates: At A p
+        for(uint projectionIndex: range(projections.size)) { // At
+            const Projection& projection = projections[projectionIndex];
+            float length;
+            float sum = volume.accumulate(projection, origin, length); // A p
+            reconstructionSum += sum;
+            pointCount += floor(length);
+        }
+        AtApData[index] = reconstructionSum/pointCount; // At A p
+        pAtAp[id] += pData[index] * AtApData[index]; // p · At A p
+    });
+    float alpha = residual / sum(pAtAp);
+    float* xData = (float*)x.data.data; // x
+    float* rData = (float*)r.data.data; // r
+    float newResidualSum[coreCount] = {};
+    chunk_parallel(p.size(), [&](uint id, uint offset, uint size) {
+        for(uint index: range(offset,offset+size)) {
+            xData[index] += alpha * pData[index];
+            rData[index] -= alpha * AtApData[index];
+            newResidualSum[id] += sq(rData[index]);
+        }
+    });
+    float newResidual = sum(newResidualSum);
+    float beta = newResidual / residual;
+    chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
+        for(uint index: range(offset,offset+size)) {
+            pData[index] = beta * pData[index] + rData[index];
+        }
+    });
+    residual = newResidual;
 }

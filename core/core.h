@@ -182,6 +182,7 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
 generic T sum(const ref<T>& a) { T sum=0; for(const T& e: a) sum += e; return sum; }
+template<Type T, size_t N> T sum(const T (&a)[N]) { return sum(ref<T>(a)); }
 
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) throw() { return p; }
