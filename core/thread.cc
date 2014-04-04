@@ -136,7 +136,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
 #if __x86_64
-    //setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
+    setExceptions(/*Invalid | *//*Denormal |*/ DivisionByZero | Overflow /*| Underflow*/);
 #endif
 }
 

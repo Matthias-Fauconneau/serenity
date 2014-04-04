@@ -39,11 +39,8 @@ struct Tomography {
     VolumeF source = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
-#if SIRT
-    SIRT reconstruction{N};
-#else
+    //SIRT reconstruction{N};
     CGNR reconstruction{N};
-#endif
     View view {&phantom, &source};
     Window window {&view, int2(704), "Tomography"_};
     Tomography() {
@@ -106,7 +103,7 @@ struct Tomography {
         if(0) index = (index+1) % setCount; // Sequential order
         if(1) index = random % setCount; // Random order
 
-        reconstruction.step(projections);
+        reconstruction.step(projections, images);
 
         if(view.volume == &reconstruction.x) window.render();
     }

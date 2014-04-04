@@ -6,7 +6,7 @@ typedef VolumeT<float> VolumeF;
 
 struct Volume {
     Volume(){}
-    Volume(uint sampleSize, int3 sampleCount) : sampleSize(sampleSize), sampleCount(sampleCount), data(size()*sampleSize) {}
+    Volume(uint sampleSize, int3 sampleCount) : sampleSize(sampleSize), sampleCount(sampleCount), data(size()*sampleSize) { data.clear(0); }
 
     explicit operator bool() const { return (bool)data; }
     size_t size() const { return (size_t)sampleCount.x*sampleCount.y*sampleCount.z; }

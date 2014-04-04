@@ -27,6 +27,7 @@ struct SIRT {
     VolumeF p;
     VolumeF x;
     SIRT(uint N) : p(N), x(N) {}
+    void initialize(const ref<Projection>&, const ref<ImageF>&) {}
     void step(const ref<Projection>& projections, const ref<ImageF>& images);
 };
 
@@ -35,5 +36,5 @@ struct CGNR {
     real residual = 0;
     CGNR(uint N) : r(N), p(N), AtAp(N), x(N) {}
     void initialize(const ref<Projection>& projections, const ref<ImageF>& images);
-    void step(const ref<Projection>& projections);
+    void step(const ref<Projection>& projections, const ref<ImageF>& images);
 };

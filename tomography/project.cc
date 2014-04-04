@@ -55,8 +55,6 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
     const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
     float sum = 0; // Accumulates/Updates samples along the ray
     do {
-        //#define str4(v) str(#v, v[0], v[1], v[2], v[3])
-        //log(str4(origin), str4(position), tmax[3]);
         // Lookups sample offsets
         const v4si p0 = cvttps2dq(position);
         const uint vx0 = offsetX[p0[0]], vy0 = offsetY[p0[1]], vz0 = offsetZ[p0[2]]; //FIXME: gather
@@ -78,7 +76,7 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
         sum += dpfv[0]; // Accumulates trilinearly interpolated sample
         position = position + p.ray; // Step
     } while(!mask(position > texit)); // Check for exit intersection
-    return sum; //2 * sum / volume.sampleCount.x;
+    return sum;
 }
 
 void project(const ImageF& image, const VolumeF& volume, Projection projection) {
@@ -177,18 +175,19 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
             uint i = xy.x, j = xy.y;
             float u = fract(xy.x), v = fract(xy.y);
             float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
-                    v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+                         v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
             projectionSum += s;
         }
         // Updates: x[k+1]|v = x[k]|v + At b - At A x
-        pData[index] = rData[index] = projectionSum/lengthSum - reconstructionSum/pointCount; // Same as SIRT without constraint
+        if(lengthSum && pointCount)
+            pData[index] = rData[index] = projectionSum/lengthSum - reconstructionSum/pointCount; // Same as SIRT without constraint
         residualSum[id] += sq(rData[index]);
     });
     residual = sum(residualSum);
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + At α p[k]
-void CGNR::step(const ref<Projection>& projections) {
+void CGNR::step(const ref<Projection>& projections, const ref<ImageF>&) {
     const vec3 center = vec3(p.sampleCount)/2.f;
     const float radiusSq = sq(center.x);
     CylinderVolume volume (p);
@@ -207,7 +206,7 @@ void CGNR::step(const ref<Projection>& projections) {
             reconstructionSum += sum;
             pointCount += floor(length);
         }
-        AtApData[index] = reconstructionSum/pointCount; // At A p
+        AtApData[index] = pointCount ? reconstructionSum/pointCount : 0; // At A p
         pAtAp[id] += pData[index] * AtApData[index]; // p · At A p
     });
     float alpha = residual / sum(pAtAp);
