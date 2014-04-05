@@ -7,7 +7,6 @@
 #include "widget.h"
 #include "function.h"
 #include "time.h"
-#include "gl.h"
 
 /// 2D affine transformation (FIXME: use matrix:mat3x2)
 struct mat3x2 {

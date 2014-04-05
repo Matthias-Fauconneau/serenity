@@ -1,7 +1,7 @@
 #include "encoder.h"
 #include "thread.h"
 #include "string.h"
-#include "display.h"
+#include "graphics.h"
 
 extern "C" {
 #define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"

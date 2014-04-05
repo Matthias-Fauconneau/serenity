@@ -6,7 +6,7 @@
 #include "time.h"
 #include "layout.h"
 #include "window.h"
-#include "display.h"
+#include "graphics.h"
 #include "text.h"
 #include <fftw3.h> //fftw3f
 

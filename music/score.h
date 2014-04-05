@@ -4,7 +4,7 @@
 #include "vector.h"
 #include "map.h"
 #include "function.h"
-#include "display.h"
+#include "graphics.h"
 #include "midi.h"
 
 struct Score {

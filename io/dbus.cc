@@ -22,7 +22,8 @@ enum Field { InvalidField, Path, Interface, Member, ErrorName, ReplySerial, Dest
 void DBus::readMessage(uint32 serial, function<void(BinaryData&)> readOutputs) {
     for(;;) {
         Header header = read<Header>();
-        //if(header.message == MethodCall) assert(header.flag==0, header.flag);
+        log(header.message, header.flag, header.version, header.length, header.serial, header.fieldsSize);
+        if(header.message == MethodCall) assert(header.flag==0, header.flag);
         uint32 replySerial=0;
         String name;
         BinaryData s = read(align(8,header.fieldsSize)+header.length);

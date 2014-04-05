@@ -56,6 +56,14 @@ uint AudioFile::read(const mref<short2>& output) {
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
                     shortBuffer = unsafeReference(ref<short2>((short2*)frame->data[0], bufferSize)); // Valid until next frame
                 }
+                else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+                    shortBuffer = buffer<short2>(bufferSize);
+                    for(uint i : range(bufferSize)) for(uint j : range(2)) {
+                        int s = ((float*)frame->data[j])[i]*(1<<15);
+                        if(s<-(1<<15) || s >= (1<<15)) error("Clip", s);
+                        shortBuffer[i][j] = s;
+                    }
+                }
                 else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
                 position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }

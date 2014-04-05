@@ -2,7 +2,7 @@
 #include "file.h"
 #include "font.h"
 #include "deflate.h"
-#include "display.h"
+#include "graphics.h"
 #include "text.h" //annotations
 
 struct Variant { //TODO: union

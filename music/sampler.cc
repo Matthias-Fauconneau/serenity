@@ -87,13 +87,13 @@ void Sampler::open(uint outputRate, const string& file, const Folder& root) {
                 if(!rate) rate=sample->flac.rate;
                 else if(rate!=sample->flac.rate) error("Sample rate mismatch",rate,sample->flac.rate);
             }
-            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, release=true; else warn("unknown trigger",value); }
-            else if(key=="lovel"_) sample->lovel=toInteger(value);
-            else if(key=="hivel"_) sample->hivel=toInteger(value);
-            else if(key=="lokey"_) sample->lokey=isInteger(value)?toInteger(value):noteToMIDI(value);
-            else if(key=="hikey"_) sample->hikey=isInteger(value)?toInteger(value):noteToMIDI(value);
-            else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
-            else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?toInteger(value):noteToMIDI(value);
+            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, release=true; else error("unknown trigger",value); }
+            else if(key=="lovel"_) sample->lovel=fromInteger(value);
+            else if(key=="hivel"_) sample->hivel=fromInteger(value);
+            else if(key=="lokey"_) sample->lokey=isInteger(value)?fromInteger(value):noteToMIDI(value);
+            else if(key=="hikey"_) sample->hikey=isInteger(value)?fromInteger(value):noteToMIDI(value);
+            else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?fromInteger(value):noteToMIDI(value);
+            else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?fromInteger(value):noteToMIDI(value);
             else if(key=="ampeg_release"_) {} /*sample->releaseTime=fromDecimal(value);*/
             else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=fromDecimal(value)/100;*/
             else if(key=="rt_decay"_) {}//sample->rt_decay=toInteger(value);

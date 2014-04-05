@@ -27,7 +27,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
-        if(existsFile(".Xauthority"_,home())) {
+        if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()) {
             BinaryData s (readFile(".Xauthority"_,home()), true);
             string name, data;
             uint16 family unused = s.read();
