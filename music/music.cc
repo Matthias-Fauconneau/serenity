@@ -347,7 +347,7 @@ struct Music {
     void nextStaff(float top /*previous bottom, current top*/, float bottom /*current bottom, next top*/, float x) {
         if(top==bottom) return; // last staff
         assert(x>=0 && x<=1);
-        target = vec2(0, -(( (1-x)*top + x*bottom )*pdfScore.lastSize.x-pdfScore.size.y/2)); // Align center between current top and current bottom
+        target = vec2(0, -(( (1-x)*top + x*bottom )*pdfScore.lastSize-pdfScore.size.y/2)); // Align center between current top and current bottom
         if(!position) position=target, pdfScore.offset=int2(round(position));
 #if MIDISCORE
         midiScore.center(int2(0,bottom));
@@ -388,9 +388,9 @@ struct Music {
     void openScore(const string& name) {
         if(play) togglePlay();
         midi.clear();
-        if(existsFile(String(name+".mid"_),folder)) midi.open(readFile(String(name+".mid"_),folder));
+        if(existsFile(String(name+".mid"_),folder)) midi.open(readFile(name+".mid"_,folder));
 #if AUDIOFILE
-        if(existsFile(String(name+".mp3"_),folder)) audioFile.open(readFile(String(name+".mp3"_),folder));
+        if(existsFile(String(name+".mp3"_),folder)) audioFile.open(folder.name()+"/"_+name+".mp3"_);
 #endif
 #if SCORE
         score.clear();

@@ -10,12 +10,7 @@ void ScrollArea::render(const Image& target) {
     int2 hint = abs(widget().sizeHint());
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     if(view <= size) widget().render(target);
-    else { //FIXME: direct rendering
-        Image buffer (view.x, view.y);
-        buffer.buffer.clear(0);
-        widget().render(buffer);
-        blit(target, offset, buffer);
-    }
+    else widget().render(target, offset, view);
     if(scrollbar && size.y<view.y) fill(target, Rect(int2(size.x-scrollBarWidth, -offset.y*size.y/view.y), int2(size.x,(-offset.y+size.y)*size.y/view.y)), 0.5);
 }
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {

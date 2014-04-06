@@ -1,7 +1,6 @@
 #pragma once
 /// \file widget.h Widget interface to compose user interfaces
-#include "vector.h"
-#include "image.h"
+#include "graphics.h"
 #if !__arm__ && __GXX_EXPERIMENTAL_CXX0X__ /*!QtCreator*/
 #define X11 1
 #endif
@@ -38,7 +37,13 @@ struct Widget {
     virtual int2 sizeHint() { return -1; }
     /// Renders this widget.
     virtual void render(const Image& target)=0;
-
+    /// Renders a partial view of this widget with an offset (Default implementation).
+    virtual void render(const Image& target, int2 offset, int2 size) {
+        Image buffer (size.x, size.y);
+        buffer.buffer.clear(0);
+        render(buffer);
+        blit(target, offset, buffer);
+    }
 // Event
     /// Mouse event type
     enum Event { Press, Release, Motion, Enter, Leave };

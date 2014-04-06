@@ -508,20 +508,22 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
     }
 }
 
-int2 PDF::sizeHint() { return lastSize ? int2(-lastSize.x, lastSize.x*height) : int2(-1); }
-void PDF::render(const Image& target) {
-    int2 size = lastSize = target.size();
-    const float scale = size.x; // Fit width
+int2 PDF::sizeHint() { return lastSize ? int2(-lastSize, lastSize*height) : int2(-1); }
+void PDF::render(const Image& target, int2 offset, int2 fullSize) {
+    lastSize = fullSize.x;
+    const float scale = fullSize.x; // Fit width
+    int2 size = target.size();
 
     for(Blit& blit: blits) {
-        if(scale*(blit.position.y+blit.size.y) < 0) continue;
-        if(scale*blit.position.y >= size.y) break;
+        if(offset.y+scale*(blit.position.y+blit.size.y) < 0) continue;
+        if(offset.y+scale*blit.position.y > size.y) break;
         //if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
-        ::blit(target, int2(scale*blit.position),blit.resized);
+        ::blit(target, offset+int2(scale*blit.position),blit.resized);
     }
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-int2(0,200))/scale,vec2(-int2(0,200))/scale}))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-offset-int2(0,200))/scale,vec2(-offset-int2(0,200))/scale}))) {
         vec2 a = scale*l.a, b = scale*l.b;
+        a+=vec2(offset), b+=vec2(offset);
         if(a.y < 0 && b.y < 0) continue;
         if(a.y > size.y+200 && b.y > size.y+200) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
@@ -529,37 +531,37 @@ void PDF::render(const Image& target) {
     }
 
     for(const Polygon& polygon: polygons) {
-        int2 min = int2(floor(scale*polygon.min-vec2(1./2))), max = int2(ceil(scale*polygon.max+vec2(1./2)));
+        int2 min=offset+int2(floor(scale*polygon.min-vec2(1./2))), max=offset+int2(ceil(scale*polygon.max+vec2(1./2)));
         Rect rect = Rect(min,max) & Rect(size);
-        for(int y=rect.min.y; y < rect.max.y; y++) {
-            for(int x=rect.min.x; x < rect.max.x; x++) {
+        for(int y=rect.min.y; y < ::min<int>(size.y,rect.max.y); y++) {
+            for(int x=rect.min.x; x < ::min<int>(size.x,rect.max.x); x++) {
                 vec2 p = vec2(x,y)+vec2(1./2); float coverage=1;
                 for(const Line& e: polygon.edges) {
-                    vec2 a = scale*e.a, b=scale*e.b;
+                    vec2 a = vec2(offset)+scale*e.a, b=vec2(offset)+scale*e.b;
                     float d = cross(p-a,normalize(b-a));
                     if(d>1./2) goto outside;
                     if(d>-1./2) coverage *= 1./2-d;
                 } /*else*/ {
                     blend(target, x,y, 0, coverage?coverage:1);
                 }
-                outside:;
+outside:;
             }
         }
     }
 
-    int i = characters.binarySearch(Character{0,0,0,vec2(-int2(0,100))/scale,0});
+    int i = characters.binarySearch(Character{0,0,0,vec2(-offset-int2(0,100))/scale,0});
     for(const Character& c: characters.slice(i)) {
-        int2 pos = int2(round(scale*c.position));
+        int2 pos = offset+int2(round(scale*c.position));
         if(pos.y<=-100) { i++; continue; }
         if(pos.y>=size.y+100) break;
         c.font->font->setSize(scale*c.size);
         const Glyph& glyph = c.font->font->glyph(c.index); //FIXME: optimize lookup
-        if(glyph.image) blit(target, glyph.offset, glyph.image, colors.value(i,black));
+        if(glyph.image) blit(target, pos+glyph.offset,glyph.image,colors.value(i,black));
         i++;
     }
 
     for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
-        int2 pos = int2(round(scale*text.key));
+        int2 pos = offset+int2(round(scale*text.key));
         if(pos.y<=0) continue;
         if(pos.y>=size.y) continue; //break;
         Text(text.value,14,red).render(target, pos);

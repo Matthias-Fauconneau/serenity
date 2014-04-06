@@ -29,7 +29,8 @@ struct PDF : Widget {
     void clear() { images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
     void open(const ref<byte>& data);
     int2 sizeHint() override;
-    void render(const Image& target) override;
+    void render(const Image& target) override { render(target, 0, target.size()); }
+    void render(const Image& target, int2 offset, int2 size) override;
 
     // Current page rendering context
     mat3x2 Tm,Cm;
@@ -85,5 +86,5 @@ struct PDF : Widget {
 
     signal<> contentChanged;
     signal<int> hiddenHighlight;
-    int2 lastSize = int2(0);
+    int lastSize = 0;
 };
