@@ -1,12 +1,13 @@
 /// \file music.cc Keyboard (piano) practice application
 #include "thread.h"
 #include "file.h"
-#include "sampler.h"
 #include "midi.h"
+#include "ffmpeg.h"
 #include "png.h"
 
 #define SCORE 1
 #define KEYBOARD 1
+#define AUDIOFILE 1
 #define ENCODE 0
 #if !ENCODE
 #define WINDOW 1
@@ -39,6 +40,9 @@
 #endif
 #if ENCODE
 #include "encoder.h"
+#endif
+#if SAMPLE
+#include "sampler.h"
 #endif
 
 #if ANNOTATION
@@ -112,13 +116,23 @@ typedef PDF PDFScore;
 struct Music {
     Folder folder{"Scores"_, home()};
     MidiFile midi;
+#if AUDIOFILE
+    AudioFile audioFile;
+#endif
 
     const uint rate = 48000;
 #if THREAD
     Thread thread{-20};
+#if SAMPLE
     Sampler sampler {true}; // Audio mixing (consumer thread) preempts decoder running in advance (in producer thread (main thread))
+#endif
 #if AUDIO
+#if SAMPLE
     AudioOutput audio{{&sampler, &Sampler::read}, rate, Sampler::periodSize, thread};
+#elif AUDIOFILE
+    static constexpr uint periodSize = 8192;
+    AudioOutput audio{{&audioFile, &AudioFile::read}};
+#endif
 #endif
 #if INPUT
     Sequencer input{thread};
@@ -193,8 +207,8 @@ struct Music {
         window.actions[Escape] = []{exit();};
         window.actions[Key(' ')] = {this,&Music::togglePlay};
         window.actions[Key('o')] = {this,&Music::showScoreList};
+#if SAMPLER
         window.actions[Key('r')] = [this]{ sampler.enableReverb=!sampler.enableReverb; };
-#if AUDIO
         window.actions[Key('1')] = [this]{
             sampler.open(rate, "Salamander.raw.sfz"_, Folder("Samples"_));
             window.setTitle("Salamander - Raw"_);
@@ -215,14 +229,14 @@ struct Music {
 #if ANNOTATION
         //pdfScore.positionsChanged.connect(this,&Music::positionsChanged);
         score.annotationsChanged.connect(this,&Music::annotationsChanged);
-        window.actions[Key('e')] = {&score,&Score::toggleEdit);
-        window.actions[Key('p')] = {&pdfScore,&PDFScore::toggleEdit);
-        window.actions[LeftArrow] = {&score,&Score::previous);
-        window.actions[RightArrow] = {&score,&Score::next);
-        window.actions[Insert] = {&score,&Score::insert);
-        window.actions[Delete] = {&score,&Score::remove);
+        window.actions[Key('e')] = {&score,&Score::toggleEdit};
+        window.actions[Key('p')] = {&pdfScore,&PDFScore::toggleEdit};
+        window.actions[LeftArrow] = {&score,&Score::previous};
+        window.actions[RightArrow] = {&score,&Score::next};
+        window.actions[Insert] = {&score,&Score::insert};
+        window.actions[Delete] = {&score,&Score::remove};
 #endif
-                                  window.actions[Return] = {this, &Music::toggleDebug};
+        window.actions[Return] = {this, &Music::toggleDebug};
         array<String> files = folder.list(Files);
         for(String& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
@@ -258,7 +272,7 @@ struct Music {
 #if INPUT
         //input.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
 #endif
-        audio.start();
+        audio.start(audioFile.rate, periodSize);
 #else
         toggleDebug();
 #endif
@@ -280,7 +294,13 @@ struct Music {
         assert(!play);
         togglePlay();
         assert(name);
-        Encoder encoder (name /*, {&sampler, &Sampler::read}*/);
+#if AUDIOFILE
+        Encoder encoder (name /*, {&audioFile, &AudioFile::read}*/); //TODO: remux without reencoding
+#elif SAMPLE
+        Encoder encoder (name, {&sampler, &Sampler::read});
+#else
+        Encoder encoder (name);
+#endif
         int lastReport=0;
         for(Image image; midi.time <= midi.duration;) { // Renders score as quickly as possible
             midi.read(encoder.videoTime*encoder.rate/encoder.fps);
@@ -369,6 +389,9 @@ struct Music {
         if(play) togglePlay();
         midi.clear();
         if(existsFile(String(name+".mid"_),folder)) midi.open(readFile(String(name+".mid"_),folder));
+#if AUDIOFILE
+        if(existsFile(String(name+".mp3"_),folder)) audioFile.open(readFile(String(name+".mp3"_),folder));
+#endif
 #if SCORE
         score.clear();
         pdfScore.clear();

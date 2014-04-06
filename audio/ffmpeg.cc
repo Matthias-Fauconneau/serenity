@@ -14,9 +14,10 @@ extern "C" {
 
 void __attribute((constructor(1001))) initialize_FFmpeg() { av_register_all(); }
 
-AudioFile::AudioFile(const string& path) {
-    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return; }
-    open();
+bool AudioFile::open(const string& path) {
+    close();
+    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return false; }
+    return open();
 }
 
 bool AudioFile::open() {

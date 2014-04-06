@@ -71,7 +71,7 @@ audio/audio.h
 audio/audio.cc
 audio/ffmpeg.cc
 
-music/sampler.cc
+music/flac.cc
 music/music.cc
 music/pdf.h
 music/pdf.cc
