@@ -123,7 +123,6 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
 #endif
     if(status->state < Prepared) io<PREPARE>();
     event();
-    if(status->state < Running) io<START>();
 }
 
 void AudioOutput::stop() {
@@ -158,6 +157,7 @@ void AudioOutput::event() {
 #endif
         if(readSize<periodSize) return;
     }
+    if(status->state < Running) io<START>();
 }
 
 /// Capture
