@@ -73,9 +73,11 @@ audio/ffmpeg.cc
 
 music/sampler.cc
 music/music.cc
+music/pdf.h
 music/pdf.cc
 music/encoder.cc
 music/encoder.h
+music/keyboard.cc
 music/score.cc
 music/score.h
 music/midi.cc

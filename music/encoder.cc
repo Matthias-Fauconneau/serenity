@@ -12,6 +12,9 @@ extern "C" {
 #include <libswscale/swscale.h> //swscale
 #include <libavcodec/avcodec.h> //avcodec
 #include <libavutil/avutil.h> //avutil
+#include <libavutil/opt.h>
+#include <libavutil/channel_layout.h>
+#include <libavutil/mathematics.h>
 }
 
 Encoder::Encoder(const string& name, bool audio, int width, int height, int fps, int rate)
@@ -21,7 +24,17 @@ Encoder::Encoder(const string& name, bool audio, int width, int height, int fps,
 
     String path = homePath()+"/"_+name+".mp4"_;
     if(existsFile(path)) remove(strz(path));
-    avformat_alloc_output_context2(&context, 0, 0, strz(path));
+    context = avformat_alloc_context();
+    copy(mref<char>(context->filename), left(path, sizeof(context->filename), "\0"_));
+    context->oformat =  av_guess_format(0, context->filename, 0);
+    assert_(context->oformat);
+    if(context->oformat->priv_data_size > 0) {
+        context->priv_data = av_mallocz(context->oformat->priv_data_size);
+        if(context->oformat->priv_class) {
+            *(const AVClass**)context->priv_data= context->oformat->priv_class;
+            av_opt_set_defaults(context->priv_data);
+        }
+    } else context->priv_data = 0;
 
     // Video
     swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);

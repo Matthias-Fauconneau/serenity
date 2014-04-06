@@ -74,7 +74,7 @@ struct Normalize {
                 float actual = energy[velocityLayer].at(sample.pitch_keycenter);
                 uint velocity = velocityLayers[velocityLayer].stop;
                 float ideal = sq((float)velocity/maximumVelocity)*maximumEnergy;
-                sfz << "<region> sample="_+pad(sample.name, 16)+" lokey="_+dec(sample.lokey,3)+" hikey="_+dec(sample.hikey,3)
+                sfz << "<region> sample="_+right(sample.name, 16)+" lokey="_+dec(sample.lokey,3)+" hikey="_+dec(sample.hikey,3)
                        +" lovel="_+dec(sample.lovel,3)+" hivel="_+dec(sample.hivel,3)+" pitch_keycenter="_+dec(sample.pitch_keycenter,3)+
                        " volume="_+ftoa(10*log10(ideal/actual),2,6)+"\n"_; // 10 not 20 as energy is already squared
             }
@@ -93,7 +93,7 @@ struct Normalize {
                                sample;
                               });
                     assert(sample.hikey<=88); // Keys without dampers
-                    sfz << "<region> sample="_+pad(sample.name, 16)+" lokey="_+dec(sample.lokey,3)+" hikey="_+dec(sample.hikey,3)
+                    sfz << "<region> sample="_+right(sample.name, 16)+" lokey="_+dec(sample.lokey,3)+" hikey="_+dec(sample.hikey,3)
                            +" lovel="_+dec(sample.lovel,3)+" hivel="_+dec(sample.hivel,3)+" pitch_keycenter="_+dec(sample.pitch_keycenter,3)+
                            " trigger=release \n"_;
                 }

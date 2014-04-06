@@ -3,13 +3,14 @@
 #include "file.h"
 #include "sampler.h"
 #include "midi.h"
+#include "png.h"
 
 #define SCORE 1
 #define KEYBOARD 1
-#define ENCODE 1
+#define ENCODE 0
 #if !ENCODE
 #define WINDOW 1
-#define SAMPLE 1
+#define SAMPLE 0
 #define AUDIO 0
 #define THREAD 1
 #else
@@ -109,7 +110,7 @@ typedef PDF PDFScore;
 
 /// SFZ sampler and PDF renderer (tested with Salamander)
 struct Music {
-    Folder folder{"Scores"_};
+    Folder folder{"Scores"_, home()};
     MidiFile midi;
 
     const uint rate = 48000;
@@ -186,13 +187,13 @@ struct Music {
 #if WINDOW
         pdfScore.scrollbar = true;
         pdfScore.contentChanged.connect(&window,&Window::render);
-        window.frameSent.connect(this,&Music::smoothScroll);
+        window.frameSent = {this,&Music::smoothScroll};
 
 
         window.actions[Escape] = []{exit();};
-        window.actions[Key(' ')] = {this,&Music::togglePlay);
-        window.actions[Key('o')] = {this,&Music::showScoreList);
-        window.actions[Key('r')] = {[this]{ sampler.enableReverb=!sampler.enableReverb; });
+        window.actions[Key(' ')] = {this,&Music::togglePlay};
+        window.actions[Key('o')] = {this,&Music::showScoreList};
+        window.actions[Key('r')] = [this]{ sampler.enableReverb=!sampler.enableReverb; };
 #if AUDIO
         window.actions[Key('1')] = [this]{
             sampler.open(rate, "Salamander.raw.sfz"_, Folder("Samples"_));
@@ -221,7 +222,7 @@ struct Music {
         window.actions[Insert] = {&score,&Score::insert);
         window.actions[Delete] = {&score,&Score::remove);
 #endif
-        window.actions[Return] = {this,&Music::toggleDebug);
+                                  window.actions[Return] = {this, &Music::toggleDebug};
         array<String> files = folder.list(Files);
         for(String& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
@@ -230,7 +231,7 @@ struct Music {
                 break_:;
             }
         }
-        scores.itemPressed.connect(this,&Music::openScore);
+        scores.itemPressed.connect(this, &Music::openScore);
         showScoreList();
 #endif // WINDOW
 #endif // SCORE
@@ -262,6 +263,7 @@ struct Music {
         toggleDebug();
 #endif
 #if WINDOW
+        if(!name && scores.size==1) openScore(0);
         window.show();
 #endif
 #if THREAD
@@ -326,7 +328,7 @@ struct Music {
         if(top==bottom) return; // last staff
         assert(x>=0 && x<=1);
         target = vec2(0, -(( (1-x)*top + x*bottom )*pdfScore.lastSize.x-pdfScore.size.y/2)); // Align center between current top and current bottom
-        if(!position) position=target, pdfScore.delta=int2(round(position));
+        if(!position) position=target, pdfScore.offset=int2(round(position));
 #if MIDISCORE
         midiScore.center(int2(0,bottom));
 #endif
@@ -339,8 +341,8 @@ struct Music {
         const float k=1./60, b=1./60; // Stiffness and damping constants
         speed = b*speed + k*(target-position);
         position = position + speed; //Euler integration
-        int2 delta = min(int2(0,0), max(pdfScore.size-abs(pdfScore.widget().sizeHint()), int2(round(position))));
-        if(delta!=pdfScore.delta) { pdfScore.delta = delta; contentChanged(); }
+        int2 offset = min(int2(0,0), max(pdfScore.size-abs(pdfScore.widget().sizeHint()), int2(round(position))));
+        if(offset != pdfScore.offset) { pdfScore.offset = offset; contentChanged(); }
 #if WINDOW
         if(round(target)!=round(position)) window.render();
 #endif
@@ -373,7 +375,7 @@ struct Music {
         this->name=String(name);
 #if WINDOW
         window.setTitle(name);
-        window.backgroundCenter=window.backgroundColor=1;
+        window.background = Window::White;
 #endif
         if(existsFile(String(name+".pdf"_),folder)) {
             pdfScore.open(readFile(String(name+".pdf"_),folder));
@@ -389,7 +391,7 @@ struct Music {
             else if(existsFile(String(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(String(name+".not"_),folder)));
 #endif
             layout.first()= &pdfScore.area();
-            pdfScore.delta = 0; position=0,speed=0,target=0;
+            pdfScore.offset = 0; position=0,speed=0,target=0;
 #if WINDOW
             window.focus = &pdfScore.area();
 #endif

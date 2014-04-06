@@ -29,7 +29,7 @@ struct PDF : Widget {
     void clear() { images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
     void open(const ref<byte>& data);
     int2 sizeHint() override;
-    void render(int2 position, int2 size) override;
+    void render(const Image& target) override;
 
     // Current page rendering context
     mat3x2 Tm,Cm;
@@ -76,9 +76,9 @@ struct PDF : Widget {
     signal<const ref<vec2>&> onPath;
     array<array<vec2>> paths;
 
-    map<int,vec4> colors;
+    map<int,vec3> colors;
     /// Overrides color for the given characters
-    void setColors(const map<int,vec4>& colors) { this->colors=copy(colors); contentChanged(); }
+    void setColors(const map<int,vec3>& colors) { this->colors=copy(colors); contentChanged(); }
     map<vec2, String> annotations;
     /// Renders additionnal text annotations
     void setAnnotations(const map<vec2, String>& annotations) { this->annotations=copy(annotations); contentChanged(); }

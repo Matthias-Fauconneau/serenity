@@ -170,8 +170,8 @@ String repeat(const string& s, uint times) {
     String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
 }
 
-String pad(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
 String left(const string& s, uint length, const string& pad) { return s+repeat(pad, max<int>(0,length-s.size/pad.size)); }
+String right(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
 
 stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r << s; r << '\0'; return r; }
 
@@ -225,9 +225,9 @@ template String itoa<10>(int64,int,char);
 
 String ftoa(double n, int precision, uint pad, int exponent) {
     bool sign = n<0; n=abs(n);
-    if(__builtin_isnan(n)) return ::pad("NaN"_, pad);
-    if(n==::inf) return ::pad("∞"_, pad+2);
-    if(n==-::inf) return ::pad("-∞"_, pad+2);
+    if(__builtin_isnan(n)) return ::right("NaN"_, pad);
+    if(n==::inf) return ::right("∞"_, pad+2);
+    if(n==-::inf) return ::right("-∞"_, pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s<<'-';

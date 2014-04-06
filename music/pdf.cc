@@ -17,7 +17,7 @@ struct Variant { //TODO: union
     Variant(String&& data) : type(Data), data(move(data)) {}
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<string,Variant>&& dict) : type(Dict), dict(move(dict)) {}
-    operator bool() const { return type!=Empty; }
+    explicit operator bool() const { return type!=Empty; }
     operator int() const { assert(type==Integer, *this); return number; }
     int integer() const { assert(type==Integer, *this); return number; }
     double real() const { assert(type==Real||type==Integer); return number; }
@@ -107,7 +107,7 @@ static Variant parseVariant(TextData& s) {
     }
     if(s.match('<')) {
         String data;
-        while(!s.match('>')) data << toInteger(s.read(2),16);
+        while(!s.match('>')) data << fromInteger(s.read(2),16);
         return move(data);
     }
     if(s.match("true"_)) return true;
@@ -253,7 +253,7 @@ void PDF::open(const string& data) {
                         else {
                             if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
                                 TextData s (cs.list[3].data);
-                                for(int i=0;i<256;i++) { s.match('/'); uint8 v=toInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
+                                for(int i=0;i<256;i++) { s.match('/'); uint8 v=fromInteger(s.read(3),8); palette[i]=byte4(v,v,v,0xFF); }
                                 indexed=true;
                             } else if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceRGB"_ && cs.list[2].integer()==255) {
                                 Data s = cs.list[3].integer()?parseVariant(xref[cs.list[3].integer()]).data:move(cs.list[3].data);
@@ -509,60 +509,59 @@ void PDF::drawText(Font* font, int fontSize, float spacing, float wordSpacing, c
 }
 
 int2 PDF::sizeHint() { return lastSize ? int2(-lastSize.x, lastSize.x*height) : int2(-1); }
-void PDF::render(int2 position, int2 size) {
-    lastSize = size;
+void PDF::render(const Image& target) {
+    int2 size = lastSize = target.size();
     const float scale = size.x; // Fit width
 
     for(Blit& blit: blits) {
-        if(position.y+scale*(blit.position.y+blit.size.y) < currentClip.min.y) continue;
-        if(position.y+scale*blit.position.y > currentClip.max.y) break;
+        if(scale*(blit.position.y+blit.size.y) < 0) continue;
+        if(scale*blit.position.y >= size.y) break;
         //if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
-        ::blit(position+int2(scale*blit.position),blit.resized);
+        ::blit(target, int2(scale*blit.position),blit.resized);
     }
 
-    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-position-int2(0,200))/scale,vec2(-position-int2(0,200))/scale}))) {
+    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-int2(0,200))/scale,vec2(-int2(0,200))/scale}))) {
         vec2 a = scale*l.a, b = scale*l.b;
-        a+=vec2(position), b+=vec2(position);
-        if(a.y < currentClip.min.y && b.y < currentClip.min.y) continue;
-        if(a.y > currentClip.max.y+200 && b.y > currentClip.max.y+200) break;
+        if(a.y < 0 && b.y < 0) continue;
+        if(a.y > size.y+200 && b.y > size.y+200) break;
         if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
-        line(a,b);
+        line(target, a,b);
     }
 
     for(const Polygon& polygon: polygons) {
-        int2 min=position+int2(floor(scale*polygon.min-vec2(1./2))), max=position+int2(ceil(scale*polygon.max+vec2(1./2)));
-        Rect rect = Rect(min,max) & currentClip;
-        for(int y=rect.min.y; y < ::min<int>(framebuffer.height,rect.max.y); y++) {
-            for(int x=rect.min.x; x < ::min<int>(framebuffer.width,rect.max.x); x++) {
+        int2 min = int2(floor(scale*polygon.min-vec2(1./2))), max = int2(ceil(scale*polygon.max+vec2(1./2)));
+        Rect rect = Rect(min,max) & Rect(size);
+        for(int y=rect.min.y; y < rect.max.y; y++) {
+            for(int x=rect.min.x; x < rect.max.x; x++) {
                 vec2 p = vec2(x,y)+vec2(1./2); float coverage=1;
                 for(const Line& e: polygon.edges) {
-                    vec2 a = vec2(position)+scale*e.a, b=vec2(position)+scale*e.b;
+                    vec2 a = scale*e.a, b=scale*e.b;
                     float d = cross(p-a,normalize(b-a));
                     if(d>1./2) goto outside;
                     if(d>-1./2) coverage *= 1./2-d;
                 } /*else*/ {
-                    blend(x,y, 0, coverage?coverage:1);
+                    blend(target, x,y, 0, coverage?coverage:1);
                 }
                 outside:;
             }
         }
     }
 
-    int i = characters.binarySearch(Character{0,0,0,vec2(-position-int2(0,100))/scale,0});
+    int i = characters.binarySearch(Character{0,0,0,vec2(-int2(0,100))/scale,0});
     for(const Character& c: characters.slice(i)) {
-        int2 pos = position+int2(round(scale*c.position));
-        if(pos.y<=currentClip.min.y-100) { i++; continue; }
-        if(pos.y>=currentClip.max.y+100) break;
+        int2 pos = int2(round(scale*c.position));
+        if(pos.y<=-100) { i++; continue; }
+        if(pos.y>=size.y+100) break;
         c.font->font->setSize(scale*c.size);
         const Glyph& glyph = c.font->font->glyph(c.index); //FIXME: optimize lookup
-        if(glyph.image) blit(pos+glyph.offset,glyph.image,colors.value(i,black));
+        if(glyph.image) blit(target, glyph.offset, glyph.image, colors.value(i,black));
         i++;
     }
 
     for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
-        int2 pos = position+int2(round(scale*text.key));
-        if(pos.y<=currentClip.min.y) continue;
-        if(pos.y>=currentClip.max.y) continue; //break;
-        Text(text.value,14,red).render(pos,int2(0,0));
+        int2 pos = int2(round(scale*text.key));
+        if(pos.y<=0) continue;
+        if(pos.y>=size.y) continue; //break;
+        Text(text.value,14,red).render(target, pos);
     }
 }

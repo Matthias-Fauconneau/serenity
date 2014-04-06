@@ -12,7 +12,7 @@ struct Rect {
     int2 size() { return max-min; }
 };
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
-inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline Rect operator &(Rect a, Rect b) { return Rect(min(max(a.min,b.min),b.max),max(min(a.max,b.max),b.min)); }
 inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
 struct Image {

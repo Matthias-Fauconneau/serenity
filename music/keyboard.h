@@ -10,6 +10,6 @@ struct Keyboard : Widget {
     void inputNoteEvent(uint key, uint vel);
     void midiNoteEvent(uint key, uint vel);
     int2 sizeHint() { return int2(1056,102); }
-    void render(int2 position, int2 size);
+    void render(const Image& target);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button);
 };

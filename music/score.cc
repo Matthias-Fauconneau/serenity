@@ -670,14 +670,14 @@ void Score::seek(uint unused time) {
         expect();
     }
     if(!showActive) {
-        map<int,vec4> activeNotes;
+        map<int,vec3> activeNotes;
         for(int i: expected.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,blue);
         activeNotesChanged(activeNotes);
     }
 }
 
 void Score::noteEvent(uint key, uint vel) {
-    map<int,vec4> activeNotes;
+    map<int,vec3> activeNotes;
 #if ANNOTATION
     if(editMode) {
         if(vel) {
