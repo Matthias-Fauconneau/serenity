@@ -6,11 +6,11 @@
 
 struct View : Widget {
     const Phantom* phantom;
-    const VolumeF* volume;
+    const VolumeP* volume;
     int2 lastPos = 0;
     vec2 rotation = vec2(0, -PI/3);
 
-    View(const Phantom* phantom, const VolumeF* volume) : phantom(phantom), volume(volume) {}
+    View(const Phantom* phantom, const VolumeP* volume) : phantom(phantom), volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
         int2 delta = cursor-lastPos;
         lastPos = cursor;
@@ -22,10 +22,10 @@ struct View : Widget {
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
         if(phantom) {
-            ImageF linear = (volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
+            ImageP linear = P(volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
             convert(target, linear, volume->sampleCount.x);
         } else {
-            ImageF linear {target.size()};
+            ImageP linear {target.size()};
             project(linear, *volume, projection);
             convert(target, linear, volume->sampleCount.x);
         }
@@ -34,11 +34,11 @@ struct View : Widget {
 
 struct Tomography {
     const uint N = 32;
-    const uint P = 32;
+    const uint projectionCount = 32;
     Phantom phantom {N};
-    VolumeF source = phantom.volume(N);
-    buffer<Projection> projections {P};
-    buffer<ImageF> images {P};
+    VolumeP source = phantom.volume(N);
+    buffer<Projection> projections {projectionCount};
+    buffer<ImageP> images {projectionCount};
     //SIRT reconstruction{N};
     CGNR reconstruction{N};
     View view {&phantom, &source};
@@ -66,7 +66,7 @@ struct Tomography {
                 for(uint i: range(projections.size)) { // Projects phantom
                     mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
                     projections[i] = projection;
-                    ImageF image = (N/2) * phantom.project(N, projection.scale(vec3(N)/2.f));
+                    ImageP image = P(N/2) * phantom.project(N, projection.scale(vec3(N-1)/2.f));
                     sum += ::sum(image.data);
                     images[i] = move(image);
                 }
@@ -91,7 +91,7 @@ struct Tomography {
         const uint setCount = this->projections.size / setSize;
 
         buffer<Projection> projections {setSize};
-        buffer<ImageF> images {setSize}; images.clear();
+        buffer<ImageP> images {setSize}; images.clear();
 
         for(uint i: range(setSize)) {
             uint setIndex = i*setCount+index;

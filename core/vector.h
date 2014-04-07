@@ -2,8 +2,12 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
+typedef int v4si __attribute((__vector_size__ (16)));
+template<> inline String str(const v4si& v) { return str(v[0], v[1], v[2], v[3]); }
 typedef float v4sf __attribute((__vector_size__ (16)));
 template<> inline String str(const v4sf& v) { return str(v[0], v[1], v[2], v[3]); }
+typedef double v4df __attribute((__vector_size__ (32)));
+template<> inline String str(const v4df& v) { return str(v[0], v[1], v[2], v[3]); }
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -104,6 +108,7 @@ generic struct xyz {
     T x,y,z;
     vec<xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
     inline operator v4sf() const { return (v4sf){x,y,z,0}; }
+    inline operator v4df() const { return (v4df){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;

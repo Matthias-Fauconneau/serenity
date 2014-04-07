@@ -29,6 +29,18 @@ void convert(const Image& target, const ImageF& source, float max) {
     }
 }
 
+void convert(const Image& target, const ImageD& source, double max) {
+    if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
+    assert_(target.buffer.size == source.data.size, target.buffer.size, source.data.size, target.size(), source.size());
+    for(uint i: range(source.data.size)) {
+        uint linear12 = 0xFFF*clip(0., source.data[i]/max, 1.);
+        extern uint8 sRGB_forward[0x1000];
+        assert_(linear12 < 0x1000);
+        uint8 sRGB = sRGB_forward[linear12];
+        target.data[i] = byte4(sRGB, sRGB, sRGB, 0xFF);
+    }
+}
+
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
     else if(startsWith(file,"\x89PNG"_)) return "PNG"_;

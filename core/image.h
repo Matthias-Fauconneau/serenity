@@ -71,21 +71,25 @@ static const Image& name ## Icon() { \
     return icon; \
 }
 
-struct ImageF {
-    ImageF(){}
-    ImageF(buffer<float>&& data, uint width, uint height) : data(move(data)), width(width), height(height) {}
-    ImageF(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<float>(height*width); }
-    ImageF(int2 size) : ImageF(size.x, size.y) {}
+template<Type T> struct ImageT {
+    ImageT(){}
+    ImageT(buffer<T>&& data, uint width, uint height) : data(move(data)), width(width), height(height) {}
+    ImageT(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<T>(height*width); }
+    ImageT(int2 size) : ImageT(size.x, size.y) {}
     int2 size() const { return int2(width,height); }
-    inline float& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
-    buffer<float> data;
+    inline T& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
+    buffer<T> data;
     uint width, height;
 };
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.data),o.width,o.height); }
+template<Type T> inline ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeReference(o.data),o.width,o.height); }
 
-inline ImageF operator*(float scale, ImageF&& image) { for(float& v: image.data) v *= scale; return move(image); }
+template<Type T> inline ImageT<T> operator*(T scale, ImageT<T>&& image) { for(T& v: image.data) v *= scale; return move(image); }
+
+typedef ImageT<float> ImageF;
+typedef ImageT<double> ImageD;
 
 /// Converts a linear float image to sRGB
 void convert(const Image& target, const ImageF& source, float max=0);
+void convert(const Image& target, const ImageD& source, double max=0);

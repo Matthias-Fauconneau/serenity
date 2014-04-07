@@ -2,7 +2,6 @@
 #include "image.h"
 
 generic struct VolumeT;
-typedef VolumeT<float> VolumeF;
 
 struct Volume {
     Volume(){}
@@ -41,6 +40,15 @@ generic struct VolumeT : Volume {
     T operator()(uint x, uint y, uint z) const { return ((const T*)data.data)[index(x,y,z)]; }
     T& operator()(uint x, uint y, uint z) { return ((T*)data.data)[index(x,y,z)]; }
 };
+
+//typedef VolumeT<float> VolumeF;
+//typedef VolumeT<double> VolumeD;
+
+    // Precision parameter
+    typedef float P;
+    typedef ImageT<P> ImageP;
+    typedef VolumeT<P> VolumeP;
+
 
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);

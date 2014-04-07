@@ -13,16 +13,17 @@ struct Projection {
     vec3 worldRay = stepSize * normalize( projection.transpose() * vec3(0,0,1) );
     float a = worldRay.x*worldRay.x+worldRay.y*worldRay.y;
     // FIXME: profile
-    v4sf ray = {worldRay.x, worldRay.y, worldRay.z, 1};
-    v4sf rayZ = float4(worldRay.z);
-    v4sf raySlopeZ = float4(1/worldRay.z);
-    v4sf rayXYXY = {worldRay.x, worldRay.y, worldRay.x, worldRay.y};
-    v4sf _m4a_4_m4a_4 = {-4*a, 4, -4*a, 4};
-    v4sf rcp_2a = float4(a ? -1./(2*a) : inf);
+    v4df ray = {worldRay.x, worldRay.y, worldRay.z, 1};
+    v4df rayZ = double4(worldRay.z);
+    v4df raySlopeZ = double4(1/worldRay.z);
+    v4df rayXYXY = {worldRay.x, worldRay.y, worldRay.x, worldRay.y};
+    v4df _m4a_4_m4a_4 = {-4*a, 4, -4*a, 4};
+    v4df rcp_2a = double4(a ? -1./(2*a) : inf);
 };
 
-void project(const ImageF& image, const VolumeF& volume, Projection projection);
+void project(const ImageP& image, const VolumeP& volume, Projection projection);
 
+#if SIRT
 struct SIRT {
     VolumeF p;
     VolumeF x;
@@ -30,12 +31,13 @@ struct SIRT {
     void initialize(const ref<Projection>&, const ref<ImageF>&) {}
     void step(const ref<Projection>& projections, const ref<ImageF>& images);
 };
+#endif
 
 struct CGNR {
-    VolumeF r, p, AtAp, x;
+    VolumeP r, p, AtAp, x;
     real residualEnergy = 0;
     CGNR(uint N) : r(N), p(N), AtAp(N), x(N) {}
-    void initialize(const ref<Projection>& projections, const ref<ImageF>& images);
-    void residual(const ref<Projection>& projections, const ref<ImageF>& images, const VolumeF& additionalTarget);
-    void step(const ref<Projection>& projections, const ref<ImageF>& images);
+    void initialize(const ref<Projection>& projections, const ref<ImageP>& images);
+    void residual(const ref<Projection>& projections, const ref<ImageP>& images, const VolumeP& additionalTarget);
+    void step(const ref<Projection>& projections, const ref<ImageP>& images);
 };
