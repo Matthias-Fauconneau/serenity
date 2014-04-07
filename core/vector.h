@@ -3,6 +3,7 @@
 #include "string.h"
 #include "math.h"
 typedef float v4sf __attribute((__vector_size__ (16)));
+template<> inline String str(const v4sf& v) { return str(v[0], v[1], v[2], v[3]); }
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly

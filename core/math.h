@@ -11,6 +11,7 @@ generic inline constexpr T cb(const T& x) { return x*x*x; }
 /// Declares real as a double-precision floating point number
 typedef double real;
 
+constexpr real nanf = __builtin_nanf("");
 constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }

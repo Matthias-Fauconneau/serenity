@@ -39,14 +39,18 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
     const v4sf cbcb = dot2(originXYXY, originXYrayXY); // OO OD OO OD (b=2OD)
     const v4sf _1b1b = blendps(_1f, cbcb, 0b1010); // 1 OD 1 OD
     const v4sf _4ac_bb = p._m4a_4_m4a_4 * (cbcb*_1b1b - radiusR0R0); // -4ac bb -4ac bb
-    const v4sf sqrtDelta = sqrt( hadd(_4ac_bb,_4ac_bb) );
+    v4sf delta = hadd(_4ac_bb,_4ac_bb);
+    //const v4sf sqrtDelta = sqrt( delta );
+    const v4sf sqrtDelta = blendv(sqrt(max(_0f,delta)), float4(nan), delta<_0f); // Same as sqrt(delta) without invalid exception
     const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
     const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * p.rcp_2a; // ? t+ ? t-
     const v4sf sideZ = abs(originZ + sideT * p.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
-    const v4sf tMask = radiusSqHeight >= capSideP;
-    if(!mask(tMask)) { length=0; return 0; }
+    //const v4sf tMask = capSideP < radiusSqHeight;
+    const v4sf tMask = blendv(capSideP, radiusSqHeight, delta<_0f) < radiusSqHeight; // Same without invalid exception
+    if(!mask(tMask)) { length=0; return 0; } // 26 instructions
 
+    // 11 instructions
     const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     const v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     const v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
@@ -54,7 +58,7 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
     v4sf position = volumeOrigin + origin + tmin * p.ray;
     const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
     float sum = 0; // Accumulates/Updates samples along the ray
-    do {
+    do { // 24 instructions
         // Lookups sample offsets
         const v4si p0 = cvttps2dq(position);
         const uint vx0 = offsetX[p0[0]], vy0 = offsetY[p0[1]], vz0 = offsetZ[p0[2]]; //FIXME: gather
@@ -103,6 +107,7 @@ void project(const ImageF& image, const VolumeF& volume, Projection projection) 
     } );
 }
 
+#if SIRT
 /// Minimizes |Ax-b|² using constrained gradient descent: x[k+1] = max(0, x[k] + At b - At A x[k] )
 void SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     swap(p, x);
@@ -135,22 +140,28 @@ void SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             uint i = xy.x, j = xy.y;
             float u = fract(xy.x), v = fract(xy.y);
             float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
-                    v    * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+                         v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
             projectionSum += s;
         }
         // Updates: x[k+1]|v = max(0, x[k]|v + At b - At A x)
         xData[index] = max(0.f, pData[index] + projectionSum/lengthSum - reconstructionSum/pointCount);
     });
 }
+#endif
 
+/// Computes residual p = r = At b - At A x
 void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
-    // p0 = r0 = At b - At A x
+    residual(projections, images, p);
+}
+
+/// Computes residual r = At b - At A x (r is the negative gradient of A at x)
+void CGNR::residual(const ref<Projection>& projections, const ref<ImageF>& images, const VolumeF& additionalTarget) {
     assert(projections.size == images.size);
     const vec3 center = vec3(r.sampleCount)/2.f;
     const float radiusSq = sq(center.x);
     CylinderVolume volume (x);
     const vec2 imageCenter = vec2(images.first().size())/2.f;
-    float* pData = (float*)p.data.data;
+    float* pData = (float*)additionalTarget.data.data; // p | r (single target)
     float* rData = (float*)r.data.data;
     float residualSum[coreCount] = {};
     parallel(r.size(), [&](uint id, uint index) {
@@ -174,20 +185,36 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
             vec2 xy = (projection.projection * origin).xy() + imageCenter;
             uint i = xy.x, j = xy.y;
             float u = fract(xy.x), v = fract(xy.y);
+#if 0
             float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
                          v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+#else // DEBUG: without underflow
+            float s;
+            /**/ if(v<=0x1p-128) {
+                /**/ if(u<=0x1p-128) s = P(i,j);
+                else if(1-u<=0x1p-128) s = P(i+1, j);
+                else s = (1-u) * P(i, j) + u * P(i+1, j);
+            }
+            else if(1-v<=0x1p-128) {
+                /**/ if(u<=0x1p-128) s = P(i, j+1);
+                else if(1-u<=0x1p-128) s = P(i+1, j+1);
+                else s = (1-u) * P(i, j+1) + u * P(i+1, j+1);
+            }
+            else s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
+                        v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
+#endif
             projectionSum += s;
         }
-        // Updates: x[k+1]|v = x[k]|v + At b - At A x
+        // Updates: p[k]|v = r[k]|v = At b - At A x
         if(lengthSum && pointCount)
             pData[index] = rData[index] = projectionSum/lengthSum - reconstructionSum/pointCount; // Same as SIRT without constraint
         residualSum[id] += sq(rData[index]);
     });
-    residual = sum(residualSum);
+    residualEnergy = sum(residualSum);
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + At α p[k]
-void CGNR::step(const ref<Projection>& projections, const ref<ImageF>&) {
+void CGNR::step(const ref<Projection>& projections, const ref<ImageF>& /*images*/) {
     const vec3 center = vec3(p.sampleCount)/2.f;
     const float radiusSq = sq(center.x);
     CylinderVolume volume (p);
@@ -209,7 +236,7 @@ void CGNR::step(const ref<Projection>& projections, const ref<ImageF>&) {
         AtApData[index] = pointCount ? reconstructionSum/pointCount : 0; // At A p
         pAtAp[id] += pData[index] * AtApData[index]; // p · At A p
     });
-    float alpha = residual / sum(pAtAp);
+    float alpha = residualEnergy / sum(pAtAp);
     float* xData = (float*)x.data.data; // x
     float* rData = (float*)r.data.data; // r
     float newResidualSum[coreCount] = {};
@@ -220,12 +247,14 @@ void CGNR::step(const ref<Projection>& projections, const ref<ImageF>&) {
             newResidualSum[id] += sq(rData[index]);
         }
     });
+    //residual(projections, images, r);
     float newResidual = sum(newResidualSum);
-    float beta = newResidual / residual;
+    float beta = newResidual / residualEnergy;
+    // Computes next search direction
     chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
-            pData[index] = beta * pData[index] + rData[index];
+            pData[index] = rData[index] + beta * pData[index];
         }
     });
-    residual = newResidual;
+    residualEnergy = newResidual;
 }

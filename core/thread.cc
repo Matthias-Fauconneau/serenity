@@ -121,7 +121,8 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 #endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
-    pthread_exit((void*)-1);
+    //pthread_exit((void*)-1);
+    exit_group(-1);
 }
 #if __x86_64
 // Configures floating-point exceptions
@@ -136,7 +137,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
 #if __x86_64
-    setExceptions(/*Invalid | *//*Denormal |*/ DivisionByZero | Overflow /*| Underflow*/);
+    setExceptions(Invalid | /*Denormal |*/ DivisionByZero | Overflow | Underflow);
 #endif
 }
 
