@@ -63,8 +63,8 @@ Phantom::Phantom(uint count) {
     }
 }
 
-VolumeP Phantom::volume(int3 size) const {
-    VolumeP volume (size);
+VolumeF Phantom::volume(int3 size) const {
+    VolumeF volume (size);
     for(Ellipsoid e: ellipsoids) { // Rasterizes ellipsoids
         // Computes world axis-aligned bounding box of object's oriented bounding box
         vec3 O = e.center, min = O, max = O; // Initialize min/max to origin
@@ -100,8 +100,8 @@ VolumeP Phantom::volume(int3 size) const {
     return volume;
 }
 
-ImageP Phantom::project(int2 size, mat4 p) const {
-    ImageP target (size);
+ImageF Phantom::project(int2 size, mat4 p) const {
+    ImageF target (size);
     target.data.clear();
     const vec3 direction = normalize(p.transpose()[2].xyz());
     const vec3 origin = p.inverse()*vec3(-size.x/2,-size.y/2,0);

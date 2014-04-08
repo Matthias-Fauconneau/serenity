@@ -15,8 +15,8 @@ struct Ellipsoid {
 
 struct Phantom {
     Phantom(uint count=0);
-    VolumeP volume(int3 size) const;
-    ImageP project(int2 size, mat4 projection) const;
+    VolumeF volume(int3 size) const;
+    ImageF project(int2 size, mat4 projection) const;
 
     array<Ellipsoid> ellipsoids;
 };
