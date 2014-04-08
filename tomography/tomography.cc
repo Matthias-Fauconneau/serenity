@@ -3,12 +3,13 @@
 #include "window.h"
 #include "phantom.h"
 #include "project.h"
+#include "layout.h"
 
 struct View : Widget {
     const Phantom* phantom;
     const VolumeF* volume;
     int2 lastPos = 0;
-    vec2 rotation = vec2(0, -PI/3);
+    static vec2 rotation; // Shared between all views
 
     View(const Phantom* phantom, const VolumeF* volume) : phantom(phantom), volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
@@ -23,14 +24,15 @@ struct View : Widget {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
         if(phantom) {
             ImageF linear = float(volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
-            convert(target, linear, volume->sampleCount.x);
+            convert(target, linear/*, volume->sampleCount.x*/);
         } else {
             ImageF linear {target.size()};
             project(linear, *volume, projection);
-            convert(target, linear, volume->sampleCount.x);
+            convert(target, linear/*, volume->sampleCount.x*/);
         }
     }
 };
+vec2 View::rotation = vec2(0, -PI/3);
 
 struct Tomography {
     const uint N = 32;
@@ -41,8 +43,9 @@ struct Tomography {
     buffer<ImageF> images {P};
     //SIRT reconstruction{N};
     CGNR reconstruction{N};
-    View view {&phantom, &source};
-    Window window {&view, int2(512), "Tomography"_};
+    UniformGrid<View> views{{{0, &reconstruction.r}, {0, &reconstruction.p}, {0, &reconstruction.AtAp}, {&phantom, &source}}};
+    View& view = views.last();
+    Window window {&views, int2(512), "Tomography"_};
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
@@ -74,12 +77,13 @@ struct Tomography {
                 float mean = (sum/N) / volume; // Projection energy / volume of the support
                 reconstruction.x.clear(mean);*/ //FIXME: initialize only cylinder (+ with summation (Atb?) or FBP ?)
                 reconstruction.initialize(projections, images);
-                window.frameSent = {this, &Tomography::step};
+                //window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
                 view.volume = &reconstruction.x;
             }
         }
         window.show();
+        step();
     }
     Random random;
     uint index = 0;

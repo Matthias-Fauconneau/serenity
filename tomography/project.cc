@@ -78,7 +78,7 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
         const v4sf z0101 = shuffle(z0011, z0011, 0,2,0,2);
         const v4sf sw_yz = z0101 * y0011;
         const v4sf dpfv = dot4(sw_yz, x0000*cx0 + x1111*cx1);
-        assert_(mask(dot4(sw_yz, x0000*_1f + x1111*_1f) == _1f)==0b1111);
+        assert_(abs(dot4(sw_yz, x0000*_1f + x1111*_1f)[0]-1)<0x1p-23, log2(abs(dot4(sw_yz, x0000*_1f + x1111*_1f)[0]-1)));
         sum += dpfv[0]; // Accumulates trilinearly interpolated sample
         position = position + p.ray; // Step
     } while(!mask(position > texit)); // Check for exit intersection
@@ -202,7 +202,7 @@ float CGNR::residual(const ref<Projection>& projections, const ref<ImageF>& imag
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + At α p[k]
-bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>&) {
+bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     k++;
     const vec3 center = vec3(p.sampleCount-int3(1))/2.f;
     const float radiusSq = sq(center.x);
@@ -241,6 +241,16 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>&) {
         }
     });
     float newResidual = sum(newResidualSum);
+
+    // Asserts rk == Atb - AtAx
+    float checkResidual = residual(projections, images, AtAp, AtAp);
+    assert_(checkResidual == newResidual, newResidual, checkResidual);
+    chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
+        for(uint index: range(offset,offset+size)) {
+            assert_(rData[index] == AtApData[index], rData[index], AtApData[index]);
+        }
+    });
+
     float beta = newResidual / residualEnergy;
     float estimateEnergy = sum(estimateSum);
     log(k, residualEnergy, newResidual, beta, estimateEnergy, newResidual/estimateEnergy);

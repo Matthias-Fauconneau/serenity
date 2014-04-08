@@ -19,25 +19,12 @@ Image upsample(const Image& source) {
 
 void convert(const Image& target, const ImageF& source, float max) {
     if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
-    assert_(target.buffer.size == source.data.size, target.buffer.size, source.data.size, target.size(), source.size());
-    for(uint i: range(source.data.size)) {
-        uint linear12 = 0xFFF*clip(0.f, source.data[i]/max, 1.f);
+    for(uint y: range(source.height)) for(uint x: range(source.width)) {
+        uint linear12 = 0xFFF*clip(0.f, source(x,y)/max, 1.f);
         extern uint8 sRGB_forward[0x1000];
         assert_(linear12 < 0x1000);
         uint8 sRGB = sRGB_forward[linear12];
-        target.data[i] = byte4(sRGB, sRGB, sRGB, 0xFF);
-    }
-}
-
-void convert(const Image& target, const ImageD& source, double max) {
-    if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
-    assert_(target.buffer.size == source.data.size, target.buffer.size, source.data.size, target.size(), source.size());
-    for(uint i: range(source.data.size)) {
-        uint linear12 = 0xFFF*clip(0., source.data[i]/max, 1.);
-        extern uint8 sRGB_forward[0x1000];
-        assert_(linear12 < 0x1000);
-        uint8 sRGB = sRGB_forward[linear12];
-        target.data[i] = byte4(sRGB, sRGB, sRGB, 0xFF);
+        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
     }
 }
 

@@ -52,7 +52,8 @@ Phantom::Phantom(uint count) {
             vec3 radius = maximumRadius*vec3(random(),random(),random());
             if(max(max(radius.x,radius.y),radius.z) > 4*min(min(radius.x,radius.y),radius.z)) continue; // Limits aspect ratio
             const float margin = max(max(radius.x,radius.y),radius.z);
-            vec2 rz = (1-margin)*(2.f*vec2(random(),random())-vec2(1)); // Fits cylinder
+            //const uint N = 32;
+            vec2 rz = (1-margin)*(2.f*vec2(random(),random())-vec2(1))/2.f; //*vec2(float(N-1)/N); // Fits cylinder
             const float a = 2*PI*random();
             vec3 center = vec3(rz[0]*cos(a), rz[0]*sin(a), rz[1]);
             mat4 ellipsoid = mat4(randomRotation(random) * mat3().scale(radius)).translate(center);
