@@ -3,7 +3,7 @@
 
 static thread_local Window* window; // Current window for Widget event and render methods
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
-bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
+bool hasFocus(Widget* widget) { assert_(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(window->cursorPosition)) window->cursor=cursor; }

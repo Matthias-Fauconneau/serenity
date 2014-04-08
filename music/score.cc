@@ -1,6 +1,6 @@
 #include "score.h"
 
-float operator "" _px(uint64 length) { return length/1050.f; }
+float operator "" _px(uint64 length) { return length/1366.f; }
 
 void Score::onPath(const ref<vec2>& p) {
     vec2 min=p[0], max=p[0]; for(vec2 a: p) min=::min(min,a), max=::max(max,a);
@@ -62,8 +62,8 @@ void Score::onGlyph(int index, vec2 pos, float size,const string& font, int code
         } else
 #endif
         if(font=="OpusStd"_) {
-            //(code==3||code==6 ||code==5)
-            if((code==4||code==6) && pos.x<200_px) { //TODO: OCR
+            //(code==3/4||code==6 ||code==5)
+            if((code==3||code==6) && pos.x<200_px) { //TODO: OCR
                 if(pos.y-lastClef.y>80_px/*maxStaffDistance*1.1*/ && staffCount!=1) {
                     staffs << (lastClef.y+pos.y)/2+12_px;
                     staffCount=1;
@@ -342,7 +342,6 @@ void Score::parse() { //FIXME: All the local rules makes recognition work only o
 #if 1
     /// Detect and remove tied notes
     array<Tie> tied;
-    //for(Line tie : ties) {
     for(uint i=0; i<ties.size; i++) { Line tie=ties[i]; // not range as ties may be moved back (on left note steal by another tie)
         float l = abs(tie.b.x-tie.a.x);
         uint staff=0; for(;staff<staffs.size-1 && tie.a.y>staffs[staff];staff++) {}
@@ -408,43 +407,45 @@ alreadyTied: ;
 //staffDone: ;
 #if 1
             /// Detect notes tied over a line wrap
-            if(t.ly && (!noteBetween || (noteBetween<2 && l>156_px)) && i+1<staffs.size && tie.b.x > notes[i].keys.last()+10_px ) {
-                float ly=100_px; for(float y: keys) if(abs(-y-t.ly) < abs(ly)) ly = -y-t.ly;
-                const Staff& staff = notes[i+1];
-                if(staff) {
-                    int x = 0;
-                    float rx = staff.keys[x];
-                    assert(staff.values[x].keys, staff.values[x].size());
-                    float ry = staff.values[x].keys[0];
-                    for(Line trill : trills) if(abs(rx-trill.a.x)<8_px && -ry-trill.a.y>0 && -ry-trill.a.y<200_px) goto trillCancelTie;
-                    float min=15_px/*14*/;
-                    for(float y2 : staff.values[x].keys) {
+            //if(t.ly) { //?
+                if(/*(!noteBetween || (noteBetween<2 && l>156_px)) &&*/ i==staff && notes[i].keys && tie.b.x-notes[i].keys.last() > 10_px ) {
+                    float ly=200_px; for(float y: keys) if(abs(-y-t.ly) < abs(ly)) ly = -y-t.ly;
+                    const Staff& staff = notes[i+1];
+                    if(staff) {
+                        int x = 0;
+                        float rx = staff.keys[x];
+                        assert(staff.values[x].keys, staff.values[x].size());
+                        float ry = staff.values[x].keys[0];
+                        for(Line trill : trills) if(abs(rx-trill.a.x)<8_px && -ry-trill.a.y>0 && -ry-trill.a.y<200_px) goto trillCancelTie;
+                        float min=125_px; //20_px;
+                        /*for(float y2 : staff.values[x].keys) {
                         float ry=100_px; for(float y: keys) if(abs(-y-y2) < abs(ry)) ry = -y-y2;
                         float dy = ry-ly;
                         for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied1;
                         if(dy>=0) min=::min(min, abs(dy));
 alreadyTied1: ;
-                    }
-                    for(float y2 : staff.values[x].keys) {
-                        float ry=100_px; for(float y: keys) if(abs(-y-y2) < abs(ry)) ry = -y-y2;
-                        float dy = ry-ly;
-                        if(dy>=-15_px && abs(dy)<=min) {
-                            t.ri=i+1;t.rx=rx; t.ry=y2;
-                            for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
-                            for(Line tie : ties) if(sq(tie.b-vec2(t.rx,-t.ry))<sq(32_px)) { // Search for the matching wrapped tie
-                                debug[vec2(t.rx,-t.ry)]<<"^R"_<<str(round(dy/1_px));
-                                debug[vec2(tie.b)]<<"^"_;
-                                tied << t;
-                                goto tieFound;
-                            }
-                        } /*else*/ debug[vec2(t.rx,-t.ry)]<<"!R"_<<str(dy);
+                    }*/
+                        for(float y2 : staff.values[x].keys) {
+                            float ry=200_px; for(float y: keys) if(abs(-y-y2) < abs(ry)) ry = -y-y2;
+                            float dy = ry-ly;
+                            if(dy>=-125_px/*20_px*/ && abs(dy)<=min) {
+                                t.ri=i+1;t.rx=rx; t.ry=y2;
+                                for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
+                                for(Line tie : ties) if(sq(tie.b-vec2(t.rx,-t.ry))<sq(32_px)) { // Search for the matching wrapped tie
+                                    debug[vec2(t.rx,-t.ry)]="^R"_<<dec(dy/1_px);
+                                    debug[vec2(tie.b)]<<"^"_;
+                                    tied << t;
+                                    goto tieFound;
+                                } //else debug[vec2(rx,-y2)]<<"√R"_<<str(norm(tie.b-vec2(t.rx,-t.ry)));
+                            } /*else*/ debug[vec2(rx,-y2)]<<"!R"_<<dec(dy/1_px);
 alreadyTied2: ;
+                        }
                     }
-                }
 tieFound: ;
 trillCancelTie: ;
-            }
+                //} else debug[tie.b]<<str("!W"_,tie.b.x-notes[i].keys.last());
 #endif
+            }
         }
         //debug[vec2(tie.b)]<<(t.ly?"!R"_:"!L"_);
         continue;
@@ -474,7 +475,7 @@ continueTie: ;
     for(Staff& staff: notes) {
         for(float x : staff.keys) for(float y : staff.at(x).keys) {
             staff.at(x).at(y).scoreIndex=indices.size;
-            positions<<vec2(x,-y); indices<<staff.at(x).at(y).index; durations<<staff.at(x).at(y).duration;
+            positions<<vec2(x,-y); indices<<staff.at(x).at(y).pdfIndex; durations<<staff.at(x).at(y).duration;
         }
     }
 
@@ -495,7 +496,7 @@ continueTie: ;
         }
     }
 
-    for(int i: range(staffs.size)) debug[vec2(0,staffs[i])]=str(i,"________"_);
+    for(int i: range(staffs.size)) debug[vec2(0,staffs[i])]=str(i,"_________"_);
 }
 
 void Score::synchronize(const ref<MidiNote>& notes) {
@@ -505,7 +506,7 @@ void Score::synchronize(const ref<MidiNote>& notes) {
     for(uint i=0; i<durations.size;) if(durations[i]==0)  positions.removeAt(i), indices.removeAt(i), durations.removeAt(i); else i++;
 #endif
 
-#if 1
+#if 0
     // Synchronize score with MIDI
     vec2 lastPos=vec2(0,0); uint lastKey=0;
     for(uint i=0; i<notes.size && i<positions.size;) {
@@ -521,11 +522,14 @@ void Score::synchronize(const ref<MidiNote>& notes) {
 #endif
 
     chords.clear();
-    uint t=-1; for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
-        if(i==0 || (positions[i-1].x != positions[i].x && notes[i].time-notes[i-1].time > 0)) chords.insert(++t);
-        debug[positions[i]]<<str(notes[i].key); //<<" "_<<str(chords.at(t).size)<<" "_<<str(notes[i].time-notes[i?i-1:0].time);
-        chords.at(t) << notes[i];
+    for(uint i: range(min(notes.size,positions.size))) { // Reconstructs chords after edition
+        if(i==0 || (positions[i-1].x != positions[i].x /*&& notes[i].time-notes[i-1].time > 0*/)) chords.append( ::Chord(i) );
+        //debug[positions[i]]<<str(i);
+        //int delta = notes[i].time-notes[i?i-1:0].time;
+        //if(delta > 0 && delta < 480/32) debug[positions[i]]<<" "_+str(delta);
+        chords.last().insertSorted(notes[i].key); // Sorts by key but keep indices from low to high
     }
+    for(uint t: range(chords.size)) for(uint i: range(chords[t].size)) { int index=chords[t].firstNoteIndex+i; debug[positions[index]]<<str(chords[t][i]); }
 }
 
 #if ANNOTATION
@@ -634,24 +638,24 @@ void Score::remove() {
 #endif
 
 void Score::expect() {
-    while(!expected && chordIndex<chords.size()-1) {
-        uint i=noteIndex; for(MidiNote note: chords.values[chordIndex]) {
-            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(note.key) /*skip double notes*/ ) {
-                expected.insert(note.key, i);
+    while(!expected && chordIndex<chords.size-1) {
+        const ::Chord& chord = chords[chordIndex];
+        for(uint i: range(chord.size)) {
+            uint index = chord.firstNoteIndex+i, key=chord[i];
+            if(/*note.duration > 0  &&*//*skip graces*/ !expected.contains(key) /*skip double notes*/ ) {
+                expected.insert(key, index);
                 errors = 0; showExpected = false; // Hides highlighting while succeeding
             }
-            assert(i<positions.size);
-            while(positions[i].y>staffs[currentStaff] && currentStaff<staffs.size-1) {
+            assert(index<positions.size);
+            while(positions[index].y>staffs[currentStaff] && currentStaff<staffs.size-1) {
                 currentStaff++;
                 currentX=0;
             }
-            currentX = max(currentX, positions[i].x);
-            i++;
+            currentX = max(currentX, positions[index].x);
         }
         assert(currentStaff<staffs.size);
         nextStaff(currentStaff>0?staffs[currentStaff-1]:0,staffs[currentStaff],currentX);
         chordSize = expected.size();
-        noteIndex += chords.values[chordIndex].size;
         chordIndex++;
     }
 }
@@ -666,9 +670,9 @@ void Score::seek(uint unused time) {
     } else
 #endif
         if(chords) {
-        chordIndex=0, chordSize=0, noteIndex=0; currentStaff=0; currentX=0; expected.clear(); active.clear();
-        expect();
-    }
+            chordIndex=0, chordSize=0, currentStaff=0; currentX=0; expected.clear(); active.clear();
+            expect();
+        }
     if(!showActive) {
         map<int,vec3> activeNotes;
         for(int i: expected.values) if(!activeNotes.contains(indices?indices[i]:i)) activeNotes.insert(indices?indices[i]:i,blue);

@@ -7,6 +7,8 @@
 #include "graphics.h"
 #include "midi.h"
 
+struct Chord : array<uint> { uint firstNoteIndex; Chord(uint index):firstNoteIndex(index){} };
+
 struct Score {
     void onPath(const ref<vec2>&);
     void onGlyph(int, vec2, float,const string&, int, int);
@@ -29,8 +31,10 @@ struct Score {
     array<float> staffLines;
 
     struct Note {
-        Note(int index, int duration) : index(index), duration(duration) {}
-        int index,duration,scoreIndex=-1;
+        Note(uint index, uint duration) : pdfIndex(index), duration(duration) {}
+        uint pdfIndex; // into PDF::characters
+        uint duration; // Note duration
+        uint scoreIndex=-1; // into positions/indices/durations
     };
     typedef map<float, Note> Chord;
     typedef map<float, Chord> Staff;
@@ -42,12 +46,12 @@ struct Score {
     /// Synchronize notes to MIDI track
     void synchronize(const ref<MidiNote>& notes);
 
-    map<uint, array<MidiNote>> chords; // chronological MIDI notes key values
+    array< ::Chord> chords; // Maps ordered MIDI events to note indices
     array<vec2> positions; // MIDI-synchronized note positions in associated PDF
     array<int> indices; // MIDI-synchronized character indices in associated PDF
-    array<int> durations; // MIDI-synchronized character indices in associated PDF
+    array<int> durations; // MIDI-synchronized character indices in associated PDF (for manual annotations)
 
-    uint chordIndex=-1, noteIndex=0, currentStaff=0; float currentX=0;
+    uint chordIndex=-1, currentStaff=0; float currentX=0;
     int chordSize=0; //Initial expected set size (to allow missing notes on large chords)
     map<uint,uint> active; // Maps active keys to notes (indices)
     map<uint,uint> expected; // Maps expected keys to notes (indices)
@@ -73,12 +77,12 @@ struct Score {
     int pass=-1;
     int msScore=0; //HACK
     map<int,int> histogram;
-    const int quarter=9, half=11, whole=16;
+    const int quarter=9, half=17, whole=16;
 
     void clear() {
         staffs.clear(); keys.clear(); previousClef=lastClef=lastPos=0; /*maxStaffDistance=100;*/ staffCount=0;
         repeats.clear(); ties.clear(); tails.clear(); ledgers.clear(); staffLines.clear(); tremolos.clear(); trills.clear();
-        notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, noteIndex=0, currentStaff=0;
+        notes.clear(); dots.clear(); chords.clear(); positions.clear(); indices.clear(); durations.clear(); chordIndex=-1, currentStaff=0;
         active.clear(); expected.clear(); debug.clear(); pass=-1; histogram.clear(); errors=0;
     }
 };

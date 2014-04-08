@@ -6,16 +6,19 @@
 #include "png.h"
 
 #define SCORE 1
-#define KEYBOARD 1
-#define AUDIOFILE 1
+#define KEYBOARD 0
 #define ENCODE 0
 #if !ENCODE
 #define WINDOW 1
+#define THREAD 1
 #define SAMPLE 0
 #define AUDIO 0
-#define THREAD 1
+#if AUDIO
+#define AUDIOFILE 0
+#endif
 #else
 #define SAMPLE 0
+#define AUDIOFILE 0
 #endif
 
 #if AUDIO
@@ -237,6 +240,7 @@ struct Music {
         window.actions[Delete] = {&score,&Score::remove};
 #endif
         window.actions[Return] = {this, &Music::toggleDebug};
+        window.actions[F5] = [this]{ openScore(name); };
         array<String> files = folder.list(Files);
         for(String& file : files) {
             if(endsWith(file,".mid"_)||endsWith(file,".pdf"_)) {
@@ -265,7 +269,10 @@ struct Music {
 #endif
 #endif
         for(string arg: arguments()) if(!endsWith(arg,".sfz"_)) { openScore(arg); break; }
-
+#if WINDOW
+        if(!name && scores.size==1) openScore(0);
+        window.show();
+#endif
 #if !ENCODE
 #if AUDIO
         //midi.noteEvent.connect([this](uint,uint){audio.start();}); // Ensures audio output is running (sampler automatically pause)
@@ -275,10 +282,6 @@ struct Music {
         audio.start(audioFile.rate, periodSize);
 #else
         toggleDebug();
-#endif
-#if WINDOW
-        if(!name && scores.size==1) openScore(0);
-        window.show();
 #endif
 #if THREAD
         thread.spawn();
@@ -348,7 +351,8 @@ struct Music {
         if(top==bottom) return; // last staff
         assert(x>=0 && x<=1);
         target = vec2(0, -(( (1-x)*top + x*bottom )*pdfScore.lastSize-pdfScore.size.y/2)); // Align center between current top and current bottom
-        if(!position) position=target, pdfScore.offset=int2(round(position));
+        if(!position) position=target;
+        if(play) pdfScore.offset=int2(round(position));
 #if MIDISCORE
         midiScore.center(int2(0,bottom));
 #endif
@@ -382,7 +386,7 @@ struct Music {
 #endif
 
 #if WINDOW
-    void openScore(uint index) { openScore(toUTF8(scores[index].text)); }
+    void openScore(uint index) { openScore(toUTF8(scores[index].text)); scores.index=index; }
 #endif
     /// Opens the given PDF+MIDI score
     void openScore(const string& name) {
@@ -394,8 +398,8 @@ struct Music {
 #endif
 #if SCORE
         score.clear();
+        bool hadAnnotations = pdfScore.annotations.size();
         pdfScore.clear();
-        this->name=String(name);
 #if WINDOW
         window.setTitle(name);
         window.background = Window::White;
@@ -414,7 +418,9 @@ struct Music {
             else if(existsFile(String(name+".not"_),folder)) score.annotate(parseAnnotations(readFile(String(name+".not"_),folder)));
 #endif
             layout.first()= &pdfScore.area();
-            pdfScore.offset = 0; position=0,speed=0,target=0;
+            if(this->name != name) { pdfScore.offset = 0, position=0,speed=0,target=0; }
+            else if(hadAnnotations) pdfScore.setAnnotations(score.debug);
+            this->name = String(name);
 #if WINDOW
             window.focus = &pdfScore.area();
 #endif

@@ -138,7 +138,7 @@ struct Selection : virtual Layout {
 /// Displays a selection using a blue highlight
 struct HighlightSelection : virtual Selection {
     /// Whether to always display the highlight or only when focused
-    bool always=false;
+    bool always=true;
     void render(const Image& target) override;
 };
 
