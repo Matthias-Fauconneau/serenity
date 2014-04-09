@@ -16,23 +16,25 @@ struct View : Widget {
         int2 delta = cursor-lastPos;
         lastPos = cursor;
         if(!button) return false;
+        setDrag(this);
         rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
         rotation.y = clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
         return true;
     }
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
+        float max = 0; //volume->sampleCount.x
         if(phantom) {
             ImageF linear = float(volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
-            convert(target, linear/*, volume->sampleCount.x*/);
+            convert(target, linear, max);
         } else {
             ImageF linear {target.size()};
             project(linear, *volume, projection);
-            convert(target, linear/*, volume->sampleCount.x*/);
+            convert(target, linear, max);
         }
     }
 };
-vec2 View::rotation = vec2(0, -PI/3);
+vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
     const uint N = 32;
@@ -43,7 +45,11 @@ struct Tomography {
     buffer<ImageF> images {P};
     //SIRT reconstruction{N};
     CGNR reconstruction{N};
+#if 0
     UniformGrid<View> views{{{0, &reconstruction.r}, {0, &reconstruction.p}, {0, &reconstruction.AtAp}, {&phantom, &source}}};
+#else
+    UniformGrid<View> views{{{&phantom, &source}}};
+#endif
     View& view = views.last();
     Window window {&views, int2(512), "Tomography"_};
     Tomography() {
@@ -77,7 +83,7 @@ struct Tomography {
                 float mean = (sum/N) / volume; // Projection energy / volume of the support
                 reconstruction.x.clear(mean);*/ //FIXME: initialize only cylinder (+ with summation (Atb?) or FBP ?)
                 reconstruction.initialize(projections, images);
-                //window.frameSent = {this, &Tomography::step};
+                window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
                 view.volume = &reconstruction.x;
             }

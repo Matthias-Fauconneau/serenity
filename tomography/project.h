@@ -10,13 +10,13 @@ struct Projection {
     // Precomputed parameters
     mat4 world = projection.inverse(); // Transform normalized view space to world space
     float stepSize = 1; //1./2;
-    vec3 worldRay = stepSize * normalize( projection.transpose() * vec3(0,0,1) );
-    float a = worldRay.x*worldRay.x+worldRay.y*worldRay.y;
+    vec3 ray3 = stepSize * normalize( projection.transpose() * vec3(0,0,1) );
+    float a = ray3.x*ray3.x+ray3.y*ray3.y;
     // FIXME: profile
-    v4sf ray = {worldRay.x, worldRay.y, worldRay.z, 1};
-    v4sf rayZ = float4(worldRay.z);
-    v4sf raySlopeZ = float4(1/worldRay.z);
-    v4sf rayXYXY = {worldRay.x, worldRay.y, worldRay.x, worldRay.y};
+    v4sf ray = {ray3.x, ray3.y, ray3.z, 1};
+    v4sf rayZ = float4(ray3.z);
+    v4sf raySlopeZ = float4(1/ray3.z);
+    v4sf rayXYXY = {ray3.x, ray3.y, ray3.x, ray3.y};
     v4sf _m4a_4_m4a_4 = {-4*a, 4, -4*a, 4};
     v4sf rcp_2a = float4(a ? -1./(2*a) : inf);
 };
