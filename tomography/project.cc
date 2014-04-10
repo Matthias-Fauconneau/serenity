@@ -1,23 +1,31 @@
 #include "project.h"
 #include "thread.h"
 
-// SIMD constants for cylinder intersections
-static const v4sf _2f = float4( 2 );
+// SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__
+#if CYLINDER
+static const v4sf _2f = float4( 2 );
 static const v4sf mfloatMax = float4(-FLT_MAX);
 static const v4sf floatMax = float4(FLT_MAX);
+static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
+#endif
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
-//static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 
 struct CylinderVolume {
     const VolumeF& volume;
     // Precomputed parameters
     int3 size = volume.sampleCount;
+#if CYLINDER
     const float radius = (size.x-1-1)/2, halfHeight = (size.z-1-1)/2; // Cylinder parameters (N-1 [domain size] - 1 (linear))
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
     const v4sf volumeOrigin = {float(size.x-1)/2, float(size.y-1)/2, float(size.z-1)/2, 0};
+#else
+    v4sf minm = vec4(vec3(0), -FLT_MAX), maxm = vec4(vec3(size-int3(1)),-FLT_MAX);
+    v4sf minM = vec4(vec3(0),  FLT_MAX), maxM = vec4(vec3(size-int3(1)), FLT_MAX);
+#endif
+
     float* const volumeData = volume;
     const uint64* const offsetX = volume.offsetX.data;
     const uint64* const offsetY = volume.offsetY.data;
@@ -28,8 +36,8 @@ struct CylinderVolume {
 };
 
 float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& length) {
-    v4sf Tmin,Tmax; {
-#if 0
+    v4sf tmin,tmax; {
+#if 0 // Cylinder
         // Intersects cap disks
         const v4sf originZ = shuffle(origin, origin, 2,2,2,2);
         const v4sf capT = (capZ - originZ) * p.raySlopeZ; // top top bottom bottom
@@ -52,30 +60,19 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
 
         // 11 instructions
         const v4sf capSideT = shuffle(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
-        Tmin = hmin( blendv(floatMax, capSideT, tMask) );
-        Tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-#else
-        vec3 O (origin[0], origin[1], origin[2]);
-        vec3 D = p.ray3;
-        vec3 min = vec3(-radius), max = vec3(radius);
-        //vec3 min = vec3(0), max = vec3(size-int3(1/*bounds*/+1/*trilinear*/));
-        float tmin = ((D.x>=0 ? min : max).x - O.x) / D.x;
-        float tmax = ((D.x>=0 ? max : min).x - O.x) / D.x;
-        float tymin= ((D.y>=0 ? min : max).y - O.y) / D.y;
-        float tymax= ((D.y>=0 ? max : min).y - O.y) / D.y;
-        if( (tmin >= tymax) || (tymin >= tmax) ) { length=0; return 0; }
-        if(tymin>tmin) tmin=tymin; if(tymax<tmax) tmax=tymax;
-        float tzmin= ((D.z >= 0?min:max).z - O.z) / D.z;
-        float tzmax= ((D.z >= 0?max:min).z - O.z) / D.z;
-        if( (tmin >= tzmax) || (tzmin >= tmax) ) { length=0; return 0; }
-        if(tzmin>tmin) tmin=tzmin; if(tzmax<tmax) tmax=tzmax;
-        Tmin = float4(tmin), Tmax = float4(tmax);
+        tmin = hmin( blendv(floatMax, capSideT, tMask) );
+        tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
+#else // Box
+        v4sf tmin = hmax((blendv(minm, maxm, p.ray<_0f) - origin) / p.ray);
+        v4sf tmax = hmin((blendv(maxM, minM, p.ray<_0f) - origin) / p.ray);
+        if(mask(tmin >= tmax)) { length=0; return 0; }
 #endif
     }
-    length = Tmax[0]-Tmin[0]; // Ray length (in steps)
-    assert_(length, origin, Tmin[0], Tmax[0]);
-    v4sf position = volumeOrigin + origin + Tmin * p.ray;
-    const v4sf texit = max(floatMMMm, Tmax); // max, max, max, tmax
+    length = tmax[0]-tmin[0]; // Ray length (in steps)
+    assert_(length, origin, tmin[0], tmax[0]);
+    v4sf position = /*volumeOrigin +*/ origin + tmin * p.ray;
+#if 1 // Uniform ray sampling with trilinear interpolation
+    const v4sf texit = max(floatMMMm, tmax); // max, max, max, tmax
     float sum = 0; // Accumulates/Updates samples along the ray
     assert_(!mask(position > texit));
     do { // 24 instructions
@@ -103,6 +100,47 @@ float CylinderVolume::accumulate(const Projection& p, const v4sf origin, float& 
         sum += dpfv[0]; // Accumulates trilinearly interpolated sample
         position = position + p.ray; // Step
     } while(!mask(position > texit)); // Check for exit intersection
+#else // Complete voxel traversal with line length weighting
+    const v4si p0 = cvttps2dq(position);
+    int X = p0[0], Y = p0[1], Z = p0[2];
+    int stepX = p.ray[0] > 0 ? 1 : -1, stepY = p.ray[1] > 0 ? 1 : -1;
+    float tDeltaX = 1/v.x; // step for x increment
+    float tDeltaY = 1/v.y; // step for y increment
+    float tDeltaZ = 1/v.z; // step for z increment
+    float tMaxX = tDeltaX * (tDeltaX>0 ? (1-fract(position)); // Next X plane
+    float tMaxY = ; // Next Y plane
+    float tMaxZ = ; // Next Z plane
+    for(;;) {
+        const uint vx = offsetX[X], vy = offsetY[Y], vz = offsetZ[Z];
+        float value = volumeData[vx + vy + vz];
+        float weight = min(min(tMax))
+        if(tMaxX < tMaxY) {
+            if(tMaxX < tMaxY) {
+                X += stepX;
+                sum += tDeltaX * value;
+                if(X >= size.x) break;
+                tMaxX += tDeltaX;
+            } else {
+                Z += stepZ;
+                sum += tDeltaZ * value;
+                if(Z >= size.z) break;
+                tMaxZ += tDeltaZ;
+            }
+        } else {
+            if(tMaxY < tMaxZ) {
+                Y += stepY;
+                sum += tDeltaY * value;
+                if(Y >= size.y) break;
+                tMaxY += tDeltaY;
+            } else {
+                Z += stepZ;
+                sum += tDeltaY * value;
+                if(Z >= size.z) break;
+                tMaxZ += tDeltaZ;
+            }
+        }
+    }
+#endif
     return sum; // * length / ceil(length) ?
 }
 
@@ -209,22 +247,8 @@ float CGNR::residual(const ref<Projection>& projections, const ref<ImageF>& imag
             uint i = xy.x, j = xy.y;
             if(i>=P.width-1 || j>=P.height-1) continue; // FIXME
             float u = fract(xy.x), v = fract(xy.y);
-            assert_(i<P.width && j<P.height, i, j, u, v);
-
-#if 1 // FIXME: margin
-            assert_(i<P.width-1 && j<P.height-1);
             float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
                          v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
-#else
-            float s;
-            if(!v) { if(!u) s = P(i,j); else { assert_(i<P.width-1); s = (1-u) * P(i, j) + u * P(i+1, j); } }
-            else if(!u) { assert_(j<P.width-1); s = (1-v) * P(i, j) + v * P(i, j+1); }
-            else {
-                assert_(i<P.width-1 && j<P.height-1);
-                s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
-                        v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1));
-            }
-#endif
             projectionSum += s;
         }
         // Updates: p[k]|v = r[k]|v = At b - At A x
@@ -238,7 +262,7 @@ float CGNR::residual(const ref<Projection>& projections, const ref<ImageF>& imag
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + At α p[k]
-bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
+bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& /*images*/) {
     k++;
     const vec3 center = vec3(p.sampleCount-int3(1))/2.f;
     //const float radiusSq = sq(center.x);
@@ -267,12 +291,13 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     float alpha = residualEnergy / sum(pAtAp);
     float* xData = (float*)x.data.data; // x
     float* rData = (float*)r.data.data; // r
-    float estimateSum[coreCount] = {};
+    float deltaSum[coreCount] = {};
     float newResidualSum[coreCount] = {};
     chunk_parallel(p.size(), [&](uint id, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
-            xData[index] += alpha * pData[index];
-            estimateSum[id] += sq(xData[index]);
+            float delta = alpha * pData[index];
+            xData[index] += delta;
+            deltaSum[id] += sq(delta);
             rData[index] -= alpha * AtApData[index];
             newResidualSum[id] += sq(rData[index]);
             //const vec3 origin = vec3(zOrder(index)) - center;
@@ -280,29 +305,16 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         }
     });
     float newResidual = sum(newResidualSum);
-
-    // Asserts rk == Atb - AtAx
-    float checkResidual = residual(projections, images, AtAp, AtAp);
-#if 1
-    log(newResidual, checkResidual);
-#else
-    assert_(checkResidual == newResidual, newResidual, checkResidual);
-    chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
-        for(uint index: range(offset,offset+size)) {
-            assert_(rData[index] == AtApData[index], rData[index], AtApData[index]);
-        }
-    });
-#endif
     float beta = newResidual / residualEnergy;
-    float estimateEnergy = sum(estimateSum);
-    log(k, residualEnergy, newResidual, beta, estimateEnergy, newResidual/estimateEnergy);
-    if(beta > 1) return false;
+    float newDelta = sum(deltaSum);
+    log(k,'\t',residualEnergy,'\\',newResidual,'=',beta,'\t',deltaEnergy,'\\',newDelta,'=',newDelta/deltaEnergy);
+    if(beta > 1) return false; // FIXME: stop before last update
     // Computes next search direction
     chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
             pData[index] = rData[index] + beta * pData[index];
         }
     });
-    residualEnergy = newResidual;
+    residualEnergy = newResidual, deltaEnergy = newDelta;
     return true;
 }
