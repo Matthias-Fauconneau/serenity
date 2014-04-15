@@ -23,7 +23,7 @@ struct View : Widget {
     }
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
-        float max = 0; //volume->sampleCount.x
+        float max = volume->sampleCount.x;
         if(phantom) {
             ImageF linear = float(volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
             convert(target, linear, max);

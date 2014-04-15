@@ -24,7 +24,7 @@ struct Volume {
     uint sampleSize=0; // Sample integer size (in bytes)
     int3 sampleCount = 0; // Sample counts (along each dimensions)
     buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
-    buffer<uint64> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes    
+    buffer<int32> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes (max 16GB)
 };
 
 generic struct VolumeT : Volume {
@@ -47,5 +47,7 @@ typedef VolumeT<float> VolumeF;
 void interleavedLookup(Volume& target);
 /// Interleaves 3 coordinates
 uint64 zOrder(int3 coordinates);
+/// Uninterleaves 2 coordinates
+int2 zOrder2(uint64 index);
 /// Uninterleaves 3 coordinates
-int3 zOrder(uint64 index);
+int3 zOrder3(uint64 index);
