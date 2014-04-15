@@ -78,10 +78,8 @@ float CylinderVolume::project(const Projection& p, v8sf p01f, v4sf tEnd) {
     for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
         const v8si p01 = cvttps2dq(p01f);
-        //assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]>=0 && p01[1]<size[1] && p01[2]>=0 && p01[2]<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
-        //assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]>=0 && p01[5]<size[1] && p01[6]>=0 && p01[6]<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
-        assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]-(offsetY-offsetX)>=0 && p01[1]-(offsetY-offsetX)<size[1] && p01[2]-(offsetZ-offsetX)>=0 && p01[2]-(offsetZ-offsetX)<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
-        assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]-(offsetY-offsetX)>=0 && p01[5]-(offsetY-offsetX)<size[1] && p01[6]-(offsetZ-offsetX)>=0 && p01[6]-(offsetZ-offsetX)<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
+        assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]-(offsetY-offsetX)>=0 && p01[1]-(offsetY-offsetX)<size[1] && p01[2]-(offsetZ-offsetX)>=0 && p01[2]-(offsetZ-offsetX)<size[2], p01[0], p01[1], p01[2]);
+        assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]-(offsetY-offsetX)>=0 && p01[5]-(offsetY-offsetX)<size[1] && p01[6]-(offsetZ-offsetX)>=0 && p01[6]-(offsetZ-offsetX)<size[2], p01[4], p01[5], p01[6]);
         // Lookups sample offsets
         const v8si offsetXYZXYZ = gather(offsetX, p01, _11101110);
         const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
@@ -102,17 +100,17 @@ void CylinderVolume::backproject(float* volumeData, const Projection& p, v8sf p0
     for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
         const v8si p01 = cvttps2dq(p01f);
-        assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]>=0 && p01[1]<size[1] && p01[2]>=0 && p01[2]<size[2], p01[0], p01[1], p01[2]);
-        assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]>=0 && p01[5]<size[1] && p01[6]>=0 && p01[6]<size[2], p01[4], p01[5], p01[6]);
+        assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]-(offsetY-offsetX)>=0 && p01[1]-(offsetY-offsetX)<size[1] && p01[2]-(offsetZ-offsetX)>=0 && p01[2]-(offsetZ-offsetX)<size[2], p01[0], p01[1], p01[2]);
+        assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]-(offsetY-offsetX)>=0 && p01[5]-(offsetY-offsetX)<size[1] && p01[6]-(offsetZ-offsetX)>=0 && p01[6]-(offsetZ-offsetX)<size[2], p01[4], p01[5], p01[6]);
         // Lookups sample offsets
         const v8si offsetXYZXYZ = gather(offsetX, p01, _11101110);
         const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
         // Gather samples
         v8sf cx01 = gather(volumeData, v01);
         // Computes trilinear interpolation coefficients
-        const v8sf pc_1mpc = abs(p01f - cvtdq2ps(p01)); // XYZ0, XYZ0
-        const v8sf w01 = shuffle8(pc_1mpc, pc_1mpc, 0,0,0,0, 4,4,4,4) * shuffle8(pc_1mpc, pc_1mpc, 1,1, 5,5, 1,1, 5,5) * shuffle8(pc_1mpc, pc_1mpc, 2,6, 2,6, 2,6, 2,6); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
-        // Update
+        const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
+        const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
+       // Update
         cx01 += w01 * value8; // cx01 = max(_0f, cx01) ?
         // Scatter ~ scatter(data, v01, cx01);
         volumeData[v01[0]] = cx01[0];
@@ -189,6 +187,8 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
         }
     });
     residualEnergy = sum(residualSum);
+    log(residualEnergy);
+    assert_(residualEnergy);
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + At α p[k]
@@ -266,7 +266,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     float beta = newResidual / residualEnergy;
     float newDelta = sum(deltaSum);
     log(k,'\t',residualEnergy,'\\',newResidual,'=',beta,'\t',deltaEnergy,'\\',newDelta,'=',newDelta/deltaEnergy);
-    if(beta > 1) return false; // FIXME: stop before last update
+    //if(beta > 1) return false; // FIXME: stop before last update
     // Computes next search direction
     chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {

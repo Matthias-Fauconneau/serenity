@@ -37,9 +37,9 @@ struct View : Widget {
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
-    const uint N = 32;
-    const uint P = 32;
-    Phantom phantom {N};
+    const uint N = 128;
+    const uint P = N;
+    Phantom phantom {16};
     VolumeF source = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
@@ -51,7 +51,7 @@ struct Tomography {
     UniformGrid<View> views{{{&phantom, &source}}};
 #endif
     View& view = views.last();
-    Window window {&views, int2(512), "Tomography"_};
+    Window window {&views, int2(1024), "Tomography"_};
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
@@ -83,13 +83,13 @@ struct Tomography {
                 float mean = (sum/N) / volume; // Projection energy / volume of the support
                 reconstruction.x.clear(mean);*/ //FIXME: initialize only cylinder (+ with summation (Atb?) or FBP ?)
                 reconstruction.initialize(projections, images);
-                //window.frameSent = {this, &Tomography::step};
+                window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
                 view.volume = &reconstruction.x;
             }
         }
         window.show();
-        //step();
+        step();
     }
     Random random;
     uint index = 0;
