@@ -83,13 +83,13 @@ struct Tomography {
                 float mean = (sum/N) / volume; // Projection energy / volume of the support
                 reconstruction.x.clear(mean);*/ //FIXME: initialize only cylinder (+ with summation (Atb?) or FBP ?)
                 reconstruction.initialize(projections, images);
-                window.frameSent = {this, &Tomography::step};
+                //window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
                 view.volume = &reconstruction.x;
             }
         }
         window.show();
-        step();
+        //step();
     }
     Random random;
     uint index = 0;

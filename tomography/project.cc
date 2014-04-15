@@ -9,6 +9,7 @@ static const v4sf floatMax = float4(FLT_MAX);
 static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 const v8si _11101110 = (v8si){~0ll,~0ll,~0ll,0ll, ~0ll,~0ll,~0ll,0ll};
+const v8sf _00001111f = (v8sf){0,0,0,0,1,1,1,1};
 
 struct CylinderVolume {
     const VolumeF& volume;
@@ -38,8 +39,8 @@ struct CylinderVolume {
     /// Convenience method to intersect and integrate
     float project(const Projection& p, v4sf origin) {
         v8sf pStart; v4sf tEnd;
-        intersect(p, origin, pStart, tEnd);
-        return project(p, pStart, tEnd);
+        float length = intersect(p, origin, pStart, tEnd);
+        return length ? project(p, pStart, tEnd) : 0;
     }
 };
 
@@ -77,16 +78,18 @@ float CylinderVolume::project(const Projection& p, v8sf p01f, v4sf tEnd) {
     for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
         const v8si p01 = cvttps2dq(p01f);
-        assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]>=0 && p01[1]<size[1] && p01[2]>=0 && p01[2]<size[2], p01[0], p01[1], p01[2]);
-        assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]>=0 && p01[5]<size[1] && p01[6]>=0 && p01[6]<size[2], p01[4], p01[5], p01[6]);
+        //assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]>=0 && p01[1]<size[1] && p01[2]>=0 && p01[2]<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
+        //assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]>=0 && p01[5]<size[1] && p01[6]>=0 && p01[6]<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
+        assert_(p01[0]>=0 && p01[0]<size[0] && p01[1]-(offsetY-offsetX)>=0 && p01[1]-(offsetY-offsetX)<size[1] && p01[2]-(offsetZ-offsetX)>=0 && p01[2]-(offsetZ-offsetX)<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
+        assert_(p01[4]>=0 && p01[4]<size[0] && p01[5]-(offsetY-offsetX)>=0 && p01[5]-(offsetY-offsetX)<size[1] && p01[6]-(offsetZ-offsetX)>=0 && p01[6]-(offsetZ-offsetX)<size[2], p01[0], p01[1], p01[2], p01[4], p01[5], p01[6], p01f, p.ray8, tEnd);
         // Lookups sample offsets
         const v8si offsetXYZXYZ = gather(offsetX, p01, _11101110);
         const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
         // Gather samples
         const v8sf cx01 = gather(volumeData, v01);
         // Computes trilinear interpolation coefficients
-        const v8sf pc_1mpc = abs(p01f - cvtdq2ps(p01)); // XYZ0, XYZ0
-        const v8sf w01 = shuffle8(pc_1mpc, pc_1mpc, 0,0,0,0, 4,4,4,4) * shuffle8(pc_1mpc, pc_1mpc, 1,1, 5,5, 1,1, 5,5) * shuffle8(pc_1mpc, pc_1mpc, 2,6, 2,6, 2,6, 2,6); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
+        const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
+        const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
         const float value = dot8(w01, cx01);
         Ax += value; // Accumulates trilinearly interpolated sample
         p01f += p.ray8; // Step
@@ -169,9 +172,11 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
             float b = imageData[pixel.y*image.width+pixel.x];
             v8sf pStart; v4sf tEnd;
             float length = volume.intersect(projection, origin, pStart, tEnd);
-            float Ax = volume.project(projection, pStart, tEnd);
-            float p = (b - Ax)/length;
-            volume.backproject(pData, projection, pStart, tEnd, p);
+            if(length) {
+                float Ax = volume.project(projection, pStart, tEnd);
+                float p = (b - Ax) / length;
+                volume.backproject(pData, projection, pStart, tEnd, p);
+            }
         } );
     }
     // Copies r=p and computes |r|
@@ -226,8 +231,10 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             const v4sf origin = worldOrigin + float4(pixel.x) * viewStepX + float4(pixel.y) * viewStepY;
             v8sf pStart; v4sf tEnd;
             float length = volume.intersect(projection, origin, pStart, tEnd);
-            float Ap = volume.project(projection, pStart, tEnd);
-            volume.backproject(AtApData, projection, pStart, tEnd, Ap / length); // AtAp
+            if(length) {
+                float Ap = volume.project(projection, pStart, tEnd);
+                volume.backproject(AtApData, projection, pStart, tEnd, Ap / length); // AtAp
+            }
         } );
     }
     float pAtApSum[coreCount] = {};
@@ -238,7 +245,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         }
     });
     float pAtAp = sum(pAtApSum);
-    assert(sum(pAtAp));
+    assert(pAtAp);
     float alpha = residualEnergy / pAtAp;
     float* xData = (float*)x.data.data; // x
     float* rData = (float*)r.data.data; // r

@@ -41,8 +41,8 @@ inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf bitOr(v4sf a, v4sf b) { return v4si(a) | v4si(b); } //__builtin_ia32_orps(a, b); }
 
-const v4si notSignBit = (v4si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
-inline v4sf abs(v4sf a) { return notSignBit & (v4si)a; }
+const v4si notSignBit4 = (v4si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
+inline v4sf abs(v4sf a) { return notSignBit4 & (v4si)a; }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
@@ -75,7 +75,8 @@ inline v8sf gather(const float* base, v8si indices) { return __builtin_ia32_gath
 inline v8sf float8(float f) { return (v8sf){f,f,f,f, f,f,f,f}; }
 inline v8sf constexpr float8(float a, float b, float c, float d, float e, float f, float g, float h) { return (v8sf){a,b,c,d,e,f,g,h}; }
 
-inline v8sf dup(v4sf a) { return __builtin_ia32_vbroadcastsi256(a); }
+//inline v8sf dup(v4sf a) { return __builtin_ia32_vbroadcastsi256(a); }
+inline v8sf dup(v4sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3, 0, 1, 2, 3); }
 
 const v8si notSignBit8 = (v8si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
 inline v8sf abs(v8sf a) { return notSignBit8 & (v8si)a; }
@@ -91,6 +92,6 @@ inline v4sf high(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 1); }
 inline v8si cvttps2dq(v8sf a) { return __builtin_ia32_cvttps2dq256(a); } // Truncates
 inline v8sf cvtdq2ps(v8si a) { return __builtin_ia32_cvtdq2ps256(a); }
 inline float dot8(v8sf a,  v8sf b) {
-     v8sf dot4 = __builtin_ia32_dpps256(a, b, 0xF1);
-      return (low(dot4)+low(dot4))[0];
+     v8sf dot4 = __builtin_ia32_dpps256(a, b, 0xFF);
+      return (low(dot4)+high(dot4))[0];
  }
