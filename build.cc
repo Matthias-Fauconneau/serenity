@@ -136,7 +136,8 @@ struct Build {
             if(!flags.contains("debug"_)) args << String("-O3"_);
             if(flags.contains("profile"_)) {
                 args << String("-finstrument-functions"_);
-                if(!endsWith(CXX,"clang++"_)) args << String("-finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile"_);
+                if(!endsWith(CXX,"clang++"_))
+                    args << String("-finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile"_);
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
@@ -146,7 +147,7 @@ struct Build {
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
-            {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -o"_);
+            {static const array<string> flags = split("-c -pipe -std=c++1y -fabi-version=0 -Wall -Wextra -Wno-overloaded-virtual -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }
@@ -162,7 +163,7 @@ struct Build {
 
         string install;
         if(arguments().size>1) { for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-'); }
-        //if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
+        if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
         if(flags.contains("arm"_)) {
             CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_);
             LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);

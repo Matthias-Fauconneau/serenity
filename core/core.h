@@ -17,7 +17,7 @@ generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
 generic inline constexpr Type remove_reference<T>::type&& move(T&& t) { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
-generic void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Base template for explicit copy (overriden by explicitly copyable types)
 generic T copy(const T& o) { return o; }
 

@@ -69,9 +69,9 @@ struct mat4 {
     mat4(mat3 m):mat4(1){for(int i=0;i<3;i++) for(int j=0;j<3;j++) M(i,j)=m(i,j); }
 
     constexpr float M(int i, int j) const { return data[j*4+i]; }
-    constexpr float& M(int i, int j) { return data[j*4+i]; }
-    constexpr float operator()(int i, int j) const { return M(i,j); }
-    constexpr float& operator()(int i, int j) { return M(i,j); }
+    /*constexpr*/ float& M(int i, int j) { return data[j*4+i]; }
+    /*constexpr*/ float operator()(int i, int j) const { return M(i,j); }
+    /*constexpr*/ float& operator()(int i, int j) { return M(i,j); }
     vec4& operator[](int j) { return (vec4&)data[j*4]; }
     const vec4& operator[](int j) const { return (vec4&)data[j*4]; }
 
@@ -115,7 +115,7 @@ struct mat4 {
         return M;
     }
     mat4 translate(vec3 v) const { mat4 M=*this; for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return M; }
-    constexpr mat4 scale(const vec3 v) const { mat4 M=*this; for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
+    /*constexpr*/ mat4 scale(const vec3 v) const { mat4 M=*this; for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
     mat4 rotate(float angle, vec3 u) const {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;

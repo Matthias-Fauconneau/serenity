@@ -2,14 +2,15 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
+typedef short v2hi __attribute((__vector_size__ (4)));
 typedef int v4si __attribute((__vector_size__(16)));
-template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 typedef float v4sf __attribute((__vector_size__(16)));
-template<> inline String str(const v4sf& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 typedef int v8si __attribute((__vector_size__(32)));
-template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
 typedef float v8sf __attribute((__vector_size__(32)));
-template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
+/*template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+template<> inline String str(const v4sf& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
+template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }*/
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -18,7 +19,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 
     vec(){}
     /// Initializes all components to the same value \a v
-    constexpr vec(T v) { for(uint i=0;i<N;i++) at(i)=v; }
+    /*constexpr*/ vec(T v) { for(uint i=0;i<N;i++) at(i)=v; }
     /// Initializes components separately
     template<Type... Args> constexpr vec(T a, T b, Args... args):V<T>{a,b,T(args)...}{
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
@@ -37,7 +38,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     /// Unchecked accessor
     T& at(uint i) { return ((T*)this)[i]; }
     /// Accessor (checked in debug build, const)
-    constexpr T operator[](uint i) const { assert(i<N); return at(i); }
+    /*constexpr*/ T operator[](uint i) const { assert(i<N); return at(i); }
     /// Accessor (checked in debug build)
     T& operator[](uint i) { assert(i<N); return at(i); }
     /// \name Operators
@@ -94,7 +95,10 @@ generic String str(const vec& v) { String s("("_); for(uint i=0;i<N;i++) { s<<st
 #undef generic
 #define generic template<Type T>
 
-generic struct xy { T x,y; };
+generic struct xy {
+    T x,y;
+    inline operator v2hi() const { return (v2hi){x,y}; }
+};
 /// Integer x,y vector (16bit)
 typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)

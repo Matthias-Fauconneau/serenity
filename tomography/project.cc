@@ -30,11 +30,11 @@ struct CylinderVolume {
 
     CylinderVolume(const VolumeF& volume) : volume(volume) { assert_(volume.tiled() && size.x == size.y); }
     /// Computes ray - cylinder intersection
-    float intersect(const Projection& p, v4sf origin, v8sf& pStart, v4sf& tEnd);
+    inline float intersect(const Projection& p, v4sf origin, v8sf& pStart, v4sf& tEnd);
     /// Ray integration using uniform sampling with trilinear interpolation
-    float project(const Projection& p, v8sf pStart, v4sf tEnd);
+    inline float project(const Projection& p, v8sf pStart, v4sf tEnd);
     /// Ray backprojection using uniform sampling with trilinear interpolation
-    void backproject(float* volumeData, const Projection& p, v8sf pStart, v4sf tEnd, float value);
+    inline void backproject(float* volumeData, const Projection& p, v8sf pStart, v4sf tEnd, float value);
 
     /// Convenience method to intersect and integrate
     float project(const Projection& p, v4sf origin) {
@@ -44,7 +44,7 @@ struct CylinderVolume {
     }
 };
 
-float CylinderVolume::intersect(const Projection& p, v4sf origin, v8sf& pStart, v4sf& tEnd) {
+inline float CylinderVolume::intersect(const Projection& p, v4sf origin, v8sf& pStart, v4sf& tEnd) {
     // Intersects cap disks
     const v4sf originZ = shuffle4(origin, origin, 2,2,2,2);
     const v4sf capT = (capZ - originZ) * p.raySlopeZ; // top top bottom bottom
@@ -73,7 +73,7 @@ float CylinderVolume::intersect(const Projection& p, v4sf origin, v8sf& pStart, 
     return floor(tmax[0]-tmin[0]); // Ray length (in steps) = Weight sum
 }
 
-float CylinderVolume::project(const Projection& p, v8sf p01f, v4sf tEnd) {
+inline float CylinderVolume::project(const Projection& p, v8sf p01f, v4sf tEnd) {
     float Ax = 0; // Accumulates along the ray
     for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
@@ -95,7 +95,7 @@ float CylinderVolume::project(const Projection& p, v8sf p01f, v4sf tEnd) {
     }
 }
 
-void CylinderVolume::backproject(float* volumeData, const Projection& p, v8sf p01f, v4sf tEnd, float value) {
+inline void CylinderVolume::backproject(float* volumeData, const Projection& p, v8sf p01f, v4sf tEnd, float value) {
     v8sf value8 = float8(value);
     for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
@@ -151,10 +151,15 @@ void project(const ImageF& image, const VolumeF& volume, Projection projection) 
 
 /// Computes residual r = p = At ( b - A x )
 void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
+    int2 imageSize = images.first().size();
+    zOrder2 = buffer<v2hi>(imageSize.y * imageSize.x); // Large lookup table (~512K) but read sequentially (stream read, skip cache)
+    for(uint index: range(zOrder2.size)) zOrder2[index] = short2(::zOrder2(index)); // Generates lookup table (assumes square POT images)
+
     assert(projections.size == images.size);
     CylinderVolume volume (x);
     float* pData = (float*)p.data.data;
     float* rData = (float*)r.data.data;
+    const v2hi* zOrder2Data = zOrder2.data;
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
@@ -165,9 +170,9 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
         const v4sf worldOrigin = projection.world * vec3(0,0,0) - (float(image.size().x-1)/2)*vViewStepX - (float(image.size().y-1)/2)*vViewStepY;
 
         parallel(image.data.size, [&](uint, uint pixelIndex) { // Process pixels in zOrder for coherence (TODO: 2x2x2 ray packets)
-            int2 pixel = zOrder2(pixelIndex); // FIXME: lookup
-            const v4sf origin = worldOrigin + float4(pixel.x) * viewStepX + float4(pixel.y) * viewStepY;
-            float b = imageData[pixel.y*image.width+pixel.x];
+            v2hi pixelPosition = zOrder2Data[pixelIndex];
+            const v4sf origin = worldOrigin + float4(pixelPosition[0]) * viewStepX + float4(pixelPosition[1]) * viewStepY;
+            float b = imageData[pixelPosition[1]*image.width+pixelPosition[0]];
             v8sf pStart; v4sf tEnd;
             float length = volume.intersect(projection, origin, pStart, tEnd);
             if(length) {
@@ -197,26 +202,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     CylinderVolume volume (p);
     float* pData = (float*)p.data.data; // p
     float* AtApData = (float*)AtAp.data.data; // At A p
-/*
-    parallel(p.size(), [&](uint id, uint index) {
-        const vec3 origin = vec3(zOrder(index)) - center;
-        //if(sq(origin.xy()) > radiusSq) return;
-        float reconstructionSum = 0, pointCount = 0;
-        // Projects/Accumulates: At A p
-        for(uint projectionIndex: range(projections.size)) { // At
-            const Projection& projection = projections[projectionIndex];
-            v8sf pStart; v4sf tEnd;
-            float length = intersect(p, origin, pStart, tEnd);
-            float Ax = volume.project(pStart, tEnd);
-            float p = (b - Ax)/length;
-            volume.backproject(pStart, tEnd, p);
-        }
-        if(pointCount) {
-            AtApData[index] = reconstructionSum / pointCount; // At A p
-            pAtAp[id] += pData[index] * AtApData[index]; // p · At A p
-        }
-    });
-*/
+    const v2hi* zOrder2Data = zOrder2.data;
     // TODO: Gathers all projections from p, then backproject (gather-scatter) in AtAp (i.e process one volume per pass) |OR| Interleave p and AtAp (half cache hit/miss if full ray fits) (+no need to allocate memory for all projections)
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
         const Projection& projection = projections[projectionIndex];
@@ -227,8 +213,8 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         const v4sf worldOrigin = projection.world * vec3(0,0,0) - (float(image.size().x-1)/2)*vViewStepX - (float(image.size().y-1)/2)*vViewStepY;
 
         parallel(image.data.size, [&](uint, uint pixelIndex) { // Process pixels in zOrder for coherence (TODO: 2x2x2 ray packets)
-            int2 pixel = zOrder2(pixelIndex); // FIXME: lookup
-            const v4sf origin = worldOrigin + float4(pixel.x) * viewStepX + float4(pixel.y) * viewStepY;
+            v2hi pixelPosition = zOrder2Data[pixelIndex];
+            const v4sf origin = worldOrigin + float4(pixelPosition[0]) * viewStepX + float4(pixelPosition[1]) * viewStepY;
             v8sf pStart; v4sf tEnd;
             float length = volume.intersect(projection, origin, pStart, tEnd);
             if(length) {
@@ -258,8 +244,6 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             deltaSum[id] += sq(delta);
             rData[index] -= alpha * AtApData[index];
             newResidualSum[id] += sq(rData[index]);
-            //const vec3 origin = vec3(zOrder(index)) - center;
-            //if(sq(origin.xy()) > radiusSq) assert_(xData[index]==0, index, zOrder(index), origin, xData[index], pData[index], rData[index]);
         }
     });
     float newResidual = sum(newResidualSum);

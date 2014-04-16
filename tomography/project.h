@@ -27,6 +27,7 @@ struct CGNR {
     VolumeF r, p, AtAp, x;
     real residualEnergy = 0, deltaEnergy = 0;
     uint k = 0;
+    buffer<v2hi> zOrder2;
     CGNR(uint N) : r(N), p(N), AtAp(N), x(N) {}
     void initialize(const ref<Projection>& projections, const ref<ImageF>& images);
     bool step(const ref<Projection>& projections, const ref<ImageF>& images);
