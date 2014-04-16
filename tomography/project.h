@@ -30,11 +30,12 @@ struct Projection {
     v8sf ray8;
 };
 
+/// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, Projection projection);
 
 struct CGNR {
     VolumeF r, p, AtAp, x;
-    real residualEnergy = 0, deltaEnergy = 0;
+    real residualEnergy = 0;// deltaEnergy = 0;
     uint k = 0;
     buffer<v2hi> zOrder2;
     CGNR(uint N) : r(N), p(N), AtAp(N), x(N) {}
