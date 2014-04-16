@@ -29,7 +29,7 @@ struct View : Widget {
             convert(target, linear, max);
         } else {
             ImageF linear {target.size()};
-            project(linear, *volume, projection);
+            project(linear, *volume, Projection(projection, target.size()));
             convert(target, linear, max);
         }
     }
@@ -74,9 +74,9 @@ struct Tomography {
                 float sum = 0;
                 for(uint i: range(projections.size)) { // Projects phantom
                     mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
-                    projections[i] = projection;
                     ImageF image = float(N/2) * phantom.project(N, projection.scale(vec3(N-1)/2.f));
                     sum += ::sum(image.data);
+                    projections[i] = Projection(projection, image.size());
                     images[i] = move(image);
                 }
                 /*float volume = PI*sq(N/2)*N;

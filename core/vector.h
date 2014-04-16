@@ -97,10 +97,12 @@ generic String str(const vec& v) { String s("("_); for(uint i=0;i<N;i++) { s<<st
 
 generic struct xy {
     T x,y;
-    inline operator v2hi() const { return (v2hi){x,y}; }
 };
 /// Integer x,y vector (16bit)
-typedef vec<xy,int16,2> short2;
+/*struct short2 : vec<xy,int16,2> {
+    inline operator v2hi() const { return (v2hi){x,y}; }
+;*/
+typedef vec<xy,short,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
 /// Single precision x,y vector
@@ -112,7 +114,7 @@ inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 
 generic struct xyz {
     T x,y,z;
-    vec<xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
+    vec< ::xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
     inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
