@@ -52,8 +52,7 @@ Phantom::Phantom(uint count) {
             vec3 radius = maximumRadius*vec3(random(),random(),random());
             if(max(max(radius.x,radius.y),radius.z) > 4*min(min(radius.x,radius.y),radius.z)) continue; // Limits aspect ratio
             const float margin = max(max(radius.x,radius.y),radius.z);
-            //const uint N = 32;
-            vec2 rz = (1-margin)*(2.f*vec2(random(),random())-vec2(1))/2.f; //*vec2(float(N-1)/N); // Fits cylinder
+            vec2 rz = (1-margin)*(2.f*vec2(random(),random())-vec2(1)); // Fits cylinder
             const float a = 2*PI*random();
             vec3 center = vec3(rz[0]*cos(a), rz[0]*sin(a), rz[1]);
             mat4 ellipsoid = mat4(randomRotation(random) * mat3().scale(radius)).translate(center);
@@ -73,12 +72,12 @@ VolumeF Phantom::volume(int3 size) const {
             vec3 corner = O + e.forward*vec3(i?-1:1,j?-1:1,k?-1:1);
             min=::min(min, corner), max=::max(max, corner);
         }
-        min = ::max(vec3(size)*(min+vec3(1))/2.f, vec3(0)), max = ::min(ceil(vec3(size)*(max+vec3(1))/2.f), vec3(size));
+        min = ::max(vec3(size-int3(1))*(min+vec3(1))/2.f, vec3(0)), max = ::min(ceil(vec3(size-int3(1))*(max+vec3(1))/2.f), vec3(size));
 
         const v4sf origin = e.inverse * (vec3(-1) - e.center);
-        const v4sf vx = e.inverse[0] / vec3(size.x/2);
-        const v4sf vy = e.inverse[1] / vec3(size.y/2);
-        const v4sf vz = e.inverse[2] / vec3(size.z/2);
+        const v4sf vx = e.inverse[0] / vec3(float(size.x-1)/2);
+        const v4sf vy = e.inverse[1] / vec3(float(size.y-1)/2);
+        const v4sf vz = e.inverse[2] / vec3(float(size.z-1)/2);
 
         float* volumeData = (float*)volume.data.data;
         const int32* const offsetX = volume.offsetX.data;
@@ -105,7 +104,7 @@ ImageF Phantom::project(int2 size, mat4 p) const {
     ImageF target (size);
     target.data.clear();
     const vec3 direction = normalize(p.transpose()[2].xyz());
-    const vec3 origin = p.inverse()*vec3(-size.x/2,-size.y/2,0);
+    const vec3 origin = p.inverse() * vec3(-vec2(size-int2(1))/2.f,0);
     const vec3 vx = p.inverse()[0].xyz();
     const vec3 vy = p.inverse()[1].xyz();
     for(Ellipsoid e: ellipsoids) {
@@ -116,7 +115,7 @@ ImageF Phantom::project(int2 size, mat4 p) const {
             vec2 corner = O + (M * vec3(i?-1:1,j?-1:1,k?-1:1)).xy();
             min=::min(min, corner), max=::max(max, corner);
         }
-        min = ::max(min+vec2(size)/2.f, vec2(0)), max = ::min(ceil(max+vec2(size)/2.f), vec2(size));
+        min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));
 
         const v4sf p0 = e.inverse * direction;
         const float a = dot4(p0, p0)[0];

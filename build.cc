@@ -137,7 +137,7 @@ struct Build {
             if(flags.contains("profile"_)) {
                 args << String("-finstrument-functions"_);
                 if(!endsWith(CXX,"clang++"_))
-                    args << String("-finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile"_);
+                    args << String("-finstrument-functions-exclude-file-list=core,array,string,trace,profile"_);
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
@@ -147,7 +147,8 @@ struct Build {
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
-            {static const array<string> flags = split("-c -pipe -std=c++1y -fabi-version=0 -Wall -Wextra -Wno-overloaded-virtual -o"_);
+            if(startsWith(section(CXX,'/',-2,-1),"g++"_)) args << String("-fabi-version=0"_);
+            {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }

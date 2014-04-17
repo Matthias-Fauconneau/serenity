@@ -7,10 +7,10 @@ typedef int v4si __attribute((__vector_size__(16)));
 typedef float v4sf __attribute((__vector_size__(16)));
 typedef int v8si __attribute((__vector_size__(32)));
 typedef float v8sf __attribute((__vector_size__(32)));
-/*template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+//template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 template<> inline String str(const v4sf& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
-template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
-template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }*/
+//template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
+//template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly

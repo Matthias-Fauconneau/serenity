@@ -1,11 +1,13 @@
 #pragma once
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
-#if __GNUC__
-#define inline(R) extern __inline R __attribute__((__gnu_inline__, __always_inline__, __artificial__))
-#else
+
+#if __clang__
 #define inline(R) static __inline R __attribute__((__always_inline__, __nodebug__))
+#else
+#define inline(R) extern __inline R __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 #endif
+
 // v2hi
 typedef short v2hi __attribute((__vector_size__ (4)));
 
@@ -53,10 +55,10 @@ inline (v4sf) abs(v4sf a) { return v4sf(notSignBit4 & v4si(a)); }
 
 inline (v4sf) min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline (v4sf) max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
-#if __GNUC__
-#define shuffle4(v1, v2, i1, i2, i3, i4) __builtin_shuffle(v1,v2, (v4si){i1,i2, 4+(i3), 4+(i4)})
-#else
+#if __clang__
 #define shuffle4(v1, v2, i1, i2, i3, i4) __builtin_shufflevector(v1,v2, i1,i2, 4+(i3), 4+(i4))
+#else
+#define shuffle4(v1, v2, i1, i2, i3, i4) __builtin_shuffle(v1,v2, (v4si){i1,i2, 4+(i3), 4+(i4)})
 #endif
 inline (v4sf) hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
 inline (v4sf) dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
@@ -83,10 +85,10 @@ const v8si _1111111 = (v8si){~0ll,~0ll,~0ll,~0ll, ~0ll,~0ll,~0ll,~0ll};
 typedef float v8sf __attribute((__vector_size__ (32)));
 const v8sf _00000000f = (v8sf){0,0,0,0, 0,0,0,0};
 
-#if __GNUC__
-inline (v8sf) gather(const float* base, v8si indices) { return __builtin_ia32_gathersiv8sf(_00000000f, base, indices, (v8sf)_1111111, 4); }
-#else
+#if __clang__
 inline (v8sf) gather(const float* base, v8si indices) { return __builtin_ia32_gatherd_ps256(_00000000f, (v8sf*)base, indices, _1111111, 4); }
+#else
+inline (v8sf) gather(const float* base, v8si indices) { return __builtin_ia32_gathersiv8sf(_00000000f, base, indices, (v8sf)_1111111, 4); }
 #endif
 
 inline (v8sf) float8(float f) { return (v8sf){f,f,f,f, f,f,f,f}; }
@@ -100,16 +102,14 @@ inline (v8sf) dup(v4sf a) { return (v8sf)__builtin_ia32_vbroadcastsi256((v2di)a)
 const v8si notSignBit8 = (v8si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
 inline (v8sf) abs(v8sf a) { return v8sf(notSignBit8 & v8si(a)); }
 
-#if __GNUC__
-inline (v8si) gather(const int* base, v8si indices, v8si mask) { return __builtin_ia32_gathersiv8si(_00000000, base, indices, mask, 4); }
-#else
-inline (v8si) gather(const int* base, v8si indices, v8si mask) { return __builtin_ia32_gatherd_d256(_00000000, (const v8si*)base, indices, mask, 4); }
-#endif
+inline (v8sf) max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a,b); }
 
-#if __GNUC__
-#define shuffle8(v1, v2, i0, i1, i2, i3, i4, i5, i6, i7) __builtin_shuffle(v1,v2, (v8si){i0,i1,i2,i3, 8+i4, 8+i5, 8+i6, 8+i7})
-#else
+#if __clang__
+inline (v8si) gather(const int* base, v8si indices, v8si mask) { return __builtin_ia32_gatherd_d256(_00000000, (const v8si*)base, indices, mask, 4); }
 #define shuffle8(v1, v2, i0, i1, i2, i3, i4, i5, i6, i7) __builtin_shufflevector(v1,v2, i0,i1,i2,i3, 8+i4, 8+i5, 8+i6, 8+i7)
+#else
+inline (v8si) gather(const int* base, v8si indices, v8si mask) { return __builtin_ia32_gathersiv8si(_00000000, base, indices, mask, 4); }
+#define shuffle8(v1, v2, i0, i1, i2, i3, i4, i5, i6, i7) __builtin_shuffle(v1,v2, (v8si){i0,i1,i2,i3, 8+i4, 8+i5, 8+i6, 8+i7})
 #endif
 
 inline (v4sf) low(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 0); }
