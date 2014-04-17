@@ -36,7 +36,7 @@ struct View : Widget {
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
-    const uint N = 128;
+    const uint N = 64;
     const uint P = N;
     Phantom phantom {16};
     VolumeF source = phantom.volume(N);

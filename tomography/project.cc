@@ -53,15 +53,23 @@ template<bool CGNR=false> static inline float update(const Projection& projectio
     const v4sf cbcb = dot2(originXYXY, originXYrayXY); // OO OD OO OD (b=2OD)
     const v4sf _1b1b = blendps(_1f, cbcb, 0b1010); // 1 OD 1 OD
     const v4sf _4ac_bb = projection._m4a_4_m4a_4 * (cbcb*_1b1b - volume.radiusR0R0); // -4ac bb -4ac bb
-    v4sf delta = hadd(_4ac_bb,_4ac_bb);
+    const v4sf delta = hadd(_4ac_bb,_4ac_bb);
+#if !EXCEPTION
     const v4sf sqrtDelta = sqrt( delta );
     const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
     const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
+#else
+    v4sf sideT;
+    if(mask(delta>=_0f)) {
+        const v4sf sqrtDelta = sqrt( delta );
+        const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
+        sideT = mask(projection.rcp_2a==-floatMax) ? -floatMax : (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
+    } else sideT = floatMax;
+#endif
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = capSideP < volume.radiusSqHeight;
-    float& b = imageData[pixelPosition[1]*imageWidth+pixelPosition[0]];
-    if(!mask(tMask)) { if(!targetData) b=0; return 0; }
+    if(!mask(tMask)) { if(!targetData) imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=0; return 0; }
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
@@ -89,14 +97,17 @@ template<bool CGNR=false> static inline float update(const Projection& projectio
         if(mask(low(p01f) > tEnd)) break;
     }
     /// Updates
-    if(!targetData) { b=Ax; return Ax; }
+    if(!targetData) {  imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=Ax; return Ax; }
     float value;
     if(!imageData) value = Ax; // CGNR
-    else if(CGNR) value = b - Ax; // CGNR first step
     else {
-        float length = tmax[0]-tmin[0]; // Ray length (in steps) = Weight sum
-        assert_(length >= 1);
-        value = b / length - Ax / floor(length); // SIRT
+        float b =  imageData[pixelPosition[1]*imageWidth+pixelPosition[0]];
+        if(CGNR) value = b - Ax; // CGNR first step
+        else { // SIRT
+            float length = tmax[0]-tmin[0];
+            assert_(length >= 1);
+            value = b / length - Ax / floor(length);
+        }
     }
     /// Backprojects
     v8sf value8 = float8(value);
@@ -157,6 +168,24 @@ bool SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     return true;
 }
 
+#if 0
+// Computes regularization: QtQ = lambda · ( I + alpha · CtC )
+static float regularization(const VolumeF& volume, const uint index) {
+    int3 p = zOrder3(index);
+    assert_(index == uint(volume.offsetX[p.x]+volume.offsetY[p.y]+volume.offsetZ[p.z]));
+    float Ix = volume.data[index];
+    float CtCx = 0;
+    for(int z=-1; z<=1; z++) for(int y=-1; y<=1; y++) for(int x=-1; x<=1; x++) {
+        if(p+int3(x,y,z) >= int3(0) && p+int3(x,y,z) < volume.sampleCount) {
+            float Cx = Ix - volume.data[volume.offsetX[p.x+x]+volume.offsetY[p.y+y]+volume.offsetZ[p.z+z]];
+            CtCx += sq(Cx);
+        }
+    }
+    float QtQx = Ix + 1 * CtCx;
+    return QtQx;
+}
+#endif
+
 /// Computes residual r = p = At ( b - A x )
 void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
     assert(projections.size == images.size);
@@ -177,9 +206,10 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
     // Copies r=p and computes |r|
     float* rData = (float*)r.data.data;
     float residualSum[coreCount] = {};
-    chunk_parallel(p.size(), [pData, rData, &residualSum](uint id, uint offset, uint size) {
+    chunk_parallel(p.size(), [pData, rData, &residualSum, this](uint id, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
-            float p = pData[index];
+            float& p = pData[index];
+            //p -= regularization(x, index); // = 0
             rData[index] = p;
             residualSum[id] += sq(p);
         }
@@ -206,8 +236,9 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     // Computes |p·Atp|
     float* pData = (float*)p.data.data;
     float pAtApSum[coreCount] = {};
-    chunk_parallel(p.size(), [pData, AtApData, &pAtApSum](uint id, uint offset, uint size) {
+    chunk_parallel(p.size(), [pData, AtApData, &pAtApSum, this](uint id, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
+            //AtApData[index] += regularization(p, index);
             pAtApSum[id] += pData[index] * AtApData[index];
         }
     });
@@ -255,6 +286,6 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
 
     log(k,'\t',residualEnergy,'\\',newResidual,'=',beta);
     residualEnergy = newResidual;
-    return beta < 1;
-    //return true;
+    //return beta < 1;
+    return true;
 }

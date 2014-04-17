@@ -12,7 +12,7 @@ generic inline constexpr T cb(const T& x) { return x*x*x; }
 typedef double real;
 
 constexpr float epsilon = __FLT_EPSILON__;
-constexpr real nanf = __builtin_nanf("");
+constexpr float nanf = __builtin_nanf("");
 constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }

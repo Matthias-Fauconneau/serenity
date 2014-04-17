@@ -18,7 +18,11 @@ struct Projection {
         raySlopeZ = float4(1/ray3.z);
         rayXYXY = (v4sf){ray3.x, ray3.y, ray3.x, ray3.y};
         _m4a_4_m4a_4 = (v4sf){-4*a, 4, -4*a, 4};
+#if EXCEPTION
+        rcp_2a = a ? float4(-1./(2*a)) : float4(-__FLT_MAX__);
+#else
         rcp_2a = float4(-1./(2*a));
+#endif
         rayZ = float4(ray3.z);
         ray = (v4sf){ray3.x, ray3.y, ray3.z, 1};
         ray8 = dup(ray);
