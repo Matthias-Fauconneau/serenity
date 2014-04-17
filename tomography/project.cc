@@ -133,13 +133,15 @@ template<bool CGNR=false> static inline float update(const Projection& projectio
     }
 }
 
+static constexpr uint threadCount = 1;
+
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
     const CylinderVolume volume(source);
     float* const imageData = (float*)image.data;
     uint imageWidth = image.width;
     //parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { short2 p = short2(::zOrder2(index));  update<>(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth, 0); } ); //FIXME: NPOT
-    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { short2 p = short2(index%imageWidth, index/imageWidth);  update<>(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth, 0); } );
+    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { short2 p = short2(index%imageWidth, index/imageWidth);  update<>(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth, 0); }, threadCount);
 }
 
 void SIRT::initialize(const ref<Projection>& /*projections*/, const ref<ImageF>& images) {
@@ -158,12 +160,12 @@ bool SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         float* const imageData = (float*)image.data;
         uint imageWidth = image.width;
         float* pData = (float*)p.data.data;
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, pData](uint, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, pData); } );
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, pData](uint, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, pData); }, threadCount);
     }
     { // Updates x = max(0, x+p) and clears p
         float* pData = (float*)p.data.data; float* xData = (float*)x.data.data;
         const float alpha = 1./projections.size; // Step size
-        chunk_parallel(p.size(), [alpha, pData, xData](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) { xData[i] = max(0.f, xData[i] + alpha * pData[i]); pData[i]=0; }} );
+        chunk_parallel(p.size(), [alpha, pData, xData](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) { xData[i] = max(0.f, xData[i] + alpha * pData[i]); pData[i]=0; }}, threadCount);
     }
     return true;
 }
@@ -201,7 +203,7 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
         const ImageF& image = images[projectionIndex];
         float* const imageData = (float*)image.data;
         uint imageWidth = image.width;
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, pData](uint, uint pixelIndex) { update<true>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, pData); } );
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, pData](uint, uint pixelIndex) { update<true>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, pData); }, threadCount);
     }
     // Copies r=p and computes |r|
     float* rData = (float*)r.data.data;
@@ -213,7 +215,7 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
             rData[index] = p;
             residualSum[id] += sq(p);
         }
-    });
+    }, threadCount);
     residualEnergy = sum(residualSum);
     assert_(residualEnergy);
 }
@@ -230,7 +232,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, AtApData](uint, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, 0, 0, AtApData); } );
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, AtApData](uint, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, 0, 0, AtApData); }, threadCount);
     }
 
     // Computes |p·Atp|
@@ -241,7 +243,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             //AtApData[index] += regularization(p, index);
             pAtApSum[id] += pData[index] * AtApData[index];
         }
-    });
+    }, threadCount);
     float pAtAp = sum(pAtApSum);
     assert(pAtAp);
 
@@ -256,7 +258,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             rData[index] -= alpha * AtApData[index];
             newResidualSum[id] += sq(rData[index]);
         }
-    });
+    }, threadCount);
     float newResidual = sum(newResidualSum);
     float beta = newResidual / residualEnergy;
 
@@ -282,7 +284,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         for(uint index: range(offset,offset+size)) {
             pData[index] = rData[index] + beta * pData[index];
         }
-    });
+    }, threadCount);
 
     log(k,'\t',residualEnergy,'\\',newResidual,'=',beta);
     residualEnergy = newResidual;

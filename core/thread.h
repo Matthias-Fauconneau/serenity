@@ -132,13 +132,13 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<class F> void parallel(uint64 start, uint64 stop, F f) {
+template<class F> void parallel(uint64 start, uint64 stop, F f, uint threadCount = coreCount) {
 #if DEBUG || PROFILE
     for(uint i : range(start, stop)) f(0, i);
 #else
     function<void(uint, uint)> delegate = f;
-    thread threads[coreCount];
-    for(uint i: range(coreCount)) {
+    thread threads[threadCount];
+    for(uint i: range(threadCount)) {
         threads[i].id = i;
         threads[i].counter = &start;
         threads[i].stop = stop;
@@ -148,14 +148,13 @@ template<class F> void parallel(uint64 start, uint64 stop, F f) {
     for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert(status==0); }
 #endif
 }
-template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
+template<class F> void parallel(uint stop, F f, uint threadCount = coreCount) { parallel(0, stop, f, threadCount); }
 
 /// Runs a loop in parallel chunks
-template<class F> void chunk_parallel(uint totalSize, F f) {
-    constexpr uint chunkCount = coreCount;
-    assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
-    const uint chunkSize = totalSize/chunkCount;
-    parallel(chunkCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
+template<class F> void chunk_parallel(uint totalSize, F f, uint threadCount = coreCount) {
+    assert(totalSize%threadCount<threadCount); //Last chunk will be smaller
+    const uint chunkSize = totalSize/threadCount;
+    parallel(threadCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); }, threadCount);
 }
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
