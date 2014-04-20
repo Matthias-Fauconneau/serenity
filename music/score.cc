@@ -432,7 +432,7 @@ alreadyTied1: ;
                                 t.ri=i+1;t.rx=rx; t.ry=y2;
                                 for(Tie o: tied) if(t.ri == o.ri && t.rx == o.rx && t.ry==o.ry) goto alreadyTied2;
                                 for(Line tie : ties) if(sq(tie.b-vec2(t.rx,-t.ry))<sq(32_px)) { // Search for the matching wrapped tie
-                                    debug[vec2(t.rx,-t.ry)]="^R"_<<dec(dy/1_px);
+                                    debug[vec2(t.rx,-t.ry)]="^R"_+dec(dy/1_px);
                                     debug[vec2(tie.b)]<<"^"_;
                                     tied << t;
                                     goto tieFound;

@@ -1,21 +1,356 @@
 #include "thread.h"
+#include "xml.h"
+#include "window.h"
+#include "font.h"
 
-#include "dbus.h"
-#include <unistd.h>
-struct StatusNotifierItem : DBus {
-    DBus::Object dbus{this, String("org.freedesktop.DBus"_),String("/org/freedesktop/DBus"_)};
-    StatusNotifierItem() {
-        String name = "org.kde.StatusNotifierItem-"_+dec(getpid())+"-1"_;
-        dbus("RequestName"_, name, (uint)0);
-        DBus::Object item{this, String("org.kde.StatusNotifierItem"_), copy(name)};
-        item.set("Category"_,variant<String>(String("ApplicationStatus"_)));
-        item.set("Id"_,variant<String>(String("Player"_)));
-        item.set("Title"_,variant<String>(String("Player"_)));
-        item.set("IconName"_,variant<String>(String("media-playback-start"_)));
-        //item.set("Status"_,variant<String>(String("Active"_)));
-        //item.set("WindowId"_,variant<uint>(window.id));
-        //TODO: VOID org.freedesktop.StatusNotifierItem.Activate (INT x, INT y);
-        //TODO: signals
-        //exit();
+struct MusicXML : Widget {
+    enum ClefSign { Bass, Treble };
+    enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
+    enum Duration { Eighth };
+
+    struct Clef {
+        ClefSign clefSign;
+        int octave;
+    };
+    struct Key {
+        int fifths; // Index on the fifths circle
+    };
+    struct Time {
+        uint beats, beatType;
+    };
+    struct Note {
+        int pitch; // Absolute pitch (without accidental)
+        Accidental accidental;
+        Duration duration;
+        bool grace;
+    };
+    struct Rest {
+        Duration duration;
+    };
+
+    struct Sign {
+        uint time; // Absolute time offset
+        uint staff; // Staff index
+        enum { Note, Rest, Clef, Key, Time, Measure } type;
+        union {
+            struct Note note;
+            struct Rest rest;
+            struct Clef clef;
+            struct Key key;
+            struct Time timeSignature;
+        };
+    };
+
+    array<Sign> signs;
+
+    Window window {this};
+    MusicXML() {
+        Element root = parseXML(readFile("Storytime.xml"_, Folder("Scores"_,home())));
+        map<uint, Clef> clefs; Key keySignature={0}; Time timeSignature={0,0}; uint time = 0;
+        root.xpath("score-partwise/part/measure"_, [&](const Element& m) {
+            for(const Element& e: m.children) {
+                if(e.name=="print"_) {}
+                else if(e.name=="attributes"_) {
+                    if(e("clef"_)) {
+                        uint staff = fromInteger(e("clef"_)["number"_])-1;
+                        ClefSign clefSign = ClefSign("FG"_.indexOf(e("clef"_)("sign"_).text()[0]));
+                        signs << Sign{time, staff, Sign::Clef, .clef={clefSign, 0}};
+                        clefs[staff] = {clefSign, 0};
+                    }
+                    if(e("key"_)) {
+                        keySignature.fifths = fromInteger(e("key"_)("fifths"_).text());
+                        signs << Sign{time, 0, Sign::Key, .key=keySignature};
+                    }
+                    if(e("time"_)) {
+                        timeSignature = {uint(fromInteger(e("time"_)("beats"_).text())), uint(fromInteger(e("time"_)("beat-type"_).text()))};
+                        signs << Sign{time, 0, Sign::Time, .timeSignature=timeSignature};
+                    }
+                }
+                else if(e.name=="direction"_) {}
+                else if(e.name=="note"_) {
+                    uint staff = fromInteger(e("staff"_).text());
+                    Duration duration = Duration(ref<string>{"eighth"_}.indexOf(e("type"_).text()));
+                    if(e("rest"_)) {
+                        signs << Sign{time, staff, Sign::Rest, .rest={duration}};
+                    } else {
+                        assert_(e("pitch"_)("step"_).text(), e);
+                        uint step = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
+                        int octave = fromInteger(e("pitch"_)("octave"_).text());
+                        int pitch = 23 + (octave-1) * 12 + step;
+                        Accidental accidental = Accidental(ref<string>{""_,"flat"_,"sharp"_,"natural"_}.indexOf(e("accidental"_).text()));
+                        signs << Sign{time, staff, Sign::Note, .note={pitch, accidental, duration, e("grace"_)?true:false}};
+                    }
+                    if(e("duration"_)) time += fromInteger(e("duration"_).text());
+                }
+                else if(e.name=="backup"_) {
+                    time -= fromInteger(e("duration"_).text());
+                }
+                else if(e.name=="forward"_) {
+                    time += fromInteger(e("duration"_).text());
+                }
+                else if(e.name=="barline"_) {}
+                else error(e);
+            }
+        });
+    }
+    void render(const Image& target) {
+
     }
 } test;
+
+#if 0
+#pragma once
+struct MidiScore : Widget {
+    enum Clef { Bass, Treble };
+    int keys[4][11] = {
+        {1,0,1,0,1,1,0,1,0,1,0}, // F minor
+        {0,1,0,1,1,0,1,0,1,0,1},  // C major (should be same for all majors)
+        {0,1,0,1,1,0,1,0,1,0,1},  // G major TESTME
+        {0,1,0,1,1,0,1,0,1,0,1}  // D major TESTME
+    };
+    int accidentals[4][12] = { // 0=nothing, 1=♭, 2=♯, 3=♮ (TODO)
+        {0,1,0,1,0,0,1,0,1,0,0,3}, // F minor
+        {0,2,0,2,0,0,2,0,2,0,2,0},  // C major
+        {0,2,0,2,0,3,0,0,2,0,2,0},  // G major TODO
+        {3,0,0,2,0,3,0,0,2,0,2,0}  // D major TODO
+    };
+    map<uint, MidiChord> notes;
+    int key=-1; uint tempo=120; uint timeSignature[2] = {4,4};
+
+    const int staffCount = 2;
+    const int measuresPerStaff = 3;
+    const int staffInterval = 12, staffMargin = 4*staffInterval, staffHeight = staffMargin+4*staffInterval+staffMargin, systemHeight=staffCount*staffHeight+staffMargin;
+    const int systemHeader = 128;
+    int ticksPerBeat;
+    int beatsPerMeasure;
+    int staffTime;
+
+    array<float> staffs;
+    array<vec2> positions;
+
+    void parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2], uint ticksPerBeat);
+    int2 sizeHint();
+
+    // Returns staff coordinates from note  (for a given clef and key)
+    int staffY(Clef clef, int note);
+
+    int2 position=0, size=0;
+    // Returns staff X position from time
+    int staffX(int t);
+
+    // Returns page coordinates from staff coordinates
+    int2 page(int staff, int t, int h);
+
+    // Draws a staff
+    void drawStaff(int t, int staff, Clef clef);
+    // Draws a ledger line
+    void drawLedger(int staff, int t, int h);
+
+    void render(int2 position, int2 size);
+    map<int,vec4> colors;
+    signal<> contentChanged;
+    void setColors(const map<int,vec4>& colors) { this->colors=copy(colors); contentChanged(); }
+};
+
+void MidiScore::parse(map<uint,Chord>&& notes, int unused key, uint tempo, uint timeSignature[2], uint ticksPerBeat) {
+        this->notes=move(notes);
+        this->key=key;
+        this->tempo=tempo;
+        if(this->timeSignature[0]==3 && this->timeSignature[0]==4) {
+            this->timeSignature[0]=timeSignature[0];
+            this->timeSignature[1]=timeSignature[1];
+        }
+        this->ticksPerBeat=ticksPerBeat;
+        beatsPerMeasure = this->timeSignature[0]*this->timeSignature[1];
+        staffTime = measuresPerStaff*beatsPerMeasure;
+    }
+
+int2 MidiScore::sizeHint() { return int2(1280,systemHeight*(notes.keys.last()/staffTime+1)); }
+
+// Returns staff coordinates from note  (for a given clef and key)
+int MidiScore::staffY(Clef clef, int note) {
+    assert(key==-1 || key==0 || key==2, key);
+    int h=note/12*7; for(int i=0;i<note%12;i++) h+=keys[key+1][i];
+    const int trebleOffset = 6*7+3; // C0 position in intervals from top line
+    const int bassOffset = 4*7+5; // C0 position in intervals from top line
+    int clefOffset = clef==Treble ? trebleOffset : clef==Bass ? bassOffset : 0;
+    return clefOffset-h;
+}
+
+// Returns staff X position from time
+int MidiScore::staffX(int t) { return systemHeader+t%staffTime*(size.x-systemHeader-16)/staffTime; }
+
+// Returns page coordinates from staff coordinates
+int2 MidiScore::page(int staff, int t, int h) { return position+int2(staffX(t),t/staffTime*systemHeight+(!staff)*staffHeight+2*staffMargin+h*staffInterval/2); }
+
+static void glyph(int2 position, const string name, vec4 color=black) {
+    //static Font font{"/usr/share/lilypond/2.16.1/fonts/otf/emmentaler-20.otf"_,128};
+    static Font font{"/Scores/emmentaler-20.otf"_,128};
+    const Glyph& glyph = font.glyph(font.index(name));
+    blit(position+glyph.offset,glyph.image,color);
+}
+
+// Draws a staff
+void MidiScore::drawStaff(int t, int staff, Clef clef) {
+    for(int i: range(5)) {
+        int y = page(staff, t, i*2).y;
+        line(int2(position.x+16, y), int2(position.x+size.x-16, y));
+    }
+    if(clef==Treble) glyph(int2(position.x+16+8,page(staff, t, 3*2).y),"clefs.G"_);
+    if(clef==Bass) glyph(int2(position.x+16+8,page(staff, t, 1*2).y),"clefs.F"_);
+    for(int i: range(abs(key))) {
+        int tone = i*5; if(key<0) tone+=11;
+        glyph(int2(position.x+16+48,page(staff,t,staffY(clef,tone)%7).y),key<0?"accidentals.flat"_:"accidentals.sharp"_);
+    }
+    static constexpr string numbers[10] = {"zero"_,"one"_,"two"_,"three"_,"four"_,"five"_,"six"_,"seven"_,"eight"_,"nine"_};
+    glyph(int2(position.x+16+64,page(staff, t, 2*2).y-1),numbers[timeSignature[0]]);
+    glyph(int2(position.x+16+64,page(staff, t, 4*2).y-1),numbers[timeSignature[1]]);
+}
+// Draws a ledger line
+void MidiScore::drawLedger(int staff, int t, int h) {
+    int2 p = page(staff, t, h);
+    line(p+int2(-4,0),p+int2(16,0));
+}
+
+void MidiScore::render(int2 position, int2 size) {
+    staffs.clear(); positions.clear();
+    int lastSystem=-1; uint lastMeasure=0, noteIndex=0;
+    this->position=position, this->size=size;
+    //Text(str(notes)).render(position,size);
+    array<MidiNote> actives[2]; //0 = treble (right hand), 1 = bass (left hand)
+    array<MidiNote> quavers[2]; // for quaver linking
+    for(uint i: range(notes.size())) {
+        uint t = notes.keys[i]*4/ticksPerBeat;
+
+        // Removes released notes from active sets
+        for(array<MidiNote>& active: actives) active.filter([t](const MidiNote& note){return note.start+note.duration<=t;});
+        uint sustain[2] = { (uint)actives[0].size, (uint)actives[1].size }; // Remaining notes kept sustained
+
+        if(int(t/staffTime)>lastSystem) { // Draws system
+            lastSystem=t/staffTime;
+            drawStaff(t, 0, Bass);
+            drawStaff(t, 1, Treble);
+            line(int2(position.x+16,page(1,t,0).y),int2(position.x+16,page(0,t,8).y));
+            line(int2(position.x+size.x-16,page(1,t,0).y),int2(position.x+size.x-16,page(0,t,8).y));
+            staffs << staffMargin+(lastSystem+1)*systemHeight;
+            lastMeasure=t/beatsPerMeasure;
+        } else if(t/beatsPerMeasure>lastMeasure) { // Draws measure bars
+            line(page(1,t,0)-int2(8,0),page(0,t,8)-int2(8,0));
+            lastMeasure=t/beatsPerMeasure;
+        }
+
+        array<MidiNote> currents[2]; // new notes to be pressed
+        for(MidiNote note: notes.values[i]) { //first rough split based on pitch
+            int s = note.key>=60; //middle C
+            currents[s] << note;
+            actives[s] << note;
+        }
+        for(uint s: range(2)) { // then balances load on both hand
+            array<MidiNote>& active = actives[s];
+            array<MidiNote>& otherActive = actives[!s];
+            array<MidiNote>& current = currents[s];
+            array<MidiNote>& other = currents[!s];
+            while(
+                  current && // any notes to move ?
+                  ((s==0 && current.last().key>=52) || (s==1 && current.first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
+                  current.size>=other.size && // keep new notes balanced
+                  active.size>=otherActive.size && // keep active (sustain+new) notes balanced
+                  (!other ||
+                   (s==1 && abs(int(other.first().key-current.first().key))<=12) || // keep short span on new notes (left)
+                   (s==0 && abs(int(other.last().key-current.last().key))<=12) ) && // keep short span on new notes (right)
+                  (!sustain[!s] ||
+                   (s==1 && abs(int(otherActive[0].key-current.first().key))<=18) || // keep short span with active notes (left)
+                   (s==0 && abs(int(otherActive[sustain[!s]-1].key-current.last().key))<=18) ) && // keep short span with active notes (right)
+                  (
+                      active.size>otherActive.size+1 || // balance active notes
+                      current.size>other.size+1 || // balance load
+                      // both new notes and active notes load are balanced
+                      (currents[0] && currents[1] && s == 0 && abs(int(currents[1].first().key-currents[1].last().key))<abs(int(currents[0].first().key-currents[0].last().key))) || // minimize left span
+                      (currents[0] && currents[1] && s == 1 && abs(int(currents[0].first().key-currents[0].last().key))<abs(int(currents[1].first().key-currents[1].last().key))) || // minimize right span
+                      (sustain[s] && sustain[!s] && active[sustain[s]-1].start>otherActive[sustain[!s]-1].start) // load least recently used hand
+                      )) {
+                if(!s) {
+                    other.insertAt(0, current.pop());
+                    actives[!s].insertAt(0, active.pop());
+                } else {
+                    other << current.take(0);
+                    actives[!s] << active.take(sustain[s]);
+                }
+            }
+        }
+
+        for(uint s: range(2)) { // finally displays notes on the right staff
+            Clef clef = (Clef)s;
+            int tailMin=100, tailMax=-100; uint minDuration=-1,maxDuration=0;
+            for(MidiNote note: currents[s]) { // draws notes
+                int h = staffY(clef, note.key);
+                for(int i=-2;i>=h;i-=2) drawLedger(s, t, i);
+                for(int i=10;i<=h;i+=2) drawLedger(s, t, i);
+                int2 position = page(s, t, h);
+                uint duration=note.duration;
+                if(duration <= 12) {
+                    glyph(position, duration<=6?"noteheads.s2"_:"noteheads.s1"_, colors.value(noteIndex,black));
+                    int accidental = accidentals[key+1][note.key%12];
+                    if(accidental) glyph(position+int2(-12,0),accidental==1?"accidentals.flat"_:"accidentals.sharp"_);
+                    if(duration<=3) quavers[s] << note;
+                    else {
+                        tailMin=min(tailMin,h), tailMax=max(tailMax,h);
+                        minDuration = min(minDuration,duration), maxDuration=max(maxDuration,duration);
+                    }
+                } else glyph(position,"noteheads.s0"_, colors.value(noteIndex,black));
+                positions << vec2(position); noteIndex++;
+                if(duration==3 || duration==6 || duration==12 || duration == 24) glyph(position+int2(16,4),"dots.dot"_);
+            }
+            if(tailMin<=tailMax) {
+                bool tailUp = !s;
+                int x = page(s,t,0).x + (tailUp ? 12 : 0);
+                line(vec2(x+0.5, page(s,t,tailMax).y+(tailUp?0:32)),vec2(x+0.5, page(s,t,tailMin).y+(tailUp?-32:0)),2);
+                //assert(minDuration==maxDuration,minDuration,maxDuration);
+                //if(minDuration!=maxDuration) Text(String("!"_)).render(int2(x,page(s,t,tailMin).y));
+            }
+        }
+
+        t = i+1<notes.size() ? notes.keys[i+1]*4/ticksPerBeat : t+beatsPerMeasure;
+        if(t/beatsPerMeasure>lastMeasure) { // Links quaver tails
+            for(int s: range(2)) {
+                Clef clef = (Clef)s;
+                bool tailUp=true; int dx = tailUp ? 12 : 0; uint slurY=tailUp?-1:0;
+                uint begin=0;
+                for(uint i: range(quavers[s].size)) {
+                    MidiNote note = quavers[s][i];
+                    int2 position = page(s, note.start, staffY(clef, note.key));
+                    if(tailUp) slurY=min<uint>(slurY,position.y);
+                    else slurY=max<uint>(slurY,position.y);
+                    uint duration=note.duration;
+                    if(i+1>=quavers[s].size || quavers[s][i+1].duration<duration || (quavers[s][i+1].start != note.start && quavers[s][i+1].start != note.start+duration)) {
+                        ref<MidiNote> linked = quavers[s].slice(begin,i+1-begin);
+                        if(linked.size==1) slurY+=tailUp?-32:32; else slurY+=tailUp?-24:24;
+                        int2 lastPosition=0;
+                        for(MidiNote note : linked) {
+                            int2 position = page(s,note.start,staffY(clef, note.key));
+                            int x = position.x + dx;
+                            line(vec2(x+0.5,position.y),vec2(x+0.5,slurY),2);
+                            if(linked.size==1) { // draws single tail
+                                int x = position.x + dx;
+                                if(note.duration==1) glyph(int2(x+1,slurY),tailUp?"flags.u4"_:"flags.d4"_);
+                                else if(note.duration==2) glyph(int2(x+1,slurY),tailUp?"flags.u3"_:"flags.d3"_);
+                            } else if(lastPosition){ // draws horizontal tail links
+                                if(note.duration==1) {
+                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?7:-7)+0.5),vec2(position.x+dx,slurY+(tailUp?7:-7)+0.5),2);
+                                    line(vec2(lastPosition.x+dx,slurY+(tailUp?9:-9)+0.5),vec2(position.x+dx,slurY+(tailUp?9:-9)+0.5),2);
+                                }
+                                line(vec2(lastPosition.x+dx,slurY+0.5),vec2(position.x+dx,slurY+0.5),2);
+                                line(vec2(lastPosition.x+dx,slurY+(tailUp?2:-2)+0.5),vec2(position.x+dx,slurY+(tailUp?2:-2)+0.5),2);
+                            }
+                            lastPosition=position;
+                        }
+                        begin=i+1;
+                        slurY=tailUp?-1:0;
+                    }
+                }
+                quavers[s].clear();
+            }
+        }
+    }
+}
+#endif

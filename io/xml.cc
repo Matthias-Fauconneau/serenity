@@ -70,7 +70,7 @@ Element::Element(TextData& s, bool html) {
         else if(s.match('<')) children << unique<Element>(s,html);
         else {
             String content = unescape(s.whileNot('<'));
-            if(content) children << unique<Element>(move(content));
+            if(trim(content)) children << unique<Element>(move(content));
         }
     }
 }

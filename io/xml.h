@@ -15,7 +15,7 @@ struct Element {
     /// Parses XML data to construct a DOM tree of \a Elements
     /// \note As all name, content and attribute Strings are referenced, the input document should live as long as the parsed elements.
     Element(TextData& data, bool html=false);
-    explicit operator bool() { return name||content; }
+    explicit operator bool() const { return name||content; }
     /// Returns value for \a attribute (fail if missing)
     string attribute(const string& attribute) const;
     /// Returns value for \a attribute (empty String if missing)
