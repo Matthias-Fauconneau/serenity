@@ -136,17 +136,17 @@ void Window::event() {
         renderBackground(target);
         widget->render(target);
 
-        putImage(0, size);
+        putImage(Rect(size));
         state=Server;
         if(frameSent) frameSent();
     }
 }
 
-void Window::putImage(int2 position, int2 size) {
+void Window::putImage(Rect rect) {
     Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
-    r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
-    r.dstX = position.x, r.dstY = position.y;
+    r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
+    r.dstX = rect.position().x, r.dstY = rect.position().y;
     send(raw(r));
 }
 

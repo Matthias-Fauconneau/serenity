@@ -40,7 +40,7 @@ struct Window : Device {
     function<void()>& globalAction(Key);
 
     /// Sends a partial update
-    void putImage(int2 position, int2 size);
+    void putImage(Rect r);
 
     /// Sets display state
     void setDisplay(bool displayState);

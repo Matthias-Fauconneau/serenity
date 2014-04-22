@@ -1,6 +1,5 @@
 #include "project.h"
 #include "thread.h"
-#include "time.h"
 
 // SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__
@@ -153,7 +152,8 @@ void SIRT::initialize(const ref<Projection>& /*projections*/, const ref<ImageF>&
 }
 
 bool SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
-    assert(projections.size == images.size);
+    time.start();
+
     const v2hi* zOrder2Data = zOrder2.data;
     const CylinderVolume volume (x);
     for(uint projectionIndex: range(projections.size)) {
@@ -175,6 +175,10 @@ bool SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             }
         }, threadCount);
     }
+
+    time.stop();
+    k++;
+    log("SIRT\t", time, k);// FIXME: compute residual
     return true;
 }
 
@@ -215,8 +219,7 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
-    k++;
-    Time time;
+    time.start();
 
     // Computes At A p (i.e projects and backprojects p)
     const v2hi* zOrder2Data = zOrder2.data;
@@ -269,7 +272,9 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         }
     }, threadCount);
 
-    log(k,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
+    time.stop();
+    k++;
+    log("CGNR\t", time, k); //,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
     residualEnergy = newResidual;
     return true;
 }

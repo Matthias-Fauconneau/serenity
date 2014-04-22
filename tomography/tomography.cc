@@ -35,7 +35,7 @@ struct View : Widget {
 };
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
-struct Tomography {
+struct Tomography : Poll {
     const uint N = 128;
     const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
@@ -43,27 +43,31 @@ struct Tomography {
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
     //SIRT reconstruction{N};
-    CGNR reconstruction{N};
+    //CGNR reconstruction{N};
 #if 0
     UniformGrid<View> views{{{0, &reconstruction.AtAp}, {0, &reconstruction.r}, {0, &reconstruction.p}, {&phantom, &source}}};
-#else
+#elif 0
     UniformGrid<View> views{{{&phantom, &source}}};
+#else
+    //mref<unique<Reconstruction>> reconstructions = {unique<SIRT>(N), unique<CGNR>(N)};
+    unique<Reconstruction> reconstructions[2] {unique<SIRT>(N), unique<CGNR>(N)};
+    UniformGrid<View> views{{{0, &reconstructions[0]->x},{0, &reconstructions[1]->x}}};
 #endif
     View& view = views.last();
-    Window window {&views, int2(1024), "Tomography"_};
+    Window window {&views, int2(2048,1024), "Tomography"_};
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
-        window.actions['p'] = [this] {
+        /*window.actions['p'] = [this] {
             if(view.phantom) view.phantom = 0, window.setTitle("Source");
             else view.phantom = &phantom, window.setTitle("Phantom");
             window.render();
-        };
-        window.actions[Space] = [this] { step(); };
-        window.actions[Return] = [this] {
+        };*/
+        //window.actions[Space] = [this] { step(); };
+        /*window.actions[Return] = [this] {
             if(view.volume == &source) view.volume = &reconstruction.x; else view.volume = &source;
             window.render();
-        };
+        };*/
         for(string argument: arguments()) {
             if(argument=="view"_) {
                 view.phantom = 0;
@@ -78,10 +82,11 @@ struct Tomography {
                     projections[i] = Projection(projection, image.size());
                     images[i] = move(image);
                 }
-                reconstruction.initialize(projections, images);
-                window.frameSent = {this, &Tomography::step};
+                //reconstruction.initialize(projections, images);
+                for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
+                //window.frameSent = {this, &Tomography::step};
                 view.phantom = 0;
-                view.volume = &reconstruction.x;
+                //view.volume = &reconstruction.x;
             }
         }
         step();
@@ -92,6 +97,7 @@ struct Tomography {
     }
     Random random;
     uint index = 0;
+    void event() { step(); }
     void step() {
         uint setSize; // one projection per step
         /**/ if(0) setSize = 1;
@@ -112,8 +118,18 @@ struct Tomography {
         if(0) index = (index+1) % setCount; // Sequential order
         if(0) index = random % setCount; // Random order
 
+#if 0
         if( !reconstruction.step(projections, images) ) window.frameSent = function<void()>();
-
         if(view.volume == &reconstruction.x) window.render();
+#else
+        // Step forward the reconstruction which consumed the least time.
+        uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
+        reconstructions[index]->step(projections, images);
+        // Renders only the reconstruction which updated
+        Rect rect = views.layout(window.size)[index];
+        views[index].render(clip(window.target, rect));
+        window.putImage(rect);
+        queue(); // Schedule next iteration (after any pending events are processed)
+#endif
     }
 } tomography;

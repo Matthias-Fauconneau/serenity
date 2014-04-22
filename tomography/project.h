@@ -3,6 +3,7 @@
 #include "volume.h"
 #include "simd.h"
 #include "thread.h"
+#include "time.h"
 
 struct Projection {
     Projection(mat4 projection, int2 imageSize) {
@@ -36,21 +37,31 @@ void project(const ImageF& image, const VolumeF& volume, const Projection& proje
 
 static constexpr uint threadCount = 8;
 
-struct SIRT {
+struct Reconstruction {
+    uint k = 0;
+    Time time = 0;
     buffer<v2hi> zOrder2;
-    VolumeF x, p[threadCount];
-    SIRT(uint N) : x(N), p{N} {}
-    void initialize(const ref<Projection>& projections, const ref<ImageF>& images);
-    bool step(const ref<Projection>& projections, const ref<ImageF>& images);
+    VolumeF x;
+    Reconstruction(uint N) : x(N) {}
+    virtual ~Reconstruction() {}
+    virtual void initialize(const ref<Projection>& projections, const ref<ImageF>& images) abstract;
+    virtual bool step(const ref<Projection>& projections, const ref<ImageF>& images) abstract;
+};
+inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.time < b.time; }
+inline String str(const Reconstruction& r) { return str(r.k, r.time); }
+
+struct SIRT : Reconstruction {
+    VolumeF p[threadCount];
+    SIRT(uint N) : Reconstruction(N) { for(VolumeF& e: p) e = VolumeF(N); }
+    virtual void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
+    virtual bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
 };
 
-struct CGNR {
-    buffer<v2hi> zOrder2;
-    VolumeF x,  AtAp[threadCount+1], p, r;
-
+struct CGNR : Reconstruction  {
     real residualEnergy = 0;
-    uint k = 0;
-    CGNR(uint N) : x(N), p(N), r(N) { for(VolumeF& e: AtAp) e = VolumeF(N); }
-    void initialize(const ref<Projection>& projections, const ref<ImageF>& images);
-    bool step(const ref<Projection>& projections, const ref<ImageF>& images);
+    VolumeF p, r, AtAp[threadCount+1];
+
+    CGNR(uint N) : Reconstruction(N), p(N), r(N) { for(VolumeF& e: AtAp) e = VolumeF(N); }
+    void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
+    bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
 };
