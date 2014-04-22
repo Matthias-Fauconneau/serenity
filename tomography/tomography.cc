@@ -36,21 +36,21 @@ struct View : Widget {
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
-    const uint N = 64;
-    const uint P = N;
+    const uint N = 128;
+    const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
     VolumeF source = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
     //SIRT reconstruction{N};
     CGNR reconstruction{N};
-#if 1
+#if 0
     UniformGrid<View> views{{{0, &reconstruction.AtAp}, {0, &reconstruction.r}, {0, &reconstruction.p}, {&phantom, &source}}};
 #else
     UniformGrid<View> views{{{&phantom, &source}}};
 #endif
     View& view = views.last();
-    Window window {&views, int2(1024*3/2), "Tomography"_};
+    Window window {&views, int2(1024), "Tomography"_};
     Tomography() {
         window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;

@@ -15,8 +15,10 @@ int2 zOrder2(uint64 index) { return int2(pack(index,0,2),pack(index,1,2)); }
 int3 zOrder3(uint64 index) { return int3(pack(index,0,3),pack(index,1,3),pack(index,2,3)); }
 
 void interleavedLookup(Volume& target) {
-    if(target.tiled()) return;
+    if(target.tiled()) { assert(target.offsetX.size == target.sampleCount.x, target.offsetX.size, target.sampleCount.x); assert(target.offsetY.size == target.sampleCount.y, target.offsetY.size, target.sampleCount.y); assert(target.offsetZ.size == target.sampleCount.z); return; } // FIXME: Generates for largest (but might invalidates offset deltas in CylinderVolume)
     target.offsetX = interleavedLookup(target.sampleCount.x,0,3);
     target.offsetY = interleavedLookup(target.sampleCount.y,1,3);
     target.offsetZ = interleavedLookup(target.sampleCount.z,2,3);
 }
+
+//buffer<int32> Volume::offsetX, Volume::offsetY, Volume::offsetZ;

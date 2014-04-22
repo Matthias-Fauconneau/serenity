@@ -23,13 +23,15 @@ struct Volume {
 
     uint sampleSize=0; // Sample integer size (in bytes)
     int3 sampleCount = 0; // Sample counts (along each dimensions)
-    buffer<byte> data; // Samples ordered in Z slices, Y rows, X samples
-    buffer<int32> offsetX, offsetY, offsetZ; // Offset lookup tables for bricked volumes (max 16GB)
+    buffer<byte> data; // Samples in Z-Order
+    /*static*/ buffer<int32> offsetX, offsetY, offsetZ; // Offset lookup tables for Z-ordered volumes (max 16GB) //FIXME: share
 };
 
 generic struct VolumeT : Volume {
+    VolumeT() {}
     // Allocates a volume in private memory
-    VolumeT(int3 sampleCount) : Volume(sizeof(T), sampleCount) { interleavedLookup(*this); }
+    VolumeT(int3 sampleCount) : Volume(sizeof(T), sampleCount) { interleavedLookup(*this); assert_(tiled()); }
+    VolumeT(uint sampleCount) : VolumeT(int3(sampleCount)) { assert_(tiled()); }
 
     operator const ref<T>() const { assert(data.size==sizeof(T)*size()); return ref<T>((const T*)data.data, data.size/sizeof(T)); }
     operator const mref<T>() { assert(data.size==sizeof(T)*size()); return mref<T>((T*)data.data, data.size/sizeof(T)); }

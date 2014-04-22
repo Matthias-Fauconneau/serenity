@@ -199,7 +199,7 @@ generic struct mref : ref<T> {
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
     explicit operator bool() const { if(size) assert(data); return size; }
-    explicit operator T*() const { return (T*)data; }
+    /*explicit*/ operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
     T& at(size_t i) const { assert(i<size); return (T&)data[i]; }

@@ -1,5 +1,6 @@
 #include "project.h"
 #include "thread.h"
+#include "time.h"
 
 // SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__
@@ -13,7 +14,7 @@ static const v8sf _00001111f = (v8sf){0,0,0,0,1,1,1,1};
 
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
-        assert_(volume.tiled() && volume.sampleCount.x == volume.sampleCount.y);
+        assert_(volume.tiled() && volume.sampleCount.x == volume.sampleCount.y, volume.tiled(), volume.sampleCount);
         const float radius = (volume.sampleCount.x-1)/2, halfHeight = (volume.sampleCount.z-1)/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
         capZ = (v4sf){halfHeight, halfHeight, -halfHeight, -halfHeight};
         radiusR0R0 = (v4sf){radius*radius, 0, radius*radius, 0};
@@ -21,8 +22,10 @@ struct CylinderVolume {
         dataOrigin = dup(float4(float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2 + (volume.offsetY.data-volume.offsetX.data), float(volume.sampleCount.z-1)/2 + (volume.offsetZ.data-volume.offsetX.data), 0)) + float8(0,0,0,0,1,1,1,0);
         zOrder = volume.offsetX.data;
         data = volume;
+#if DEBUG
         offset = int3(0, volume.offsetY.data-volume.offsetX.data, volume.offsetZ.data-volume.offsetX.data);
         size = volume.sampleCount;
+#endif
     }
 
     // Precomputed parameters
@@ -32,9 +35,10 @@ struct CylinderVolume {
     v8sf dataOrigin;
     const int32* zOrder;
     float* data;
-    // Bound check
+#if DEBUG
     int3 offset;
     int3 size;
+#endif
 };
 
 /// Integrates \a volume along ray defined by (\a projection, \a pixelPosition). if \a imageData and not \a targetData: stores result into image; if targetData: backprojects value; if imageData and targetData: backprojects difference
@@ -54,18 +58,9 @@ template<bool CGNR=false> static inline float update(const Projection& projectio
     const v4sf _1b1b = blendps(_1f, cbcb, 0b1010); // 1 OD 1 OD
     const v4sf _4ac_bb = projection._m4a_4_m4a_4 * (cbcb*_1b1b - volume.radiusR0R0); // -4ac bb -4ac bb
     const v4sf delta = hadd(_4ac_bb,_4ac_bb);
-#if !EXCEPTION
     const v4sf sqrtDelta = sqrt( delta );
     const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
     const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
-#else
-    v4sf sideT;
-    if(mask(delta>=_0f)) {
-        const v4sf sqrtDelta = sqrt( delta );
-        const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
-        sideT = mask(projection.rcp_2a==-floatMax) ? -floatMax : (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
-    } else sideT = floatMax;
-#endif
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = capSideP < volume.radiusSqHeight;
@@ -81,8 +76,8 @@ template<bool CGNR=false> static inline float update(const Projection& projectio
     for(v8sf p01f = pStart;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
         const v8si p01 = cvttps2dq(p01f);
-        {int3 p = int3(p01[0],p01[1],p01[2])-volume.offset; assert_(p >= int3(0) && p<volume.size, p);}
-        {int3 p = int3(p01[4],p01[5],p01[6])-volume.offset; assert_(p >= int3(0) && p<volume.size, p);}
+        assert(({ int3 p = int3(p01[0],p01[1],p01[2])-volume.offset; p >= int3(0) && p<volume.size}), p);
+        assert(({ int3 p = int3(p01[4],p01[5],p01[6])-volume.offset; p >= int3(0) && p<volume.size}), p);
         // Lookups sample offsets
         const v8si offsetXYZXYZ = gather(volume.zOrder, p01, _11101110);
         const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
@@ -117,28 +112,35 @@ template<bool CGNR=false> static inline float update(const Projection& projectio
         // Lookups sample offsets
         const v8si offsetXYZXYZ = gather(volume.zOrder, p01, _11101110);
         const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
+#if 1
         // Gather samples
         v8sf cx01 = gather(targetData, v01);
         // Computes trilinear interpolation coefficients
         const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
         const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
         // Update
-        //cx01 = max(_00000000f, cx01 + w01 * value8); // cx01 = max(_0f, cx01) ?
         cx01 += w01 * value8;
         // Scatter ~ scatter(data, v01, cx01);
         targetData[v01[0]] = cx01[0]; targetData[v01[1]] = cx01[1]; targetData[v01[2]] = cx01[2]; targetData[v01[3]] = cx01[3];
         targetData[v01[4]] = cx01[4]; targetData[v01[5]] = cx01[5]; targetData[v01[6]] = cx01[6]; targetData[v01[7]] = cx01[7];
+#else
+        // Computes trilinear interpolation coefficients
+        const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
+        const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
+        const v8sf a01 = w01 * value8; // Values to be added
+        // TODO: Atomic scatter (or scatter in as many volumes as threads...)
+        targetData[v01[0]] = cx01[0]; targetData[v01[1]] = cx01[1]; targetData[v01[2]] = cx01[2]; targetData[v01[3]] = cx01[3];
+        targetData[v01[4]] = cx01[4]; targetData[v01[5]] = cx01[5]; targetData[v01[6]] = cx01[6]; targetData[v01[7]] = cx01[7];
+#endif
         p01f += projection.ray8; // Step
         if(mask(low(p01f) > tEnd)) return Ax;
     }
 }
 
-static constexpr uint threadCount = 1;
-
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
     const CylinderVolume volume(source);
-    float* const imageData = (float*)image.data;
+    float* const imageData = image.data;
     uint imageWidth = image.width;
     //parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { short2 p = short2(::zOrder2(index));  update<>(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth, 0); } ); //FIXME: NPOT
     parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { short2 p = short2(index%imageWidth, index/imageWidth);  update<>(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth, 0); }, threadCount);
@@ -157,36 +159,24 @@ bool SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        float* const imageData = (float*)image.data;
+        float* const imageData = image.data;
         uint imageWidth = image.width;
-        float* pData = (float*)p.data.data;
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, pData](uint, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, pData); }, threadCount);
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, this](uint id, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, p[id]); }, threadCount);
     }
     { // Updates x = max(0, x+p) and clears p
-        float* pData = (float*)p.data.data; float* xData = (float*)x.data.data;
+        float* xData = x;
         const float alpha = 1./projections.size; // Step size
-        chunk_parallel(p.size(), [alpha, pData, xData](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) { xData[i] = max(0.f, xData[i] + alpha * pData[i]); pData[i]=0; }}, threadCount);
+        chunk_parallel(x.size(), [this, alpha, xData](uint, uint offset, uint size) {
+            float* P[threadCount]; for(uint id: range(threadCount)) P[id] = p[id];
+            for(uint i: range(offset,offset+size)) {
+                float p = 0;
+                for(uint id: range(threadCount)) { p += P[id][i]; P[id][i]=0; } // Merges p and clears p#
+                xData[i] = max(0.f, xData[i] + alpha * p);
+            }
+        }, threadCount);
     }
     return true;
 }
-
-#if 0
-// Computes regularization: QtQ = lambda · ( I + alpha · CtC )
-static float regularization(const VolumeF& volume, const uint index) {
-    int3 p = zOrder3(index);
-    assert_(index == uint(volume.offsetX[p.x]+volume.offsetY[p.y]+volume.offsetZ[p.z]));
-    float Ix = volume.data[index];
-    float CtCx = 0;
-    for(int z=-1; z<=1; z++) for(int y=-1; y<=1; y++) for(int x=-1; x<=1; x++) {
-        if(p+int3(x,y,z) >= int3(0) && p+int3(x,y,z) < volume.sampleCount) {
-            float Cx = Ix - volume.data[volume.offsetX[p.x+x]+volume.offsetY[p.y+y]+volume.offsetZ[p.z+z]];
-            CtCx += sq(Cx);
-        }
-    }
-    float QtQx = Ix + 1 * CtCx;
-    return QtQx;
-}
-#endif
 
 /// Computes residual r = p = At ( b - A x )
 void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
@@ -197,22 +187,25 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
     for(uint index: range(zOrder2.size)) { short2 p = short2(::zOrder2(index)); zOrder2[index] = (v2hi){p.x, p.y}; } // Generates lookup table (assumes square POT images)
     const v2hi* zOrder2Data = zOrder2.data;
     const CylinderVolume volume (x);
-    float* pData = (float*)p.data.data;
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        float* const imageData = (float*)image.data;
+        float* const imageData = image.data;
         uint imageWidth = image.width;
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, pData](uint, uint pixelIndex) { update<true>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, pData); }, threadCount);
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, this](uint id, uint pixelIndex) { update<true>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, AtAp[id]); }, threadCount); // FIXME: Split rays in coherent non-intersecting chunks
     }
-    // Copies r=p and computes |r|
-    float* rData = (float*)r.data.data;
+    // Merges r=p=sum(p#) and computes |r|
+    float* pData = p;
+    float* rData = r;
     float residualSum[coreCount] = {};
     chunk_parallel(p.size(), [pData, rData, &residualSum, this](uint id, uint offset, uint size) {
-        for(uint index: range(offset,offset+size)) {
-            float& p = pData[index];
+        float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
+        for(uint i: range(offset,offset+size)) {
+            float p = 0;
+            for(uint id: range(threadCount)) { p += P[id][i]; P[id][i]=0; } // Merges p and clears AtAp#
             //p -= regularization(x, index); // = 0
-            rData[index] = p;
+            pData[i] = p;
+            rData[i] = p;
             residualSum[id] += sq(p);
         }
     }, threadCount);
@@ -223,25 +216,32 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     k++;
+    Time time;
 
     // Computes At A p (i.e projects and backprojects p)
     const v2hi* zOrder2Data = zOrder2.data;
     const CylinderVolume volume (p);
-    float* AtApData = (float*)AtAp.data.data;
-    chunk_parallel(p.size(), [AtApData](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) { AtApData[i]=0; }} ); // Zeroes AtAp
+    /*chunk_parallel(p.size(), [this](uint id, uint offset, uint size) { // Zeroes AtAp (if kept for visualization)
+        float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
+        for(uint i: range(offset,offset+size)) { P[id][i]=0; }
+    } );*/
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, AtApData](uint, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, 0, 0, AtApData); }, threadCount);
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, this](uint id, uint pixelIndex) { update<>(projection, zOrder2Data[pixelIndex], volume, 0, 0, AtAp[id]); }, threadCount);
     }
 
-    // Computes |p·Atp|
-    float* pData = (float*)p.data.data;
+    // Merges and clears AtAp and computes |p·Atp|
+    float* AtApData = AtAp[threadCount]; // threadCount+1 volumes, last one is used to merge
+    float* pData = p;
     float pAtApSum[coreCount] = {};
     chunk_parallel(p.size(), [pData, AtApData, &pAtApSum, this](uint id, uint offset, uint size) {
-        for(uint index: range(offset,offset+size)) {
-            //AtApData[index] += regularization(p, index);
-            pAtApSum[id] += pData[index] * AtApData[index];
+        float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
+        for(uint i: range(offset,offset+size)) {
+            float AtAp = 0;
+            for(uint id: range(threadCount)) { AtAp += P[id][i]; P[id][i]=0; } // Merges AtAp# and clears AtAp#
+            AtApData[i] = AtAp;
+            pAtApSum[id] += pData[i] * AtAp;
         }
     }, threadCount);
     float pAtAp = sum(pAtApSum);
@@ -249,8 +249,8 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
 
     // Updates x += α p, r -= α AtAp, clears AtAp, computes |r|²
     float alpha = residualEnergy / pAtAp;
-    float* xData = (float*)x.data.data;
-    float* rData = (float*)r.data.data;
+    float* xData = x;
+    float* rData = r;
     float newResidualSum[coreCount] = {};
     chunk_parallel(p.size(), [alpha, pData, xData, AtApData, rData, &newResidualSum](uint id, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
@@ -262,23 +262,6 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     float newResidual = sum(newResidualSum);
     float beta = newResidual / residualEnergy;
 
-    /*if(beta>1) { // Recomputes residual from images
-        log(k,'\t',residualEnergy,'\\',newResidual,'=',beta,"recompute");
-        const CylinderVolume volume (x);
-        chunk_parallel(p.size(), [rData](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) { rData[i]=0; }} ); // Zeroes AtAp
-        for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
-            const Projection& projection = projections[projectionIndex];
-            const ImageF& image = images[projectionIndex];
-            float* const imageData = (float*)image.data;
-            uint imageWidth = image.width;
-            parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, rData](uint, uint pixelIndex) { update<true>(projection, zOrder2Data[pixelIndex], volume, imageData, imageWidth, rData); } );
-        }
-        float newResidualSum[coreCount] = {};
-        chunk_parallel(p.size(), [rData, &newResidualSum](uint id, uint offset, uint size) { for(uint index: range(offset,offset+size)) { newResidualSum[id] += sq(rData[index]); } });
-        newResidual = sum(newResidualSum);
-        beta = newResidual / residualEnergy;
-    }*/
-
     // Computes next search direction: p[k+1] = r[k+1] + β p[k]
     chunk_parallel(p.size(), [&](uint, uint offset, uint size) {
         for(uint index: range(offset,offset+size)) {
@@ -286,8 +269,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         }
     }, threadCount);
 
-    log(k,'\t',residualEnergy,'\\',newResidual,'=',beta);
+    log(k,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
     residualEnergy = newResidual;
-    //return beta < 1;
     return true;
 }
