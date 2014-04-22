@@ -134,8 +134,8 @@ struct Window : Device {
     /// If set, this window will always be anchored to this position
     Anchor anchor = Float;
 
-    /// Signals sent frames
-    function<void()> frameSent;
+    /// Signals displayed updates
+    function<void()> displayed;
 
     /// Root window
     uint root = 0;

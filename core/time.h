@@ -21,9 +21,8 @@ struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){if
 struct Time {
     uint64 startTime, stopTime=0;
     Time(uint64 startTime=realTime()) : startTime(startTime) {}
-    void start() { if(stopTime) startTime=realTime() - (startTime ? stopTime-startTime : 0); stopTime=0; }
-    void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
+    void start() { startTime = realTime() - (stopTime ? stopTime-startTime : 0); stopTime=0; }
+    void stop() { if(!stopTime) stopTime = realTime(); }
     operator uint64() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000 : 0; }
     float toFloat() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000000.f : 0; }
 };

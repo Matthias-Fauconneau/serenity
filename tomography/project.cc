@@ -274,7 +274,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
 
     time.stop();
     k++;
-    log("CGNR\t", time, k); //,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
+    log("CGNR\t", time.toFloat()/k, k); //,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
     residualEnergy = newResidual;
     return true;
 }

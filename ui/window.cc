@@ -137,17 +137,17 @@ void Window::event() {
         widget->render(target);
 
         putImage(Rect(size));
-        state=Server;
-        if(frameSent) frameSent();
     }
 }
 
 void Window::putImage(Rect rect) {
+    assert_(id); assert_(state==Idle); assert_(rect.size());
     Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
     r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
     r.dstX = rect.position().x, r.dstY = rect.position().y;
     send(raw(r));
+    state=Server;
 }
 
 // Events
@@ -218,7 +218,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
             else exit(0); // Exits application by default
         }
-        else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
+        else if(type==Shm::event+Shm::Completion) { int stateWas=state; state=Idle; if(displayed) displayed(); if(stateWas==Wait) render(); }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
         window=0;
