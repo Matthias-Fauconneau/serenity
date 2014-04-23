@@ -36,7 +36,7 @@ struct View : Widget {
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
-    const uint N = 64;
+    const uint N = 128;
     const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
     VolumeF source = phantom.volume(N);
@@ -45,11 +45,11 @@ struct Tomography {
     unique<Reconstruction> reconstructions[1] {unique<CGNR>(N)};
     UniformGrid<View> views{{{0, &reconstructions[0]->x}}};
     View& view = views.last();
-    //Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
+#define WINDOW 0
+#if WINDOW
+    Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
+#endif
     Tomography() {
-        //window.actions[Escape] = []{ exit(); };
-        //window.background = Window::NoBackground;
-
         // Projects phantom
         for(uint i: range(projections.size)) {
             mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
@@ -60,8 +60,15 @@ struct Tomography {
 
         for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
         step();
-        //window.show();
-        //window.displayed = {this, &Tomography::step};
+
+#if WINDOW
+        window.actions[Escape] = []{ exit(); };
+        window.background = Window::NoBackground;
+        window.show();
+        window.displayed = {this, &Tomography::step};
+#else
+        step();
+#endif
     }
 
     void step() {

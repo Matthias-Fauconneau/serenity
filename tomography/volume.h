@@ -3,6 +3,10 @@
 
 generic struct VolumeT;
 
+#define ZORDER 0
+#define ZORDER2 0
+static constexpr uint threadCount = 8;
+
 struct Volume {
     Volume(){}
     Volume(uint sampleSize, int3 sampleCount) : sampleSize(sampleSize), sampleCount(sampleCount), data(size()*sampleSize) { data.clear(0); }
@@ -47,9 +51,15 @@ typedef VolumeT<float> VolumeF;
 
 /// Generates lookup tables for tiled volume data access
 void interleavedLookup(Volume& target);
-/// Interleaves 3 coordinates
-uint64 zOrder(int3 coordinates);
+
+#if ZORDER2
 /// Uninterleaves 2 coordinates
 int2 zOrder2(uint64 index);
+#endif
+
+#if ZORDER
+/// Interleaves 3 coordinates
+uint64 zOrder(int3 coordinates);
 /// Uninterleaves 3 coordinates
 int3 zOrder3(uint64 index);
+#endif

@@ -35,12 +35,12 @@ struct Projection {
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, const Projection& projection);
 
-static constexpr uint threadCount = 1;
-
 struct Reconstruction {
     uint k = 0;
     Time totalTime;
+#if ZORDER2
     buffer<v2hi> zOrder2;
+#endif
     VolumeF x;
     Reconstruction(uint N) : x(N) {}
     virtual ~Reconstruction() {}
