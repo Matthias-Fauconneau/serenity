@@ -36,7 +36,7 @@ struct View : Widget {
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
-    const uint N = 128;
+    const uint N = 64;
     const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
     VolumeF source = phantom.volume(N);
@@ -45,11 +45,10 @@ struct Tomography {
     unique<Reconstruction> reconstructions[1] {unique<CGNR>(N)};
     UniformGrid<View> views{{{0, &reconstructions[0]->x}}};
     View& view = views.last();
-    Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
+    //Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
     Tomography() {
-        window.actions[Escape] = []{ exit(); };
-        window.background = Window::NoBackground;
-        window.displayed = {this, &Tomography::step};
+        //window.actions[Escape] = []{ exit(); };
+        //window.background = Window::NoBackground;
 
         // Projects phantom
         for(uint i: range(projections.size)) {
@@ -61,18 +60,19 @@ struct Tomography {
 
         for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
         step();
-        window.show();
+        //window.show();
+        //window.displayed = {this, &Tomography::step};
     }
 
     void step() {
         // Step forward the reconstruction which consumed the least time.
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         reconstructions[index]->step(projections, images);
-        if(window.target) { // Renders only the reconstruction which updated
+        /*if(window.target) { // Renders only the reconstruction which updated
             Rect rect = views.layout(window.size)[index];
             assert_(window.target);
             views[index].render(clip(window.target, rect));
             window.putImage(rect);
-        }
+        }*/
     }
 } tomography;

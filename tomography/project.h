@@ -35,11 +35,11 @@ struct Projection {
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, const Projection& projection);
 
-static constexpr uint threadCount = 8;
+static constexpr uint threadCount = 1;
 
 struct Reconstruction {
     uint k = 0;
-    Time time = 0;
+    Time totalTime;
     buffer<v2hi> zOrder2;
     VolumeF x;
     Reconstruction(uint N) : x(N) {}
@@ -47,19 +47,13 @@ struct Reconstruction {
     virtual void initialize(const ref<Projection>& projections, const ref<ImageF>& images) abstract;
     virtual bool step(const ref<Projection>& projections, const ref<ImageF>& images) abstract;
 };
-inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.time < b.time; }
-inline String str(const Reconstruction& r) { return str(r.k, r.time); }
-
-struct SIRT : Reconstruction {
-    VolumeF p[threadCount];
-    SIRT(uint N) : Reconstruction(N) { for(VolumeF& e: p) e = VolumeF(N); }
-    virtual void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
-    virtual bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
-};
+inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.totalTime < b.totalTime; }
+inline String str(const Reconstruction& r) { return str(r.k, r.totalTime); }
 
 struct CGNR : Reconstruction  {
     real residualEnergy = 0;
     VolumeF p, r, AtAp[threadCount+1];
+    tsc AtApTime, mergeTime, updateTime, nextTime;
 
     CGNR(uint N) : Reconstruction(N), p(N), r(N) { for(VolumeF& e: AtAp) e = VolumeF(N); }
     void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;

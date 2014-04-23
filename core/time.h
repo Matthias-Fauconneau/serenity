@@ -4,6 +4,7 @@
 #include "thread.h"
 #include "function.h"
 #include "string.h"
+#include "math.h"
 
 /// Returns Unix real-time in seconds
 long currentTime();
@@ -15,18 +16,20 @@ int64 realTime();
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
-struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){if(!tsc) tsc=rdtsc();} void stop(){if(tsc) total+=rdtsc()-tsc; tsc=0;} operator uint64(){return total + (tsc?rdtsc()-tsc:0);} };
+struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){assert(!tsc); tsc=rdtsc();} void stop(){assert(tsc); total+=rdtsc()-tsc; tsc=0;} operator uint64() const {assert_(!tsc); return total + (tsc?rdtsc()-tsc:0);} };
 #endif
+
 /// Logs the time spent executing a scope
 struct Time {
-    uint64 startTime, stopTime=0;
-    Time(uint64 startTime=realTime()) : startTime(startTime) {}
+    uint64 startTime=0, stopTime=0;
     void start() { startTime = realTime() - (stopTime ? stopTime-startTime : 0); stopTime=0; }
     void stop() { if(!stopTime) stopTime = realTime(); }
     operator uint64() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000 : 0; }
     float toFloat() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000000.f : 0; }
 };
 inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
+inline String percent(const uint64 a, const uint64 b) { return dec((100*a+50)/b)+"%"_; }
+inline String operator/(const Time& a, const Time& b) { return dec(round(100*a.toFloat()/b.toFloat()))+"%"_; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
