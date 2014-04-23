@@ -32,13 +32,12 @@ struct CylinderVolume {
     float* data;
 };
 
-static tsc intersectTime[threadCount], gatherTime[threadCount], scatterTime[threadCount], lookupTime[threadCount], dataTime[threadCount];
+struct Profile { tsc gatherTime, scatterTime, lookupTime, dataTime; } profile[threadCount], discard;
 
 /// Integrates \a volume along ray defined by (\a projection, \a pixelPosition). if \a imageData and not \a targetData: stores result into image; if targetData: backprojects value; if imageData and targetData: backprojects difference
 /// \note Splitting intersect / projects / updates / backprojects triggers spurious uninitialized warnings when there is no intersection test, which suggests the compiler is not able to flatten the code.
-static inline float update(const Projection& projection, v2hi pixelPosition, const CylinderVolume& volume, float* imageData, const uint imageWidth, float* targetData=0, int id=-1) {
+static inline float update(const Projection& projection, v2hi pixelPosition, const CylinderVolume& volume, float* imageData, const uint imageWidth, float* targetData=0, Profile& profile=discard) {
     /// Intersects
-    if(id>=0) intersectTime[id].start();
     v4sf origin = projection.origin + float4(pixelPosition[0]) * projection.xAxis + float4(pixelPosition[1]) * projection.yAxis;
     // Intersects cap disks
     const v4sf originZ = shuffle4(origin, origin, 2,2,2,2);
@@ -58,16 +57,15 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = capSideP < volume.radiusSqHeight;
-    if(!mask(tMask)) { if(!targetData) imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=0; if(id>=0) intersectTime[id].stop(); return 0; }
+    if(!mask(tMask)) { if(!targetData) imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=0; return 0; }
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
     origin += tmin * projection.ray;
     v8sf pStart = volume.dataOrigin + dup(origin);
     v4sf tEnd = max(floatMMMm, tmax); // max, max, max, tmax
-    if(id>=0) intersectTime[id].stop();
     /// Projects
-    if(id>=0) gatherTime[id].start();
+    profile.gatherTime.start();
     float Ax = 0; // Accumulates along the ray
     for(v8sf p01f = pStart;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
@@ -89,25 +87,25 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
         p01f += projection.ray8; // Step
         if(mask(low(p01f) > tEnd)) break;
     }
-    if(id>=0) gatherTime[id].stop();
+    profile.gatherTime.stop();
     /// Updates
     if(!targetData) { imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=Ax; return Ax; }
     float value = imageData ? imageData[pixelPosition[1]*imageWidth+pixelPosition[0]] - Ax : Ax;
     /// Backprojects
-    if(id>=0) scatterTime[id].start();
+    profile.scatterTime.start();
     v8sf value8 = float8(value);
     for(v8sf p01f = pStart;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
         const v8si p01 = cvttps2dq(p01f);
         // Lookups sample offsets
-        lookupTime[id].start();
+        profile.lookupTime.start();
         const v8si offsetXYZXYZ = gather(volume.zOrder, p01, _11101110);
-        lookupTime[id].stop();
+        profile.lookupTime.stop();
         const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
         // Gather samples
-        dataTime[id].start();
+        profile.dataTime.start();
         v8sf cx01 = gather(targetData, v01);
-        dataTime[id].stop();
+        profile.dataTime.stop();
         // Computes trilinear interpolation coefficients
         const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
         const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
@@ -119,7 +117,7 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
         p01f += projection.ray8; // Step
         if(mask(low(p01f) > tEnd)) break;
     }
-    if(id>=0) scatterTime[id].stop();
+    profile.scatterTime.stop();
     return Ax;
 }
 
@@ -174,7 +172,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, this](uint id, uint pixelIndex) { update(projection, zOrder2Data[pixelIndex], volume, 0, 0, AtAp[id], id); }, threadCount);
+        parallel(image.data.size, [zOrder2Data, &projection, &volume, this](uint id, uint pixelIndex) { update(projection, zOrder2Data[pixelIndex], volume, 0, 0, AtAp[id], profile[id]); }, threadCount);
     }
     AtApTime.stop();
 
@@ -224,7 +222,9 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     totalTime.stop();
     k++;
     //mergeTime/totalTime, updateTime/totalTime, nextTime/totalTime); //,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
-    log(k, str(totalTime.toFloat()/k)+"s"_, "gather:", percent(sum(gatherTime),AtApTime), "scatter:", percent(sum(scatterTime),AtApTime), "(", percent(sum(lookupTime),sum(scatterTime)), percent(sum(dataTime),sum(scatterTime)),")");
+    uint64 gatherTime=0, scatterTime=0, lookupTime=0, dataTime=0;
+    for(const Profile& p: profile) { gatherTime+=p.gatherTime; scatterTime+=p.scatterTime; lookupTime+=p.lookupTime; dataTime+=p.dataTime; }
+    log(k, str(totalTime.toFloat()/k)+"s"_, "gather:", percent(gatherTime,AtApTime), "scatter:", percent(scatterTime,AtApTime), "(", percent(lookupTime,scatterTime), percent(dataTime,scatterTime),")");
     residualEnergy = newResidual;
     return true;
 }
