@@ -5,6 +5,8 @@
 #include "thread.h"
 #include "time.h"
 
+#define APPROXIMATE 1 // Approximate adjoint using bilinear sample instead of trilinear scatter
+
 struct Projection {
     Projection(mat4 projection, int2 imageSize) {
         // Intermediate parameters
@@ -24,12 +26,19 @@ struct Projection {
         rayZ = float4(ray3.z);
         ray = (v4sf){ray3.x, ray3.y, ray3.z, 1};
         ray8 = dup(ray);
+
+#if APPROXIMATE
+        this->projection = projection;
+#endif
     }
 
     // Precomputed parameters (11x4)
     v4sf origin, xAxis, yAxis;
     v4sf raySlopeZ, rayXYXY, _m4a_4_m4a_4, rcp_2a, rayZ, ray;
     v8sf ray8;
+#if APPROXIMATE
+    mat4 projection;
+#endif
 };
 
 /// Projects \a volume onto \a image according to \a projection
@@ -52,7 +61,12 @@ inline String str(const Reconstruction& r) { return str(r.k, r.totalTime); }
 
 struct CGNR : Reconstruction  {
     real residualEnergy = 0;
-    VolumeF p, r, AtAp[threadCount+1];
+    VolumeF p, r;
+#if !APPROXIMATE
+    VolumeF AtAp[threadCount];
+#else
+    VolumeF AtAp[1];
+#endif
     tsc AtApTime, mergeTime, updateTime, nextTime;
 
     CGNR(uint N) : Reconstruction(N), p(N), r(N) { for(VolumeF& e: AtAp) e = VolumeF(N); }

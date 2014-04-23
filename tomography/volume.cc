@@ -31,4 +31,4 @@ void interleavedLookup(Volume& target) {
 #endif
 }
 
-buffer<int32> Volume::offsetX, Volume::offsetY, Volume::offsetZ;
+//buffer<int32> Volume::offsetX, Volume::offsetY, Volume::offsetZ __attribute((init_priority(103)));

@@ -45,7 +45,7 @@ struct Tomography {
     unique<Reconstruction> reconstructions[1] {unique<CGNR>(N)};
     UniformGrid<View> views{{{0, &reconstructions[0]->x}}};
     View& view = views.last();
-#define WINDOW 0
+#define WINDOW 1
 #if WINDOW
     Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
 #endif
@@ -62,6 +62,7 @@ struct Tomography {
         }
 
         for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
+        //view.volume = &((CGNR*)reconstructions[0].pointer)->p;
         step();
 
 #if WINDOW

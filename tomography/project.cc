@@ -50,7 +50,7 @@ static constexpr bool profile = false;
 #if REGULARIZATION
 // Computes regularization: QtQ = lambda · ( I + alpha · CtC )
 static float regularization(const VolumeF& volume, const uint index) {
-    int3 p = int3(index%volume.sampleCount.x, (index/volume.sampleCount.x)%volume.sampleCount.z, index/(volume.sampleCount.x*volume.sampleCount.y)); //zOrder3(index);
+    int3 p = int3(index%volume.sampleCount.x, (index/volume.sampleCount.x)%volume.sampleCount.y, index/(volume.sampleCount.x*volume.sampleCount.y)); //zOrder3(index);
     assert_(index == uint(volume.offsetX[p.x]+volume.offsetY[p.y]+volume.offsetZ[p.z]), index, p);
     float Ix = volume.data[index];
     float CtCx = 0;
@@ -67,9 +67,9 @@ static float regularization(const VolumeF& volume, const uint index) {
 
 /// Integrates \a volume along ray defined by (\a projection, \a pixelPosition). if \a imageData and not \a targetData: stores result into image; if targetData: backprojects value; if imageData and targetData: backprojects difference
 /// \note Splitting intersect / projects / updates / backprojects triggers spurious uninitialized warnings when there is no intersection test, which suggests the compiler is not able to flatten the code.
-static inline float update(const Projection& projection, v2hi pixelPosition, const CylinderVolume& volume, float* imageData, const uint imageWidth, float* targetData=0, Profile& profiles=discard) {
+static inline float update(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, float b=0, float* targetData=0, Profile& profiles=discard) {
     /// Intersects
-    v4sf origin = projection.origin + float4(pixelPosition[0]) * projection.xAxis + float4(pixelPosition[1]) * projection.yAxis;
+    v4sf origin = projection.origin + float4(pixelPosition.x) * projection.xAxis + float4(pixelPosition.y) * projection.yAxis;
     // Intersects cap disks
     const v4sf originZ = shuffle4(origin, origin, 2,2,2,2);
     const v4sf capT = (volume.capZ - originZ) * projection.raySlopeZ; // top top bottom bottom
@@ -88,7 +88,7 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = capSideP < volume.radiusSqHeight;
-    if(!mask(tMask)) { if(!targetData) imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=0; return 0; }
+    if(!mask(tMask)) return 0;
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
@@ -125,14 +125,11 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
         if(mask(low(p01f) > tEnd)) break;
     }
     if(profile) profiles.gatherTime.stop();
-    /// Updates
-    if(!targetData) { imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=Ax; return Ax; }
-    float value =
-            imageData ? imageData[pixelPosition[1]*imageWidth+pixelPosition[0]] - Ax  //- regularization(x, index); // = 0
-            : Ax;
+    if(!targetData) return Ax; // Projection only
+    Ax -= b;  //+ regularization(x, index); // = 0
     /// Backprojects
     if(profile) profiles.scatterTime.start();
-    v8sf value8 = float8(value);
+    v8sf value8 = float8(Ax);
     for(v8sf p01f = pStart;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         // Converts {position, position+1} to integer coordinates
         const v8si p01 = cvttps2dq(p01f);
@@ -169,7 +166,7 @@ void project(const ImageF& image, const VolumeF& source, const Projection& proje
     const CylinderVolume volume(source);
     float* const imageData = image.data;
     uint imageWidth = image.width;
-    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { short2 p = short2(index%imageWidth, index/imageWidth);  update(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth); }, threadCount);
+    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { uint x=index%imageWidth, y=index/imageWidth; imageData[y*imageWidth+x] = update(projection, vec2(x, y), volume); }, threadCount);
 }
 
 /// Computes residual r = p = At ( b - A x )
@@ -178,8 +175,8 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
     int2 imageSize = images.first().size();
     zOrder2 = buffer<v2hi>(imageSize.y * imageSize.x); // Large lookup table (~512K) but read sequentially (stream read, skip cache)
     for(uint index: range(zOrder2.size)) { short2 p = short2(::zOrder2(index)); zOrder2[index] = (v2hi){p.x, p.y}; } // Generates lookup table (assumes square POT images)
-    const v2hi* zOrder2Data = zOrder2.data;
 #endif
+#if !APPROXIMATE
     const CylinderVolume volume (x);
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
         const Projection& projection = projections[projectionIndex];
@@ -188,24 +185,54 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
         uint imageWidth = image.width;
         // TODO: Schedule non-intersecting rays to avoid duplicating target volume for coherent scatter without atomics
 #if ZORDER2
-        parallel(image.data.size, [zOrder2Data, &projection, &volume, imageData, imageWidth, this](uint id, uint index) { update(projection, zOrder2Data[index], volume, imageData, imageWidth, AtAp[id]); }, threadCount);
+        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { v2hi p = zOrder2[index]; update(projection, vec2(p[0], p[1]), volume, imageData[uint(p[1])*imageWidth+uint(p[0])], AtAp[id]); }, threadCount);
 #else
-        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { short2 p = short2(index%imageWidth, index/imageWidth); update(projection, (v2hi){p.x, p.y}, volume, imageData, imageWidth, AtAp[id]); }, threadCount);
+        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, imageData[y*imageWidth+x], AtAp[id]); }, threadCount);
 #endif
     }
+#endif
     // Merges r=p=sum(p#) and computes |r|
     float* pData = p;
     float* rData = r;
     float residualSum[coreCount] = {};
+#if APPROXIMATE // Approximates trilinear backprojection with bilinear sample (reverse splat)
+    const vec3 center = vec3(p.sampleCount-int3(1))/2.f;
+    const float radiusSq = sq(center.x);
+    const vec2 imageCenter = vec2(images.first().size()-int2(1))/2.f;
+    chunk_parallel(p.size(), [&projections, &images, center, radiusSq, imageCenter, pData, rData, &residualSum, this](uint id, uint offset, uint size) {
+        for(uint i: range(offset,offset+size)) {
+#if ZORDER
+            const vec3 origin = vec3(zOrder3(i)) - center;
+#else
+            const vec3 origin = vec3(i%x.sampleCount.x, (i/x.sampleCount.x)%x.sampleCount.y, i/(x.sampleCount.x*x.sampleCount.y)) - center;
+#endif
+            if(sq(origin.xy()) > radiusSq) continue;
+            float Atb = 0;
+            for(uint projectionIndex: range(projections.size)) {
+                const Projection& projection = projections[projectionIndex];
+                const ImageF& P = images[projectionIndex];
+                vec2 xy = (projection.projection * origin).xy() + imageCenter;
+                uint i = xy.x, j = xy.y;
+                float u = fract(xy.x), v = fract(xy.y);
+#if ZORDER2
+                FIXME
+#else
+                float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
+                        v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
+#endif
+                Atb += s;
+            }
+#else
     chunk_parallel(p.size(), [pData, rData, &residualSum, this](uint id, uint offset, uint size) {
         float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
         for(uint i: range(offset,offset+size)) {
-            float p = 0;
-            for(uint id: range(threadCount)) { p += P[id][i]; P[id][i]=0; } // Merges p and clears AtAp#
-            //p -= regularization(x, index); // = 0
-            pData[i] = p;
-            rData[i] = p;
-            residualSum[id] += sq(p);
+            float Atb = 0;
+            for(uint id: range(threadCount)) { Atb -= P[id][i]; /*- as we compute Ax - b instead of b - Ax (to factorize update for step)*/ P[id][i]=0; } // Merges p and clears AtAp#
+#endif
+            //Atb -= regularization(x, index); // = 0
+            pData[i] = Atb;
+            rData[i] = Atb;
+            residualSum[id] += sq(Atb);
         }
     }, threadCount);
     residualEnergy = sum(residualSum);
@@ -214,7 +241,23 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     totalTime.start();
+    Time time; time.start();
 
+#if APPROXIMATE
+    // Projects p
+    const CylinderVolume volume (p);
+    for(uint projectionIndex: range(projections.size)) {
+        const Projection& projection = projections[projectionIndex];
+        const ImageF& image = images[projectionIndex];
+        float* const imageData = image.data;
+#if ZORDER2
+        parallel(image.data.size, [&projection, &volume, imageData, this](uint, uint index) { v2hi p=zOrder2[index]; imageData[index] = update(projection, vec2(p[0], p[1]), volume); }, threadCount);
+#else
+        uint imageWidth = image.width;
+        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint, uint index) { vec2 p(index%imageWidth, index/imageWidth); imageData[index] = update(projection, p, volume); }, threadCount);
+#endif
+    }
+#else
     // Computes At A p (i.e projects and backprojects p)
     AtApTime.start();
     const CylinderVolume volume (p);
@@ -222,27 +265,53 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
 #if ZORDER2
-        parallel(image.data.size, [this, &volume, &projection](uint id, uint index) { update(projection, zOrder2[index], volume, 0, 0, AtAp[id], profiles[id]); }, threadCount);
+        parallel(image.data.size, [this, &volume, &projection](uint id, uint index) { v2hi p=zOrder2[index]; update(projection, vec2(p[0], p[1]), volume, 0, AtAp[id], profiles[id]); }, threadCount);
 #else
         uint imageWidth = image.width;
-        parallel(image.data.size, [this, &volume, &projection, imageWidth](uint id, uint index) { short2 p = short2(index%imageWidth, index/imageWidth); update(projection, (v2hi){p.x, p.y}, volume, 0, 0, AtAp[id], profiles[id]); }, threadCount);
+        parallel(image.data.size, [this, &volume, &projection, imageWidth](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, 0, AtAp[id], profiles[id]); }, threadCount);
 #endif
     }
     AtApTime.stop();
+#endif
 
     // Merges and clears AtAp and computes |p·Atp|
     mergeTime.start();
-    float* AtApData = AtAp[threadCount]; // threadCount+1 volumes, last one is used to merge
+    float* AtApData = AtAp[0]; // Merges into first volume
     float* pData = p;
     float pAtApSum[coreCount] = {};
+#if APPROXIMATE // Approximates trilinear backprojection with bilinear sample (reverse splat)
+    const vec3 center = vec3(p.sampleCount-int3(1))/2.f;
+    const float radiusSq = sq(center.x);
+    const vec2 imageCenter = vec2(images.first().size()-int2(1))/2.f;
+    chunk_parallel(p.size(), [&projections, &images, center, radiusSq, imageCenter, pData, AtApData, &pAtApSum, this](uint id, uint offset, uint size) {
+        for(uint i: range(offset,offset+size)) {
+            float AtAp = 0;
+#if ZORDER
+            const vec3 origin = vec3(zOrder3(i)) - center;
+#else
+            const vec3 origin = vec3(i%x.sampleCount.x, (i/x.sampleCount.x)%x.sampleCount.y, i/(x.sampleCount.x*x.sampleCount.y)) - center;
+#endif
+            if(sq(origin.xy()) > radiusSq) continue;
+            for(uint projectionIndex: range(projections.size)) {
+                const Projection& projection = projections[projectionIndex];
+                const ImageF& P = images[projectionIndex];
+                vec2 xy = (projection.projection * origin).xy() + imageCenter;
+                uint i = xy.x, j = xy.y;
+                float u = fract(xy.x), v = fract(xy.y);
+                float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
+                        v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
+                AtAp += s;
+            }
+#else
     chunk_parallel(p.size(), [pData, AtApData, &pAtApSum, this](uint id, uint offset, uint size) {
         float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
         for(uint i: range(offset,offset+size)) {
             float AtAp = 0;
+            for(uint id: range(threadCount)) { AtAp += P[id][i]; P[id][i]=0; } // Merges and clears AtAp#
+#endif
 #if REGULARIZATION
             AtAp += regularization(p, i);
 #endif
-            for(uint id: range(threadCount)) { AtAp += P[id][i]; P[id][i]=0; } // Merges and clears AtAp#
             AtApData[i] = AtAp;
             pAtApSum[id] += pData[i] * AtAp;
         }
@@ -257,10 +326,11 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     float* rData = r;
     float newResidualSum[coreCount] = {};
     chunk_parallel(p.size(), [alpha, pData, xData, AtApData, rData, &newResidualSum](uint id, uint offset, uint size) {
-        for(uint index: range(offset,offset+size)) {
-            xData[index] += alpha * pData[index];
-            rData[index] -= alpha * AtApData[index];
-            newResidualSum[id] += sq(rData[index]);
+        for(uint i: range(offset,offset+size)) {
+            xData[i] += alpha * pData[i];
+            rData[i] -= alpha * AtApData[i];
+            AtApData[i] = 0;
+            newResidualSum[id] += sq(rData[i]);
         }
     }, threadCount);
     float newResidual = sum(newResidualSum);
@@ -276,12 +346,13 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     }, threadCount);
     nextTime.stop();
 
+    time.stop();
     totalTime.stop();
     k++;
     //mergeTime/totalTime, updateTime/totalTime, nextTime/totalTime); //,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
     uint64 gatherTime=0, scatterTime=0, lookupTime=0, dataTime=0;
     for(const Profile& p: profiles) { gatherTime+=p.gatherTime; scatterTime+=p.scatterTime; lookupTime+=p.lookupTime; dataTime+=p.dataTime; }
-    log(k, str(totalTime.toFloat()/k)+"s"_, profile ? str("gather:", percent(gatherTime,AtApTime), "scatter:", percent(scatterTime,AtApTime), "(", percent(lookupTime,scatterTime), percent(dataTime,scatterTime),")") : ""_);
+    log(dec(k,2), time, str(totalTime.toFloat()/k)+"s"_, profile ? str("gather:", percent(gatherTime,AtApTime), "scatter:", percent(scatterTime,AtApTime), "(", percent(lookupTime,scatterTime), percent(dataTime,scatterTime),")") : ""_);
     residualEnergy = newResidual;
     return true;
 }
