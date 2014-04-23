@@ -160,6 +160,11 @@ template<> void __attribute((noreturn)) error(const string& message) {
     exit_thread(-1); // Exits this thread
 }
 
+template<> void __attribute((noreturn)) abort(const string& message) {
+    log(message);
+    exit_group(-1);
+}
+
 // Entry point
 int main() {
     if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
