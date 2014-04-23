@@ -3,8 +3,8 @@
 
 generic struct VolumeT;
 
-#define ZORDER 0
-#define ZORDER2 0
+#define ZORDER 1
+#define ZORDER2 1
 static constexpr uint threadCount = 8;
 
 struct Volume {
@@ -28,7 +28,7 @@ struct Volume {
     uint sampleSize=0; // Sample integer size (in bytes)
     int3 sampleCount = 0; // Sample counts (along each dimensions)
     buffer<byte> data; // Samples in Z-Order
-    /*static*/ buffer<int32> offsetX, offsetY, offsetZ; // Offset lookup tables for Z-ordered volumes (max 16GB) //FIXME: share
+    static buffer<int32> offsetX, offsetY, offsetZ; // Offset lookup tables for Z-ordered volumes (max 16GB) //FIXME: share
 };
 
 generic struct VolumeT : Volume {

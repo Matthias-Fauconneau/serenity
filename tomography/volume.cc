@@ -25,10 +25,10 @@ void interleavedLookup(Volume& target) {
     target.offsetX = buffer<int32>(target.sampleCount.x);
     for(uint x: range(target.sampleCount.x)) target.offsetX[x] = x;
     target.offsetY = buffer<int32>(target.sampleCount.y);
-    for(uint y: range(target.sampleCount.y)) target.offsetX[y] = y * target.sampleCount.x;
+    for(uint y: range(target.sampleCount.y)) target.offsetY[y] = y * target.sampleCount.x;
     target.offsetZ = buffer<int32>(target.sampleCount.z);
-    for(uint z: range(target.sampleCount.z)) target.offsetX[z] = z * target.sampleCount.y * target.sampleCount.x;
+    for(uint z: range(target.sampleCount.z)) target.offsetZ[z] = z * target.sampleCount.y * target.sampleCount.x;
 #endif
 }
 
-//buffer<int32> Volume::offsetX, Volume::offsetY, Volume::offsetZ;
+buffer<int32> Volume::offsetX, Volume::offsetY, Volume::offsetZ;

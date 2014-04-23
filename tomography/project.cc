@@ -46,6 +46,25 @@ struct CylinderVolume {
 struct Profile { tsc gatherTime, scatterTime, lookupTime, dataTime; } profiles[threadCount], discard;
 static constexpr bool profile = false;
 
+#define REGULARIZATION 0
+#if REGULARIZATION
+// Computes regularization: QtQ = lambda · ( I + alpha · CtC )
+static float regularization(const VolumeF& volume, const uint index) {
+    int3 p = int3(index%volume.sampleCount.x, (index/volume.sampleCount.x)%volume.sampleCount.z, index/(volume.sampleCount.x*volume.sampleCount.y)); //zOrder3(index);
+    assert_(index == uint(volume.offsetX[p.x]+volume.offsetY[p.y]+volume.offsetZ[p.z]), index, p);
+    float Ix = volume.data[index];
+    float CtCx = 0;
+    for(int z=-1; z<=1; z++) for(int y=-1; y<=1; y++) for(int x=-1; x<=1; x++) {
+        if(p+int3(x,y,z) >= int3(0) && p+int3(x,y,z) < volume.sampleCount) {
+            float Cx = Ix - volume.data[volume.offsetX[p.x+x]+volume.offsetY[p.y+y]+volume.offsetZ[p.z+z]];
+            CtCx += sq(Cx);
+        }
+    }
+    float QtQx = Ix + 1 * CtCx;
+    return QtQx;
+}
+#endif
+
 /// Integrates \a volume along ray defined by (\a projection, \a pixelPosition). if \a imageData and not \a targetData: stores result into image; if targetData: backprojects value; if imageData and targetData: backprojects difference
 /// \note Splitting intersect / projects / updates / backprojects triggers spurious uninitialized warnings when there is no intersection test, which suggests the compiler is not able to flatten the code.
 static inline float update(const Projection& projection, v2hi pixelPosition, const CylinderVolume& volume, float* imageData, const uint imageWidth, float* targetData=0, Profile& profiles=discard) {
@@ -95,6 +114,7 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
         // Gather samples
         //if(id>=0) dataTime[id].start();
         const v8sf cx01 = gather(volume.data, v01);
+        //gather(targetData, v01); // Prefetch
         //if(id>=0) dataTime[id].stop();
         // Computes trilinear interpolation coefficients
         const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
@@ -107,7 +127,9 @@ static inline float update(const Projection& projection, v2hi pixelPosition, con
     if(profile) profiles.gatherTime.stop();
     /// Updates
     if(!targetData) { imageData[pixelPosition[1]*imageWidth+pixelPosition[0]]=Ax; return Ax; }
-    float value = imageData ? imageData[pixelPosition[1]*imageWidth+pixelPosition[0]] - Ax : Ax;
+    float value =
+            imageData ? imageData[pixelPosition[1]*imageWidth+pixelPosition[0]] - Ax  //- regularization(x, index); // = 0
+            : Ax;
     /// Backprojects
     if(profile) profiles.scatterTime.start();
     v8sf value8 = float8(value);
@@ -217,6 +239,9 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
         for(uint i: range(offset,offset+size)) {
             float AtAp = 0;
+#if REGULARIZATION
+            AtAp += regularization(p, i);
+#endif
             for(uint id: range(threadCount)) { AtAp += P[id][i]; P[id][i]=0; } // Merges and clears AtAp#
             AtApData[i] = AtAp;
             pAtApSum[id] += pData[i] * AtAp;

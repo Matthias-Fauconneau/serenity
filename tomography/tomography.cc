@@ -49,7 +49,10 @@ struct Tomography {
 #if WINDOW
     Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
 #endif
+    //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"ondemand"_); }
     Tomography() {
+        //execute("/bin/sh"_, /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"performance"_);
+
         // Projects phantom
         for(uint i: range(projections.size)) {
             mat4 projection = mat4().rotateX(-PI/2 /*Pitch*/).rotateZ(2*PI*i/N /*Yaw*/);
@@ -67,7 +70,7 @@ struct Tomography {
         window.show();
         window.displayed = {this, &Tomography::step};
 #else
-        step();
+        for(uint unused i: range(2)) step();
 #endif
     }
 
@@ -75,11 +78,13 @@ struct Tomography {
         // Step forward the reconstruction which consumed the least time.
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         reconstructions[index]->step(projections, images);
-        /*if(window.target) { // Renders only the reconstruction which updated
+#if WINDOW
+        if(window.target) { // Renders only the reconstruction which updated
             Rect rect = views.layout(window.size)[index];
             assert_(window.target);
             views[index].render(clip(window.target, rect));
             window.putImage(rect);
-        }*/
+        }
+#endif
     }
 } tomography;
