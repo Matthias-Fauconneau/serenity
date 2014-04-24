@@ -39,7 +39,7 @@ struct Tomography {
     const uint N = 128;
     const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
-    VolumeF source = phantom.volume(N);
+    VolumeF target = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
     unique<Reconstruction> reconstructions[1] {unique<CGNR>(N)};

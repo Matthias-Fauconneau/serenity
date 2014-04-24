@@ -25,7 +25,6 @@ struct Projection {
         rcp_2a = float4(-1./(2*a));
         rayZ = float4(ray3.z);
         ray = (v4sf){ray3.x, ray3.y, ray3.z, 1};
-        ray8 = dup(ray);
 
 #if APPROXIMATE
         this->projection = projection;
@@ -35,7 +34,6 @@ struct Projection {
     // Precomputed parameters (11x4)
     v4sf origin, xAxis, yAxis;
     v4sf raySlopeZ, rayXYXY, _m4a_4_m4a_4, rcp_2a, rayZ, ray;
-    v8sf ray8;
 #if APPROXIMATE
     mat4 projection;
 #endif

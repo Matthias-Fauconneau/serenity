@@ -80,19 +80,16 @@ VolumeF Phantom::volume(int3 size) const {
         const v4sf vz = e.inverse[2] / vec3(float(size.z-1)/2);
 
         float* volumeData = (float*)volume.data.data;
-        const int32* const offsetX = volume.offsetX.data;
-        const int32* const offsetY = volume.offsetY.data;
-        const int32* const offsetZ = volume.offsetZ.data;
 
         for(int z: range(min.z, max.z)) {
             const v4sf pz = origin + float4(z) * vz;
-            float* volumeZ = volumeData + offsetZ[z];
+            float* volumeZ = volumeData + z * volume.sampleCount.y * volume.sampleCount.x;
             for(int y: range(min.y, max.y)) {
                 const v4sf pzy = pz + float4(y) * vy;
-                float* volumeZY = volumeZ + offsetY[y];
+                float* volumeZY = volumeZ + y * volume.sampleCount.x;
                 for(int x: range(min.x, max.x)) {
                     const v4sf pzyx = pzy + float4(x) * vx;
-                    if(mask(dot4(pzyx, pzyx) < _1f)) volumeZY[offsetX[x]] += e.value;
+                    if(mask(dot4(pzyx, pzyx) < _1f)) volumeZY[x] += e.value;
                 }
             }
         }

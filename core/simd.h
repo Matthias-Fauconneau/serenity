@@ -11,9 +11,12 @@
 // v2hi
 typedef short v2hi __attribute((__vector_size__ (4)));
 
+// v2sf
+typedef float v2sf __attribute((__vector_size__ (8)));
+
 // v4si
 typedef int v4si __attribute((__vector_size__ (16)));
-unused const v4si _1i = {1,1,1,1};
+unused static const v4si _1i = {1,1,1,1};
 inline (v4si) set1(int i) { return (v4si){i,i,i,i}; }
 inline (v4si) loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline (v4si) loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
@@ -21,7 +24,7 @@ inline (void) storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v8hi
 typedef short v8hi __attribute((__vector_size__ (16)));
-unused const v8hi _0h = {0,0,0,0};
+unused static const v8hi _0h = {0,0,0,0};
 inline (v8hi) short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
 inline (v8hi) loada(const uint16* const ptr) { return *(v8hi*)ptr; }
 inline (v8hi) loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_lddqu((byte*)ptr); }
@@ -41,8 +44,8 @@ inline (void) storeu(byte* const ptr, v16qi a) { __builtin_ia32_storedqu(ptr, a)
 typedef float v4sf __attribute((__vector_size__ (16)));
 inline (v4sf) constexpr float4(float f) { return (v4sf){f,f,f,f}; }
 inline (v4sf) constexpr float4(float a, float b, float c, float d) { return (v4sf){a,b,c,d}; }
-unused const v4sf _1f = float4( 1 );
-unused const v4sf _0f = float4( 0 );
+unused static const v4sf _1f = float4( 1 );
+unused static const v4sf _0f = float4( 0 );
 
 inline (v4sf) loada(const float* const ptr) { return *(v4sf*)ptr; }
 inline (v4sf) loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
@@ -79,11 +82,11 @@ inline (v4si) cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); } // Trunc
 inline (v4sf) cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
 typedef int v8si __attribute((__vector_size__ (32)));
-const v8si _00000000 = (v8si){0,0,0,0, 0,0,0,0};
-const v8si _1111111 = (v8si){~0ll,~0ll,~0ll,~0ll, ~0ll,~0ll,~0ll,~0ll};
+static const v8si _00000000 = (v8si){0,0,0,0, 0,0,0,0};
+static const v8si _1111111 = (v8si){~0ll,~0ll,~0ll,~0ll, ~0ll,~0ll,~0ll,~0ll};
 
 typedef float v8sf __attribute((__vector_size__ (32)));
-const v8sf _00000000f = (v8sf){0,0,0,0, 0,0,0,0};
+static const v8sf _00000000f = (v8sf){0,0,0,0, 0,0,0,0};
 
 #if __clang__
 inline (v8sf) gather(const float* base, v8si indices) { return __builtin_ia32_gatherd_ps256(_00000000f, (v8sf*)base, indices, _1111111, 4); }
@@ -114,11 +117,22 @@ inline (v8si) gather(const int* base, v8si indices, v8si mask) { return __builti
 
 inline (v4sf) low(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 0); }
 inline (v4sf) high(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 1); }
+inline (v8sf) merge(v4sf a, v4sf b)  { v8sf c = __builtin_shufflevector(a, a, 0, 1, 2, 3, -1, -1, -1, -1); __builtin_ia32_vinsertf128_ps256(c, b, 1); return c; }
 //v4sf low(v8sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3); }
 //v4sf high(v8sf a) { return __builtin_shufflevector(a, a, 4, 5, 6, 7); }
 inline (v8si) cvttps2dq(v8sf a) { return __builtin_ia32_cvttps2dq256(a); } // Truncates
 inline (v8sf) cvtdq2ps(v8si a) { return __builtin_ia32_cvtdq2ps256(a); }
-inline (float) dot8(v8sf a,  v8sf b) {
+inline (v4sf) dot8(v8sf a,  v8sf b) {
      v8sf dot4 = __builtin_ia32_dpps256(a, b, 0xFF);
-      return (low(dot4)+high(dot4))[0];
+      return low(dot4)+high(dot4);
  }
+
+typedef double v4df __attribute((__vector_size__ (32)));
+static const v4df _0000f = (v4df){0,0,0,0};
+static const v4si _1111 = (v4si){~0ll,~0ll,~0ll,~0ll};
+
+#if __clang__
+inline (v8sf) gather2(const float* base, v4si indices) { return __builtin_ia32_gatherd_pd256(_0000f, (v4df*)base, indices, _1111111, 4); }
+#else
+inline (v8sf) gather2(const float* base, v4si indices) { return __builtin_ia32_gathersiv4sd(_0000f, base, indices, (v4df)_1111111, 4); }
+#endif

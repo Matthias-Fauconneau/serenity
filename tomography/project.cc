@@ -8,25 +8,17 @@ static const v4sf mfloatMax = float4(-FLT_MAX);
 static const v4sf floatMax = float4(FLT_MAX);
 static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
-static const v8sf _00001111f = (v8sf){0,0,0,0,1,1,1,1};
-#if ZORDER
-static const v8si _11101110 = (v8si){~0ll,~0ll,~0ll,0ll, ~0ll,~0ll,~0ll,0ll};
-#endif
 
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
-        assert_(volume.tiled() && volume.sampleCount.x == volume.sampleCount.y, volume.tiled(), volume.sampleCount);
+        assert(volume.sampleCount.x == volume.sampleCount.y);
         const float radius = (volume.sampleCount.x-1)/2, halfHeight = (volume.sampleCount.z-1)/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
         capZ = (v4sf){halfHeight, halfHeight, -halfHeight, -halfHeight};
         radiusR0R0 = (v4sf){radius*radius, 0, radius*radius, 0};
         radiusSqHeight = (v4sf){radius*radius, radius*radius, halfHeight, halfHeight};
-#if ZORDER
-        dataOrigin = dup(float4(float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2 + (volume.offsetY.data-volume.offsetX.data), float(volume.sampleCount.z-1)/2 + (volume.offsetZ.data-volume.offsetX.data), 0)) + float8(0,0,0,0,1,1,1,0);
-        zOrder = volume.offsetX.data;
-#else
-        dataOrigin = dup(float4(float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1)/2, 0)) + float8(0,0,0,0,1,1,1,0);
-        stride = (v8si){1,volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y,0, 1,volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y,0};
-#endif
+        dataOrigin = float4(float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1)/2, 0);
+        stride = (v4si){1, volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y, 0};
+        offset = (v4si){volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y,volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y};
         data = volume;
     }
 
@@ -34,40 +26,15 @@ struct CylinderVolume {
     v4sf capZ;
     v4sf radiusR0R0;
     v4sf radiusSqHeight;
-    v8sf dataOrigin;
-#if ZORDER
-    const int32* zOrder;
-#else
-    v8si stride;
-#endif
+    v4sf dataOrigin;
+    v4si stride;
+    v4si offset;
     float* data;
 };
 
-struct Profile { tsc gatherTime, scatterTime, lookupTime, dataTime; } profiles[threadCount], discard;
-static constexpr bool profile = false;
-
-#define REGULARIZATION 0
-#if REGULARIZATION
-// Computes regularization: QtQ = lambda · ( I + alpha · CtC )
-static float regularization(const VolumeF& volume, const uint index) {
-    int3 p = int3(index%volume.sampleCount.x, (index/volume.sampleCount.x)%volume.sampleCount.y, index/(volume.sampleCount.x*volume.sampleCount.y)); //zOrder3(index);
-    assert_(index == uint(volume.offsetX[p.x]+volume.offsetY[p.y]+volume.offsetZ[p.z]), index, p);
-    float Ix = volume.data[index];
-    float CtCx = 0;
-    for(int z=-1; z<=1; z++) for(int y=-1; y<=1; y++) for(int x=-1; x<=1; x++) {
-        if(p+int3(x,y,z) >= int3(0) && p+int3(x,y,z) < volume.sampleCount) {
-            float Cx = Ix - volume.data[volume.offsetX[p.x+x]+volume.offsetY[p.y+y]+volume.offsetZ[p.z+z]];
-            CtCx += sq(Cx);
-        }
-    }
-    float QtQx = Ix + 1 * CtCx;
-    return QtQx;
-}
-#endif
-
 /// Integrates \a volume along ray defined by (\a projection, \a pixelPosition). if \a imageData and not \a targetData: stores result into image; if targetData: backprojects value; if imageData and targetData: backprojects difference
 /// \note Splitting intersect / projects / updates / backprojects triggers spurious uninitialized warnings when there is no intersection test, which suggests the compiler is not able to flatten the code.
-static inline float update(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, float b=0, float* targetData=0, Profile& profiles=discard) {
+static inline float update(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, float b=0, float* targetData=0) {
     /// Intersects
     v4sf origin = projection.origin + float4(pixelPosition.x) * projection.xAxis + float4(pixelPosition.y) * projection.yAxis;
     // Intersects cap disks
@@ -92,72 +59,44 @@ static inline float update(const Projection& projection, vec2 pixelPosition, con
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-    origin += tmin * projection.ray;
-    v8sf pStart = volume.dataOrigin + dup(origin);
+    v4sf pStart = volume.dataOrigin + origin + tmin * projection.ray;
     v4sf tEnd = max(floatMMMm, tmax); // max, max, max, tmax
     /// Projects
-    if(profile) profiles.gatherTime.start();
-    float Ax = 0; // Accumulates along the ray
-    for(v8sf p01f = pStart;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
-        // Converts {position, position+1} to integer coordinates
-        const v8si p01 = cvttps2dq(p01f);
-        if(profile) profiles.lookupTime.start();
-#if ZORDER
-        // Lookups sample offsets
-        const v8si offsetXYZXYZ = gather(volume.zOrder, p01, _11101110);
-#else
-        const v8si offsetXYZXYZ = p01 * volume.stride;
-#endif
-        if(profile) profiles.lookupTime.stop();
-
-        const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
-        // Gather samples
-        //if(id>=0) dataTime[id].start();
-        const v8sf cx01 = gather(volume.data, v01);
-        //gather(targetData, v01); // Prefetch
-        //if(id>=0) dataTime[id].stop();
-        // Computes trilinear interpolation coefficients
-        const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
+    // TODO: check code
+    v4sf accumulator = _0f; // Accumulates along the ray
+    for(v4sf p01f = pStart, step=projection.ray;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
+        const v4si p01 = cvttps2dq(p01f); // Converts position to integer coordinates
+        const v4si index = dot4(p01, volume.stride); // to voxel index
+        const v4si v01 = index + volume.offset; // to 4 voxel indices
+        const v8sf x01 = gather2(volume.data, v01); // Gather samples
+        const v4sf fract = p01f - cvtdq2ps(p01);
+        const v8sf w_1mw = merge(fract, _1f-fract); // Computes trilinear interpolation coefficients
         const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
-        const float value = dot8(w01, cx01);
-        Ax += value; // Accumulates trilinearly interpolated sample
-        p01f += projection.ray8; // Step
-        if(mask(low(p01f) > tEnd)) break;
+        accumulator += dot8(w01, x01); // Accumulates trilinearly interpolated sample
+        p01f += step; // Step
+        if(mask(p01f > tEnd)) break;
     }
-    if(profile) profiles.gatherTime.stop();
+    float Ax = accumulator[0];
     if(!targetData) return Ax; // Projection only
     Ax -= b;  //+ regularization(x, index); // = 0
     /// Backprojects
-    if(profile) profiles.scatterTime.start();
     v8sf value8 = float8(Ax);
-    for(v8sf p01f = pStart;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
-        // Converts {position, position+1} to integer coordinates
-        const v8si p01 = cvttps2dq(p01f);
-        if(profile) profiles.lookupTime.start();
-#if ZORDER
-        // Lookups sample offsets
-        const v8si offsetXYZXYZ = gather(volume.zOrder, p01, _11101110);
-#else
-        const v8si offsetXYZXYZ = p01 * volume.stride;
-#endif
-        if(profile) profiles.lookupTime.stop();
-        const v8si v01 = shuffle8(offsetXYZXYZ,offsetXYZXYZ, 0,0,0,0, 4,4,4,4) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 1,1, 5,5, 1,1, 5,5) + shuffle8(offsetXYZXYZ,offsetXYZXYZ, 2,6, 2,6, 2,6, 2,6);
-        // Gather samples
-        if(profile) profiles.dataTime.start();
-        v8sf cx01 = gather(targetData, v01);
-        if(profile) profiles.dataTime.stop();
-        // Computes trilinear interpolation coefficients
-        const v8sf w_1mw = abs(p01f - cvtdq2ps(p01) - _00001111f); // fract(x), 1-fract(x)
+    for(v4sf p01f = pStart, step=projection.ray;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
+        const v4si p01 = cvttps2dq(p01f); // Converts position to integer coordinates
+        const v4si index = dot4(p01, volume.stride); // to voxel index
+        const v4si v01 = index + volume.offset; // to 4 voxel indices
+        const v8sf x01 = gather2(volume.data, v01); // Gather samples
+        const v4sf fract = p01f - cvtdq2ps(p01);
+        const v8sf w_1mw = merge(fract, _1f-fract); // Computes trilinear interpolation coefficients
         const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
-        // Update
-        cx01 += w01 * value8;
-        // Scatter ~ scatter(data, v01, cx01);
-        targetData[v01[0]] = cx01[0]; targetData[v01[1]] = cx01[1]; targetData[v01[2]] = cx01[2]; targetData[v01[3]] = cx01[3];
-        targetData[v01[4]] = cx01[4]; targetData[v01[5]] = cx01[5]; targetData[v01[6]] = cx01[6]; targetData[v01[7]] = cx01[7];
-        p01f += projection.ray8; // Step
-        if(mask(low(p01f) > tEnd)) break;
+        const v8sf y01 = x01 + w01 * value8;
+        (v2sf&)(targetData[v01[0]]) = __builtin_shufflevector(y01, y01, 0, 1);
+        (v2sf&)(targetData[v01[1]]) = __builtin_shufflevector(y01, y01, 2, 3);
+        (v2sf&)(targetData[v01[2]]) = __builtin_shufflevector(y01, y01, 4, 5);
+        (v2sf&)(targetData[v01[3]]) = __builtin_shufflevector(y01, y01, 6, 7);
+        p01f += step;
+        if(mask(p01f > tEnd)) break;
     }
-    if(profile) profiles.scatterTime.stop();
     return Ax;
 }
 
@@ -166,16 +105,11 @@ void project(const ImageF& image, const VolumeF& source, const Projection& proje
     const CylinderVolume volume(source);
     float* const imageData = image.data;
     uint imageWidth = image.width;
-    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { uint x=index%imageWidth, y=index/imageWidth; imageData[y*imageWidth+x] = update(projection, vec2(x, y), volume); }, threadCount);
+    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { uint x=index%imageWidth, y=index/imageWidth; imageData[y*imageWidth+x] = update(projection, vec2(x, y), volume); }, coreCount);
 }
 
 /// Computes residual r = p = At ( b - A x )
 void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
-#if ZORDER2
-    int2 imageSize = images.first().size();
-    zOrder2 = buffer<v2hi>(imageSize.y * imageSize.x); // Large lookup table (~512K) but read sequentially (stream read, skip cache)
-    for(uint index: range(zOrder2.size)) { short2 p = short2(::zOrder2(index)); zOrder2[index] = (v2hi){p.x, p.y}; } // Generates lookup table (assumes square POT images)
-#endif
 #if !APPROXIMATE
     const CylinderVolume volume (x);
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
@@ -183,12 +117,7 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
         const ImageF& image = images[projectionIndex];
         float* const imageData = image.data;
         uint imageWidth = image.width;
-        // TODO: Schedule non-intersecting rays to avoid duplicating target volume for coherent scatter without atomics
-#if ZORDER2
-        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { v2hi p = zOrder2[index]; update(projection, vec2(p[0], p[1]), volume, imageData[uint(p[1])*imageWidth+uint(p[0])], AtAp[id]); }, threadCount);
-#else
-        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, imageData[y*imageWidth+x], AtAp[id]); }, threadCount);
-#endif
+        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, imageData[y*imageWidth+x], AtAp[id]); }, coreCount);
     }
 #endif
     // Merges r=p=sum(p#) and computes |r|
@@ -201,11 +130,7 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
     const vec2 imageCenter = vec2(images.first().size()-int2(1))/2.f;
     chunk_parallel(p.size(), [&projections, &images, center, radiusSq, imageCenter, pData, rData, &residualSum, this](uint id, uint offset, uint size) {
         for(uint i: range(offset,offset+size)) {
-#if ZORDER
-            const vec3 origin = vec3(zOrder3(i)) - center;
-#else
             const vec3 origin = vec3(i%x.sampleCount.x, (i/x.sampleCount.x)%x.sampleCount.y, i/(x.sampleCount.x*x.sampleCount.y)) - center;
-#endif
             if(sq(origin.xy()) > radiusSq) continue;
             float Atb = 0;
             for(uint projectionIndex: range(projections.size)) {
@@ -214,29 +139,45 @@ void CGNR::initialize(const ref<Projection>& projections, const ref<ImageF>& ima
                 vec2 xy = (projection.projection * origin).xy() + imageCenter;
                 uint i = xy.x, j = xy.y;
                 float u = fract(xy.x), v = fract(xy.y);
-#if ZORDER2
-                FIXME
-#else
                 float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
                         v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
-#endif
                 Atb += s;
             }
 #else
     chunk_parallel(p.size(), [pData, rData, &residualSum, this](uint id, uint offset, uint size) {
-        float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
+        float* P[coreCount]; for(uint id: range(coreCount)) P[id] = AtAp[id];
         for(uint i: range(offset,offset+size)) {
             float Atb = 0;
-            for(uint id: range(threadCount)) { Atb -= P[id][i]; /*- as we compute Ax - b instead of b - Ax (to factorize update for step)*/ P[id][i]=0; } // Merges p and clears AtAp#
+            for(uint id: range(coreCount)) { Atb -= P[id][i]; /*- as we compute Ax - b instead of b - Ax (to factorize update for step)*/ P[id][i]=0; } // Merges p and clears AtAp#
 #endif
             //Atb -= regularization(x, index); // = 0
             pData[i] = Atb;
             rData[i] = Atb;
             residualSum[id] += sq(Atb);
         }
-    }, threadCount);
+    }, coreCount);
     residualEnergy = sum(residualSum);
 }
+
+
+#define REGULARIZATION 0
+#if REGULARIZATION
+// Computes regularization: QtQ = lambda · ( I + alpha · CtC )
+static float regularization(const VolumeF& volume, const uint index) {
+    int3 p = int3(index%volume.sampleCount.x, (index/volume.sampleCount.x)%volume.sampleCount.y, index/(volume.sampleCount.x*volume.sampleCount.y));
+    assert_(index == uint(volume.offsetX[p.x]+volume.offsetY[p.y]+volume.offsetZ[p.z]), index, p);
+    float Ix = volume.data[index];
+    float CtCx = 0;
+    for(int z=-1; z<=1; z++) for(int y=-1; y<=1; y++) for(int x=-1; x<=1; x++) {
+        if(p+int3(x,y,z) >= int3(0) && p+int3(x,y,z) < volume.sampleCount) {
+            float Cx = Ix - volume.data[volume.offsetX[p.x+x]+volume.offsetY[p.y+y]+volume.offsetZ[p.z+z]];
+            CtCx += sq(Cx);
+        }
+    }
+    float QtQx = Ix + 1 * CtCx;
+    return QtQx;
+}
+#endif
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
@@ -250,12 +191,8 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
         float* const imageData = image.data;
-#if ZORDER2
-        parallel(image.data.size, [&projection, &volume, imageData, this](uint, uint index) { v2hi p=zOrder2[index]; imageData[index] = update(projection, vec2(p[0], p[1]), volume); }, threadCount);
-#else
         uint imageWidth = image.width;
-        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint, uint index) { vec2 p(index%imageWidth, index/imageWidth); imageData[index] = update(projection, p, volume); }, threadCount);
-#endif
+        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint, uint index) { vec2 p(index%imageWidth, index/imageWidth); imageData[index] = update(projection, p, volume); }, coreCount);
     }
 #else
     // Computes At A p (i.e projects and backprojects p)
@@ -264,12 +201,8 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-#if ZORDER2
-        parallel(image.data.size, [this, &volume, &projection](uint id, uint index) { v2hi p=zOrder2[index]; update(projection, vec2(p[0], p[1]), volume, 0, AtAp[id], profiles[id]); }, threadCount);
-#else
         uint imageWidth = image.width;
-        parallel(image.data.size, [this, &volume, &projection, imageWidth](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, 0, AtAp[id], profiles[id]); }, threadCount);
-#endif
+        parallel(image.data.size, [this, &volume, &projection, imageWidth](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, 0, AtAp[id], profiles[id]); }, coreCount);
     }
     AtApTime.stop();
 #endif
@@ -286,11 +219,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     chunk_parallel(p.size(), [&projections, &images, center, radiusSq, imageCenter, pData, AtApData, &pAtApSum, this](uint id, uint offset, uint size) {
         for(uint i: range(offset,offset+size)) {
             float AtAp = 0;
-#if ZORDER
-            const vec3 origin = vec3(zOrder3(i)) - center;
-#else
             const vec3 origin = vec3(i%x.sampleCount.x, (i/x.sampleCount.x)%x.sampleCount.y, i/(x.sampleCount.x*x.sampleCount.y)) - center;
-#endif
             if(sq(origin.xy()) > radiusSq) continue;
             for(uint projectionIndex: range(projections.size)) {
                 const Projection& projection = projections[projectionIndex];
@@ -304,10 +233,10 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             }
 #else
     chunk_parallel(p.size(), [pData, AtApData, &pAtApSum, this](uint id, uint offset, uint size) {
-        float* P[threadCount]; for(uint id: range(threadCount)) P[id] = AtAp[id];
+        float* P[coreCount]; for(uint id: range(coreCount)) P[id] = AtAp[id];
         for(uint i: range(offset,offset+size)) {
             float AtAp = 0;
-            for(uint id: range(threadCount)) { AtAp += P[id][i]; P[id][i]=0; } // Merges and clears AtAp#
+            for(uint id: range(coreCount)) { AtAp += P[id][i]; P[id][i]=0; } // Merges and clears AtAp#
 #endif
 #if REGULARIZATION
             AtAp += regularization(p, i);
@@ -315,7 +244,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             AtApData[i] = AtAp;
             pAtApSum[id] += pData[i] * AtAp;
         }
-    }, threadCount);
+    }, coreCount);
     float pAtAp = sum(pAtApSum);
     mergeTime.stop();
 
@@ -332,7 +261,7 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
             AtApData[i] = 0;
             newResidualSum[id] += sq(rData[i]);
         }
-    }, threadCount);
+    }, coreCount);
     float newResidual = sum(newResidualSum);
     float beta = newResidual / residualEnergy;
     updateTime.stop();
@@ -343,16 +272,13 @@ bool CGNR::step(const ref<Projection>& projections, const ref<ImageF>& images) {
         for(uint index: range(offset,offset+size)) {
             pData[index] = rData[index] + beta * pData[index];
         }
-    }, threadCount);
+    }, coreCount);
     nextTime.stop();
 
     time.stop();
     totalTime.stop();
     k++;
-    //mergeTime/totalTime, updateTime/totalTime, nextTime/totalTime); //,'\t',residualEnergy,'\\',newResidual,'=',beta, time);
-    uint64 gatherTime=0, scatterTime=0, lookupTime=0, dataTime=0;
-    for(const Profile& p: profiles) { gatherTime+=p.gatherTime; scatterTime+=p.scatterTime; lookupTime+=p.lookupTime; dataTime+=p.dataTime; }
-    log(dec(k,2), time, str(totalTime.toFloat()/k)+"s"_, profile ? str("gather:", percent(gatherTime,AtApTime), "scatter:", percent(scatterTime,AtApTime), "(", percent(lookupTime,scatterTime), percent(dataTime,scatterTime),")") : ""_);
+    log(dec(k,2), time, str(totalTime.toFloat()/k)+"s"_);
     residualEnergy = newResidual;
     return true;
 }
