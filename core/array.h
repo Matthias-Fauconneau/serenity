@@ -64,8 +64,8 @@ generic struct array : buffer<T> {
         new (&at(index)) T(move(e));
         return at(index);
     }
-    /// Inserts immediately before the first element greater than or equal to the argument
-    template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) < e) i++; insertAt(i,move(e)); return i; }
+    /// Inserts immediately before the first element greater than the argument
+    template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i,move(e)); return i; }
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy(raw(at(i)), raw(at(i+1))); size--; }

@@ -8,7 +8,15 @@ bool operator <(const string& a, const string& b) {
         if(a[i] < b[i]) return true;
         if(a[i] > b[i]) return false;
     }
-    return a.size > b.size;
+    return a.size < b.size;
+}
+
+bool operator <=(const string& a, const string& b) {
+    for(uint i: range(min(a.size,b.size))) {
+        if(a[i] < b[i]) return true;
+        if(a[i] > b[i]) return false;
+    }
+    return a.size <= b.size;
 }
 
 uint count(const string& a, byte c) {

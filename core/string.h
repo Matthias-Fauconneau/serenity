@@ -7,6 +7,7 @@ generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(c
 
 /// Lexically compare strings
 bool operator <(const string& a, const string& b);
+bool operator <=(const string& a, const string& b);
 
 /// Counts number of occurence of a character in a String
 uint count(const string& a, byte c);

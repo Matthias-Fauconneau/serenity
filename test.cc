@@ -4,61 +4,64 @@
 #include "font.h"
 #include "utf8.h"
 
+enum ClefSign { Bass, Treble };
+enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
+enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
+enum Loudness { ppp, pp, p, mp, mf, f, ff, fff };
+
+struct Note {
+    int step; // 0 = C4
+    Accidental accidental;
+    Duration duration;
+    bool dot;
+    bool grace;
+};
+struct Rest {
+    Duration duration;
+};
+struct Dynamic {
+    Loudness loudness;
+};
+struct Clef {
+    ClefSign clefSign;
+    int octave;
+};
+struct KeySignature {
+    int fifths; // Index on the fifths circle
+};
+struct TimeSignature {
+    uint beats, beatUnit;
+};
+struct Metronome {
+    Duration beatUnit;
+    uint perMinute;
+};
+
+struct Sign {
+    uint time; // Absolute time offset
+    uint duration;
+    uint staff; // Staff index
+    enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome } type;
+    union {
+        struct Note note;
+        struct Rest rest;
+        struct Clef clef;
+        struct KeySignature keySignature;
+        struct TimeSignature timeSignature;
+        struct Metronome metronome;
+        struct Dynamic dynamic;
+    };
+};
+bool operator <=(const Sign& a, const Sign& b) { return a.time <= b.time; }
+
 struct MusicXML : Widget {
-    enum ClefSign { Bass, Treble };
-    enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
-    enum Duration { Invalid=-1, Whole, Half, Quarter, Eighth, Sixteenth };
-    enum Loudness { ppp, pp, p, mp, mf, f, ff, fff };
 
-    struct Note {
-        int step; // 0 = C4
-        Accidental accidental;
-        Duration duration;
-        bool dot;
-        bool grace;
-    };
-    struct Rest {
-        Duration duration;
-    };
-    struct Dynamic {
-        Loudness loudness;
-    };
-    struct Clef {
-        ClefSign clefSign;
-        int octave;
-    };
-    struct KeySignature {
-        int fifths; // Index on the fifths circle
-    };
-    struct TimeSignature {
-        uint beats, beatUnit;
-    };
-    struct Metronome {
-        Duration beatUnit;
-        uint perMinute;
-    };
-
-    struct Sign {
-        uint time; // Absolute time offset
-        uint duration;
-        uint staff; // Staff index
-        enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome } type;
-        union {
-            struct Note note;
-            struct Rest rest;
-            struct Clef clef;
-            struct KeySignature keySignature;
-            struct TimeSignature timeSignature;
-            struct Metronome metronome;
-            struct Dynamic dynamic;
-        };
-    };
 
     uint divisions = 256;
     array<Sign> signs;
     map<uint, vec3> colors;
 
-    Window window {this, int2(1280, 384), "MusicXML"_};
+    Window window {this, int2(0, 384), "MusicXML"_};
     MusicXML() {
         Element root = parseXML(readFile("Storytime.xml"_, Folder("Scores"_,home())));
         map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0}; uint time = 0, nextTime = 0;
@@ -80,7 +83,8 @@ struct MusicXML : Widget {
                         int step = (octave-4) * 7 + octaveStep;
                         Accidental accidental = Accidental(ref<string>{""_,"flat"_,"sharp"_,"natural"_}.indexOf(e("accidental"_).text()));
                         //signs << Sign{time, staff, Sign::Note, .note={pitch, accidental, type, e("grace"_)?true:false}};
-                        {Sign sign{time, duration, staff, Sign::Note, {}}; sign.note={step, accidental, type, false /*dot*/, e("grace"_)?true:false}; signs << sign;};
+                        {Sign sign{time, duration, staff, Sign::Note, {}}; sign.note={step, accidental, type, false /*dot*/, e("grace"_)?true:false};
+                            signs.insertSorted(sign);};
                     }
                     nextTime = time+duration;
                 }
@@ -119,7 +123,7 @@ struct MusicXML : Widget {
                     });
                     if(e("key"_)) {
                         keySignature.fifths = fromInteger(e("key"_)("fifths"_).text());
-                        {Sign sign{time, 0, 0, Sign::KeySignature, {}}; sign.keySignature=keySignature; signs << sign;}
+                        {Sign sign{time, 0, 0, Sign::KeySignature, {}}; sign.keySignature=keySignature; signs.insertSorted(sign); }
                     }
                     if(e("time"_)) {
                         timeSignature = {uint(fromInteger(e("time"_)("beats"_).text())), uint(fromInteger(e("time"_)("beat-type"_).text()))};
@@ -131,7 +135,8 @@ struct MusicXML : Widget {
                 else error(e);
             }
             time=nextTime;
-            signs << Sign{time, 0, 0, Sign::Measure, {}};
+            signs.insertSorted(Sign{time, 0, 0, Sign::Measure, {}});
+            signs.insertSorted(Sign{time, 0, 1, Sign::Measure, {}});
         });
         window.background = Window::White;
         window.actions[Escape] = []{exit();};
@@ -179,7 +184,7 @@ struct MusicXML : Widget {
         fill(target, Rect(int2(x-1, y0+staffMargin), int2(x+1, y0+staffMargin+staffHeight+4*lineInterval))); // System
 
         map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
-        array<Sign> eighths;
+        array<Sign> staffEighths[2];
         struct Position { // Holds positions for both notes (default) and directions (explicit)
             uint direction, note;
             Position(uint x) : direction(x), note(x) {}
@@ -189,12 +194,13 @@ struct MusicXML : Widget {
         map<uint, Position> timeTrack; // Maps times to positions
         uint noteIndex = 0;
         for(Sign sign: signs) {
+            array<Sign>& eighths = staffEighths[sign.staff];
             if(eighths && (
                         sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 ||
                         (sign.time%divisions == 0 && eighths.size==1) ||
                         sign.type != Sign::Note ||
-                        sign.note.duration<Eighth ||
-                        sign.staff != eighths.last().staff)) {
+                        sign.note.duration<Eighth /*||
+                                  sign.staff != eighths.last().staff*/)) {
                 bool tailUp = false;
                 if(eighths.size==1) { // Draws single tail
                     Sign sign = eighths.last();
@@ -232,7 +238,7 @@ struct MusicXML : Widget {
             else timeTrack.insert(sign.time, x); // Marks position for future signs
 
             /**/ if(sign.type == Sign::Note) {
-                int step = clefStep(clefs[staff].clefSign, sign.note.step);
+                int step = clefStep(clefs.at(staff).clefSign, sign.note.step);
                 for(int s=2; s<=step; s+=2) { int y=y0+staffY(staff, s); ::fill(target, int2(x-noteSize.x/6,y-1)+Rect(int2(noteSize.x,2))); }
                 for(int s=-10; s>=step; s-=2) { int y=y0+staffY(staff, s); ::fill(target, int2(x-noteSize.x/6,y-1)+Rect(int2(noteSize.x,2))); }
                 int2 p = int2(x, y0+Y(clefs, staff, sign.note.step));
@@ -259,8 +265,10 @@ struct MusicXML : Widget {
                 else error(int(sign.rest.duration));
             }
             else if(sign.type == Sign::Measure) {
-                fill(target, Rect(int2(x-1, y0+staffY(0,0)),int2(x+1, y0+staffY(1,-8))));
-                x += noteSize.x;
+                if(sign.staff==0) {
+                    fill(target, Rect(int2(x-1, y0+staffY(0,0)),int2(x+1, y0+staffY(1,-8))));
+                    x += noteSize.x;
+                }
             }
             else if(sign.type == Sign::Dynamic) {
                 string word = ref<string>{"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_}[uint(sign.dynamic.loudness)];
@@ -272,14 +280,17 @@ struct MusicXML : Widget {
                 }
             } else if(sign.type == Sign::Clef) {
                 string change = clefs.contains(sign.staff)?"_change"_:""_;
-                Clef clef = clefs[sign.staff] = sign.clef;
+                Clef clef = sign.clef;
                 assert_(!clef.octave);
-                x += noteSize.x/2;
-                if(clef.clefSign==Treble) x += glyph(target, int2(x, y0+Y(clefs,staff,4)), "clefs.G"_+change);
-                if(clef.clefSign==Bass) x += glyph(target, int2(x, y0+Y(clefs,staff,-4)),"clefs.F"_+change);
-                x += noteSize.x/2;
-                if(staff==0) x=timeTrack.at(sign.time);
-                timeTrack.at(sign.time).direction = x;
+                if(!clefs.contains(sign.staff) || clefs.at(sign.staff).clefSign != sign.clef.clefSign) {
+                    clefs[sign.staff] = sign.clef;
+                    x += noteSize.x/2;
+                    if(clef.clefSign==Treble) x += glyph(target, int2(x, y0+Y(clefs,staff,4)), "clefs.G"_+change);
+                    if(clef.clefSign==Bass) x += glyph(target, int2(x, y0+Y(clefs,staff,-4)),"clefs.F"_+change);
+                    x += noteSize.x/2;
+                    if(staff==0) x=timeTrack.at(sign.time);
+                    timeTrack.at(sign.time).direction = x;
+                }
             }
             else if(sign.type==Sign::KeySignature) {
                 keySignature = sign.keySignature;
