@@ -37,7 +37,7 @@ uint16 Font::index(const string& name) {
     if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
     assert(index,name); return index;
 }
-uint16 Font::index(uint16 code) {
+uint16 Font::index(uint code) {
     for(int i=0;i<face->num_charmaps;i++) {
         FT_Set_Charmap(face, face->charmaps[i] );
         uint index = FT_Get_Char_Index(face, code);

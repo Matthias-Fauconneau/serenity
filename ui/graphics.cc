@@ -133,11 +133,17 @@ void line(const Image& target, float x1, float y1, float x2, float y2, vec3 colo
 }
 
 void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color, float alpha) {
+    assert_(p0.x < p1.x);
     for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
-        int y0 = p0.y + (p1.y - p0.y) * ( x - p0.x ) / (p1.x - p0.x); // FIXME: step
-        for(uint y: range(max(0,y0), min(int(target.height),y0+dy))) { // FIXME: clip once
+        float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
+        float f0 = floor(y0);
+        float coverage = (y0-f0);
+        int i0 = int(f0);
+        if(uint(i0)<target.height) blend(target, x, i0, color, alpha*(1-coverage));
+        for(uint y: range(max(0,i0+1), min(int(target.height),i0+1+dy-1))) { // FIXME: clip once
             blend(target, x,y, color, alpha); // FIXME: antialias
         }
+        if(uint(i0)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
     }
     //TODO: optimize solid fill
     //int3 linear = int3(round(float(0xFFF)*color));

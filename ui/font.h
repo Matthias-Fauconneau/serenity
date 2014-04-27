@@ -30,7 +30,7 @@ struct Font {
     /// Returns font glyph index for glyph \a name
     uint16 index(const string& name);
     /// Returns font glyph index for Unicode codepoint \a code
-    uint16 index(uint16 code);
+    uint16 index(uint code);
     /// Returns hinted advance for \a index
     float advance(uint16 index);
     /// Returns unhinted advance for \a index
