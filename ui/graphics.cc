@@ -131,3 +131,15 @@ void line(const Image& target, float x1, float y1, float x2, float y2, vec3 colo
         intery += gradient;
     }
 }
+
+void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color, float alpha) {
+    for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
+        int y0 = p0.y + (p1.y - p0.y) * ( x - p0.x ) / (p1.x - p0.x); // FIXME: step
+        for(uint y: range(max(0,y0), min(int(target.height),y0+dy))) { // FIXME: clip once
+            blend(target, x,y, color, alpha); // FIXME: antialias
+        }
+    }
+    //TODO: optimize solid fill
+    //int3 linear = int3(round(float(0xFFF)*color));
+    //byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
+}

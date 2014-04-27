@@ -169,10 +169,9 @@ struct MusicXML : Widget {
                         int y = Y(clefs, sign.staff, sign.note.step);
                         fill(target, Rect(int2(x,y),int2(x+tailWidth, y+tailLength)));
                     }
-                    for(int dy: range(noteSize.y*2)) { // FIXME: Rasterize quad
-                        line(target, vec2(timeTrack[eighths.first().time], Y(clefs, eighths.first().staff, eighths.first().note.step)+tailLength+dy/4),
-                                vec2(timeTrack[eighths.last().time]+1, Y(clefs, eighths.last().staff, eighths.last().note.step)+tailLength+dy/4));
-                    }
+                    parallelogram(target, int2(timeTrack[eighths.first().time], Y(clefs, eighths.first().staff, eighths.first().note.step)+tailLength),
+                            int2(timeTrack[eighths.last().time]+1, Y(clefs, eighths.last().staff, eighths.last().note.step)+tailLength), noteSize.y/2);
+
                 } else { // Draws horizontal beam
                     int tailY = target.size().y;
                     for(Sign sign: eighths) tailY = min(tailY, Y(clefs, sign.staff, sign.note.step)+tailLength);

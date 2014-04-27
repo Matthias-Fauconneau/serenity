@@ -34,3 +34,6 @@ void blit(const Image& target, int2 position, const Image& source, vec3 color=wh
 void line(const Image& target, float x1, float y1, float x2, float y2, vec3 color=black, float alpha=1);
 inline void line(const Image& target, vec2 p1, vec2 p2, vec3 color=black, float alpha=1) { line(target, p1.x, p1.y, p2.x, p2.y, color, alpha); }
 inline void line(const Image& target, int2 p1, int2 p2, vec3 color=black, float alpha=1) { line(target, p1.x,p1.y,p2.x,p2.y, color, alpha); }
+
+/// Draws a parallelogram parallel to the Y axis
+void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color=black, float alpha=1);
