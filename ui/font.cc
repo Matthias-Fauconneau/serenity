@@ -23,7 +23,7 @@ void Font::load(const ref<byte>& data, int size) {
     }
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font"); return; }
     fontCount++;
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size*64,size*64,0,0}; FT_Request_Size(face,&req);
+    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL/*REAL_DIM*/,size*64,size*64,0,0}; FT_Request_Size(face,&req);
     ascender=((FT_FaceRec*)face)->size->metrics.ascender*0x1p-6;
 }
 void Font::setSize(float size) {

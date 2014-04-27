@@ -143,7 +143,7 @@ struct MusicXML : Widget {
     const int staffHeight = staffMargin + 4*lineInterval + staffMargin;
     const int staffCount = 2;
 
-    Font font {File("emmentaler-20.otf"_, Folder("Scores"_,home())), 24*halfLineInterval};
+    Font font {File("emmentaler-26.otf"_, Folder("Scores"_,home())), 4*lineInterval};
     vec2 glyphSize(const string name) { return font.size(font.index(name)); }
 
     int2 noteSize = int2(round(glyphSize("noteheads.s0"_)));
@@ -189,7 +189,12 @@ struct MusicXML : Widget {
         map<uint, Position> timeTrack; // Maps times to positions
         uint noteIndex = 0;
         for(Sign sign: signs) {
-            if(eighths && ((sign.time%divisions == 0 && eighths.size==1) || sign.type != Sign::Note || sign.note.duration<Eighth || sign.staff != eighths.last().staff)) {
+            if(eighths && (
+                        sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 ||
+                        (sign.time%divisions == 0 && eighths.size==1) ||
+                        sign.type != Sign::Note ||
+                        sign.note.duration<Eighth ||
+                        sign.staff != eighths.last().staff)) {
                 bool tailUp = false;
                 if(eighths.size==1) { // Draws single tail
                     Sign sign = eighths.last();
@@ -266,7 +271,7 @@ struct MusicXML : Widget {
                     x += glyph(target, int2(x, y0+staffHeight), {character});
                 }
             } else if(sign.type == Sign::Clef) {
-                string change = clefs.contains(sign.staff)?""_:"_change"_;
+                string change = clefs.contains(sign.staff)?"_change"_:""_;
                 Clef clef = clefs[sign.staff] = sign.clef;
                 assert_(!clef.octave);
                 x += noteSize.x/2;

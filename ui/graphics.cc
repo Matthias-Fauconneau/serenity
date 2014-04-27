@@ -133,7 +133,7 @@ void line(const Image& target, float x1, float y1, float x2, float y2, vec3 colo
 }
 
 void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color, float alpha) {
-    assert_(p0.x < p1.x);
+    if(p0.x > p1.x) swap(p0.x, p1.x); //assert_(p0.x < p1.x);
     for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
         float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
         float f0 = floor(y0);
