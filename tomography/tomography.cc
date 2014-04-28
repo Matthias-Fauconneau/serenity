@@ -1,9 +1,17 @@
-#include "volume.h"
-#include "matrix.h"
-#include "window.h"
 #include "phantom.h"
-#include "project.h"
+#include "update.h"
+#include "adjoint.h"
+#include "approximate.h"
+#include "window.h"
 #include "layout.h"
+
+/// Projects \a volume onto \a image according to \a projection
+inline void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
+    const CylinderVolume volume(source);
+    float* const imageData = image.data;
+    uint imageWidth = image.width;
+    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { uint x=index%imageWidth, y=index/imageWidth; imageData[y*imageWidth+x] = update(projection, vec2(x, y), volume); }, coreCount);
+}
 
 struct View : Widget {
     const Phantom* phantom;
@@ -36,18 +44,32 @@ struct View : Widget {
 vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
+#if DEBUG
+    const uint N = 64;
+#else
     const uint N = 128;
+#endif
     const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
     VolumeF target = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
-    unique<Reconstruction> reconstructions[1] {unique<CGNR>(N)};
-    UniformGrid<View> views{{{0, &reconstructions[0]->x}}};
-    View& view = views.last();
+#if 0 // ADJOINT
+    string labels[1] = {"Adjoint"_};
+    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(N)};
+    HList<View> views{{{0, &reconstructions[0]->x}}};
+#elif 0 // APPROXIMATE
+    string labels[1] = {"Approximate"_};
+    unique<Reconstruction> reconstructions[1] {unique<Approximate>(N)};
+    HList<View> views{{{0, &reconstructions[0]->x}}};
+#else
+    string labels[2] = {"Adjoint"_,"Approximate"_};
+    unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Approximate>(N)};
+    HList<View> views{{{0, &reconstructions[0]->x},{0, &target},{0, &reconstructions[1]->x}}};
+#endif
 #define WINDOW 1
 #if WINDOW
-    Window window {&views, int2(views.count()*1024,1024), "Tomography"_};
+    Window window {&views, int2(views.count()*853/*1024*/,853), "Tomography"_};
 #endif
     //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"ondemand"_); }
     Tomography() {
@@ -62,7 +84,7 @@ struct Tomography {
         }
 
         for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
-        //view.volume = &((CGNR*)reconstructions[0].pointer)->p;
+        //view.volume = &((Adjoint*)reconstructions[0].pointer)->p;
         step();
 
 #if WINDOW
@@ -71,19 +93,33 @@ struct Tomography {
         window.show();
         window.displayed = {this, &Tomography::step};
 #else
-        for(uint unused i: range(2)) step();
+        for(uint unused i: range(3)) step();
 #endif
     }
 
     void step() {
         // Step forward the reconstruction which consumed the least time.
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
+        log_(left(labels[index],16)+"\t"_);
         reconstructions[index]->step(projections, images);
+        const VolumeF& x = reconstructions[index]->x;
+        const VolumeF& x0 = target;
+        const float* xData = x;
+        const float* x0Data = x0;
+        float residualSum[coreCount] = {};
+        chunk_parallel(x.size(), [&](uint id, uint offset, uint size) {
+            float accumulator = 0;
+            for(uint i: range(offset,offset+size)) accumulator += sq(xData[i] - x0Data[i]);
+            residualSum[id] += accumulator;
+        });
+        const float SSE = sum(residualSum);
+        log("\tSSE", SSE);
 #if WINDOW
         if(window.target) { // Renders only the reconstruction which updated
-            Rect rect = views.layout(window.size)[index];
-            assert_(window.target);
-            views[index].render(clip(window.target, rect));
+            uint viewIndex = index ? 2 : 0;
+            Rect rect = views.layout(window.size)[viewIndex];
+            Image target = clip(window.target, rect);
+            views[viewIndex].render(target);
             window.putImage(rect);
         }
 #endif

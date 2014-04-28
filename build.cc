@@ -133,7 +133,7 @@ struct Build {
             else args << String("-march=native"_);
 
             if(!flags.contains("release"_)) args << String("-g"_);
-            if(!flags.contains("debug"_)) args << String("-Ofast"_); //-O3
+            if(!flags.contains("debug"_)) args << String("-O3"_); // O3 / Ofast
             if(flags.contains("profile"_)) {
                 args << String("-finstrument-functions"_);
                 if(!endsWith(CXX,"clang++"_))

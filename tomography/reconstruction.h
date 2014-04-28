@@ -2,10 +2,7 @@
 #include "matrix.h"
 #include "volume.h"
 #include "simd.h"
-#include "thread.h"
 #include "time.h"
-
-#define APPROXIMATE 1 // Approximate adjoint using bilinear sample instead of trilinear scatter
 
 struct Projection {
     Projection(mat4 projection, int2 imageSize) {
@@ -25,18 +22,13 @@ struct Projection {
         rcp_2a = float4(-1./(2*a));
         rayZ = float4(ray3.z);
         ray = (v4sf){ray3.x, ray3.y, ray3.z, 1};
-
-#if APPROXIMATE
         this->projection = projection;
-#endif
     }
 
     // Precomputed parameters (11x4)
     v4sf origin, xAxis, yAxis;
     v4sf raySlopeZ, rayXYXY, _m4a_4_m4a_4, rcp_2a, rayZ, ray;
-#if APPROXIMATE
-    mat4 projection;
-#endif
+    mat4 projection; // for approximate
 };
 
 /// Projects \a volume onto \a image according to \a projection
@@ -45,9 +37,6 @@ void project(const ImageF& image, const VolumeF& volume, const Projection& proje
 struct Reconstruction {
     uint k = 0;
     Time totalTime;
-#if ZORDER2
-    buffer<v2hi> zOrder2;
-#endif
     VolumeF x;
     Reconstruction(uint N) : x(N) {}
     virtual ~Reconstruction() {}
@@ -56,18 +45,3 @@ struct Reconstruction {
 };
 inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.totalTime < b.totalTime; }
 inline String str(const Reconstruction& r) { return str(r.k, r.totalTime); }
-
-struct CGNR : Reconstruction  {
-    real residualEnergy = 0;
-    VolumeF p, r;
-#if !APPROXIMATE
-    VolumeF AtAp[threadCount];
-#else
-    VolumeF AtAp[1];
-#endif
-    tsc AtApTime, mergeTime, updateTime, nextTime;
-
-    CGNR(uint N) : Reconstruction(N), p(N), r(N) { for(VolumeF& e: AtAp) e = VolumeF(N); }
-    void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
-    bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
-};

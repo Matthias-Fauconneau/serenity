@@ -81,6 +81,10 @@ inline (v4si) cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); } // Rounds
 inline (v4si) cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); } // Truncates
 inline (v4sf) cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
+//inline (v4si) dot4(v4si a, v4si b) { v4si c = a*b; v4si d = __builtin_ia32_phaddd128(c,c); return __builtin_ia32_phaddd128(d,d); }
+//inline (v4si) dot4(v4si a, v4si b) { return cvttps2dq(dot4(cvtdq2ps(a),cvtdq2ps(b))); }
+inline (v4si) dot4(v4si a, v4si b) { const v4si p = a*b; v4si d = p + shuffle4(p,p,1,0,3,2); return d + shuffle4(d,d,2,3,0,1); }
+
 typedef int v8si __attribute((__vector_size__ (32)));
 static const v8si _00000000 = (v8si){0,0,0,0, 0,0,0,0};
 static const v8si _1111111 = (v8si){~0ll,~0ll,~0ll,~0ll, ~0ll,~0ll,~0ll,~0ll};

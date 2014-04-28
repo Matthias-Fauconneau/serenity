@@ -63,6 +63,10 @@ tomography/slice.cc
 tomography/slice.h
 tomography/phantom.cc
 tomography/phantom.h
-tomography/project.cc
-tomography/project.h
+tomography/adjoint.cc
+tomography/reconstruction.h
 tomography/tomography.cc
+tomography/approximate.h
+tomography/approximate.cc
+tomography/adjoint.h
+tomography/update.h
