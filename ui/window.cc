@@ -141,6 +141,7 @@ void Window::event() {
 }
 
 void Window::putImage(Rect rect) {
+    if(rect==Rect(0)) rect=Rect(target.size());
     assert_(id); assert_(state==Idle); assert_(rect.size());
     Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
@@ -556,12 +557,8 @@ void Window::renderBackground(Image& target) {
             else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
         }
     }
-    else if(background==White) {
-        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
-    }
-    else if(background==Black) {
-        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
-    }
+    else if(background==White) fill(target, Rect(target.size()), white);
+    else if(background==Black)  fill(target, Rect(target.size()), black);
 }
 
 void Window::keyPress(Key key, Modifiers modifiers) {

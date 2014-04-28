@@ -140,7 +140,7 @@ void Plot::render(const Image& target) {
         buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
         if(plotPoints) for(uint i: range(data.size())) {
             int2 p = int2(round(points[i]));
-            const int pointRadius = 2;
+            const int pointRadius = 16;
             line(target, p-int2(pointRadius, 0), p+int2(pointRadius, 0), color);
             line(target, p-int2(0, pointRadius), p+int2(0, pointRadius), color);
         }

@@ -2,8 +2,10 @@
 #include "update.h"
 #include "adjoint.h"
 #include "approximate.h"
+#include "plot.h"
 #include "window.h"
 #include "layout.h"
+#include "graphics.h"
 
 /// Projects \a volume onto \a image according to \a projection
 inline void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
@@ -11,6 +13,29 @@ inline void project(const ImageF& image, const VolumeF& source, const Projection
     float* const imageData = image.data;
     uint imageWidth = image.width;
     parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { uint x=index%imageWidth, y=index/imageWidth; imageData[y*imageWidth+x] = update(projection, vec2(x, y), volume); }, coreCount);
+}
+
+inline float SSQ(const VolumeF& x) {
+    const float* xData = x;
+    float SSQ[coreCount] = {};
+    chunk_parallel(x.size(), [&](uint id, uint offset, uint size) {
+        float accumulator = 0;
+        for(uint i: range(offset,offset+size)) accumulator += sq(xData[i]);
+        SSQ[id] += accumulator;
+    });
+    return sum(SSQ);
+}
+
+inline float SSE(const VolumeF& a, const VolumeF& b) {
+    assert_(a.size() == b.size());
+    const float* aData = a; const float* bData = b;
+    float SSE[coreCount] = {};
+    chunk_parallel(a.size(), [&](uint id, uint offset, uint size) {
+        float accumulator = 0;
+        for(uint i: range(offset,offset+size)) accumulator += sq(aData[i] - bData[i]);
+        SSE[id] += accumulator;
+    });
+    return sum(SSE);
 }
 
 struct View : Widget {
@@ -51,7 +76,7 @@ struct Tomography {
 #endif
     const uint P = N; // * threadCount; // Exact adjoint method (gather, scatter) has same space requirement as approximate adjoint method (gather, gather) when P ~ TN
     Phantom phantom {16};
-    VolumeF target = phantom.volume(N);
+    VolumeF x0 = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
 #if 0 // ADJOINT
@@ -65,11 +90,15 @@ struct Tomography {
 #else
     string labels[2] = {"Adjoint"_,"Approximate"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Approximate>(N)};
-    HList<View> views{{{0, &reconstructions[0]->x},{0, &target},{0, &reconstructions[1]->x}}};
+    HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
+    float SSQ = ::SSQ(x0);
+    float bestSSE[2] = {inf, inf};
 #endif
 #define WINDOW 1
 #if WINDOW
-    Window window {&views, int2(views.count()*853/*1024*/,853), "Tomography"_};
+    Plot plot;
+    VBox layout {{&views, &plot}};
+    Window window {&layout, int2(0), "Tomography"_};
 #endif
     //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"ondemand"_); }
     Tomography() {
@@ -102,25 +131,25 @@ struct Tomography {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         log_(left(labels[index],16)+"\t"_);
         reconstructions[index]->step(projections, images);
-        const VolumeF& x = reconstructions[index]->x;
-        const VolumeF& x0 = target;
-        const float* xData = x;
-        const float* x0Data = x0;
-        float residualSum[coreCount] = {};
-        chunk_parallel(x.size(), [&](uint id, uint offset, uint size) {
-            float accumulator = 0;
-            for(uint i: range(offset,offset+size)) accumulator += sq(xData[i] - x0Data[i]);
-            residualSum[id] += accumulator;
-        });
-        const float SSE = sum(residualSum);
-        log("\tSSE", SSE);
+        const float PSNR = 10*log10(SSQ / ::SSE(reconstructions[index]->x, x0));
+        plot[labels[index]].insert(reconstructions[index]->totalTime.toFloat(), PSNR);
+        bestSSE[index] = min(bestSSE[index], PSNR);
+        log("\t", PSNR);
 #if WINDOW
-        if(window.target) { // Renders only the reconstruction which updated
+        if(window.target) { // FIXME
+            // Renders plot
+            {Rect rect = layout.layout(window.size)[1];
+                Image target = clip(window.target, rect);
+                fill(target, Rect(target.size()), white);
+                plot.render(target);
+            }
+            // Renders only the reconstruction which updated
             uint viewIndex = index ? 2 : 0;
-            Rect rect = views.layout(window.size)[viewIndex];
+            Rect viewsRect = layout.layout(window.size)[0];
+            Rect rect = viewsRect.position() + views.layout(viewsRect.size())[viewIndex];
             Image target = clip(window.target, rect);
             views[viewIndex].render(target);
-            window.putImage(rect);
+            window.putImage();
         }
 #endif
     }
