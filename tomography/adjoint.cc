@@ -52,7 +52,6 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
             if(filter) {
                 mref<float> input = filters[id];
                 v4sf start[input.size], end[input.size];
-#if 1
                 uint first;
                 for(first=0;first<input.size;first++) { if(intersect(projection, vec2(first, y), volume, start[first], end[first])) break; else input[first] = 0; }
                 uint last = first;
@@ -65,21 +64,6 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
                 for(uint x: range(last, input.size)) input[x] = 0;
                 ref<float> output = filters[id].filter();
                 for(uint x: range(first, last)) backproject(start[x], projection.ray, end[x], volume, AtAp[id], float8(output[x]));
-#else
-                bool intersects[input.size];
-                for(uint x: range(input.size)) {
-                    if(intersect(projection, vec2(x, y), volume, start[x], end[x])) {
-                        intersects[x] = true;
-                        input[x] = project(start[x], projection.ray, end[x], volume, p.data);
-                    } else {
-                        intersects[x] = false;
-                        input[x] = 0;
-                    }
-                }
-                ref<float> output = filters[id].filter();
-                assert_(input.size == output.size);
-                for(uint x: range(output.size)) if(intersects[x]) backproject(start[x], projection.ray, end[x], volume, AtAp[id], float8(output[x]));
-#endif
             } else {
                 for(uint x: range(image.width)) {
                     v4sf start, end;

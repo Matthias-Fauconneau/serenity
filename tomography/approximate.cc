@@ -3,7 +3,15 @@
 
 /// Computes residual r = p = At ( b - A x )
 void Approximate::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
-    // Merges r=p=sum(p#) and computes |r|
+    if(filter) for(Filter& filter: filters) filter = 2*images.first().width;
+    // Filters source images
+    if(filter) for(const ImageF& image: images) {
+        parallel(image.height, [&image, this](uint id, uint y) {
+            mref<float> imageRow = image.data.slice(y*image.width, image.width);
+            ref<float> filteredRow = filters[id].filter(imageRow);
+            for(uint x: range(image.width))  imageRow[x] = filteredRow[x];
+        });
+    }
     float* pData = p;
     float* rData = r;
     float residualSum[coreCount] = {};
@@ -52,9 +60,18 @@ bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& im
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        float* const imageData = image.data;
-        uint imageWidth = image.width;
-        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint, uint index) { vec2 p(index%imageWidth, index/imageWidth); imageData[index] = update(projection, p, volume); });
+        parallel(image.height, [&image, &projection, &volume, this](uint id, uint y) {
+            mref<float> output = image.data.slice(y*image.width, image.width);
+            mref<float> input = filter ? filters[id] : output;
+            for(uint x: range(image.width)) {
+                v4sf start, end;
+                input[x] = intersect(projection, vec2(x, y), volume, start, end) ? project(start, projection.ray, end, volume, p) : 0;
+            }
+            if(filter) {
+                ref<float> filtered = filters[id].filter(input);
+                for(uint x: range(image.width)) output[x] = filtered[x];
+            }
+        });
     }
 
     // Merges and clears AtAp and computes |p·Atp|

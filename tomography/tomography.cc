@@ -1,7 +1,7 @@
 #include "phantom.h"
 #include "update.h"
 #include "adjoint.h"
-//include "approximate.h"
+#include "approximate.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -81,33 +81,42 @@ struct Tomography {
     VolumeF x0 = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
-#if 1 // ADJOINT
+#if 0 // Single
+#if 0 // Adjoint
     string labels[1] = {"Adjoint"_};
     unique<Reconstruction> reconstructions[1] {unique<Adjoint>(N)};
-    HList<View> views{{{0, &reconstructions[0]->x}}};
-#elif 1
-    string labels[2] = {"Direct"_,"Filtered"_};
-    unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Adjoint>(N, true)};
-    HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
-#elif 0 // APPROXIMATE
+#else // Approximate
     string labels[1] = {"Approximate"_};
     unique<Reconstruction> reconstructions[1] {unique<Approximate>(N)};
+#endif
     HList<View> views{{{0, &reconstructions[0]->x}}};
-#else
+#else // Comparison
+#if 0 // Adjoint: Direct vs Filtered
+    string labels[2] = {"Direct"_,"Filtered"_};
+    unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Adjoint>(N, true)};
+#elif 1 // Approximate: Direct vs Filtered
+    string labels[2] = {"Direct"_,"Filtered"_};
+    unique<Reconstruction> reconstructions[2] {unique<Approximate>(N), unique<Approximate>(N, true)};
+#elif 0 // Direct: Adjoint vs Approximate
     string labels[2] = {"Adjoint"_,"Approximate"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Approximate>(N)};
+#elif 1 // Filtered: Adjoint vs Approximate
+    string labels[2] = {"Adjoint"_,"Approximate"_};
+    unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N, true), unique<Approximate>(N, true)};
+#endif
     HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
 #endif
     float SSQ = ::SSQ(x0);
 #define WINDOW 1
 #if WINDOW
+#define PLOT 1
 #if PLOT
     Plot plot;
     VBox layout {{&views, &plot}};
 #else
     VBox layout {{&views}};
 #endif
-    Window window {&layout, int2(512), "Tomography"_};
+    Window window {&layout, int2(3*512,2*512), "Tomography"_};
 #endif
     //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"ondemand"_); }
     Tomography() {
