@@ -1,7 +1,7 @@
 #include "phantom.h"
 #include "update.h"
 #include "adjoint.h"
-#include "approximate.h"
+//include "approximate.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -10,9 +10,11 @@
 /// Projects \a volume onto \a image according to \a projection
 inline void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
     const CylinderVolume volume(source);
-    float* const imageData = image.data;
-    uint imageWidth = image.width;
-    parallel(image.data.size, [&projection, &volume, imageData, imageWidth](uint, uint index) { uint x=index%imageWidth, y=index/imageWidth; imageData[y*imageWidth+x] = update(projection, vec2(x, y), volume); }, coreCount);
+    parallel(image.height, [&projection, &volume, &source, &image](uint, uint y) {
+        v4sf start,end;
+        mref<float> row = image.data.slice(y*image.width, image.width);
+        for(uint x: range(row.size)) row[x] = intersect(projection, vec2(x, y), volume, start, end) ? project(start, projection.ray, end, volume, source.data) : 0;
+    }, coreCount);
 }
 
 inline float SSQ(const VolumeF& x) {
@@ -55,7 +57,7 @@ struct View : Widget {
     }
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
-        float max = 0; //volume->sampleCount.x;
+        float max = volume->sampleCount.x/2;
         if(phantom) {
             ImageF linear = float(volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
             convert(target, linear, max);
@@ -79,10 +81,14 @@ struct Tomography {
     VolumeF x0 = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
-#if 0 // ADJOINT
+#if 1 // ADJOINT
     string labels[1] = {"Adjoint"_};
     unique<Reconstruction> reconstructions[1] {unique<Adjoint>(N)};
     HList<View> views{{{0, &reconstructions[0]->x}}};
+#elif 1
+    string labels[2] = {"Direct"_,"Filtered"_};
+    unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Adjoint>(N, true)};
+    HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
 #elif 0 // APPROXIMATE
     string labels[1] = {"Approximate"_};
     unique<Reconstruction> reconstructions[1] {unique<Approximate>(N)};
@@ -91,14 +97,17 @@ struct Tomography {
     string labels[2] = {"Adjoint"_,"Approximate"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Approximate>(N)};
     HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
-    float SSQ = ::SSQ(x0);
-    float bestSSE[2] = {inf, inf};
 #endif
+    float SSQ = ::SSQ(x0);
 #define WINDOW 1
 #if WINDOW
+#if PLOT
     Plot plot;
     VBox layout {{&views, &plot}};
-    Window window {&layout, int2(0), "Tomography"_};
+#else
+    VBox layout {{&views}};
+#endif
+    Window window {&layout, int2(512), "Tomography"_};
 #endif
     //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"ondemand"_); }
     Tomography() {
@@ -132,17 +141,20 @@ struct Tomography {
         log_(left(labels[index],16)+"\t"_);
         reconstructions[index]->step(projections, images);
         const float PSNR = 10*log10(SSQ / ::SSE(reconstructions[index]->x, x0));
+#if PLOT
         plot[labels[index]].insert(reconstructions[index]->totalTime.toFloat(), PSNR);
-        bestSSE[index] = min(bestSSE[index], PSNR);
+#endif
         log("\t", PSNR);
 #if WINDOW
         if(window.target) { // FIXME
+#if PLOT
             // Renders plot
             {Rect rect = layout.layout(window.size)[1];
                 Image target = clip(window.target, rect);
                 fill(target, Rect(target.size()), white);
                 plot.render(target);
             }
+#endif
             // Renders only the reconstruction which updated
             uint viewIndex = index ? 2 : 0;
             Rect viewsRect = layout.layout(window.size)[0];

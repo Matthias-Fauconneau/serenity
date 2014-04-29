@@ -70,3 +70,4 @@ tomography/approximate.h
 tomography/approximate.cc
 tomography/adjoint.h
 tomography/update.h
+tomography/filter.h

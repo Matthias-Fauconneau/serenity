@@ -20,7 +20,6 @@ struct CylinderVolume {
         dataOrigin = float4(float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1)/2, 0);
         stride = (v4si){1, volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y, 0};
         offset = (v4si){0,volume.sampleCount.x,volume.sampleCount.x*volume.sampleCount.y,volume.sampleCount.x*volume.sampleCount.y+volume.sampleCount.x};
-        data = volume;
     }
 
     // Precomputed parameters
@@ -30,12 +29,9 @@ struct CylinderVolume {
     v4sf dataOrigin;
     v4si stride;
     v4si offset;
-    float* data;
 };
 
-/// Integrates \a volume along ray defined by (\a projection, \a pixelPosition). if \a imageData and not \a targetData: stores result into image; if targetData: backprojects value; if imageData and targetData: backprojects difference
-/// \note Splitting intersect / projects / updates / backprojects triggers spurious uninitialized warnings when there is no intersection test, which suggests the compiler is not able to flatten the code.
-static inline float update(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, float b=0, float* targetData=0) {
+static inline bool intersect(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, v4sf& start, v4sf& end) {
     /// Intersects
     v4sf origin = projection.origin + float4(pixelPosition.x) * projection.xAxis + float4(pixelPosition.y) * projection.yAxis;
     // Intersects cap disks
@@ -56,45 +52,45 @@ static inline float update(const Projection& projection, vec2 pixelPosition, con
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = capSideP < volume.radiusSqHeight;
-    if(!mask(tMask)) return 0;
+    if(!mask(tMask)) { /*start=_0f; end=_0f;*/ return false; }
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-    v4sf pStart = volume.dataOrigin + origin + tmin * projection.ray;
-    v4sf tEnd = max(floatMMMm, tmax); // max, max, max, tmax
-    /// Projects
-    // TODO: check code
-    v4sf accumulator = _0f; // Accumulates along the ray
-    for(v4sf p01f = pStart, step=projection.ray;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
-        const v4si p01 = cvttps2dq(p01f); // Converts position to integer coordinates
-        const v4si index = dot4(p01, volume.stride); // to voxel index
-        const v4si v01 = index + volume.offset; // to 4 voxel indices
-        const v8sf x01 = gather2(volume.data, v01); // Gather samples
-        const v8sf w_1mw = abs(dup(p01f - cvtdq2ps(p01)) - _00001111f); // Computes trilinear interpolation coefficients
-        const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
-        accumulator += dot8(w01, x01); // Accumulates trilinearly interpolated sample
-        p01f += step; // Step
-        if(mask(p01f > tEnd)) break;
+    start = volume.dataOrigin + origin + tmin * projection.ray;
+    end = max(floatMMMm, tmax); // max, max, max, tmax
+    return true;
+}
+
+/// Integrates value from voxels along ray
+static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVolume& volume, const float* data) {
+    for(v4sf accumulator = _0f;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
+        const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
+        const v4si index = dot4(integerPosition, volume.stride); // to voxel index
+        const v4si indices = index + volume.offset; // to 4 voxel indices
+        const v8sf samples = gather2(data, indices); // Gather samples
+        const v8sf fract = abs(dup(position - cvtdq2ps(integerPosition)) - _00001111f); // Computes trilinear interpolation coefficients
+        const v8sf weights = shuffle8(fract, fract, 4,4,4,4, 0,0,0,0) * shuffle8(fract, fract, 5,5, 1,1, 5,5, 1,1) * shuffle8(fract, fract, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
+        accumulator += dot8(weights, samples); // Accumulates trilinearly interpolated sample
+        position += step; // Step
+        if(mask(position > end)) return accumulator[0];
     }
-    float Ax = accumulator[0];
-    if(!targetData) return Ax; // Projection only
-    Ax -= b;  //+ regularization(x, index); // = 0
-    /// Backprojects
-    v8sf value8 = float8(Ax);
-    for(v4sf p01f = pStart, step=projection.ray;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
-        const v4si p01 = cvttps2dq(p01f); // Converts position to integer coordinates
-        const v4si index = dot4(p01, volume.stride); // to voxel index
-        const v4si v01 = index + volume.offset; // to 4 voxel indices
-        const v8sf x01 = gather2(targetData, v01); // Gather samples
-        const v8sf w_1mw = abs(dup(p01f - cvtdq2ps(p01)) - _00001111f); // Computes trilinear interpolation coefficients
-        const v8sf w01 = shuffle8(w_1mw, w_1mw, 4,4,4,4, 0,0,0,0) * shuffle8(w_1mw, w_1mw, 5,5, 1,1, 5,5, 1,1) * shuffle8(w_1mw, w_1mw, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
-        const v8sf y01 = x01 + w01 * value8;
-        (v2sf&)(targetData[v01[0]]) = __builtin_shufflevector(y01, y01, 0, 1);
-        (v2sf&)(targetData[v01[1]]) = __builtin_shufflevector(y01, y01, 2, 3);
-        (v2sf&)(targetData[v01[2]]) = __builtin_shufflevector(y01, y01, 4, 5);
-        (v2sf&)(targetData[v01[3]]) = __builtin_shufflevector(y01, y01, 6, 7);
-        p01f += step;
-        if(mask(p01f > tEnd)) break;
+}
+
+/// Backprojects value onto voxels along ray
+static inline void backproject(v4sf position, v4sf step, v4sf end, const CylinderVolume& volume, const float* data, v8sf value) {
+    for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
+        const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
+        const v4si index = dot4(integerPosition, volume.stride); // to voxel index
+        const v4si indices = index + volume.offset; // to 4 voxel indices
+        const v8sf samples = gather2(data, indices); // Gather samples
+        const v8sf fract = abs(dup(position - cvtdq2ps(integerPosition)) - _00001111f); // Computes trilinear interpolation coefficients
+        const v8sf weights = shuffle8(fract, fract, 4,4,4,4, 0,0,0,0) * shuffle8(fract, fract, 5,5, 1,1, 5,5, 1,1) * shuffle8(fract, fract, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
+        const v8sf result = samples + weights * value;
+        (v2sf&)(data[indices[0]]) = __builtin_shufflevector(result, result, 0, 1);
+        (v2sf&)(data[indices[1]]) = __builtin_shufflevector(result, result, 2, 3);
+        (v2sf&)(data[indices[2]]) = __builtin_shufflevector(result, result, 4, 5);
+        (v2sf&)(data[indices[3]]) = __builtin_shufflevector(result, result, 6, 7);
+        position += step;
+        if(mask(position > end)) return;
     }
-    return Ax;
 }

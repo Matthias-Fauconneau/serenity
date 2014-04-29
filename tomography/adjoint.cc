@@ -3,13 +3,21 @@
 
 /// Computes residual r = p = At ( b - A x )
 void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
+    if(filter) for(Filter& filter: filters) filter = 2*images.first().width;
     const CylinderVolume volume (x);
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        float* const imageData = image.data;
-        uint imageWidth = image.width;
-        parallel(image.data.size, [&projection, &volume, imageData, imageWidth, this](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, imageData[y*imageWidth+x], AtAp[id]); });
+        parallel(image.height, [&image, &projection, &volume, this](uint id, uint y) {
+            ref<float> row = image.data.slice(y*image.width, image.width);
+            if(filter) row = filters[id].filter(row);
+            for(uint x: range(image.width)) {
+                v4sf start, end;
+                if(intersect(projection, vec2(x, y), volume, start, end)) {
+                    backproject(start, projection.ray, end, volume, AtAp[id], float8(/*scale **/ row[x])); // - Ax but x = 0
+                }
+            }
+        });
     }
     // Merges r=p=sum(p#) and computes |r|
     float* pData = p;
@@ -20,8 +28,7 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
         float* P[coreCount]; for(uint id: range(coreCount)) P[id] = AtAp[id];
         for(uint i: range(offset,offset+size)) {
             float Atb = 0;
-            for(uint id: range(coreCount)) { Atb -= P[id][i]; /*- as we compute Ax - b instead of b - Ax (to factorize update for step)*/ P[id][i]=0; } // Merges p and clears AtAp#
-            //Atb -= regularization(x, index); // = 0
+            for(uint id: range(coreCount)) { Atb += P[id][i]; P[id][i]=0; } // Merges p and clears AtAp#
             pData[i] = Atb;
             rData[i] = Atb;
             accumulator += sq(Atb);
@@ -41,8 +48,48 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
     for(uint projectionIndex: range(projections.size)) {
         const Projection& projection = projections[projectionIndex];
         const ImageF& image = images[projectionIndex];
-        uint imageWidth = image.width;
-        parallel(image.data.size, [this, &volume, &projection, imageWidth](uint id, uint index) { int x=index%imageWidth, y=index/imageWidth; update(projection, vec2(x, y), volume, 0, AtAp[id]); });
+        parallel(image.height, [&image, &projection, &volume, this](uint id, uint y) {
+            if(filter) {
+                mref<float> input = filters[id];
+                v4sf start[input.size], end[input.size];
+#if 1
+                uint first;
+                for(first=0;first<input.size;first++) { if(intersect(projection, vec2(first, y), volume, start[first], end[first])) break; else input[first] = 0; }
+                uint last = first;
+                if(last<input.size) for(;;) {
+                    input[last] = project(start[last], projection.ray, end[last], volume, p.data);
+                    last++;
+                    if(!(last<input.size)) break;
+                    if(!intersect(projection, vec2(last, y), volume, start[last], end[last])) break;
+                }
+                for(uint x: range(last, input.size)) input[x] = 0;
+                ref<float> output = filters[id].filter();
+                for(uint x: range(first, last)) backproject(start[x], projection.ray, end[x], volume, AtAp[id], float8(output[x]));
+#else
+                bool intersects[input.size];
+                for(uint x: range(input.size)) {
+                    if(intersect(projection, vec2(x, y), volume, start[x], end[x])) {
+                        intersects[x] = true;
+                        input[x] = project(start[x], projection.ray, end[x], volume, p.data);
+                    } else {
+                        intersects[x] = false;
+                        input[x] = 0;
+                    }
+                }
+                ref<float> output = filters[id].filter();
+                assert_(input.size == output.size);
+                for(uint x: range(output.size)) if(intersects[x]) backproject(start[x], projection.ray, end[x], volume, AtAp[id], float8(output[x]));
+#endif
+            } else {
+                for(uint x: range(image.width)) {
+                    v4sf start, end;
+                    if(intersect(projection, vec2(x, y), volume, start, end)) {
+                        float Ax = project(start, projection.ray, end, volume, p.data);
+                        backproject(start, projection.ray, end, volume, AtAp[id], float8(Ax));
+                    }
+                }
+            }
+        });
     }
 
     // Merges and clears AtAp and computes |p·Atp|
