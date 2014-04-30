@@ -117,7 +117,7 @@ struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(const ref<Widget*>& widgets):Widgets(widgets){}
 };
 template<class T> struct UniformGrid : GridLayout,  Array<T> {
-    UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
+    UniformGrid(const mref<T>& items={}, int width=0) : GridLayout(width), Array<T>(items) {}
 };
 
 /// Implements selection of active widget/item for a \a Layout

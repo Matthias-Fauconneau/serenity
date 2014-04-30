@@ -55,6 +55,7 @@ struct View : Widget {
         rotation.y = clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
         return true;
     }
+    int2 sizeHint() { return int2(512); }
     void render(const Image& target) override {
         mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
         float max = volume->sampleCount.x/2;
@@ -85,26 +86,37 @@ struct Tomography {
 #if 0 // Adjoint
     string labels[1] = {"Adjoint"_};
     unique<Reconstruction> reconstructions[1] {unique<Adjoint>(N)};
-#else // Approximate
-    string labels[1] = {"Approximate"_};
+#else // Bilinear
+    string labels[1] = {"Bilinear"_};
     unique<Reconstruction> reconstructions[1] {unique<Approximate>(N)};
 #endif
     HList<View> views{{{0, &reconstructions[0]->x}}};
-#else // Comparison
+#elif 0 // Comparison
 #if 0 // Adjoint: Direct vs Filtered
     string labels[2] = {"Direct"_,"Filtered"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Adjoint>(N, true)};
-#elif 1 // Approximate: Direct vs Filtered
+#elif 1 // Bilinear: Direct vs Filtered
     string labels[2] = {"Direct"_,"Filtered"_};
     unique<Reconstruction> reconstructions[2] {unique<Approximate>(N), unique<Approximate>(N, true)};
-#elif 0 // Direct: Adjoint vs Approximate
-    string labels[2] = {"Adjoint"_,"Approximate"_};
+#elif 0 // Direct: Adjoint vs Bilinear
+    string labels[2] = {"Adjoint"_,"Bilinear"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N), unique<Approximate>(N)};
-#elif 1 // Filtered: Adjoint vs Approximate
-    string labels[2] = {"Adjoint"_,"Approximate"_};
+#elif 1 // Filtered: Adjoint vs Bilinear
+    string labels[2] = {"Adjoint"_,"Bilinear"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N, true), unique<Approximate>(N, true)};
 #endif
     HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
+#elif 0 //Direct/Filtered Adjoint/Bilinear
+    string labels[4] = {"Direct Adjoint"_,"Direct Bilinear"_,"Ramp Adjoint"_,"Ramp Bilinear"_};
+    unique<Reconstruction> reconstructions[4] {unique<Adjoint>(N, false), unique<Approximate>(N, false), unique<Adjoint>(N, true), unique<Approximate>(N, true)};
+    UniformGrid<View> views{{{0, &reconstructions[0]->x},{0, &reconstructions[1]->x},{0, &reconstructions[2]->x},{0, &reconstructions[3]->x}}};
+#else // [Filtered] [Regularized] [Adjoint]
+    string labels[8] = {"Adjoint"_,"Filtered Adjoint"_,"Regularized Adjoint"_,"Filtered Regularized Adjoint"_, "Bilinear"_,"Filtered Bilinear"_,"Regularized Bilinear"_,"Filtered Regularized Bilinear"_ };
+    unique<Reconstruction> reconstructions[8] {unique<Adjoint>(N, false, false), unique<Adjoint>(N, true, false), unique<Adjoint>(N, true, false), unique<Adjoint>(N, true, true),
+                unique<Approximate>(N, false, false), unique<Approximate>(N, true, false), unique<Approximate>(N, true, false), unique<Approximate>(N, true, true)
+                                              };
+    UniformGrid<View> views{{{0, &reconstructions[0]->x},{0, &reconstructions[1]->x},{0, &reconstructions[2]->x},{0, &reconstructions[3]->x},
+            {0, &reconstructions[4]->x},{0, &reconstructions[5]->x},{0, &reconstructions[6]->x},{0, &reconstructions[7]->x}}, 4};
 #endif
     float SSQ = ::SSQ(x0);
 #define WINDOW 1
@@ -112,7 +124,7 @@ struct Tomography {
 #define PLOT 1
 #if PLOT
     Plot plot;
-    VBox layout {{&views, &plot}};
+    HBox layout {{&views, &plot}};
 #else
     VBox layout {{&views}};
 #endif
@@ -165,7 +177,7 @@ struct Tomography {
             }
 #endif
             // Renders only the reconstruction which updated
-            uint viewIndex = index ? 2 : 0;
+            uint viewIndex = index;// ? 2 : 0;
             Rect viewsRect = layout.layout(window.size)[0];
             Rect rect = viewsRect.position() + views.layout(viewsRect.size())[viewIndex];
             Image target = clip(window.target, rect);

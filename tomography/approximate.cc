@@ -39,6 +39,7 @@ void Approximate::initialize(const ref<Projection>& projections, const ref<Image
                                 v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
                         Atb += s;
                     }
+                    // No projection and no regularization (x=0)
                     pData[izy+x] = Atb;
                     rData[izy+x] = Atb;
                     accumulator += sq(Atb);
@@ -88,9 +89,10 @@ bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& im
         for(uint y: range(1, p.sampleCount.y-1)) {
             uint izy = iz + y * p.sampleCount.x;
             for(uint x: range(1, p.sampleCount.x-1)) {
+                uint i = izy+x;
                 const vec3 origin = vec3(x,y,z) - center;
                 if(sq(origin.xy()) < radiusSq) {
-                    float AtAp = 0;
+                    float AtAp = regularize ? regularization(p, x,y,z, i) : 0;
                     for(uint projectionIndex: range(projections.size)) {
                         const Projection& projection = projections[projectionIndex];
                         const ImageF& P = images[projectionIndex];
@@ -102,8 +104,8 @@ bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& im
                                 v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
                         AtAp += s;
                     }
-                    AtApData[izy+x] = AtAp;
-                    accumulator += pData[izy+x] * AtAp;
+                    AtApData[i] = AtAp;
+                    accumulator += pData[i] * AtAp;
                 }
             }
         }

@@ -94,3 +94,19 @@ static inline void backproject(v4sf position, v4sf step, v4sf end, const Cylinde
         if(mask(position > end)) return;
     }
 }
+
+// Computes regularization: QtQ = lambda · ( I + alpha · CtC )
+static inline float regularization(const VolumeF& volume, const uint x, const uint y, const uint z, const uint i) {
+    const uint X = volume.sampleCount.y, Y = volume.sampleCount.y, XY=X*Y, Z = volume.sampleCount.z;
+    float* data = volume.data + i;
+    float Ix = data[0];
+    float CtCx = 0;
+    for(int dz=-1; dz<=1; dz++) for(int dy=-1; dy<=1; dy++) for(int dx=-1; dx<=1; dx++) {
+        if(uint(x+dx) < X && uint(y+dy) < Y && uint(z+dz) < Z) {
+            float Cx = Ix - data[dz*int(XY) + dy*int(X) + dx];
+            CtCx += sq(Cx);
+        }
+    }
+    float QtQx = 0 * Ix + 1 * CtCx;
+    return QtQx;
+}

@@ -7,9 +7,9 @@ struct Adjoint : Reconstruction  {
     VolumeF p, r;
     VolumeF AtAp[coreCount];
     Filter filters[coreCount];
-    bool filter = true;
+    const bool filter, regularize;
 
-    Adjoint(uint N, bool filter = false) : Reconstruction(N), p(N), r(N), filter(filter) { for(VolumeF& e: AtAp) e = VolumeF(N); }
+    Adjoint(uint N, bool filter = false, bool regularize = false) : Reconstruction(N), p(N), r(N), filter(filter), regularize(regularize) { for(VolumeF& e: AtAp) e = VolumeF(N); }
     void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
     bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
 };
