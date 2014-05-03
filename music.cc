@@ -1,86 +1,14 @@
-#include "thread.h"
+﻿#include "thread.h"
 #include "xml.h"
 #include "window.h"
 #include "font.h"
 #include "utf8.h"
 
-// -> graphics.h
-
-// 8bit signed integer (for edge flags)
-struct Image8 {
-    Image8(uint width, uint height) : width(width), height(height) {
-        assert(width); assert(height);
-        data = ::buffer<int8>(height*width);
-        data.clear(0);
-    }
-    int8& operator()(uint x, uint y) {assert(x<width && y<height, x, y, width, height); return data[y*width+x]; }
-    buffer<int8> data;
-    uint width, height;
-};
-
-// FIXME: Coverage integration
-static int lastStepY; //dont flag first/last point twice but cancel on direction changes
-inline void line(Image8& raster, int2 p0, int2 p1) {
-    int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
-    int dx = abs(x1-x0);
-    int dy = abs(y1-y0);
-    int sx = (x0 < x1) ? 1 : -1;
-    int sy = (y0 < y1) ? 1 : -1;
-    int err = dx-dy;
-    if(sy!=lastStepY) raster(x0,y0) -= sy;
-    for(;;) {
-        if(x0 == x1 && y0 == y1) break;
-        int e2 = 2*err;
-        if(e2 > -dy) { err -= dy, x0 += sx; }
-        if(e2 < dx) { err += dx, y0 += sy; raster(x0,y0) -= sy; } //only raster at y step
-    }
-    lastStepY=sy;
-}
-
-inline vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
-inline void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
-    const int N = 12;
-    int2 a = int2(round(A));
-    for(int i : range(1,N+1)) {
-        int2 b = int2(round(cubic(A,B,C,D,float(i)/N)));
-        line(raster, a, b);
-        a=b;
-    }
-}
-
-// Renders cubic spline (two control points between each end point)
-void cubic(const Image& target, const ref<vec2>& points, vec3 color=black, float alpha=1) {
-    vec2 pMin = vec2(target.size()), pMax = 0;
-    for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
-    pMin = floor(pMin), pMax = ceil(pMax);
-    int2 iMin = int2(pMin), iMax = int2(pMax);
-    int2 size = iMax-iMin;
-    if(!size) return;
-    const uint oversample = 8;
-    Image8 raster(oversample*size.x+1,oversample*size.y+1);
-    for(uint i=0;i<points.size; i+=3) {
-        cubic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin), float(oversample)*(points[(i+2)%points.size]-pMin),
-                float(oversample)*(points[(i+3)%points.size]-pMin));
-    }
-    iMin = max(int2(0),iMin), iMax = min(target.size(), iMax);
-    for(uint y: range(iMin.y, iMax.y)) {
-        int acc[oversample]={};
-        for(uint x: range(iMin.x, iMax.x)) { //Supersampled rasterization
-            int coverage = 0;
-            for(uint j: range(oversample)) for(int i: range(oversample)) {
-                acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);
-                //assert_(acc[j]>=0, acc[j]);
-                coverage += acc[j]!=0;
-            }
-            if(coverage) blend(target, x, y, color, float(coverage)/sq(oversample)*alpha);
-        }
-    }
-}
-
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
 enum Loudness { ppp, pp, p, mp, mf, f, ff, fff };
+enum Action { Ped=-1, Start, Change, Stop };
 
 struct Clef {
     ClefSign clefSign;
@@ -114,12 +42,15 @@ struct Metronome {
     Duration beatUnit;
     uint perMinute;
 };
+struct Pedal {
+    Action action;
+};
 
 struct Sign {
     uint time; // Absolute time offset
     uint duration;
     uint staff; // Staff index
-    enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome } type;
+    enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome, Pedal } type;
     union {
         struct Note note;
         struct Rest rest;
@@ -128,9 +59,11 @@ struct Sign {
         struct TimeSignature timeSignature;
         struct Metronome metronome;
         struct Dynamic dynamic;
+        struct Pedal pedal;
     };
 };
-bool operator <=(const Sign& a, const Sign& b) { return a.time <= b.time; }
+bool operator <(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step; return a.time < b.time; }
+bool operator <=(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step; return a.time <= b.time; }
 
 struct MusicXML : Widget {
 
@@ -198,7 +131,11 @@ struct MusicXML : Widget {
                         uint perMinute = fromInteger(d("metronome"_)("per-minute"_).text());
                         {Sign sign{time, 0, 0, Sign::Metronome, {}}; sign.metronome={beatUnit, perMinute}; signs << sign;}
                     }
-                    else if(d("pedal"_)) {}
+                    else if(d("pedal"_)) {
+                        Action action = Action(ref<string>{"start"_,"change"_,"stop"_}.indexOf(d("pedal"_)["type"_]));
+                        if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
+                        {Sign sign{time, 0, 0, Sign::Pedal, {}}; sign.pedal={action}; signs << sign;}
+                    }
                     else if(d("wedge"_)) {}
                     else if(d("octave-shift"_)) {}
                     else if(d("other-direction"_)) {}
@@ -280,6 +217,7 @@ struct MusicXML : Widget {
         map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
         array<Sign> beams[2]; // Signs belonging to current beam (per staff)
         array<Sign> slurs[2]; // Signs belonging to current slur (per staff)
+        uint pedalStartTime = 0; // Current pedal start time
         struct Position { // Holds positions for both notes (default) and directions (explicit)
             int direction, note;
             Position(int x) : direction(x), note(x) {}
@@ -291,21 +229,22 @@ struct MusicXML : Widget {
         for(Sign sign: signs) {
             array<Sign>& beam = beams[sign.staff];
             if(beam && (
-                        sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 ||
-                        beam.first().time%divisions ||
+                        (sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 && sign.time>beam.first().time) || // Beam at half measure
+                        (beam.first().time%divisions && sign.time>beam.first().time) || // Off beat (tail after complete chord)
                         (sign.type != Sign::Note && sign.type != Sign::Clef) ||
                         (sign.type == Sign::Note && sign.note.duration<Eighth))) {
                 int clefStepSum = 0; for(Sign sign: beam) clefStepSum += clefStep(sign.note.clef.clefSign, sign.note.step);
                 bool tailUp = clefStepSum < (int(beam.size) * -4); // Average note height below mid staff
 
-                if(beam.size==1) { // Draws single tail
-                    Sign sign = beam.last();
-                    Note note = sign.note;
-                    int x = timeTrack.at(sign.time);
-                    int y = y0+Y(sign.note.clef, sign.staff, note.step);
-                    fill(target, int2(x+(tailUp?noteSize.x-2:0),y-tailUp*tailLength)+Rect(int2(tailWidth, tailLength)));
-                    /**/ if(note.duration==Eighth) glyph(target, int2(x+(tailUp?noteSize.x-2:0)+tailWidth, y+(tailUp?-1:1)*tailLength), tailUp?"flags.u3"_:"flags.d3"_);
-                    else if(note.duration==Sixteenth) glyph(target, int2(x+(tailUp?noteSize.x-2:0)+tailWidth, y+(tailUp?-1:1)*tailLength), tailUp?"flags.u4"_:"flags.d4"_);
+                if(beam.first().time==beam.last().time) { // Draws single tail
+                    Sign sign = tailUp ? max(beam) : min(beam);
+                    int x = timeTrack.at(sign.time) + (tailUp?noteSize.x-2:0);
+                    int yMin = y0+Y(sign.note.clef, sign.staff, min(beam).note.step);
+                    int yMax = y0+Y(sign.note.clef, sign.staff, max(beam).note.step);
+                    fill(target, Rect(int2(x, yMax-tailUp*tailLength),int2(x+tailWidth, yMin+(!tailUp)*tailLength)));
+                    int yTail = tailUp ? yMax-tailLength : yMin+tailLength;
+                    /**/ if(sign.note.duration==Eighth) glyph(target, int2(x+tailWidth, yTail), tailUp?"flags.u3"_:"flags.d3"_);
+                    else if(sign.note.duration==Sixteenth) glyph(target, int2(x+tailWidth, yTail), tailUp?"flags.u4"_:"flags.d4"_);
                 } else if(beam.size==2) { // Draws slanted beam
                     for(Sign sign: beam) {
                         int x = timeTrack.at(sign.time)+(tailUp?noteSize.x-2:0);
@@ -371,12 +310,15 @@ struct MusicXML : Widget {
                 if(sign.note.slur) {
                     if(!slur) { if(x < int(target.width)) slur << sign; } // Starts new slur (only if visible)
                     else { // Stops
-                        vec2 p0 = vec2(timeTrack.at(slur.first().time), y0+Y(clefs, slur.first().staff, slur.first().note.step)) + vec2(noteSize.x/2, -2*noteSize.y);
-                        vec2 p1 = vec2(p) + vec2(noteSize.x/2, -2*noteSize.y);
-                        vec2 k0 = vec2(p0.x, max(p0.y,p1.y)) + vec2(0, -3*noteSize.y);
-                        vec2 k0p = k0 + vec2(0, -noteSize.y/2);
-                        vec2 k1 = vec2(p1.x, max(p0.y,p1.y)) + vec2(0, -3*noteSize.y);
-                        vec2 k1p = k1 + vec2(0, -noteSize.y/2);
+                        int clefStepSum = 0; for(Sign sign: slur) clefStepSum += clefStep(sign.note.clef.clefSign, sign.note.step);
+                        int slurDown = clefStepSum < (int(slur.size) * -4) ? 1 : -1; // Average note height below mid staff
+
+                        vec2 p0 = vec2(timeTrack.at(slur.first().time), y0+Y(clefs, slur.first().staff, slur.first().note.step)) + vec2(noteSize.x/2, slurDown*2*noteSize.y);
+                        vec2 p1 = vec2(p) + vec2(noteSize.x/2, slurDown*2*noteSize.y);
+                        vec2 k0 = vec2(p0.x, max(p0.y,p1.y)) + vec2(0, slurDown*3*noteSize.y);
+                        vec2 k0p = k0 + vec2(0, slurDown*noteSize.y/2);
+                        vec2 k1 = vec2(p1.x, max(p0.y,p1.y)) + vec2(0, slurDown*3*noteSize.y);
+                        vec2 k1p = k1 + vec2(0, slurDown*noteSize.y/2);
                         cubic(target, {p0,k0,k1,p1,k1p,k0p});
                         slur.clear();
                     } // TODO: continue
@@ -399,11 +341,21 @@ struct MusicXML : Widget {
                     x += noteSize.x;
                 }
             }
+            else if(sign.type == Sign::Pedal) {
+                int y = y0+staffY(1, -24);
+                if(sign.pedal.action == Ped) glyph(target, int2(x, y), "pedal.Ped"_);
+                int px = glyphSize("pedal.Ped"_).x;
+                if(sign.pedal.action == Change || sign.pedal.action == Stop) {
+                    line(target, int2(timeTrack.at(pedalStartTime)+px, y), int2(x, y));
+                    line(target, int2(x, y-lineInterval), int2(x, y));
+                }
+                if(sign.pedal.action == Start || sign.pedal.action == Change) pedalStartTime = sign.time;
+            }
             else if(sign.type == Sign::Dynamic) {
                 string word = ref<string>{"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_}[uint(sign.dynamic.loudness)];
                 float w = 0; for(char character: word.slice(0,word.size-1)) w += advance({character}); w += glyphSize({word.last()}).x;
                 uint x = timeTrack.at(sign.time).direction;
-                x -= w/2; x += glyphSize({word.first()}).x/2;
+                /*x -= w/2;*/ x += glyphSize({word.first()}).x/2;
                 for(char character: word) {
                     x += glyph(target, int2(x, y0+staffHeight), {character});
                 }
@@ -457,7 +409,7 @@ struct MusicXML : Widget {
     }
 
     bool mouseEvent(int2, int2, Event, Button button) {
-        if(button==WheelUp) { position--; return true; }
+        if(button==WheelUp) { position = max(0, position-1); return true; }
         if(button==WheelDown) { position++;return true; }
         return false;
     }
