@@ -5,8 +5,69 @@
 #include "utf8.h"
 
 // -> graphics.h
-vec2 quadratic(vec2 A, vec2 B, vec2 C, float t) { return ((1-t)*(1-t))*A + (2*(1-t)*t)*B + (t*t)*C; }
-//vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
+
+// 8bit signed integer (for edge flags)
+struct Image8 {
+    Image8(uint width, uint height) : width(width), height(height) {
+        assert(width); assert(height);
+        data = ::buffer<int8>(height*width);
+        data.clear(0);
+    }
+    int8& operator()(uint x, uint y) {assert(x<width && y<height, x, y, width, height); return data[y*width+x]; }
+    buffer<int8> data;
+    uint width, height;
+};
+
+// FIXME: Coverage integration
+static int lastStepY; //dont flag first/last point twice but cancel on direction changes
+inline void line(Image8& raster, int2 p0, int2 p1) {
+    int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
+    int dx = abs(x1-x0);
+    int dy = abs(y1-y0);
+    int sx = (x0 < x1) ? 1 : -1;
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx-dy;
+    if(sy!=lastStepY) raster(x0,y0) -= sy;
+    for(;;) {
+        if(x0 == x1 && y0 == y1) break;
+        int e2 = 2*err;
+        if(e2 > -dy) { err -= dy, x0 += sx; }
+        if(e2 < dx) { err += dx, y0 += sy; raster(x0,y0) -= sy; } //only raster at y step
+    }
+    lastStepY=sy;
+}
+
+inline void quadratic(Image8& raster, vec2 A, vec2 B, vec2 C) {
+    const int N = 6;
+    int2 a = int2(round(A));
+    for(int i : range(1,N+1)) {
+        float t = float(i)/N;
+        int2 b = int2(round(((1-t)*(1-t))*A + (2*(1-t)*t)*B + (t*t)*C));
+        line(raster, a, b);
+        a=b;
+    }
+}
+
+// Renders quadratic spline (vertices are alternatively end (on) or control (off) points)
+void quadratic(const Image& target, const ref<vec2>& points, vec3 color=black, float alpha=1) {
+    vec2 pMin = vec2(target.size()), pMax = 0;
+    for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
+    pMin = floor(pMin), pMax = ceil(pMax);
+    int2 iMin = int2(pMin), iMax = int2(pMax);
+    int2 size = iMax-iMin;
+    if(!size) return;
+    Image8 raster(size.x+1,size.y+1);
+    for(uint i=0;i<points.size; i+=2) quadratic(raster, points[i]-pMin, points[(i+1)%points.size]-pMin, points[(i+2)%points.size]-pMin);
+    iMin = max(int2(0),iMin), iMax = min(target.size(), iMax);
+    for(uint y: range(iMin.y, iMax.y)) {
+        int acc = 0;
+        for(uint x: range(iMin.x, iMax.x)) {
+            acc += raster(x-iMin.x, y-iMin.y);
+            //assert_(acc==0 || acc==1, acc);
+            if(acc) blend(target, x, y, color, alpha);
+        }
+    }
+}
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
@@ -294,7 +355,8 @@ struct MusicXML : Widget {
                         vec2 A = vec2(timeTrack.at(slur.first().time), y0+Y(clefs, slur.first().staff, slur.first().note.step)) + vec2(noteSize.x/2, -2*noteSize.y);
                         vec2 C = vec2(p) + vec2(noteSize.x/2, -2*noteSize.y);
                         vec2 B = vec2((A.x+C.x)/2, max(A.y,C.y)) + vec2(0, -3*noteSize.y);
-                        const uint N=6; for(int t: range(N)) line(target, quadratic(A,B,C, float(t)/N), quadratic(A,B,C, float(t+1)/N));
+                        vec2 D = B + vec2(0, -noteSize.y);
+                        quadratic(target, {A,B,C,D});
                         slur.clear();
                     } // TODO: continue
                 }

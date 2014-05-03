@@ -106,7 +106,6 @@ void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool tr
 void line(const Image& target, float x1, float y1, float x2, float y2, vec3 color, float alpha) {
     color = clip(vec3(0), color, vec3(1));
     float dx = x2 - x1, dy = y2 - y1;
-    assert_(abs(vec2(dx,dy)) <= vec2(2*target.size()), x1, y1, x2, y2);
     bool transpose=false;
     if(abs(dx) < abs(dy)) { swap(x1, y1); swap(x2, y2); swap(dx, dy); transpose=true; }
     if(x1 > x2) { swap(x1, x2); swap(y1, y2); }

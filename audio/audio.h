@@ -81,6 +81,7 @@ private:
 /// Audio control using ALSA Control interface
 struct AudioControl : Device {
     uint id = 0;
+    long min, max;
     AudioControl();
     operator long();
     void operator =(long value);

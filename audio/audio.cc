@@ -275,7 +275,7 @@ AudioControl::AudioControl() : Device("/dev/snd/controlC1"_) {
         Info info;
         info.id.numid = ids[i].numid;
         iowr<ELEM_INFO>(info);
-        if(startsWith(string(info.id.name),"Master Playback Volume"_)) { id=info.id.numid; break; }
+        if(startsWith(string(info.id.name),"Master Playback Volume"_)) { id=info.id.numid; min=info.min, max=info.max; break; }
     }
 }
 
@@ -287,6 +287,6 @@ AudioControl::operator long() {
 
 void AudioControl::operator =(long v) {
     Value value; value.id.numid = id;
-    value.values[0] = v;
+    value.values[0] = clip(min, v, max);
     iowr<ELEM_WRITE>(value);
 }
