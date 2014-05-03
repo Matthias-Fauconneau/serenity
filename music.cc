@@ -18,8 +18,9 @@ struct Note {
     int step; // 0 = C4
     Accidental accidental;
     Duration duration;
-    bool dot;
-    bool grace;
+    bool dot:1;
+    bool grace:1;
+    bool staccato:1;
 };
 struct Rest {
     Duration duration;
@@ -84,7 +85,8 @@ struct MusicXML : Widget {
                         int step = (octave-4) * 7 + octaveStep;
                         Accidental accidental = Accidental(ref<string>{""_,"flat"_,"sharp"_,"natural"_}.indexOf(e("accidental"_).text()));
                         //signs << Sign{time, staff, Sign::Note, .note={pitch, accidental, type, e("grace"_)?true:false}};
-                        {Sign sign{time, duration, staff, Sign::Note, {}}; sign.note={clefs.at(staff), step, accidental, type, false /*dot*/, e("grace"_)?true:false};
+                        {Sign sign{time, duration, staff, Sign::Note, {}};
+                            sign.note={clefs.at(staff), step, accidental, type, false /*dot*/, e("grace"_)?true:false, e("notations"_)("articulations"_)("staccato"_)?true:false};
                             signs.insertSorted(sign);};
                     }
                     nextTime = time+duration;
@@ -266,8 +268,9 @@ struct MusicXML : Widget {
                     if(duration<=Eighth) eighths << sign;
                     else fill(target, p+Rect(int2(1,tailLength)));
                 }
-                noteIndex++;
                 if(sign.note.dot) glyph(target, p+int2(16,4),"dots.dot"_);
+                if(sign.note.staccato) glyph(target, p+int2(noteSize.x/2,-noteSize.y),"scripts.staccato"_);
+                noteIndex++;
             }
             else if(sign.type == Sign::Rest) {
                 int2 p = int2(x, y0+staffY(staff, -4));
