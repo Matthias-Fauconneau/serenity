@@ -38,7 +38,7 @@ inline void line(Image8& raster, int2 p0, int2 p1) {
 }
 
 inline void quadratic(Image8& raster, vec2 A, vec2 B, vec2 C) {
-    const int N = 6;
+    const int N = 9;
     int2 a = int2(round(A));
     for(int i : range(1,N+1)) {
         float t = float(i)/N;
@@ -56,15 +56,22 @@ void quadratic(const Image& target, const ref<vec2>& points, vec3 color=black, f
     int2 iMin = int2(pMin), iMax = int2(pMax);
     int2 size = iMax-iMin;
     if(!size) return;
-    Image8 raster(size.x+1,size.y+1);
-    for(uint i=0;i<points.size; i+=2) quadratic(raster, points[i]-pMin, points[(i+1)%points.size]-pMin, points[(i+2)%points.size]-pMin);
+    const uint oversample = 8;
+    Image8 raster(oversample*size.x+1,oversample*size.y+1);
+    for(uint i=0;i<points.size; i+=2) {
+        quadratic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin), float(oversample)*(points[(i+2)%points.size]-pMin));
+    }
     iMin = max(int2(0),iMin), iMax = min(target.size(), iMax);
     for(uint y: range(iMin.y, iMax.y)) {
-        int acc = 0;
-        for(uint x: range(iMin.x, iMax.x)) {
-            acc += raster(x-iMin.x, y-iMin.y);
-            //assert_(acc==0 || acc==1, acc);
-            if(acc) blend(target, x, y, color, alpha);
+        int acc[oversample]={};
+        for(uint x: range(iMin.x, iMax.x)) { //Supersampled rasterization
+            int coverage = 0;
+            for(uint j: range(oversample)) for(int i: range(oversample)) {
+                acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);
+                //assert_(acc[j]>=0, acc[j]);
+                coverage += acc[j]!=0;
+            }
+            if(coverage) blend(target, x, y, color, float(coverage)/sq(oversample)*alpha);
         }
     }
 }
@@ -355,7 +362,7 @@ struct MusicXML : Widget {
                         vec2 A = vec2(timeTrack.at(slur.first().time), y0+Y(clefs, slur.first().staff, slur.first().note.step)) + vec2(noteSize.x/2, -2*noteSize.y);
                         vec2 C = vec2(p) + vec2(noteSize.x/2, -2*noteSize.y);
                         vec2 B = vec2((A.x+C.x)/2, max(A.y,C.y)) + vec2(0, -3*noteSize.y);
-                        vec2 D = B + vec2(0, -noteSize.y);
+                        vec2 D = B + vec2(0, -noteSize.y/2);
                         quadratic(target, {A,B,C,D});
                         slur.clear();
                     } // TODO: continue
@@ -377,7 +384,6 @@ struct MusicXML : Widget {
                     if(x > int(target.width)) break;
                     x += noteSize.x;
                 }
-                break;
             }
             else if(sign.type == Sign::Dynamic) {
                 string word = ref<string>{"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_}[uint(sign.dynamic.loudness)];
