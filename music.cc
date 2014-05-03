@@ -29,6 +29,12 @@ struct Note {
 struct Rest {
     Duration duration;
 };
+struct Measure {
+    uint index;
+};
+struct Pedal {
+    Action action;
+};
 struct Dynamic {
     Loudness loudness;
 };
@@ -42,9 +48,6 @@ struct Metronome {
     Duration beatUnit;
     uint perMinute;
 };
-struct Pedal {
-    Action action;
-};
 
 struct Sign {
     uint time; // Absolute time offset
@@ -54,6 +57,7 @@ struct Sign {
     union {
         struct Note note;
         struct Rest rest;
+        struct Measure measure;
         struct Clef clef;
         struct KeySignature keySignature;
         struct TimeSignature timeSignature;
@@ -75,7 +79,7 @@ struct MusicXML : Widget {
     Window window {this, int2(0, 384), "MusicXML"_};
     MusicXML() {
         Element root = parseXML(readFile("Storytime.xml"_, Folder("Scores"_,home())));
-        map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0}; uint time = 0, nextTime = 0;
+        map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0}; uint time = 0, nextTime = 0; uint measureIndex=1;
         root.xpath("score-partwise/part/measure"_, [&](const Element& m) {
             for(const Element& e: m.children) {
                 if(!(e.name=="note"_ && e("chord"_))) time = nextTime; // Reverts previous advance
@@ -163,8 +167,9 @@ struct MusicXML : Widget {
                 else error(e);
             }
             time=nextTime;
-            signs.insertSorted(Sign{time, 0, 0, Sign::Measure, {}});
-            signs.insertSorted(Sign{time, 0, 1, Sign::Measure, {}});
+            measureIndex++;
+            {Sign sign{time, 0, 0, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
+            {Sign sign{time, 0, 1, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
         });
         window.background = Window::White;
         window.actions[Escape] = []{exit();};
@@ -215,7 +220,8 @@ struct MusicXML : Widget {
         fill(target, Rect(int2(x-1, y0+staffMargin), int2(x+1, y0+staffMargin+staffHeight+4*lineInterval))); // System
 
         map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
-        array<Sign> beams[2]; // Signs belonging to current beam (per staff)
+        typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
+        array<Chord> beams[2]; // Chords belonging to current beam (per staff)
         array<Sign> slurs[2]; // Signs belonging to current slur (per staff)
         uint pedalStartTime = 0; // Current pedal start time
         struct Position { // Holds positions for both notes (default) and directions (explicit)
@@ -227,55 +233,57 @@ struct MusicXML : Widget {
         map<uint, Position> timeTrack; // Maps times to positions
         uint noteIndex = 0;
         for(Sign sign: signs) {
-            array<Sign>& beam = beams[sign.staff];
+            array<Chord>& beam = beams[sign.staff];
             if(beam && (
-                        (sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 && sign.time>beam.first().time) || // Beam at half measure
-                        (beam.first().time%divisions && sign.time>beam.first().time) || // Off beat (tail after complete chord)
+                        (sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 && sign.time>beam[0][0].time) || // Beam at half measure
+                        (beam[0][0].time%divisions && sign.time>beam[0][0].time) || // Off beat (tail after complete chord)
                         (sign.type != Sign::Note && sign.type != Sign::Clef) ||
                         (sign.type == Sign::Note && sign.note.duration<Eighth))) {
-                int clefStepSum = 0; for(Sign sign: beam) clefStepSum += clefStep(sign.note.clef.clefSign, sign.note.step);
+                int clefStepSum = 0; for(const Chord& chord: beam) for(Sign sign: chord) clefStepSum += clefStep(sign.note.clef.clefSign, sign.note.step);
                 bool tailUp = clefStepSum < (int(beam.size) * -4); // Average note height below mid staff
 
-                if(beam.first().time==beam.last().time) { // Draws single tail
-                    Sign sign = tailUp ? max(beam) : min(beam);
+                if(beam.size==1) { // Draws single tail
+                    Sign sign = tailUp ? beam[0].last() : beam[0].first();
                     int x = timeTrack.at(sign.time) + (tailUp?noteSize.x-2:0);
-                    int yMin = y0+Y(sign.note.clef, sign.staff, min(beam).note.step);
-                    int yMax = y0+Y(sign.note.clef, sign.staff, max(beam).note.step);
-                    fill(target, Rect(int2(x, yMax-tailUp*tailLength),int2(x+tailWidth, yMin+(!tailUp)*tailLength)));
+                    int yMin = y0+Y(sign.note.clef, sign.staff, beam[0].first().note.step);
+                    int yMax = y0+Y(sign.note.clef, sign.staff, beam[0].last().note.step);
+                    fill(target, Rect(int2(x, yMax-tailUp*tailLength), int2(x+tailWidth, yMin+(!tailUp)*tailLength)));
                     int yTail = tailUp ? yMax-tailLength : yMin+tailLength;
                     /**/ if(sign.note.duration==Eighth) glyph(target, int2(x+tailWidth, yTail), tailUp?"flags.u3"_:"flags.d3"_);
                     else if(sign.note.duration==Sixteenth) glyph(target, int2(x+tailWidth, yTail), tailUp?"flags.u4"_:"flags.d4"_);
                 } else if(beam.size==2) { // Draws slanted beam
-                    for(Sign sign: beam) {
+                    for(const Chord& chord: beam) {
+                        Sign sign = chord.first();
                         int x = timeTrack.at(sign.time)+(tailUp?noteSize.x-2:0);
-                        int y = y0+Y(sign.note.clef, sign.staff, sign.note.step);
-                        int y1 = y+(tailUp?-1:1)*(tailLength-noteSize.y);
+                        int y = y0+Y(sign.note.clef, sign.staff, (tailUp?chord.first():chord.last()).note.step);
+                        int y1 = y0+Y(sign.note.clef, sign.staff, (tailUp?chord.last():chord.first()).note.step)+(tailUp?-1:1)*(tailLength-noteSize.y);
                         fill(target, Rect(int2(x,min(y,y1)),int2(x+tailWidth, max(y,y1))));
                     }
-                    int2 p0 (timeTrack.at(beam.first().time)+(tailUp?noteSize.x-2:0),
-                             y0+Y(beam.first().note.clef, beam.first().staff, beam.first().note.step)+(tailUp?-1:1)*(tailLength-noteSize.y));
-                    int2 p1 (timeTrack.at(beam.last ().time)+(tailUp?noteSize.x-2:0)+tailWidth,
-                             y0+Y(beam.last().note.clef, beam.last ().staff, beam.last ().note.step)+(tailUp?-1:1)*(tailLength-noteSize.y));
+                    int2 p0 (timeTrack.at(beam.first()[0].time)+(tailUp?noteSize.x-2:0),
+                             y0+Y(beam.first()[0].note.clef, beam.first()[0].staff, beam.first()[0].note.step)+(tailUp?-1:1)*(tailLength-noteSize.y));
+                    int2 p1 (timeTrack.at(beam.last ()[0].time)+(tailUp?noteSize.x-2:0)+tailWidth,
+                             y0+Y(beam.last()[0].note.clef, beam.last()[0].staff, beam.last()[0].note.step)+(tailUp?-1:1)*(tailLength-noteSize.y));
                     parallelogram(target, p0, p1, noteSize.y/2);
                 } else { // Draws horizontal beam
                     int tailY = tailUp ? 0 : target.size().y;
                     if(tailUp) {
-                        for(Sign sign: beam) tailY = max(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?1:2)));
-                        for(Sign sign: beam) tailY = min(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?2:1)));
+                        for(const Chord& chord: beam) for(Sign sign: chord) tailY = max(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?1:2)));
+                        for(const Chord& chord: beam) for(Sign sign: chord) tailY = min(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?2:1)));
                     } else {
-                        for(Sign sign: beam) tailY = min(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?2:1)));
-                        for(Sign sign: beam) tailY = max(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?1:2)));
+                        for(const Chord& chord: beam) for(Sign sign: chord) tailY = min(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?2:1)));
+                        for(const Chord& chord: beam) for(Sign sign: chord) tailY = max(tailY, y0+Y(sign.note.clef, sign.staff, sign.note.step)+(tailUp?-1:1)*(tailLength/(tailUp?1:2)));
                     }
-                    for(Sign sign: beam) {
+                    for(const Chord& chord: beam) for(Sign sign: chord) {
                         int x = timeTrack.at(sign.time) + (tailUp ? noteSize.x-2 : 0);
                         int y = y0+Y(sign.note.clef, sign.staff, sign.note.step);
                         fill(target, Rect(int2(x,min(y, tailY)),int2(x+tailWidth, max(tailY, y))));
                     }
-                    fill(target, Rect(int2(timeTrack.at(beam.first().time) + (tailUp ? noteSize.x-2 : 0),            tailY-(tailUp?noteSize.y/2:0)),
-                                      int2(timeTrack.at(beam.last().time) + (tailUp ? noteSize.x-2 : 0) + tailWidth, tailY+(tailUp?0:noteSize.y/2))));
+                    fill(target, Rect(int2(timeTrack.at(beam.first()[0].time) + (tailUp ? noteSize.x-2 : 0),            tailY-(tailUp?noteSize.y/2:0)),
+                                      int2(timeTrack.at(beam.last()[0].time) + (tailUp ? noteSize.x-2 : 0) + tailWidth, tailY+(tailUp?0:noteSize.y/2))));
                 }
 
-                for(Sign sign: beam) {
+                for(const Chord& chord: beam) {
+                    Sign sign = tailUp ? chord.first() : chord.last();
                     int x = timeTrack.at(sign.time) + noteSize.x/2;
                     int y = y0+Y(sign.note.clef, sign.staff, sign.note.step) + (tailUp?1:-1) * noteSize.y;
                     if(sign.note.staccato) glyph(target, int2(x,y),"scripts.staccato"_);
@@ -302,7 +310,8 @@ struct MusicXML : Widget {
                     if(sign.note.accidental == Flat) glyph(target, p+int2(-noteSize.x,0),"accidentals.flat"_);
                     if(sign.note.accidental == Natural) glyph(target, p+int2(-noteSize.x,0),"accidentals.natural"_);
                     if(sign.note.accidental == Sharp) glyph(target, p+int2(-noteSize.x,0),"accidentals.sharp"_);
-                    beam << sign;
+                    if(beam && beam.last().last().time == sign.time) beam.last().insertSorted(sign);
+                    else beam << Chord{ref<Sign>{sign}};
                 }
                 if(sign.note.dot) glyph(target, p+int2(16,4),"dots.dot"_);
                 array<Sign>& slur = slurs[sign.staff];
@@ -339,6 +348,13 @@ struct MusicXML : Widget {
                 if(sign.staff==0) {
                     fill(target, Rect(int2(x-1, y0+staffY(0,0)),int2(x+1, y0+staffY(1,-8))));
                     x += noteSize.x;
+                    uint sx = x;
+                    for(uint8 code: dec(sign.measure.index)) {
+                        uint16 index = textFont.index(code);
+                        const Glyph& glyph = textFont.glyph(index);
+                        blit(target, int2(sx, y0)+glyph.offset, glyph.image, black);
+                        sx += textFont.advance(index);
+                    }
                 }
             }
             else if(sign.type == Sign::Pedal) {
