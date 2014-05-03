@@ -71,22 +71,4 @@ audio/audio.h
 audio/audio.cc
 audio/ffmpeg.cc
 
-music/flac.cc
-music/music.cc
-music/pdf.h
-music/pdf.cc
-music/encoder.cc
-music/encoder.h
-music/keyboard.cc
-music/score.cc
-music/score.h
-music/midi.cc
-music/midi.h
-
-tuner/fft.cc
-tuner/pitch.cc
-tuner/stretch.cc
-tuner/tuner.cc
-tuner/profile.h
-tuner/estimate.cc
-tuner/normalize.cc
+music.cc
