@@ -37,19 +37,19 @@ inline void line(Image8& raster, int2 p0, int2 p1) {
     lastStepY=sy;
 }
 
-inline void quadratic(Image8& raster, vec2 A, vec2 B, vec2 C) {
-    const int N = 9;
+inline vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
+inline void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
+    const int N = 12;
     int2 a = int2(round(A));
     for(int i : range(1,N+1)) {
-        float t = float(i)/N;
-        int2 b = int2(round(((1-t)*(1-t))*A + (2*(1-t)*t)*B + (t*t)*C));
+        int2 b = int2(round(cubic(A,B,C,D,float(i)/N)));
         line(raster, a, b);
         a=b;
     }
 }
 
-// Renders quadratic spline (vertices are alternatively end (on) or control (off) points)
-void quadratic(const Image& target, const ref<vec2>& points, vec3 color=black, float alpha=1) {
+// Renders cubic spline (two control points between each end point)
+void cubic(const Image& target, const ref<vec2>& points, vec3 color=black, float alpha=1) {
     vec2 pMin = vec2(target.size()), pMax = 0;
     for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
     pMin = floor(pMin), pMax = ceil(pMax);
@@ -58,8 +58,9 @@ void quadratic(const Image& target, const ref<vec2>& points, vec3 color=black, f
     if(!size) return;
     const uint oversample = 8;
     Image8 raster(oversample*size.x+1,oversample*size.y+1);
-    for(uint i=0;i<points.size; i+=2) {
-        quadratic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin), float(oversample)*(points[(i+2)%points.size]-pMin));
+    for(uint i=0;i<points.size; i+=3) {
+        cubic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin), float(oversample)*(points[(i+2)%points.size]-pMin),
+                float(oversample)*(points[(i+3)%points.size]-pMin));
     }
     iMin = max(int2(0),iMin), iMax = min(target.size(), iMax);
     for(uint y: range(iMin.y, iMax.y)) {
@@ -359,11 +360,13 @@ struct MusicXML : Widget {
                 if(sign.note.slur) {
                     if(!slur) slur << sign; // Starts
                     else { // Stops
-                        vec2 A = vec2(timeTrack.at(slur.first().time), y0+Y(clefs, slur.first().staff, slur.first().note.step)) + vec2(noteSize.x/2, -2*noteSize.y);
-                        vec2 C = vec2(p) + vec2(noteSize.x/2, -2*noteSize.y);
-                        vec2 B = vec2((A.x+C.x)/2, max(A.y,C.y)) + vec2(0, -3*noteSize.y);
-                        vec2 D = B + vec2(0, -noteSize.y/2);
-                        quadratic(target, {A,B,C,D});
+                        vec2 p0 = vec2(timeTrack.at(slur.first().time), y0+Y(clefs, slur.first().staff, slur.first().note.step)) + vec2(noteSize.x/2, -2*noteSize.y);
+                        vec2 p1 = vec2(p) + vec2(noteSize.x/2, -2*noteSize.y);
+                        vec2 k0 = vec2(p0.x, max(p0.y,p1.y)) + vec2(0, -3*noteSize.y);
+                        vec2 k0p = k0 + vec2(0, -noteSize.y/2);
+                        vec2 k1 = vec2(p1.x, max(p0.y,p1.y)) + vec2(0, -3*noteSize.y);
+                        vec2 k1p = k1 + vec2(0, -noteSize.y/2);
+                        cubic(target, {p0,k0,k1,p1,k1p,k0p});
                         slur.clear();
                     } // TODO: continue
                 }
