@@ -185,7 +185,7 @@ static void line(Image8& raster, int2 p0, int2 p1) {
 
 static vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
-    const int N = 12;
+    const int N = 16; //FIXME
     int2 a = int2(round(A));
     for(int i : range(1,N+1)) {
         int2 b = int2(round(cubic(A,B,C,D,float(i)/N)));

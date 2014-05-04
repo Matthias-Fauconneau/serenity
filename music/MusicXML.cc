@@ -4,14 +4,20 @@
 array<Sign> parse(string document, uint& divisions) {
     array<Sign> signs;
     Element root = parseXML(document);
-    map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0}; uint time = 0, nextTime = 0; uint measureIndex=1;
-    root.xpath("score-partwise/part/measure"_, [&](const Element& m) {
+    map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; uint time = 0, nextTime = 0, maxTime = 0;
+    uint measureIndex=1;
+    for(const Element& m: root("score-partwise"_)("part"_).children) {
+        assert_(m.name=="measure"_, m);
+        log("Measure:", measureIndex);
         for(const Element& e: m.children) {
-            if(!(e.name=="note"_ && e("chord"_))) time = nextTime; // Reverts previous advance
+            if(!(e.name=="note"_ && e("chord"_))) time = nextTime; // Advances time (except chords)
+            log("time", time%(timeSignature.beats*divisions));
+            maxTime = max(maxTime, time);
 
             if(e.name=="note"_) {
+                if(e("grace"_)) continue; // FIXME
                 uint duration = e("duration"_) ? fromInteger(e("duration"_).text()) : 0;
-                nextTime = time+duration;
+                if(!e("chord"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
                 uint staff = fromInteger(e("staff"_).text())-1;
                 Duration type = Duration(ref<string>{"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}.indexOf(e("type"_).text()));
@@ -29,10 +35,9 @@ array<Sign> parse(string document, uint& divisions) {
                         else assert_(e("notations"_)("slur"_).attribute("type"_)=="start"_, e("notations"_)("slur"_).attribute("type"_), e);
                         slurs[staff] = !slurs[staff];
                     }
-                    //signs << Sign{time, staff, Sign::Note, .note={pitch, accidental, type, e("grace"_)?true:false}};
                     {Sign sign{time, duration, staff, Sign::Note, {}};
                         sign.note={clefs.at(staff), step, accidental, type,
-                                   false /*dot*/,
+                                   e("dot"_) ? true : false,
                                    e("notations"_)("slur"_)?true:false,
                                    e("grace"_)?true:false,
                                    e("notations"_)("articulations"_)("staccato"_)?true:false,
@@ -44,11 +49,16 @@ array<Sign> parse(string document, uint& divisions) {
                 }
             }
             else if(e.name=="backup"_) {
-                time -= fromInteger(e("duration"_).text());
+                int dt = fromInteger(e("duration"_).text());
+                time -= dt;
+                log("<<", dt);
                 nextTime = time;
             }
             else if(e.name=="forward"_) {
-                time += fromInteger(e("duration"_).text());
+                int dt =  fromInteger(e("duration"_).text());
+                time += dt;
+                log(">>", dt);
+                //maxTime = max(maxTime, time);
                 nextTime = time;
             }
             else if(e.name=="direction"_) {
@@ -98,9 +108,13 @@ array<Sign> parse(string document, uint& divisions) {
             else error(e);
         }
         time=nextTime;
+        maxTime = max(maxTime, time);
+        //time=maxTime;
         measureIndex++;
         {Sign sign{time, 0, 0, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
         {Sign sign{time, 0, 1, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
-    });
+        if(time%(timeSignature.beats*divisions)!=0) break;
+        assert_(time%(timeSignature.beats*divisions)==0, measureIndex, time, timeSignature.beats, divisions);
+    }
     return signs;
 }

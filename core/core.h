@@ -152,6 +152,19 @@ generic struct ref {
     /// Slices a reference to elements from \a start to \a stop
     ref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
+    struct reverse_ref {
+        const T* start; const T* stop;
+        struct iterator {
+            const T* pointer;
+            const T& operator*() { return *pointer; }
+            iterator& operator++() { pointer--; return *this; }
+            bool operator !=(const iterator& o) const { return pointer>=o.pointer; }
+        };
+        iterator begin() const { return {start}; }
+        iterator end() const { return {stop}; }
+    };
+    reverse_ref reverse() { return {end()-1, begin()}; }
+
     /// Compares all elements
     bool operator ==(const ref<T>& o) const {
         if(size != o.size) return false;

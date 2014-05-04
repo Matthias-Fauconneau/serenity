@@ -66,7 +66,6 @@ generic struct array : buffer<T> {
     }
     /// Inserts immediately before the first element greater than the argument
     template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i,move(e)); return i; }
-    //template<Type V> int insertSorted(V&& e) { int i=size-1; while(i>=0 && at(i) > e) i--; insertAt(i,move(e)); return i; } // Starts search from back
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy(raw(at(i)), raw(at(i+1))); size--; }
@@ -79,8 +78,6 @@ generic struct array : buffer<T> {
     template<Type K> int tryRemove(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
     /// Removes one matching element and returns an index to its successor, aborts if not sed
     template<Type K> int remove(const K& key) { int i=indexOf(key); assert(i>=0); removeAt(i); return i; }
-    /// Removes all matching elements
-    //template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
     template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
