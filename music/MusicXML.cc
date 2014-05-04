@@ -61,11 +61,14 @@ array<Sign> parse(string document, uint& divisions) {
                     {Sign sign{time, 0, 0, Sign::Metronome, {}}; sign.metronome={beatUnit, perMinute}; signs << sign;}
                 }
                 else if(d("pedal"_)) {
-                    Action action = Action(ref<string>{"start"_,"change"_,"stop"_}.indexOf(d("pedal"_)["type"_]));
+                    PedalAction action = PedalAction(ref<string>{"start"_,"change"_,"stop"_}.indexOf(d("pedal"_)["type"_]));
                     if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
                     {Sign sign{time, 0, 0, Sign::Pedal, {}}; sign.pedal={action}; signs << sign;}
                 }
-                else if(d("wedge"_)) {}
+                else if(d("wedge"_)) {
+                    WedgeAction action = WedgeAction(ref<string>{"crescendo"_,"diminuendo"_,"stop"_}.indexOf(d("wedge"_)["type"_]));
+                    {Sign sign{time, 0, 0, Sign::Wedge, {}}; sign.wedge={action}; signs << sign;}
+                }
                 else if(d("octave-shift"_)) {}
                 else if(d("other-direction"_)) {}
                 else error(e);

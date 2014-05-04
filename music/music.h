@@ -5,7 +5,8 @@ enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
 enum Loudness { ppp, pp, p, mp, mf, f, ff, fff };
-enum Action { Ped=-1, Start, Change, Stop };
+enum PedalAction { Ped=-1, Start, Change, PedalStop };
+enum WedgeAction { Crescendo, Diminuendo, WedgeStop };
 
 struct Clef {
     ClefSign clefSign;
@@ -30,7 +31,10 @@ struct Measure {
     uint index;
 };
 struct Pedal {
-    Action action;
+    PedalAction action;
+};
+struct Wedge {
+    WedgeAction action;
 };
 struct Dynamic {
     Loudness loudness;
@@ -50,7 +54,7 @@ struct Sign {
     uint time; // Absolute time offset
     uint duration;
     uint staff; // Staff index
-    enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome, Pedal } type;
+    enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome, Pedal, Wedge } type;
     union {
         struct Note note;
         struct Rest rest;
@@ -61,6 +65,7 @@ struct Sign {
         struct Metronome metronome;
         struct Dynamic dynamic;
         struct Pedal pedal;
+        struct Wedge wedge;
     };
 };
 inline bool operator <(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step; return a.time < b.time; }
