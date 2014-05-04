@@ -165,7 +165,7 @@ struct Image8 {
 };
 
 // FIXME: Coverage integration
-static int lastStepY; //dont flag first/last point twice but cancel on direction changes
+static int lastStepY = 0; // Do not flag first/last point twice but cancel on direction changes
 static void line(Image8& raster, int2 p0, int2 p1) {
     int x0=p0.x, y0=p0.y, x1=p1.x, y1=p1.y;
     int dx = abs(x1-x0);
@@ -200,15 +200,16 @@ void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha
     for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
     pMin = floor(pMin), pMax = ceil(pMax);
     const int2 iMin = int2(pMin), iMax = int2(pMax);
+    const int2 cMin = max(int2(0),iMin), cMax = min(target.size(), iMax);
+    if(!(cMin < cMax)) return;
     const int2 size = iMax-iMin;
-    if(!size) return;
     const uint oversample = 8;
     Image8 raster(oversample*size.x+1,oversample*size.y+1);
+    lastStepY = 0;
     for(uint i=0;i<points.size; i+=3) {
         cubic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin), float(oversample)*(points[(i+2)%points.size]-pMin),
                 float(oversample)*(points[(i+3)%points.size]-pMin));
     }
-    const int2 cMin = max(int2(0),iMin), cMax = min(target.size(), iMax);
     for(uint y: range(cMin.y, cMax.y)) {
         int acc[oversample]={};
         for(uint x: range(iMin.x, cMin.x)) for(uint j: range(oversample)) for(uint i: range(oversample)) acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);

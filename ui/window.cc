@@ -202,14 +202,11 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                    e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
         }
-        else if(type==Expose) { if(!e.expose.count) render(); }
+        else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.y==0 && e.expose.w==1 && e.expose.h==1)) render(); }
         else if(type==UnmapNotify) mapped=false;
         else if(type==MapNotify) { mapped=true; if(needUpdate) queue(); }
         else if(type==ReparentNotify) {}
-        else if(type==ConfigureNotify) {
-            position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-            if(this->size!=size) { this->size=size; render(); }
-        }
+        else if(type==ConfigureNotify) { position=int2(e.configure.x,e.configure.y); }
         else if(type==GravityNotify) {}
         else if(type==ClientMessage) {
             function<void()>* action = actions.find(Escape);

@@ -146,7 +146,7 @@ struct Build {
                 if(wait(pid)) fail();
                 pids.remove(pid);
             }
-            {static const array<string> flags = split("-c -pipe -std=c++11 -Wall -Wextra -Wno-overloaded-virtual -o"_);
+            {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }

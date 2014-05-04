@@ -71,4 +71,6 @@ audio/audio.h
 audio/audio.cc
 audio/ffmpeg.cc
 
-music.cc
+music/music.cc
+music/MusicXML.cc
+music/music.h

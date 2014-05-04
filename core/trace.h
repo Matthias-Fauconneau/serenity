@@ -7,4 +7,4 @@ struct Symbol { String function; string file; uint line=0; };
 /// Returns symbolic informations (file, function and line) corresponding to \a address
 Symbol findSymbol(void* address);
 /// Traces current stack skipping first \a skip frames
-String trace(int skip, void* ip=0);
+String trace(int skip=0, void* ip=0);

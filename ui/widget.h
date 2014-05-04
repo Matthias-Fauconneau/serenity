@@ -1,7 +1,7 @@
 #pragma once
 /// \file widget.h Widget interface to compose user interfaces
 #include "graphics.h"
-#if !__arm__ && __GXX_EXPERIMENTAL_CXX0X__ /*!QtCreator*/
+#if !__arm__
 #define X11 1
 #endif
 

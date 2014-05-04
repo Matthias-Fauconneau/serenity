@@ -66,6 +66,7 @@ generic struct array : buffer<T> {
     }
     /// Inserts immediately before the first element greater than the argument
     template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i,move(e)); return i; }
+    //template<Type V> int insertSorted(V&& e) { int i=size-1; while(i>=0 && at(i) > e) i--; insertAt(i,move(e)); return i; } // Starts search from back
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) copy(raw(at(i)), raw(at(i+1))); size--; }
@@ -166,7 +167,7 @@ generic T quickselect(const mref<T>& at, size_t left, size_t right, size_t k) {
 /// Quickselects the median in-place
 generic T median(const mref<T>& at) { if(at.size==1) return at[0u]; return quickselect(at, 0, at.size-1, at.size/2); }
 
-generic void quicksort(mref<T>& at, int left, int right) {
+generic void quicksort(const mref<T>& at, int left, int right) {
     if(left < right) { // If the list has 2 or more items
         int pivotIndex = partition(at, left, right, (left + right)/2);
         if(pivotIndex) quicksort(at, left, pivotIndex-1);
@@ -174,4 +175,4 @@ generic void quicksort(mref<T>& at, int left, int right) {
     }
 }
 /// Quicksorts the array in-place
-generic void quicksort(mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }
+generic void quicksort(const mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }

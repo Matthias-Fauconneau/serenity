@@ -86,7 +86,7 @@ struct Window : Device {
     /// Drag state
     int2 dragStart, dragPosition, dragSize;
     /// Whether a render request was skipped while unmapped
-    bool needUpdate = true;
+    bool needUpdate = false;
     /// Whether the current display is active
     bool displayState = true;
     /// Pending long actions
