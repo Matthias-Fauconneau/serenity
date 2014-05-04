@@ -4,7 +4,7 @@
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
-enum Loudness { ppp, pp, p, mp, mf, f, ff, fff };
+enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
 enum PedalAction { Ped=-1, Start, Change, PedalStop };
 enum WedgeAction { Crescendo, Diminuendo, WedgeStop };
 
@@ -23,6 +23,7 @@ struct Note {
     bool staccato:1;
     bool tenuto:1;
     bool accent:1;
+    bool stem:1; // 0: down, 1: up
 };
 struct Rest {
     Duration duration;
@@ -68,5 +69,19 @@ struct Sign {
         struct Wedge wedge;
     };
 };
-inline bool operator <(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step; return a.time < b.time; }
-inline bool operator <=(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step; return a.time <= b.time; }
+/*inline bool operator <(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step; return a.time < b.time; }
+inline bool operator <=(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step; return a.time <= b.time; }*/
+inline bool operator <(const Sign& a, const Sign& b) {
+    if(a.time==b.time) {
+        if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
+        if(a.type==Sign::Pedal || b.type==Sign::Pedal) return a.type < b.type;
+    }
+    return a.time < b.time;
+}
+inline bool operator <=(const Sign& a, const Sign& b) {
+    if(a.time==b.time) {
+        if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
+        if(a.type==Sign::Pedal || b.type==Sign::Pedal) return a.type <= b.type;
+    }
+    return a.time <= b.time;
+}

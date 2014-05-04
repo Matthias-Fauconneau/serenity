@@ -36,6 +36,7 @@ array<Sign> parse(string document, uint& divisions) {
                                    e("notations"_)("articulations"_)("staccato"_)?true:false,
                                    e("notations"_)("articulations"_)("tenuto"_)?true:false,
                                    e("notations"_)("articulations"_)("accent"_)?true:false,
+                                   e("stem").text() == "up"_
                                   };
                         signs.insertSorted(sign);};
                 }
@@ -63,7 +64,8 @@ array<Sign> parse(string document, uint& divisions) {
                 else if(d("pedal"_)) {
                     PedalAction action = PedalAction(ref<string>{"start"_,"change"_,"stop"_}.indexOf(d("pedal"_)["type"_]));
                     if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
-                    {Sign sign{time, 0, 0, Sign::Pedal, {}}; sign.pedal={action}; signs << sign;}
+                    int offset = e("offset"_) ? fromInteger(e("offset"_).text()) : 0;
+                    {Sign sign{time + offset, 0, 0, Sign::Pedal, {}}; sign.pedal={action}; signs.insertSorted(sign);}
                 }
                 else if(d("wedge"_)) {
                     WedgeAction action = WedgeAction(ref<string>{"crescendo"_,"diminuendo"_,"stop"_}.indexOf(d("wedge"_)["type"_]));
