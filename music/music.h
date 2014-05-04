@@ -74,14 +74,16 @@ inline bool operator <=(const Sign& a, const Sign& b) { if(a.time==b.time && a.t
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
         if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
-        if(a.type==Sign::Pedal || b.type==Sign::Pedal) return a.type < b.type;
+        if(a.type==Sign::Pedal && b.type==Sign::Measure) return a.type < b.type;
+        if(b.type==Sign::Pedal && a.type==Sign::Measure) return a.type < b.type;
     }
     return a.time < b.time;
 }
 inline bool operator <=(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
         if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
-        if(a.type==Sign::Pedal || b.type==Sign::Pedal) return a.type <= b.type;
+        if(a.type==Sign::Pedal && b.type==Sign::Measure) return a.type <= b.type;
+        if(b.type==Sign::Pedal && a.type==Sign::Measure) return a.type <= b.type;
     }
     return a.time <= b.time;
 }

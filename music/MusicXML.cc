@@ -10,10 +10,12 @@ array<Sign> parse(string document, uint& divisions) {
             if(!(e.name=="note"_ && e("chord"_))) time = nextTime; // Reverts previous advance
 
             if(e.name=="note"_) {
+                uint duration = e("duration"_) ? fromInteger(e("duration"_).text()) : 0;
+                nextTime = time+duration;
+                if(e["print-object"_]=="no"_) continue;
                 uint staff = fromInteger(e("staff"_).text())-1;
                 Duration type = Duration(ref<string>{"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}.indexOf(e("type"_).text()));
                 assert_(int(type)>=0, e);
-                uint duration = e("duration"_) ? fromInteger(e("duration"_).text()) : 0;
                 if(e("rest"_)) {
                     {Sign sign{time, duration, staff, Sign::Rest, {}}; sign.rest={type}; signs.insertSorted(sign);}
                 } else {
@@ -40,7 +42,6 @@ array<Sign> parse(string document, uint& divisions) {
                                   };
                         signs.insertSorted(sign);};
                 }
-                nextTime = time+duration;
             }
             else if(e.name=="backup"_) {
                 time -= fromInteger(e("duration"_).text());

@@ -23,8 +23,9 @@ struct MusicXML : Widget {
 
     // Layout
     const int staffCount = 2;
-    const int halfLineInterval = 4, lineInterval = 2*halfLineInterval;
-    const int lineWidth = 1, stemWidth = 1, stemLength = 8*halfLineInterval, beamWidth = 6;
+    const int halfLineInterval = 5, lineInterval = 2*halfLineInterval;
+    const int lineWidth = 1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
+    const int shortStemLength = 5*halfLineInterval;
 
     int clefStep(ClefSign clefSign, int step) { return step - (clefSign==Treble ? 10 : -2); } // Translates C4 step to top line step using clef
     int staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
@@ -33,7 +34,7 @@ struct MusicXML : Widget {
     int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     Font textFont{File("FreeSerifBold.ttf"_,Folder("Scores"_,home())), 6*halfLineInterval};
-    Font font {File("emmentaler-26.otf"_, Folder("Scores"_,home())), 5*lineInterval};
+    Font font {File("emmentaler-26.otf"_, Folder("Scores"_,home())), 9*halfLineInterval};
     vec2 glyphSize(const string name) { return font.size(font.index(name)); }
     float advance(const string name) { return font.advance(font.index(name)); }
     int2 noteSize = int2(round(glyphSize("noteheads.s2"_)));
@@ -57,7 +58,7 @@ struct MusicXML : Widget {
     array<Cubic> cubics;
 
     map<uint, vec3> colors; // Overrides color for Blit index
-    uint position = 58-1;
+    uint position = 66-1;
 
     float glyph(int2 position, const string name) {
         uint16 index = font.index(name);
@@ -136,13 +137,12 @@ struct MusicXML : Widget {
                     parallelograms << Parallelogram{p0, p1, beamWidth};
                 } else { // Draws horizontal beam
                     int stemY = stemUp ? -1000 : 1000; //FIXME
-                    const int shortLength = 3*lineInterval;
                     if(stemUp) {
                         for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)-stemLength);
-                        for(const Chord& chord: beam) for(Sign sign: chord) stemY = min(stemY, Y(sign)-shortLength);
+                        for(const Chord& chord: beam) for(Sign sign: chord) stemY = min(stemY, Y(sign)-shortStemLength);
                     } else {
                         for(const Chord& chord: beam) for(Sign sign: chord) stemY = min(stemY, Y(sign)+stemLength);
-                        for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)+shortLength);
+                        for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)+shortStemLength);
                     }
                     stemY = stemUp ? min(stemY, staffY(sign.staff, -4)) : max(stemY, staffY(sign.staff, -4));
                     for(const Chord& chord: beam) for(Sign sign: chord) {
@@ -159,11 +159,12 @@ struct MusicXML : Widget {
                     int x = X(sign) + noteSize.x/2;
                     int step = clefStep(sign.note.clef.clefSign, sign.note.step);
                     int y = Y(sign) + (stemUp?1:-1) * (lineInterval+(step%2?0:halfLineInterval));
-                    if(chord.first().note.staccato) glyph(int2(x,y),"scripts.staccato"_);
-                    if(chord.first().note.tenuto) glyph(int2(x,y),"scripts.tenuto"_);
+                    if(chord.first().note.staccato) { glyph(int2(x,y),"scripts.staccato"_); y+=lineInterval; }
+                    if(chord.first().note.tenuto) { glyph(int2(x,y),"scripts.tenuto"_); y+=lineInterval; }
                     int y2 = staffY(sign.staff, stemUp ? -10 : 2);
                     y = stemUp ? max(y,y2) : min(y,y2);
-                    if(chord.first().note.accent) glyph(int2(x,y),"scripts.sforzato"_);
+                    y -= (stemUp?0:glyphSize("scripts.sforzato"_).y/2);
+                    if(chord.first().note.accent) { glyph(int2(x,y),"scripts.sforzato"_); y+=lineInterval; }
                  }
                 beam.clear();
 
@@ -201,12 +202,11 @@ struct MusicXML : Widget {
                 int2 p = int2(x, Y(clefs, staff, sign.note.step));
                 Duration duration = sign.note.duration;
                 noteToBlit << blits.size;
-                if(duration == Whole) x += 3*glyph(p, "noteheads.s0"_);
-                else {
-                    x += 3*glyph(p, duration==Half?"noteheads.s1"_:"noteheads.s2"_);
-                    if(sign.note.accidental == Flat) glyph(p+int2(-noteSize.x,0),"accidentals.flat"_);
-                    if(sign.note.accidental == Natural) glyph(p+int2(-noteSize.x,0),"accidentals.natural"_);
-                    if(sign.note.accidental == Sharp) glyph(p+int2(-noteSize.x,0),"accidentals.sharp"_);
+                x += 3*glyph(p, "noteheads.s"_+dec(min(2,int(duration))));
+                if(sign.note.accidental == Flat) glyph(p+int2(-2*noteSize.x/3,0),"accidentals.flat"_);
+                if(sign.note.accidental == Natural) glyph(p+int2(-2*noteSize.x/3,0),"accidentals.natural"_);
+                if(sign.note.accidental == Sharp) glyph(p+int2(-2*noteSize.x/3,0),"accidentals.sharp"_);
+                if(duration>=Half) {
                     if(beam && beam.last().last().time == sign.time) beam.last().insertSorted(sign);
                     else beam << Chord(ref<Sign>({sign}));
                 }
