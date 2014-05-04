@@ -12,7 +12,7 @@ const Folder& fonts();
 struct Glyph {
     bool valid=false;
     int2 offset; // (left bearing, min.y-baseline)
-    Image image; //not owned
+    Image image;
 };
 
 /// Freetype wrapper
