@@ -48,7 +48,9 @@ void Plot::render(const Image& target) {
                 }
             }
         } else {
-            assert(!log[axis]); //FIXME
+            assert_(!log[axis]); //FIXME
+            if(!(min[axis] && isNumber(min[axis]))) return;
+            assert_(min[axis] && isNumber(min[axis])); //FIXME
             tickCount[axis] = subExponent(min[axis]);
             if(max[axis] > 0) {
                 float tickWidth = -min[axis]/tickCount[axis];

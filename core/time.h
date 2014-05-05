@@ -87,11 +87,11 @@ struct Random {
     void seed() { sz=rdtsc(); sw=rdtsc(); }
 #endif
     void reset() { z=sz; w=sw; }
-    uint64 next() {
+    uint next() {
         z = 36969 * (z & 0xFFFF) + (z >> 16);
         w = 18000 * (w & 0xFFFF) + (w >> 16);
         return (z << 16) + w;
     }
-    operator uint64() { return next(); }
+    operator uint() { return next(); }
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };

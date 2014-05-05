@@ -2,6 +2,7 @@
 #include "update.h"
 #include "adjoint.h"
 #include "approximate.h"
+#include "MLEM.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -82,13 +83,16 @@ struct Tomography {
     VolumeF x0 = phantom.volume(N);
     buffer<Projection> projections {P};
     buffer<ImageF> images {P};
-#if 0 // Single
+#if 1 // Single
 #if 0 // Adjoint
     string labels[1] = {"Adjoint"_};
     unique<Reconstruction> reconstructions[1] {unique<Adjoint>(N)};
-#else // Bilinear
+#elif 0 // Bilinear
     string labels[1] = {"Bilinear"_};
     unique<Reconstruction> reconstructions[1] {unique<Approximate>(N)};
+#else // MLEM
+    string labels[1] = {"MLEM"_};
+    unique<Reconstruction> reconstructions[1] {unique<MLEM>(N)};
 #endif
     HList<View> views{{{0, &reconstructions[0]->x}}};
 #elif 0 // Comparison
@@ -159,13 +163,13 @@ struct Tomography {
     void step() {
         // Step forward the reconstruction which consumed the least time.
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
-        log_(left(labels[index],16)+"\t"_);
+        //log_(left(labels[index],16)+"\t"_);
         reconstructions[index]->step(projections, images);
         const float PSNR = 10*log10(SSQ / ::SSE(reconstructions[index]->x, x0));
 #if PLOT
         plot[labels[index]].insert(reconstructions[index]->totalTime.toFloat(), PSNR);
 #endif
-        log("\t", PSNR);
+        //log("\t", PSNR);
 #if WINDOW
         if(window.target) { // FIXME
 #if PLOT
