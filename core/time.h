@@ -82,7 +82,7 @@ struct Timer : Poll {
 struct Random {
     uint sz=1,sw=1;
     uint z,w;
-    Random() { /*seed();*/ reset(); }
+    Random() { seed(); reset(); }
 #if USE_TSC
     void seed() { sz=rdtsc(); sw=rdtsc(); }
 #endif

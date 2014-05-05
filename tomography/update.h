@@ -13,7 +13,7 @@ static const v8sf _00001111f = (v8sf){0,0,0,0,1,1,1,1};
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
         assert(volume.sampleCount.x == volume.sampleCount.y);
-        const float radius = (volume.sampleCount.x-1)/2, halfHeight = (volume.sampleCount.z-1)/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
+        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1)/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
         capZ = (v4sf){halfHeight, halfHeight, -halfHeight, -halfHeight};
         radiusR0R0 = (v4sf){radius*radius, 0, radius*radius, 0};
         radiusSqHeight = (v4sf){radius*radius, radius*radius, halfHeight, halfHeight};
@@ -51,7 +51,7 @@ static inline bool intersect(const Projection& projection, vec2 pixelPosition, c
     const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
-    const v4sf tMask = capSideP < volume.radiusSqHeight;
+    const v4sf tMask = capSideP <= volume.radiusSqHeight;
     if(!mask(tMask)) { /*start=_0f; end=_0f;*/ return false; }
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
