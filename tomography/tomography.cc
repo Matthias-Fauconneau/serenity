@@ -7,16 +7,7 @@
 #include "window.h"
 #include "layout.h"
 #include "graphics.h"
-
-/// Projects \a volume onto \a image according to \a projection
-inline void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
-    const CylinderVolume volume(source);
-    parallel(image.height, [&projection, &volume, &source, &image](uint, uint y) {
-        v4sf start,end;
-        mref<float> row = image.data.slice(y*image.width, image.width);
-        for(uint x: range(row.size)) row[x] = intersect(projection, vec2(x, y), volume, start, end) ? project(start, projection.ray, end, volume, source.data) : 0;
-    }, coreCount);
-}
+#include "view.h"
 
 inline float SSQ(const VolumeF& x) {
     const float* xData = x;
@@ -41,36 +32,7 @@ inline float SSE(const VolumeF& a, const VolumeF& b) {
     return sum(SSE);
 }
 
-struct View : Widget {
-    const Phantom* phantom;
-    const VolumeF* volume;
-    int2 lastPos = 0;
-    static vec2 rotation; // Shared between all views
 
-    View(const Phantom* phantom, const VolumeF* volume) : phantom(phantom), volume(volume) {}
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) {
-        int2 delta = cursor-lastPos;
-        lastPos = cursor;
-        if(!button || event != Motion) return false;
-        rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
-        rotation.y = clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
-        return true;
-    }
-    int2 sizeHint() { return int2(512); }
-    void render(const Image& target) override {
-        mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())/norm(volume->sampleCount));
-        float max = volume->sampleCount.x/2;
-        if(phantom) {
-            ImageF linear = float(volume->sampleCount.x/2) * phantom->project(target.size(), projection.scale(vec3(volume->sampleCount)/2.f));
-            convert(target, linear, max);
-        } else {
-            ImageF linear {target.size()};
-            project(linear, *volume, Projection(projection, target.size()));
-            convert(target, linear, max);
-        }
-    }
-};
-vec2 View::rotation = vec2(PI/4, -PI/3);
 
 struct Tomography {
 #if DEBUG
@@ -151,9 +113,9 @@ struct Tomography {
         step();
 
 #if WINDOW
-        window.actions[Escape] = []{ exit(); };
+        /*window.actions[Escape] = []{ exit(); };
         window.background = Window::NoBackground;
-        window.show();
+        window.show();*/
         window.displayed = {this, &Tomography::step};
 #else
         for(uint unused i: range(3)) step();

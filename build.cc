@@ -45,6 +45,7 @@ struct Build {
             return name;
         } else { // library header
             for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
+                s.whileAny(" \t"_);
                 string library=s.identifier("_"_);
                 if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += String(library); }
                 break;

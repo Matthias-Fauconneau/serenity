@@ -7,7 +7,7 @@ typedef int v4si __attribute((__vector_size__(16)));
 typedef float v4sf __attribute((__vector_size__(16)));
 typedef int v8si __attribute((__vector_size__(32)));
 typedef float v8sf __attribute((__vector_size__(32)));
-//template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 template<> inline String str(const v4sf& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 //template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
 //template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
@@ -33,6 +33,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     }
     /// Initializes components from another vec \a o casting from \a T2 to \a T
     template<template<typename> class W, Type F> explicit vec(const vec<W,F,N>& o) { for(uint i=0;i<N;i++) at(i)=(T)o[i]; }
+
     /// Unchecked accessor (const)
     const T& at(uint i) const { return ((T*)this)[i]; }
     /// Unchecked accessor
@@ -119,6 +120,8 @@ generic struct xyz {
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
+/// Unsigned integer x,y,z vector
+typedef vec<xyz,uint,3> uint3;
 /// Integer x,y,z vector (16bit)
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector

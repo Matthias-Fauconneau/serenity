@@ -1,6 +1,7 @@
 #include "image.h"
 #include "data.h"
 #include "vector.h"
+#include "graphics.h" //sRGB_forward
 
 Image clip(const Image& image, Rect r) {
     r = r & Rect(image.size());

@@ -73,3 +73,10 @@ tomography/update.h
 tomography/filter.h
 tomography/MLEM.h
 tomography/MLEM.cc
+netcdf.cc
+tomography/view.h
+tomography/view.cc
+viewer.cc
+netcdf.h
+tomography/project.h
+tomography/project.cc

@@ -21,7 +21,7 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 
-Window::Window(Widget* widget, int2 size, const string& unused title, const Image& unused icon) :
+Window::Window(Widget* widget, const string& unused title, int2 size, const Image& unused icon) :
     Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
@@ -98,6 +98,10 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
     setTitle(title);
     setIcon(icon);
+
+    actions[Escape] = []{ exit(); };
+    background = Window::NoBackground;
+    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
