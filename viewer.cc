@@ -3,15 +3,14 @@
 #include "volume.h"
 #include "view.h"
 #include "project.h"
+#include "layout.h"
 #include "window.h"
 
-struct Viewer {
+struct Volume {
     Map map;
     VolumeF volume;
-    View view { &volume };
-    Window window { &view, "Viewer"_};
-    Viewer() {
-        Folder folder ("Data/tomo_floatFcbp_nc"_, home());
+
+    Volume(const Folder& folder) {
         array<String> files = folder.list();
         for(string name: files) {
             TextData s (name);
@@ -54,5 +53,22 @@ struct Viewer {
             }
             volume = VolumeF(int3(X,Y,Z), data);
         }
+    }
+};
+
+struct Viewer {
+    array<unique<Volume>> volumes;
+    HList<View> views;
+    Window window { &views, "Viewer"_};
+    Viewer() {
+        Folder folder {"Results"_, home()};
+        array<String> names = folder.list(Folders);
+        for(String& name: names) {
+            volumes << unique<Volume>(Folder(name, folder));
+            views << View( &volumes.last()->volume );
+        }
+        window.setSize(int2(views.size*512, 512));
+        window.setTitle(str(names));
+        window.show();
     }
 } app;

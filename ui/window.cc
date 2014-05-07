@@ -100,8 +100,6 @@ Window::Window(Widget* widget, const string& unused title, int2 size, const Imag
     setIcon(icon);
 
     actions[Escape] = []{ exit(); };
-    background = Window::NoBackground;
-    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}

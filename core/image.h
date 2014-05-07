@@ -74,7 +74,7 @@ static const Image& name ## Icon() { \
 
 template<Type T> struct ImageT {
     ImageT(){}
-    ImageT(buffer<T>&& data, uint width, uint height) : data(move(data)), width(width), height(height) {}
+    ImageT(buffer<T>&& data, uint width, uint height) : data(move(data)), width(width), height(height) { assert_(this->data.size==width*height); }
     ImageT(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<T>(height*width); }
     ImageT(int2 size) : ImageT(size.x, size.y) {}
     int2 size() const { return int2(width,height); }
