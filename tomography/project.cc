@@ -2,9 +2,8 @@
 #include "thread.h"
 
 /// Projects \a volume onto \a image according to \a projection
-void project(const ImageF& image, const VolumeF& source, const mat4& transform) {
+void project(const ImageF& image, const VolumeF& source, const Projection& projection) {
     const CylinderVolume volume = source;
-    const Projection projection (transform, image.size());
     parallel(image.height, [&projection, &volume, &source, &image](uint, uint y) {
         v4sf start,end;
         mref<float> row = image.data.slice(y*image.width, image.width);

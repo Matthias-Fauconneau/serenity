@@ -1,4 +1,5 @@
 #include "view.h"
+#include "project.h"
 
 bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 delta = cursor-lastPos;
@@ -10,10 +11,10 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 }
 
 void View::render(const Image& target) {
-    mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(norm(target.size())); // /norm(volume->sampleCount()));
-    float max = 0; //1; //volume->sampleCount().x/2;
+    mat4 projection = mat4().rotateX(rotation.y /*Pitch*/).rotateZ(rotation.x /*Yaw*/).scale(float(target.height-1)/float(volume->sampleCount.z-1));
+    float max = 1; //volume->sampleCount.x/2;
     ImageF linear( target.size() );
-    project(linear, projection);
+    project(linear, *volume, Projection(projection, linear.size()));
     convert(target, linear, max);
 }
 

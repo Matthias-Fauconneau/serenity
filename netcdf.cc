@@ -32,7 +32,7 @@ map<string, Attribute> NetCDF::parseAttributes() {
         attribute.type = s.read();
         assert_(attribute.type<=DOUBLE);
         uint32 elementCount = s.read();
-        attribute.data = s.read<byte>(elementCount * attribute.elementSize());
+        attribute.data = buffer<byte>( s.read<byte>(elementCount * attribute.elementSize()) );
         s.align(4);
     }
     return attributes;
@@ -55,10 +55,14 @@ map<string, Variable> NetCDF::parseVariables() {
             entry.value = dimensions.values[dimensionIndex];
         }
         variable.attributes = parseAttributes();
-        variable.type = (NCType)(uint32)s.read();
+        variable.type = s.read();
         uint32 size = s.read();
         uint32 offset = s.read();
-        variable.data = s.buffer.slice(offset, size);
+        variable.data = buffer<byte>( s.buffer.slice(offset, size) );
+        if(variable.elementSize()==1) {}
+        else if(variable.elementSize()==4) variable.data = cast<byte>( bswap(cast<int32>(variable.data)) ); // NetCDF is big endian ...
+        else if(variable.elementSize()==8) variable.data = cast<byte>( bswap(cast<int64>(variable.data)) ); // NetCDF is big endian ...
+        else error(variable.type);
     }
     return variables;
 }

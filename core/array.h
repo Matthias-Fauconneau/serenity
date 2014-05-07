@@ -112,6 +112,8 @@ generic struct array : buffer<T> {
 };
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
+//generic buffer<T> copy(const array<T>& o) { return copy((const ref<T>&)(o)); }
+//generic array<T> copy(const array<T>& o) { return copy((const ref<T>&)(o)); }
 
 /// Concatenates two arrays
 generic inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }

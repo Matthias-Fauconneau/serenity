@@ -56,7 +56,7 @@ struct Tomography {
     string labels[1] = {"MLEM"_};
     unique<Reconstruction> reconstructions[1] {unique<MLEM>(N)};
 #endif
-    HList<View> views{{{0, &reconstructions[0]->x}}};
+    HList<View> views{{&reconstructions[0]->x}};
 #elif 0 // Comparison
 #if 0 // Adjoint: Direct vs Filtered
     string labels[2] = {"Direct"_,"Filtered"_};
@@ -71,18 +71,18 @@ struct Tomography {
     string labels[2] = {"Adjoint"_,"Bilinear"_};
     unique<Reconstruction> reconstructions[2] {unique<Adjoint>(N, true), unique<Approximate>(N, true)};
 #endif
-    HList<View> views{{{0, &reconstructions[0]->x},{0, &x0},{0, &reconstructions[1]->x}}};
+    HList<View> views{{&reconstructions[0]->x,&x0,&reconstructions[1]->x}};
 #elif 0 //Direct/Filtered Adjoint/Bilinear
     string labels[4] = {"Direct Adjoint"_,"Direct Bilinear"_,"Ramp Adjoint"_,"Ramp Bilinear"_};
     unique<Reconstruction> reconstructions[4] {unique<Adjoint>(N, false), unique<Approximate>(N, false), unique<Adjoint>(N, true), unique<Approximate>(N, true)};
-    UniformGrid<View> views{{{0, &reconstructions[0]->x},{0, &reconstructions[1]->x},{0, &reconstructions[2]->x},{0, &reconstructions[3]->x}}};
+    UniformGrid<View> views{{&reconstructions[0]->x,&reconstructions[1]->x,&reconstructions[2]->x,&reconstructions[3]->x}};
 #else // [Filtered] [Regularized] [Adjoint]
     string labels[8] = {"Adjoint"_,"Filtered Adjoint"_,"Regularized Adjoint"_,"Filtered Regularized Adjoint"_, "Bilinear"_,"Filtered Bilinear"_,"Regularized Bilinear"_,"Filtered Regularized Bilinear"_ };
     unique<Reconstruction> reconstructions[8] {unique<Adjoint>(N, false, false), unique<Adjoint>(N, true, false), unique<Adjoint>(N, true, false), unique<Adjoint>(N, true, true),
                 unique<Approximate>(N, false, false), unique<Approximate>(N, true, false), unique<Approximate>(N, true, false), unique<Approximate>(N, true, true)
                                               };
-    UniformGrid<View> views{{{0, &reconstructions[0]->x},{0, &reconstructions[1]->x},{0, &reconstructions[2]->x},{0, &reconstructions[3]->x},
-            {0, &reconstructions[4]->x},{0, &reconstructions[5]->x},{0, &reconstructions[6]->x},{0, &reconstructions[7]->x}}, 4};
+    UniformGrid<View> views{{&reconstructions[0]->x,&reconstructions[1]->x,&reconstructions[2]->x,&reconstructions[3]->x},
+            &reconstructions[4]->x,&reconstructions[5]->x,&reconstructions[6]->x,&reconstructions[7]->x}, 4};
 #endif
     float SSQ = ::SSQ(x0);
 #define WINDOW 1
@@ -94,7 +94,7 @@ struct Tomography {
 #else
     VBox layout {{&views}};
 #endif
-    Window window {&layout, int2(3*512,2*512), "Tomography"_};
+    Window window {&layout, "Tomography"_, int2(3*512,2*512)};
 #endif
     //~Music() { writeFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"_,"ondemand"_); }
     Tomography() {

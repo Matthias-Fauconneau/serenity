@@ -58,7 +58,7 @@ static inline bool intersect(const Projection& projection, vec2 pixelPosition, c
     const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
     const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
-    const v4sf tMask = capSideP <= volume.radiusSqHeight;
+    const v4sf tMask = capSideP < volume.radiusSqHeight;
     if(!mask(tMask)) { /*start=_0f; end=_0f;*/ return false; }
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
@@ -74,10 +74,10 @@ static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVo
         const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
         const v4si index = dot4(integerPosition, volume.stride); // to voxel index
         const v4si indices = index + volume.offset; // to 4 voxel indices
-        assert_(uint(indices[0])<uint(volume.stride[2]*volume.stride[1]), indices);
-        assert_(uint(indices[1])<uint(volume.stride[2]*volume.stride[1]), indices);
-        assert_(uint(indices[2])<uint(volume.stride[2]*volume.stride[1]), indices);
-        assert_(uint(indices[3])<uint(volume.stride[2]*volume.stride[1]), indices);
+        assert_(uint(indices[0])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
+        assert_(uint(indices[1])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
+        assert_(uint(indices[2])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
+        assert_(uint(indices[3])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
         const v8sf samples = gather2(data, indices); // Gather samples
         const v8sf fract = abs(dup(position - cvtdq2ps(integerPosition)) - _00001111f); // Computes trilinear interpolation coefficients
         const v8sf weights = shuffle8(fract, fract, 4,4,4,4, 0,0,0,0) * shuffle8(fract, fract, 5,5, 1,1, 5,5, 1,1) * shuffle8(fract, fract, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ
@@ -88,4 +88,4 @@ static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVo
 }
 
 /// Projects \a volume onto \a image according to \a projection
-void project(const ImageF& image, const VolumeF& volume, const mat4& projection);
+void project(const ImageF& image, const VolumeF& volume, const Projection& projection);

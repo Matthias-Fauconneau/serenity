@@ -2,9 +2,9 @@
 /// \file data.h Structured data parsers (Data, BinaryData, TextData)
 #include "memory.h"
 
-#define big16 __builtin_bswap16
-#define big32 __builtin_bswap32
-#define big64 __builtin_bswap64
+inline int16 bswap(int16 v) { return __builtin_bswap16(v); }
+inline int32 bswap(int32 v) { return __builtin_bswap32(v); }
+inline int64 bswap(int64 v) { return __builtin_bswap64(v); }
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
@@ -30,6 +30,12 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
     assert((o.capacity*sizeof(O))%sizeof(T) == 0);
     buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
     o.capacity = 0;
+    return buffer;
+}
+
+generic inline buffer<T> bswap(const ref<T>& data) {
+    ::buffer<T> buffer(data.size);
+    for(uint i: range(data.size)) buffer[i] = bswap(data[i]);
     return buffer;
 }
 
@@ -97,9 +103,9 @@ struct BinaryData : Data {
 
     /// Reads one raw \a T element
     generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
-    int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
-    int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
-    int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
+    int64 read64() { return isBigEndian?bswap(read<int64>()):read<int64>(); }
+    int32 read32() { return isBigEndian?bswap(read<int32>()):read<int32>(); }
+    int16 read16() { return isBigEndian?bswap(read<int16>()):read<int16>(); }
 
     /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
     struct ReadOperator {

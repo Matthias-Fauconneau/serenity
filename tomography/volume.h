@@ -5,7 +5,8 @@
 struct VolumeF {
     VolumeF(){}
     VolumeF(int3 sampleCount) : sampleCount(sampleCount), data(size()) { data.clear(0); }
-    VolumeF(int3 sampleCount, ref<float> data) : sampleCount(sampleCount), data(data) { assert_(data.size == size()); }
+    VolumeF(int3 sampleCount, const ref<float>& data) : sampleCount(sampleCount), data(data) { assert_(data.size == size()); }
+    //VolumeF(int3 sampleCount, buffer<float>&& data) : sampleCount(sampleCount), data(move(data)) { assert_(this->data.size == size()); }
     explicit operator bool() const { return (bool)data; }
     size_t size() const { return (size_t)sampleCount.x*sampleCount.y*sampleCount.z; }
     operator float*() const { return (float*)data.data; }
@@ -17,7 +18,7 @@ struct VolumeF {
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
         assert(volume.sampleCount.x == volume.sampleCount.y);
-        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1)/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
+        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
         capZ = (v4sf){halfHeight, halfHeight, -halfHeight, -halfHeight};
         radiusR0R0 = (v4sf){radius*radius, 0, radius*radius, 0};
         radiusSqHeight = (v4sf){radius*radius, radius*radius, halfHeight, halfHeight};

@@ -56,13 +56,13 @@ int Date::localTimeOffset(int64 utc) const {
     BinaryData s (localtime, true);
     s.advance(20);
     uint unused gmtCount = s.read(), unused stdCount = s.read(), unused leapCount = s.read(), transitionCount = s.read(), infoCount = s.read(), nameCount = s.read();
-    ref<int> transitionTimes = s.read<int>(transitionCount);
-    uint i = 0; for(; i < transitionCount; i++) if(utc < (int)big32(transitionTimes[i])) break; i--;
+    ref<int32> transitionTimes = s.read<int32>(transitionCount);
+    uint i = 0; for(; i < transitionCount; i++) if(utc < bswap(transitionTimes[i])) break; i--;
     ref<uint8> transitionIndices = s.read<uint8>(transitionCount);
     uint index = transitionIndices[i];
     struct ttinfo { int32 gmtOffset; uint8 isDST, nameIndex; } packed;
     ref<ttinfo> infos = s.read<ttinfo>(infoCount);
-    return big32(infos[index].gmtOffset);
+    return bswap(infos[index].gmtOffset);
 }
 Date::Date(int64 time) {
     int64 utc = time;

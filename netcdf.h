@@ -6,7 +6,7 @@ typedef uint32 Dimension;
 enum NCType { BYTE=1, CHAR, SHORT, INT, FLOAT, DOUBLE };
 
 struct VariantArray {
-    uint32 type; ref<byte> data;
+    uint32 type; buffer<byte> data; //ref<byte> data;
     uint elementSize() { return ref<uint>({0,1,1,2,4,4,8})[type]; }
     operator ref<byte>() const { assert_(type==BYTE || type==CHAR); return cast<byte>(data); }
     operator ref<short>() const { assert_(type==SHORT); return cast<short>(data); }
@@ -29,7 +29,7 @@ struct Variable : VariantArray {
     map<string, Dimension> dimensions;
     map<string, Attribute> attributes;
 };
-inline String str(const Variable& v) { return str(v.dimensions,v.attributes); }
+inline String str(const Variable& v) { return str(ref<string>({""_,"byte"_,"char"_,"short"_,"int"_,"float"_,"double"_})[v.type], v.dimensions,v.attributes); }
 
 struct NetCDF {
     NetCDF(const ref<byte>& data);
