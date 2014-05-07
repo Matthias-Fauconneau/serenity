@@ -74,10 +74,6 @@ static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVo
         const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
         const v4si index = dot4(integerPosition, volume.stride); // to voxel index
         const v4si indices = index + volume.offset; // to 4 voxel indices
-        assert_(uint(indices[0])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
-        assert_(uint(indices[1])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
-        assert_(uint(indices[2])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
-        assert_(uint(indices[3])<uint(volume.stride[2]*volume.stride[1]), position, indices, uint(volume.stride[2]*volume.stride[1]));
         const v8sf samples = gather2(data, indices); // Gather samples
         const v8sf fract = abs(dup(position - cvtdq2ps(integerPosition)) - _00001111f); // Computes trilinear interpolation coefficients
         const v8sf weights = shuffle8(fract, fract, 4,4,4,4, 0,0,0,0) * shuffle8(fract, fract, 5,5, 1,1, 5,5, 1,1) * shuffle8(fract, fract, 6,2, 6,2, 6,2, 6,2); // xxxXXXX * yyYYyyYY * zZzZzZzZ = xyz, xyZ, xYz, xYZ, Xyz, XyZ, XYz, XYZ

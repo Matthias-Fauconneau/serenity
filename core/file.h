@@ -44,7 +44,7 @@ struct Folder : Handle {
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
     /// Lists all files in this folder
-    array<String> list(uint flags) const;
+    array<String> list(uint flags=Files|Sorted) const;
 };
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const string& folder, const Folder& at=currentWorkingDirectory());
@@ -146,7 +146,7 @@ struct Map {
     enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
     Map(){}
-    explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
+    Map(const File& file, Prot prot=Read, Flags flags=Shared);
     explicit Map(const string& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     default_move(Map);

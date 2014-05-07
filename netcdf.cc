@@ -59,10 +59,10 @@ map<string, Variable> NetCDF::parseVariables() {
         uint32 size = s.read();
         uint32 offset = s.read();
         variable.data = buffer<byte>( s.buffer.slice(offset, size) );
-        if(variable.elementSize()==1) {}
+        /*if(variable.elementSize()==1) {}
         else if(variable.elementSize()==4) variable.data = cast<byte>( bswap(cast<int32>(variable.data)) ); // NetCDF is big endian ...
         else if(variable.elementSize()==8) variable.data = cast<byte>( bswap(cast<int64>(variable.data)) ); // NetCDF is big endian ...
-        else error(variable.type);
+        else error(variable.type);*/
     }
     return variables;
 }

@@ -4,6 +4,7 @@
 
 inline int16 bswap(int16 v) { return __builtin_bswap16(v); }
 inline int32 bswap(int32 v) { return __builtin_bswap32(v); }
+inline float bswap(float v) { return __builtin_bswap32(v); }
 inline int64 bswap(int64 v) { return __builtin_bswap64(v); }
 
 /// Aligns \a offset to \a width (only for power of two \a width)
