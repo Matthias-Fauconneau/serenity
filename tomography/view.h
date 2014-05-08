@@ -10,6 +10,6 @@ struct View : Widget {
 
     View(VolumeF* volume) : volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button);
-    int2 sizeHint() { return int2(512); }
+    int2 sizeHint();
     void render(const Image& target) override;
 };

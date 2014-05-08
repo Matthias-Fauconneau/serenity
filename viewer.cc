@@ -24,13 +24,13 @@ struct Volume {
             map = file;
             volume = VolumeF(int3(X,Y,Z), cast<float>((ref<byte>)map));
         }
-        if(!volume) { // Regenerates memory map-able (little endian) data
+        if(!volume) { // Generates memory map-able (little endian) data
             uint X = 0, Y = 0, Z = 0;
             for(string name: files) {
                 if(!startsWith(name,"block"_) || !endsWith(name,".nc"_)) continue;
                 Map file = File(name, folder);
                 NetCDF cdf ( file );
-                ref<uint> dimensions = cdf.variables["tomo_float"_].dimensions.values;
+                ref<uint> dimensions = cdf.variables.values[1].dimensions.values;
                 if(X) assert_( X == dimensions[2] ); else X = dimensions[2];
                 if(Y) assert_( Y == dimensions[1] ); else Y = dimensions[1];
                 Z += dimensions[0];
@@ -42,11 +42,12 @@ struct Volume {
             uint z = 0;
             for(string name: files) {
                 if(!startsWith(name,"block"_) || !endsWith(name,".nc"_)) continue;
+                log(name);
                 Map file = File(name, folder);
                 NetCDF cdf ( file );
-                ref<uint> dimensions = cdf.variables["tomo_float"_].dimensions.values;
+                ref<uint> dimensions = cdf.variables.values[1].dimensions.values;
                 int Z = dimensions[0];
-                ref<int32> source = cast<int32>( ref<float>(cdf.variables["tomo_float"_]) );
+                ref<int32> source = cast<int32>( ref<float>(cdf.variables.values[1]) );
                 mref<int32> target ((int32*)data.data+z*Y*X, Z*Y*X);
                 for(uint i: range(Z*Y*X)) target[i] = bswap(source[i]);
                 z += dimensions[0];
@@ -67,7 +68,7 @@ struct Viewer {
             volumes << unique<Volume>(Folder(name, folder));
             views << View( &volumes.last()->volume );
         }
-        window.setSize(int2(views.size*512, 512));
+        window.setSize(int2(views.size*views[0].sizeHint().x, views[0].sizeHint().y));
         window.setTitle(str(names));
         window.show();
     }

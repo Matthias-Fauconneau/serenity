@@ -80,3 +80,4 @@ viewer.cc
 netcdf.h
 tomography/project.h
 tomography/project.cc
+test.cc

@@ -19,6 +19,8 @@ bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 
 ImageF slice(const VolumeF& volume, uint z) { int3 size = volume.sampleCount; return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y); }
 
+int2 View::sizeHint() { return renderVolume ? int2(512) : volume->sampleCount.xy(); }
+
 void View::render(const Image& target) {
     ImageF image;
     float max = 0; //1; //volume->sampleCount.x/2;
@@ -29,8 +31,8 @@ void View::render(const Image& target) {
     } else {
         image = slice(*volume, sliceZ*(volume->sampleCount.z-1));
     }
-    assert_(target.size() == image.size(), target.size(), image.size());
-    convert(target, image, max);
+    assert_(target.size() >= image.size(), target.size(), image.size());
+    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, max);
 }
 
 float View::sliceZ = 0;

@@ -19,7 +19,7 @@ typedef VariantArray Attribute;
 inline String str(const Attribute& a) {
     /**/  if(a.type==BYTE||a.type==CHAR) return str((ref<byte>)a);
     else if(a.type==SHORT) return str((ref<short>)a);
-    else if(a.type==INT) return str((ref<short>)a);
+    else if(a.type==INT) return str((ref<int>)a);
     else if(a.type==FLOAT) return str((ref<float>)a);
     else if(a.type==DOUBLE) return str((ref<double>)a);
     else error(int(a.type));
