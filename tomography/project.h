@@ -7,7 +7,7 @@ struct Projection {
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
-        assert_(image_height*imageSize.x == image_width*imageSize.y);
+        assert_(image_height*imageSize.x == image_width*imageSize.y, imageSize, image_height, image_width);
         const uint num_projections_per_revolution = 2520;
         const uint total_num_projections = 5041;
         const float camera_length = 328.811; // [mm]

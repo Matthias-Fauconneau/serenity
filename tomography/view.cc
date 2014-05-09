@@ -1,29 +1,20 @@
 #include "view.h"
 #include "project.h"
 
-bool View::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
-    //int2 delta = cursor-lastPos;
-    lastPos = cursor;
-    if(event==Press && button==RightButton) renderVolume=!renderVolume;
-    if(button && event == Motion) {
-        /*if(renderVolume) {
-            rotation += vec2(-2*PI*delta.x/size.x,2*PI*delta.y/size.y);
-            rotation.y = clip(float(-PI),rotation.y,float(0)); // Keep pitch between [-PI,0]
-        } else {*/
-            index = clip(0.f, float(cursor.x)/float(size.x-1), 1.f);
-        //}
-        return true;
-    }
+ImageF slice(const VolumeF& volume, uint z) { int3 size = volume.sampleCount; return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y); }
+
+static float index = 0;
+static float maxValue = 1;
+
+bool View::mouseEvent(int2 cursor, int2 size, Event, Button button) {
+    if(button) { index = clip(0.f, float(cursor.x)/float(size.x-1), 1.f); return true; }
     return false;
 }
-
-ImageF slice(const VolumeF& volume, uint z) { int3 size = volume.sampleCount; return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y); }
 
 int2 View::sizeHint() { return renderVolume ? int2(512, 384) : volume->sampleCount.xy(); }
 
 void View::render(const Image& target) {
     ImageF image;
-    float max = 0; //1; //volume->sampleCount.x/2;
     if(renderVolume) {
         image = ImageF( target.size() );
         project(image, *volume, Projection(volume->sampleCount, image.size(), index));
@@ -33,9 +24,21 @@ void View::render(const Image& target) {
         image = slice(*volume, index*(volume->sampleCount.z-1));
     }
     assert_(target.size() >= image.size(), target.size(), image.size());
-    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, max);
+    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }
 
-//bool View::renderVolume = true;
-float View::index = 0;
-//vec2 View::rotation = vec2(PI/4, -PI/3);
+bool DiffView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
+    if(button) { index = clip(0.f, float(cursor.x)/float(size.x-1), 1.f); return true; }
+    return false;
+}
+
+int2 DiffView::sizeHint() { return projections->sampleCount.xy(); }
+
+void DiffView::render(const Image& target) {
+    ImageF reprojection = ImageF( target.size() );
+    project(reprojection, *volume, Projection(volume->sampleCount, reprojection.size(), index));
+    ImageF source = slice(*projections, index*(projections->sampleCount.z-1));
+    ImageF image = ImageF( target.size() );
+    for(uint y: range(image.height)) for(uint x: range(image.width)) image(x,y) = abs(reprojection(x,y)-source(x,y));
+    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
+}

@@ -98,8 +98,8 @@ Window::Window(Widget* widget, const string& unused title, int2 size, const Imag
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
     setTitle(title);
     setIcon(icon);
-
     actions[Escape] = []{ exit(); };
+    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
@@ -130,6 +130,7 @@ void Window::event() {
             }
             target.width=size.x, target.height=size.y, target.stride=align(16,size.x);
             target.buffer.size = target.height*target.stride;
+            assert_(target.buffer.size < 4096*4096, target.width, target.height);
             shm = check( shmget(0, target.buffer.size*sizeof(byte4), IPC_CREAT | 0777) );
             target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}

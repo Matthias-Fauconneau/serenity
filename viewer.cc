@@ -57,23 +57,9 @@ struct Volume {
     }
 };
 
-struct Viewer {
-    array<unique<Volume>> volumes;
-    HList<View> views;
-    Window window { &views, "Viewer"_};
-    Viewer() {
-        /*Folder folder {"Results"_, home()};
-        array<String> names = folder.list(Folders);
-        for(String& name: names) {
-            volumes << unique<Volume>(Folder(name, folder));
-            views << View( &volumes.last()->volume );
-        }
-        window.setTitle(str(names));*/
-        volumes << unique<Volume>(Folder("FBP"_, Folder("Results"_, home())));
-        views << View( &volumes.last()->volume, true);
-        volumes << unique<Volume>(Folder("LIN_PSS"_, Folder("Data"_, home())));
-        views << View( &volumes.last()->volume, false);
-        window.setSize(int2(views.size*views[0].sizeHint().x, views[0].sizeHint().y));
-        window.show();
-    }
-} app;
+unique<Volume> volumes[2] = { unique<Volume>(Folder("FBP"_, Folder("Results"_, home()))), unique<Volume>(Folder("LIN_PSS"_, Folder("Data"_, home()))) };
+View volume {&volumes[0]->volume, true};
+DiffView diff { &volumes[0]->volume, &volumes[1]->volume };
+View projections {&volumes[1]->volume, false};
+HBox views {{ &volume, &diff, &projections }};
+Window window { &views, "Viewer"_};
