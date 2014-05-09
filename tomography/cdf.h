@@ -1,16 +1,14 @@
-#include "thread.h"
-#include "netcdf.h"
 #include "volume.h"
-#include "view.h"
-#include "project.h"
-#include "layout.h"
-#include "window.h"
+#include "file.h"
+#include "data.h"
+#include "netcdf.h"
 
-struct Volume {
+/// Memory mapped volume generated from a CDF data folder
+struct VolumeCDF {
     Map map;
     VolumeF volume;
 
-    Volume(const Folder& folder) {
+    VolumeCDF(const Folder& folder) {
         array<String> files = folder.list();
         for(string name: files) {
             TextData s (name);
@@ -56,10 +54,3 @@ struct Volume {
         }
     }
 };
-
-unique<Volume> volumes[2] = { unique<Volume>(Folder("FBP"_, Folder("Results"_, home()))), unique<Volume>(Folder("LIN_PSS"_, Folder("Data"_, home()))) };
-View volume {&volumes[0]->volume, true};
-DiffView diff { &volumes[0]->volume, &volumes[1]->volume };
-View projections {&volumes[1]->volume, false};
-HBox views {{ &volume, &diff, &projections }};
-Window window { &views, "Viewer"_};

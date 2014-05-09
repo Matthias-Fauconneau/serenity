@@ -3,6 +3,7 @@
 
 /// Computes residual r = p = At ( b - A x )
 void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
+    log_("Initialize"_); Time time;
     if(filter) for(Filter& filter: filters) filter = 2*images.first().width;
     const CylinderVolume volume (x);
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
@@ -12,9 +13,9 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
             ref<float> row = image.data.slice(y*image.width, image.width);
             if(filter) row = filters[id].filter(row);
             for(uint x: range(image.width)) {
-                v4sf start, end;
-                if(intersect(projection, vec2(x, y), volume, start, end)) {
-                    backproject(start, projection.ray, end, volume, AtAp[id], float8(/*scale **/ row[x])); // - Ax but x = 0
+                v4sf start, step, end;
+                if(intersect(projection, vec2(x, y), volume, start, step, end)) {
+                    backproject(start, step, end, volume, AtAp[id], float8(/*scale **/ row[x])); // - Ax but x = 0
                 }
             }
         });
@@ -37,12 +38,13 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
         residualSum[id] += accumulator;
     });
     residualEnergy = sum(residualSum);
+    log(time);
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     totalTime.start();
-    Time time; time.start();
+    log_(str(dec(k,2)," ")); Time time; time.start();
 
     // Computes At A p (i.e projects and backprojects p)
     const CylinderVolume volume (p);
@@ -52,25 +54,25 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
         parallel(image.height, [&image, &projection, &volume, this](uint id, uint y) {
             if(filter) {
                 mref<float> input = filters[id];
-                v4sf start[input.size], end[input.size];
+                v4sf start[input.size], step[input.size], end[input.size]; // FIXME: AoS
                 uint first;
-                for(first=0;first<input.size;first++) { if(intersect(projection, vec2(first, y), volume, start[first], end[first])) break; else input[first] = 0; }
+                for(first=0;first<input.size;first++) { if(intersect(projection, vec2(first, y), volume, start[first], step[first], end[first])) break; else input[first] = 0; }
                 uint last = first;
                 if(last<input.size) for(;;) {
-                    input[last] = project(start[last], projection.ray, end[last], volume, p.data);
+                    input[last] = project(start[last], step[last], end[last], volume, p.data);
                     last++;
                     if(!(last<input.size)) break;
-                    if(!intersect(projection, vec2(last, y), volume, start[last], end[last])) break;
+                    if(!intersect(projection, vec2(last, y), volume, start[last], step[last], end[last])) break;
                 }
                 for(uint x: range(last, input.size)) input[x] = 0;
                 ref<float> output = filters[id].filter();
-                for(uint x: range(first, last)) backproject(start[x], projection.ray, end[x], volume, AtAp[id], float8(output[x]));
+                for(uint x: range(first, last)) backproject(start[x], step[x], end[x], volume, AtAp[id], float8(output[x]));
             } else {
                 for(uint x: range(image.width)) {
-                    v4sf start, end;
-                    if(intersect(projection, vec2(x, y), volume, start, end)) {
-                        float Ax = project(start, projection.ray, end, volume, p.data);
-                        backproject(start, projection.ray, end, volume, AtAp[id], float8(Ax));
+                    v4sf start, step, end;
+                    if(intersect(projection, vec2(x, y), volume, start, step, end)) {
+                        float Ax = project(start, step, end, volume, p.data);
+                        backproject(start, step, end, volume, AtAp[id], float8(Ax));
                     }
                 }
             }
@@ -123,7 +125,7 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
     time.stop();
     totalTime.stop();
     k++;
-    log_(str(dec(k,2), time, str(totalTime.toFloat()/k)+"s"_));
+    log_(str(time, str(totalTime.toFloat()/k)+"s"_));
     residualEnergy = newResidual;
     return true;
 }

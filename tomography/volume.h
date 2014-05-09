@@ -6,7 +6,6 @@ struct VolumeF {
     VolumeF(){}
     VolumeF(int3 sampleCount) : sampleCount(sampleCount), data(size()) { data.clear(0); }
     VolumeF(int3 sampleCount, const ref<float>& data) : sampleCount(sampleCount), data(data) { assert_(data.size == size()); }
-    //VolumeF(int3 sampleCount, buffer<float>&& data) : sampleCount(sampleCount), data(move(data)) { assert_(this->data.size == size()); }
     explicit operator bool() const { return (bool)data; }
     size_t size() const { return (size_t)sampleCount.x*sampleCount.y*sampleCount.z; }
     operator float*() const { return (float*)data.data; }
@@ -14,6 +13,8 @@ struct VolumeF {
     int3 sampleCount = 0; // Sample counts (along each dimensions)
     buffer<float> data; // Samples in Z-Order
 };
+
+inline ImageF slice(const VolumeF& volume, uint z) { int3 size = volume.sampleCount; return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y); }
 
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {

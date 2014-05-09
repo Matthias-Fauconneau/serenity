@@ -1,23 +1,24 @@
 #include "view.h"
 #include "project.h"
 
-ImageF slice(const VolumeF& volume, uint z) { int3 size = volume.sampleCount; return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y); }
-
 static float index = 0;
-static float maxValue = 1;
+static float maxValue = 0;
 
 bool View::mouseEvent(int2 cursor, int2 size, Event, Button button) {
     if(button) { index = clip(0.f, float(cursor.x)/float(size.x-1), 1.f); return true; }
     return false;
 }
 
-int2 View::sizeHint() { return renderVolume ? int2(512, 384) : volume->sampleCount.xy(); }
+int2 View::sizeHint() {
+    if(!renderVolume) assert_(volume->sampleCount.xy()==sensorSize);
+    return renderVolume ? sensorSize : volume->sampleCount.xy();
+}
 
 void View::render(const Image& target) {
     ImageF image;
     if(renderVolume) {
         image = ImageF( target.size() );
-        project(image, *volume, Projection(volume->sampleCount, image.size(), index));
+        project(image, *volume, Projection(volume->sampleCount, image.size(), index*total_num_projections));
     } else {
         const uint total_num_projections = 5041;
         assert_(volume->sampleCount.z == total_num_projections);
@@ -32,7 +33,10 @@ bool DiffView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
     return false;
 }
 
-int2 DiffView::sizeHint() { return projections->sampleCount.xy(); }
+int2 DiffView::sizeHint() {
+    assert_(projections->sampleCount.xy()==sensorSize, projections->sampleCount.xy());
+    return projections->sampleCount.xy();
+}
 
 void DiffView::render(const Image& target) {
     ImageF reprojection = ImageF( target.size() );

@@ -2,14 +2,15 @@
 #include "volume.h"
 #include "matrix.h"
 
+const uint total_num_projections = 5041;
+
 struct Projection {
-    Projection(const int3 volumeSize, const int2 imageSize, const float index) {
+    Projection(const int3 volumeSize, const int2 imageSize, const uint index) {
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
         assert_(image_height*imageSize.x == image_width*imageSize.y, imageSize, image_height, image_width);
         const uint num_projections_per_revolution = 2520;
-        const uint total_num_projections = 5041;
         const float camera_length = 328.811; // [mm]
         const float specimen_distance = 2.78845; // [mm]
         const float pixel_size = 0.194; // [mm]
@@ -23,8 +24,9 @@ struct Projection {
         const float volumeRadius = specimen_distance * cos(hFOV); // [mm] ~ 2 mm
         const float voxelRadius = float(volumeSize.x-1)/2;
 
-        mat3 rotation = mat3().rotateZ(2*PI*index*total_num_projections/num_projections_per_revolution);
-        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (index*deltaZ / 2 /*FIXME: half pitch ?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
+        mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
+        //origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (index/total_num_projections*deltaZ / 2 /*FIXME: half pitch ?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
+        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/total_num_projections*deltaZ * num_projections_per_revolution / total_num_projections /*FIXME?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.y-1)/aspectRatio);
         ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];

@@ -8,7 +8,7 @@ struct Reconstruction {
     uint k = 0;
     Time totalTime;
     VolumeF x;
-    Reconstruction(uint N) : x(N) {}
+    Reconstruction(int3 N) : x(N) {}
     virtual ~Reconstruction() {}
     virtual void initialize(const ref<Projection>& projections, const ref<ImageF>& images) abstract;
     virtual bool step(const ref<Projection>& projections, const ref<ImageF>& images) abstract;
