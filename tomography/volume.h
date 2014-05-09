@@ -25,6 +25,7 @@ struct CylinderVolume {
         dataOrigin = float4(float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1)/2, 0);
         stride = (v4si){1, int(volume.sampleCount.x), int(volume.sampleCount.x*volume.sampleCount.y), 0};
         offset = (v4si){0, int(volume.sampleCount.x), int(volume.sampleCount.x*volume.sampleCount.y), int(volume.sampleCount.x*volume.sampleCount.y+volume.sampleCount.x)};
+        size = volume.sampleCount; // Bound check
     }
 
     // Precomputed parameters
@@ -34,4 +35,5 @@ struct CylinderVolume {
     v4sf dataOrigin;
     v4si stride;
     v4si offset;
+    int3 size; // Bound check
 };

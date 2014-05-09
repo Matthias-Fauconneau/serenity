@@ -3,30 +3,34 @@
 #include "matrix.h"
 
 struct Projection {
-    Projection(mat4 projection, int2 imageSize) {
-        // Intermediate parameters
-        mat4 world = projection.inverse(); // Transform normalized view space to world space
-        static constexpr float stepSize = 1;
-        vec3 ray3 = stepSize * normalize( projection.transpose()[2].xyz() );
-        float a = ray3.x*ray3.x+ray3.y*ray3.y;
+    Projection(const int3 volumeSize, const int2 imageSize, const float index) {
+        // FIXME: parse from measurement file
+        //const uint image_height = 1536;
+        const uint image_width = 2048;
+        const uint num_projections_per_revolution = 2520;
+        const uint total_num_projections = 5041;
+        const float camera_length = 328.811; // [mm]
+        const float specimen_distance = 2.78845; // [mm]
+        const float pixel_size = 0.194; // [mm]
+        const float z_end_position = 37.3082; // [mm]
+        const float z_start_position = 32.1; // [mm]
+        const float deltaZ = z_end_position-z_start_position; // [mm] ~ 5 mm
+        const float pitch = deltaZ/total_num_projections; // [mm] ~2.60 mm
+        const float detectorHalfWidth = image_width * pixel_size; // [mm] ~ 397 mm
+        const float hFOV = atan(detectorHalfWidth, camera_length); // Horizontal field of view (i.e cone beam angle) [rad] ~ 50°
+        const float volumeRadius = specimen_distance * cos(hFOV); // [mm] ~ 2 mm
+        const float voxelRadius = float(volumeSize.x-1)/2;
 
-        // Precomputed parameters
-        origin = world * vec3(-vec2(imageSize-int2(1))/2.f, 0);
-        xAxis = world[0];
-        yAxis = world[1];
-        raySlopeZ = float4(1/ray3.z);
-        rayXYXY = (v4sf){ray3.x, ray3.y, ray3.x, ray3.y};
-        _m4a_4_m4a_4 = (v4sf){-4*a, 4, -4*a, 4};
-        rcp_2a = float4(-1./(2*a));
-        rayZ = float4(ray3.z);
-        ray = (v4sf){ray3.x, ray3.y, ray3.z, 1};
-        this->projection = projection;
+        mat3 rotation = mat3().rotateZ(2*PI*index*total_num_projections/num_projections_per_revolution);
+        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, index*pitch/volumeRadius*voxelRadius);
+        ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
+        ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.y-1));
+        ray[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0) - ray[0]*float(imageSize.x-1)/2.f - ray[1]*float(imageSize.y-1)/2.f;
     }
 
     // Precomputed parameters (11x4)
-    v4sf origin, xAxis, yAxis;
-    v4sf raySlopeZ, rayXYXY, _m4a_4_m4a_4, rcp_2a, rayZ, ray;
-    mat4 projection; // for approximate
+    v4sf origin;
+    vec3 ray[3]; //FIXME: v4sf
 };
 
 // SIMD constants for intersections
@@ -38,33 +42,40 @@ static const v4sf signPPNN = (v4sf)(v4si){0,0,(int)0x80000000,(int)0x80000000};
 static const v4sf floatMMMm = {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX};
 static const v8sf _00001111f = (v8sf){0,0,0,0,1,1,1,1};
 
-static inline bool intersect(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, v4sf& start, v4sf& end) {
+static inline bool intersect(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, v4sf& start, v4sf& ray, v4sf& end) {
     /// Intersects
-    v4sf origin = projection.origin + float4(pixelPosition.x) * projection.xAxis + float4(pixelPosition.y) * projection.yAxis;
+    const v4sf origin = projection.origin;
+    ray = vec4(normalize( pixelPosition.x * projection.ray[0] + pixelPosition.y * projection.ray[1] + projection.ray[2] ), 1);
+
     // Intersects cap disks
     const v4sf originZ = shuffle4(origin, origin, 2,2,2,2);
-    const v4sf capT = (volume.capZ - originZ) * projection.raySlopeZ; // top top bottom bottom
+    const v4sf capT = (volume.capZ - originZ) * rcp(shuffle4(ray, ray, 2,2,2,2)); // top top bottom bottom
     const v4sf originXYXY = shuffle4(origin, origin, 0,1,0,1);
-    const v4sf capXY = originXYXY + capT * projection.rayXYXY;
+    const v4sf capXY = originXYXY + capT * shuffle4(ray, ray, 0,1,0,1);
     const v4sf capR = dot2(capXY, capXY); // top bottom top bottom
     // Intersect cylinder side
-    const v4sf originXYrayXY = shuffle4(origin, projection.ray, 0,1,0,1); // Ox Oy Dx Dy
+    const v4sf originXYrayXY = shuffle4(origin, ray, 0,1,0,1); // Ox Oy Dx Dy
     const v4sf cbcb = dot2(originXYXY, originXYrayXY); // OO OD OO OD (b=2OD)
     const v4sf _1b1b = blendps(_1f, cbcb, 0b1010); // 1 OD 1 OD
-    const v4sf _4ac_bb = projection._m4a_4_m4a_4 * (cbcb*_1b1b - volume.radiusR0R0); // -4ac bb -4ac bb
+    const float a = ray[0]*ray[0]+ray[1]*ray[1];
+    const v4sf _4ac_bb = (v4sf){-4*a, 4, -4*a, 4}* (cbcb*_1b1b - volume.radiusR0R0); // -4ac bb -4ac bb
     const v4sf delta = hadd(_4ac_bb,_4ac_bb);
     const v4sf sqrtDelta = sqrt( delta );
     const v4sf sqrtDeltaPPNN = bitOr(sqrtDelta, signPPNN); // +delta +delta -delta -delta
-    const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) * projection.rcp_2a; // ? t+ ? t-
-    const v4sf sideZ = abs(originZ + sideT * projection.rayZ); // ? z+ ? z-
+    const v4sf sideT = (_2f*_1b1b + sqrtDeltaPPNN) *  float4(-1./(2*a)); // ? t+ ? t-
+    const v4sf sideZ = abs(originZ + sideT * float4(ray[2])); // ? z+ ? z-
     const v4sf capSideP = shuffle4(capR, sideZ, 0, 1, 1, 3); // topR2 bottomR2 +sideZ -sideZ
     const v4sf tMask = capSideP < volume.radiusSqHeight;
     if(!mask(tMask)) { /*start=_0f; end=_0f;*/ return false; }
     const v4sf capSideT = shuffle4(capT, sideT, 0, 2, 1, 3); //ray position (t) for top bottom +side -side
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
-    start = volume.dataOrigin + origin + tmin * projection.ray;
+    start = volume.dataOrigin + origin + tmin * ray;
+    if(!(int3(start[0], start[1], start[2])>=int3(0) && int3(start[0], start[1], start[2])<int3(volume.size))) return false; // DEBUG
+    assert_(int3(start[0], start[1], start[2])>=int3(0) && int3(start[0], start[1], start[2])<int3(volume.size), start, volume.size);
     end = max(floatMMMm, tmax); // max, max, max, tmax
+    v4sf last = volume.dataOrigin + origin + tmax * ray;
+    assert_(int3(last[0], last[1], last[2])>=int3(0) && int3(last[0], last[1], last[2])<int3(volume.size), last, volume.size);
     return true;
 }
 
@@ -72,6 +83,7 @@ static inline bool intersect(const Projection& projection, vec2 pixelPosition, c
 static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVolume& volume, const float* data) {
     for(v4sf accumulator = _0f;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
+        assert_(int3(integerPosition[0], integerPosition[1], integerPosition[2])>=int3(0) && int3(integerPosition[0], integerPosition[1], integerPosition[2])<volume.size, position);
         const v4si index = dot4(integerPosition, volume.stride); // to voxel index
         const v4si indices = index + volume.offset; // to 4 voxel indices
         const v8sf samples = gather2(data, indices); // Gather samples

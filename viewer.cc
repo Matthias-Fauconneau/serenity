@@ -65,6 +65,7 @@ struct Viewer {
         Folder folder {"Results"_, home()};
         array<String> names = folder.list(Folders);
         for(String& name: names) {
+            if(name!="FBP"_) continue; // TEST
             volumes << unique<Volume>(Folder(name, folder));
             views << View( &volumes.last()->volume );
         }

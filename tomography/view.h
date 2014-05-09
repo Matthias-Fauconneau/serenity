@@ -5,8 +5,10 @@
 struct View : Widget {
     const VolumeF* volume;
     int2 lastPos = 0;
-    static vec2 rotation; static float sliceZ; // Shared between all views
-    bool renderVolume = false;
+    // Shared between all views
+    static bool renderVolume;
+    static float index; // Z slice index (2D) or projection index along trajectory (3D)
+    //static vec2 rotation;
 
     View(VolumeF* volume) : volume(volume) {}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button);
