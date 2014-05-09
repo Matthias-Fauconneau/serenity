@@ -64,11 +64,13 @@ inline (v4sf) max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
 #define shuffle4(v1, v2, i1, i2, i3, i4) __builtin_shuffle(v1,v2, (v4si){i1,i2, 4+(i3), 4+(i4)})
 #endif
 inline (v4sf) hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
+inline (v4sf) dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x77); }
 inline (v4sf) dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
 inline (v4sf) hsum(v4sf a) { return dot4(a,_1f); }
 inline (v4sf) rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
 inline (v4sf) rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline (v4sf) sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
+inline (v4sf) normalize3(v4sf v) { return rsqrt(dot3(v, v)) * v; }
 
 inline (int) mask(v4sf a) { return __builtin_ia32_movmskps(a); }
 #define blendps __builtin_ia32_blendps

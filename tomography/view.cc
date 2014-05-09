@@ -28,12 +28,14 @@ void View::render(const Image& target) {
         image = ImageF( target.size() );
         project(image, *volume, Projection(volume->sampleCount, image.size(), index));
     } else {
+        const uint total_num_projections = 5041;
+        assert_(volume->sampleCount.z == total_num_projections);
         image = slice(*volume, index*(volume->sampleCount.z-1));
     }
     assert_(target.size() >= image.size(), target.size(), image.size());
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, max);
 }
 
-bool View::renderVolume = true;
+//bool View::renderVolume = true;
 float View::index = 0;
 //vec2 View::rotation = vec2(PI/4, -PI/3);
