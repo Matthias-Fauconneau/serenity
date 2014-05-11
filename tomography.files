@@ -81,3 +81,6 @@ tomography/netcdf.h
 tomography/project.h
 tomography/project.cc
 tomography/cdf.h
+test.cc
+tomography/SIRT.h
+tomography/SIRT.cc

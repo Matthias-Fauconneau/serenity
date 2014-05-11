@@ -1,7 +1,9 @@
 #include "cdf.h"
 #include "adjoint.h"
-//include "approximate.h"
-//include "MLEM.h"
+//#include "approximate.h"
+//#include "MLEM.h"
+//#include "adjoint.h"
+#include "SIRT.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -41,8 +43,8 @@ struct Tomography {
     VolumeCDF projectionData {Folder("Preprocessed"_/*LIN_PSS"_*/, Folder("Data"_, home()))};
     array<Projection> projections;
     array<ImageF> images;
-    string labels[1] = {"Adjoint"_};
-    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(reconstructionSize)};
+    //string labels[1] = {"Adjoint"_};
+    unique<Reconstruction> reconstructions[1] {unique<SIRT>(reconstructionSize)};
     HList<View> views{{&reconstructions[0]->x}};
 
 
@@ -57,9 +59,9 @@ struct Tomography {
 #endif
     Tomography() {
         const uint stride = 8; // Use 1/8 of projections
-        for(uint index=0; index<projections.size; index+=stride) {
+        for(int index=0; index<projectionData.volume.sampleCount.z; index+=stride) {
             images << slice(projectionData.volume, index);
-            projections << Projection(reconstructionSize, images[index].size(), index);
+            projections << Projection(reconstructionSize, images.last().size(), index);
         }
 
         for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);

@@ -8,7 +8,7 @@ struct Approximate : Reconstruction  {
     Filter filters[coreCount];
     const bool filter, regularize;
 
-    Approximate(uint N, bool filter=false, bool regularize=false) : Reconstruction(N), p(N), r(N), AtAp(N), filter(filter), regularize(regularize) {}
+    Approximate(int3 N, bool filter=false, bool regularize=false) : Reconstruction(N), p(N), r(N), AtAp(N), filter(filter), regularize(regularize) {}
     void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
     bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
 };

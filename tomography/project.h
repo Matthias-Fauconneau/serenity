@@ -20,7 +20,6 @@ struct Projection {
         //const float pitch = deltaZ/total_num_projections*num_projections_per_revolution; // [mm] ~ 2.604 mm
         const float detectorHalfWidth = image_width * pixel_size; // [mm] ~ 397 mm
         const float hFOV = atan(detectorHalfWidth, camera_length); // Horizontal field of view (i.e cone beam angle) [rad] ~ 50°
-        const float aspectRatio = float(image_width)/float(image_height);
         const float volumeRadius = specimen_distance * cos(hFOV); // [mm] ~ 2 mm
         const float voxelRadius = float(volumeSize.x-1)/2;
 
@@ -28,12 +27,23 @@ struct Projection {
         //origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (index/total_num_projections*deltaZ / 2 /*FIXME: half pitch ?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
         origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/total_num_projections*deltaZ * num_projections_per_revolution / total_num_projections /*FIXME?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
-        ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.y-1)/aspectRatio);
+        ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
         ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];
+        this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
+        this->scale = float(imageSize.x-1)/voxelRadius;
+    }
+    //inline v4sf ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(pixelPosition.y) * ray[1] + ray[2]), 0b0111); }
+    inline vec2 project(vec3 p) const {
+        p = rotation * (p - vec3(origin[0],origin[1],origin[2]));
+        assert(p.x, p);
+        p = p / p.x; // Perspective divide
+        return vec2(p.y * scale, p.z * scale);
     }
 
     v4sf origin;
     v4sf ray[3];
+    mat3 rotation;
+    float scale;
 };
 
 // SIMD constants for intersections

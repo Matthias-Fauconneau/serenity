@@ -1,9 +1,8 @@
-#include "MLEM.h"
+#include "SIRT.h"
 #include "update.h"
 
-void MLEM::initialize(const ref<Projection>&, const ref<ImageF>& images) {
+void SIRT::initialize(const ref<Projection>&, const ref<ImageF>& images) {
     float sum = 0; for(const ImageF& image: images) sum += ::sum(image.data);
-    //float volume = PI*((x.sampleCount.x-1)/2)*((x.sampleCount.y-1)/2)*x.sampleCount.z;
     float volume = 0;
     const uint X=x.sampleCount.x, Y=x.sampleCount.y, Z=x.sampleCount.z;
     const vec3 center = vec3(x.sampleCount-int3(1))/2.f;
@@ -13,8 +12,7 @@ void MLEM::initialize(const ref<Projection>&, const ref<ImageF>& images) {
     for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { const vec3 origin = vec3(x,y,z) - center; if(sq(origin.xy()) < radiusSq) this->x[z*X*Y + y*X + x] = mean; }
 }
 
-/// Optimizes Poisson parameter vector Ax to maximize likelihood p(b|x) using Newton's method: x[k+1] = x[k] - f(x[k])/f'(x[k])
-bool MLEM::step(const ref<Projection>& projections, const ref<ImageF>& images) {
+bool SIRT::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     totalTime.start();
     Time time; time.start();
 
@@ -44,10 +42,10 @@ bool MLEM::step(const ref<Projection>& projections, const ref<ImageF>& images) {
                     v4sf start, step, end;
                     intersect(projection, xy, volume, start, step, end);
                     float Ax = project(start, step, end, volume, xData);
-                    if(Ax) { sum += b / Ax; count += 1; } else assert(!b);
+                    if(Ax) { sum += b - Ax; count += 1; } else assert(!b);
                 //}
                 float& xv = xData[z*X*Y + y*X + x];
-                xv = min(xv * max(float(projections.size-1)/projections.size, sum / count), 1.f);
+                xv = clip(0.f, sum / count, 1.f);
             } else assert(xData[z*X*Y + y*X + x] == 0);
         }
     });
@@ -57,4 +55,3 @@ bool MLEM::step(const ref<Projection>& projections, const ref<ImageF>& images) {
     log_(str(dec(k,2), time, str(totalTime.toFloat()/k)+"s"_));
     return true;
 }
-

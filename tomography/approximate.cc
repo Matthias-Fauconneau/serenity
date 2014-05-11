@@ -25,13 +25,13 @@ void Approximate::initialize(const ref<Projection>& projections, const ref<Image
         for(uint y: range(1, p.sampleCount.y-1)) {
             uint izy = iz + y * p.sampleCount.x;
             for(uint x: range(1, p.sampleCount.x-1)) {
-                const vec3 origin = vec3(x,y,z) - center;
-                if(sq(origin.xy()) < radiusSq) {
+                const vec3 point = vec3(x,y,z) - center;
+                if(sq(point.xy()) < radiusSq) {
                     float Atb = 0;
                     for(uint projectionIndex: range(projections.size)) {
                         const Projection& projection = projections[projectionIndex];
                         const ImageF& P = images[projectionIndex];
-                        vec2 xy = (projection.projection * origin).xy() + imageCenter;
+                        vec2 xy = projection.project(point) + imageCenter;
                         uint i = xy.x, j = xy.y;
                         float u = fract(xy.x), v = fract(xy.y);
                         assert(i<P.width && j<P.height, i,j, u,v);
@@ -65,8 +65,8 @@ bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& im
             mref<float> output = image.data.slice(y*image.width, image.width);
             mref<float> input = filter ? filters[id] : output;
             for(uint x: range(image.width)) {
-                v4sf start, end;
-                input[x] = intersect(projection, vec2(x, y), volume, start, end) ? project(start, projection.ray, end, volume, p) : 0;
+                v4sf start, step, end;
+                input[x] = intersect(projection, vec2(x, y), volume, start, step, end) ? project(start, step, end, volume, p) : 0;
             }
             if(filter) {
                 ref<float> filtered = filters[id].filter(input);
@@ -90,13 +90,13 @@ bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& im
             uint izy = iz + y * p.sampleCount.x;
             for(uint x: range(1, p.sampleCount.x-1)) {
                 uint i = izy+x;
-                const vec3 origin = vec3(x,y,z) - center;
-                if(sq(origin.xy()) < radiusSq) {
+                const vec3 point = vec3(x,y,z) - center;
+                if(sq(point.xy()) < radiusSq) {
                     float AtAp = regularize ? regularization(p, x,y,z, i) : 0;
                     for(uint projectionIndex: range(projections.size)) {
                         const Projection& projection = projections[projectionIndex];
                         const ImageF& P = images[projectionIndex];
-                        vec2 xy = (projection.projection * origin).xy() + imageCenter;
+                        vec2 xy = projection.project(point) + imageCenter;
                         uint i = xy.x, j = xy.y;
                         float u = fract(xy.x), v = fract(xy.y);
                         assert(i<P.width && j<P.height, i,j, u,v);
