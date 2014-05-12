@@ -52,17 +52,17 @@ void DiffView::render(const Image& target) {
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }*/
 
-static uint sliceIndex = 0;
+static float sliceIndex = 0;
 
 bool SliceView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
-    if(button) { sliceIndex = clip(0, int(cursor.x*(volume.sampleCount.z-1)/(size.x-1)), int(volume.sampleCount.z-1)); return true; }
+    if(button) { sliceIndex = clip(0.f, float(cursor.x)/float(size.x-1), 1.f); return true; }
     return false;
 }
 
 int2 SliceView::sizeHint() { return upsampleFactor * volume.sampleCount.xy(); }
 
 void SliceView::render(const Image& target) {
-    ImageF image = slice(volume, sliceIndex);
+    ImageF image = slice(volume, sliceIndex*(volume.sampleCount.z-1));
     while(image.size() < target.size()) image = upsample(image);
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }

@@ -86,7 +86,7 @@ inline float SSE(const VolumeF& volume, const ref<Projection>& projections, cons
 
 struct Application : Poll {
     const uint stride = 32;
-    const int downsampleFactor = 4;
+    const int downsampleFactor = 2;
     const int3 reconstructionSize = int3(512,512,896) / downsampleFactor;
 
     VolumeCDF projectionDataCDF {Folder("Preprocessed"_, Folder("Data"_, home()))};
@@ -120,11 +120,15 @@ struct Application : Poll {
     buffer<Projection> fullSizeProjections = evaluateProjections(filteredBackprojection.volume.sampleCount, images[0].size(), projectionCount, stride); //FIXME
     VolumeView filteredBackprojectionView {filteredBackprojection.volume, fullSizeProjections, 2}; //TODO: preproject
     VolumeView reconstructionView {reconstructions[0]->x, projections, 2};
+    HBox top {{&projectionView, &filteredBackprojectionView, &reconstructionView}};
     Plot plot;
     SliceView filteredBackprojectionSliceView {filteredBackprojection.volume, 2};
-    SliceView reconstructionSliceView {reconstructions[0]->x, 2};
-    WidgetGrid layout {{&projectionView, &filteredBackprojectionView, &reconstructionView,&plot,&filteredBackprojectionSliceView,&reconstructionSliceView}};
-    Window window {&layout, "Compute"_, int2(3,2)*/*projectionView.sizeHint()*/int2(512,512)}; // FIXME
+    SliceView reconstructionSliceView {reconstructions[0]->x, downsampleFactor};
+    HBox bottom {{&plot, &filteredBackprojectionSliceView, &reconstructionSliceView}};
+    VBox layout {{&top, &bottom}};
+    //WidgetGrid layout {{&projectionView, &filteredBackprojectionView, &reconstructionView,&plot,&filteredBackprojectionSliceView,&reconstructionSliceView}};
+    //Window window {&layout, "Compute"_, int2(3*512,projectionView.sizeHint().y+512)}; // FIXME
+    Window window {&layout, "Compute"_, int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
 
 
     void event() {

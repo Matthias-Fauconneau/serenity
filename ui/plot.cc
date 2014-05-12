@@ -11,7 +11,7 @@ uint subExponent(float& value) {
     error("No matching subexponent for"_, value);
 }
 
-int2 Plot::sizeHint() { return int2(512, 512); }
+int2 Plot::sizeHint() { return int2(-488, -512); }
 void Plot::render(const Image& target) {
     quicksort(dataSets);
 
