@@ -48,6 +48,7 @@ void Plot::render(const Image& target) {
                 }
             }
         } else {
+            if(log[axis]) return;
             assert_(!log[axis]); //FIXME
             if(!(min[axis] && isNumber(min[axis]))) return;
             assert_(min[axis] && isNumber(min[axis])); //FIXME

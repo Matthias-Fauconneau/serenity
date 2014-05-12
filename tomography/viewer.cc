@@ -5,10 +5,15 @@
 #include "layout.h"
 #include "window.h"
 
+VolumeCDF projectionData (Folder("Preprocessed"_ , Folder("Data"_, home())));
 VolumeCDF reconstruction (Folder("FBP"_, Folder("Results"_, home())));
-VolumeCDF projections (Folder("Preprocessed"_ /*"LIN_PSS"_*/, Folder("Data"_, home())));
-View reconstructionView (&reconstruction.volume, true);
-DiffView diff (&reconstruction.volume, &projections.volume);
-View projectionsView (&projections.volume, false);
-HBox views ({ &reconstructionView, &diff, &projectionsView });
-Window window (&views, "View"_, int2(3*sensorSize.x,sensorSize.y));
+
+buffer<ImageF> images = sliceProjectionVolume(projectionData.volume);
+buffer<Projection> projections = evaluateProjections(reconstruction.volume.sampleCount, images[0].size(), images.size);
+
+ProjectionView projectionsView (images, 4);
+//DiffView diff (&reconstruction.volume, &projections.volume);
+VolumeView reconstructionView (reconstruction.volume, projections, 4);
+HBox views ({ &projectionsView, /*&diff,*/ &reconstructionView });
+//const int2 imageSize = int2(504, 378);
+Window window (&views, "View"_);

@@ -2,11 +2,13 @@
 #include "volume.h"
 #include "matrix.h"
 
-const uint total_num_projections = 5041;
+inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); } // FIXME
+
+constexpr uint staticTotalProjectionCount = 5041;
 
 struct Projection {
-    const int3 volumeSize; const int2 imageSize;
-    Projection(const int3 volumeSize, const int2 imageSize, const uint index) : volumeSize(volumeSize), imageSize(imageSize) {
+    int3 volumeSize; int2 imageSize; uint index;
+    Projection(const int3 volumeSize, const int2 imageSize, const uint index) : volumeSize(volumeSize), imageSize(imageSize), index(index) {
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
@@ -25,14 +27,15 @@ struct Projection {
         const float voxelRadius = float(volumeSize.x-1)/2;
 
         mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
-        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (index/total_num_projections*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
+        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(staticTotalProjectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
         ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];
         this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
         this->scale = float(imageSize.x-1)/voxelRadius;
     }
-    //inline v4sf ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(pixelPosition.y) * ray[1] + ray[2]), 0b0111); }
+    inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
+    //inline v4sf ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2]), 0b0111); }
     inline vec2 project(vec3 p) const {
         p = rotation * (p - vec3(origin[0],origin[1],origin[2]));
         assert(p.x, p);
@@ -45,6 +48,20 @@ struct Projection {
     mat3 rotation;
     float scale;
 };
+
+inline buffer<ImageF> sliceProjectionVolume(const VolumeF& volume, uint stride=1) {
+    assert_(staticTotalProjectionCount == volume.sampleCount.z);
+    buffer<ImageF> images (volume.sampleCount.z / stride);
+    for(int index: range(images.size)) new (images+index) ImageF(downsample(slice(volume, index*stride))); // and actually also downsamples
+    return images;
+}
+
+inline buffer<Projection> evaluateProjections(int3 reconstructionSize, int2 imageSize, uint projectionCount, uint stride=1) {
+    assert_(staticTotalProjectionCount == projectionCount);
+    buffer<Projection> projections (projectionCount / stride);
+    for(int index: range(projections.size)) projections[index] = Projection(reconstructionSize, imageSize, index*stride);
+    return projections;
+}
 
 // SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__

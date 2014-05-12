@@ -156,6 +156,9 @@ template<class F> void chunk_parallel(uint totalSize, F f, uint threadCount = co
     parallel(threadCount, [&](uint id, uint chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); }, threadCount);
 }
 
+/// Runs a loop over a list
+template<class T, class F> void parallel(const ref<T>& list, F f, uint threadCount = coreCount) { parallel(0, list.size, [&](uint id, uint index){ f(id, list[index]); }, threadCount); }
+
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void exit(int status=0);
 /// Immediatly terminates the current thread

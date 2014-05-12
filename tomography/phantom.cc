@@ -97,34 +97,27 @@ VolumeF Phantom::volume(int3 size) const {
     return volume;
 }
 
-ImageF Phantom::project(int2 size, mat4 p) const {
+ImageF Phantom::project(int2 size, const Projection& projection) const {
+    assert_(size == projection.imageSize);
     ImageF target (size);
     target.data.clear();
-    const vec3 direction = normalize(p.transpose()[2].xyz());
-    const vec3 origin = p.inverse() * vec3(-vec2(size-int2(1))/2.f,0);
-    const vec3 vx = p.inverse()[0].xyz();
-    const vec3 vy = p.inverse()[1].xyz();
     for(Ellipsoid e: ellipsoids) {
         // Computes projection axis-aligned bounding box of object's oriented bounding box
-        vec2 O = (p * e.center).xy(), min = O, max = O; // Initialize min/max to origin
-        mat3 M = (mat3)p * e.forward;
+        /*vec2 O = projection.project(e.center), min = O, max = O; // Initialize min/max to origin
         for(int i: range(2)) for(int j: range(2)) for(int k: range(2)) { // Bounds each corner
-            vec2 corner = O + (M * vec3(i?-1:1,j?-1:1,k?-1:1)).xy();
+            vec2 corner = O + projection.project(e.forward * vec3(i?-1:1,j?-1:1,k?-1:1));
             min=::min(min, corner), max=::max(max, corner);
         }
-        min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));
+        min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));*/
+        int2 min = 0, max = size;
 
-        const v4sf p0 = e.inverse * direction;
-        const float a = dot4(p0, p0)[0];
-        const v4sf p10 = e.inverse * (origin - e.center);
-        const v4sf px = e.inverse * vx;
-        const v4sf py = e.inverse * vy;
+        const v4sf O = e.inverse * (toVec3(projection.origin)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
         for(int y: range(min.y, max.y)) {
-            const v4sf p1y = p10 + float4(y) * py;
             for(int x: range(min.x, max.x)) {
-                const v4sf p1 = p1y + float4(x) * px;
-                const float b = dot4(p0, p1)[0];
-                const float c = dot4(p1, p1)[0] - 1;
+                const v4sf D = e.inverse * (projection.pixelRay(x, y)/(vec3(projection.volumeSize-int3(1))/2.f));
+                const float a = dot4(D, D)[0];
+                const float b = dot4(D, O)[0];
+                const float c = dot4(O, O)[0] - 1;
                 float d = b*b - a*c;
                 if(d<=0) continue;
                 float t1 = - b - sqrt(d);
