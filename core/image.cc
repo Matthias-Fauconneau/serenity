@@ -12,21 +12,8 @@ Image clip(const Image& image, Rect r) {
 Image upsample(const Image& source) {
     int w=source.width, h=source.height;
     Image target(w*2,h*2);
-    for(int y=0; y<h; y++) for(int x=0; x<w; x++) {
-        target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
-    }
+    for(uint y: range(h)) for(uint x: range(w)) target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
     return target;
-}
-
-void convert(const Image& target, const ImageF& source, float max) {
-    if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
-    for(uint y: range(source.height)) for(uint x: range(source.width)) {
-        uint linear12 = 0xFFF*clip(0.f, source(x,y)/max, 1.f);
-        extern uint8 sRGB_forward[0x1000];
-        assert_(linear12 < 0x1000);
-        uint8 sRGB = sRGB_forward[linear12];
-        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
-    }
 }
 
 string imageFileFormat(const ref<byte>& file) {
@@ -53,4 +40,29 @@ Image decodeImage(const ref<byte>& file) {
     else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return decodeTIFF(file);
     else if(startsWith(file,"BM"_)) return decodeBMP(file);
     else { if(file.size) error("Unknown image format"_,hex(file.slice(0,min<int>(file.size,4)))); return Image(); }
+}
+
+void convert(const Image& target, const ImageF& source, float max) {
+    if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
+    for(uint y: range(source.height)) for(uint x: range(source.width)) {
+        uint linear12 = 0xFFF*clip(0.f, source(x,y)/max, 1.f);
+        extern uint8 sRGB_forward[0x1000];
+        assert_(linear12 < 0x1000);
+        uint8 sRGB = sRGB_forward[linear12];
+        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
+    }
+}
+
+ImageF downsample(const ImageF& source) {
+    int w=source.width, h=source.height;
+    ImageF target(w/2,h/2);
+    for(uint y: range(target.height)) for(uint x: range(target.width)) target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
+    return target;
+}
+
+ImageF upsample(const ImageF& source) {
+    int w=source.width, h=source.height;
+    ImageF target(w*2,h*2);
+    for(uint y: range(h)) for(uint x: range(w)) target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
+    return target;
 }

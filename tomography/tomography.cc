@@ -1,9 +1,8 @@
 #include "cdf.h"
-#include "adjoint.h"
+//include "SIRT.h"
 //#include "approximate.h"
-//#include "MLEM.h"
-//#include "adjoint.h"
-#include "SIRT.h"
+#include "adjoint.h"
+//include "MLEM.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -38,43 +37,32 @@ inline float SSE(const VolumeF& a, const VolumeF& b) {
 }
 #endif
 
-struct Tomography {
-    int3 reconstructionSize = int3(512,512,896);
+struct Tomography : Poll {
     VolumeCDF projectionData {Folder("Preprocessed"_/*LIN_PSS"_*/, Folder("Data"_, home()))};
-    array<Projection> projections;
+
+    const int downsampleFactor = 4;
+    int3 reconstructionSize = int3(512,512,896) / downsampleFactor;
+
     array<ImageF> images;
-    //string labels[1] = {"Adjoint"_};
-    unique<Reconstruction> reconstructions[1] {unique<SIRT>(reconstructionSize)};
-    HList<View> views{{&reconstructions[0]->x}};
+    array<Projection> projections;
 
+    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(reconstructionSize, true, true)};
 
-#if WINDOW
-#if PLOT
-    Plot plot;
-    HBox layout {{&views, &plot}};
-#else
-    VBox layout {{&views}};
-#endif
-    Window window {&layout, "Reconstruction"_};
-#endif
-    Tomography() {
-        const uint stride = 8; // Use 1/8 of projections
+    Thread thread;
+
+    Tomography() : Poll(0,0,thread) {
+        const uint stride = projectionData.volume.sampleCount.z / (896/downsampleFactor);
         for(int index=0; index<projectionData.volume.sampleCount.z; index+=stride) {
-            images << slice(projectionData.volume, index);
+            images << downsample(slice(projectionData.volume, index));
             projections << Projection(reconstructionSize, images.last().size(), index);
         }
-
+        log(reconstructionSize, projections.size, images.first().size());  // 2: (256, 256, 448) 230 (252, 189), 4:
         for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
-        step();
-
-#if WINDOW
-        window.displayed = {this, &Tomography::step};
-#else
-        for(uint unused i: range(3)) step();
-#endif
+        queue();
+        thread.spawn();
     }
 
-    void step() {
+    void event() {
         // Step forward the reconstruction which consumed the least time.
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         //log_(left(labels[index],16)+"\t"_);
@@ -84,24 +72,20 @@ struct Tomography {
         plot[labels[index]].insert(reconstructions[index]->totalTime.toFloat(), PSNR);
 #endif
         //log("\t", PSNR);
-#if WINDOW
-        if(window.target) { // FIXME
-#if PLOT
-            // Renders plot
-            {Rect rect = layout.layout(window.size)[1];
-                Image target = clip(window.target, rect);
-                fill(target, Rect(target.size()), white);
-                plot.render(target);
-            }
-#endif
-            // Renders only the reconstruction which updated
-            uint viewIndex = index;
-            Rect viewsRect = layout.layout(window.size)[0];
-            Rect rect = viewsRect.position() + views.layout(viewsRect.size())[viewIndex];
-            Image target = clip(window.target, rect);
-            views[viewIndex].render(target);
-            window.putImage();
-        }
-#endif
+        queue();
     }
-} tomography;
+};
+
+struct Application : Tomography {
+#if WINDOW
+    //string labels[1] = {"Adjoint"_};
+    HList<View> views{{{projectionData.volume, projections, false},{reconstructions[0]->x, projections}}};
+#if PLOT
+    Plot plot;
+    HBox layout {{&views, &plot}};
+#else
+    VBox layout {{&views}};
+#endif
+    Window window {&layout, "Reconstruction"_};
+#endif
+} app;

@@ -84,13 +84,17 @@ template<Type T> struct ImageT {
 };
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-template<Type T> inline ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeReference(o.data),o.width,o.height); }
+generic inline ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeReference(o.data),o.width,o.height); }
 
-template<Type T> inline ImageT<T> operator*(T scale, ImageT<T>&& image) { for(T& v: image.data) v *= scale; return move(image); }
+generic inline ImageT<T> operator*(T scale, ImageT<T>&& image) { for(T& v: image.data) v *= scale; return move(image); }
 
 typedef ImageT<float> ImageF;
-typedef ImageT<double> ImageD;
 
 /// Converts a linear float image to sRGB
 void convert(const Image& target, const ImageF& source, float max=0);
-void convert(const Image& target, const ImageD& source, double max=0);
+
+/// Downsamples by adding samples
+ImageF downsample(const ImageF& source);
+
+/// Upsamples an image by duplicating samples
+ImageF upsample(const ImageF& source);

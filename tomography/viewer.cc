@@ -5,7 +5,6 @@
 #include "layout.h"
 #include "window.h"
 
-
 VolumeCDF reconstruction (Folder("FBP"_, Folder("Results"_, home())));
 VolumeCDF projections (Folder("Preprocessed"_ /*"LIN_PSS"_*/, Folder("Data"_, home())));
 View reconstructionView (&reconstruction.volume, true);

@@ -5,7 +5,8 @@
 const uint total_num_projections = 5041;
 
 struct Projection {
-    Projection(const int3 volumeSize, const int2 imageSize, const uint index) {
+    const int3 volumeSize; const int2 imageSize;
+    Projection(const int3 volumeSize, const int2 imageSize, const uint index) : volumeSize(volumeSize), imageSize(imageSize) {
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
@@ -14,9 +15,9 @@ struct Projection {
         const float camera_length = 328.811; // [mm]
         const float specimen_distance = 2.78845; // [mm]
         const float pixel_size = 0.194; // [mm]
-        const float z_end_position = 37.3082; // [mm]
         const float z_start_position = 32.1; // [mm]
-        const float deltaZ = z_end_position-z_start_position; // [mm] ~ 5 mm
+        const float z_end_position = 37.3082; // [mm]
+        const float deltaZ = (z_end_position-z_start_position) / 2 /* Half pitch: Z[end] is incorrect ?*/; // [mm] ~ 5 mm
         //const float pitch = deltaZ/total_num_projections*num_projections_per_revolution; // [mm] ~ 2.604 mm
         const float detectorHalfWidth = image_width * pixel_size; // [mm] ~ 397 mm
         const float hFOV = atan(detectorHalfWidth, camera_length); // Horizontal field of view (i.e cone beam angle) [rad] ~ 50°
@@ -24,8 +25,7 @@ struct Projection {
         const float voxelRadius = float(volumeSize.x-1)/2;
 
         mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
-        //origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (index/total_num_projections*deltaZ / 2 /*FIXME: half pitch ?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
-        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/total_num_projections*deltaZ * num_projections_per_revolution / total_num_projections /*FIXME?*/)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
+        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (index/total_num_projections*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y/2);
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
         ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];

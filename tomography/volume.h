@@ -14,12 +14,16 @@ struct VolumeF {
     buffer<float> data; // Samples in Z-Order
 };
 
-inline ImageF slice(const VolumeF& volume, uint z) { int3 size = volume.sampleCount; return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y); }
+inline ImageF slice(const VolumeF& volume, uint z) {
+    int3 size = volume.sampleCount;
+    assert_(z < uint(size.z), z, size.z);
+    return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y);
+}
 
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
         assert(volume.sampleCount.x == volume.sampleCount.y);
-        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon (Prevents out of bounds on exact $-1 (ALT: extend offsetZ by one row (gather anything and multiply by 0))
+        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
         capZ = (v4sf){halfHeight, halfHeight, -halfHeight, -halfHeight};
         radiusR0R0 = (v4sf){radius*radius, 0, radius*radius, 0};
         radiusSqHeight = (v4sf){radius*radius, radius*radius, halfHeight, halfHeight};
