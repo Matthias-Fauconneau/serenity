@@ -9,7 +9,7 @@ struct Adjoint : Reconstruction  {
     Filter filters[coreCount];
     const bool filter, regularize;
 
-    Adjoint(int3 size, uint projectionCount, bool filter = false, bool regularize = false) : Reconstruction(size,projectionCount,"adjoint"_+(filter?"-filter"_:""_)+(regularize?"-regularize"_:""_)), p(size), r(size), filter(filter), regularize(regularize) { for(VolumeF& e: AtAp) e = VolumeF(size); }
+    Adjoint(int3 reconstructionSize, int3 projectionSize, bool filter = false, bool regularize = false) : Reconstruction(reconstructionSize,projectionSize,"adjoint"_+(filter?"-filter"_:""_)+(regularize?"-regularize"_:""_)), p(reconstructionSize), r(reconstructionSize), filter(filter), regularize(regularize) { for(VolumeF& e: AtAp) e = VolumeF(reconstructionSize); }
     void initialize(const ref<Projection>& projections, const ref<ImageF>& images) override;
     bool step(const ref<Projection>& projections, const ref<ImageF>& images) override;
 };

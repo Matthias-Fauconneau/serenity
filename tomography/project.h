@@ -49,10 +49,10 @@ struct Projection {
     float scale;
 };
 
-inline buffer<ImageF> sliceProjectionVolume(const VolumeF& volume, uint stride=1) {
+inline buffer<ImageF> sliceProjectionVolume(const VolumeF& volume, uint stride=1, bool downsampleProjections=false) {
     assert_(staticTotalProjectionCount == volume.sampleCount.z);
     buffer<ImageF> images (volume.sampleCount.z / stride);
-    for(int index: range(images.size)) new (images+index) ImageF(downsample(slice(volume, index*stride))); // and actually also downsamples
+    for(int index: range(images.size)) new (images+index) ImageF(downsampleProjections ? downsample(slice(volume, index*stride)) : slice(volume, index*stride));
     return images;
 }
 

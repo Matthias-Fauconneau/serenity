@@ -13,7 +13,6 @@ int2 ProjectionView::sizeHint() { return upsampleFactor * projections[projection
 void ProjectionView::render(const Image& target) {
     ImageF image = share(projections[projectionIndex]);
     for(uint unused i: range(log2(upsampleFactor))) image = upsample(image);
-    //assert_(target.size() == image.size(), target.size(), image.size());
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }
 

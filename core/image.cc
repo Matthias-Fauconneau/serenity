@@ -43,8 +43,9 @@ Image decodeImage(const ref<byte>& file) {
 }
 
 void convert(const Image& target, const ImageF& source, float max) {
-    if(!max) for(uint i: range(source.data.size)) max=::max(max, source.data[i]);
-    for(uint y: range(source.height)) for(uint x: range(source.width)) {
+    const int margin=0; // Regularization
+    if(!max) for(uint y: range(margin, source.height-margin)) for(uint x: range(margin,source.width-margin)) max=::max(max, source(x,y));
+    for(uint y: range(margin,source.height-margin)) for(uint x: range(margin,source.width-margin)) {
         uint linear12 = 0xFFF*clip(0.f, source(x,y)/max, 1.f);
         extern uint8 sRGB_forward[0x1000];
         assert_(linear12 < 0x1000);

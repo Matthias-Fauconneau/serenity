@@ -150,7 +150,7 @@ void Plot::render(const Image& target) {
             line(target, p-int2(pointRadius, 0), p+int2(pointRadius, 0), color);
             line(target, p-int2(0, pointRadius), p+int2(0, pointRadius), color);
         }
-        if(plotLines) for(uint i: range(data.size()-1)) line(target, points[i], points[i+1], color);
+        //if(plotLines) for(uint i: range(data.size()-1)) line(target, points[i], points[i+1], color);
     }
 }
 

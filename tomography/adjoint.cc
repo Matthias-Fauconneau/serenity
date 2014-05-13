@@ -26,13 +26,14 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
     float* pData = p;
     float* rData = r;
     float residualSum[coreCount] = {};
-    parallel(x.sampleCount.z, [pData, rData, &residualSum, this](uint id, uint z) {
+    uint X = x.sampleCount.x, Y = x.sampleCount.y, Z = x.sampleCount.z;
+    parallel(Z, [pData, rData, &residualSum, X,Y, this](uint id, uint z) {
         float accumulator = 0;
         float* P[coreCount]; for(uint id: range(coreCount)) P[id] = AtAp[id];
-        uint iz = z * x.sampleCount.y * x.sampleCount.x;
-        for(uint y: range(x.sampleCount.y)) {
-            uint izy = iz + y * p.sampleCount.x;
-            for(uint x: range(this->x.sampleCount.x)) {
+        uint iz = z * Y * X;
+        for(uint y: range(Y)) {
+            uint izy = iz + y * X;
+            for(uint x: range(X)) {
                 uint i = izy + x;
                 float Atb = 0; //regularize ? - regularization(this->x, x,y,z, i) : 0; // - ?
                 for(uint id: range(coreCount)) { Atb += P[id][i]; P[id][i]=0; } // Merges p and clears AtAp#
@@ -90,12 +91,13 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
     float* AtApData = AtAp[0]; // Merges into first volume
     float* pData = p;
     float pAtApSum[coreCount] = {};
-    parallel(1, p.sampleCount.z-1, [&projections, pData, AtApData, &pAtApSum, this](uint id, uint z) {
+    uint X = x.sampleCount.x, Y = x.sampleCount.y, Z = x.sampleCount.z;
+    parallel(1, Z-1, [&projections, pData, AtApData, &pAtApSum, X,Y, this](uint id, uint z) {
         float accumulator = 0;
-        uint iz = z * p.sampleCount.y * p.sampleCount.x;
-        for(uint y: range(1, p.sampleCount.y-1)) {
-            uint izy = iz + y * p.sampleCount.x;
-            for(uint x: range(1, p.sampleCount.x-1)) {
+        uint iz = z * Y * X;
+        for(uint y: range(1, Y-1)) {
+            uint izy = iz + y * X;
+            for(uint x: range(1, X-1)) {
                 uint i = izy + x;
                 float* P[coreCount]; for(uint id: range(coreCount)) P[id] = AtAp[id];
                 float AtAp = regularize ? regularization(p, x,y,z, i) : 0;
@@ -128,6 +130,13 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
 
     // Computes next search direction: p[k+1] = r[k+1] + β p[k]
     chunk_parallel(p.size(), [&](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) pData[i] = rData[i] + beta * pData[i]; });
+
+    // Fix borders for regularization
+    for(uint xy: range(X*Y)) xData[0*Y*X+xy] = xData[1*Y*X+xy];
+    for(uint z: range(Z)) for(uint y: range(X)) xData[z*Y*X+y*X+0] = xData[z*Y*X+y*X+1];
+    for(uint z: range(Z)) for(uint y: range(X)) xData[z*Y*X+y*X+(X-1)] = xData[z*Y*X+y*X+(X-1-1)];
+    for(uint z: range(Z)) for(uint x: range(X)) xData[z*Y*X+0*X+x] = xData[z*Y*X+1*X+x];
+    for(uint z: range(Z)) for(uint x: range(X)) xData[z*Y*X+(Y-1)*X+x] = xData[z*Y*X+(Y-1-1)*X+x];
 
     time.stop();
     totalTime.stop();

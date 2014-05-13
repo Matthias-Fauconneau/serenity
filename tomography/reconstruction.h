@@ -12,7 +12,7 @@ struct Reconstruction {
 
     int k = -1;
     Time totalTime;
-    Reconstruction(int3 N, uint projectionCount, string label) : name(label+"-"_+dec(projectionCount)+"."_+str(N.x)+"x"_+str(N.y)+"x"_+str(N.z)) {
+    Reconstruction(int3 N, int3 projectionSize, string label) : name(label+"-"_+strx(projectionSize)+"."_+strx(N)) {
         x.sampleCount = N;
         File file;
 #if 0
@@ -21,6 +21,8 @@ struct Reconstruction {
             file = File(name+"."_+str(k), folder, ReadOnly/*Write*/);
             map = Map(file, Map::Prot(Map::Read/*|Map::Write*/));
         } else
+#else
+        if(existsFile(name, folder)) removeFile(name, folder);
 #endif
         {
             file = File(name, folder, Flags(ReadWrite|Create));
