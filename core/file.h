@@ -170,9 +170,9 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
 /// Renames a file replacing any existing files or links
 void rename(const string& oldName, const string& newName, const Folder& at=currentWorkingDirectory());
 /// Removes file
-void remove(const string& name, const Folder& at=currentWorkingDirectory());
+void removeFile(const string& name, const Folder& at=currentWorkingDirectory());
 /// Removes folder
-void remove(const Folder& folder);
+void removeFolder(const Folder& folder);
 /// Removes folder
 void removeFolder(const string& name, const Folder& at=currentWorkingDirectory());
 /// Removes file or folder

@@ -17,8 +17,8 @@ struct Filter {
         return filter();
     }
     ref<float> filter() {
-        for(uint i: range(r.size/4)) r[i] = 0;
-        for(uint i: range(r.size/4+r.size/2,r.size)) r[i] = 0;
+        int start = r.size/4; float firstR = r[start];  for(uint i: range(start)) r[i] = firstR;
+        int end = r.size/4+r.size/2; float lastR = r[end-1]; for(uint i: range(end,r.size)) r[i] = lastR;
         fftwf_execute(forward);
         uint N = r.size;
         float scale = 16./(N*N);

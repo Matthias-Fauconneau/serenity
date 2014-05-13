@@ -109,24 +109,24 @@ void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system
 void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
-    assert(existsFile(oldName,oldAt), oldName, newName);
-    assert(!existsFile(newName,newAt), oldName, newName);
-    assert(newName.size<0x100);
+    assert_(existsFile(oldName,oldAt), oldName, newName);
+    assert_(!existsFile(newName,newAt), oldName, newName);
+    assert_(newName.size<0x100);
     check_(renameat(oldAt.fd,strz(oldName),newAt.fd,strz(newName)));
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { assert(oldName!=newName); rename(at, oldName, at, newName); }
-void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
+void removeFile(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
 void removeFolder(const string& name, const Folder& at) { check__( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
-void remove(const Folder& folder) { int fd=check(openat(folder.fd, strz("."_), O_WRONLY|O_DIRECTORY, 0), folder.name()); check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); close(fd); }
+void removeFolder(const Folder& folder) { int fd=check(openat(folder.fd, strz("."_), O_WRONLY|O_DIRECTORY, 0), folder.name()); check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); close(fd); }
 void removeFileOrFolder(const string& name, const Folder& at) {
     if(existsFolder(name,at)) {
-        for(const string& file: Folder(name,at).list(Files)) ::remove(file,Folder(name,at));
+        for(const string& file: Folder(name,at).list(Files)) ::removeFile(file,Folder(name,at));
         ::removeFolder(name, at);
-    } else ::remove(name, at);
+    } else ::removeFile(name, at);
 }
 void symlink(const string& from,const string& to, const Folder& at) {
     assert(from!=to);
-    remove(from,at);
+    //removeFile(from,at);
     check_(symlinkat(strz(from),at.fd,strz(to)), from,"->",to);
 }
 void touchFile(const string& path, const Folder& at, bool setModified) {

@@ -1,7 +1,7 @@
 #include "phantom.h"
 #include "cdf.h"
 //include "SIRT.h"
-//#include "approximate.h"
+//include "approximate.h"
 #include "adjoint.h"
 //include "MLEM.h"
 #include "plot.h"
@@ -85,58 +85,60 @@ inline float SSE(const VolumeF& volume, const ref<Projection>& projections, cons
 }
 
 struct Application : Poll {
+    // Parameters
     const uint stride = 32;
-    const int downsampleFactor = 2;
+    const int downsampleFactor = 4;
     const int3 reconstructionSize = int3(512,512,896) / downsampleFactor;
 
+    // Data
     VolumeCDF projectionDataCDF {Folder("Preprocessed"_, Folder("Data"_, home()))};
     const VolumeF& projectionData = projectionDataCDF.volume;
     const uint projectionCount = projectionData.sampleCount.z;
-    //Phantom phantom {16};
 
     array<ImageF> images = sliceProjectionVolume(projectionData, stride);
     array<Projection> projections = evaluateProjections(reconstructionSize, images[0].size(), projectionCount, stride);
 
+    // Reconstruction
     string labels[1] = {"Adjoint"_};
-    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(reconstructionSize, true, true)};
-
+    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(reconstructionSize, projectionCount, true, true)};
     Thread thread;
 
-    Application() : Poll(0,0,thread) {
-        /*for(int index: range(reconstructionSize.z)) {
-            const int2 imageSize = int2(504, 378)/2;
-            projections << Projection(reconstructionSize, imageSize, index*total_num_projections/reconstructionSize.z);
-            images << phantom.project(imageSize, projections.last());*/
-        log(reconstructionSize, projections.size, images.first().size());
-        for(auto& reconstruction: reconstructions) reconstruction->initialize(projections, images);
-        queue();
-        //reconstructions[0]->x = phantom.volume(reconstructionSize);
-        thread.spawn();
-    }
-
+    // Evaluation
+    array<ImageF> referenceImages = sliceProjectionVolume(projectionData);
+    array<Projection> referenceProjections = evaluateProjections(reconstructionSize, images[0].size(), projectionCount);
     VolumeCDF filteredBackprojection {Folder("FBP"_, Folder("Results"_, home()))};
-    const float SSQ = ::SSQ(images); //::SSQ(filteredBackprojection.volume);
-    ProjectionView projectionView {images, 2};
-    buffer<Projection> fullSizeProjections = evaluateProjections(filteredBackprojection.volume.sampleCount, images[0].size(), projectionCount, stride); //FIXME
+    buffer<Projection> fullSizeProjections = evaluateProjections(filteredBackprojection.volume.sampleCount, images[0].size(), projectionCount);
+    const float SSQ = ::SSQ(referenceImages);
+
+    ProjectionView projectionView {referenceImages, 2};
     VolumeView filteredBackprojectionView {filteredBackprojection.volume, fullSizeProjections, 2}; //TODO: preproject
-    VolumeView reconstructionView {reconstructions[0]->x, projections, 2};
+    VolumeView reconstructionView {reconstructions[0]->x, referenceProjections, 2};
     HBox top {{&projectionView, &filteredBackprojectionView, &reconstructionView}};
     Plot plot;
     SliceView filteredBackprojectionSliceView {filteredBackprojection.volume, 2};
     SliceView reconstructionSliceView {reconstructions[0]->x, downsampleFactor};
     HBox bottom {{&plot, &filteredBackprojectionSliceView, &reconstructionSliceView}};
     VBox layout {{&top, &bottom}};
-    //WidgetGrid layout {{&projectionView, &filteredBackprojectionView, &reconstructionView,&plot,&filteredBackprojectionSliceView,&reconstructionSliceView}};
-    //Window window {&layout, "Compute"_, int2(3*512,projectionView.sizeHint().y+512)}; // FIXME
-    Window window {&layout, "Compute"_, int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
+    Window window {&layout, strx(int3(images.first().size(), projections.size))+" "_+strx(reconstructionSize) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
 
-
+    Application() : Poll(0,0,thread) { if(reconstructions[0]->k==-1) { queue(); thread.spawn(); } /*else view only*/ }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
-        reconstructions[index]->step(projections, images);
-        const float PSNR = 10*log10(SSQ / ::SSE(reconstructions[index]->x, projections, images));
-        plot[labels[index]].insert(reconstructions[index]->totalTime.toFloat(), PSNR);
-        log("\t", PSNR);
+        Reconstruction& r = reconstructions[index];
+        if(r.k>=0) {
+            if(existsFile(r.name+".step"_,r.folder)) removeFile(r.name+".step"_, r.folder);  // Removes previous evaluation
+            rename(r.name+"."_+dec(r.k), r.name+".step"_, r.folder); // Renames during step to invalidate volume if aborted
+            r.step(projections, images);
+            rename(r.name+".step"_, r.name+"."_+dec(r.k), r.folder); // Renames back to valid state once step is complete
+        } else {
+            r.initialize(projections, images);
+            if(existsFile(r.name+"."_+dec(r.k), r.folder)) removeFile(r.name+"."_+dec(r.k), r.folder);  // Removes previous evaluation
+            rename(r.name, r.name+"."_+dec(r.k), r.folder);
+        }
+        //const float PSNR = 10*log10(SSQ / ::SSE(r.x, projections, images));
+        //const float PSNR = 10*log10(SSQ / ::SSE(r.x, referenceProjections, referenceImages));
+        //plot[labels[index]].insert(r.totalTime.toFloat(), PSNR);
+        //log("\t", PSNR);
         window.render();
         queue();
     }

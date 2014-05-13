@@ -3,7 +3,8 @@
 
 /// Computes residual r = p = At ( b - A x )
 void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
-    log_("Initialize"_); Time time;
+    assert_(k==-1);
+    log_("Initialize "_); Time time;
     if(filter) for(Filter& filter: filters) filter = 2*images.first().width;
     const CylinderVolume volume (x);
     for(uint projectionIndex: range(projections.size)) { // TODO: Cluster rays for coherence (even from different projections)
@@ -15,7 +16,8 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
             for(uint x: range(image.width)) {
                 v4sf start, step, end;
                 if(intersect(projection, vec2(x, y), volume, start, step, end)) {
-                    backproject(start, step, end, volume, AtAp[id], float8(/*scale **/ row[x])); // - Ax but x = 0
+                    float Ax = 0; //project(start, step, end, volume, this->x.data);
+                    backproject(start, step, end, volume, AtAp[id], float8(row[x] - Ax));
                 }
             }
         });
@@ -24,21 +26,26 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
     float* pData = p;
     float* rData = r;
     float residualSum[coreCount] = {};
-    chunk_parallel(p.size(), [pData, rData, &residualSum, this](uint id, uint offset, uint size) {
+    parallel(x.sampleCount.z, [pData, rData, &residualSum, this](uint id, uint z) {
         float accumulator = 0;
         float* P[coreCount]; for(uint id: range(coreCount)) P[id] = AtAp[id];
-        for(uint i: range(offset,offset+size)) {
-            float Atb = 0;
-            for(uint id: range(coreCount)) { Atb += P[id][i]; P[id][i]=0; } // Merges p and clears AtAp#
-            // No regularization (x=0)
-            pData[i] = Atb;
-            rData[i] = Atb;
-            accumulator += sq(Atb);
+        uint iz = z * x.sampleCount.y * x.sampleCount.x;
+        for(uint y: range(x.sampleCount.y)) {
+            uint izy = iz + y * p.sampleCount.x;
+            for(uint x: range(this->x.sampleCount.x)) {
+                uint i = izy + x;
+                float Atb = 0; //regularize ? - regularization(this->x, x,y,z, i) : 0; // - ?
+                for(uint id: range(coreCount)) { Atb += P[id][i]; P[id][i]=0; } // Merges p and clears AtAp#
+                pData[i] = Atb;
+                rData[i] = Atb;
+                accumulator += sq(Atb);
+            }
         }
         residualSum[id] += accumulator;
     });
     residualEnergy = sum(residualSum);
     log(time);
+    k=0;
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
