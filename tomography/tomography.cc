@@ -86,7 +86,7 @@ inline float SSE(const VolumeF& volume, const ref<Projection>& projections, cons
 
 struct Application : Poll {
     // Parameters
-    const uint stride = 8;
+    const uint stride = 4;
     const int downsampleFactor = 1;
     const bool downsampleProjections = false;
     const int3 reconstructionSize = int3(512,512,896) / downsampleFactor;
@@ -135,11 +135,11 @@ struct Application : Poll {
         }
         if(existsFile(r.name+"."_+dec(r.k), r.folder)) removeFile(r.name+"."_+dec(r.k), r.folder);  // Removes previous evaluation
         rename(r.name, r.name+"."_+dec(r.k), r.folder);
-        Time time;
-        const float PSNR = 10*log10(SSQ / ::SSE(r.x, projections, images));
+        //Time time;
+        //const float PSNR = 10*log10(SSQ / ::SSE(r.x, projections, images));
         //const float PSNR = 10*log10(SSQ / ::SSE(r.x, referenceProjections, referenceImages));
-        plot[labels[index]].insert(r.totalTime.toFloat(), PSNR);
-        log("\t", PSNR, "\tEvaluation:",time);
+        //plot[labels[index]].insert(r.totalTime.toFloat(), PSNR);
+        //log("\t", PSNR, "\tEvaluation:",time);
         window.render();
         if(r.k<10) queue();
     }

@@ -15,7 +15,7 @@ struct Layout : Widget {
     /// Renders all visible child widgets
     void render(const Image& target) override;
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
+    bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override;
 };
 
 /// Implements Layout storage using array<Widget*> (i.e by reference)

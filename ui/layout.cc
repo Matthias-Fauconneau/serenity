@@ -6,9 +6,9 @@ void Layout::render(const Image& target) {
     for(uint i: range(count())) at(i).render(clip(target, widgets[i]));
 }
 
-bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+bool Layout::mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) {
     array<Rect> widgets = layout(size);
-    for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
+    for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(target, widgets[i],cursor,event,button)) return true;
     return false;
 }
 

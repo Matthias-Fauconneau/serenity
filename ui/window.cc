@@ -21,7 +21,7 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 
-Window::Window(Widget* widget, const string& unused title, int2 size, const Image& unused icon) :
+Window::Window(Widget* widget, const string& title unused, int2 size, const Image& icon unused) :
     Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
@@ -117,11 +117,11 @@ void Window::event() {
         processEvent(type, e);
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
-    if(needUpdate) {
-        needUpdate = false;
+    if(motionPending) processEvent(LastEvent, XEvent());
+    if(needRender) {
         assert(size);
 
-        if(state!=Idle) { state=Wait; return; }
+        //if(state!=Idle) { state=Wait; return; } // Synchronizes full render
         if(target.size() != size) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
@@ -138,8 +138,13 @@ void Window::event() {
 
         renderBackground(target);
         widget->render(target);
-
-        putImage(Rect(size));
+        needRender = false;
+        needUpdate = true;
+    }
+    if(needUpdate) {
+        if(state!=Idle) { state=Wait; return; }
+        putImage();
+        needUpdate = false;
     }
 }
 
@@ -186,46 +191,51 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         window=this;
         /**/ if(type==MotionNotify) {
             cursorPosition = int2(e.x,e.y);
-            Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-            if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
-            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
-            if(cursor!=lastCursor) setCursor(cursor);
+            cursorState = e.state;
+            motionPending = true;
+        } else {
+            if(motionPending) {
+                Cursor lastCursor = cursor; cursor=Cursor::Arrow;
+                if(drag && cursorState&Button1Mask && drag->mouseEvent(target, cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //render(); FIXME: Asssumes all widgets supports partial updates; FIXME: always update full surface
+                else if(widget->mouseEvent(target, cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //render(); FIXME: Asssumes all widgets supports partial updates; FIXME: always update full surface
+                if(cursor!=lastCursor) setCursor(cursor);
+            }
+            if(type==ButtonPress) {
+                Widget* focus=this->focus; this->focus=0;
+                dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
+                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render();
+            }
+            else if(type==ButtonRelease) {
+                drag=0;
+                if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
+            }
+            else if(type==KeyPress) keyPress(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
+            else if(type==KeyRelease) keyRelease(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
+            else if(type==EnterNotify || type==LeaveNotify) {
+                if(type==LeaveNotify && hideOnLeave) hide();
+                if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
+                                       e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
+            }
+            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) render(); } // FIXME
+            else if(type==UnmapNotify) mapped=false;
+            else if(type==MapNotify) { mapped=true; if(needRender) queue(); }
+            else if(type==ReparentNotify) {}
+            else if(type==ConfigureNotify) {
+                position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
+                if(this->size!=size) { this->size=size; render(); }
+            }
+            else if(type==GravityNotify) {}
+            else if(type==ClientMessage) {
+                function<void()>* action = actions.find(Escape);
+                if(action) (*action)(); // Local window action
+                else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
+                else exit(0); // Exits application by default
+            }
+            else if(type==Shm::event+Shm::Completion) { /*int stateWas=state;*/ state=Idle; if(displayed) displayed(); /*if(stateWas==Wait) render();*/ }
+            else if( type==DestroyNotify || type==MappingNotify || type==LastEvent) {}
+            else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
+            window=0;
         }
-        else if(type==ButtonPress) {
-            Widget* focus=this->focus; this->focus=0;
-            dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-            if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render();
-        }
-        else if(type==ButtonRelease) {
-            drag=0;
-            if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
-        }
-        else if(type==KeyPress) keyPress(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
-        else if(type==KeyRelease) keyRelease(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
-        else if(type==EnterNotify || type==LeaveNotify) {
-            if(type==LeaveNotify && hideOnLeave) hide();
-            if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
-                                   e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
-        }
-        else if(type==Expose) { if(!e.expose.count) render(); }
-        else if(type==UnmapNotify) mapped=false;
-        else if(type==MapNotify) { mapped=true; if(needUpdate) queue(); }
-        else if(type==ReparentNotify) {}
-        else if(type==ConfigureNotify) {
-            position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-            if(this->size!=size) { this->size=size; render(); }
-        }
-        else if(type==GravityNotify) {}
-        else if(type==ClientMessage) {
-            function<void()>* action = actions.find(Escape);
-            if(action) (*action)(); // Local window action
-            else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
-            else exit(0); // Exits application by default
-        }
-        else if(type==Shm::event+Shm::Completion) { int stateWas=state; state=Idle; if(displayed) displayed(); if(stateWas==Wait) render(); }
-        else if( type==DestroyNotify || type==MappingNotify) {}
-        else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
-        window=0;
     }
 }
 uint Window::send(const ref<byte>& request) { write(request); return ++sequence; }
@@ -247,7 +257,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::render() { needUpdate=true; if(mapped) queue(); }
+void Window::render() { needRender=true; if(mapped) queue(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
@@ -428,20 +438,20 @@ void Window::touchscreenEvent() {
                 if(pressState==1) {
                     Widget* focus=this->focus; this->focus=0;
                     dragStart=cursorPosition, dragPosition=position, dragSize=size;
-                    if(widget->mouseEvent(cursorPosition, size, Widget::Press, Widget::LeftButton) || this->focus!=focus) needUpdate=true;
+                    if(widget->mouseEvent(cursorPosition, size, Widget::Press, Widget::LeftButton) || this->focus!=focus) needRender=true;
                 }
                 if(pressState==0) {
                     drag=0;
-                    if(widget->mouseEvent(cursorPosition, size, Widget::Release, Widget::LeftButton)) needUpdate=true;
+                    if(widget->mouseEvent(cursorPosition, size, Widget::Release, Widget::LeftButton)) needRender=true;
                 }
                 previousPressState = pressState;
             }
-            if(drag && pressState==1 && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true;
-            else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, pressState==1?Widget::LeftButton:Widget::None)) needUpdate=true;
+            if(drag && pressState==1 && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needRender=true;
+            else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, pressState==1?Widget::LeftButton:Widget::None)) needRender=true;
         }
     }
     window=0;
-    if(needUpdate) render();
+    if(needRender) render();
 }
 
 void Window::buttonEvent() {
@@ -452,7 +462,7 @@ void Window::buttonEvent() {
         if(e.type == EV_KEY && e.value==0) keyRelease(Key(e.code), NoModifiers);
     }
     window=0;
-    if(needUpdate) render();
+    if(needRender) render();
 }
 
 void Window::keyboardEvent() {
@@ -462,7 +472,7 @@ void Window::keyboardEvent() {
         if(e.type == EV_KEY && e.value==0) keyRelease(Key(e.code), NoModifiers);
     }
     window=0;
-    if(needUpdate) render();
+    if(needRender) render();
 }
 
 
@@ -470,7 +480,7 @@ void Window::render() {
     if(!displayState) return;
     if(!mapped) return;
     if(target.size() != size) target = Image(size.x, size.y);
-    needUpdate = false;
+    needRender = false;
     renderBackground(target);
     assert(&widget);
     widget->render(target);

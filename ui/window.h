@@ -65,12 +65,13 @@ struct Window : Device {
     Widget* drag=0;
     /// Current widget that gets keyboard events reported without modifiers (when in focus)
     Widget* directInput=0;
-    /// Current cursor position
+    /// Current cursor position & state
     int2 cursorPosition=0;
+    int cursorState=0;
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
-    enum Background { NoBackground, Black, White, Oxygen } background = White;
+    enum Background { NoBackground, Black, White, Oxygen } background = NoBackground;
 
     /// Renders window background to \a target
     void renderBackground(Image& target);
@@ -85,8 +86,12 @@ struct Window : Device {
     Image target;
     /// Drag state
     int2 dragStart, dragPosition, dragSize;
-    /// Whether a render request was skipped while unmapped
-    bool needUpdate = true;
+    /// Whether a motion event is pending processing
+    bool motionPending = false;
+    /// Whether to trigger full render after all events are processed
+    bool needRender = false;
+    /// Whether to trigger full update after all events are processed
+    bool needUpdate = false;
     /// Whether the current display is active
     bool displayState = true;
     /// Pending long actions

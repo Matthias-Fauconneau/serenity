@@ -70,7 +70,13 @@ struct Build {
         else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
         else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
         if(value != condition) {
-            for(; !s.match("#endif"_); s.line()) tryParseConditions(s);
+            for(;;) {
+                if(s.match("#endif"_)) break;
+                if(s.match("#else"_)) break;
+                assert_(s, "Unterminated #if");
+                s.line();
+            }
+            tryParseConditions(s);
         }
     }
     bool tryParseFiles(TextData& s) {

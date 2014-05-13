@@ -59,8 +59,6 @@ tomography/result.h
 tomography/operation.h
 tomography/volume.h
 tomography/volume-operation.h
-tomography/slice.cc
-tomography/slice.h
 tomography/phantom.cc
 tomography/phantom.h
 tomography/adjoint.cc

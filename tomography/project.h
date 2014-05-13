@@ -4,11 +4,9 @@
 
 inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); } // FIXME
 
-constexpr uint staticTotalProjectionCount = 5041;
-
 struct Projection {
     int3 volumeSize; int2 imageSize; uint index;
-    Projection(const int3 volumeSize, const int2 imageSize, const uint index) : volumeSize(volumeSize), imageSize(imageSize), index(index) {
+    Projection(const int3 volumeSize, const int2 imageSize, const uint index, const uint projectionCount) : volumeSize(volumeSize), imageSize(imageSize), index(index) {
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
@@ -27,7 +25,7 @@ struct Projection {
         const float voxelRadius = float(volumeSize.x-1)/2;
 
         mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
-        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(staticTotalProjectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
+        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
         ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];
@@ -50,16 +48,14 @@ struct Projection {
 };
 
 inline buffer<ImageF> sliceProjectionVolume(const VolumeF& volume, uint stride=1, bool downsampleProjections=false) {
-    assert_(staticTotalProjectionCount == volume.sampleCount.z);
     buffer<ImageF> images (volume.sampleCount.z / stride);
     for(int index: range(images.size)) new (images+index) ImageF(downsampleProjections ? downsample(slice(volume, index*stride)) : slice(volume, index*stride));
     return images;
 }
 
 inline buffer<Projection> evaluateProjections(int3 reconstructionSize, int2 imageSize, uint projectionCount, uint stride=1) {
-    assert_(staticTotalProjectionCount == projectionCount);
     buffer<Projection> projections (projectionCount / stride);
-    for(int index: range(projections.size)) projections[index] = Projection(reconstructionSize, imageSize, index*stride);
+    for(int index: range(projections.size)) projections[index] = Projection(reconstructionSize, imageSize, index*stride, projectionCount);
     return projections;
 }
 

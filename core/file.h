@@ -147,7 +147,7 @@ struct Map {
 
     Map(){}
     Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
+    explicit Map(const string& path, const Folder& at=currentWorkingDirectory(), Prot prot=Read):Map(File(path,at),prot){}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     default_move(Map);
     ~Map();
