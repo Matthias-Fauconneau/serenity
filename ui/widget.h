@@ -46,9 +46,9 @@ struct Widget {
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted
     virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { (void)cursor, (void)size, (void)event, (void)button; return false; }
-    virtual bool mouseEvent(const Image& target unused, int2 cursor, int2 size, Event event, Button button) { return mouseEvent(cursor, size, event, button); } // Default implementation doesn't render
+    virtual bool mouseEvent(const Image& target _unused, int2 cursor, int2 size, Event event, Button button) { return this->mouseEvent(cursor, size, event, button); } // Default implementation doesn't render
     /// Convenience overload for layout implementation
-    bool mouseEvent(const Image& target, Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(clip(target,rect),cursor-rect.position(),rect.size(),event,button); }
+    bool mouseEvent(const Image& target, Rect rect, int2 cursor, Event event, Button button) { return this->mouseEvent(clip(target,rect),cursor-rect.position(),rect.size(),event,button); }
 
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus

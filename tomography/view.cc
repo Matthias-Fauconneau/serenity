@@ -12,7 +12,7 @@ int2 ProjectionView::sizeHint() { return upsampleFactor * projections[projection
 
 void ProjectionView::render(const Image& target) {
     ImageF image = share(projections[projectionIndex]);
-    for(uint unused i: range(log2(upsampleFactor))) image = upsample(image);
+    for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }
 
@@ -24,10 +24,10 @@ bool SliceView::mouseEvent(const Image& target, int2 cursor, int2 size, Event, B
     return false;
 }
 
-int2 SliceView::sizeHint() { return upsampleFactor * volume.sampleCount.xy(); }
+int2 SliceView::sizeHint() { return upsampleFactor * volume->sampleCount.xy(); }
 
 void SliceView::render(const Image& target) {
-    ImageF image = slice(volume, sliceIndex*(volume.sampleCount.z-1));
+    ImageF image = slice(*volume, sliceIndex*(volume->sampleCount.z-1));
     while(image.size() < target.size()) image = upsample(image);
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }
@@ -42,8 +42,7 @@ int2 VolumeView::sizeHint() { return upsampleFactor * projections[projectionInde
 
 void VolumeView::render(const Image& target) {
     ImageF image = ImageF( projections[projectionIndex].imageSize );
-    project(image, volume, projections[projectionIndex]);
-    for(uint unused i: range(log2(upsampleFactor))) image = upsample(image);
-    //assert_(target.size() == image.size(), target.size(), image.size());
-    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
+    project(image, *volume, projections[projectionIndex]);
+    for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
+    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);\
 }

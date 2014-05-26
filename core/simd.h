@@ -16,7 +16,7 @@ typedef float v2sf __attribute((__vector_size__ (8)));
 
 // v4si
 typedef int v4si __attribute((__vector_size__ (16)));
-unused static const v4si _1i = {1,1,1,1};
+_unused static const v4si _1i = {1,1,1,1};
 inline (v4si) set1(int i) { return (v4si){i,i,i,i}; }
 inline (v4si) loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline (v4si) loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
@@ -24,7 +24,7 @@ inline (void) storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v8hi
 typedef short v8hi __attribute((__vector_size__ (16)));
-unused static const v8hi _0h = {0,0,0,0};
+_unused static const v8hi _0h = {0,0,0,0};
 inline (v8hi) short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
 inline (v8hi) loada(const uint16* const ptr) { return *(v8hi*)ptr; }
 inline (v8hi) loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_lddqu((byte*)ptr); }
@@ -44,8 +44,8 @@ inline (void) storeu(byte* const ptr, v16qi a) { __builtin_ia32_storedqu(ptr, a)
 typedef float v4sf __attribute((__vector_size__ (16)));
 inline (v4sf) constexpr float4(float f) { return (v4sf){f,f,f,f}; }
 inline (v4sf) constexpr float4(float a, float b, float c, float d) { return (v4sf){a,b,c,d}; }
-unused static const v4sf _1f = float4( 1 );
-unused static const v4sf _0f = float4( 0 );
+_unused static const v4sf _1f = float4( 1 );
+_unused static const v4sf _0f = float4( 0 );
 
 inline (v4sf) loada(const float* const ptr) { return *(v4sf*)ptr; }
 inline (v4sf) loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }

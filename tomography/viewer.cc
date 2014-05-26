@@ -29,21 +29,31 @@ int3 parseSize(string path) {
     return int3(X,Y,Z);
 }
 
-struct Viewer {
-    Map file;
-    VolumeF volume;
-    buffer<Projection> projections = evaluateProjections(volume.sampleCount, int2(504,378), 5041);
-    SliceView sliceView {volume, 2};
-    VolumeView volumeView {volume, projections, 2};
-    HBox views {{ &sliceView, &volumeView }};
+struct Viewer : HBox {
+    buffer<Map> files;
+    buffer<VolumeF> volumes;
+    uint currentIndex = 0;
+    const VolumeF* current() { return &volumes[currentIndex]; }
+    buffer<Projection> projections = evaluateProjections(current()->sampleCount, int2(504,378), 5041);
+    SliceView sliceView {current(), 2};
+    VolumeView volumeView {current(), projections, 2};
     Window window;
 
-    Viewer(string path) :
-        file(path),
-        volume (parseSize(path), cast<float>((ref<byte>)file)),
-        window (&views, section(section(path,'/',-2,-1),'.')) {
-        assert_(volume.data.size != volume.size()*sizeof(float));
+    Viewer(ref<string> paths) :
+        HBox{{ &sliceView, &volumeView }},
+        files( apply(paths,[](string path){ return Map(path); } ) ),
+        volumes ( apply(paths.size, [&](uint i){ return VolumeF(parseSize(paths[i]), cast<float>((ref<byte>)files[i])); }) ),
+        window (this, join(apply(paths,[](string path){ return section(section(path,'/',-2,-1),'.'); })," "_)) {
     }
-} app ( arguments()[0] );
+    bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override {
+        if((button == WheelUp &&  currentIndex> 0) || (button == WheelDown && currentIndex < volumes.size-1)) {
+            if(button == WheelUp) currentIndex--; else currentIndex++;
+            sliceView.volume = current();
+            volumeView.volume = current();
+            return true;
+        }
+        return HBox::mouseEvent(target, cursor, size, event, button);
+    }
+} app ( arguments() );
 
 #endif

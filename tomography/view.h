@@ -14,21 +14,21 @@ struct ProjectionView : Widget {
 };
 
 struct SliceView : Widget {
-    const VolumeF& volume;
+    const VolumeF* volume;
     const int upsampleFactor;
 
-    SliceView(const VolumeF& volume, const int upsampleFactor) : volume(volume), upsampleFactor(upsampleFactor) {}
+    SliceView(const VolumeF* volume, const int upsampleFactor) : volume(volume), upsampleFactor(upsampleFactor) {}
     bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
     void render(const Image& target) override;
 };
 
 struct VolumeView : Widget {
-    const VolumeF& volume;
+    const VolumeF* volume;
     const ref<Projection>& projections;
     const int upsampleFactor;
 
-    VolumeView(const VolumeF& volume, const ref<Projection>& projections, const int upsampleFactor) : volume(volume), projections(projections), upsampleFactor(upsampleFactor) {}
+    VolumeView(const VolumeF* volume, const ref<Projection>& projections, const int upsampleFactor) : volume(volume), projections(projections), upsampleFactor(upsampleFactor) {}
     bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
     void render(const Image& target) override;

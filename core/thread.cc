@@ -168,7 +168,7 @@ int main() {
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
-void exit(int status) {
+void exit(int status) throw() {
     exitStatus = status;
     terminate = true;
     Locker lock(threadsLock);

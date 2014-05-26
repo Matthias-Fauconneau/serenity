@@ -21,7 +21,7 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 
-Window::Window(Widget* widget, const string& title unused, int2 size, const Image& icon unused) :
+Window::Window(Widget* widget, const string& title _unused, int2 size, const Image& icon _unused) :
     Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
     String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
@@ -30,15 +30,15 @@ Window::Window(Widget* widget, const string& title unused, int2 size, const Imag
         if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()>0) {
             BinaryData s (readFile(".Xauthority"_,home()), true);
             string name, data;
-            uint16 family unused = s.read();
-            {uint16 length = s.read(); string host unused = s.read<byte>(length); }
-            {uint16 length = s.read(); string port unused = s.read<byte>(length); }
+            uint16 family _unused = s.read();
+            {uint16 length = s.read(); string host _unused = s.read<byte>(length); }
+            {uint16 length = s.read(); string port _unused = s.read<byte>(length); }
             {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
             {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
         } else send(raw(r));
     }
-    {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
+    {ConnectionSetupReply1 _unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
     {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();
         read(align(4,r.vendorLength));
         read<XFormat>(r.numFormats);
@@ -65,8 +65,8 @@ Window::Window(Widget* widget, const string& title unused, int2 size, const Imag
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>(raw(QueryPictFormats()));
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
-        for(uint unused i: range(r.numScreens)) { PictScreen screen = read<PictScreen>();
-            for(uint unused i: range(screen.numDepths)) { PictDepth depth = read<PictDepth>();
+        for(uint _unused i: range(r.numScreens)) { PictScreen screen = read<PictScreen>();
+            for(uint _unused i: range(screen.numDepths)) { PictDepth depth = read<PictDepth>();
                 array<PictVisual> visuals = read<PictVisual>(depth.numPictVisuals);
                 if(depth.depth==32) for(PictVisual pictVisual: visuals) if(pictVisual.visual==visual) format=pictVisual.format;
             }
@@ -196,14 +196,14 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         } else {
             if(motionPending) {
                 Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-                if(drag && cursorState&Button1Mask && drag->mouseEvent(target, cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //render(); FIXME: Asssumes all widgets supports partial updates; FIXME: always update full surface
-                else if(widget->mouseEvent(target, cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //render(); FIXME: Asssumes all widgets supports partial updates; FIXME: always update full surface
+                if(drag && cursorState&Button1Mask && drag->mouseEvent(target, cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
+                else if(widget->mouseEvent(target, cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
                 if(cursor!=lastCursor) setCursor(cursor);
             }
             if(type==ButtonPress) {
                 Widget* focus=this->focus; this->focus=0;
                 dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render();
+                if(widget->mouseEvent(target, int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render(); // FIXME: Pass target for correct override but should not be used (FIXME: support partial update)
             }
             else if(type==ButtonRelease) {
                 drag=0;
@@ -257,7 +257,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::render() { needRender=true; if(mapped) queue(); }
+void Window::render() { needRender=true; log("needRender"); if(mapped) queue(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
@@ -408,7 +408,7 @@ void Window::setDisplay(bool displayState) { log("Unimplemented X11 setDisplay",
 #include <linux/fb.h>
 #include <linux/input.h>
 
-Window::Window(Widget* widget, int2, const string& title unused, const Image& icon unused) : Device("/dev/fb0"_), widget(widget) {
+Window::Window(Widget* widget, int2, const string& title _unused, const Image& icon _unused) : Device("/dev/fb0"_), widget(widget) {
     fb_var_screeninfo var; ioctl(FBIOGET_VSCREENINFO, &var);
     fb_fix_screeninfo fix; ioctl(FBIOGET_FSCREENINFO, &fix);
     this->size = this->displaySize = int2(var.xres_virtual, var.yres_virtual);
@@ -506,9 +506,9 @@ void Window::hide() {
     vt.ioctl(VT_ACTIVATE, (void*)previousVT);
     mapped=false;
 }
-void Window::setTitle(const string& title unused) {}
-void Window::setIcon(const Image& icon unused) {}
-String Window::getSelection(bool unused clipboard) { return String(); }
+void Window::setTitle(const string& title _unused) {}
+void Window::setIcon(const Image& icon _unused) {}
+String Window::getSelection(bool _unused clipboard) { return String(); }
 function<void()>& Window::globalAction(Key key) { return actions.insert(key); }
 void Window::putImage(int2 position, int2 size) {
     assert(displayState);

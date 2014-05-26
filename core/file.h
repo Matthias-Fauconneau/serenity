@@ -10,9 +10,9 @@ extern "C" int* __errno_location() throw() __attribute((const));
 /// Aborts if \a expr is negative and logs corresponding error code
 #define check(expr, message...) ({ long e=(long)expr; if(e<0 && -e<LAST) error(#expr ""_, errors[*__errno_location()], ##message); e; })
 /// Aborts if \a expr is negative and logs corresponding error code (unused result)
-#define check_(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) error(#expr ""_, errors[*__errno_location()], ##message); })
+#define check_(expr, message...) ({ long _unused e=expr; if(e<0 && -e<LAST) error(#expr ""_, errors[*__errno_location()], ##message); })
 /// Does not abort if \a expr is negative and logs corresponding error code (unused result)
-#define check__(expr, message...) ({ long unused e=expr; if(e<0 && -e<LAST) log(#expr ""_, errors[*__errno_location()], ##message); })
+#define check__(expr, message...) ({ long _unused e=expr; if(e<0 && -e<LAST) log(#expr ""_, errors[*__errno_location()], ##message); })
 
 /// Unix file descriptor
 struct Handle {

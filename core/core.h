@@ -2,8 +2,8 @@
 /// \file core.h keywords, basic types, debugging, ranges, ref
 
 // Keywords
-#define unused __attribute((unused))
-#define packed __attribute((packed))
+#define _unused __attribute((unused))
+#define _packed __attribute((packed))
 #define notrace __attribute((no_instrument_function))
 #define Type typename
 #define generic template<Type T>

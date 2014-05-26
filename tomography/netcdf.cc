@@ -70,7 +70,7 @@ map<string, Variable> NetCDF::parseVariables() {
 NetCDF::NetCDF(const ref<byte>& data) : s(data, true) {
     // Header
     if(s.read<byte>(4)!="CDF\x01"_) { error("Invalid CDF"); } // Magic
-    uint32 unused recordCount = s.read();
+    uint32 _unused recordCount = s.read();
     dimensions = parseDimensions();
     attributes = parseAttributes();
     variables = parseVariables();

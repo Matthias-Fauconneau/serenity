@@ -141,6 +141,6 @@ struct Application : Poll {
         //plot[labels[index]].insert(r.totalTime.toFloat(), PSNR);
         //log("\t", PSNR, "\tEvaluation:",time);
         window.render();
-        if(r.k<10) queue();
+        if(r.k<4) queue();
     }
 } app;

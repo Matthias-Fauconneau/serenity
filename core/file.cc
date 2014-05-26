@@ -60,7 +60,7 @@ array<String> Folder::list(uint flags) const {
 bool existsFolder(const string& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
 
 // Stream
-void Stream::read(byte* buffer, size_t size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size, read, size); }
+void Stream::read(byte* buffer, size_t size) { int _unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size, read, size); }
 int64 Stream::readUpTo(byte* buffer, size_t size) { return check( ::read(fd, buffer, size), (int)fd, buffer, size); }
 buffer<byte> Stream::read(size_t size) {
     buffer<byte> buffer(size);

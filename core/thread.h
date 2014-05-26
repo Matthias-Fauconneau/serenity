@@ -131,7 +131,7 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<class F> void parallel(uint64 start, uint64 stop, F f, uint unused threadCount = coreCount) {
+template<class F> void parallel(uint64 start, uint64 stop, F f, uint _unused threadCount = coreCount) {
 #if DEBUG || PROFILE
     for(uint i : range(start, stop)) f(0, i);
 #else
@@ -160,7 +160,7 @@ template<class F> void chunk_parallel(uint totalSize, F f, uint threadCount = co
 template<class T, class F> void parallel(const ref<T>& list, F f, uint threadCount = coreCount) { parallel(0, list.size, [&](uint id, uint index){ f(id, list[index]); }, threadCount); }
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
-void exit(int status=0);
+extern "C" void exit(int status=0) throw();
 /// Immediatly terminates the current thread
 void __attribute((noreturn)) exit_thread(int status);
 

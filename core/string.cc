@@ -61,9 +61,9 @@ bool isASCII(const string& s) {
 bool isUTF8(const string& s) {
     for(uint i=0; i<s.size;i++) {
         /**/  if((s[i]&0b10000000)==0b00000000) {}
-        else if((s[i]&0b11100000)==0b11000000) { for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false; }
-        else if((s[i]&0b11110000)==0b11100000) { for(uint j unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false; }
-        else if((s[i]&0b11111000)==0b11110000) { for(uint j unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11100000)==0b11000000) { for(uint j _unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11110000)==0b11100000) { for(uint j _unused: range(2)) if((s[++i]&0b11000000) != 0b10000000) return false; }
+        else if((s[i]&0b11111000)==0b11110000) { for(uint j _unused: range(3)) if((s[++i]&0b11000000) != 0b10000000) return false; }
         else return false;
     }
     return true;
@@ -167,7 +167,7 @@ String simplify(String&& s) {
 }
 
 String repeat(const string& s, uint times) {
-    String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
+    String r (times*s.size); for(uint _unused i: range(times)) r<<s; return r;
 }
 
 String pad(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
@@ -234,7 +234,7 @@ String ftoa(double n, int precision, uint pad, int exponent) {
     if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);
         uint decimal = round(fract*exp10(precision));
-        uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
+        uint exp10=1; for(uint i _unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
         s<<utoa(integer)<<'.'<< utoa<10>(decimal,precision,'0');
     } else s<<utoa(round(n));
