@@ -63,8 +63,8 @@ Phantom::Phantom(uint count) {
     }
 }
 
-VolumeF Phantom::volume(int3 size) const {
-    VolumeF volume (size);
+void Phantom::volume(const VolumeF& volume) const {
+    int3 size = volume.sampleCount;
     for(Ellipsoid e: ellipsoids) { // Rasterizes ellipsoids
         // Computes world axis-aligned bounding box of object's oriented bounding box
         vec3 O = e.center, min = O, max = O; // Initialize min/max to origin
@@ -94,13 +94,11 @@ VolumeF Phantom::volume(int3 size) const {
             }
         }
     }
-    return volume;
 }
 
-ImageF Phantom::project(int2 size, const Projection& projection) const {
-    assert_(size == projection.imageSize);
-    ImageF target (size);
-    target.data.clear();
+void Phantom::project(const ImageF& target, const Projection& projection) const {
+    assert_(target.size() == projection.imageSize);
+    //target.data.clear();
     for(Ellipsoid e: ellipsoids) {
         // Computes projection axis-aligned bounding box of object's oriented bounding box
         /*vec2 O = projection.project(e.center), min = O, max = O; // Initialize min/max to origin
@@ -109,7 +107,7 @@ ImageF Phantom::project(int2 size, const Projection& projection) const {
             min=::min(min, corner), max=::max(max, corner);
         }
         min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));*/
-        int2 min = 0, max = size;
+        int2 min = 0, max = target.size();
 
         const v4sf O = e.inverse * (toVec3(projection.origin)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
         for(int y: range(min.y, max.y)) {
@@ -127,5 +125,4 @@ ImageF Phantom::project(int2 size, const Projection& projection) const {
             }
         }
     }
-    return target;
 }

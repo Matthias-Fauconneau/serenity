@@ -63,7 +63,7 @@ tomography/phantom.cc
 tomography/phantom.h
 tomography/adjoint.cc
 tomography/reconstruction.h
-tomography/tomography.cc
+tomography/compute.cc
 tomography/approximate.h
 tomography/approximate.cc
 tomography/adjoint.h
@@ -82,3 +82,6 @@ tomography/cdf.h
 test.cc
 tomography/SIRT.h
 tomography/SIRT.cc
+tomography/error.h
+tomography/evaluate.cc
+tomography/synthetic.cc

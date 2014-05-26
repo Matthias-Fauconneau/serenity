@@ -135,6 +135,7 @@ template<class F> void parallel(uint64 start, uint64 stop, F f, uint _unused thr
 #if DEBUG || PROFILE
     for(uint i : range(start, stop)) f(0, i);
 #else
+    assert(threadCount>1);
     function<void(uint, uint)> delegate = f;
     thread threads[threadCount];
     for(uint i: range(threadCount)) {

@@ -4,6 +4,7 @@
 #include "project.h"
 #include "layout.h"
 #include "window.h"
+#include "error.h"
 
 #if 0
 VolumeCDF projectionData (Folder("Preprocessed"_ , Folder("Data"_, home())));
@@ -20,15 +21,6 @@ HBox views ({ &projectionsView, /*&diff,*/ &reconstructionView });
 Window window (&views, "View"_);
 #else
 
-int3 parseSize(string path) {
-    TextData s (section(path,'/',-2,-1));
-    s.until('.');
-    int X = s.mayInteger(); if(!s.match("x"_)) error(s.buffer);
-    int Y = s.mayInteger(); if(!s.match("x"_)) error(s.buffer);
-    int Z = s.mayInteger();
-    return int3(X,Y,Z);
-}
-
 struct Viewer : HBox {
     buffer<Map> files;
     buffer<VolumeF> volumes;
@@ -40,10 +32,15 @@ struct Viewer : HBox {
     Window window;
 
     Viewer(ref<string> paths) :
-        HBox{{ &sliceView, &volumeView }},
+        HBox{{ &sliceView /*, &volumeView*/ }},
         files( apply(paths,[](string path){ return Map(path); } ) ),
         volumes ( apply(paths.size, [&](uint i){ return VolumeF(parseSize(paths[i]), cast<float>((ref<byte>)files[i])); }) ),
         window (this, join(apply(paths,[](string path){ return section(section(path,'/',-2,-1),'.'); })," "_)) {
+        if(volumes.size == 2) {
+            const float MSE = SSE(volumes[0], volumes[1])/sqrt(SSQ(volumes[0])*SSQ(volumes[1]));
+            const float PSNR = 10 * log10(MSE);
+            log(MSE, PSNR);
+        }
     }
     bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override {
         if((button == WheelUp &&  currentIndex> 0) || (button == WheelDown && currentIndex < volumes.size-1)) {

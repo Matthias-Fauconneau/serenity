@@ -80,6 +80,7 @@ template<Type T> struct ImageT {
     ImageT(buffer<T>&& data, uint width, uint height) : data(move(data)), width(width), height(height) { assert_(this->data.size==width*height); }
     ImageT(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<T>(height*width); }
     ImageT(int2 size) : ImageT(size.x, size.y) {}
+    //ImageT(int2 size, const ref<float>& data) : width(size.x), height(size.y), data(data) { assert_(data.size == this->size()); }
     int2 size() const { return int2(width,height); }
     inline T& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
     buffer<T> data;

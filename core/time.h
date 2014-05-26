@@ -28,7 +28,6 @@ struct Time {
     float toFloat() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000000.f : 0; }
 };
 inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
-inline String percent(const uint64 a, const uint64 b) { return b ? dec((100*a+50)/b)+"%"_ : ""_; }
 inline String operator/(const Time& a, const Time& b) { return b ? dec(round(100*a.toFloat()/b.toFloat()))+"%"_ : ""_; }
 
 struct Date {

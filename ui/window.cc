@@ -257,7 +257,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::render() { needRender=true; log("needRender"); if(mapped) queue(); }
+void Window::render() { needRender=true; if(mapped) queue(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }

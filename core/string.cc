@@ -245,6 +245,9 @@ String ftoa(double n, int precision, uint pad, int exponent) {
     return pad>s.size ? repeat(" "_,pad-s.size)+s : move(s);
 }
 
+String percent(const float f) { return dec(round(100*f))+"%"_; }
+String percent(const uint64 a, const uint64 b) { return b ? dec((100*a+50)/b)+"%"_ : ""_; }
+
 String binaryPrefix(size_t value, string unit) {
     if(value < 1u<<10) return str(value, unit);
     if(value < 10u<<20) return str(value/1024.0,"ki"_+unit);

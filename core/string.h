@@ -106,6 +106,9 @@ String ftoa(double number, int precision=2, uint pad=0, int exponent=0);
 inline String str(const float& n) { return ftoa(n); }
 inline String str(const double& n) { return ftoa(n); }
 
+String percent(const float f);
+String percent(const uint64 a, const uint64 b);
+
 /// Formats value using best binary prefix
 String binaryPrefix(size_t value, string unit="B"_);
 

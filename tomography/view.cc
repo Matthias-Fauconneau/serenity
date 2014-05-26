@@ -44,5 +44,5 @@ void VolumeView::render(const Image& target) {
     ImageF image = ImageF( projections[projectionIndex].imageSize );
     project(image, *volume, projections[projectionIndex]);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
-    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);\
+    convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);
 }
