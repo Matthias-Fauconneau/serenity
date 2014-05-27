@@ -1,6 +1,5 @@
 #pragma once
 #include "image.h"
-#include "simd.h"
 
 struct VolumeF {
     VolumeF(){}
@@ -23,22 +22,21 @@ inline ImageF slice(const VolumeF& volume, uint z) {
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
         assert(volume.sampleCount.x == volume.sampleCount.y);
-        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
-        capZ = (float4){halfHeight, halfHeight, -halfHeight, -halfHeight};
-        radiusR0R0 = (float4){radius*radius, 0, radius*radius, 0};
-        radiusSqHeight = (float4){radius*radius, radius*radius, halfHeight, halfHeight};
-        dataOrigin = {float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1)/2, 0};
-        stride = (v4si){1, int(volume.sampleCount.x), int(volume.sampleCount.x*volume.sampleCount.y), 0};
-        offset = (v4si){0, int(volume.sampleCount.x), int(volume.sampleCount.x*volume.sampleCount.y), int(volume.sampleCount.x*volume.sampleCount.y+volume.sampleCount.x)};
+        float radius = float(volume.sampleCount.x-1)/2;
+        float halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
+        capZ = (float2){halfHeight, -halfHeight};
+        radiusSq = radius*radius;
+        dataOrigin = {float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1)/2};
+        stride = {1, int(volume.sampleCount.x), int(volume.sampleCount.x*volume.sampleCount.y), 0};
+        offset = {0, int(volume.sampleCount.x), int(volume.sampleCount.x*volume.sampleCount.y), int(volume.sampleCount.x*volume.sampleCount.y+volume.sampleCount.x)};
         size = volume.sampleCount; // Bound check
     }
 
     // Precomputed parameters
-    float4 capZ;
-    float4 radiusR0R0;
-    float4 radiusSqHeight;
-    float4 dataOrigin;
-    v4si stride;
-    v4si offset;
+    float2 capZ; // ±height/2
+    float radiusSq;
+    float3 dataOrigin;
+    int4 stride;
+    int4 offset;
     int3 size; // Bound check
 };

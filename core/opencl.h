@@ -16,3 +16,7 @@ cl_kernel createKernel(string source, string name);
     extern char _binary_ ## name ##_cl_start[], _binary_ ## name ##_cl_end[]; \
     return createKernel(ref<byte>(_binary_ ## name ##_cl_start,_binary_ ## name ##_cl_end), #name); \
 }
+
+typedef float float2 __attribute__((ext_vector_type(2)));
+typedef float float3 __attribute__((ext_vector_type(3)));
+typedef float float4 __attribute__((ext_vector_type(4)));

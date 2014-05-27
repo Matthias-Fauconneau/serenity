@@ -22,7 +22,8 @@ cl_kernel createKernel(string source, string name) {
         clCheck( clGetProgramBuildInfo(program, devices[0], CL_PROGRAM_BUILD_LOG, 0, 0, &buildLogSize) );
         char buildLog[buildLogSize];
         clCheck( clGetProgramBuildInfo(program, devices[0], CL_PROGRAM_BUILD_LOG, buildLogSize, (void*)buildLog, 0) );
-        log(join(split(string(buildLog,buildLogSize-1),'\n').slice(0,16),"\n"_));
+        array<string> lines = split(string(buildLog,buildLogSize-1),'\n');
+        log(join(lines.slice(0,min(16ul,lines.size)),"\n"_));
         error();
     }
     assert_(name.last()==0);

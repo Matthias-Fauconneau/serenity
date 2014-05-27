@@ -2,17 +2,14 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
-typedef short v2hi __attribute((__vector_size__ (4)));
-typedef int v4si __attribute((__vector_size__(16)));
-//typedef float float4 __attribute((__vector_size__(16)));
-typedef float float4 __attribute__((ext_vector_type(4)));
+
+//typedef int int2 __attribute__((ext_vector_type(2)));
+//typedef int int3 __attribute__((ext_vector_type(3)));
 typedef int int4 __attribute__((ext_vector_type(4)));
-typedef int v8si __attribute((__vector_size__(32)));
-typedef float v8sf __attribute((__vector_size__(32)));
-template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
-template<> inline String str(const float4& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
-//template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
-//template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
+
+typedef float float2 __attribute__((ext_vector_type(2)));
+typedef float float3 __attribute__((ext_vector_type(3)));
+typedef float float4 __attribute__((ext_vector_type(4)));
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -114,7 +111,7 @@ inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 generic struct xyz {
     T x,y,z;
     vec< ::xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
-    inline operator float4() const { return (float4){x,y,z,0}; }
+    inline operator float3() const { return (float3){x,y,z}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;

@@ -28,10 +28,11 @@ struct Projection {
         origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
-        ray[2] = (float4)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];
+        ray[2] = (float3)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float3((imageSize.x-1)/2.f)*ray[0] - float3((imageSize.y-1)/2.f)*ray[1];
         this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
         this->scale = float(imageSize.x-1)/voxelRadius;
     }
+#if 0
     inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
     //inline float4 ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2]), 0b0111); }
     inline vec2 project(vec3 p) const {
@@ -40,9 +41,10 @@ struct Projection {
         p = p / p.x; // Perspective divide
         return vec2(p.y * scale, p.z * scale);
     }
+#endif
 
-    float4 origin;
-    float4 ray[3];
+    float3 origin;
+    float3 ray[3];
     mat3 rotation;
     float scale;
 };
@@ -58,7 +60,7 @@ inline buffer<Projection> evaluateProjections(int3 reconstructionSize, int2 imag
     for(int index: range(projections.size)) projections[index] = Projection(reconstructionSize, imageSize, index*stride, projectionCount);
     return projections;
 }
-
+#if 0
 // SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__
 static const float4 _2f = float4( 2 );
@@ -124,6 +126,7 @@ static inline float project(float4 position, float4 step, float4 end, const Cyli
         if(mask(position > end)) return accumulator[0];
     }
 }
+#endif
 
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, const Projection& projection);
