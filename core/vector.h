@@ -4,11 +4,13 @@
 #include "math.h"
 typedef short v2hi __attribute((__vector_size__ (4)));
 typedef int v4si __attribute((__vector_size__(16)));
-typedef float v4sf __attribute((__vector_size__(16)));
+//typedef float float4 __attribute((__vector_size__(16)));
+typedef float float4 __attribute__((ext_vector_type(4)));
+typedef int int4 __attribute__((ext_vector_type(4)));
 typedef int v8si __attribute((__vector_size__(32)));
 typedef float v8sf __attribute((__vector_size__(32)));
 template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
-template<> inline String str(const v4sf& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+template<> inline String str(const float4& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 //template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
 //template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
 
@@ -112,7 +114,7 @@ inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 generic struct xyz {
     T x,y,z;
     vec< ::xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
-    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
+    inline operator float4() const { return (float4){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
@@ -136,7 +138,7 @@ generic struct xyzw {
     vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
     vec< ::xy,T,2> xy()const{ return *(vec< ::xy,T,2>*)this; }
-    inline operator v4sf() const { return *(v4sf*)this; }
+    inline operator float4() const { return *(float4*)this; }
 };
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4;
@@ -154,4 +156,4 @@ generic struct bgra {
 /// Integer b,g,r,a vector (8bit)
 typedef vec<bgra,uint8,4> byte4;
 /// Integer b,g,r,a vector (32bit)
-typedef vec<bgra,int,4> int4;
+//typedef vec<bgra,int,4> int4;

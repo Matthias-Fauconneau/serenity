@@ -92,6 +92,7 @@ template<> void log(const string& message);
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const string& message) __attribute((noreturn));
+template<> void error() __attribute((noreturn));
 
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message

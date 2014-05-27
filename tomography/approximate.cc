@@ -65,7 +65,7 @@ bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& im
             mref<float> output = image.data.slice(y*image.width, image.width);
             mref<float> input = filter ? filters[id] : output;
             for(uint x: range(image.width)) {
-                v4sf start, step, end;
+                float4 start, step, end;
                 input[x] = intersect(projection, vec2(x, y), volume, start, step, end) ? project(start, step, end, volume, p) : 0;
             }
             if(filter) {

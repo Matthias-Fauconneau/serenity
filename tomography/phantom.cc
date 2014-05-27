@@ -74,21 +74,21 @@ void Phantom::volume(const VolumeF& volume) const {
         }
         min = ::max(vec3(size-int3(1))*(min+vec3(1))/2.f, vec3(0)), max = ::min(ceil(vec3(size-int3(1))*(max+vec3(1))/2.f), vec3(size));
 
-        const v4sf origin = e.inverse * (vec3(-1) - e.center);
-        const v4sf vx = e.inverse[0] / vec3(float(size.x-1)/2);
-        const v4sf vy = e.inverse[1] / vec3(float(size.y-1)/2);
-        const v4sf vz = e.inverse[2] / vec3(float(size.z-1)/2);
+        const float4 origin = e.inverse * (vec3(-1) - e.center);
+        const float4 vx = e.inverse[0] / vec3(float(size.x-1)/2);
+        const float4 vy = e.inverse[1] / vec3(float(size.y-1)/2);
+        const float4 vz = e.inverse[2] / vec3(float(size.z-1)/2);
 
         float* volumeData = (float*)volume.data.data;
 
         for(int z: range(min.z, max.z)) {
-            const v4sf pz = origin + float4(z) * vz;
+            const float4 pz = origin + float4(z) * vz;
             float* volumeZ = volumeData + z * volume.sampleCount.y * volume.sampleCount.x;
             for(int y: range(min.y, max.y)) {
-                const v4sf pzy = pz + float4(y) * vy;
+                const float4 pzy = pz + float4(y) * vy;
                 float* volumeZY = volumeZ + y * volume.sampleCount.x;
                 for(int x: range(min.x, max.x)) {
-                    const v4sf pzyx = pzy + float4(x) * vx;
+                    const float4 pzyx = pzy + float4(x) * vx;
                     if(mask(dot4(pzyx, pzyx) < _1f)) volumeZY[x] += e.value;
                 }
             }
@@ -110,10 +110,10 @@ void Phantom::project(const ImageF& target, const Projection& projection) const 
         min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));*/
         int2 min = 0, max = target.size();
 
-        const v4sf O = e.inverse * (toVec3(projection.origin)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
+        const float4 O = e.inverse * (toVec3(projection.origin)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
         for(int y: range(min.y, max.y)) {
             for(int x: range(min.x, max.x)) {
-                const v4sf D = e.inverse * (projection.pixelRay(x, y)/(vec3(projection.volumeSize-int3(1))/2.f));
+                const float4 D = e.inverse * (projection.pixelRay(x, y)/(vec3(projection.volumeSize-int3(1))/2.f));
                 const float a = dot4(D, D)[0];
                 const float b = dot4(D, O)[0];
                 const float c = dot4(O, O)[0] - 1;

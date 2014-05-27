@@ -2,7 +2,7 @@
 #include "reconstruction.h"
 
 /// Backprojects value onto voxels along ray
-static inline void backproject(v4sf position, v4sf step, v4sf end, const CylinderVolume& volume, const float* data, v8sf value) {
+static inline void backproject(float4 position, float4 step, float4 end, const CylinderVolume& volume, const float* data, v8sf value) {
     for(;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
         const v4si index = dot4(integerPosition, volume.stride); // to voxel index

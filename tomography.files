@@ -86,3 +86,5 @@ tomography/error.h
 tomography/evaluate.cc
 tomography/synthetic.cc
 tomography/project.cl
+core/opencl.h
+core/opencl.cc
