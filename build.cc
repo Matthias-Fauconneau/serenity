@@ -80,18 +80,20 @@ struct Build {
         }
     }
     bool tryParseFiles(TextData& s) {
-        if(!s.match("FILE("_) && !s.match("ICON("_)) return false;
-        string name = s.identifier("_-"_);
+        string suffix;
+        if(s.match("FILE("_) || s.match("ICON("_)) {}
+        else if(s.match("KERNEL("_)) suffix=".cl"_;
+        else return false;
+        String file = s.identifier("_-"_)+suffix;
         s.skip(")"_);
 
         String filesPath = tmp+"/files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
         Folder(filesPath, root(), true);
-        String path = find(replace(name,"_"_,"/"_));
-        assert(path, "No such file to embed", name);
+        String path = find(file);
+        assert(path, "No such file to embed", file);
         Folder subfolder = Folder(section(path,'/',0,-2), folder);
-        string file = section(path,'/',-2,-1);
         String object = filesPath+"/"_+file+".o"_;
-        assert_(!files.contains(object), name);
+        assert_(!files.contains(object), file);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
             if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();

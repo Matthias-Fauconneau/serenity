@@ -85,3 +85,4 @@ tomography/SIRT.cc
 tomography/error.h
 tomography/evaluate.cc
 tomography/synthetic.cc
+tomography/project.cl

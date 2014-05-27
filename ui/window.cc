@@ -203,7 +203,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(type==ButtonPress) {
                 Widget* focus=this->focus; this->focus=0;
                 dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-                if(widget->mouseEvent(target, int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render(); // FIXME: Pass target for correct override but should not be used (FIXME: support partial update)
+                if(widget->mouseEvent(target, int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
             }
             else if(type==ButtonRelease) {
                 drag=0;

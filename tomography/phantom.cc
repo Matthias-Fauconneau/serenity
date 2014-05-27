@@ -94,6 +94,7 @@ void Phantom::volume(const VolumeF& volume) const {
             }
         }
     }
+    for(float v: volume.data) assert_(v>=0);
 }
 
 void Phantom::project(const ImageF& target, const Projection& projection) const {
