@@ -5,8 +5,9 @@
 inline vec3 toVec3(float4 v) { return vec3(v[0],v[1],v[2]); } // FIXME
 
 struct Projection {
-    int3 volumeSize; int2 imageSize; uint index;
-    Projection(const int3 volumeSize, const int2 imageSize, const uint index, const uint projectionCount) : volumeSize(volumeSize), imageSize(imageSize), index(index) {
+    //int3 volumeSize;
+    int2 imageSize; //uint index;
+    Projection(const int3 volumeSize, const int2 imageSize, const uint index, const uint projectionCount) : /*volumeSize(volumeSize),*/ imageSize(imageSize) /*, index(index) */ {
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
@@ -29,8 +30,8 @@ struct Projection {
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
         ray[2] = (float3)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float3((imageSize.x-1)/2.f)*ray[0] - float3((imageSize.y-1)/2.f)*ray[1];
-        this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
-        this->scale = float(imageSize.x-1)/voxelRadius;
+        //this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
+        //this->scale = float(imageSize.x-1)/voxelRadius;
     }
 #if 0
     inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
@@ -45,8 +46,8 @@ struct Projection {
 
     float3 origin;
     float3 ray[3];
-    mat3 rotation;
-    float scale;
+    //mat3 rotation;
+    //float scale;
 };
 
 inline buffer<ImageF> sliceProjectionVolume(const VolumeF& volume, uint stride=1, bool downsampleProjections=false) {

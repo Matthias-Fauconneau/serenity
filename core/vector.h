@@ -3,13 +3,14 @@
 #include "string.h"
 #include "math.h"
 
-//typedef int int2 __attribute__((ext_vector_type(2)));
-//typedef int int3 __attribute__((ext_vector_type(3)));
 typedef int int4 __attribute__((ext_vector_type(4)));
 
 typedef float float2 __attribute__((ext_vector_type(2)));
+inline float sq(float2 x) { return x.x * x.x + x.y * x.y; }
 typedef float float3 __attribute__((ext_vector_type(3)));
+template<> inline String str(const float3& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+")"_; }
 typedef float float4 __attribute__((ext_vector_type(4)));
+//template<> inline String str(const float4& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
