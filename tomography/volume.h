@@ -19,6 +19,7 @@ inline ImageF slice(const VolumeF& volume, uint z) {
     return ImageF(buffer<float>(volume.data.slice(z*size.y*size.x,size.y*size.x)), size.x, size.y);
 }
 
+#if 0
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
         assert(volume.sampleCount.x == volume.sampleCount.y);
@@ -40,3 +41,4 @@ struct CylinderVolume {
     int4 offset;
     int3 size; // Bound check
 };
+#endif
