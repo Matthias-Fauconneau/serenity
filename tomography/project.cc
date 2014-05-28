@@ -23,7 +23,7 @@ void project(const ImageF& image, const VolumeF& volume, const Projection& proje
     float halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
     float3 dataOrigin = {float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1 -1 /*FIXME*/)/2};
     CLProjection clProjection = {projection.origin, (float2){halfHeight,-halfHeight} - projection.origin.z, {projection.ray[0],projection.ray[1],projection.ray[2]}, sq(projection.origin.xy) - radius*radius, radius*radius, halfHeight, projection.origin + dataOrigin};
-    clSetKernelArg(kernel, 0, sizeof(CLProjection), &clProjection);
+    clSetKernelArg(kernel, 0, sizeof(CLProjection), &clProjection); //TODO: generic argument wrapper
 
     cl_image_format format = {CL_R, CL_FLOAT};
     cl_image_desc desc = {CL_MEM_OBJECT_IMAGE3D, (size_t)volume.sampleCount.x, (size_t)volume.sampleCount.y, (size_t)volume.sampleCount.z, 0,0,0,0,0,0};
@@ -42,6 +42,7 @@ void project(const ImageF& image, const VolumeF& volume, const Projection& proje
 
     size_t globalSize[] = {(size_t)image.width, (size_t)image.height};
     clCheck( clEnqueueNDRangeKernel(queue, kernel, 2, 0, globalSize, 0, 0, 0, 0) );
+
     clEnqueueUnmapMemObject(queue, clImage, imageMap, 0, 0, 0);
     clReleaseMemObject(clImage);
     clEnqueueUnmapMemObject(queue, clSource, volumeMap, 0, 0, 0);

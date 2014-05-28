@@ -2,15 +2,33 @@
 
 cl_context context;
 cl_command_queue queue;
-cl_device_id devices[2];
+cl_device_id device;
 
 void __attribute((constructor(1002))) setup_cl() {
-    cl_platform_id platform; uint platformCount;
-    clGetPlatformIDs(1, &platform, &platformCount); assert_(platformCount == 1);
-    uint deviceCount;
-    clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU/*CL_DEVICE_TYPE_ALL*/, 2, devices, &deviceCount);
-    context = clCreateContext(0, deviceCount, devices, &clNotify, 0, 0);
-    queue = clCreateCommandQueue(context, devices[0], 0, 0);
+    uint platformCount; clGetPlatformIDs(0, 0, &platformCount);
+    cl_platform_id platforms[platformCount]; clGetPlatformIDs(platformCount, platforms, 0);
+    for(cl_platform_id platform: ref<cl_platform_id>(platforms, platformCount)) {
+        for(cl_platform_info attribute : { CL_PLATFORM_NAME, CL_PLATFORM_VENDOR, CL_PLATFORM_VERSION, CL_PLATFORM_PROFILE, CL_PLATFORM_EXTENSIONS }) {
+            size_t size; clGetPlatformInfo(platform, attribute, 0, 0, &size);
+            char info[size]; clGetPlatformInfo(platform, attribute, size, info, 0);
+            log(string(info,size-1));
+        }
+    }
+    assert_(platformCount >= 2);
+    cl_platform_id platform = platforms[0]; // {AMD, Intel, Beignet}
+    uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount);
+    cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
+    for(cl_device_id device: ref<cl_device_id>(devices, deviceCount)) {
+        for(cl_device_info attribute : { CL_DEVICE_NAME, CL_DEVICE_VERSION, CL_DRIVER_VERSION}) {
+            size_t size; clGetDeviceInfo(device, attribute, 0, 0, &size);
+            char info[size]; clGetDeviceInfo(device, attribute, size, info, 0);
+            log(string(info,size-1));
+        }
+    }
+    device = devices[1]; // {GPU, CPU}
+    context = clCreateContext(0, 1, &device, &clNotify, 0, 0);
+    queue = clCreateCommandQueue(context, device, 0, 0);
+    error("");
 }
 
 cl_kernel createKernel(string source, string name) {
@@ -19,9 +37,9 @@ cl_kernel createKernel(string source, string name) {
     clCheck(status);
     if(clBuildProgram(program, 0, 0, 0, 0, 0)) {
         size_t buildLogSize;
-        clCheck( clGetProgramBuildInfo(program, devices[0], CL_PROGRAM_BUILD_LOG, 0, 0, &buildLogSize) );
+        clCheck( clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, 0, &buildLogSize) );
         char buildLog[buildLogSize];
-        clCheck( clGetProgramBuildInfo(program, devices[0], CL_PROGRAM_BUILD_LOG, buildLogSize, (void*)buildLog, 0) );
+        clCheck( clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, buildLogSize, (void*)buildLog, 0) );
         array<string> lines = split(string(buildLog,buildLogSize-1),'\n');
         log(join(lines.slice(0,min(16ul,lines.size)),"\n"_));
         error();
