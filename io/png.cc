@@ -53,8 +53,8 @@ Image decodePNG(const ref<byte>& file) {
             bitDepth = s.read(); assert(bitDepth==8 || bitDepth == 4 || bitDepth == 1);
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
             alpha = depth==2||depth==4;
-            uint8 unused compression = s.read(); assert(compression==0);
-            uint8 unused filter = s.read(); assert(filter==0);
+            uint8 _unused compression = s.read(); assert(compression==0);
+            uint8 _unused filter = s.read(); assert(filter==0);
             interlace = s.read();
         } else if(tag == "IDAT"_) {
             /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
@@ -128,8 +128,8 @@ Image decodePNG(const ref<byte>& file) {
 
 uint32 crc32(const ref<byte>& data) {
     static uint crc_table[256];
-    static int unused once = ({ for(uint n: range(256)) {
-                                     uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
+    static int _unused once = ({ for(uint n: range(256)) {
+                                     uint c=n; for(uint _unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
     uint crc = 0xFFFFFFFF;
     for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
     return ~crc;
@@ -150,7 +150,7 @@ buffer<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
     buffer<byte> data(w*h*4+h);
     byte* dst = data.begin(); const byte* src = (byte*)image.data;
-    for(uint unused y: range(h)) {
+    for(uint _unused y: range(h)) {
         *dst++ = 0;
         for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],image.alpha?src[x*4+3]:0xFF);
         dst+=w*4, src+=image.stride*4;
@@ -160,13 +160,13 @@ buffer<byte> filter(const Image& image) {
 
 buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n"_);
-    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
+    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr { bswap(image.width), bswap(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"_+raw(ihdr);
-    file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
+    file<< raw(bswap(uint32(IHDR.size-4))) << IHDR << raw(bswap(crc32(IHDR)));
 
     array<byte> IDAT = "IDAT"_+deflate(filter(image),true);
-    file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
+    file<< raw(bswap(uint32(IDAT.size-4))) << IDAT << raw(bswap(crc32(IDAT)));
 
-    file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));
+    file<<raw(bswap(0))<<"IEND"_<<raw(bswap(crc32("IEND"_)));
     return move(file);
 }

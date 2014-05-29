@@ -2,7 +2,7 @@
 #include "volume.h"
 #include "matrix.h"
 
-inline vec3 toVec3(float4 v) { return vec3(v[0],v[1],v[2]); } // FIXME
+//inline vec3 toVec3(float4 v) { return vec3(v[0],v[1],v[2]); } // FIXME
 
 struct Projection {
     //int3 volumeSize;
@@ -27,9 +27,12 @@ struct Projection {
 
         mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
         origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
-        ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
+        /*ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
-        ray[2] = (float3)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float3((imageSize.x-1)/2.f)*ray[0] - float3((imageSize.y-1)/2.f)*ray[1];
+        ray[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0) - float3((imageSize.x-1)/2.f)*ray[0] - float3((imageSize.y-1)/2.f)*ray[1];*/
+        this->rotation[0] = rotation * vec3(0,2.f*voxelRadius,0);
+        this->rotation[1] = rotation * vec3(0,0,2.f*voxelRadius);
+        this->rotation[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0); // - float3((imageSize.x-1)/2.f)*this->rotation[0] - float3((imageSize.y-1)/2.f)*this->rotation[1];
         //this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
         //this->scale = float(imageSize.x-1)/voxelRadius;
     }
@@ -45,8 +48,8 @@ struct Projection {
 #endif
 
     float3 origin;
-    float3 ray[3];
-    //mat3 rotation;
+    //float3 ray[3];
+    mat3 rotation;
     //float scale;
 };
 
