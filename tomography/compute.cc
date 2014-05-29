@@ -27,24 +27,24 @@ struct Application : Poll {
 
     // Reconstruction
     string labels[1] = {"Adjoint"_};
-    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(reconstructionSize, int3(images.first().size(), projections.size), true, true, "synthetic-"_)};
+    unique<Reconstruction> reconstructions[1] {unique<Adjoint>(reconstructionSize, int3(images.first().size(), projections.size), true, true, "synthetic")};
     Thread thread;
 
     // Evaluation
     array<ImageF> referenceImages = sliceProjectionVolume(projectionData, 1, downsampleProjections);
     array<Projection> referenceProjections = evaluateProjections(reconstructionSize, images[0].size(), projectionCount);
-    //VolumeCDF filteredBackprojection {Folder("FBP"_, Folder("Results"_, home()))};
-    //buffer<Projection> fullSizeProjections = evaluateProjections(filteredBackprojection.volume.sampleCount, images[0].size(), projectionCount);
+    VolumeCDF filteredBackprojection {Folder("FBP"_, Folder("Results"_, home()))};
+    buffer<Projection> fullSizeProjections = evaluateProjections(filteredBackprojection.volume.sampleCount, images[0].size(), projectionCount);
     const float SSQ = ::SSQ(/*referenceImages*/images);
 
     ProjectionView projectionView {referenceImages, downsampleProjections?2:1};
-    //VolumeView filteredBackprojectionView {&filteredBackprojection.volume, fullSizeProjections, downsampleProjections?2:1}; //TODO: preproject
+    VolumeView filteredBackprojectionView {&filteredBackprojection.volume, fullSizeProjections, downsampleProjections?2:1}; //TODO: preproject
     VolumeView reconstructionView {&reconstructions[0]->x, referenceProjections, downsampleProjections?2:1};
-    HBox top {{&projectionView, /*&filteredBackprojectionView,*/ &reconstructionView}};
+    HBox top {{&projectionView, &filteredBackprojectionView, &reconstructionView}};
     Plot plot;
-    //SliceView filteredBackprojectionSliceView {&filteredBackprojection.volume, downsampleProjections?2:1};
+    SliceView filteredBackprojectionSliceView {&filteredBackprojection.volume, downsampleProjections?2:1};
     SliceView reconstructionSliceView {&reconstructions[0]->x, downsampleFactor};
-    HBox bottom {{&plot, /*&filteredBackprojectionSliceView,*/ &reconstructionSliceView}};
+    HBox bottom {{&plot, &filteredBackprojectionSliceView, &reconstructionSliceView}};
     VBox layout {{&top, &bottom}};
     Window window {&layout, strx(int3(images.first().size(), projections.size))+" "_+strx(reconstructionSize) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
 
@@ -52,7 +52,7 @@ struct Application : Poll {
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
-        //FIXME: keep every iterations, map p, r
+        //FIXME: keep every iterations
         if(r.k>=0) {
             if(existsFile(r.name, r.folder)) removeFile(r.name, r.folder);  // Removes previous evaluation
             rename(r.name+"."_+dec(r.k), r.name, r.folder); // Renames during step to invalidate volume if aborted
@@ -69,6 +69,6 @@ struct Application : Poll {
         //plot[labels[index]].insert(r.totalTime.toFloat(), PSNR);
         //log("\t", PSNR, "\tEvaluation:",time);
         window.render();
-        if(r.k<1) queue();
+        if(r.k<4) queue();
     }
 } app ( arguments()[0] );

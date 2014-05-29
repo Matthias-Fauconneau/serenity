@@ -56,7 +56,7 @@ Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() { error(); assert(!thread); pthread_create(&thread,0,&::run,this); }
+void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 
 void Thread::run() {
     tid=gettid();
@@ -152,9 +152,6 @@ template<> void __attribute((noreturn)) error(const string& message) {
         reentrant = false;
     }
     log(message);
-    error();
-}
-template<> void __attribute((noreturn)) error() {
     exit(-1); // Signals all threads to terminate
     {Locker lock(threadsLock);
         for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list

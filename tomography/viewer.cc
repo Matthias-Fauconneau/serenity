@@ -32,7 +32,7 @@ struct Viewer : HBox {
     Window window;
 
     Viewer(ref<string> paths) :
-        HBox{{ &sliceView, &volumeView }},
+        HBox{{ &sliceView /*, &volumeView*/ }},
         files( apply(paths,[](string path){ return Map(path); } ) ),
         volumes ( apply(paths.size, [&](uint i){ return VolumeF(parseSize(paths[i]), cast<float>((ref<byte>)files[i])); }) ),
         window (this, join(apply(paths,[](string path){ return section(section(path,'/',-2,-1),'.'); })," "_)) {

@@ -40,49 +40,48 @@ typedef byte v16qi  __attribute((__vector_size__ (16)));
 inline (v16qi) loadu(const byte* const ptr) { return __builtin_ia32_lddqu(ptr); }
 inline (void) storeu(byte* const ptr, v16qi a) { __builtin_ia32_storedqu(ptr, a); }
 
-// float4
-//typedef float float4 __attribute((__vector_size__ (16)));
-typedef float float4 __attribute__((ext_vector_type(4)));
-//inline (float4) constexpr float4(float f) { return (float4){f,f,f,f}; }
-//inline (float4) constexpr float4(float a, float b, float c, float d) { return (float4){a,b,c,d}; }
-_unused static const float4 _1f = {1,1,1,1};
-_unused static const float4 _0f = {0,0,0,0};
+// v4sf
+typedef float v4sf __attribute((__vector_size__ (16)));
+inline (v4sf) constexpr float4(float f) { return (v4sf){f,f,f,f}; }
+inline (v4sf) constexpr float4(float a, float b, float c, float d) { return (v4sf){a,b,c,d}; }
+_unused static const v4sf _1f = float4( 1 );
+_unused static const v4sf _0f = float4( 0 );
 
-inline (float4) loada(const float* const ptr) { return *(float4*)ptr; }
-inline (float4) loadu(const float* const ptr) { return (float4)__builtin_ia32_lddqu((byte*)ptr); }
-inline (void) storea(float* const ptr, float4 a) { *(float4*)ptr = a; }
+inline (v4sf) loada(const float* const ptr) { return *(v4sf*)ptr; }
+inline (v4sf) loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
+inline (void) storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
-inline (float4) bitOr(float4 a, float4 b) { return float4(v4si(a) | v4si(b)); } //__builtin_ia32_orps(a, b); }
+inline (v4sf) bitOr(v4sf a, v4sf b) { return v4sf(v4si(a) | v4si(b)); } //__builtin_ia32_orps(a, b); }
 
 const v4si notSignBit4 = (v4si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
-inline (float4) abs(float4 a) { return float4(notSignBit4 & v4si(a)); }
+inline (v4sf) abs(v4sf a) { return v4sf(notSignBit4 & v4si(a)); }
 
-inline (float4) min(float4 a, float4 b) { return __builtin_ia32_minps(a,b); }
-inline (float4) max(float4 a, float4 b) { return __builtin_ia32_maxps(a,b); }
+inline (v4sf) min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
+inline (v4sf) max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
 #if __clang__
 #define shuffle4(v1, v2, i1, i2, i3, i4) __builtin_shufflevector(v1,v2, i1,i2, 4+(i3), 4+(i4))
 #else
 #define shuffle4(v1, v2, i1, i2, i3, i4) __builtin_shuffle(v1,v2, (v4si){i1,i2, 4+(i3), 4+(i4)})
 #endif
-inline (float4) hadd(float4 a, float4 b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
-inline (float4) dot3(float4 a, float4 b) { return __builtin_ia32_dpps(a,b,0x77); }
-inline (float4) dot4(float4 a, float4 b) { return __builtin_ia32_dpps(a,b,0xFF); }
-inline (float4) hsum(float4 a) { return dot4(a,_1f); }
-inline (float4) rcp(float4 a) { return __builtin_ia32_rcpps(a); }
-inline (float4) rsqrt(float4 a) { return __builtin_ia32_rsqrtps(a); }
-inline (float4) sqrt(float4 a) { return __builtin_ia32_sqrtps(a); }
-inline (float4) normalize3(float4 v) { return rsqrt(dot3(v, v)) * v; }
+inline (v4sf) hadd(v4sf a, v4sf b) { return __builtin_ia32_haddps(a,b); } //a0+a1, a2+a3, b0+b1, b2+b3
+inline (v4sf) dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x77); }
+inline (v4sf) dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
+inline (v4sf) hsum(v4sf a) { return dot4(a,_1f); }
+inline (v4sf) rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
+inline (v4sf) rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
+inline (v4sf) sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }
+inline (v4sf) normalize3(v4sf v) { return rsqrt(dot3(v, v)) * v; }
 
-inline (int) mask(int4 a) { return __builtin_ia32_movmskps(a); }
+inline (int) mask(v4sf a) { return __builtin_ia32_movmskps(a); }
 #define blendps __builtin_ia32_blendps
-inline (float4) blendv(float4 a, float4 b, int4 m) { return __builtin_ia32_blendvps(a, b, m); }
-inline (float4) dot2(float4 a, float4 b) { float4 sq = a*b; return hadd(sq,sq); }
-inline (float4) hmin(float4 a) { a = min(a, shuffle4(a, a, 1,0,3,2)); return min(a, shuffle4(a, a, 2,2,0,0)); }
-inline (float4) hmax(float4 a) { a = max(a, shuffle4(a, a, 1,0,3,2)); return max(a, shuffle4(a, a, 2,2,0,0)); }
+inline (v4sf) blendv(v4sf a, v4sf b, v4sf m) { return __builtin_ia32_blendvps(a, b, m); }
+inline (v4sf) dot2(v4sf a, v4sf b) { v4sf sq = a*b; return hadd(sq,sq); }
+inline (v4sf) hmin(v4sf a) { a = min(a, shuffle4(a, a, 1,0,3,2)); return min(a, shuffle4(a, a, 2,2,0,0)); }
+inline (v4sf) hmax(v4sf a) { a = max(a, shuffle4(a, a, 1,0,3,2)); return max(a, shuffle4(a, a, 2,2,0,0)); }
 
-inline (v4si) cvtps2dq(float4 a) { return __builtin_ia32_cvtps2dq(a); } // Rounds
-inline (v4si) cvttps2dq(float4 a) { return __builtin_ia32_cvttps2dq(a); } // Truncates
-inline (float4) cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
+inline (v4si) cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); } // Rounds
+inline (v4si) cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); } // Truncates
+inline (v4sf) cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
 //inline (v4si) dot4(v4si a, v4si b) { v4si c = a*b; v4si d = __builtin_ia32_phaddd128(c,c); return __builtin_ia32_phaddd128(d,d); }
 //inline (v4si) dot4(v4si a, v4si b) { return cvttps2dq(dot4(cvtdq2ps(a),cvtdq2ps(b))); }
@@ -106,8 +105,8 @@ inline (v8sf) constexpr float8(float a, float b, float c, float d, float e, floa
 
 typedef long long int v2di __attribute((__vector_size__ (16)));
 
-inline (v8sf) dup(float4 a) { return (v8sf)__builtin_ia32_vbroadcastsi256((v2di)a); }
-//inline (v8sf) dup(float4 a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3, 0, 1, 2, 3); }
+inline (v8sf) dup(v4sf a) { return (v8sf)__builtin_ia32_vbroadcastsi256((v2di)a); }
+//inline (v8sf) dup(v4sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3, 0, 1, 2, 3); }
 
 const v8si notSignBit8 = (v8si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
 inline (v8sf) abs(v8sf a) { return v8sf(notSignBit8 & v8si(a)); }
@@ -122,14 +121,14 @@ inline (v8si) gather(const int* base, v8si indices, v8si mask) { return __builti
 #define shuffle8(v1, v2, i0, i1, i2, i3, i4, i5, i6, i7) __builtin_shuffle(v1,v2, (v8si){i0,i1,i2,i3, 8+i4, 8+i5, 8+i6, 8+i7})
 #endif
 
-inline (float4) low(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 0); }
-inline (float4) high(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 1); }
-inline (v8sf) merge(float4 a, float4 b)  { v8sf c = __builtin_shufflevector(a, a, 0, 1, 2, 3, -1, -1, -1, -1); __builtin_ia32_vinsertf128_ps256(c, b, 1); return c; }
-//float4 low(v8sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3); }
-//float4 high(v8sf a) { return __builtin_shufflevector(a, a, 4, 5, 6, 7); }
+inline (v4sf) low(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 0); }
+inline (v4sf) high(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 1); }
+inline (v8sf) merge(v4sf a, v4sf b)  { v8sf c = __builtin_shufflevector(a, a, 0, 1, 2, 3, -1, -1, -1, -1); __builtin_ia32_vinsertf128_ps256(c, b, 1); return c; }
+//v4sf low(v8sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3); }
+//v4sf high(v8sf a) { return __builtin_shufflevector(a, a, 4, 5, 6, 7); }
 inline (v8si) cvttps2dq(v8sf a) { return __builtin_ia32_cvttps2dq256(a); } // Truncates
 inline (v8sf) cvtdq2ps(v8si a) { return __builtin_ia32_cvtdq2ps256(a); }
-inline (float4) dot8(v8sf a,  v8sf b) {
+inline (v4sf) dot8(v8sf a,  v8sf b) {
      v8sf dot4 = __builtin_ia32_dpps256(a, b, 0xFF);
       return low(dot4)+high(dot4);
  }

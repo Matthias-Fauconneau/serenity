@@ -2,14 +2,15 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
-
-//typedef int int4 __attribute__((ext_vector_type(4)));
-//typedef float float2 __attribute__((ext_vector_type(2)));
-//inline float sq(float2 x) { return x.x * x.x + x.y * x.y; }
-//typedef float float3 __attribute__((ext_vector_type(3)));
-//template<> inline String str(const float3& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+")"_; }
-//typedef float float4 __attribute__((ext_vector_type(4)));
-//template<> inline String str(const float4& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+typedef short v2hi __attribute((__vector_size__ (4)));
+typedef int v4si __attribute((__vector_size__(16)));
+typedef float v4sf __attribute((__vector_size__(16)));
+typedef int v8si __attribute((__vector_size__(32)));
+typedef float v8sf __attribute((__vector_size__(32)));
+template<> inline String str(const v4si& v) { return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+template<> inline String str(const v4sf& v){ return "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+")"_; }
+//template<> inline String str(const v8si& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
+//template<> inline String str(const v8sf& v) { return  "("_+str(v[0])+", "_+str(v[1])+", "_+str(v[2])+", "_+str(v[3])+", "_+str(v[4])+", "_+str(v[5])+", "_+str(v[6])+", "_+str(v[7])+")"_; }
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -103,16 +104,15 @@ typedef vec<xy,short,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
 /// Single precision x,y vector
-typedef vec<xy,float,2> float2;
-inline float cross(float2 a, float2 b) { return a.y*b.x - a.x*b.y; }
+typedef vec<xy,float,2> vec2;
+inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
-inline float2 normal(float2 a) { return float2(-a.y, a.x); }
-typedef float2 vec2;
+inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 
 generic struct xyz {
     T x,y,z;
     vec< ::xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
-    //inline operator float3() const { return (float3){x,y,z}; }
+    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
@@ -121,15 +121,14 @@ typedef vec<xyz,uint,3> uint3;
 /// Integer x,y,z vector (16bit)
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
-typedef vec<xyz,float,3> float3;
-inline float3 cross(float3 a, float3 b) { return float3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
-inline float3 normal(float3 v) {
+typedef vec<xyz,float,3> vec3;
+inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
+inline vec3 normal(vec3 v) {
     int index=0; float min=v[0];
     for(int i: range(3)) if(abs(v[i]) < min) index=i, min=abs(v[i]);
-    float3 t=0; t[index]=1;
+    vec3 t=0; t[index]=1;
     return normalize(cross(v, t));
 }
-typedef float3 vec3;
 
 generic struct xyzw {
     T x,y,z,w;
@@ -137,11 +136,10 @@ generic struct xyzw {
     vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
     vec< ::xy,T,2> xy()const{ return *(vec< ::xy,T,2>*)this; }
-    //inline operator float4() const { return *(float4*)this; }
+    inline operator v4sf() const { return *(v4sf*)this; }
 };
 /// Floating-point x,y,z,w vector
-typedef vec<xyzw,float,4> float4;
-typedef float4 vec4;
+typedef vec<xyzw,float,4> vec4;
 
 generic struct bgr {
     T b,g,r;
@@ -156,4 +154,4 @@ generic struct bgra {
 /// Integer b,g,r,a vector (8bit)
 typedef vec<bgra,uint8,4> byte4;
 /// Integer b,g,r,a vector (32bit)
-//typedef vec<bgra,int,4> int4;
+typedef vec<bgra,int,4> int4;

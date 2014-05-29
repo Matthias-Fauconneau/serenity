@@ -41,7 +41,7 @@ bool MLEM::step(const ref<Projection>& projections, const ref<ImageF>& images) {
                     assert(i<P.width && j<P.height, i,j, u,v);
                     float b = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
                                        v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
-                    float4 start, step, end;
+                    v4sf start, step, end;
                     intersect(projection, xy, volume, start, step, end);
                     float Ax = project(start, step, end, volume, xData);
                     if(Ax) { sum += b / Ax; count += 1; } else assert(!b);

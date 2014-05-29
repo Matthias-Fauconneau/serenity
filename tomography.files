@@ -78,11 +78,10 @@ tomography/viewer.cc
 tomography/netcdf.h
 tomography/project.h
 tomography/project.cc
-tomography/project.glsl
 tomography/cdf.h
+test.cc
 tomography/SIRT.h
 tomography/SIRT.cc
 tomography/error.h
 tomography/evaluate.cc
 tomography/synthetic.cc
-tomography/project.cl

@@ -14,7 +14,7 @@ void Adjoint::initialize(const ref<Projection>& projections, const ref<ImageF>& 
             ref<float> row = image.data.slice(y*image.width, image.width);
             if(filter) row = filters[id].filter(row);
             for(uint x: range(image.width)) {
-                float4 start, step, end;
+                v4sf start, step, end;
                 if(intersect(projection, vec2(x, y), volume, start, step, end)) {
                     float Ax = 0; //project(start, step, end, volume, this->x.data);
                     backproject(start, step, end, volume, AtAp[id], float8(row[x] - Ax));
@@ -62,7 +62,7 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
         parallel(image.height, [&image, &projection, &volume, this](uint id, uint y) {
             if(filter) {
                 mref<float> input = filters[id];
-                float4 start[input.size], step[input.size], end[input.size]; // FIXME: AoS
+                v4sf start[input.size], step[input.size], end[input.size]; // FIXME: AoS
                 uint first;
                 for(first=0;first<input.size;first++) { if(intersect(projection, vec2(first, y), volume, start[first], step[first], end[first])) break; else input[first] = 0; }
                 uint last = first;
@@ -77,7 +77,7 @@ bool Adjoint::step(const ref<Projection>& projections, const ref<ImageF>& images
                 for(uint x: range(first, last)) backproject(start[x], step[x], end[x], volume, AtAp[id], float8(output[x]));
             } else {
                 for(uint x: range(image.width)) {
-                    float4 start, step, end;
+                    v4sf start, step, end;
                     if(intersect(projection, vec2(x, y), volume, start, step, end)) {
                         float Ax = project(start, step, end, volume, p.data);
                         backproject(start, step, end, volume, AtAp[id], float8(Ax));
