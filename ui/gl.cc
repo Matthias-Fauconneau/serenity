@@ -23,14 +23,15 @@ static Display* display;
 static GLXContext glContext;
 
 void __attribute((constructor(1002))) setup_gl() {
-    display = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert(display);
+    display = XOpenDisplay(strz(getenv("COMPUTE"_,":0"_))); assert(display);
+    //display = XOpenDisplay(":1"); assert(display);
     const int fbAttribs[] = {0};
     int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(display, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
     glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
-            (display, fbConfigs[0], 0, true, (int[]){ GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_DEBUG_BIT_ARB, GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB, 0});
-    XFree(fbConfigs);
+            (display, fbConfigs[0], 0, true, (int[]){ GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 0, 0});
     assert(glContext);
-    GLXPbuffer id = glXCreatePbuffer( display, fbConfigs[0], (int[]){GLX_PBUFFER_WIDTH, 0, GLX_PBUFFER_HEIGHT, 0, 0} );
+    GLXPbuffer id = glXCreatePbuffer( display, fbConfigs[0], (int[]){GLX_PBUFFER_WIDTH, 1, GLX_PBUFFER_HEIGHT, 1, 0} );
+    XFree(fbConfigs);
     glXMakeContextCurrent(display, id, id, glContext);
 }
 
@@ -125,9 +126,9 @@ GLShader::GLShader(const string& source, const ref<string>& stages) {
         int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
         int length=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&length);
         if(!status || length>1) {
-            ::buffer<byte> buffer(length);
-            glGetShaderInfoLog(shader, length, 0, buffer.begin());
-            error(glsl, buffer.slice(0,buffer.size-1));
+            char buffer[length];
+            glGetShaderInfoLog(shader, length, 0, buffer);
+            error(string(buffer,length-1));
         }
         glAttachShader(id, shader);
     }
@@ -225,7 +226,7 @@ GLTexture::GLTexture(int2 size) : size(size,0) {
 GLTexture::GLTexture(const VolumeF& volume) : size(volume.sampleCount) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_3D, id);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R, size.x, size.y, size.z, 0, GL_R, GL_FLOAT, volume.data.data);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, size.x, size.y, size.z, 0, GL_RED, GL_FLOAT, volume.data.data);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

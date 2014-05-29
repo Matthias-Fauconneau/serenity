@@ -21,13 +21,15 @@ void project(const ImageF& image, const VolumeF& volume, const Projection& proje
     program["dataOrigin"_] = projection.origin + vec3(volume.sampleCount-int3(1,1,2/*FIXME*/))/2.f;
 
     GLTexture gpuVolume = volume; //FIXME: avoid transfers
+    error("OK");
     program.bindSamplers({"volume"_}); gpuVolume.bind(0);
     GLFrameBuffer target = GLTexture(image.size());
+    target.bind(ClearColor);
 
-    GLVertexBuffer vertexBuffer;
+    /*GLVertexBuffer vertexBuffer;
     vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)});
     vertexBuffer.bindAttribute(program,"position"_,2);
-    vertexBuffer.draw(TriangleStrip);
+    vertexBuffer.draw(TriangleStrip);*/
 
     target.texture.read(image);
 }
