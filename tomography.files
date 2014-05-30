@@ -78,6 +78,7 @@ tomography/viewer.cc
 tomography/netcdf.h
 tomography/project.h
 tomography/project.cc
+tomography/project.glsl
 tomography/cdf.h
 test.cc
 tomography/SIRT.h

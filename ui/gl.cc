@@ -221,12 +221,12 @@ void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
 GLTexture::GLTexture(int2 size) : size(size,0) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, size.x, size.y, 0, GL_RED, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, size.x, size.y, 0, GL_RED, GL_FLOAT, 0);
 }
 GLTexture::GLTexture(const VolumeF& volume) : size(volume.sampleCount) {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_3D, id);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, size.x, size.y, size.z, 0, GL_RED, GL_FLOAT, volume.data.data);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, size.x, size.y, size.z, 0, GL_RED, GL_FLOAT, volume.data.data);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -250,8 +250,8 @@ void GLTexture::read(const ImageF& target) const {
 GLFrameBuffer::GLFrameBuffer(GLTexture&& texture) : texture(move(texture)) {
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.id, 0);
-    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this->texture.id, 0);
+    assert_(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
 GLFrameBuffer::~GLFrameBuffer() {
     if(id) glDeleteFramebuffers(1,&id);

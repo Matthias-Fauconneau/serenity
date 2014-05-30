@@ -4,8 +4,11 @@
 
 inline int16 bswap(int16 v) { return __builtin_bswap16(v); }
 inline int32 bswap(int32 v) { return __builtin_bswap32(v); }
-inline float bswap(float v) { return __builtin_bswap32(v); }
 inline int64 bswap(int64 v) { return __builtin_bswap64(v); }
+inline uint16 bswap(uint16 v) { return __builtin_bswap16(v); }
+inline uint32 bswap(uint32 v) { return __builtin_bswap32(v); }
+inline uint64 bswap(uint64 v) { return __builtin_bswap64(v); }
+inline float bswap(float v) { return __builtin_bswap32(v); }
 
 /// Aligns \a offset to \a width (only for power of two \a width)
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
