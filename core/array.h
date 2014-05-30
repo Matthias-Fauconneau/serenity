@@ -30,7 +30,7 @@ generic struct array : buffer<T> {
             if(capacity) {
                 data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
                 assert(size_t(data)%alignof(T)==0);
-            } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("");
+            } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error(__FILE__, nextCapacity);
             capacity=nextCapacity;
         }
     }

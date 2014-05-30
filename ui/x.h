@@ -78,7 +78,7 @@ struct FreePixmap { int8 req=54,pad=0; uint16 size=2; uint pixmap; };
 struct CreateGC { int8 req=55,pad=0; uint16 size=4; uint context,window,mask=0; };
 struct FreeGC { int8 req=60,pad=0; uint16 size=2; uint context; };
 struct CopyArea { int8 req=62,pad=0; uint16 size=7; uint src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
-struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad=0; };
+struct PutImage { int8 req=72,format=2; uint16 size16=0; uint32 size=7; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad=0; };
 struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window,visual; };
 struct FreeCursor { int8 req=95,pad=0; uint16 size=2; uint cursor; };
 struct QueryExtension { int8 req=98,pad=0; uint16 size=2, length, pad2=0; };
@@ -94,6 +94,12 @@ constexpr string events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"Button
                                 "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_,"MappingNotify"_};
 constexpr string xErrors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
                                   "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
+
+namespace BigRequests {
+extern int EXT, event, errorBase;
+struct BigReqEnable { int8 ext=EXT, req=0; uint16 size=1; };
+struct BigReqEnableReply { int8 unused; uint16 seq; uint length; uint maximumRequestLength; uint8 pad[20]; } _packed;
+}
 
 namespace Shm {
 extern int EXT, event, errorBase;

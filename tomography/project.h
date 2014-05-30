@@ -1,7 +1,10 @@
 #pragma once
 #include "volume.h"
 #include "matrix.h"
-#include "gl.h"
+
+#define CL 0
+#define GL 0
+#define AVX2 0
 
 inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); } // FIXME
 
@@ -89,7 +92,7 @@ inline buffer<Projection> evaluateProjections(int3 reconstructionSize, int2 imag
     return projections;
 }
 
-#if !GL
+#if AVX2
 // SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__
 static const v4sf _2f = float4( 2 );
@@ -160,4 +163,4 @@ static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVo
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, const Projection& projection);
 /// Projects \a volume onto \a image according to \a projection
-void projectGL(const ImageF& image, const GLTexture& volume, const Projection& projection);
+void projectGL(const ImageF& image, const struct GLTexture& volume, const Projection& projection);

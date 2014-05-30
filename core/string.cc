@@ -85,7 +85,7 @@ int64 fromInteger(const string& number, int base) {
         if(*i>='0' && *i<='9') n = *i-'0';
         else if(*i>='a' && *i<='f') n = *i+10-'a';
         else if(*i>='A' && *i<='F') n = *i+10-'A';
-        else if(*i == '.') { error("Unexpected decimal"); break; }
+        //else if(*i == '.') { error("Unexpected decimal"); break; }
         else break;
         value *= base;
         value += n;

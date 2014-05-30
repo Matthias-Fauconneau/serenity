@@ -73,7 +73,7 @@ array<Rect> Linear::layout(int2 size) {
     if(main==Left) pen.x+=0;
     else if(main==Center || main==Even || main==Spread || main==Share) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
-    else error("");
+    else error(__FILE__);
     if(side==AlignLeft) pen.y+=0;
     else if(side==AlignCenter) pen.y+=(size.y-height)/2;
     else if(side==AlignRight) pen.y+=size.y-height;

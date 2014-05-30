@@ -54,21 +54,25 @@ struct Viewer : HBox {
 } app ( arguments() );
 
 #else
-struct Viewer : HBox {
+#include "thread.h"
+#include "cdf.h"
+#include "project.h"
+#include "time.h"
+
+struct Viewer {
     buffer<Map> files;
     buffer<VolumeF> volumes;
-    uint currentIndex = 0;
-    const VolumeF* current() { return &volumes[currentIndex]; }
-    buffer<Projection> projections = evaluateProjections(current()->sampleCount, int2(256,256), 256); //evaluateProjections(current()->sampleCount, int2(504,378), 5041);
+    buffer<Projection> projections = evaluateProjections(volumes[0].sampleCount, int2(256,256), 256); //evaluateProjections(current()->sampleCount, int2(504,378), 5041);*/
 
     Viewer(ref<string> paths) :
         files( apply(paths,[](string path){ return Map(path); } ) ),
         volumes ( apply(paths.size, [&](uint i){ return VolumeF(parseSize(paths[i]), cast<float>((ref<byte>)files[i])); }) ) {
         ImageF image (projections[0].imageSize);
         for(int _unused t: range(3)) {
-            {Time time; time.start(); for(Projection p: projections) projectGL(image, volumes[0], p); log("GPU", time);}
-            {Time time; time.start(); for(Projection p: projections) project(image, , p); log("CPU", time);}
+            //{Time time; time.start(); for(Projection p: projections) projectGL(image, volumes[0], p); log("GPU", time);}
+            {Time time; time.start(); for(Projection p: projections) project(image, volumes[0], p); log("CPU", time);}
         }
+        log(paths);
     }
 } app ( arguments() );
 #endif

@@ -2,6 +2,7 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 #include "math.h"
+typedef float float3 __attribute__((ext_vector_type(3)));
 typedef short v2hi __attribute((__vector_size__ (4)));
 typedef int v4si __attribute((__vector_size__(16)));
 typedef float v4sf __attribute((__vector_size__(16)));
@@ -113,6 +114,7 @@ generic struct xyz {
     T x,y,z;
     vec< ::xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
     inline operator v4sf() const { return (v4sf){x,y,z,0}; }
+    inline operator float3() const { return (float3){x,y,z}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;

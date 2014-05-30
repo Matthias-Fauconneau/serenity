@@ -130,6 +130,8 @@ struct Window : Device {
     /// Returns a snapshot of the root window
     Image getSnapshot();
 
+    /// If set, Shared memory extension cannot be used
+    bool remote;
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
     /// If set, this window will not be managed by the session window manager

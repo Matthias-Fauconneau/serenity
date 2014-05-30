@@ -82,6 +82,7 @@ struct Build {
     bool tryParseFiles(TextData& s) {
         string suffix;
         if(s.match("FILE("_) || s.match("ICON("_)) {}
+        else if(s.match("KERNEL("_)) suffix=".cl"_;
         else if(s.match("SHADER("_)) suffix=".glsl"_;
         else return false;
         String file = s.identifier("_-"_)+suffix;
@@ -139,7 +140,7 @@ struct Build {
             else args << String("-I/usr/include/freetype2"_);
             if(flags.contains("arm"_)) {}
             else if(flags.contains("atom"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
-            else args << String("-march=native"_);
+            else args << String("-march=corei7-avx"_); //String("-march=native"_);
 
             if(!flags.contains("release"_)) args << String("-g"_);
             if(!flags.contains("debug"_)) args << String("-O3"_); // O3 / Ofast

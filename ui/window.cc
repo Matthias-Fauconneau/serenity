@@ -18,23 +18,34 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 #include <sys/shm.h>
 
 // Globals
+namespace BigRequests { int EXT, event, errorBase; } using namespace BigRequests;
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 
 Window::Window(Widget* widget, const string& title _unused, int2 size, const Image& icon _unused) :
-    Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
-    String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
-    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
-    if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
+    Socket(section(getenv("DISPLAY"_,":0"_),':')?PF_INET:PF_LOCAL, SOCK_STREAM),
+    Poll(Socket::fd,POLLIN), widget(widget), remote(section(getenv("DISPLAY"_,":0"_),':')) {
+    if(!remote) {
+        String path = "/tmp/.X11-unix/X"_+section(getenv("DISPLAY"_,":0"_),':',1,2);
+        struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
+        if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
+    } else {
+        uint display = fromInteger( section(getenv("DISPLAY"_,":0"_),':',1,2) );
+        struct sockaddress { uint16 family; uint16 port; uint8 host[4]; int pad[2]={}; } addr = {PF_INET, bswap(uint16(6000+display)), {127,0,0,1}};
+        if(check(connect(Socket::fd,(const sockaddr*)&addr,sizeof(addr)))) error("X connection failed");
+    }
+    remote = true; // Disables Shm
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()>0) {
             BinaryData s (readFile(".Xauthority"_,home()), true);
             string name, data;
-            uint16 family _unused = s.read();
-            {uint16 length = s.read(); string host _unused = s.read<byte>(length); }
-            {uint16 length = s.read(); string port _unused = s.read<byte>(length); }
-            {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
-            {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
+            while(s) { // FIXME: Assumes last entry is correct
+                uint16 family _unused = s.read();
+                {uint16 length = s.read(); string host _unused = s.read<byte>(length); }
+                {uint16 length = s.read(); string port _unused = s.read<byte>(length); }
+                {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
+                {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
+            }
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
         } else send(raw(r));
     }
@@ -55,6 +66,12 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
         minKeyCode=r.minKeyCode, maxKeyCode=r.maxKeyCode;
     }
     assert(visual);
+
+    {QueryExtensionReply r=readReply<QueryExtensionReply>((
+        {QueryExtension r; r.length="BIG-REQUESTS"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"BIG-REQUESTS"_+pad(4,r.length));}));
+        BigRequests::EXT=r.major; BigRequests::event=r.firstEvent; BigRequests::errorBase=r.firstError;}
+    {BigRequests::BigReqEnableReply r = readReply<BigRequests::BigReqEnableReply>(raw(BigRequests::BigReqEnable()));
+        log(r.maximumRequestLength);}
 
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
@@ -123,17 +140,21 @@ void Window::event() {
 
         //if(state!=Idle) { state=Wait; return; } // Synchronizes full render
         if(target.size() != size) {
-            if(shm) {
-                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                shmdt(target.data);
-                shmctl(shm, IPC_RMID, 0);
+            if(remote) target = Image(size.x, size.y);
+            else {
+                if(shm) {
+                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                    shmdt(target.data);
+                    shmctl(shm, IPC_RMID, 0);
+                }
+                target.width=size.x, target.height=size.y;
+                target.stride = remote ? size.x : align(16,size.x);
+                target.buffer.size = target.height*target.stride;
+                assert_(target.buffer.size < 4096*4096, target.width, target.height);
+                shm = check( shmget(0, target.buffer.size*sizeof(byte4), IPC_CREAT | 0777) );
+                target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
+                Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));
             }
-            target.width=size.x, target.height=size.y, target.stride=align(16,size.x);
-            target.buffer.size = target.height*target.stride;
-            assert_(target.buffer.size < 4096*4096, target.width, target.height);
-            shm = check( shmget(0, target.buffer.size*sizeof(byte4), IPC_CREAT | 0777) );
-            target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
-            {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
         }
 
         renderBackground(target);
@@ -142,7 +163,7 @@ void Window::event() {
         needUpdate = true;
     }
     if(needUpdate) {
-        if(state!=Idle) { state=Wait; return; }
+        if(!remote) if(state!=Idle) { state=Wait; return; }
         putImage();
         needUpdate = false;
     }
@@ -150,13 +171,19 @@ void Window::event() {
 
 void Window::putImage(Rect rect) {
     if(rect==Rect(0)) rect=Rect(target.size());
-    assert_(id); assert_(state==Idle); assert_(rect.size());
-    Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
-    r.totalW=target.stride; r.totalH=target.height;
-    r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
-    r.dstX = rect.position().x, r.dstY = rect.position().y;
-    send(raw(r));
-    state=Server;
+    assert_(id); assert_(rect.size());
+    if(remote) {
+        ::PutImage r; r.drawable=id+XWindow; r.context=id+GContext; r.w=target.size().x, r.h=target.size().y; r.size += target.buffer.size;
+        send(String(raw(r)+cast<byte>(target.buffer)));
+    } else {
+        assert_(state==Idle);
+        Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+        r.totalW=target.stride; r.totalH=target.height;
+        r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
+        r.dstX = rect.position().x, r.dstY = rect.position().y;
+        send(raw(r));
+        state=Server;
+    }
 }
 
 // Events
@@ -231,7 +258,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
                 else exit(0); // Exits application by default
             }
-            else if(type==Shm::event+Shm::Completion) { /*int stateWas=state;*/ state=Idle; if(displayed) displayed(); /*if(stateWas==Wait) render();*/ }
+            else if(type==Shm::event+Shm::Completion) { assert_(!remote); /*int stateWas=state;*/ state=Idle; if(displayed) displayed(); /*if(stateWas==Wait) render();*/ }
             else if( type==DestroyNotify || type==MappingNotify || type==LastEvent) {}
             else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
             window=0;
