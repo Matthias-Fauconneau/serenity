@@ -37,18 +37,19 @@ void __attribute((constructor(1002))) setup_gl() {
 
 /// Shader
 
-void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
-void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program); glUniform1f(location,v); }
-void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
-void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
-void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
-void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
+void GLUniform::operator=(int v) { assert_(location>=0); glUseProgram(program); glUniform1i(location,v); }
+void GLUniform::operator=(float v) { assert_(location>=0); glUseProgram(program); glUniform1f(location,v); }
+void GLUniform::operator=(vec2 v) { assert_(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
+void GLUniform::operator=(vec3 v) { assert_(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
+void GLUniform::operator=(vec4 v) { assert_(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
+void GLUniform::operator=(mat3 m) { assert_(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
 
 GLUniform GLShader::operator[](const string& name) {
     int location = uniformLocations.value(String(name),-1);
     if(location<0) {
-        location=glGetUniformLocation(id,strz(name));
-        if(location<0) return GLUniform(id,location); //error("Unknown uniform"_,name);
+        location=glGetUniformLocation(id, strz(name));
+        if(location<0) error("Unknown uniform"_, name, source);
+        if(location<0) return GLUniform(id,location);
         uniformLocations.insert(String(name),location);
     }
     return GLUniform(id,location);

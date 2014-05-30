@@ -1,74 +1,12 @@
 #pragma once
 #include "volume.h"
 #include "matrix.h"
+#include "gl.h"
 
 inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); } // FIXME
 
-#define GL 1
-#if GL
 typedef float float3 __attribute__((ext_vector_type(3)));
-struct Projection {
-    //int3 volumeSize;
-    int2 imageSize; //uint index;
-    Projection(const int3 volumeSize, const int2 imageSize, const uint index, const uint projectionCount) : /*volumeSize(volumeSize),*/ imageSize(imageSize) /*, index(index) */ {
-#if 0
-        // FIXME: parse from measurement file
-        const uint image_height = 1536;
-        const uint image_width = 2048;
-        assert_(image_height*imageSize.x == image_width*imageSize.y, imageSize, image_height, image_width);
-        const uint num_projections_per_revolution = 2520;
-        const float camera_length = 328.811; // [mm]
-        const float specimen_distance = 2.78845; // [mm]
-        const float pixel_size = 0.194; // [mm]
-        const float z_start_position = 32.1; // [mm]
-        const float z_end_position = 37.3082; // [mm]
-#else // Synthetic
-        const uint image_width = 2048;
-        const uint num_projections_per_revolution = projectionCount/2;
-        const float camera_length = 328.811; // [mm]
-        const float specimen_distance = 2.78845; // [mm]
-        const float pixel_size = 0.194; // [mm]
-        const float z_start_position = 0; // [mm]
-#endif
-        //const float pitch = deltaZ/total_num_projections*num_projections_per_revolution; // [mm] ~ 2.604 mm
-        const float detectorHalfWidth = image_width * pixel_size; // [mm] ~ 397 mm
-        const float hFOV = atan(detectorHalfWidth, camera_length); // Horizontal field of view (i.e cone beam angle) [rad] ~ 50°
-        const float volumeRadius = specimen_distance * cos(hFOV); // [mm] ~ 2 mm
-        const float voxelRadius = float(volumeSize.x-1)/2;
-#if 1 // Synthetic
-        const float z_end_position = volumeSize.z*volumeRadius/voxelRadius; // [mm]
-#endif
-        const float deltaZ = (z_end_position-z_start_position) / 2 /* Half pitch: Z[end] is incorrect ?*/; // [mm] ~ 5 mm
 
-        mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
-        origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
-        //this->origin = {origin.x, origin.y, origin.z};
-        /*ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
-        ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
-        ray[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0) - float3((imageSize.x-1)/2.f)*ray[0] - float3((imageSize.y-1)/2.f)*ray[1];*/
-        this->rotation[0] = rotation * vec3(0,2.f*voxelRadius,0);
-        this->rotation[1] = rotation * vec3(0,0,2.f*voxelRadius);
-        this->rotation[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0); // - float3((imageSize.x-1)/2.f)*this->rotation[0] - float3((imageSize.y-1)/2.f)*this->rotation[1];
-        //this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
-        //this->scale = float(imageSize.x-1)/voxelRadius;
-    }
-#if 0
-    inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
-    //inline float4 ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2]), 0b0111); }
-    inline vec2 project(vec3 p) const {
-        p = rotation * (p - vec3(origin[0],origin[1],origin[2]));
-        assert(p.x, p);
-        p = p / p.x; // Perspective divide
-        return vec2(p.y * scale, p.z * scale);
-    }
-#endif
-
-    vec3 origin;
-    //float3 ray[3];
-    mat3 rotation;
-    //float scale;
-};
-#else
 struct Projection {
     int3 volumeSize; int2 imageSize; uint index;
     Projection(const int3 volumeSize, const int2 imageSize, const uint index, const uint projectionCount) : volumeSize(volumeSize), imageSize(imageSize), index(index) {
@@ -108,6 +46,14 @@ struct Projection {
         ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];
         this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
         this->scale = float(imageSize.x-1)/voxelRadius;
+
+        glOrigin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
+        this->glRotation[0] = rotation * vec3(0,2.f*voxelRadius,0);
+        this->glRotation[1] = rotation * vec3(0,0,2.f*voxelRadius);
+        this->glRotation[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0); // - float3((imageSize.x-1)/2.f)*this->rotation[0] - float3((imageSize.y-1)/2.f)*this->rotation[1];
+        //this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
+        //this->scale = float(imageSize.x-1)/voxelRadius;
+
     }
     inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
     //inline v4sf ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2]), 0b0111); }
@@ -118,12 +64,18 @@ struct Projection {
         return vec2(p.y * scale, p.z * scale);
     }
 
+    // GL cast
+    vec3 glOrigin;
+    mat3 glRotation;
+
+    // CPU cast
     v4sf origin;
     v4sf ray[3];
+
+    // CPU project
     mat3 rotation;
-    float scale;
+    float scale; // FIXME -> mat3
 };
-#endif
 
 inline buffer<ImageF> sliceProjectionVolume(const VolumeF& volume, uint stride=1, bool downsampleProjections=false) {
     buffer<ImageF> images (volume.sampleCount.z / stride);
@@ -207,3 +159,5 @@ static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVo
 
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, const Projection& projection);
+/// Projects \a volume onto \a image according to \a projection
+void projectGL(const ImageF& image, const GLTexture& volume, const Projection& projection);

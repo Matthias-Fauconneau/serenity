@@ -2,6 +2,7 @@
 #include "volume.h"
 #include "matrix.h"
 #include "project.h"
+#include "gl.h"
 
 struct ProjectionView : Widget {
     const ref<ImageF>& projections;
@@ -27,9 +28,11 @@ struct VolumeView : Widget {
     const VolumeF* volume;
     const ref<Projection>& projections;
     const int upsampleFactor;
+    GLTexture gpuVolume;
 
     VolumeView(const VolumeF* volume, const ref<Projection>& projections, const int upsampleFactor) : volume(volume), projections(projections), upsampleFactor(upsampleFactor) {}
     bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
     void render(const Image& target) override;
+    void setCurrent(const VolumeF* volume) { this->volume = volume; gpuVolume = GLTexture(); }
 };

@@ -19,7 +19,7 @@ VolumeView reconstructionView (reconstruction.volume, projections, 2);
 HBox views ({ &projectionsView, /*&diff,*/ &reconstructionView });
 //const int2 imageSize = int2(504, 378);
 Window window (&views, "View"_);
-#else
+#elif 1
 
 struct Viewer : HBox {
     buffer<Map> files;
@@ -46,11 +46,29 @@ struct Viewer : HBox {
         if((button == WheelUp &&  currentIndex> 0) || (button == WheelDown && currentIndex < volumes.size-1)) {
             if(button == WheelUp) currentIndex--; else currentIndex++;
             sliceView.volume = current();
-            volumeView.volume = current();
+            volumeView.setCurrent( current() );
             return true;
         }
         return HBox::mouseEvent(target, cursor, size, event, button);
     }
 } app ( arguments() );
 
+#else
+struct Viewer : HBox {
+    buffer<Map> files;
+    buffer<VolumeF> volumes;
+    uint currentIndex = 0;
+    const VolumeF* current() { return &volumes[currentIndex]; }
+    buffer<Projection> projections = evaluateProjections(current()->sampleCount, int2(256,256), 256); //evaluateProjections(current()->sampleCount, int2(504,378), 5041);
+
+    Viewer(ref<string> paths) :
+        files( apply(paths,[](string path){ return Map(path); } ) ),
+        volumes ( apply(paths.size, [&](uint i){ return VolumeF(parseSize(paths[i]), cast<float>((ref<byte>)files[i])); }) ) {
+        ImageF image (projections[0].imageSize);
+        for(int _unused t: range(3)) {
+            {Time time; time.start(); for(Projection p: projections) projectGL(image, volumes[0], p); log("GPU", time);}
+            {Time time; time.start(); for(Projection p: projections) project(image, , p); log("CPU", time);}
+        }
+    }
+} app ( arguments() );
 #endif
