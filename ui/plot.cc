@@ -23,6 +23,8 @@ void Plot::render(const Image& target) {
             for(auto point: dataSet.data) {
                 vec2 p(point.key,point.value);
                 assert(isNumber(p.x) && isNumber(p.y), p);
+                if(log[0]) assert_(p.x>0);
+                if(log[1]) assert_(p.y>0);
                 min=::min(min,p);
                 max=::max(max,p);
             }

@@ -23,7 +23,7 @@ inline ImageF slice(const VolumeF& volume, uint z) {
 struct CylinderVolume {
     CylinderVolume(const VolumeF& volume) {
         assert(volume.sampleCount.x == volume.sampleCount.y);
-        const float radius = float(volume.sampleCount.x-1)/2, halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
+        const float radius = float(volume.sampleCount.x-1 -2/*regularization margin*/)/2, halfHeight = float(volume.sampleCount.z-1 -2/*regularization margin*/ /*-1 FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
         capZ = (v4sf){halfHeight, halfHeight, -halfHeight, -halfHeight};
         radiusR0R0 = (v4sf){radius*radius, 0, radius*radius, 0};
         radiusSqHeight = (v4sf){radius*radius, radius*radius, halfHeight, halfHeight};

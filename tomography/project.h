@@ -7,6 +7,7 @@ inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); } // FIXME
 struct Projection {
     int3 volumeSize; int2 imageSize; uint index;
     Projection(const int3 volumeSize, const int2 imageSize, const uint index, const uint projectionCount) : volumeSize(volumeSize), imageSize(imageSize), index(index) {
+#if 0
         // FIXME: parse from measurement file
         const uint image_height = 1536;
         const uint image_width = 2048;
@@ -17,12 +18,23 @@ struct Projection {
         const float pixel_size = 0.194; // [mm]
         const float z_start_position = 32.1; // [mm]
         const float z_end_position = 37.3082; // [mm]
-        const float deltaZ = (z_end_position-z_start_position) / 2 /* Half pitch: Z[end] is incorrect ?*/; // [mm] ~ 5 mm
+#else // Synthetic
+        const uint image_width = 2048;
+        const uint num_projections_per_revolution = projectionCount/2;
+        const float camera_length = 328.811; // [mm]
+        const float specimen_distance = 2.78845; // [mm]
+        const float pixel_size = 0.194; // [mm]
+        const float z_start_position = 0; // [mm]
+#endif
         //const float pitch = deltaZ/total_num_projections*num_projections_per_revolution; // [mm] ~ 2.604 mm
         const float detectorHalfWidth = image_width * pixel_size; // [mm] ~ 397 mm
         const float hFOV = atan(detectorHalfWidth, camera_length); // Horizontal field of view (i.e cone beam angle) [rad] ~ 50°
         const float volumeRadius = specimen_distance * cos(hFOV); // [mm] ~ 2 mm
         const float voxelRadius = float(volumeSize.x-1)/2;
+#if 1 // Synthetic
+        const float z_end_position = volumeSize.z*volumeRadius/voxelRadius; // [mm]
+#endif
+        const float deltaZ = (z_end_position-z_start_position) / 2 /* Half pitch: Z[end] is incorrect ?*/; // [mm] ~ 5 mm
 
         mat3 rotation = mat3().rotateZ(2*PI*float(index)/num_projections_per_revolution);
         origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));

@@ -32,6 +32,6 @@ static inline float regularization(const VolumeF& volume, const uint x, const ui
             CtCx += sq(Cx);
         }
     }
-    float QtQx = 0 * Ix + 1 * CtCx;
+    float QtQx = 0 * Ix + 1./cb(3) * CtCx;
     return QtQx;
 }

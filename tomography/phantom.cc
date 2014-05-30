@@ -65,6 +65,7 @@ Phantom::Phantom(uint count) {
 
 void Phantom::volume(const VolumeF& volume) const {
     int3 size = volume.sampleCount;
+    for(float& v: volume.data) v=0;
     for(Ellipsoid e: ellipsoids) { // Rasterizes ellipsoids
         // Computes world axis-aligned bounding box of object's oriented bounding box
         vec3 O = e.center, min = O, max = O; // Initialize min/max to origin
@@ -94,6 +95,7 @@ void Phantom::volume(const VolumeF& volume) const {
             }
         }
     }
+    for(float v: volume.data) assert_(v>=0);
 }
 
 void Phantom::project(const ImageF& target, const Projection& projection) const {

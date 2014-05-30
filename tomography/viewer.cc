@@ -26,13 +26,13 @@ struct Viewer : HBox {
     buffer<VolumeF> volumes;
     uint currentIndex = 0;
     const VolumeF* current() { return &volumes[currentIndex]; }
-    buffer<Projection> projections = evaluateProjections(current()->sampleCount, int2(504,378), 5041);
+    buffer<Projection> projections = evaluateProjections(current()->sampleCount, int2(256,256), 256); //evaluateProjections(current()->sampleCount, int2(504,378), 5041);
     SliceView sliceView {current(), 2};
     VolumeView volumeView {current(), projections, 2};
     Window window;
 
     Viewer(ref<string> paths) :
-        HBox{{ &sliceView /*, &volumeView*/ }},
+        HBox{{ &sliceView , &volumeView }},
         files( apply(paths,[](string path){ return Map(path); } ) ),
         volumes ( apply(paths.size, [&](uint i){ return VolumeF(parseSize(paths[i]), cast<float>((ref<byte>)files[i])); }) ),
         window (this, join(apply(paths,[](string path){ return section(section(path,'/',-2,-1),'.'); })," "_)) {
