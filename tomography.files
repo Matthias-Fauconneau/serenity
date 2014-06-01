@@ -40,8 +40,6 @@ ui/graphics.cc
 ui/graphics.h
 ui/font.cc
 ui/font.h
-ui/gl.cc
-ui/gl.h
 ui/layout.h
 ui/layout.cc
 ui/text.cc
@@ -78,7 +76,7 @@ tomography/viewer.cc
 tomography/netcdf.h
 tomography/project.h
 tomography/project.cc
-tomography/project.glsl
+tomography/project.cl
 tomography/cdf.h
 test.cc
 tomography/SIRT.h

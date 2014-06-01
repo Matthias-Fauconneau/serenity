@@ -11,25 +11,28 @@ void __attribute((constructor(1002))) setup_cl() {
         for(cl_platform_info attribute : { CL_PLATFORM_NAME, CL_PLATFORM_VENDOR, CL_PLATFORM_VERSION, CL_PLATFORM_PROFILE, CL_PLATFORM_EXTENSIONS }) {
             size_t size; clGetPlatformInfo(platform, attribute, 0, 0, &size);
             char info[size]; clGetPlatformInfo(platform, attribute, size, info, 0);
-            log(string(info,size-1));
+            //log(string(info,size-1));
         }
     }
-    cl_platform_id platform = platforms[0]; // {AMD, Intel, Beignet}
-    uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount);
-    cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
-    for(cl_device_id device: ref<cl_device_id>(devices, deviceCount)) {
-        for(cl_device_info attribute : { CL_DEVICE_NAME, CL_DEVICE_VERSION, CL_DRIVER_VERSION}) {
-            size_t size; clGetDeviceInfo(device, attribute, 0, 0, &size);
-            char info[size]; clGetDeviceInfo(device, attribute, size, info, 0);
-            log(string(info,size-1));
+    if(platformCount) {
+        cl_platform_id platform = platforms[0]; // {AMD, Intel, Beignet}
+        uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount);
+        cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
+        for(cl_device_id device: ref<cl_device_id>(devices, deviceCount)) {
+            for(cl_device_info attribute : { CL_DEVICE_NAME, CL_DEVICE_VERSION, CL_DRIVER_VERSION}) {
+                size_t size; clGetDeviceInfo(device, attribute, 0, 0, &size);
+                char info[size]; clGetDeviceInfo(device, attribute, size, info, 0);
+                //log(string(info,size-1));
+            }
         }
+        device = devices[0]; // {GPU, CPU}
+        context = clCreateContext(0, 1, &device, &clNotify, 0, 0);
+        queue = clCreateCommandQueue(context, device, 0, 0);
     }
-    device = devices[1]; // {GPU, CPU}
-    context = clCreateContext(0, 1, &device, &clNotify, 0, 0);
-    queue = clCreateCommandQueue(context, device, 0, 0);
 }
 
 cl_kernel createKernel(string source, string name) {
+    if(!context) return 0;
     int status;
     cl_program program = clCreateProgramWithSource(context, 1, &source.data, &source.size, &status);
     if(clBuildProgram(program, 0, 0, 0, 0, 0)) {

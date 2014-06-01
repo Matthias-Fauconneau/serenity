@@ -2,10 +2,6 @@
 #include "volume.h"
 #include "matrix.h"
 
-#define CL 0
-#define GL 0
-#define AVX2 0
-
 inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); } // FIXME
 
 typedef float float3 __attribute__((ext_vector_type(3)));
@@ -92,7 +88,6 @@ inline buffer<Projection> evaluateProjections(int3 reconstructionSize, int2 imag
     return projections;
 }
 
-#if AVX2
 // SIMD constants for intersections
 #define FLT_MAX __FLT_MAX__
 static const v4sf _2f = float4( 2 );
@@ -135,11 +130,7 @@ static inline bool intersect(const Projection& projection, vec2 pixelPosition, c
     v4sf tmin = hmin( blendv(floatMax, capSideT, tMask) );
     v4sf tmax = hmax( blendv(mfloatMax, capSideT, tMask) );
     start = volume.dataOrigin + origin + tmin * ray;
-    //if(!(int3(start[0], start[1], start[2])>=int3(0) && int3(start[0], start[1], start[2])<int3(volume.size))) return false; // DEBUG
-    //assert_(int3(start[0], start[1], start[2])>=int3(0) && int3(start[0], start[1], start[2])<int3(volume.size), start, volume.size);
     end = max(floatMMMm, tmax); // max, max, max, tmax
-    //v4sf last = volume.dataOrigin + origin + tmax * ray;
-    //assert_(int3(last[0], last[1], last[2])>=int3(0) && int3(last[0], last[1], last[2])<int3(volume.size), last, volume.size);
     return true;
 }
 
@@ -147,7 +138,6 @@ static inline bool intersect(const Projection& projection, vec2 pixelPosition, c
 static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVolume& volume, const float* data) {
     for(v4sf accumulator = _0f;;) { // Uniform ray sampling with trilinear interpolation (24 instructions / step)
         const v4si integerPosition = cvttps2dq(position); // Converts position to integer coordinates
-        //assert_(int3(integerPosition[0], integerPosition[1], integerPosition[2])>=int3(0) && int3(integerPosition[0], integerPosition[1], integerPosition[2])<volume.size, position);
         const v4si index = dot4(integerPosition, volume.stride); // to voxel index
         const v4si indices = index + volume.offset; // to 4 voxel indices
         const v8sf samples = gather2(data, indices); // Gather samples
@@ -158,9 +148,6 @@ static inline float project(v4sf position, v4sf step, v4sf end, const CylinderVo
         if(mask(position > end)) return accumulator[0];
     }
 }
-#endif
 
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const VolumeF& volume, const Projection& projection);
-/// Projects \a volume onto \a image according to \a projection
-void projectGL(const ImageF& image, const struct GLTexture& volume, const Projection& projection);

@@ -70,8 +70,7 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="BIG-REQUESTS"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"BIG-REQUESTS"_+pad(4,r.length));}));
         BigRequests::EXT=r.major; BigRequests::event=r.firstEvent; BigRequests::errorBase=r.firstError;}
-    {BigRequests::BigReqEnableReply r = readReply<BigRequests::BigReqEnableReply>(raw(BigRequests::BigReqEnable()));
-        log(r.maximumRequestLength);}
+    readReply<BigRequests::BigReqEnableReply>(raw(BigRequests::BigReqEnable()));
 
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));

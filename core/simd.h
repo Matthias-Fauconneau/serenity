@@ -105,8 +105,11 @@ inline (v8sf) constexpr float8(float a, float b, float c, float d, float e, floa
 
 typedef long long int v2di __attribute((__vector_size__ (16)));
 
+#if AVX2
 inline (v8sf) dup(v4sf a) { return (v8sf)__builtin_ia32_vbroadcastsi256((v2di)a); }
-//inline (v8sf) dup(v4sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3, 0, 1, 2, 3); }
+#else
+inline (v8sf) dup(v4sf a) { return __builtin_shufflevector(a, a, 0, 1, 2, 3, 0, 1, 2, 3); }
+#endif
 
 const v8si notSignBit8 = (v8si){(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF,(int)0x7FFFFFFF};
 inline (v8sf) abs(v8sf a) { return v8sf(notSignBit8 & v8si(a)); }
@@ -138,7 +141,11 @@ static const v4df _0000f = (v4df){0,0,0,0};
 static const v4si _1111 = (v4si){~0ll,~0ll,~0ll,~0ll};
 
 #if __clang__
+#if AVX2
 inline (v8sf) gather2(const float* base, v4si indices) { return __builtin_ia32_gatherd_pd256(_0000f, (v4df*)base, indices, _1111111, 4); }
+#else
+inline (v8sf) gather2(const float* base, v4si indices) { return (v8sf){base[indices[0]],base[indices[0]+1],base[indices[1]+0],base[indices[1]+1],base[indices[2]+0],base[indices[2]+1],base[indices[3]+0],base[indices[3]+1]}; }
+#endif
 #else
 inline (v8sf) gather2(const float* base, v4si indices) { return __builtin_ia32_gathersiv4sd(_0000f, base, indices, (v4df)_1111111, 4); }
 #endif
