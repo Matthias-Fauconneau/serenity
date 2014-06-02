@@ -18,7 +18,6 @@ core/math.h
 core/matrix.h
 core/memory.h
 core/profile.cc
-core/simd.h
 core/string.cc
 core/string.h
 core/thread.cc
@@ -84,3 +83,4 @@ tomography/SIRT.cc
 tomography/error.h
 tomography/evaluate.cc
 tomography/synthetic.cc
+tomography/sum.cl

@@ -3,14 +3,8 @@
 #include "image.h"
 
 // Colors
-constexpr vec3 black(0, 0, 0);
-constexpr vec3 darkGray(12./16, 12./16, 12./16);
-constexpr vec3 lightGray (15./16, 15./16, 15./16);
-constexpr vec3 white (1, 1, 1);
-constexpr vec3 highlight (14./16, 12./16, 8./16);
-constexpr vec3 blue (1, 0, 0);
-constexpr vec3 green (0, 1, 0);
-constexpr vec3 red (0, 0, 1);
+constexpr vec3 black {0,0,0};
+constexpr vec3 white {1,1,1};
 
 /// Converts lightness, chroma, hue to linear sRGB
 /// sRGB primaries:

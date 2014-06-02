@@ -42,11 +42,6 @@ int2 VolumeView::sizeHint() { return upsampleFactor * projections[projectionInde
 
 void VolumeView::render(const Image& target) {
     ImageF image = ImageF( projections[projectionIndex].imageSize );
-#if GL
-    if(volume->sampleCount <= int3(256) && !gpuVolume) gpuVolume = unique<GLTexture>(*volume);
-    if(gpuVolume) projectGL(image, gpuVolume, projections[projectionIndex]);
-    else
-#endif
     project(image, *volume, projections[projectionIndex]);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
     convert(clip(target, (target.size()-image.size())/2+Rect(image.size())), image, maxValue);

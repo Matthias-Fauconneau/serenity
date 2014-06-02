@@ -1,6 +1,5 @@
 #include "phantom.h"
 #include "time.h" // Random
-#include "simd.h"
 
 Ellipsoid::Ellipsoid(vec3 scale, vec3 angles, vec3 center, float value) :
     forward(mat3().rotateX(angles.x).rotateY(angles.y).rotateZ(angles.z).scale(scale)),

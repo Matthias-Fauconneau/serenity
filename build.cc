@@ -86,7 +86,7 @@ struct Build {
         else if(s.match("SHADER("_)) suffix=".glsl"_;
         else return false;
         String file = s.identifier("_-"_)+suffix;
-        s.skip(")"_);
+        s.until(")"_);
 
         String filesPath = tmp+"/files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
         Folder(filesPath, root(), true);
@@ -94,13 +94,14 @@ struct Build {
         assert(path, "No such file to embed", file);
         Folder subfolder = Folder(section(path,'/',0,-2), folder);
         String object = filesPath+"/"_+file+".o"_;
-        assert_(!files.contains(object), file);
-        int64 lastFileEdit = File(file, subfolder).modifiedTime();
-        if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();
-            needLink = true;
+        if(!files.contains(object)) {
+            int64 lastFileEdit = File(file, subfolder).modifiedTime();
+            if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
+                if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();
+                needLink = true;
+            }
+            files << move(object);
         }
-        files << move(object);
         return true;
     }
 
@@ -158,7 +159,7 @@ struct Build {
                 pids.remove(pid);
             }
             if(startsWith(section(CXX,'/',-2,-1),"g++"_)) args << String("-fabi-version=0"_);
-            {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -o"_);
+            {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -Wno-deprecated-declarations -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }
