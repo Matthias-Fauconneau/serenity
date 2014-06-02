@@ -42,19 +42,15 @@ struct Projection {
         origin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
         ray[0] = rotation * vec3(0,2.f*voxelRadius/float(imageSize.x-1),0);
         ray[1] = rotation * vec3(0,0,2.f*voxelRadius/float(imageSize.x-1));
-        ray[2] = (v4sf)(rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0)) - float4((imageSize.x-1)/2.f)*ray[0] - float4((imageSize.y-1)/2.f)*ray[1];
+        ray[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0) - vec3((imageSize.x-1)/2.f)*ray[0] - vec3((imageSize.y-1)/2.f)*ray[1];
         this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
         this->scale = float(imageSize.x-1)/voxelRadius;
 
-        glOrigin = rotation * vec3(-specimen_distance/volumeRadius*voxelRadius,0, (float(index)/float(projectionCount)*deltaZ)/volumeRadius*voxelRadius - volumeSize.z/2 + imageSize.y*voxelRadius/float(imageSize.x-1));
-        this->glRotation[0] = rotation * vec3(0,2.f*voxelRadius,0);
-        this->glRotation[1] = rotation * vec3(0,0,2.f*voxelRadius);
-        this->glRotation[2] = rotation * vec3(specimen_distance/volumeRadius*voxelRadius,0,0); // - float3((imageSize.x-1)/2.f)*this->rotation[0] - float3((imageSize.y-1)/2.f)*this->rotation[1];
         //this->rotation = mat3().rotateZ( - 2*PI*float(index)/num_projections_per_revolution);
         //this->scale = float(imageSize.x-1)/voxelRadius;
 
     }
-    inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
+    //inline vec3 pixelRay(float x, float y) const { return toVec3(normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2])); }
     //inline v4sf ray(float x, float y) { return  blendps(_1f, normalize3(float4(x) * ray[0] + float4(y) * ray[1] + ray[2]), 0b0111); }
     inline vec2 project(vec3 p) const {
         p = rotation * (p - vec3(origin[0],origin[1],origin[2]));
@@ -63,15 +59,11 @@ struct Projection {
         return vec2(p.y * scale, p.z * scale);
     }
 
-    // GL cast
-    vec3 glOrigin;
-    mat3 glRotation;
+    // cast
+    vec3 origin;
+    mat3 ray;
 
-    // CPU cast
-    v4sf origin;
-    v4sf ray[3];
-
-    // CPU project
+    // project
     mat3 rotation;
     float scale; // FIXME -> mat3
 };
@@ -103,7 +95,7 @@ static const v4sf _0404f = (v4sf){0,4,0,4};
 static inline bool intersect(const Projection& projection, vec2 pixelPosition, const CylinderVolume& volume, v4sf& start, v4sf& ray, v4sf& end) {
     /// Intersects
     const v4sf origin = projection.origin;
-    ray =  blendps(_1f, normalize3(float4(pixelPosition.x) * projection.ray[0] + float4(pixelPosition.y) * projection.ray[1] + projection.ray[2]), 0b0111);
+    ray =  blendps(_1f, normalize3(pixelPosition.x * projection.ray[0] + pixelPosition.y * projection.ray[1] + projection.ray[2]), 0b0111);
 
     // Intersects cap disks
     const v4sf originZ = shuffle4(origin, origin, 2,2,2,2);

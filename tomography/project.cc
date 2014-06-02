@@ -21,7 +21,7 @@ void project(const ImageF& image, const VolumeF& volume, const Projection& proje
         float radius = float(volume.sampleCount.x-1)/2;
         float halfHeight = float(volume.sampleCount.z-1 -1/*FIXME*/ )/2; // Cylinder parameters (N-1 [domain size] - epsilon)
         float3 dataOrigin = {float(volume.sampleCount.x-1)/2, float(volume.sampleCount.y-1)/2, float(volume.sampleCount.z-1 -1 /*FIXME*/)/2};
-        CLProjection clProjection = {projection.glOrigin, (float2){halfHeight,-halfHeight} - projection.glOrigin.z, {projection.glRotation[0],projection.glRotation[1],projection.glRotation[2]}, sq(projection.glOrigin.xy()) - radius*radius, radius*radius, halfHeight, (float3){projection.glOrigin.x,projection.glOrigin.y,projection.glOrigin.z} + dataOrigin};
+        CLProjection clProjection = {projection.origin, (float2){halfHeight,-halfHeight} - projection.origin.z, {projection.ray[0], projection.ray[1], projection.ray[2]}, sq(projection.origin.xy()) - radius*radius, radius*radius, halfHeight, (float3){projection.origin.x,projection.origin.y,projection.origin.z} + dataOrigin};
         clSetKernelArg(kernel, 0, sizeof(CLProjection), &clProjection); //TODO: generic argument wrapper
 
         cl_image_format format = {CL_R, CL_FLOAT};
