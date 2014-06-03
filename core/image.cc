@@ -44,8 +44,8 @@ Image decodeImage(const ref<byte>& file) {
 
 void convert(const Image& target, const ImageF& source, float max) {
     const int margin=0; // Regularization
-    if(!max) for(uint y: range(margin, source.height-margin)) for(uint x: range(margin,source.width-margin)) if(isNumber(source(x,y))) max=::max(max, source(x,y));
-    for(uint y: range(margin,source.height-margin)) for(uint x: range(margin,source.width-margin)) {
+    if(!max) for(uint y: range(margin, source.size.y-margin)) for(uint x: range(margin,source.size.x-margin)) if(isNumber(source(x,y))) max=::max(max, source(x,y));
+    for(uint y: range(margin,source.size.y-margin)) for(uint x: range(margin,source.size.x-margin)) {
         uint linear12 = 0xFFF*clip(0.f, source(x,y)/max, 1.f);
         extern uint8 sRGB_forward[0x1000];
         assert_(linear12 < 0x1000);
@@ -55,15 +55,13 @@ void convert(const Image& target, const ImageF& source, float max) {
 }
 
 ImageF downsample(const ImageF& source) {
-    int w=source.width, h=source.height;
-    ImageF target(w/2,h/2);
-    for(uint y: range(target.height)) for(uint x: range(target.width)) target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
+    ImageF target(source.size/2);
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
     return target;
 }
 
 ImageF upsample(const ImageF& source) {
-    int w=source.width, h=source.height;
-    ImageF target(w*2,h*2);
-    for(uint y: range(h)) for(uint x: range(w)) target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
+    ImageF target(source.size*2);
+    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
     return target;
 }

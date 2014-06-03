@@ -75,30 +75,20 @@ static const Image& name ## Icon() { \
     return icon; \
 }
 
-template<Type T> struct ImageT {
-    ImageT(){}
-    ImageT(buffer<T>&& data, uint width, uint height) : data(move(data)), width(width), height(height) { assert_(this->data.size==width*height); }
-    ImageT(uint width, uint height) : width(width), height(height) { assert(width); assert(height); data=::buffer<T>(height*width); }
-    ImageT(int2 size) : ImageT(size.x, size.y) {}
-    //ImageT(int2 size, const ref<float>& data) : width(size.x), height(size.y), data(data) { assert_(data.size == this->size()); }
-    int2 size() const { return int2(width,height); }
-    inline T& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*width+x]; }
-    buffer<T> data;
-    uint width, height;
+struct ImageF {
+    ImageF(){}
+    ImageF(buffer<float>&& data, int2 size) : data(move(data)), size(size) { assert_(this->data.size==size_t(size.x*size.y)); }
+    ImageF(int2 size) : size(size) { assert(size); data=::buffer<float>(size.x*size.y); }
+    inline float& operator()(uint x, uint y) const {assert(x<size.x && y<size.y); return data[y*size.x+x]; }
+    buffer<float> data;
+    int2 size;
 };
-
-/// Returns a weak reference to \a image (unsafe if referenced image is freed)
-generic inline ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeReference(o.data),o.width,o.height); }
-
-generic inline ImageT<T> operator*(T scale, ImageT<T>&& image) { for(T& v: image.data) v *= scale; return move(image); }
-
-typedef ImageT<float> ImageF;
+inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.data),o.size); }
+//inline ImageF operator*(float scale, ImageF&& image) { for(float& v: image.data) v *= scale; return move(image); }
 
 /// Converts a linear float image to sRGB
 void convert(const Image& target, const ImageF& source, float max=0);
-
 /// Downsamples by adding samples
 ImageF downsample(const ImageF& source);
-
 /// Upsamples an image by duplicating samples
 ImageF upsample(const ImageF& source);

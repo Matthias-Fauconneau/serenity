@@ -1,138 +1,50 @@
 #include "approximate.h"
-#include "update.h"
+#include "sum.h"
 
-/// Computes residual r = p = At ( b - A x )
-void Approximate::initialize(const ref<Projection>& projections, const ref<ImageF>& images) {
-    if(filter) for(Filter& filter: filters) filter = 2*images.first().width;
-    // Filters source images
-    if(filter) for(const ImageF& image: images) {
-        parallel(image.height, [&image, this](uint id, uint y) {
-            mref<float> imageRow = image.data.slice(y*image.width, image.width);
-            ref<float> filteredRow = filters[id].filter(imageRow);
-            for(uint x: range(image.width))  imageRow[x] = filteredRow[x];
-        });
-    }
-    float* pData = p;
-    float* rData = r;
-    float residualSum[coreCount] = {};
-    // Approximates trilinear backprojection with bilinear sample (reverse splat)
-    const vec3 center = vec3(p.sampleCount-int3(1))/2.f;
-    const float radiusSq = sq(center.x);
-    const vec2 imageCenter = vec2(images.first().size()-int2(1))/2.f;
-    parallel(1, p.sampleCount.z-1, [&projections, &images, center, radiusSq, imageCenter, pData, rData, &residualSum, this](uint id, uint z) {
-        float accumulator = 0;
-        uint iz = z * p.sampleCount.y * p.sampleCount.x;
-        for(uint y: range(1, p.sampleCount.y-1)) {
-            uint izy = iz + y * p.sampleCount.x;
-            for(uint x: range(1, p.sampleCount.x-1)) {
-                const vec3 point = vec3(x,y,z) - center;
-                if(sq(point.xy()) < radiusSq) {
-                    float Atb = 0;
-                    for(uint projectionIndex: range(projections.size)) {
-                        const Projection& projection = projections[projectionIndex];
-                        const ImageF& P = images[projectionIndex];
-                        vec2 xy = projection.project(point) + imageCenter;
-                        uint i = xy.x, j = xy.y;
-                        float u = fract(xy.x), v = fract(xy.y);
-                        assert(i<P.width && j<P.height, i,j, u,v);
-                        float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
-                                v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
-                        Atb += s;
-                    }
-                    // No projection and no regularization (x=0)
-                    pData[izy+x] = Atb;
-                    rData[izy+x] = Atb;
-                    accumulator += sq(Atb);
-                }
-            }
-        }
-        residualSum[id] += accumulator;
-    });
-    residualEnergy = sum(residualSum);
+KERNEL(approximate, backproject) //const mat4x3* projections, __read_only image2d_array_t images, sampler_t imageSampler, image3d_t p, image3d_t r) {
+
+/// Backprojects \a images to \a volume
+void Approximate::backproject(const VolumeF& volume) {
+    cl_kernel kernel = ::backproject();
+    static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0); // NVidia does not implement OpenCL 1.2 (2D image arrays)
+    setKernelArgs(kernel, projectionArray.data.pointer, images, sampler, volume.data.pointer);
+    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)volume.size.x, (size_t)volume.size.y, (size_t)volume.size.z}, 0, 0, 0, 0) );
 }
 
+
+Approximate::Approximate(int3 reconstructionSize, const ref<Projection>& projections, const ImageArray& images, bool filter, bool regularize, string label)
+    : Reconstruction(reconstructionSize, images.size, label), p(reconstructionSize), r(reconstructionSize), AtAp(reconstructionSize), filter(filter), regularize(regularize), projections(projections), projectionArray(projections, x.size, images.size.xy()), images(images) {
+    /// Computes residual r=p=Atb (assumes x=0)
+    backproject(p);
+    clEnqueueCopyImage(queue, p.data.pointer, r.data.pointer, (size_t[]){0,0,0}, (size_t[]){0,0,0},  (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0,0,0);
+    // Executes sum kernel
+    residualEnergy = SSQ(r);
+}
+
+KERNEL(approximate, update)
+
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
-bool Approximate::step(const ref<Projection>& projections, const ref<ImageF>& images) {
+bool Approximate::step() {
     totalTime.start();
     Time time; time.start();
 
     // Projects p
-    const CylinderVolume volume (p);
     for(uint projectionIndex: range(projections.size)) {
-        const Projection& projection = projections[projectionIndex];
-        const ImageF& image = images[projectionIndex];
-        parallel(image.height, [&image, &projection, &volume, this](uint id, uint y) {
-            mref<float> output = image.data.slice(y*image.width, image.width);
-            mref<float> input = filter ? filters[id] : output;
-            for(uint x: range(image.width)) {
-                v4sf start, step, end;
-                input[x] = intersect(projection, vec2(x, y), volume, start, step, end) ? project(start, step, end, volume, p) : 0;
-            }
-            if(filter) {
-                ref<float> filtered = filters[id].filter(input);
-                for(uint x: range(image.width)) output[x] = filtered[x];
-            }
-        });
+        project(images.data.pointer, projectionIndex*images.size.y*images.size.x, images.size.xy(), p, projections[projectionIndex]);
+        //TODO: filter
     }
-
-    // Merges and clears AtAp and computes |p·Atp|
-    float* AtApData = AtAp;
-    float* pData = p;
-    float pAtApSum[coreCount] = {};
-    // Approximates trilinear backprojection with bilinear sample (reverse splat)
-    const vec3 center = vec3(p.sampleCount-int3(1))/2.f;
-    const float radiusSq = sq(center.x);
-    const vec2 imageCenter = vec2(images.first().size()-int2(1))/2.f;
-    parallel(1, p.sampleCount.z-1, [&projections, &images, center, radiusSq, imageCenter, pData, AtApData, &pAtApSum, this](uint id, uint z) {
-        float accumulator = 0;
-        uint iz = z * p.sampleCount.y * p.sampleCount.x;
-        for(uint y: range(1, p.sampleCount.y-1)) {
-            uint izy = iz + y * p.sampleCount.x;
-            for(uint x: range(1, p.sampleCount.x-1)) {
-                uint i = izy+x;
-                const vec3 point = vec3(x,y,z) - center;
-                if(sq(point.xy()) < radiusSq) {
-                    float AtAp = regularize ? regularization(p, x,y,z, i) : 0;
-                    for(uint projectionIndex: range(projections.size)) {
-                        const Projection& projection = projections[projectionIndex];
-                        const ImageF& P = images[projectionIndex];
-                        vec2 xy = projection.project(point) + imageCenter;
-                        uint i = xy.x, j = xy.y;
-                        float u = fract(xy.x), v = fract(xy.y);
-                        assert(i<P.width && j<P.height, i,j, u,v);
-                        float s = (1-v) * ((1-u) * P(i,j  ) + u * P(i+1,j  )) +
-                                v  * ((1-u) * P(i,j+1) + u * P(i+1,j+1)) ;
-                        AtAp += s;
-                    }
-                    AtApData[i] = AtAp;
-                    accumulator += pData[i] * AtAp;
-                }
-            }
-        }
-        pAtApSum[id] += accumulator;
-    });
-    float pAtAp = sum(pAtApSum);
-
-    // Updates x += α p, r -= α AtAp, clears AtAp, computes |r|²
+    backproject(AtAp);
+    float pAtAp = dot(p, AtAp); // Reduces to |p·Atp|
     float alpha = residualEnergy / pAtAp;
-    float* xData = x;
-    float* rData = r;
-    float newResidualSum[coreCount] = {};
-    chunk_parallel(p.size(), [alpha, pData, xData, AtApData, rData, &newResidualSum](uint id, uint offset, uint size) {
-        float accumulator = 0;
-        for(uint i: range(offset,offset+size)) {
-            xData[i] += alpha * pData[i];
-            rData[i] -= alpha * AtApData[i];
-            AtApData[i] = 0;
-            accumulator += sq(rData[i]);
-        }
-        newResidualSum[id] += accumulator;
-    });
-    float newResidual = sum(newResidualSum);
+    cl_kernel kernel = update();
+    setKernelArgs(kernel, x.data.pointer, 1, x.data.pointer, alpha, p.data.pointer);       // Estimate: x = x + α p
+    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0) );
+    setKernelArgs(kernel, r.data.pointer, 1,  r.data.pointer, -alpha, AtAp.data.pointer); // Residual: r = r - α AtAp
+    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0) );
+    float newResidual = dot(r,r); // Reduces to |r|²
     float beta = newResidual / residualEnergy;
-
-    // Computes next search direction: p[k+1] = r[k+1] + β p[k]
-    chunk_parallel(p.size(), [&](uint, uint offset, uint size) { for(uint i: range(offset,offset+size)) pData[i] = rData[i] + beta * pData[i]; });
+    setKernelArgs(kernel, p.data.pointer, 1, r.data.pointer, beta, p.data.pointer); // Search direction: p = r + β p
+    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0) );
 
     time.stop();
     totalTime.stop();

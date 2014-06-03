@@ -1,6 +1,7 @@
 #pragma once
 #include <CL/opencl.h> //OpenCL
 #include "string.h"
+#include "vector.h"
 
 inline void clNotify(const char* info, const void *, size_t, void *) { error(info); }
 
@@ -14,5 +15,10 @@ cl_kernel createKernel(string source, string name);
 
 #define KERNEL(file, name) static cl_kernel name() { \
     extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
-    return createKernel(ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), #name); \
+    static cl_kernel kernel = createKernel(ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), #name); \
+    return kernel; \
 }
+
+inline void _setKernelArgs(cl_kernel, int) {}
+template<Type T, Type... Args> inline void _setKernelArgs(cl_kernel k, int i, const T& t, const Args&... args) { clSetKernelArg(k , i, sizeof(t), &t); _setKernelArgs(k, i+1, args...); }
+template<Type... Args> inline void setKernelArgs(cl_kernel k, const Args&... args){ _setKernelArgs(k, 0, args...); }

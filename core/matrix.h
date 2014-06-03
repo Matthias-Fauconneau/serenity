@@ -31,6 +31,7 @@ struct mat3 {
     float& operator()(int i, int j) { return M(i,j); }
     vec3& operator[](int j) { return (vec3&)data[j*3]; }
     const vec3& operator[](int j) const { return (vec3&)data[j*3]; }
+    const vec3 row(int i) const { return vec3(M(i,0),M(i,1),M(i,2)); }
 
     vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
     vec3 operator*(vec3 v) const {vec3 r; for(int i=0;i<3;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2); return r; }

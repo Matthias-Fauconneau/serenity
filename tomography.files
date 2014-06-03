@@ -17,6 +17,7 @@ core/map.h
 core/math.h
 core/matrix.h
 core/memory.h
+core/opencl.h
 core/profile.cc
 core/string.cc
 core/string.h
@@ -80,7 +81,8 @@ tomography/cdf.h
 test.cc
 tomography/SIRT.h
 tomography/SIRT.cc
-tomography/error.h
+tomography/sum.h
 tomography/evaluate.cc
 tomography/synthetic.cc
 tomography/sum.cl
+tomography/approximate.cl
