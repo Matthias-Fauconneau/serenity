@@ -31,7 +31,7 @@ struct Approximate : Reconstruction  {
     ProjectionArray projectionArray;
     const ImageArray& images;
 
-    Approximate(int3 reconstructionSize, const ref<Projection>& projections, const ImageArray& images, bool filter = false, bool regularize = false, string label=""_);
+    Approximate(int3 volumeSize, const ref<Projection>& projections, const ImageArray& images, bool filter = false, bool regularize = false, string label=""_);
     bool step() override;
 
     void backproject(const VolumeF& volume);

@@ -1,5 +1,7 @@
+constant size_t blockSize = 128; // threadCount
+
 // Sum of squares
-__kernel void SSQ(__global float*  A, __global float* blockSums, size_t count, __local volatile float* sdata) {
+kernel void SSQ(global float*  A, global float* blockSums, size_t count, local volatile float* sdata) {
     // Performs first level block-parallel sequential reduction from global memory to scratch memory
     size_t tid = get_local_id(0);
     size_t i = get_group_id(0)*get_local_size(0) + get_local_id(0);
@@ -23,7 +25,7 @@ __kernel void SSQ(__global float*  A, __global float* blockSums, size_t count, _
 }
 
 // Sum of square differences
-__kernel void SSE(__global float*  A, __global float*  B, __global float* output, size_t count, __local volatile float* sdata) {
+kernel void SSE(global float*  A, global float*  B, global float* blockSums, size_t count, local volatile float* sdata) {
     // Performs first level block-parallel sequential reduction from global memory to scratch memory
     size_t tid = get_local_id(0);
     size_t i = get_group_id(0)*get_local_size(0) + get_local_id(0);
@@ -47,7 +49,7 @@ __kernel void SSE(__global float*  A, __global float*  B, __global float* output
 }
 
 // Sum of products
-__kernel void dot(__global float*  A, __global float*  B, __global float* output, size_t count, __local volatile float* sdata) {
+kernel void dotProduct(global float*  A, global float*  B, global float* blockSums, size_t count, local volatile float* sdata) {
     // Performs first level block-parallel sequential reduction from global memory to scratch memory
     size_t tid = get_local_id(0);
     size_t i = get_group_id(0)*get_local_size(0) + get_local_id(0);

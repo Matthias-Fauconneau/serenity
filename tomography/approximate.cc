@@ -1,19 +1,21 @@
 #include "approximate.h"
 #include "sum.h"
 
-KERNEL(approximate, backproject) //const mat4x3* projections, __read_only image2d_array_t images, sampler_t imageSampler, image3d_t p, image3d_t r) {
+KERNEL(approximate, backproject) // const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const mat4x3* projections, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
 
 /// Backprojects \a images to \a volume
 void Approximate::backproject(const VolumeF& volume) {
-    cl_kernel kernel = ::backproject();
+    const float3 center = float3(p.size-int3(1))/2.f;
+    const float radiusSq = sq(center.x);
+    const float2 imageCenter = float2(images.size.xy()-int2(1))/2.f;
     static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0); // NVidia does not implement OpenCL 1.2 (2D image arrays)
-    setKernelArgs(kernel, projectionArray.data.pointer, images, sampler, volume.data.pointer);
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)volume.size.x, (size_t)volume.size.y, (size_t)volume.size.z}, 0, 0, 0, 0) );
+    setKernelArgs(backprojectKernel, float4(center,0), radiusSq, imageCenter, size_t(projectionArray.size), projectionArray.data.pointer, images.data.pointer, sampler, volume.data.pointer);
+    clCheck( clEnqueueNDRangeKernel(queue, backprojectKernel, 3, 0, (size_t[]){(size_t)volume.size.x, (size_t)volume.size.y, (size_t)volume.size.z}, 0, 0, 0, 0), "backproject");
 }
 
 
-Approximate::Approximate(int3 reconstructionSize, const ref<Projection>& projections, const ImageArray& images, bool filter, bool regularize, string label)
-    : Reconstruction(reconstructionSize, images.size, label), p(reconstructionSize), r(reconstructionSize), AtAp(reconstructionSize), filter(filter), regularize(regularize), projections(projections), projectionArray(projections, x.size, images.size.xy()), images(images) {
+Approximate::Approximate(int3 volumeSize, const ref<Projection>& projections, const ImageArray& images, bool filter, bool regularize, string label)
+    : Reconstruction(volumeSize, images.size, label+"-approximate"_+(filter?"-filter"_:""_)+(regularize?"-regularize"_:""_)), p(volumeSize), r(volumeSize), AtAp(volumeSize), filter(filter), regularize(regularize), projections(projections), projectionArray(projections, x.size, images.size.xy()), images(images) {
     /// Computes residual r=p=Atb (assumes x=0)
     backproject(p);
     clEnqueueCopyImage(queue, p.data.pointer, r.data.pointer, (size_t[]){0,0,0}, (size_t[]){0,0,0},  (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0,0,0);
@@ -34,17 +36,16 @@ bool Approximate::step() {
         //TODO: filter
     }
     backproject(AtAp);
-    float pAtAp = dot(p, AtAp); // Reduces to |p·Atp|
+    float pAtAp = dotProduct(p, AtAp); // Reduces to |p·Atp|
     float alpha = residualEnergy / pAtAp;
-    cl_kernel kernel = update();
-    setKernelArgs(kernel, x.data.pointer, 1, x.data.pointer, alpha, p.data.pointer);       // Estimate: x = x + α p
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0) );
-    setKernelArgs(kernel, r.data.pointer, 1,  r.data.pointer, -alpha, AtAp.data.pointer); // Residual: r = r - α AtAp
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0) );
-    float newResidual = dot(r,r); // Reduces to |r|²
+    setKernelArgs(updateKernel, x.data.pointer, 1, x.data.pointer, alpha, p.data.pointer);
+    clCheck( clEnqueueNDRangeKernel(queue, updateKernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0),  "Estimate: x = x + α p");
+    setKernelArgs(updateKernel, r.data.pointer, 1,  r.data.pointer, -alpha, AtAp.data.pointer);
+    clCheck( clEnqueueNDRangeKernel(queue, updateKernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0), "Residual: r = r - α AtAp");
+    float newResidual = dotProduct(r,r); // Reduces to |r|²
     float beta = newResidual / residualEnergy;
-    setKernelArgs(kernel, p.data.pointer, 1, r.data.pointer, beta, p.data.pointer); // Search direction: p = r + β p
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0) );
+    setKernelArgs(updateKernel, p.data.pointer, 1, r.data.pointer, beta, p.data.pointer);
+    clCheck( clEnqueueNDRangeKernel(queue, updateKernel, 3, 0, (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0, 0, 0, 0), "Search direction: p = r + β p");
 
     time.stop();
     totalTime.stop();

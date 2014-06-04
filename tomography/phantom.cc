@@ -1,5 +1,7 @@
 #include "phantom.h"
 #include "time.h" // Random
+#include "project.h"
+#include "image.h"
 
 Ellipsoid::Ellipsoid(vec3 scale, vec3 angles, vec3 center, float value) :
     forward(mat3().rotateX(angles.x).rotateY(angles.y).rotateZ(angles.z).scale(scale)),
@@ -62,9 +64,9 @@ Phantom::Phantom(uint count) {
     }
 }
 
-void Phantom::volume(const VolumeF& volume) const {
-    int3 size = volume.sampleCount;
-    for(float& v: volume.data) v=0;
+buffer<float> Phantom::volume(int3 size) const {
+    buffer<float> data (size.x*size.y*size.z);
+    for(float& v: data) v=0;
     for(Ellipsoid e: ellipsoids) { // Rasterizes ellipsoids
         // Computes world axis-aligned bounding box of object's oriented bounding box
         vec3 O = e.center, min = O, max = O; // Initialize min/max to origin
@@ -74,31 +76,45 @@ void Phantom::volume(const VolumeF& volume) const {
         }
         min = ::max(vec3(size-int3(1))*(min+vec3(1))/2.f, vec3(0)), max = ::min(ceil(vec3(size-int3(1))*(max+vec3(1))/2.f), vec3(size));
 
-        const v4sf origin = e.inverse * (vec3(-1) - e.center);
-        const v4sf vx = e.inverse[0] / vec3(float(size.x-1)/2);
-        const v4sf vy = e.inverse[1] / vec3(float(size.y-1)/2);
-        const v4sf vz = e.inverse[2] / vec3(float(size.z-1)/2);
+        const vec3 origin = e.inverse * (vec3(-1) - e.center);
+        const vec3 vx = e.inverse[0] / vec3(float(size.x-1)/2);
+        const vec3 vy = e.inverse[1] / vec3(float(size.y-1)/2);
+        const vec3 vz = e.inverse[2] / vec3(float(size.z-1)/2);
 
-        float* volumeData = (float*)volume.data.data;
+        float* volumeData = (float*)data.data;
 
         for(int z: range(min.z, max.z)) {
-            const v4sf pz = origin + float4(z) * vz;
-            float* volumeZ = volumeData + z * volume.sampleCount.y * volume.sampleCount.x;
+            const vec3 pz = origin + float(z) * vz;
+            float* volumeZ = volumeData + z * size.y * size.x;
             for(int y: range(min.y, max.y)) {
-                const v4sf pzy = pz + float4(y) * vy;
-                float* volumeZY = volumeZ + y * volume.sampleCount.x;
+                const vec3 pzy = pz + float(y) * vy;
+                float* volumeZY = volumeZ + y * size.x;
                 for(int x: range(min.x, max.x)) {
-                    const v4sf pzyx = pzy + float4(x) * vx;
-                    if(mask(dot4(pzyx, pzyx) < _1f)) volumeZY[x] += e.value;
+                    const vec3 pzyx = pzy + float(x) * vx;
+                    if(sq(pzyx) < 1) volumeZY[x] += e.value;
                 }
             }
         }
     }
-    for(float v: volume.data) assert_(v>=0);
+    for(float v: data) assert_(v>=0);
+    return data;
 }
 
 void Phantom::project(const ImageF& target, const Projection& projection) const {
-    assert_(target.size() == projection.imageSize);
+    // Cylinder parameters
+    //const float radius = float(volume.size.x-1)/2;
+    //const float halfHeight = float(volume.size.z-1 -1 )/2;  //(N-1 [domain size] - epsilon)
+    //float3 center = {radius, radius, halfHeight};
+    // Projection parameters
+    mat3 rotation = mat3().rotateZ(projection.angle);
+    float3 offset = rotation * projection.offset;
+    float extent = 1/sqrt(1-1/sq(projection.offset.x)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
+    int2 size = target.size;
+    float pixelSize = extent/float(size.x-1); // Pixel size on origin plane
+    float3 rayX = rotation * float3(0,pixelSize,0);
+    float3 rayY = rotation * float3(0,0,pixelSize);
+    float3 ray1 = rotation * float3(-projection.offset.x,-pixelSize*float(size.x-1)/2,-pixelSize*float(size.y-1)/2);
+
     //target.data.clear();
     for(Ellipsoid e: ellipsoids) {
         // Computes projection axis-aligned bounding box of object's oriented bounding box
@@ -108,15 +124,17 @@ void Phantom::project(const ImageF& target, const Projection& projection) const 
             min=::min(min, corner), max=::max(max, corner);
         }
         min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));*/
-        int2 min = 0, max = target.size();
+        int2 min = 0, max = target.size;
 
-        const v4sf O = e.inverse * (toVec3(projection.origin)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
+        //const vec3 O = e.inverse * (toVec3(projection.offset)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
+        const vec3 O = e.inverse * (offset - e.center);
+        const float c = dot(O, O) - 1;
         for(int y: range(min.y, max.y)) {
             for(int x: range(min.x, max.x)) {
-                const v4sf D = e.inverse * (projection.pixelRay(x, y)/(vec3(projection.volumeSize-int3(1))/2.f));
-                const float a = dot4(D, D)[0];
-                const float b = dot4(D, O)[0];
-                const float c = dot4(O, O)[0] - 1;
+                //const vec3 D = e.inverse * (projection.pixelRay(x, y)/(vec3(projection.volumeSize-int3(1))/2.f));
+                const vec3 D = e.inverse * (float(x) * rayX + float(y) * rayY + ray1);
+                const float a = dot(D, D);
+                const float b = dot(D, O);
                 float d = b*b - a*c;
                 if(d<=0) continue;
                 float t1 = - b - sqrt(d);

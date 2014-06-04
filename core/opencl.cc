@@ -42,11 +42,10 @@ cl_kernel createKernel(string source, string name) {
         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, buildLogSize, (void*)buildLog, 0);
         array<string> lines = split(string(buildLog,buildLogSize-1),'\n');
         log(join(lines.slice(0,min(16ul,lines.size)),"\n"_));
-        error(__FILE__);
+        error(name);
     }
-    assert_(name.last()==0);
-    cl_kernel kernel = clCreateKernel(program, name.data, &status);
-    clCheck(status);
+    cl_kernel kernel = clCreateKernel(program, strz(name), &status);
+    clCheck(status, "clCreateKernel");
     assert_(kernel);
     return kernel;
 }

@@ -4,15 +4,15 @@
 #include "project.h"
 #include "layout.h"
 #include "window.h"
-#include "error.h"
+#include "sum.h"
 
 struct Viewer : HBox {
     buffer<VolumeF> volumes;
     uint currentIndex = 0;
     const VolumeF* current() { return &volumes[currentIndex]; }
-    buffer<Projection> projections = evaluateProjections(current()->sampleCount, int2(256,256), 256); //evaluateProjections(current()->sampleCount, int2(504,378), 5041);
+    buffer<Projection> projections = evaluateProjections(current()->size, int2(256,256), 256, 1, true); //evaluateProjections(current()->sampleCount, int2(504,378), 5041, 1, false);
     SliceView sliceView {current(), 2};
-    VolumeView volumeView {current(), projections, 2};
+    VolumeView volumeView {current(), projections,  int2(256,256), 2};
     Window window;
 
     Viewer(ref<string> paths) :

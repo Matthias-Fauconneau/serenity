@@ -1,7 +1,5 @@
 #pragma once
 #include "matrix.h"
-#include "volume.h"
-#include "project.h"
 
 struct Ellipsoid {
     mat3 forward;
@@ -16,8 +14,8 @@ struct Ellipsoid {
 
 struct Phantom {
     Phantom(uint count=0);
-    void volume(const VolumeF& volume) const;
-    void project(const ImageF& image, const Projection& projection) const;
+    buffer<float> volume(int3 size) const;
+    void project(const struct ImageF& image, const struct Projection& projection) const;
 
     array<Ellipsoid> ellipsoids;
 };

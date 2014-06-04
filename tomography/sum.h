@@ -2,60 +2,55 @@
 #include "volume.h"
 #include "project.h"
 
-KERNEL(sum, SSQ)
-// __kernel void SSQ(__global float* A, __global float* output, size_t count, __local volatile float* scratch)
-
+KERNEL(sum, SSQ) // __global float*  A, __global float* blockSums, size_t count, __local volatile float* sdata
 inline float SSQ(const VolumeF& A) {
-    cl_kernel kernel = SSQ();
+    cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_ONLY, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
+    clEnqueueCopyImageToBuffer(queue, A.data.pointer, buffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0); // FIXME
+
     size_t elementCount = A.size.z*A.size.y*A.size.x;
-    size_t threadCount = 128; //
+    size_t threadCount = 128; // blockSize
     assert_(elementCount % threadCount == 0); //FIXME
     size_t blockCount = elementCount / threadCount;
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, blockCount * sizeof(float), 0, 0);
-    setKernelArgs(kernel, A.data.pointer, output, elementCount);
+    setKernelArgs(SSQKernel, buffer/*A.data.pointer*/, output, elementCount);
+    clSetKernelArg(SSQKernel, 3, threadCount*sizeof(float), 0);
     size_t localSize = threadCount;
     size_t globalSize = blockCount * localSize;
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 1, 0, &globalSize, &localSize, 0, 0, 0) );
-    float buffer[blockCount];
-    clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), buffer, 0,0,0);
+    clCheck( clEnqueueNDRangeKernel(queue, SSQKernel, 1, 0, &globalSize, &localSize, 0, 0, 0), "SSQ");
+    float blockSums[blockCount];
+    clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), blockSums, 0,0,0);
     clReleaseMemObject(output);
-    return sum(ref<float>(buffer,blockCount));
+    return sum(ref<float>(blockSums,blockCount));
 }
 
-KERNEL(sum, SSE)
-// __kernel void SSE(__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch)
-
+KERNEL(sum, SSE) //__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch
 inline float SSE(const VolumeF& A, const VolumeF& B) {
-    cl_kernel kernel = SSE();
     size_t elementCount = A.size.z*A.size.y*A.size.x;
     size_t threadCount = 128; //
     assert_(elementCount % threadCount == 0); //FIXME
     size_t blockCount = elementCount / threadCount;
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, blockCount * sizeof(float), 0, 0);
-    setKernelArgs(kernel, A.data.pointer, B.data.pointer, output, elementCount);
+    setKernelArgs(SSEKernel, A.data.pointer, B.data.pointer, output, elementCount);
     size_t localSize = threadCount;
     size_t globalSize = blockCount * localSize;
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 1, 0, &globalSize, &localSize, 0, 0, 0) );
+    clCheck( clEnqueueNDRangeKernel(queue, SSEKernel, 1, 0, &globalSize, &localSize, 0, 0, 0), "SSE");
     float buffer[blockCount];
     clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), buffer, 0,0,0);
     clReleaseMemObject(output);
     return sum(ref<float>(buffer,blockCount));
 }
 
-KERNEL(sum, dot)
-// __kernel void dot(__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch)
-
-inline float dot(const VolumeF& A, const VolumeF& B) {
-    cl_kernel kernel = dot();
+KERNEL(sum, dotProduct) //__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch
+inline float dotProduct(const VolumeF& A, const VolumeF& B) {
     size_t elementCount = A.size.z*A.size.y*A.size.x;
     size_t threadCount = 128; //
     assert_(elementCount % threadCount == 0); //FIXME
     size_t blockCount = elementCount / threadCount;
-    cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, blockCount * sizeof(float), 0, 0);
-    setKernelArgs(kernel, A.data.pointer, B.data.pointer, output, elementCount);
+    cl_mem output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, blockCount * sizeof(float), 0, 0);
+    setKernelArgs(dotProductKernel, A.data.pointer, B.data.pointer, output, elementCount);
     size_t localSize = threadCount;
     size_t globalSize = blockCount * localSize;
-    clCheck( clEnqueueNDRangeKernel(queue, kernel, 1, 0, &globalSize, &localSize, 0, 0, 0) );
+    clCheck( clEnqueueNDRangeKernel(queue, dotProductKernel, 1, 0, &globalSize, &localSize, 0, 0, 0), "dotProduct");
     float buffer[blockCount];
     clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), buffer, 0,0,0);
     clReleaseMemObject(output);

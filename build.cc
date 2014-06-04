@@ -163,6 +163,7 @@ struct Build {
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }
+        files << tmp+"/"_+join(flags,"-"_)+"/"_+target+".o"_;
     }
 
     void fail() { log("Build failed"_); exit(-1); exit_thread(-1); }
@@ -189,7 +190,7 @@ struct Build {
         if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
-            args << apply(modules, [this](const unique<Node>& module){ return tmp+"/"_+join(flags,"-"_)+"/"_+module->name+".o"_; });
+            //args << apply(modules, [this](const unique<Node>& module){ return tmp+"/"_+join(flags,"-"_)+"/"_+module->name+".o"_; });
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking

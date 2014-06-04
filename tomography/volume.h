@@ -5,7 +5,7 @@
 struct VolumeF {
     VolumeF() {}
     VolumeF(int3 size, const ref<float>& data={}) : size(size) {
-        assert_(data.size == (size_t)size.x*size.y*size.z);
+        assert_(!data || data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
         cl_image_format format = {CL_R, CL_FLOAT};
         this->data.pointer = clCreateImage3D(context, CL_MEM_READ_WRITE | (data?CL_MEM_COPY_HOST_PTR:0), &format, size.x, size.y, size.z, 0,0, (float*)data.data, 0);
         assert_(this->data.pointer);
@@ -22,7 +22,7 @@ struct VolumeF {
 inline ImageF slice(const VolumeF& volume, size_t z) {
     int3 size = volume.size;
     ImageF image(size.xy());
-    clCheck( clEnqueueReadImage(queue, volume.data.pointer, true, (size_t[]){0,0,z}, (size_t[]){size_t(size.x),size_t(size.y),1}, 0,0, (float*)image.data.data, 0,0,0) );
+    clCheck( clEnqueueReadImage(queue, volume.data.pointer, true, (size_t[]){0,0,z}, (size_t[]){size_t(size.x),size_t(size.y),1}, 0,0, (float*)image.data.data, 0,0,0), "slice");
     return image;
 }
 

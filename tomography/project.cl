@@ -1,5 +1,5 @@
-__kernel void project(float3 origin, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, float3 rayX, float3 rayY, float3 ray1, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/
-                                __read_only image3d_t volume, sampler_t volumeSampler, const uint offset, const uint width, __global float* image) {
+kernel void project(float3 origin, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, float3 rayX, float3 rayY, float3 ray1, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/,
+                                read_only image3d_t volume, sampler_t volumeSampler, const uint offset, const uint width, global float* image) {
     size_t x = get_global_id(0);
     size_t y = get_global_id(1);
     const float3 ray = normalize(x * rayX + y * rayY + ray1);

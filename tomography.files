@@ -17,6 +17,7 @@ core/map.h
 core/math.h
 core/matrix.h
 core/memory.h
+core/opencl.cc
 core/opencl.h
 core/profile.cc
 core/string.cc

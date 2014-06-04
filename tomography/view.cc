@@ -1,5 +1,7 @@
 #include "view.h"
 
+uint SliceView::staticIndex;
+
 bool SliceView::mouseEvent(const Image& target, int2 cursor, int2 size, Event, Button button) {
     if(button) { index = clip(0, int(cursor.x*(volume->size.z-1)/(size.x-1)), int(volume->size.z)); render(target); return true; }
     return false;
@@ -13,6 +15,7 @@ void SliceView::render(const Image& target) {
     convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, 0);
 }
 
+uint VolumeView::staticIndex;
 
 bool VolumeView::mouseEvent(const Image& target, int2 cursor, int2 size, Event, Button button) {
     if(button) { index = clip(0, int(cursor.x*(projections.size-1)/(size.x-1)), int(projections.size)); render(target); return true; }
