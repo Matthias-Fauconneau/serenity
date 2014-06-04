@@ -4,7 +4,6 @@
 #include "project.h"
 #include "layout.h"
 #include "window.h"
-#include "sum.h"
 
 struct Viewer : HBox {
     buffer<VolumeF> volumes;
@@ -19,11 +18,6 @@ struct Viewer : HBox {
         HBox{{ &sliceView , &volumeView }},
         volumes ( apply(paths, [&](string path){ return VolumeF(parseSize(path), cast<float>((ref<byte>)Map(path))); }) ),
         window (this, join(apply(paths,[](string path){ return section(section(path,'/',-2,-1),'.'); })," "_)) {
-        if(volumes.size == 2) {
-            const float MSE = SSE(volumes[0], volumes[1])/sqrt(SSQ(volumes[0])*SSQ(volumes[1]));
-            const float PSNR = 10 * log10(MSE);
-            log(MSE, PSNR);
-        }
     }
     bool mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) override {
         if((button == WheelUp &&  currentIndex> 0) || (button == WheelDown && currentIndex < volumes.size-1)) {

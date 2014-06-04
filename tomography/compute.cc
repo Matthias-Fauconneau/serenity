@@ -46,7 +46,7 @@ struct Application : Poll {
     VBox layout {{&top, &bottom}};
     Window window {&layout, strx(projectionData.size)+" "_+strx(volumeSize) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
 
-    Application(string path) : Poll(0,0,thread), projectionData(loadCDF(path)), projections(evaluateProjections(volumeSize, projectionData.size.xy(), projectionCount, stride, true)) { queue(); thread.spawn(); /*else view only*/ }
+    Application(string path) : Poll(0,0/*,thread*/), projectionData(loadCDF(path)), projections(evaluateProjections(volumeSize, projectionData.size.xy(), projectionCount, stride, true)) { queue(); /*thread.spawn();*/ }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
