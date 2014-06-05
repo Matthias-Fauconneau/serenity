@@ -17,6 +17,6 @@ cl_kernel createKernel(string source, string name);
     extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
     static cl_kernel name ## Kernel = createKernel(ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), #name ##_);
 
-inline void _setKernelArgs(cl_kernel, int) {}
-template<Type T, Type... Args> inline void _setKernelArgs(cl_kernel k, int i, const T& t, const Args&... args) { clCheck( clSetKernelArg(k , i, sizeof(t), &t), i); _setKernelArgs(k, i+1, args...); }
-template<Type... Args> inline void setKernelArgs(cl_kernel k, const Args&... args){ _setKernelArgs(k, 0, args...); }
+inline void setKernelArg(cl_kernel, int) {}
+template<Type T, Type... Args> inline void setKernelArg(cl_kernel k, int i, const T& t, const Args&... args) { clCheck( clSetKernelArg(k , i, sizeof(t), &t), i); setKernelArg(k, i+1, args...); }
+template<Type... Args> inline void setKernelArgs(cl_kernel k, const Args&... args){ setKernelArg(k, 0, args...); }

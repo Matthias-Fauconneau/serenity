@@ -34,6 +34,7 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
         struct sockaddress { uint16 family; uint16 port; uint8 host[4]; int pad[2]={}; } addr = {PF_INET, bswap(uint16(6000+display)), {127,0,0,1}};
         if(check(connect(Socket::fd,(const sockaddr*)&addr,sizeof(addr)))) error("X connection failed");
     }
+    remote = true;
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()>0) {
             BinaryData s (readFile(".Xauthority"_,home()), true);

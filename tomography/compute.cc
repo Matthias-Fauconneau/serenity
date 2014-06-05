@@ -1,8 +1,5 @@
 #include "cdf.h"
-//include "SIRT.h"
 #include "approximate.h"
-//include "adjoint.h"
-//include "MLEM.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -46,17 +43,15 @@ struct Application : Poll {
     VBox layout {{&top, &bottom}};
     Window window {&layout, strx(projectionData.size)+" "_+strx(volumeSize) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
 
-    Application(string path) : Poll(0,0/*,thread*/), projectionData(loadCDF(path)), projections(evaluateProjections(volumeSize, projectionData.size.xy(), projectionCount, stride, true)) { queue(); /*thread.spawn();*/ }
+    Application(string path) : Poll(0,0,thread), projectionData(loadCDF(path)), projections(evaluateProjections(volumeSize, projectionData.size.xy(), projectionCount, stride, true)) { queue(); thread.spawn(); }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
-        //if(existsFile(r.name, r.folder)) removeFile(r.name, r.folder);  // Removes previous evaluation
         r.step();
-        //TODO: store iterations
         const float PSNR = 10*log10( ::SSE(referenceVolume, r.x) / SSQ );
         plot[labels[index]].insert(r.totalTime.toFloat(), -PSNR);
         log("\t", r.totalTime.toFloat(), -PSNR);
         window.render();
-        /*if(r.k<4)*/ queue();
+        queue();
     }
 } app ( arguments()[0] );

@@ -8,7 +8,7 @@ struct Projection {
 };
 
 /// Projects \a volume into \a buffer according to \a projection
-void project(cl_mem buffer, uint bufferOffset, int2 size, const struct VolumeF& volume, const Projection& projection);
+void project(cl_mem buffer, size_t bufferOffset, int2 size, const struct VolumeF& volume, const Projection& projection);
 
 /// Projects \a volume into \a image according to \a projection
 void project(const struct ImageF& image, const struct VolumeF& volume, const Projection& projection);

@@ -12,7 +12,8 @@ int2 SliceView::sizeHint() { return upsampleFactor * volume->size.xy(); }
 void SliceView::render(const Image& target) {
     ImageF image = slice(*volume, index);
     while(image.size < target.size()) image = upsample(image);
-    convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, 0);
+    Image t = clip(target, (target.size()-image.size)/2+Rect(image.size));
+    if(t.size() == image.size) convert(t, image, 0);
 }
 
 uint VolumeView::staticIndex;

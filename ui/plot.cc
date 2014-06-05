@@ -13,12 +13,12 @@ uint subExponent(float& value) {
 
 int2 Plot::sizeHint() { return int2(-488, -512); }
 void Plot::render(const Image& target) {
+    if(!dataSets) return;
     quicksort(dataSets);
 
     vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
     else {  // Computes axis scales
-        assert(dataSets);
         for(const DataSet& dataSet: dataSets) {
             for(auto point: dataSet.data) {
                 vec2 p(point.key,point.value);

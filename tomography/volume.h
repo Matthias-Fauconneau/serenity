@@ -8,6 +8,11 @@ struct VolumeF {
         assert_(!data || data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
         cl_image_format format = {CL_R, CL_FLOAT};
         this->data.pointer = clCreateImage3D(context, CL_MEM_READ_WRITE | (data?CL_MEM_COPY_HOST_PTR:0), &format, size.x, size.y, size.z, 0,0, (float*)data.data, 0);
+        if(!data) clEnqueueFillImage(queue, this->data.pointer, (float[]){0,0,0,0},  (size_t[]){0,0,0}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0,0);
+        /*else {
+            //buffer<float> data (size.x * size.y * size.z); clCheck( clEnqueueReadImage(queue, this->data.pointer, true, (size_t[]){0,0,0}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0, (float*)data.data, 0,0,0) );
+            for(float x: data) assert_(isNumber(x), x);
+        }*/
         assert_(this->data.pointer);
     }
     default_move(VolumeF);
