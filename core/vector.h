@@ -108,13 +108,13 @@ typedef float3 vec3;
 
 generic struct xyzw {
     T x,y,z,w;
-    constexpr xyzw() {}
     vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
     vec< ::xy,T,2> xy()const{ return *(vec< ::xy,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> float4;
+typedef float4 vec4;
 
 generic struct bgr {
     T b,g,r;

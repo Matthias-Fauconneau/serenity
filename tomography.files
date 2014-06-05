@@ -3,6 +3,7 @@ README.md
 TODO
 build.sh
 build.cc
+test.cc
 
 core/array.h
 core/core.h

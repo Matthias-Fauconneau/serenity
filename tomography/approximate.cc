@@ -5,42 +5,21 @@ KERNEL(approximate, backproject) // const float3 center, const float radiusSq, c
 
 /// Backprojects \a images to \a volume
 void Approximate::backproject(const VolumeF& A) {
-    const float3 center = float3(p.size-int3(1))/2.f;
+    const float3 center = float3(A.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(images.size.xy()-int2(1))/2.f;
     static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0); // NVidia does not implement OpenCL 1.2 (2D image arrays)
-
-    {
-        ::buffer<float> data (images.size.x * images.size.y * images.size.z);
-        clCheck( clEnqueueReadImage(queue, images.data.pointer, true, (size_t[]){0,0,0}, (size_t[]){size_t(images.size.x),size_t(images.size.y),size_t(images.size.z)}, 0,0, (float*)data.data, 0,0,0) );
-        for(float x: data) assert_(isNumber(x), x, "images");
-    }
-
-    // FIXME
-    //cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
-    //clCheck( clEnqueueCopyImageToBuffer(queue, A.data.pointer, buffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0) ); // FIXME
-
     setKernelArgs(backprojectKernel, float4(center,0), radiusSq, imageCenter, size_t(projectionArray.size), projectionArray.data.pointer, images.data.pointer, sampler, A.data.pointer);
-    //setKernelArgs(backprojectKernel, float4(center,0), radiusSq, imageCenter, size_t(projectionArray.size), projectionArray.data.pointer, images.data.pointer, sampler, size_t(A.size.y*A.size.x), size_t(A.size.x), buffer);
     clCheck( clEnqueueNDRangeKernel(queue, backprojectKernel, 3, 0, (size_t[]){(size_t)A.size.x, (size_t)A.size.y, (size_t)A.size.z}, 0, 0, 0, 0), "backproject");
-
-    //clCheck( clEnqueueCopyBufferToImage(queue, buffer, A.data.pointer, 0, (size_t[]){0,0,0}, (size_t[]){size_t(images.size.x),size_t(images.size.y),size_t(images.size.z)}, 0,0,0) ); // FIXME
-    {
-        ::buffer<float> data (A.size.x * A.size.y * A.size.z);
-        clCheck( clEnqueueReadImage(queue, A.data.pointer, true, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0, (float*)data.data, 0,0,0) );
-        for(float x: data) assert_(isNumber(x), x, "backproject");
-    }
 }
-
 
 Approximate::Approximate(int3 volumeSize, const ref<Projection>& projections, const ImageArray& images, bool filter, bool regularize, string label)
     : Reconstruction(volumeSize, images.size, label+"-approximate"_+(filter?"-filter"_:""_)+(regularize?"-regularize"_:""_)), p(volumeSize), r(volumeSize), AtAp(volumeSize), filter(filter), regularize(regularize), projections(projections), projectionArray(projections, x.size, images.size.xy()), images(images) {
     /// Computes residual r=p=Atb (assumes x=0)
     backproject(p);
-    clEnqueueCopyImage(queue, p.data.pointer, r.data.pointer, (size_t[]){0,0,0}, (size_t[]){0,0,0},  (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0,0,0);
-    // Executes sum kernel
-    residualEnergy = SSQ(r);
+    residualEnergy = SSQ(p);
     log("residualEnergy", residualEnergy);
+    clEnqueueCopyImage(queue, p.data.pointer, r.data.pointer, (size_t[]){0,0,0}, (size_t[]){0,0,0},  (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0,0,0);
 }
 
 KERNEL(approximate, update)
@@ -52,8 +31,8 @@ bool Approximate::step() {
 
     // Projects p
     for(uint projectionIndex: range(projections.size)) {
-        //project(images.data.pointer, projectionIndex*images.size.y*images.size.x, images.size.xy(), p, projections[projectionIndex]); FIXME
-        cl_mem buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, images.size.y*images.size.x * sizeof(float), 0, 0);
+        //project(images.data.pointer, projectionIndex*images.size.y*images.size.x, images.size.xy(), p, projections[projectionIndex]); //FIXME
+        cl_mem buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, images.size.y*images.size.x*sizeof(float), 0, 0);
         project(buffer, 0, images.size.xy(), p, projections[projectionIndex]);
         clEnqueueCopyBufferToImage(queue, buffer, images.data.pointer, 0, (size_t[]){0,0,projectionIndex}, (size_t[]){size_t(images.size.x),size_t(images.size.y),size_t(1)}, 0,0,0);
     }

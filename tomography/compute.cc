@@ -52,6 +52,6 @@ struct Application : Poll {
         plot[labels[index]].insert(r.totalTime.toFloat(), -PSNR);
         log("\t", r.totalTime.toFloat(), -PSNR);
         window.render();
-        queue();
+        //queue();
     }
 } app ( arguments()[0] );

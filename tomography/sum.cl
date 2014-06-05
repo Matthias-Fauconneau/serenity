@@ -1,5 +1,4 @@
-//constant size_t blockSize = 128; // threadCount
-#define blockSize 1
+#define blockSize 128 //constant size_t blockSize = 128;
 
 // Sum of squares
 kernel void SSQ(global float*  A, global float* blockSums, size_t count, local volatile float* sdata) {
@@ -11,9 +10,7 @@ kernel void SSQ(global float*  A, global float* blockSums, size_t count, local v
     while(i < count) { sdata[tid] += A[i]*A[i]; i += gridSize; }
     barrier(CLK_LOCAL_MEM_FENCE);
     // Reduces each block
-    /*if(blockSize >= 512) { if (tid < 256) { sdata[tid] += sdata[tid + 256]; } barrier(CLK_LOCAL_MEM_FENCE); } // 512->256
-    if(blockSize >= 256) { if (tid < 128) { sdata[tid] += sdata[tid + 128]; } barrier(CLK_LOCAL_MEM_FENCE); } // 256->128
-    if(blockSize >= 128) { if (tid <   64) { sdata[tid] += sdata[tid +   64]; } barrier(CLK_LOCAL_MEM_FENCE); } // 128->64
+    if(blockSize >= 128) { if (tid < 64) { sdata[tid] += sdata[tid + 64]; } barrier(CLK_LOCAL_MEM_FENCE); } // 128->64
     if(tid < 32) { // No need for barriers anymore on warp-sized operations (Unnecessary sums will be scheduled)
         if (blockSize >=  64) { sdata[tid] += sdata[tid + 32]; } //64->32
         if (blockSize >=  32) { sdata[tid] += sdata[tid + 16]; } //32->16
@@ -21,7 +18,7 @@ kernel void SSQ(global float*  A, global float* blockSums, size_t count, local v
         if (blockSize >=    8) { sdata[tid] += sdata[tid +   4]; } //  8-> 4
         if (blockSize >=    4) { sdata[tid] += sdata[tid +   2]; } //  4-> 2
         if (blockSize >=    2) { sdata[tid] += sdata[tid +   1]; } //  2-> 1
-    }*/
+    }
     if(tid == 0) blockSums[get_group_id(0)] = sdata[0]; // Outputs block sum back to global memory
 }
 
@@ -35,9 +32,7 @@ kernel void SSE(global float*  A, global float*  B, global float* blockSums, siz
     while (i < count) { sdata[tid] += (A[i]-B[i])*(A[i]-B[i]); i += gridSize; }
     barrier(CLK_LOCAL_MEM_FENCE);
     // Reduces each block
-    if(blockSize >= 512) { if (tid < 256) { sdata[tid] += sdata[tid + 256]; } barrier(CLK_LOCAL_MEM_FENCE); } // 512->256
-    if(blockSize >= 256) { if (tid < 128) { sdata[tid] += sdata[tid + 128]; } barrier(CLK_LOCAL_MEM_FENCE); } // 256->128
-    if(blockSize >= 128) { if (tid <   64) { sdata[tid] += sdata[tid +   64]; } barrier(CLK_LOCAL_MEM_FENCE); } // 128->64
+    if(blockSize >= 128) { if (tid < 64) { sdata[tid] += sdata[tid + 64]; } barrier(CLK_LOCAL_MEM_FENCE); } // 128->64
     if(tid < 32) { // No need for barriers anymore on warp-sized operations (Unnecessary sums will be scheduled)
         if (blockSize >=  64) { sdata[tid] += sdata[tid + 32]; } //64->32
         if (blockSize >=  32) { sdata[tid] += sdata[tid + 16]; } //32->16
@@ -59,9 +54,7 @@ kernel void dotProduct(global float*  A, global float*  B, global float* blockSu
     while (i < count) { sdata[tid] += A[i]*B[i]; i += gridSize; }
     barrier(CLK_LOCAL_MEM_FENCE);
     // Reduces each block
-    if(blockSize >= 512) { if (tid < 256) { sdata[tid] += sdata[tid + 256]; } barrier(CLK_LOCAL_MEM_FENCE); } // 512->256
-    if(blockSize >= 256) { if (tid < 128) { sdata[tid] += sdata[tid + 128]; } barrier(CLK_LOCAL_MEM_FENCE); } // 256->128
-    if(blockSize >= 128) { if (tid <   64) { sdata[tid] += sdata[tid +   64]; } barrier(CLK_LOCAL_MEM_FENCE); } // 128->64
+    if(blockSize >= 128) { if (tid < 64) { sdata[tid] += sdata[tid + 64]; } barrier(CLK_LOCAL_MEM_FENCE); } // 128->64
     if(tid < 32) { // No need for barriers anymore on warp-sized operations (Unnecessary sums will be scheduled)
         if (blockSize >=  64) { sdata[tid] += sdata[tid + 32]; } //64->32
         if (blockSize >=  32) { sdata[tid] += sdata[tid + 16]; } //32->16

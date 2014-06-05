@@ -1,8 +1,9 @@
-kernel void project(float3 origin, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, float3 rayX, float3 rayY, float3 ray1, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/,
+struct mat4 { float4 columns[4]; };
+kernel void project(float3 origin, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, struct mat4 imageToWorldRay, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/,
                                 read_only image3d_t volume, sampler_t volumeSampler, const size_t offset, const uint width, global float* image) {
     size_t x = get_global_id(0);
     size_t y = get_global_id(1);
-    const float3 ray = normalize(x * rayX + y * rayY + ray1);
+    const float3 ray = normalize((x * imageToWorldRay.columns[0] + y * imageToWorldRay.columns[1] + imageToWorldRay.columns[2] + imageToWorldRay.columns[3]).xyz);
     // Intersects cap disks
     const float2 capT = plusMinusHalfHeightMinusOriginZ / ray.z; // top bottom
     const float4 capXY = origin.xyxy + capT.xxyy * ray.xyxy; // topX topY bottomX bottomY

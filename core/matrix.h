@@ -118,6 +118,7 @@ struct mat4 {
     }
     mat4 translate(vec3 v) const { mat4 M=*this; for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return M; }
     /*constexpr*/ mat4 scale(const vec3 v) const { mat4 M=*this; for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
+    /*constexpr*/ mat4 scale(const vec4 v) const { mat4 M=*this; for(int j=0;j<4;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
     mat4 rotate(float angle, vec3 u) const {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;

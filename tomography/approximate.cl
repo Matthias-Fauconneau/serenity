@@ -1,5 +1,5 @@
 typedef float4 mat4x3[3];
-inline float3 mul(const mat4x3 M, float3 v) { return (float3)(M[0].x*v.x + M[0].y*v.y + M[0].z*v.z + M[1].w, M[1].x*v.x + M[1].y*v.y + M[1].z*v.z + M[1].w, M[2].x*v.x + M[2].y*v.y + M[2].z*v.z + M[2].w); }
+inline float3 mul(const mat4x3 M, float3 v) { return (float3)(M[0].x*v.x + M[0].y*v.y + M[0].z*v.z + M[0].w, M[1].x*v.x + M[1].y*v.y + M[1].z*v.z + M[1].w, M[2].x*v.x + M[2].y*v.y + M[2].z*v.z + M[2].w); }
 //typedef image3d_t image2d_array_t; // NVidia does not implement OpenCL 1.2 (2D image arrays)
 
 // Approximates trilinear backprojection with bilinear sample (reverse splat)
@@ -12,7 +12,7 @@ kernel void backproject(const float3 center, const float radiusSq, const float2 
     float Atb = 0;
     if(point.x*point.x + point.y*point.y < radiusSq) {
         for(uint projectionIndex=0; projectionIndex<projectionCount; projectionIndex++) {
-            float3 p = mul(projections[projectionIndex], (float3)(x,y,z)); // Homogeneous projection coordinates
+            float3 p = mul(projections[projectionIndex], point); // Homogeneous projection coordinates
             //mat4x3 M = projections[projectionIndex];
             //float3 p = float3(M[0].x*x + M[0].y*y + M[0].z*z + M[1].w, M[1].x*x + M[1].y*y + M[1].z*z + M[1].w, M[2].x*x + M[2].y*y + M[2].z*z + M[2].w);
             if(p.x) {

@@ -16,9 +16,9 @@ struct Approximate : Reconstruction  {
                 const Projection& projection = projections[i];
                 const float radius = float(volumeSize.x-1)/2;
                 const float scale = float(imageSize.x-1)/radius;
-                const mat3 transform = mat3().scale(vec3(1,scale,scale)).rotateZ( -projection.angle );
+                const mat3 worldToView = mat3().scale(vec3(1,scale,scale)).rotateZ( -projection.angle );
                 mat4x3& p = clProjections[i];
-                for(uint i: range(3)) p.rows[i] = {transform.row(i), -projection.offset[i]};
+                for(uint i: range(3)) p.rows[i] = {worldToView.row(i), - float(imageSize.x-1) * projection.offset[i]};
             }
             data.pointer = clCreateBuffer(context, CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR, projections.size*sizeof(mat4x3), (float*)clProjections.data, 0);
             assert_(data.pointer);
