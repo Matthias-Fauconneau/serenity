@@ -1,7 +1,7 @@
 #include "approximate.h"
 #include "sum.h"
 
-KERNEL(approximate, backproject) // const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const mat4x3* projections, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
+KERNEL(approximate, backproject) //const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const struct mat4* worldToView, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
 
 /// Backprojects \a images to \a volume
 void Approximate::backproject(const VolumeF& A) {
@@ -14,7 +14,7 @@ void Approximate::backproject(const VolumeF& A) {
 }
 
 Approximate::Approximate(int3 volumeSize, const ref<Projection>& projections, const ImageArray& images, bool filter, bool regularize, string label)
-    : Reconstruction(volumeSize, images.size, label+"-approximate"_+(filter?"-filter"_:""_)+(regularize?"-regularize"_:""_)), p(volumeSize), r(volumeSize), AtAp(volumeSize), filter(filter), regularize(regularize), projections(projections), projectionArray(projections, x.size, images.size.xy()), images(images) {
+    : Reconstruction(volumeSize, images.size, label+"-approximate"_+(filter?"-filter"_:""_)+(regularize?"-regularize"_:""_)), p(volumeSize), r(volumeSize), AtAp(volumeSize), filter(filter), regularize(regularize), projections(projections), projectionArray(projections), images(images) {
     /// Computes residual r=p=Atb (assumes x=0)
     backproject(p);
     residualEnergy = SSQ(p);

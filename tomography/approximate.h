@@ -9,18 +9,10 @@ struct Approximate : Reconstruction  {
 
     // Projects voxel coordinates to image coordinates for bilinear sample
     struct ProjectionArray {
-        struct mat4x3 { float4 rows[3]; };
-        ProjectionArray(const ref<Projection>& projections, int3 volumeSize, int2 imageSize) : size(projections.size) {
-            buffer<mat4x3> clProjections (projections.size);
-            for(uint i: range(projections.size)) {
-                const Projection& projection = projections[i];
-                const float radius = float(volumeSize.x-1)/2;
-                const float scale = float(imageSize.x-1)/radius;
-                const mat3 worldToView = mat3().scale(vec3(1,scale,scale)).rotateZ( -projection.angle );
-                mat4x3& p = clProjections[i];
-                for(uint i: range(3)) p.rows[i] = {worldToView.row(i), - float(imageSize.x-1) * projection.offset[i]};
-            }
-            data.pointer = clCreateBuffer(context, CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR, projections.size*sizeof(mat4x3), (float*)clProjections.data, 0);
+        ProjectionArray(const ref<Projection>& projections) : size(projections.size) {
+            buffer<mat4> worldToViews (projections.size);
+            for(uint i: range(projections.size)) worldToViews[i] = projections[i].worldToView;
+            data.pointer = clCreateBuffer(context, CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR, worldToViews.size*sizeof(mat4), (float*)worldToViews.data, 0);
             assert_(data.pointer);
         }
         int size;

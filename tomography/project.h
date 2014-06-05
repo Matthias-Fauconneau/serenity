@@ -6,15 +6,15 @@ struct Projection {
     Projection(int3 volumeSize, int2 imageSize, float angle /*Rotation angle (in radians) around vertical axis*/, float distance /*normalized by radius*/, float z /*normalized by radius*/) {
         const float3 halfVolumeSize = float3(volumeSize-int3(1))/2.f;
         float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
-        //.translate(vec3(-1));
-        worldToView = mat4().scale(vec3(vec2(float(imageSize.x-1)/extent),1/distance)).rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,-z)).rotateZ(angle).scale(1.f/halfVolumeSize);
+        mat4 worldToView = mat4().scale(vec3(vec2(float(imageSize.x-1)/extent),1/distance)).rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,-z)).rotateZ(angle).scale(1.f/halfVolumeSize);
         mat4 viewToWorld = worldToView.inverse();
-        imageToWorldRay = viewToWorld.scale(vec4(1,1,1,0)).translate(vec3(-vec2(imageSize-int2(1))/2.f,0));
-        origin = viewToWorld[3].xyz();
+        imageToWorld = viewToWorld.scale(vec4(1,1,1,0)).translate(vec3(-vec2(imageSize-int2(1))/2.f,0));
+        imageToWorld[2] += imageToWorld[3]; // Precomputes ray origin (input will always be (x,y,1,1))
+        imageToWorld[3] = viewToWorld[3]; // View origin in world coordinates (stored in unused last column)
+        worldToView = mat4().translate(vec3(vec2(imageSize-int2(1))/2.f,0)) * worldToView;
     }
-    mat4 worldToView; // Transforms from world coordinates [X,Y,Z] to view coordinates [±x,y/2, 1]
-    mat4 imageToWorldRay; // Transforms from image coordinates [x,y,1] to world ray coordinates [0..X,Y,Z]
-    vec3 origin; // View origin in world coordinates
+    mat4 imageToWorld; // Transforms from image coordinates (origin: [0,0,0,1], ray: [size,1,0]) to world coordinates [±1/2]
+    mat4 worldToView; // Transforms from world coordinates [±1/2] to view coordinates [±size/2, 1] (cannot directly transform to image coordinates because of perspective division)
 };
 
 inline buffer<Projection> evaluateProjections(int3 volumeSize, int2 imageSize, uint projectionCount, uint stride, bool synthetic) {

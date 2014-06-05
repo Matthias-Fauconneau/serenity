@@ -12,7 +12,8 @@ void project(cl_mem buffer, size_t bufferOffset, int2 imageSize, const VolumeF& 
     float3 center = {radius, radius, halfHeight};
     // Executes projection kernel
     static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0);
-    setKernelArgs(projectKernel, float4(p.origin,0), float2(1,-1) * halfHeight - p.origin.z, p.imageToWorldRay, sq(p.origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + p.origin,0), volume.data.pointer, sampler, bufferOffset, imageSize.x, buffer);
+    float3 origin = p.imageToWorld[3].xyz();
+    setKernelArgs(projectKernel, p.imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.data.pointer, sampler, bufferOffset, imageSize.x, buffer);
     clCheck( clEnqueueNDRangeKernel(queue, projectKernel, 2, 0, (size_t[2]){size_t(imageSize.x), size_t(imageSize.y)}, 0, 0, 0, 0), "project");
     /*{
         ::buffer<float> data (size.x * size.y);
