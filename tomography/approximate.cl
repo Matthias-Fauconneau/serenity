@@ -8,7 +8,7 @@ kernel void backproject(const float3 center, const float radiusSq, const float2 
             struct mat4 M = worldToView[projectionIndex];
             float3 view = world.x * M.columns[0].xyz + world.y * M.columns[1].xyz + world.z * M.columns[2].xyz + M.columns[3].xyz; // Homogeneous view coordinates
             float2 image = view.xy / view.z + imageCenter; // Perspective divide + Image coordinates offset
-            Atb += read_imagef(images, imageSampler, (float4)(image,z,0)).x;
+            Atb += read_imagef(images, imageSampler, (float4)(image,projectionIndex,0)).x;
         }
     }
     // No projection and no regularization (x=0)
