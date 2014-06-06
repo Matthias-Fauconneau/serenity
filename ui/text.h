@@ -35,7 +35,7 @@ struct Text : virtual Widget {
 
     int2 sizeHint();
     void layout();
-    void render(const Image& target) override;
+    void render() override;
     void render(const Image& target, int2 offset);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
@@ -67,18 +67,4 @@ struct Text : virtual Widget {
     // Inline links
     struct Link { Cursor begin,end; String identifier;};
     array<Link> links;
-};
-
-/// TextInput is an editable \a Text
-struct TextInput : Text {
-    /// User edited this text
-    signal<const string&> textChanged;
-    /// User pressed enter
-    signal<const string&> textEntered;
-    /// Cursor start position for selections
-    Cursor selectionStart;
-
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-    bool keyPress(Key key, Modifiers modifiers) override;
-    void render(const Image& target) override;
 };

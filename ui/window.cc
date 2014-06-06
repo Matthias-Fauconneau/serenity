@@ -222,14 +222,14 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         } else {
             if(motionPending) {
                 Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-                if(drag && cursorState&Button1Mask && drag->mouseEvent(target, cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
-                else if(widget->mouseEvent(target, cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
+                else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
                 if(cursor!=lastCursor) setCursor(cursor);
             }
             if(type==ButtonPress) {
                 Widget* focus=this->focus; this->focus=0;
                 dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-                if(widget->mouseEvent(target, int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render(); // FIXME: Pass target for correct override but should not be used (FIXME: support partial update)
+                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render(); // FIXME: Pass target for correct override but should not be used (FIXME: support partial update)
             }
             else if(type==ButtonRelease) {
                 drag=0;

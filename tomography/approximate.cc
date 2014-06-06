@@ -9,7 +9,7 @@ void Approximate::backproject(const VolumeF& A) {
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(images.size.xy()-int2(1))/2.f;
     static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0); // NVidia does not implement OpenCL 1.2 (2D image arrays)
-    setKernelArgs(backprojectKernel, float4(center,0), radiusSq, imageCenter, size_t(projectionArray.size), projectionArray.data.pointer, images.data.pointer, sampler, A.data.pointer);
+    setKernelArgs(backprojectKernel, float4(center,0), radiusSq, imageCenter, size_t(1/*projectionArray.size*/), projectionArray.data.pointer, images.data.pointer, sampler, A.data.pointer);
     clCheck( clEnqueueNDRangeKernel(queue, backprojectKernel, 3, 0, (size_t[]){(size_t)A.size.x, (size_t)A.size.y, (size_t)A.size.z}, 0, 0, 0, 0), "backproject");
 }
 
@@ -20,6 +20,7 @@ Approximate::Approximate(int3 volumeSize, const ref<Projection>& projections, co
     residualEnergy = SSQ(p);
     log("residualEnergy", residualEnergy);
     clEnqueueCopyImage(queue, p.data.pointer, r.data.pointer, (size_t[]){0,0,0}, (size_t[]){0,0,0},  (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0,0,0);
+    clEnqueueCopyImage(queue, p.data.pointer, x.data.pointer, (size_t[]){0,0,0}, (size_t[]){0,0,0},  (size_t[]){(size_t)x.size.x, (size_t)x.size.y, (size_t)x.size.z}, 0,0,0);     //DEBUG
 }
 
 KERNEL(approximate, update)

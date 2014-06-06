@@ -1,14 +1,14 @@
 #include "layout.h"
 
 // Layout
-void Layout::render(const Image& target) {
+void Layout::render() {
     array<Rect> widgets = layout(target.size());
     for(uint i: range(count())) at(i).render(clip(target, widgets[i]));
 }
 
-bool Layout::mouseEvent(const Image& target, int2 cursor, int2 size, Event event, Button button) {
+bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     array<Rect> widgets = layout(size);
-    for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(target, widgets[i],cursor,event,button)) return true;
+    for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
     return false;
 }
 
@@ -87,36 +87,6 @@ array<Rect> Linear::layout(int2 size) {
         else if(side==Right) y=height-heights[i];
         widgets<< xy(pen+int2(0,y))+Rect(xy(int2(widths[i],heights[i])));
         pen.x += widths[i]+margin;
-    }
-    return widgets;
-}
-
-// Grid
-int2 GridLayout::sizeHint() {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-    int2 max(0,0);
-    for(uint i: range(count())) max = ::max(max,at(i).sizeHint());
-    return int2(w,h)*(max+margin);
-}
-
-array<Rect> GridLayout::layout(int2 size) {
-    array<Rect> widgets(count());
-    if(count()) {
-        uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-        assert(w && h);
-#if 1 // Uniform element size
-        int2 elementSize = int2(size.x/w,size.y/h);
-        int2 margin = (size - int2(w,h)*elementSize) / 2;
-        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) widgets<< margin + int2(x,y)*elementSize + Rect(elementSize);
-#else // TODO: Layout with all the Linear complexity (probably best to merge with Linear and make a special case of Grid)
-        int widths[w];, heights[h];
-        clear(widths), clear(heights);
-        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) {
-            int2 size = at(i).sizeHint();
-            widths[x] = max(widths[x], size.x)
-            heights[y] = max(heights[y], size.y)
-        }
-#endif
     }
     return widgets;
 }

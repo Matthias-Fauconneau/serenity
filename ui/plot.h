@@ -17,7 +17,7 @@ struct Plot : virtual Widget {
         dataSets << DataSet{String(label), {}}; return dataSets.last().data;
     }
     int2 sizeHint() override;
-    void render(const Image& target) override;
+    void render() override;
 
     String title, xlabel, ylabel;
     bool log[2] = {true, false};

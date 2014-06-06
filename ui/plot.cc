@@ -12,7 +12,7 @@ uint subExponent(float& value) {
 }
 
 int2 Plot::sizeHint() { return int2(-488, -512); }
-void Plot::render(const Image& target) {
+void Plot::render() {
     if(!dataSets) return;
     quicksort(dataSets);
 

@@ -51,6 +51,7 @@ generic vec operator +(const vec& u) { return u; }
 generic vec operator -(const vec& u) { vec r; for(uint i=0;i<N;i++) r[i]=-u[i]; return r; }
 generic vec operator +(const vec& u, const vec& v) { vec r; for(uint i=0;i<N;i++) r[i]=u[i]+v[i]; return r; }
 generic vec operator +(const vec& u, T s) { vec r; for(uint i=0;i<N;i++) r[i]=u[i]+s; return r; }
+generic vec operator +(T s, const vec& u) { vec r; for(uint i=0;i<N;i++) r[i]=u[i]+s; return r; }
 generic vec operator -(const vec& u, const vec& v) { vec r; for(uint i=0;i<N;i++) r[i]=u[i]-v[i]; return r; }
 generic vec operator -(const vec& u, T s) { vec r; for(uint i=0;i<N;i++) r[i]=u[i]-s; return r; }
 generic vec operator *(const vec& u, const vec& v) { vec r; for(uint i=0;i<N;i++) r[i]=u[i]*v[i]; return r; }

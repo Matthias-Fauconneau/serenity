@@ -27,6 +27,7 @@ struct VolumeF {
 inline ImageF slice(const VolumeF& volume, size_t z) {
     int3 size = volume.size;
     ImageF image(size.xy());
+    assert_(z < size_t(size.z), z);
     clCheck( clEnqueueReadImage(queue, volume.data.pointer, true, (size_t[]){0,0,z}, (size_t[]){size_t(size.x),size_t(size.y),1}, 0,0, (float*)image.data.data, 0,0,0), "slice");
     return image;
 }

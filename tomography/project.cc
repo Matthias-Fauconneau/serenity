@@ -2,7 +2,7 @@
 #include "volume.h"
 #include "opencl.h"
 
-KERNEL(project, project) //float3 origin, float2 plusMinusHalfHeightMinusOriginZ, float3 rayX, float3 rayY, float3 ray1, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin, __read_only image3d_t volume, sampler_t volumeSampler, const uint width, __global float* image
+KERNEL(project, project)
 
 /// Projects \a volume onto \a image according to \a projection
 void project(cl_mem buffer, size_t bufferOffset, int2 imageSize, const VolumeF& volume, const Projection& p) {
@@ -15,11 +15,6 @@ void project(cl_mem buffer, size_t bufferOffset, int2 imageSize, const VolumeF& 
     float3 origin = p.imageToWorld[3].xyz();
     setKernelArgs(projectKernel, p.imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.data.pointer, sampler, bufferOffset, imageSize.x, buffer);
     clCheck( clEnqueueNDRangeKernel(queue, projectKernel, 2, 0, (size_t[2]){size_t(imageSize.x), size_t(imageSize.y)}, 0, 0, 0, 0), "project");
-    /*{
-        ::buffer<float> data (size.x * size.y);
-        clCheck( clEnqueueReadBuffer(queue, buffer, true, 0, size.x*size.y*sizeof(float), (float*)data.data, 0,0,0) );
-        for(float x: data) assert_(isNumber(x), x);
-    }*/
 }
 
 /// Projects \a volume onto \a image according to \a projection
