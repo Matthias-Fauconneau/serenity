@@ -56,6 +56,7 @@
 struct Median : VolumePass<uint16> {
     string parameters() const override { return "radius"_; }
     void execute(const Dict& args, Volume16& target, const Volume& source) override {
+        assert_(source.sampleSize==2, "Median filter should be evaluated on 16bit data (Hint: use denoise=0 to skip)");
         int radius = args.value("radius"_,1);
         /***/ if(radius==1) median/*<1>*/(target, source); // Median in a 3³ window (27 samples)
         //else if(radius==2) median<2>(target, source); // Median in a 5³ window (125 samples) FIXME: Introduces anisotropy because of the cubic window (instead of ball)
