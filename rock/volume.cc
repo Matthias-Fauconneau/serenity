@@ -111,7 +111,7 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
     uint maximum = source.squared? round(sqrt(float(source.maximum))) : source.maximum;
     uint normalizeFactor = normalize ? maximum : 0xFF;
     if(!normalize && maximum>0x8000) { normalizeFactor=0xFF00; static int unused once = (log("16bit volume truncated to 8bit image slices"_),0); }
-    assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum<=0x8000");
+    assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum>0x8000");
     float radiusSq = ((X-1)/2.0-marginX)*((Y-1)/2.0-marginY);
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
         if(cylinder && source.cylinder && sq(x-(X-1)/2.f)+sq(y-(Y-1)/2.f) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0xFF/*Avoids transparent window*/); continue; }
@@ -134,11 +134,11 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
             continue;
         }
         else error("source.sampleSize"_,source.sampleSize);
-        uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFF / normalizeFactor;
-        if(binary) linear8 = linear8 ? 0xFF : 0;
-        if(invert) linear8 = 0xFF-linear8;
-        extern uint8 sRGB_forward[0x1000]; //FIXME: unnecessary quantization loss on rounding linear values to 8bit
-        uint sRGB8 = gamma ? sRGB_forward[linear8*0x100] : linear8; // !gamma: abusing sRGB standard to store linear values
+        uint linear8 = (source.squared ? round(sqrt(float(value))) : value) * 0xFFF / normalizeFactor;
+        if(binary) linear8 = linear8 ? 0xFFF : 0;
+        if(invert) linear8 = 0xFFF-linear8;
+        extern uint8 sRGB_forward[0x1000];
+        uint sRGB8 = gamma ? sRGB_forward[linear8] : linear8*0xFF/0xFFF; // !gamma: stores linear values in standard sRGB images
         target(x-marginX,y-marginY) = byte4(sRGB8, sRGB8, sRGB8, 0xFF);
     }
     return target;
