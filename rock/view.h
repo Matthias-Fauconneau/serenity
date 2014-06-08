@@ -1,6 +1,5 @@
 #pragma once
 /// view.h Abstract interface to view results
-#include "result.h"
 #include "widget.h"
 
 struct View : virtual Widget {

@@ -2,6 +2,7 @@
 #include "view.h"
 #include "volume.h"
 #include "widget.h"
+#include "result.h"
 
 /// Displays volume as slices
 struct SliceView : View {

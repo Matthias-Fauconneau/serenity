@@ -171,6 +171,7 @@ struct Build {
         // Configures
         CXX = which(getenv("CC"_));
         if(!CXX) CXX=which("clang++"_);
+        if(!CXX) CXX=which("g++4.9"_);
         if(!CXX) CXX=which("g++4.8"_);
         if(!CXX) CXX=which("g++"_);
 

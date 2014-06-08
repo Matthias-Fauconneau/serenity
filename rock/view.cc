@@ -4,6 +4,7 @@
 #include "window.h"
 #include "sample.h"
 #include "plot.h"
+#include "result.h"
 
 struct TextView : View, Text {
     bool view(const string& metadata, const string& name, const buffer<byte>& data) override {
