@@ -37,7 +37,7 @@ struct Synthetic : VolumeOperation {
         target.sampleCount = size;
         target.field = String("μ"_);
         target.maximum = 0xFF;
-        target.data.clear(0xFF);
+        target.data.clear(target.maximum-1);
         /// Synthesizes random oriented ellipsoids
         const uint maximumRadius = (size.x-1)/4;
         array<mat4> ellipsoids; // Oriented bounding boxes (mat4 might not be most efficient but is probably the easiest representation)
@@ -63,7 +63,7 @@ struct Synthetic : VolumeOperation {
                 mat4 worldToBox = ellipsoid.inverse();
                 for(int z: range(min.z, max.z+1)) for(int y: range(min.y, max.y+1)) for(int x: range(min.x, max.x+1)) {
                     vec3 p = worldToBox*vec3(x,y,z);
-                    if(sq(p) < 1) target(x,y,z) = 0;
+                    if(sq(p) < 1) target(x,y,z) = 1;
                 }
                 ellipsoids << ellipsoid;
             }
@@ -88,7 +88,7 @@ struct Synthetic : VolumeOperation {
                 float t = dot(B-A, P-A)/sq(B-A);
                 if(t<=0 || t>=1) continue;
                 //if(sq(P - (A+t*(B-A))) < sq((1-2*t*(1-t))*tubeRadius)) target(x,y,z) = 0; // Tapered cylinder
-                if(sq(P - (A+t*(B-A))) < sq(tubeRadius)) target(x,y,z) = 0; // Straight cylinder
+                if(sq(P - (A+t*(B-A))) < sq(tubeRadius)) target(x,y,z) = 1; // Straight cylinder
             }
             tubes << Tube{A, B, tubeRadius};
         }
