@@ -108,6 +108,7 @@ bool isDecimal(const string& number) {
 double fromDecimal(const string& number) {
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
+    if(number == "NaN"_) return __builtin_nan("");
     double sign=1, eSign=1;
     const byte* i = number.begin();
     if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;

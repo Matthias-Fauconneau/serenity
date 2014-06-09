@@ -158,7 +158,7 @@ uint TextData::hexadecimal() {
 string TextData::whileDecimal() {
     uint start=index;
     matchAny("-+"_);
-    if(!match("∞"_)) for(bool gotDot=false, gotE=false;available(1);) {
+    if(!match("∞"_) && !match("NaN"_)) for(bool gotDot=false, gotE=false;available(1);) {
         byte c=peek();
         /**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
         else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
