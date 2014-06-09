@@ -18,7 +18,7 @@ struct Volume {
     size_t size() const { return (size_t)sampleCount.x*sampleCount.y*sampleCount.z; }
     bool tiled() const { if(offsetX || offsetY || offsetZ) { assert(offsetX && offsetY && offsetZ); return true; } else return false; }
     void copyMetadata(const Volume& source) {
-        margin=source.margin; maximum=source.maximum; squared=source.squared; floatingPoint=source.floatingPoint; field=copy(source.field); origin=source.origin;
+        margin=source.margin; maximum=source.maximum; squared=source.squared; floatingPoint=source.floatingPoint; field=copy(source.field); origin=source.origin; cylinder=source.cylinder;
     }
 
     bool contains(int3 position) const { return position >= margin && position<sampleCount-margin; }

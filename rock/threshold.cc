@@ -23,7 +23,7 @@ struct Otsu : Operation {
         uint64 totalCount=0, totalSum=0;
         for(uint64 t: range(density.size)) totalCount += density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        UniformSample interclassVariance (density.size);
+        UniformSample interclassVariance (density.size); interclassVariance.clear();
         if(args.value("normalize"_,"0"_)!="0"_) interclassVariance.scale = 1./(density.size-1);
         real parameters[4];
         for(uint64 t: range(density.size)) {
@@ -35,7 +35,7 @@ struct Otsu : Operation {
             real foregroundMean = real(foregroundSum)/real(foregroundCount);
             real backgroundMean = real(backgroundSum)/real(backgroundCount);
             real variance = real(foregroundCount)*real(backgroundCount)*sq(foregroundMean - backgroundMean);
-            if(variance > maximumVariance) {
+            if(variance >= maximumVariance) {
                 maximumVariance=variance, threshold = t;
                 parameters[0]=backgroundCount, parameters[1]=foregroundCount, parameters[2]=backgroundMean, parameters[3]=foregroundMean;
             }

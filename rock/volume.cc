@@ -32,6 +32,7 @@ String volumeFormat(const Volume& volume) {
     if(volume.floatingPoint) s << "-float"_;
     if(volume.field) s << "-"_ << volume.field;
     if(volume.origin) s << '+' << str(volume.origin.x) << '+' << str(volume.origin.y) << '+' << str(volume.origin.z);
+    if(volume.cylinder) s << "-cylinder"_;
     return s;
 }
 
@@ -55,6 +56,7 @@ bool parseVolumeFormat(Volume& volume, const string& format) {
         volume.origin.y = s.mayInteger(true); if(!s.match('+')) return false;
         volume.origin.z = s.mayInteger(true);
     }
+    if(s.match("-cylinder"_)) volume.cylinder=true;
     if(s) return false;
     return true;
 }
