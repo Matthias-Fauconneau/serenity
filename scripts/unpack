@@ -1,7 +1,0 @@
-#!/bin/sh 
-BUILD=/dev/shm
-PV=$(basename ${1%.tar.*})
-test -s /ptmp/distfiles/$1* || fetch $1 || exit
-echo "Unpacking $PV"
-tar xf /ptmp/distfiles/$1* -C $BUILD || exit
-ls $BUILD/$PV*
