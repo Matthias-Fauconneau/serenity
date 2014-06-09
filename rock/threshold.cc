@@ -21,9 +21,9 @@ struct Otsu : Operation {
         if(args.value("ignore-clip"_,"0"_)!="0"_) density.first()=density.last()=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
-        for(uint64 t: range(density.size)) totalCount+=density[t], totalSum += t * density[t];
+        for(uint64 t: range(density.size)) totalCount += density[t], totalSum += t * density[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        UniformSample interclassVariance(density.size);
+        UniformSample interclassVariance (density.size);
         if(args.value("normalize"_,"0"_)!="0"_) interclassVariance.scale = 1./(density.size-1);
         real parameters[4];
         for(uint64 t: range(density.size)) {
@@ -41,6 +41,7 @@ struct Otsu : Operation {
             }
             interclassVariance[t] = variance;
         }
+        if(threshold == 0) log("WARNING: threshold=0 (Hint: use ignore-clip=1 to ignore extreme values)");
         real densityThreshold = real(threshold) / real(density.size-1);
         output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(threshold);});
         output(outputs, "otsu-parameters"_, "map"_, [&]{
@@ -207,7 +208,7 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
 
 /// Segments pore space by comparing density against a uniform threshold
 struct Binary : VolumeOperation {
-    string parameters() const override { return "threshold invert mask box"_; }
+    string parameters() const override { return "threshold invert mask box cylinder"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         assert_(isDecimal(args.at("threshold"_)), "Expected threshold value, got", args.at("threshold"_));

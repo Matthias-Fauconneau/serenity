@@ -91,15 +91,21 @@ struct Maximum : VolumeOperation {
 };
 template struct Interface<Operation>::Factory<Maximum>;
 
-/// Clips voxels to minimum
+static void minimum(Volume8& target, const Volume8& source, uint8 minimum) {
+    const uint8* const sourceData = source; uint8* const targetData = target;
+    for(uint index: range(source.size())) targetData[index] = max(sourceData[index], minimum);
+}
 static void minimum(Volume16& target, const Volume16& source, uint16 minimum) {
     const uint16* const sourceData = source; uint16* const targetData = target;
     for(uint index: range(source.size())) targetData[index] = max(sourceData[index], minimum);
 }
+/// Clips voxels to minimum
 struct Minimum : VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    virtual uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) { return toVolume(*inputs[0]).sampleSize; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
-        minimum(outputs[0], inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+        if(inputs[0].sampleSize==1) minimum(outputs[0], (const Volume8&)inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+        else if(inputs[0].sampleSize==2) minimum(outputs[0], (const Volume16&)inputs[0], parseScalar(otherInputs[0]->data)*inputs[0].maximum);
+        else error(inputs[0].sampleSize);
     }
 };
 template struct Interface<Operation>::Factory<Minimum>;
