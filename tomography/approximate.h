@@ -5,6 +5,7 @@
 struct Approximate : Reconstruction  {
     real residualEnergy = 0;
     VolumeF p, r, AtAp;
+    ImageArray w;
     const bool filter, regularize;
 
     // Projects voxel coordinates to image coordinates for bilinear sample
@@ -26,5 +27,6 @@ struct Approximate : Reconstruction  {
     Approximate(int3 volumeSize, const ref<Projection>& projections, const ImageArray& images, bool filter = false, bool regularize = false, string label=""_);
     bool step() override;
 
-    void backproject(const VolumeF& volume);
+    void backproject(const ImageArray& images, const VolumeF& volume);
+    void project(const ImageArray& images, const VolumeF& volume);
 };

@@ -34,14 +34,14 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
         struct sockaddress { uint16 family; uint16 port; uint8 host[4]; int pad[2]={}; } addr = {PF_INET, bswap(uint16(6000+display)), {127,0,0,1}};
         if(check(connect(Socket::fd,(const sockaddr*)&addr,sizeof(addr)))) error("X connection failed");
     }
-    remote = true;
+    //remote = true;
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()>0) {
             BinaryData s (readFile(".Xauthority"_,home()), true);
             string name, data;
             while(s) { // FIXME: Assumes last entry is correct
                 uint16 family _unused = s.read();
-                {uint16 length = s.read(); string host _unused = s.read<byte>(length); }
+                {uint16 length = s.read(); if(length>s.available()) break;/*FIXME*/ string host _unused = s.read<byte>(length); }
                 {uint16 length = s.read(); string port _unused = s.read<byte>(length); }
                 {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
                 {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }

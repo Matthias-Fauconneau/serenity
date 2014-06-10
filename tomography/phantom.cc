@@ -84,21 +84,8 @@ buffer<float> Phantom::volume(int3 size) const {
     return data;
 }
 
-void Phantom::project(const ImageF& target, const Projection& projection) const {
-    // Cylinder parameters
-    //const float radius = float(volume.size.x-1)/2;
-    //const float halfHeight = float(volume.size.z-1 -1 )/2;  //(N-1 [domain size] - epsilon)
-    //float3 center = {radius, radius, halfHeight};
-    // Projection parameters
-    mat3 rotation = mat3().rotateZ(projection.angle);
-    float3 offset = rotation * projection.offset;
-    float extent = 2/sqrt(1-1/sq(projection.offset.x)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
-    int2 size = target.size;
-    float pixelSize = extent/float(size.x-1); // Pixel size on origin plane
-    float3 rayX = rotation * float3(0,pixelSize,0);
-    float3 rayY = rotation * float3(0,0,pixelSize);
-    float3 ray1 = rotation * float3(-projection.offset.x,-pixelSize*float(size.x-1)/2,-pixelSize*float(size.y-1)/2);
-
+void Phantom::project(const ImageF& target, int3 volumeSize, const Projection& projection) const {
+    vec3 scale = 1.f/(vec3(volumeSize-int3(1))/2.f);
     target.data.clear();
     for(Ellipsoid e: ellipsoids) {
         // Computes projection axis-aligned bounding box of object's oriented bounding box
@@ -110,13 +97,11 @@ void Phantom::project(const ImageF& target, const Projection& projection) const 
         min = ::max(min+vec2(size-int2(1))/2.f, vec2(0)), max = ::min(ceil(max+vec2(size-int2(1))/2.f), vec2(size));*/
         int2 min = 0, max = target.size;
 
-        //const vec3 O = e.inverse * (toVec3(projection.offset)/(vec3(projection.volumeSize-int3(1))/2.f) - e.center);
-        const vec3 O = e.inverse * (offset - e.center);
+        const vec3 O = e.inverse * (scale * projection.imageToWorld[3].xyz() - e.center);
         const float c = dot(O, O) - 1;
         for(int y: range(min.y, max.y)) {
             for(int x: range(min.x, max.x)) {
-                //const vec3 D = e.inverse * (projection.pixelRay(x, y)/(vec3(projection.volumeSize-int3(1))/2.f));
-                const vec3 D = e.inverse * (float(x) * rayX + float(y) * rayY + ray1);
+                const vec3 D = e.inverse * (scale * (float(x) * projection.imageToWorld[0].xyz() + float(y) * projection.imageToWorld[1].xyz() + projection.imageToWorld[2].xyz()));
                 const float a = dot(D, D);
                 const float b = dot(D, O);
                 float d = b*b - a*c;

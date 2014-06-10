@@ -12,7 +12,7 @@ inline float SSQ(const VolumeF& A) {
     assert_(elementCount % threadCount == 0); //FIXME
     size_t blockCount = elementCount / threadCount;
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, blockCount * sizeof(float), 0, 0);
-    setKernelArgs(SSQKernel, buffer/*A.data.pointer*/, output, elementCount);
+    setKernelArgs(SSQKernel, buffer, output, elementCount);
     clCheck( clSetKernelArg(SSQKernel, 3, threadCount*sizeof(float), 0) );
     size_t localSize = threadCount;
     size_t globalSize = blockCount * localSize;
@@ -27,13 +27,14 @@ inline float SSQ(const VolumeF& A) {
 
 KERNEL(sum, SSE) //__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch
 inline float SSE(const VolumeF& A, const VolumeF& B) {
+    assert_(A.size == B.size);
     cl_mem Abuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
     clEnqueueCopyImageToBuffer(queue, A.data.pointer, Abuffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0); // FIXME
     cl_mem Bbuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, B.size.x*B.size.y*B.size.z * sizeof(float), 0, 0);
     clEnqueueCopyImageToBuffer(queue, B.data.pointer, Bbuffer, (size_t[]){0,0,0}, (size_t[]){size_t(B.size.x),size_t(B.size.y),size_t(B.size.z)}, 0,0,0,0); // FIXME
 
     size_t elementCount = A.size.z*A.size.y*A.size.x;
-    size_t threadCount = 128; //
+    size_t threadCount = 128; // blockSize
     assert_(elementCount % threadCount == 0); //FIXME
     size_t blockCount = elementCount / threadCount;
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, blockCount * sizeof(float), 0, 0);
@@ -42,21 +43,22 @@ inline float SSE(const VolumeF& A, const VolumeF& B) {
     size_t localSize = threadCount;
     size_t globalSize = blockCount * localSize;
     clCheck( clEnqueueNDRangeKernel(queue, SSEKernel, 1, 0, &globalSize, &localSize, 0, 0, 0), "SSE");
-    float buffer[blockCount];
-    clCheck( clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), buffer, 0,0,0) );
+    float blockSums[blockCount];
+    clCheck( clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), blockSums, 0,0,0) );
     clReleaseMemObject(output);
-    return sum(ref<float>(buffer,blockCount));
+    return sum(ref<float>(blockSums,blockCount));
 }
 
 KERNEL(sum, dotProduct) //__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch
 inline float dotProduct(const VolumeF& A, const VolumeF& B) {
+    assert_(A.size == B.size);
     cl_mem Abuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
     clEnqueueCopyImageToBuffer(queue, A.data.pointer, Abuffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0); // FIXME
     cl_mem Bbuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, B.size.x*B.size.y*B.size.z * sizeof(float), 0, 0);
     clEnqueueCopyImageToBuffer(queue, B.data.pointer, Bbuffer, (size_t[]){0,0,0}, (size_t[]){size_t(B.size.x),size_t(B.size.y),size_t(B.size.z)}, 0,0,0,0); // FIXME
 
     size_t elementCount = A.size.z*A.size.y*A.size.x;
-    size_t threadCount = 128; //
+    size_t threadCount = 128; // blockSize
     assert_(elementCount % threadCount == 0); //FIXME
     size_t blockCount = elementCount / threadCount;
     cl_mem output = clCreateBuffer(context, CL_MEM_READ_WRITE, blockCount * sizeof(float), 0, 0);
@@ -65,8 +67,8 @@ inline float dotProduct(const VolumeF& A, const VolumeF& B) {
     size_t localSize = threadCount;
     size_t globalSize = blockCount * localSize;
     clCheck( clEnqueueNDRangeKernel(queue, dotProductKernel, 1, 0, &globalSize, &localSize, 0, 0, 0), "SSE");
-    float buffer[blockCount];
-    clCheck( clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), buffer, 0,0,0) );
+    float blockSums[blockCount];
+    clCheck( clEnqueueReadBuffer(queue, output, true, 0, blockCount*sizeof(float), blockSums, 0,0,0) );
     clReleaseMemObject(output);
-    return sum(ref<float>(buffer,blockCount));
+    return sum(ref<float>(blockSums,blockCount));
 }

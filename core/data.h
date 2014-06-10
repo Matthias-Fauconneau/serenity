@@ -57,7 +57,7 @@ struct Data {
     ref<byte> slice(uint pos) const { return buffer.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
-    virtual uint available(uint /*need*/) { return buffer.size-index; }
+    virtual uint available(uint _unused need = 0) { return buffer.size-index; }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 
