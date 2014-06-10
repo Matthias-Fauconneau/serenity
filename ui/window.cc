@@ -21,6 +21,7 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 namespace BigRequests { int EXT, event, errorBase; } using namespace BigRequests;
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
+static uint maximumRequestLength;
 
 Window::Window(Widget* widget, const string& title _unused, int2 size, const Image& icon _unused) :
     Socket(section(getenv("DISPLAY"_,":0"_),':')?PF_INET:PF_LOCAL, SOCK_STREAM),
@@ -34,7 +35,6 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
         struct sockaddress { uint16 family; uint16 port; uint8 host[4]; int pad[2]={}; } addr = {PF_INET, bswap(uint16(6000+display)), {127,0,0,1}};
         if(check(connect(Socket::fd,(const sockaddr*)&addr,sizeof(addr)))) error("X connection failed");
     }
-    //remote = true;
     {ConnectionSetup r;
         if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()>0) {
             BinaryData s (readFile(".Xauthority"_,home()), true);
@@ -70,7 +70,7 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="BIG-REQUESTS"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"BIG-REQUESTS"_+pad(4,r.length));}));
         BigRequests::EXT=r.major; BigRequests::event=r.firstEvent; BigRequests::errorBase=r.firstError;}
-    readReply<BigRequests::BigReqEnableReply>(raw(BigRequests::BigReqEnable()));
+    maximumRequestLength = readReply<BigRequests::BigReqEnableReply>(raw(BigRequests::BigReqEnable())).maximumRequestLength;
 
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
@@ -172,8 +172,11 @@ void Window::putImage(Rect rect) {
     if(rect==Rect(0)) rect=Rect(target.size());
     assert_(id); assert_(rect.size());
     if(remote) {
+        assert_(target.buffer.size == (size_t)target.size().x*target.size().y);
         ::PutImage r; r.drawable=id+XWindow; r.context=id+GContext; r.w=target.size().x, r.h=target.size().y; r.size += target.buffer.size;
+        assert_(raw(r).size + cast<byte>(target.buffer).size == r.size*4);
         send(String(raw(r)+cast<byte>(target.buffer)));
+        assert_(r.size <= maximumRequestLength, r.size, maximumRequestLength);
     } else {
         assert_(state==Idle);
         Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
@@ -222,39 +225,39 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         } else {
             if(motionPending) {
                 Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-                if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
-                else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //render(); FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
+                else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
                 if(cursor!=lastCursor) setCursor(cursor);
             }
             if(type==ButtonPress) {
                 Widget* focus=this->focus; this->focus=0;
                 dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) render(); // FIXME: Pass target for correct override but should not be used (FIXME: support partial update)
+                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
             }
             else if(type==ButtonRelease) {
                 drag=0;
-                if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) render();
+                if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
             }
             else if(type==KeyPress) keyPress(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
             else if(type==KeyRelease) keyRelease(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
             else if(type==EnterNotify || type==LeaveNotify) {
                 if(type==LeaveNotify && hideOnLeave) hide();
                 if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
-                                       e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
+                                       e.state&Button1Mask?Widget::LeftButton:Widget::None) ) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
             }
-            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) render(); } // FIXME
+            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) needRender=true; }
             else if(type==UnmapNotify) mapped=false;
-            else if(type==MapNotify) { mapped=true; if(needRender) queue(); }
+            else if(type==MapNotify) mapped=true;
             else if(type==ReparentNotify) {}
             else if(type==ConfigureNotify) {
                 position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-                if(this->size!=size) { this->size=size; render(); }
+                if(this->size!=size) { this->size=size; needRender=true;  }
             }
             else if(type==GravityNotify) {}
             else if(type==ClientMessage) {
-                function<void()>* action = actions.find(Escape);
+                function<void()>* action = actions.find(Escape); // Translates to Escape keyPress event
                 if(action) (*action)(); // Local window action
-                else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
+                else if(focus && focus->keyPress(Escape, NoModifiers)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
                 else exit(0); // Exits application by default
             }
             else if(type==Shm::event+Shm::Completion) { assert_(!remote); /*int stateWas=state;*/ state=Idle; if(displayed) displayed(); /*if(stateWas==Wait) render();*/ }
@@ -283,7 +286,8 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::render() { needRender=true; if(mapped) queue(); }
+void Window::queueRender() { needRender=true; if(mapped) queue(); }
+void Window::immediateUpdate() { needUpdate=true; if(mapped) event(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
@@ -601,7 +605,7 @@ void Window::renderBackground(Image& target) {
 }
 
 void Window::keyPress(Key key, Modifiers modifiers) {
-    if(focus && focus->keyPress(key, modifiers)) render(); // Normal keyPress event
+    if(focus && focus->keyPress(key, modifiers)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update // Normal keyPress event
     else {
         function<void()>* action = actions.find(key);
         function<void()>* longAction = longActions.find(key);
@@ -614,7 +618,7 @@ void Window::keyPress(Key key, Modifiers modifiers) {
 
 
 void Window::keyRelease(Key key, Modifiers modifiers) {
-    if(focus && focus->keyRelease(key, modifiers)) render();
+    if(focus && focus->keyRelease(key, modifiers)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update  // Normal keyRelease event
     else if(longActionTimers.contains(key)) {
         longActionTimers.remove(key); // Removes long action before it triggers
         function<void()>* action = actions.find(key);

@@ -25,13 +25,12 @@ struct SliceView : Widget {
 
 struct VolumeView : Widget {
     const VolumeF* volume;
-    const ref<Projection>& projections;
-    const int2 size;
+    const int3 size;
     const int upsampleFactor;
     Value& index;
 
     static Value staticIndex;
-    VolumeView(const VolumeF* volume, const ref<Projection>& projections, const int2 size, const int upsampleFactor, Value& index=staticIndex) : volume(volume), projections(projections), size(size), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    VolumeView(const VolumeF* volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : volume(volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
     void render() override;

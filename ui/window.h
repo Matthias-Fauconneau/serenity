@@ -103,7 +103,8 @@ struct Window : Device {
     /// Event handler
     void event();
     /// Schedules window rendering after all events have been processed (i.e Poll::wait())
-    void render();
+    void queueRender();
+    void immediateUpdate();
 
     /// Processes one X event
     void processEvent(uint8 type, const XEvent& e);

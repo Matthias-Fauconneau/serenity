@@ -155,6 +155,7 @@ struct Map {
     explicit operator bool() const { return data; }
     operator ref<byte>() const { return ref<byte>(data, size); }
     operator mref<byte>() { return mref<byte>(data, size); }
+    operator ref<float>() const { return ref<float>((float*)data.pointer, size / sizeof(float)); }
 
     /// Locks memory map in RAM
     void lock(uint size=-1) const;

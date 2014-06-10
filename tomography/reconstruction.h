@@ -1,16 +1,17 @@
 #pragma once
-#include "volume.h"
 #include "project.h"
 #include "time.h"
 
 struct Reconstruction {
-    Folder folder {"Results"_, home()};
-    //String name;
     VolumeF x;
 
     int k = 0;
     Time totalTime;
-    Reconstruction(int3 size, int3 /*projectionSize*/, string /*label*/) : /*name(label+"-"_+strx(projectionSize)+"."_+strx(size)),*/ x(size) {}
+
+    ProjectionArray At;
+    const ImageArray& b;
+
+    Reconstruction(int3 size, const ImageArray& b) : x(size), At(size, b.size), b(b) {}
     virtual ~Reconstruction() {}
     virtual bool step() abstract;
 };
