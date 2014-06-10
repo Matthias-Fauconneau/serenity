@@ -571,6 +571,7 @@ void Window::setDisplay(bool displayState) {
 
 void Window::renderBackground(Image& target) {
     if(background==Oxygen) { // Oxygen-like radial gradient background
+        assert_(target.size() == this->target.size());
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
         const vec3 radial = vec3(246./255); // linear
         const vec3 top = vec3(221, 223, 225); // sRGB

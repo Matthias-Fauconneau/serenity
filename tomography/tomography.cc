@@ -31,14 +31,11 @@ struct Application : Poll {
     Application(string projectionPath, string referencePath) : Poll(0,0,thread), projectionData(Map(projectionPath)),referenceVolume(Map(referencePath)) { queue(); thread.spawn(); }
     void event() {
         reconstruction.step();
-        const float PSNR = 10*log10( ::SSE(referenceVolume, reconstruction.x) / SSQ );
-        plot["CG"_].insert(reconstruction.totalTime.toFloat(), -PSNR);
-        log("\t", reconstruction.totalTime.toFloat(), -PSNR);
-        reconstructionView.render();
-        reconstructionSliceView.render();
-        fill(plot.target, Rect(plot.target.size()), white); //FIXME: partial Window::renderBackground
-        plot.render();
-        window.immediateUpdate();
+        const float MSE = ::SSE(referenceVolume, reconstruction.x) / SSQ;
+        const float PSNR = 10*log10( MSE );
+        plot["CG"_].insert(reconstruction.totalTime/1000.f, -PSNR);
+        log(reconstruction.k, reconstruction.totalTime/1000.f, MSE, -PSNR);
+        reconstructionView.render(); reconstructionSliceView.render(); window.renderBackground(plot.target); plot.render(); window.immediateUpdate();
         queue();
     }
 } app ("data/"_+arguments()[0]+".proj"_, "data/"_+arguments()[0]+".ref"_);

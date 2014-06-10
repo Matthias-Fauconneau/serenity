@@ -8,9 +8,7 @@ struct ConjugateGradient : Reconstruction  {
     // Temporary
     const ImageArray Ap;
     const VolumeF AtAp;
-    // DEPRECATED
-    const ImageArray AAti;
 
     ConjugateGradient(int3 volumeSize, const ImageArray& images);
-    bool step() override;
+    void step() override;
 };

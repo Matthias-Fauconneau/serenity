@@ -22,6 +22,7 @@ struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){as
 /// Logs the time spent executing a scope
 struct Time {
     uint64 startTime=0, stopTime=0;
+    Time() { start(); }
     void start() { startTime = realTime() - (stopTime ? stopTime-startTime : 0); stopTime=0; }
     void stop() { if(!stopTime) stopTime = realTime(); }
     operator uint64() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000 : 0; }
