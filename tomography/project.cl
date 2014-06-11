@@ -1,6 +1,6 @@
 struct mat4 { float4 columns[4]; };
 kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/,
-                                read_only image3d_t volume, sampler_t volumeSampler, const size_t offset, const uint width, global float* image) {
+                                read_only image3d_t volume, sampler_t volumeSampler, const uint width, global float* image) {
     size_t x = get_global_id(0);
     size_t y = get_global_id(1);
     const float3 ray = normalize(x * imageToWorld.columns[0].xyz + y * imageToWorld.columns[1].xyz + imageToWorld.columns[2].xyz);
@@ -27,5 +27,5 @@ kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOri
         accumulator += read_imagef(volume, volumeSampler, position.xyzz).x;
         tmin+=1; position += ray;
     }
-    image[offset+y*width+x] = accumulator;
+    image[y*width+x] = accumulator;
 }

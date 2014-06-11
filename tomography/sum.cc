@@ -1,7 +1,7 @@
 #include "volume.h"
 
 static float reduce1(CLKernel& kernel, const CLVolume& A) {
-    CLBufferF buffer (A.size.x*A.size.y*A.size.z);
+    CLBufferF buffer (A.size.x*A.size.y*A.size.z); copy(buffer, A);
     size_t elementCount = A.size.z*A.size.y*A.size.x;
     size_t blockSize = 128; // threadCount
     assert_(elementCount % blockSize == 0); //FIXME
@@ -12,7 +12,7 @@ static float reduce1(CLKernel& kernel, const CLVolume& A) {
     float blockSums[blockCount];
     output.read(mref<float>(blockSums,blockCount));
     float sum = ::sum(ref<float>(blockSums,blockCount));
-    assert_(isNumber(sum));
+    assert_(isNumber(sum), kernel.name);
     return sum;
 }
 
@@ -21,8 +21,8 @@ CL(sum, SSQ) float SSQ(const CLVolume& A) { return reduce1(CL::SSQ, A); }
 
 static float reduce2(CLKernel& kernel, const CLVolume& A, const CLVolume& B) {
     assert_(A.size == B.size);
-    CLBufferF Abuffer (A.size.x*A.size.y*A.size.z);
-    CLBufferF Bbuffer (B.size.x*B.size.y*B.size.z);
+    CLBufferF Abuffer (A.size.x*A.size.y*A.size.z); copy(Abuffer, A);
+    CLBufferF Bbuffer (B.size.x*B.size.y*B.size.z); copy(Bbuffer, B);
     size_t elementCount = A.size.z*A.size.y*A.size.x;
     size_t blockSize = 128; // threadCount
     assert_(elementCount % blockSize == 0); //FIXME
@@ -33,7 +33,7 @@ static float reduce2(CLKernel& kernel, const CLVolume& A, const CLVolume& B) {
     float blockSums[blockCount];
     output.read(mref<float>(blockSums,blockCount));
     float sum = ::sum(ref<float>(blockSums,blockCount));
-    assert_(isNumber(sum));
+    assert_(isNumber(sum), kernel.name);
     return sum;
 }
 

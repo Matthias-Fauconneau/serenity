@@ -25,7 +25,7 @@ struct CLRawBuffer : CLMem {
 
 generic struct CLBuffer : CLRawBuffer {
     CLBuffer(size_t size) : CLRawBuffer(size*sizeof(T)), size(size) {}
-    CLBuffer(const ref<T>& data) : CLRawBuffer(cast<byte>(data)) {}
+    CLBuffer(const ref<T>& data) : CLRawBuffer(cast<byte>(data)), size(data.size) {}
     default_move(CLBuffer);
 
     void read(const mref<T>& target) { CLRawBuffer::read(mcast<byte>(target)); }
@@ -61,6 +61,7 @@ struct CLKernel {
     handle<cl_kernel> kernel;
     Lock lock;
     size_t localSpace = 0;
+    String name;
 
     CLKernel(string source, string name);
 
@@ -84,4 +85,4 @@ struct CLKernel {
 
 #define CL(file, name) \
     extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
-    namespace CL { static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), #name ##_); }
+    namespace CL { static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), str(#name)); }

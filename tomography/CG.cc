@@ -6,6 +6,8 @@ ConjugateGradient::ConjugateGradient(int3 volumeSize, const ImageArray& b) : Rec
      /// Computes residual r=p=Atb
     backproject(r, At, b); // p = At b (x=0)
     residualEnergy = SSQ(r);
+    assert_(residualEnergy);
+    copy(p, r);
 }
 
 // y := α a + β b
@@ -18,6 +20,7 @@ void ConjugateGradient::step() {
     project(Ap, p); // A p
     backproject(AtAp, At, Ap); // At Ap
     float pAtAp = dotProduct(p, AtAp); // |p·AtAp|
+    assert_(pAtAp);
     float alpha = residualEnergy / pAtAp;
     apply(r, 1, r, -alpha, AtAp); // Residual: r = r - α AtAp
     apply(x, 1, x, alpha, p); // Estimate: x = x + α p

@@ -37,7 +37,7 @@ void __attribute((constructor(1002))) setup_cl() {
     }
 }
 
-CLKernel::CLKernel(string source, string name) {
+CLKernel::CLKernel(string source, string name) : name(name) {
     assert_(context);
     int status;
     cl_program program = clCreateProgramWithSource(context, 1, &source.data, &source.size, &status);

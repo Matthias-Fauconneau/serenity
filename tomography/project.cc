@@ -31,19 +31,19 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
 
 CL(project, project)
 
-static void project(const CLBufferF& buffer, size_t bufferOffset, int3 imageSize, const CLVolume& volume, const uint index) {
+static void project(const CLBufferF& buffer, int3 imageSize, const CLVolume& volume, const uint index) {
     const float radius = float(volume.size.x-1)/2;
     const float halfHeight = float(volume.size.z-1 -1 )/2;  //(N-1 [domain size] - epsilon)
     float3 center = {radius, radius, halfHeight};
     mat4 imageToWorld = Projection(volume.size, imageSize, index).imageToWorld;
     float3 origin = imageToWorld[3].xyz();
-    CL::project(imageSize, imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.pointer, clampToEdgeSampler, bufferOffset, imageSize.x, buffer.pointer);
+    CL::project(imageSize, imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.pointer, clampToEdgeSampler, imageSize.x, buffer.pointer);
 }
 
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index) {
     CLBufferF buffer (image.data.size);
-    project(buffer, 0, int3(image.size, projectionCount), volume, index);
+    project(buffer, int3(image.size, projectionCount), volume, index);
     buffer.read(image.data);
 }
 
@@ -51,7 +51,7 @@ void project(const ImageF& image, const CLVolume& volume, const uint projectionC
 void project(const ImageArray& Ax, const CLVolume& x) {
     CLBufferF buffer (Ax.size.y*Ax.size.x);
     for(uint index: range(Ax.size.z)) { //FIXME: Queue all projections at once ?
-        ::project(buffer, 0, Ax.size, x, index);
+        ::project(buffer, Ax.size, x, index);
         copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     }
 }
@@ -67,9 +67,9 @@ CL(backproject, backproject) //const float3 center, const float radiusSq, const 
 
 /// Backprojects (At) \a b to \a Atb
 void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b) {
+    assert_(At.size);
     const float3 center = float3(Atb.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;
     CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter, At.size, At.pointer, b.pointer, clampSampler, Atb.pointer);
 }
-
