@@ -1,6 +1,7 @@
 #pragma once
 #include "matrix.h"
 #include "volume.h"
+#include "opencl.h"
 
 struct Projection {
     Projection(int3 volumeSize, int3 projectionSize, uint index);
@@ -16,14 +17,13 @@ void project(const ImageF& image, const CLVolume& volume, const uint projectionC
 /// Projects (A) \a x to \a Ax
 void project(const ImageArray& Ax, const CLVolume& x);
 
+/// Projects (A) \a x to \a Ax
+void project(const VolumeF& Ax, const CLVolume& x);
+
 // -- Backprojection --
 
 // Projects voxel coordinates to image coordinates for bilinear sample
-struct ProjectionArray {
-    ProjectionArray(int3 volumeSize, int3 projectionSize);
-    int size;
-    handle<cl_mem> data;
-};
+typedef CLBuffer<mat4> ProjectionArray;
 
 /// Backprojects (At) \a b to \a Atb
 void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b);

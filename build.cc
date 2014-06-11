@@ -82,8 +82,7 @@ struct Build {
     bool tryParseFiles(TextData& s) {
         string suffix;
         if(s.match("FILE("_) || s.match("ICON("_)) {}
-        else if(s.match("KERNEL("_)) suffix=".cl"_;
-        else if(s.match("SHADER("_)) suffix=".glsl"_;
+        else if(s.match("CL("_)) suffix=".cl"_;
         else return false;
         String file = s.identifier("_-"_)+suffix;
         s.until(")"_);

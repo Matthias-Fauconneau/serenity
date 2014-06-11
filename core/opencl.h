@@ -1,22 +1,87 @@
 #pragma once
-#include <CL/opencl.h> //OpenCL
+#include "thread.h"
 #include "string.h"
 #include "vector.h"
+#include "data.h"
+#include "image.h"
 
-inline void clNotify(const char* info, const void *, size_t, void *) { error(info); }
+typedef struct _cl_kernel* cl_kernel;
+typedef struct _cl_mem* cl_mem;
+typedef struct _cl_sampler* cl_sampler;
 
-static string clErrors[] = {"CL_SUCCESS"_, "CL_DEVICE_NOT_FOUND"_, "CL_DEVICE_NOT_AVAILABLE"_, "CL_COMPILER_NOT_AVAILABLE"_, "CL_MEM_OBJECT_ALLOCATION_FAILURE"_, "CL_OUT_OF_RESOURCES"_, "CL_OUT_OF_HOST_MEMORY"_, "CL_PROFILING_INFO_NOT_AVAILABLE"_, "CL_MEM_COPY_OVERLAP"_, "CL_IMAGE_FORMAT_MISMATCH"_, "CL_IMAGE_FORMAT_NOT_SUPPORTED"_, "CL_BUILD_PROGRAM_FAILURE"_, "CL_MAP_FAILURE"_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, ""_, "CL_INVALID_VALUE"_, "CL_INVALID_DEVICE_TYPE"_, "CL_INVALID_PLATFORM"_, "CL_INVALID_DEVICE"_, "CL_INVALID_CONTEXT"_, "CL_INVALID_QUEUE_PROPERTIES"_, "CL_INVALID_COMMAND_QUEUE"_, "CL_INVALID_HOST_PTR"_, "CL_INVALID_MEM_OBJECT"_, "CL_INVALID_IMAGE_FORMAT_DESCRIPTOR"_, "CL_INVALID_IMAGE_SIZE"_, "CL_INVALID_SAMPLER"_, "CL_INVALID_BINARY"_, "CL_INVALID_BUILD_OPTIONS"_, "CL_INVALID_PROGRAM"_, "CL_INVALID_PROGRAM_EXECUTABLE"_, "CL_INVALID_KERNEL_NAME"_, "CL_INVALID_KERNEL_DEFINITION"_, "CL_INVALID_KERNEL"_, "CL_INVALID_ARG_INDEX"_, "CL_INVALID_ARG_VALUE"_, "CL_INVALID_ARG_SIZE"_, "CL_INVALID_KERNEL_ARGS"_, "CL_INVALID_WORK_DIMENSION"_, "CL_INVALID_WORK_GROUP_SIZE"_, "CL_INVALID_WORK_ITEM_SIZE"_, "CL_INVALID_GLOBAL_OFFSET"_, "CL_INVALID_EVENT_WAIT_LIST"_, "CL_INVALID_EVENT"_, "CL_INVALID_OPERATION"_, "CL_INVALID_GL_OBJECT"_, "CL_INVALID_BUFFER_SIZE"_, "CL_INVALID_MIP_LEVEL"_, "CL_INVALID_GLOBAL_WORK_SIZE"_};
-#define clCheck(expr, args...) ({ int _status = expr; assert_(!_status, clErrors[-_status], #expr, ##args); })
 
-extern cl_context context;
-extern cl_command_queue queue;
+struct CLMem : handle<cl_mem> {
+    CLMem(cl_mem mem) : handle(mem) { assert_(mem); }
+    ~CLMem();
+};
 
-cl_kernel createKernel(string source, string name);
+struct CLRawBuffer : CLMem {
+    CLRawBuffer(size_t size);
+    CLRawBuffer(const ref<byte> data);
+    default_move(CLRawBuffer);
 
-#define KERNEL(file, name) \
+    void read(const mref<byte>& target);
+};
+
+generic struct CLBuffer : CLRawBuffer {
+    CLBuffer(size_t size) : CLRawBuffer(size*sizeof(T)), size(size) {}
+    CLBuffer(const ref<T>& data) : CLRawBuffer(cast<byte>(data)) {}
+    default_move(CLBuffer);
+
+    void read(const mref<T>& target) { CLRawBuffer::read(mcast<byte>(target)); }
+    size_t size;
+};
+
+typedef CLBuffer<float> CLBufferF;
+
+struct CLVolume : CLMem {
+    CLVolume(int3 size, const ref<float>& data={});
+    CLVolume(const ref<float>& data) : CLVolume(round(pow(data.size,1./3)), data) {}
+    default_move(CLVolume);
+
+    int3 size; // (width, height, depth/index)
+};
+
+// Copy volume into volume
+void copy(const CLVolume& buffer, const CLVolume& volume);
+
+// Copy volume into buffer
+void copy(const CLBufferF& buffer, const CLVolume& volume);
+
+// Inserts a slice buffer into volume
+void copy(const CLVolume& volume, size_t index, const CLBufferF& slice);
+
+ImageF slice(const CLVolume& volume, size_t index /* Z slice or projection*/);
+
+typedef CLVolume ImageArray; // NVidia does not implement OpenCL 1.2 (2D image arrays)
+
+extern cl_sampler clampToEdgeSampler, clampSampler;
+
+struct CLKernel {
+    handle<cl_kernel> kernel;
+    Lock lock;
+    size_t localSpace = 0;
+
+    CLKernel(string source, string name);
+
+    //TODO: type check
+    void setKernelArg(uint index, size_t size, const void* value);
+    void setKernelArgs(uint index) { if(localSpace) setKernelArg(index, localSpace, 0); }
+    template<Type T, Type... Args> void setKernelArgs(uint index, const T& value, const Args&... args) { setKernelArg(index, sizeof(value), &value); setKernelArgs(index+1, args...); }
+    template<Type... Args> void setKernelArgs(uint index, const CLMem& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
+
+    void enqueueNDRangeKernel(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size);
+    template<Type... Args> void execute(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size, const Args&... args) {
+        Locker lock(this->lock);
+        setKernelArgs(0, args...);
+        enqueueNDRangeKernel(work_dim, global_work_offset, global_work_size, local_work_size);
+    }
+
+    template<Type... Args> void operator()(size_t blockCount, size_t blockSize /*threadCount*/, const Args&... args) { execute(1, 0, (size_t[]){blockCount*blockSize}, &blockSize, args...); }
+    template<Type... Args> void operator()(int2 size, const Args&... args) { execute(2, 0, (size_t[]){size_t(size.x), size_t(size.y)}, 0, args...); }
+    template<Type... Args> void operator()(int3 size, const Args&... args) { execute(3, 0, (size_t[]){size_t(size.x), size_t(size.y), size_t(size.z)}, 0, args...); }
+};
+
+#define CL(file, name) \
     extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
-    static cl_kernel name ## Kernel = createKernel(ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), #name ##_);
-
-inline void setKernelArg(cl_kernel, int) {}
-template<Type T, Type... Args> inline void setKernelArg(cl_kernel k, int i, const T& t, const Args&... args) { clCheck( clSetKernelArg(k , i, sizeof(t), &t), i); setKernelArg(k, i+1, args...); }
-template<Type... Args> inline void setKernelArgs(cl_kernel k, const Args&... args){ setKernelArg(k, 0, args...); }
+    namespace CL { static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), #name ##_); }

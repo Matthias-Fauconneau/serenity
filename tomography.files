@@ -72,3 +72,4 @@ tomography/view.h
 tomography/volume.h
 tomography/downsample.cc
 tomography/acquisition.cc
+tomography/sum.cc

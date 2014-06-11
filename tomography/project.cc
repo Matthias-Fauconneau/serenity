@@ -29,59 +29,47 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
 
 // -- Projection
 
-KERNEL(project, project)
+CL(project, project)
 
-static void project(cl_mem buffer, size_t bufferOffset, int3 imageSize, const CLVolume& volume, const uint index) {
-    // Cylinder parameters
+static void project(const CLBufferF& buffer, size_t bufferOffset, int3 imageSize, const CLVolume& volume, const uint index) {
     const float radius = float(volume.size.x-1)/2;
     const float halfHeight = float(volume.size.z-1 -1 )/2;  //(N-1 [domain size] - epsilon)
     float3 center = {radius, radius, halfHeight};
-    // Executes projection kernel
-    static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0);
     mat4 imageToWorld = Projection(volume.size, imageSize, index).imageToWorld;
     float3 origin = imageToWorld[3].xyz();
-    setKernelArgs(projectKernel, imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.data.pointer, sampler, bufferOffset, imageSize.x, buffer);
-    clCheck( clEnqueueNDRangeKernel(queue, projectKernel, 2, 0, (size_t[2]){size_t(imageSize.x), size_t(imageSize.y)}, 0, 0, 0, 0), "project",
-            imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.data.pointer, sampler, bufferOffset, imageSize.x, buffer);
+    CL::project(imageSize, imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.pointer, clampToEdgeSampler, bufferOffset, imageSize.x, buffer.pointer);
 }
 
 /// Projects \a volume onto \a image according to \a projection
 void project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index) {
-    cl_mem buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, image.data.size*sizeof(float), 0, 0);
+    CLBufferF buffer (image.data.size);
     project(buffer, 0, int3(image.size, projectionCount), volume, index);
-    // Transfers result
-    clEnqueueReadBuffer(queue, buffer, true, 0,  image.data.size*sizeof(float), (float*)image.data.data, 0,0,0);
-    clReleaseMemObject(buffer);
+    buffer.read(image.data);
 }
 
 /// Projects (A) \a x to \a Ax
 void project(const ImageArray& Ax, const CLVolume& x) {
-    cl_mem buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, Ax.size.y*Ax.size.x*sizeof(float), 0, 0);
+    CLBufferF buffer (Ax.size.y*Ax.size.x);
     for(uint index: range(Ax.size.z)) { //FIXME: Queue all projections at once ?
         ::project(buffer, 0, Ax.size, x, index);
-        clEnqueueCopyBufferToImage(queue, buffer, Ax.data.pointer, 0, (size_t[]){0,0,index}, (size_t[]){size_t(Ax.size.x),size_t(Ax.size.y),size_t(1)}, 0,0,0); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
+        copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     }
-    clReleaseMemObject(buffer);
+}
+
+/// Projects (A) \a x to \a Ax
+void project(const VolumeF& Ax, const CLVolume& x) {
+    for(uint index: range(Ax.size.z)) ::project(slice(Ax, index), x, Ax.size.z, index); //FIXME: Queue all projections at once ?
 }
 
 // -- Backprojection
 
-ProjectionArray::ProjectionArray(int3 volumeSize, int3 projectionSize) : size(projectionSize.z) {
-    buffer<mat4> worldToViews (size);
-    for(uint index: range(size)) worldToViews[index] = Projection(volumeSize, projectionSize, index).worldToView;
-    data.pointer = clCreateBuffer(context, CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR, worldToViews.size*sizeof(mat4), (float*)worldToViews.data, 0);
-    assert_(data.pointer);
-}
-
-KERNEL(backproject, backproject) //const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const struct mat4* worldToView, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
+CL(backproject, backproject) //const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const struct mat4* worldToView, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
 
 /// Backprojects (At) \a b to \a Atb
 void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b) {
     const float3 center = float3(Atb.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;
-    static cl_sampler sampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0); // NVidia does not implement OpenCL 1.2 (2D image arrays)
-    setKernelArgs(backprojectKernel, float4(center,0), radiusSq, imageCenter, size_t(At.size), At.data.pointer, b.data.pointer, sampler, Atb.data.pointer);
-    clCheck( clEnqueueNDRangeKernel(queue, backprojectKernel, 3, 0, (size_t[]){size_t(Atb.size.x), size_t(Atb.size.y), size_t(Atb.size.z)}, 0, 0, 0, 0), "backproject");
+    CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter, At.size, At.pointer, b.pointer, clampSampler, Atb.pointer);
 }
 

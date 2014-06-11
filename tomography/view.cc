@@ -30,7 +30,7 @@ int2 VolumeView::sizeHint() { return upsampleFactor * size.xy(); }
 
 void VolumeView::render() {
     ImageF image = ImageF( size.xy() );
-    project(image, *volume, size.z, index.value);
+    project(image, volume, size.z, index.value);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
     convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, 0);
 }

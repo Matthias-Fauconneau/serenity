@@ -10,7 +10,7 @@ struct Reconstruction {
     ProjectionArray At;
     const ImageArray& b;
 
-    Reconstruction(int3 size, const ImageArray& b) : x(size), At(size, b.size), b(b) {}
+    Reconstruction(int3 size, const ImageArray& b) : x(size), At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; })), b(b) {}
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };

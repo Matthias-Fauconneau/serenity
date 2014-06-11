@@ -17,13 +17,13 @@ struct Application : Poll {
     // Interface
     int upsample = 4;
     Value projectionIndex;
-    SliceView projectionView {&projectionData, upsample, projectionIndex};
-    VolumeView reconstructionView {&reconstruction.x, projectionData.size, upsample, projectionIndex};
+    SliceView projectionView {projectionData, upsample, projectionIndex};
+    VolumeView reconstructionView {reconstruction.x, projectionData.size, upsample, projectionIndex};
     HBox top {{&projectionView, &reconstructionView}};
     Plot plot;
     Value sliceIndex;
-    SliceView referenceSliceView {&referenceVolume, upsample, sliceIndex};
-    SliceView reconstructionSliceView {&reconstruction.x, upsample, sliceIndex};
+    SliceView referenceSliceView {referenceVolume, upsample, sliceIndex};
+    SliceView reconstructionSliceView {reconstruction.x, upsample, sliceIndex};
     HBox bottom {{&plot, &referenceSliceView, &reconstructionSliceView}};
     VBox layout {{&top, &bottom}};
     Window window {&layout, strx(projectionData.size)+" "_+strx(referenceVolume.size) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME

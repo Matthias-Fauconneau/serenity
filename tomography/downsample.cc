@@ -9,7 +9,9 @@ void downsample(const VolumeF& target, const VolumeF& source) {
         target(x,y,z) = (source(x*2,y*2,z*2) + source(x*2+1,y*2,z*2) + source(x*2,y*2+1,z*2) + source(x*2+1,y*2+1,z*2) + source(x*2,y*2,z*2+1) + source(x*2+1,y*2,z*2+1) + source(x*2,y*2+1,z*2+1) + source(x*2+1,y*2+1,z*2+1)) / 8;
 }
 
-void __attribute((constructor)) script() {
-    const int N = fromInteger(arguments()[0]);
-    downsample(VolumeF(Map(File("data/"_+dec(N)+".ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/"_+dec(N*2)+".ref"_)));
-}
+struct App {
+    App() {
+        const int N = fromInteger(arguments()[0]);
+        downsample(VolumeF(Map(File("data/"_+dec(N)+".ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/"_+dec(N*2)+".ref"_)));
+    }
+} app;

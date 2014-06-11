@@ -67,7 +67,7 @@ string imageFileFormat(const ref<byte>& file);
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 
-/// Declares a function lazily decoding an image embedded using FILE
+/// Declares a function lazily decoding an embedded icon
 #define ICON(name) \
 static const Image& name ## Icon() { \
     extern byte _binary_## name ##_start[]; extern byte _binary_## name ##_end[]; \
