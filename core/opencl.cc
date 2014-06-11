@@ -11,51 +11,39 @@ static cl_command_queue queue;
 static cl_device_id device;
 
 void __attribute((constructor(1002))) setup_cl() {
-    uint platformCount; clGetPlatformIDs(0, 0, &platformCount);
+    uint platformCount; clGetPlatformIDs(0, 0, &platformCount); assert_(platformCount);
     cl_platform_id platforms[platformCount]; clGetPlatformIDs(platformCount, platforms, 0);
-    for(cl_platform_id platform: ref<cl_platform_id>(platforms, platformCount)) {
-        for(cl_platform_info attribute : { CL_PLATFORM_NAME, CL_PLATFORM_VENDOR, CL_PLATFORM_VERSION, CL_PLATFORM_PROFILE, CL_PLATFORM_EXTENSIONS }) {
-            size_t size; clGetPlatformInfo(platform, attribute, 0, 0, &size);
-            char info[size]; clGetPlatformInfo(platform, attribute, size, info, 0);
-            //log(string(info,size-1));
-        }
-    }
-    if(platformCount) {
-        cl_platform_id platform = platforms[0]; // {AMD, Intel, Beignet}
-        uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount);
-        cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
-        for(cl_device_id device: ref<cl_device_id>(devices, deviceCount)) {
-            for(cl_device_info attribute : { CL_DEVICE_NAME, CL_DEVICE_VERSION, CL_DRIVER_VERSION}) {
-                size_t size; clGetDeviceInfo(device, attribute, 0, 0, &size);
-                char info[size]; clGetDeviceInfo(device, attribute, size, info, 0);
-                //log(string(info,size-1));
-            }
-        }
-        device = devices[0]; // {GPU, CPU}
-        context = clCreateContext(0, 1, &device, &clNotify, 0, 0);
-        queue = clCreateCommandQueue(context, device, 0, 0);
-    }
+    cl_platform_id platform = platforms[0];
+    uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount); assert_(deviceCount);
+    cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
+    device = devices[0];
+    context = clCreateContext(0, 1, &device, &clNotify, 0, 0); assert_(context);
+    queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, 0); assert_(queue);
 }
 
 CLKernel::CLKernel(string source, string name) : name(name) {
     assert_(context);
-    int status;
-    cl_program program = clCreateProgramWithSource(context, 1, &source.data, &source.size, &status);
+    int status; cl_program program = clCreateProgramWithSource(context, 1, &source.data, &source.size, &status);
     if(clBuildProgram(program, 0, 0, 0, 0, 0)) {
-        size_t buildLogSize;
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, 0, &buildLogSize);
-        char buildLog[buildLogSize];
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, buildLogSize, (void*)buildLog, 0);
+        size_t buildLogSize; clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, 0, &buildLogSize);
+        char buildLog[buildLogSize]; clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, buildLogSize, (void*)buildLog, 0);
         array<string> lines = split(string(buildLog,buildLogSize-1),'\n');
-        log(join(lines.slice(0,min(16ul,lines.size)),"\n"_));
-        error(name);
+        log(join(lines.slice(0,min(16ul,lines.size)),"\n"_)); error(name);
     }
     kernel = clCreateKernel(program, strz(name), &status);
     assert_(!status && kernel, clErrors[-status]);
 }
-
+#include "trace.h"
 void CLKernel::setKernelArg(uint index, size_t size, const void* value) { clCheck( ::clSetKernelArg(kernel, index, size, value) ); }
-void CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) { clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0,0) ); }
+void CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) {
+    cl_event event;
+    clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0, &event) );
+    clCheck( clWaitForEvents(1, &event) );
+    cl_ulong start; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(start), &start, 0);
+    cl_ulong end; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(end), &end, 0);
+    //log(trace(1));
+    log(name, str((end-start)/1000000.0)+"ms"_);
+}
 
 CLMem::~CLMem() { if(pointer) clReleaseMemObject(pointer); pointer=0; }
 

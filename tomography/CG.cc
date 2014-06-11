@@ -11,7 +11,7 @@ ConjugateGradient::ConjugateGradient(int3 volumeSize, const ImageArray& b) : Rec
 }
 
 // y := α a + β b
-CL(apply, apply) void apply(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { CL::apply(y.size, y.pointer, alpha, a.pointer, beta, b.pointer); }
+CL(apply, apply) void apply(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { CL::apply(y.size, y, alpha, a, beta, b); }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 void ConjugateGradient::step() {

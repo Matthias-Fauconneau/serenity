@@ -69,7 +69,8 @@ struct CLKernel {
     void setKernelArg(uint index, size_t size, const void* value);
     void setKernelArgs(uint index) { if(localSpace) setKernelArg(index, localSpace, 0); }
     template<Type T, Type... Args> void setKernelArgs(uint index, const T& value, const Args&... args) { setKernelArg(index, sizeof(value), &value); setKernelArgs(index+1, args...); }
-    template<Type... Args> void setKernelArgs(uint index, const CLMem& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
+    template<Type... Args> void setKernelArgs(uint index, const CLRawBuffer& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
+    template<Type... Args> void setKernelArgs(uint index, const CLVolume& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
 
     void enqueueNDRangeKernel(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size);
     template<Type... Args> void execute(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size, const Args&... args) {

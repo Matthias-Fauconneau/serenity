@@ -37,7 +37,7 @@ static void project(const CLBufferF& buffer, int3 imageSize, const CLVolume& vol
     float3 center = {radius, radius, halfHeight};
     mat4 imageToWorld = Projection(volume.size, imageSize, index).imageToWorld;
     float3 origin = imageToWorld[3].xyz();
-    CL::project(imageSize, imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume.pointer, clampToEdgeSampler, imageSize.x, buffer.pointer);
+    CL::project(imageSize.xy(), imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume, clampToEdgeSampler, imageSize.x, buffer);
 }
 
 /// Projects \a volume onto \a image according to \a projection
@@ -71,5 +71,5 @@ void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArra
     const float3 center = float3(Atb.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;
-    CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter, At.size, At.pointer, b.pointer, clampSampler, Atb.pointer);
+    CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter, At.size, At, b, clampSampler, Atb);
 }

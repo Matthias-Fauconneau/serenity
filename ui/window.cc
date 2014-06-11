@@ -224,6 +224,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             motionPending = true;
         } else {
             if(motionPending) {
+                motionPending = false;
                 Cursor lastCursor = cursor; cursor=Cursor::Arrow;
                 if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
                 else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update

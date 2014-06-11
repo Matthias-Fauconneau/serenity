@@ -8,7 +8,7 @@ static float reduce1(CLKernel& kernel, const CLVolume& A) {
     size_t blockCount = elementCount / blockSize;
     CLBufferF output (blockCount);
     kernel.localSpace = blockSize*sizeof(float);
-    kernel(blockCount, blockSize, buffer.pointer, output.pointer, elementCount);
+    kernel(blockCount, blockSize, buffer, output, elementCount);
     float blockSums[blockCount];
     output.read(mref<float>(blockSums,blockCount));
     float sum = ::sum(ref<float>(blockSums,blockCount));
@@ -29,7 +29,7 @@ static float reduce2(CLKernel& kernel, const CLVolume& A, const CLVolume& B) {
     size_t blockCount = elementCount / blockSize;
     CLBufferF output (blockCount);
     kernel.localSpace = blockSize*sizeof(float);
-    kernel(blockCount, blockSize, Abuffer.pointer, Bbuffer.pointer, output.pointer, elementCount);
+    kernel(blockCount, blockSize, Abuffer, Bbuffer, output, elementCount);
     float blockSums[blockCount];
     output.read(mref<float>(blockSums,blockCount));
     float sum = ::sum(ref<float>(blockSums,blockCount));
@@ -39,5 +39,3 @@ static float reduce2(CLKernel& kernel, const CLVolume& A, const CLVolume& B) {
 
 CL(sum, SSE)  float SSE(const CLVolume& A, const CLVolume& B) { return reduce2(CL::SSE, A, B); }
 CL(sum, dotProduct)  float dotProduct(const CLVolume& A, const CLVolume& B) { return reduce2(CL::dotProduct, A, B); }
-
-
