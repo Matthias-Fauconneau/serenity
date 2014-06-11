@@ -4,10 +4,10 @@
 struct ConjugateGradient : Reconstruction  {
     // Persistent
     real residualEnergy = 0;
-    const VolumeF p, r;
+    const CLVolume p, r;
     // Temporary
     const ImageArray Ap;
-    const VolumeF AtAp;
+    const CLVolume AtAp;
 
     ConjugateGradient(int3 volumeSize, const ImageArray& images);
     void step() override;

@@ -9,8 +9,8 @@
 struct Application : Poll {
     // Evaluation
     Thread thread {19};
-    const VolumeF projectionData;
-    const VolumeF referenceVolume;
+    const CLVolume projectionData;
+    const CLVolume referenceVolume;
     const float SSQ = ::SSQ(referenceVolume);
     ConjugateGradient reconstruction {referenceVolume.size, projectionData};
 

@@ -3,7 +3,7 @@
 #include "project.h"
 
 KERNEL(sum, sum) // __global float*  A, __global float* blockSums, size_t count, __local volatile float* sdata
-inline float sum(const VolumeF& A) {
+inline float sum(const CLVolume& A) {
     cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
     clCheck( clEnqueueCopyImageToBuffer(queue, A.data.pointer, buffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0) ); // FIXME
 
@@ -26,7 +26,7 @@ inline float sum(const VolumeF& A) {
 }
 
 KERNEL(sum, SSQ) // __global float*  A, __global float* blockSums, size_t count, __local volatile float* sdata
-inline float SSQ(const VolumeF& A) {
+inline float SSQ(const CLVolume& A) {
     cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
     clCheck( clEnqueueCopyImageToBuffer(queue, A.data.pointer, buffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0) ); // FIXME
 
@@ -49,7 +49,7 @@ inline float SSQ(const VolumeF& A) {
 }
 
 KERNEL(sum, SSE) //__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch
-inline float SSE(const VolumeF& A, const VolumeF& B) {
+inline float SSE(const CLVolume& A, const CLVolume& B) {
     assert_(A.size == B.size);
     cl_mem Abuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
     clEnqueueCopyImageToBuffer(queue, A.data.pointer, Abuffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0); // FIXME
@@ -73,7 +73,7 @@ inline float SSE(const VolumeF& A, const VolumeF& B) {
 }
 
 KERNEL(sum, dotProduct) //__global float* A, __global float* B, __global float* output, size_t count, __local volatile float* scratch
-inline float dotProduct(const VolumeF& A, const VolumeF& B) {
+inline float dotProduct(const CLVolume& A, const CLVolume& B) {
     assert_(A.size == B.size);
     cl_mem Abuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, A.size.x*A.size.y*A.size.z * sizeof(float), 0, 0);
     clEnqueueCopyImageToBuffer(queue, A.data.pointer, Abuffer, (size_t[]){0,0,0}, (size_t[]){size_t(A.size.x),size_t(A.size.y),size_t(A.size.z)}, 0,0,0,0); // FIXME

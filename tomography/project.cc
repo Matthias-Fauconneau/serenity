@@ -31,7 +31,7 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
 
 KERNEL(project, project)
 
-static void project(cl_mem buffer, size_t bufferOffset, int3 imageSize, const VolumeF& volume, const uint index) {
+static void project(cl_mem buffer, size_t bufferOffset, int3 imageSize, const CLVolume& volume, const uint index) {
     // Cylinder parameters
     const float radius = float(volume.size.x-1)/2;
     const float halfHeight = float(volume.size.z-1 -1 )/2;  //(N-1 [domain size] - epsilon)
@@ -46,7 +46,7 @@ static void project(cl_mem buffer, size_t bufferOffset, int3 imageSize, const Vo
 }
 
 /// Projects \a volume onto \a image according to \a projection
-void project(const ImageF& image, const VolumeF& volume, const uint projectionCount, const uint index) {
+void project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index) {
     cl_mem buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, image.data.size*sizeof(float), 0, 0);
     project(buffer, 0, int3(image.size, projectionCount), volume, index);
     // Transfers result
@@ -55,7 +55,7 @@ void project(const ImageF& image, const VolumeF& volume, const uint projectionCo
 }
 
 /// Projects (A) \a x to \a Ax
-void project(const ImageArray& Ax, const VolumeF& x) {
+void project(const ImageArray& Ax, const CLVolume& x) {
     cl_mem buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, Ax.size.y*Ax.size.x*sizeof(float), 0, 0);
     for(uint index: range(Ax.size.z)) { //FIXME: Queue all projections at once ?
         ::project(buffer, 0, Ax.size, x, index);
@@ -76,7 +76,7 @@ ProjectionArray::ProjectionArray(int3 volumeSize, int3 projectionSize) : size(pr
 KERNEL(backproject, backproject) //const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const struct mat4* worldToView, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
 
 /// Backprojects (At) \a b to \a Atb
-void backproject(const VolumeF& Atb, const ProjectionArray& At, const ImageArray& b) {
+void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b) {
     const float3 center = float3(Atb.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;

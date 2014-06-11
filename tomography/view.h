@@ -12,25 +12,28 @@ struct Value {
 };
 
 struct SliceView : Widget {
-    const VolumeF* volume;
+    int3 size;
+    const VolumeF* volume = 0;
+    const CLVolume* clVolume = 0;
     const int upsampleFactor;
     Value& index;
 
     static Value staticIndex;
-    SliceView(const VolumeF* volume, const int upsampleFactor, Value& index=staticIndex) : volume(volume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    SliceView(const VolumeF* volume, const int upsampleFactor, Value& index=staticIndex) : size(volume->size), volume(volume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    SliceView(const CLVolume* clVolume, const int upsampleFactor, Value& index=staticIndex) : size(clVolume->size), clVolume(clVolume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
     void render() override;
 };
 
 struct VolumeView : Widget {
-    const VolumeF* volume;
+    const CLVolume* volume;
     const int3 size;
     const int upsampleFactor;
     Value& index;
 
     static Value staticIndex;
-    VolumeView(const VolumeF* volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : volume(volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    VolumeView(const CLVolume* volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : volume(volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
     void render() override;

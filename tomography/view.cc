@@ -3,23 +3,26 @@
 Value SliceView::staticIndex;
 
 bool SliceView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
-    if(button) { index.value = clip(0, int(cursor.x*(volume->size.z-1)/(size.x-1)), int(volume->size.z)); index.render(); return true; }
+    if(button == WheelDown) { index.value = clip(0u, index.value-1, uint(this->size.z)); index.render(); return true; }
+    if(button == WheelUp) { index.value = clip(0u, index.value+1, uint(this->size.z)); index.render(); return true; }
+    if(button) { index.value = clip(0, int(cursor.x*(this->size.z-1)/(size.x-1)), int(this->size.z-1)); index.render(); return true; }
     return false;
 }
 
-int2 SliceView::sizeHint() { return upsampleFactor * volume->size.xy(); }
+int2 SliceView::sizeHint() { return upsampleFactor * this->size.xy(); }
 
 void SliceView::render() {
-    ImageF image = slice(*volume, index.value);
-    while(image.size < target.size()) image = upsample(image);
-    Image t = clip(target, (target.size()-image.size)/2+Rect(image.size));
-    if(t.size() == image.size) convert(t, image, 0);
+    ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
+    while(image.size < this->target.size()) image = upsample(image);
+    Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
+    assert_(target.size() == image.size);
+    convert(target, image, 0);
 }
 
 Value VolumeView::staticIndex;
 
 bool VolumeView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
-    if(button) { index.value = clip(0, int(cursor.x*(this->size.z-1)/(size.x-1)), int(this->size.z)); index.render(); return true; }
+    if(button) { index.value = clip(0, int(cursor.x*(this->size.z-1)/(size.x-1)), int(this->size.z-1)); index.render(); return true; }
     return false;
 }
 

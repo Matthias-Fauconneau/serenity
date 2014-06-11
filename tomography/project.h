@@ -11,10 +11,10 @@ struct Projection {
 // -- Projection --
 
 /// Projects \a volume into \a image according to \a projection
-void project(const ImageF& image, const VolumeF& volume, const uint projectionCount, const uint index);
+void project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index);
 
 /// Projects (A) \a x to \a Ax
-void project(const ImageArray& Ax, const VolumeF& x);
+void project(const ImageArray& Ax, const CLVolume& x);
 
 // -- Backprojection --
 
@@ -26,4 +26,4 @@ struct ProjectionArray {
 };
 
 /// Backprojects (At) \a b to \a Atb
-void backproject(const VolumeF& Atb, const ProjectionArray& At, const ImageArray& b);
+void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b);

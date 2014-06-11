@@ -1,14 +1,5 @@
 #include "thread.h"
-#include "vector.h"
-
-struct VolumeF {
-    VolumeF(int3 size, const ref<float>& data) : size(size), data(data) { assert_(data.size == (size_t)size.x*size.y*size.z); }
-    VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
-    inline float& operator()(uint x, uint y, uint z) const {assert_(x<size.x && y<size.y && z<size.z, x,y,z, size); return data[z*size.y*size.x+y*size.x+x]; }
-
-    uint3 size = 0;
-    buffer<float> data;
-};
+#include "volume.h"
 
 /// Downsamples a volume by averaging 2x2x2 samples
 void downsample(const VolumeF& target, const VolumeF& source) {
@@ -19,7 +10,6 @@ void downsample(const VolumeF& target, const VolumeF& source) {
 }
 
 void __attribute((constructor)) script() {
-    //downsample(VolumeF(Map(File("data/256.ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(256)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/512.ref"_)));
-    //downsample(VolumeF(Map(File("data/128.ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(128)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/256.ref"_)));
-    downsample(VolumeF(Map(File("data/64.ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(64)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/128.ref"_)));
+    const int N = fromInteger(arguments()[0]);
+    downsample(VolumeF(Map(File("data/"_+dec(N)+".ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/"_+dec(N*2)+".ref"_)));
 }

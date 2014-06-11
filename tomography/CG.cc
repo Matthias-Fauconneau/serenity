@@ -11,7 +11,7 @@ ConjugateGradient::ConjugateGradient(int3 volumeSize, const ImageArray& b) : Rec
 
 // y := alpha * a + beta * b;
 KERNEL(apply, apply)
-void apply(const VolumeF& y, const float alpha, const VolumeF& a, const float beta, const VolumeF& b) {
+void apply(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) {
     setKernelArgs(applyKernel, y.data.pointer, alpha, a.data.pointer, beta, b.data.pointer);
     clCheck( clEnqueueNDRangeKernel(queue, applyKernel, 3, 0, (size_t[]){size_t(y.size.x), size_t(y.size.y), size_t(y.size.z)}, 0, 0, 0, 0), "Apply: y = α a + β b");
 }

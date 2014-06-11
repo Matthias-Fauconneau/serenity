@@ -2,7 +2,7 @@
 #include "project.h"
 
 struct Reconstruction {
-    VolumeF x;
+    CLVolume x;
 
     int k = 0;
     uint64 totalTime = 0;
