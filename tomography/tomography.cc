@@ -1,4 +1,4 @@
-#include "cg.h"
+#include "CG.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"

@@ -56,8 +56,10 @@ ui/plot.h
 
 tomography/apply.cl
 tomography/backproject.cl
-tomography/cg.cc
-tomography/cg.h
+tomography/CG.cc
+tomography/CG.h
+tomography/OSTR.cc
+tomography/OSTR.h
 tomography/project.cc
 tomography/project.cl
 tomography/project.h
@@ -68,3 +70,4 @@ tomography/tomography.cc
 tomography/view.cc
 tomography/view.h
 tomography/volume.h
+tomography/downsample.cc

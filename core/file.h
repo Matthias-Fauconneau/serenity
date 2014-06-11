@@ -107,7 +107,7 @@ struct File : Stream {
     int64 modifiedTime() const;
 
     /// Resizes file
-    void resize(int64 size);
+    File& resize(int64 size);
     /// Seeks to \a index
     void seek(int index);
 };

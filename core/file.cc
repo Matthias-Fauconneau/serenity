@@ -85,7 +85,7 @@ FileType File::type() const { return FileType(stat().st_mode&__S_IFMT); }
 int64 File::size() const { return stat().st_size; }
 int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st_atim.tv_sec*1000000000ull + stat.st_atim.tv_nsec; }
 int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
-void File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); }
+File& File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); return *this; }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
 #if __arm__

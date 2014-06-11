@@ -1,4 +1,4 @@
-#include "cg.h"
+#include "CG.h"
 #include "sum.h"
 #include "time.h"
 
@@ -31,6 +31,5 @@ void ConjugateGradient::step() {
     apply(p, 1, r, beta, p); //Search direction: p = r + β p
     residualEnergy = newResidual;
 
-    k++;
-    totalTime += time;
+    k++; totalTime += time;
 }
