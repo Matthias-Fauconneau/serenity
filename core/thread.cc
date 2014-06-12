@@ -56,13 +56,13 @@ Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
+void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); assert_(thread); }
 
 void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority);
     while(!terminate) {
-        if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main)
+        //if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main) (FIXME: Unregistered Poll might still queue on this thread)
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop

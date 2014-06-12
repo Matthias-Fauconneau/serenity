@@ -42,15 +42,18 @@ Image decodeImage(const ref<byte>& file) {
     else { if(file.size) error("Unknown image format"_,hex(file.slice(0,min<int>(file.size,4)))); return Image(); }
 }
 
-void convert(const Image& target, const ImageF& source, float max) {
-    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) if(isNumber(source(x,y))) max=::max(max, source(x,y));
-    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
-        uint linear12 = 0xFFF*clip(0.f, source(x,y)/max, 1.f);
+float convert(const Image& target, const ImageF& source, float max) {
+    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) { assert_(isNumber(source(x,y))); max=::max(max, abs(source(x,y))); }
+    if(max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
+        float v = source(x,y)/max;
+        assert_(abs(v) <= 1, source(x,y), max);
+        uint linear12 = 0xFFF*abs(v);
         extern uint8 sRGB_forward[0x1000];
         assert_(linear12 < 0x1000);
         uint8 sRGB = sRGB_forward[linear12];
-        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
+        target(x,y) = v > 0 ? byte4(sRGB, sRGB, sRGB, 0xFF) : byte4(sRGB, 0, 0, 0xFF);
     }
+    return max;
 }
 
 ImageF downsample(const ImageF& source) {

@@ -1,4 +1,6 @@
 #include "view.h"
+#include "text.h"
+#include "sum.h"
 
 Value SliceView::staticIndex;
 
@@ -18,6 +20,7 @@ void SliceView::render() {
     if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     convert(target, image, 0);
+    Text(str(volume ? sum(*volume) : sum(*clVolume)),16,1).render(this->target, 0);
 }
 
 Value VolumeView::staticIndex;
@@ -33,5 +36,8 @@ void VolumeView::render() {
     ImageF image = ImageF( size.xy() );
     project(image, volume, size.z, index.value);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
+    if(!target) return; // FIXME
+    assert_(target.size() == image.size, target.size(), image.size);
     convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, 0);
+    Text(str(sum(volume)),16,1).render(this->target, 0);
 }

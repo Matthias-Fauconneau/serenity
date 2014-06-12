@@ -19,3 +19,5 @@ inline ImageF slice(const VolumeF& volume, size_t index /* Z slice or projection
     assert_(index < size_t(size.z), index);
     return ImageF(buffer<float>(volume.data.slice(index*size.y*size.x,size.y*size.x)), int2(size.x,size.y));
 }
+
+inline float sum(const VolumeF& volume) { return sum(volume.data); }

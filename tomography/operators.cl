@@ -18,6 +18,6 @@ kernel void update(image3d_t Y, read_only image3d_t A, const float lambda, read_
     float a = read_imagef(A, i).x;
     float b = read_imagef(B, i).x;
     float c = read_imagef(C, i).x;
-    float d = a + c ? lambda * b / c : 0;
+    float d = c ? lambda * b / c : 0;
     write_imagef(Y, i, d > 0 ? d : 0);
 }

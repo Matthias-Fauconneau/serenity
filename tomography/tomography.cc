@@ -8,7 +8,7 @@
 #include "sum.h"
 
 Folder folder = 1 ? "ellipsoids"_ : "rock"_;
-const string name = arguments()[0];
+const uint N = fromInteger(arguments()[0]);
 
 struct Application : Poll {
     // Evaluation
@@ -21,20 +21,34 @@ struct Application : Poll {
     reconstruction {referenceVolume.size, projectionData};
 
     // Interface
-    int upsample = 4;
+    int upsample = 256 / projectionData.x;
     Value projectionIndex;
-    SliceView projectionView {projectionData, upsample, projectionIndex};
-    VolumeView reconstructionView {reconstruction.x, projectionData.size, upsample, projectionIndex};
-    HBox top {{&projectionView, &reconstructionView}};
+    SliceView b {projectionData, upsample, projectionIndex};
+    VolumeView x {reconstruction.x, projectionData.size, upsample, projectionIndex};
+#define DETAILS 1
+#if DETAILS
+    VolumeView oldX {reconstruction.oldX, projectionData.size, upsample, projectionIndex};
+    SliceView Ax {reconstruction.Ax, upsample, projectionIndex};
+    SliceView h {reconstruction.h, upsample, projectionIndex};
+    VolumeView L {reconstruction.L, projectionData.size, upsample, projectionIndex};
+    VolumeView LoAti {reconstruction.LoAti, projectionData.size, upsample, projectionIndex};
+    HBox layout {{&b, &oldX, &Ax, &h, &L, &LoAti, &x}};
+#else
+    HBox top {{&b, &x}};
     Plot plot;
     Value sliceIndex;
     SliceView referenceSliceView {referenceVolume, upsample, sliceIndex};
     SliceView reconstructionSliceView {reconstruction.x, upsample, sliceIndex};
     HBox bottom {{&plot, &referenceSliceView, &reconstructionSliceView}};
     VBox layout {{&top, &bottom}};
-    Window window {&layout, strx(projectionData.size)+" "_+strx(referenceVolume.size) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
+#endif
 
-    Application() : Poll(0,0,thread), projectionData(Map(name+".proj"_, folder)),referenceVolume(Map(name+".ref"_, folder)) { queue(); thread.spawn(); }
+    Window window {&layout, strx(projectionData.size)+" "_+strx(referenceVolume.size) /*, int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)*/}; // FIXME
+
+    Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)),referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) {
+        queue(); thread.spawn();
+        window.actions[Space] = [this]{ queue(); };
+    }
     void event() {
         reconstruction.step();
         const float SSE = ::SSE(referenceVolume, reconstruction.x);
@@ -42,12 +56,16 @@ struct Application : Poll {
         const float MSE = SSE / SSQ;
         const float PSNR = 10*log10( MSE );
         const uint k = reconstruction.k;
-        //const float time = reconstruction.totalTime/1000000000.f; //FIXME: OpenCL kernel time
-        plot["CG"_].insertMulti(/*time*/ k, -PSNR);
-        log(k, /*reconstruction.totalTime/1000000000.f,*/ MSE, -PSNR);
-        reconstructionView.render(); reconstructionSliceView.render(); window.renderBackground(plot.target); plot.render(); window.immediateUpdate();
+        log(k, MSE, -PSNR);
+#if DETAILS
+        oldX.render(); Ax.render(); h.render(); LoAti.render(); L.render();
+#else
+        window.renderBackground(plot.target); plot["CG"_].insertMulti(/*time*/ k, -PSNR); plot.render();
+        reconstructionSliceView.render();
+#endif
+        x.render(); window.immediateUpdate();
         //if(SSE<=lastSSE)
-            queue();
+            //queue();
         lastSSE = SSE;
     }
 } app;

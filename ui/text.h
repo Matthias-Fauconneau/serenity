@@ -36,6 +36,7 @@ struct Text : virtual Widget {
     int2 sizeHint();
     void layout();
     void render() override;
+    void render(const Image& target) { Widget::render(target); }
     void render(const Image& target, int2 offset);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
