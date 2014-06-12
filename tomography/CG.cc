@@ -10,8 +10,7 @@ ConjugateGradient::ConjugateGradient(int3 volumeSize, const ImageArray& b) : Rec
     copy(p, r);
 }
 
-// y := α a + β b
-CL(apply, apply) void apply(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { CL::apply(y.size, y, alpha, a, beta, b); }
+CL(operators, add) void add(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { CL::add(y.size, y, alpha, a, beta, b); } // y = α a + β b
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 void ConjugateGradient::step() {
@@ -22,11 +21,11 @@ void ConjugateGradient::step() {
     float pAtAp = dotProduct(p, AtAp); // |p·AtAp|
     assert_(pAtAp);
     float alpha = residualEnergy / pAtAp;
-    apply(r, 1, r, -alpha, AtAp); // Residual: r = r - α AtAp
-    apply(x, 1, x, alpha, p); // Estimate: x = x + α p
+    add(r, 1, r, -alpha, AtAp); // Residual: r = r - α AtAp
+    add(x, 1, x, alpha, p); // Estimate: x = x + α p
     float newResidual = SSQ(r); // |r|²
     float beta = newResidual / residualEnergy;
-    apply(p, 1, r, beta, p); //Search direction: p = r + β p
+    add(p, 1, r, beta, p); //Search direction: p = r + β p
     residualEnergy = newResidual;
 
     k++; totalTime += time;

@@ -1,4 +1,5 @@
 #include "CG.h"
+#include "SART.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -12,7 +13,9 @@ struct Application : Poll {
     const CLVolume projectionData;
     const CLVolume referenceVolume;
     const float SSQ = ::SSQ(referenceVolume);
-    ConjugateGradient reconstruction {referenceVolume.size, projectionData};
+    //ConjugateGradient
+    SART
+    reconstruction {referenceVolume.size, projectionData};
 
     // Interface
     int upsample = 4;
@@ -31,11 +34,17 @@ struct Application : Poll {
     Application(string projectionPath, string referencePath) : Poll(0,0,thread), projectionData(Map(projectionPath)),referenceVolume(Map(referencePath)) { queue(); thread.spawn(); }
     void event() {
         reconstruction.step();
-        const float MSE = ::SSE(referenceVolume, reconstruction.x) / SSQ;
+        const float SSE = ::SSE(referenceVolume, reconstruction.x);
+        static float lastSSE = SSE;
+        const float MSE = SSE / SSQ;
         const float PSNR = 10*log10( MSE );
-        plot["CG"_].insert(reconstruction.totalTime/1000.f, -PSNR);
-        log(reconstruction.k, reconstruction.totalTime/1000.f, MSE, -PSNR);
+        const uint k = reconstruction.k;
+        //const float time = reconstruction.totalTime/1000000000.f; //FIXME: OpenCL kernel time
+        plot["CG"_].insertMulti(/*time*/ k, -PSNR);
+        log(k, /*reconstruction.totalTime/1000000000.f,*/ MSE, -PSNR);
         reconstructionView.render(); reconstructionSliceView.render(); window.renderBackground(plot.target); plot.render(); window.immediateUpdate();
-        queue();
+        //if(SSE<=lastSSE)
+            queue();
+        lastSSE = SSE;
     }
 } app ("data/"_+arguments()[0]+".proj"_, "data/"_+arguments()[0]+".ref"_);

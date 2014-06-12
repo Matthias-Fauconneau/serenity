@@ -38,11 +38,12 @@ void CLKernel::setKernelArg(uint index, size_t size, const void* value) { clChec
 void CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) {
     cl_event event;
     clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0, &event) );
+#if PROFILE
     clCheck( clWaitForEvents(1, &event) );
     cl_ulong start; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(start), &start, 0);
     cl_ulong end; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(end), &end, 0);
-    //log(trace(1));
-    log(name, str((end-start)/1000000.0)+"ms"_);
+    log(name, dec(round((end-start)/1000000.0))+"ms"_);
+#endif
 }
 
 CLMem::~CLMem() { if(pointer) clReleaseMemObject(pointer); pointer=0; }

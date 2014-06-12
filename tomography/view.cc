@@ -15,6 +15,7 @@ void SliceView::render() {
     ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
     while(image.size < this->target.size()) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
+    if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     convert(target, image, 0);
 }

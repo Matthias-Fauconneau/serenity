@@ -25,8 +25,9 @@ struct Time {
     Time() { start(); }
     void start() { startTime = realTime() - (stopTime ? stopTime-startTime : 0); stopTime=0; }
     void stop() { if(!stopTime) stopTime = realTime(); }
-    operator uint64() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000 : 0; }
-    float toFloat() const { return startTime ? ((stopTime?:realTime()) - startTime)/1000000000.f : 0; }
+    uint64 elapsed() const { return startTime ? ((stopTime?:realTime()) - startTime) : 0; }
+    operator uint64() const { return elapsed(); }
+    float toFloat() const { return elapsed()/1000000000.f; }
 };
 inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
 inline String operator/(const Time& a, const Time& b) { return b ? dec(round(100*a.toFloat()/b.toFloat()))+"%"_ : ""_; }

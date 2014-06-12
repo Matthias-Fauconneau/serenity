@@ -12,6 +12,7 @@ typedef struct _cl_sampler* cl_sampler;
 
 struct CLMem : handle<cl_mem> {
     CLMem(cl_mem mem) : handle(mem) { assert_(mem); }
+    default_move(CLMem);
     ~CLMem();
 };
 

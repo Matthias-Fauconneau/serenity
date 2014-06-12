@@ -54,12 +54,12 @@ ui/x.h
 ui/plot.cc
 ui/plot.h
 
-tomography/apply.cl
+tomography/operators.cl
 tomography/backproject.cl
 tomography/CG.cc
 tomography/CG.h
-tomography/OSTR.cc
-tomography/OSTR.h
+tomography/SART.cc
+tomography/SART.h
 tomography/project.cc
 tomography/project.cl
 tomography/project.h
