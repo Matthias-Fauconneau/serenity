@@ -56,10 +56,10 @@ ui/plot.h
 
 tomography/operators.cl
 tomography/backproject.cl
-tomography/CG.cc
-tomography/CG.h
-tomography/SART.cc
-tomography/SART.h
+tomography/conjugate.cc
+tomography/conjugate.h
+tomography/algebraic.cc
+tomography/algebraic.h
 tomography/project.cc
 tomography/project.cl
 tomography/project.h

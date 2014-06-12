@@ -5,6 +5,7 @@
 #include "image.h"
 #include "file.h"
 #include "map.h"
+#include "thread.h"
 struct  FT_FaceRec_;
 
 const Folder& fonts();
@@ -49,4 +50,5 @@ struct Font {
     handle<FT_FaceRec_*> face;
     float fontSize=0, ascender=0;
     map<uint, map<uint16, Glyph>> cache;
+    Lock lock;
 };

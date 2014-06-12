@@ -1,4 +1,4 @@
-#include "CG.h"
+#include "conjugate.h"
 #include "sum.h"
 #include "time.h"
 

@@ -154,6 +154,7 @@ struct Window : Device {
 
     /// Synchronizes access to connection and event queue
     Lock lock;
+    Lock renderLock; // Maybe used by application to synchronize rendering (e.g Font is not thread-safe)
 
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;

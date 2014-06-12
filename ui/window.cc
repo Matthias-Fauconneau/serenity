@@ -157,7 +157,9 @@ void Window::event() {
         }
 
         renderBackground(target);
-        widget->render(target);
+        {Locker lock(renderLock);
+            widget->render(target);
+        }
         needRender = false;
         needUpdate = true;
     }

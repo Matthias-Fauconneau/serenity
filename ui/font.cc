@@ -49,17 +49,16 @@ uint16 Font::index(uint16 code) {
 float Font::kerning(uint16 leftIndex, uint16 rightIndex) {
     FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6;
 }
-float Font::advance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->advance.x*0x1p-6; }
-float Font::linearAdvance(uint16 index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->linearHoriAdvance*0x1p-16; }
-vec2 Font::size(uint16 index) {
-    FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
-}
+float Font::advance(uint16 index) { Locker locker(lock); FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->advance.x*0x1p-6; }
+float Font::linearAdvance(uint16 index) { Locker locker(lock); FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->linearHoriAdvance*0x1p-16; }
+vec2 Font::size(uint16 index) { Locker locker(lock); FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6); }
 
 const Glyph& Font::glyph(uint16 index, int) {
     Glyph& glyph = cache[uint(fontSize)][index];
     if(glyph.valid) return glyph;
     glyph.valid=true;
 
+    Locker locker(lock);
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);

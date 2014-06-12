@@ -36,7 +36,8 @@ generic struct CLBuffer : CLRawBuffer {
 typedef CLBuffer<float> CLBufferF;
 
 struct CLVolume : CLMem {
-    CLVolume(int3 size, const ref<float>& data={});
+    CLVolume(int3 size, float value=0);
+    CLVolume(int3 size, const ref<float>& data);
     CLVolume(const ref<float>& data) : CLVolume(round(pow(data.size,1./3)), data) {}
     default_move(CLVolume);
 

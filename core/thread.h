@@ -20,6 +20,7 @@ extern struct Thread mainThread;
 struct Lock : handle<pthread_mutex_t> {
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
+    default_move(Lock);
     /// Locks the mutex.
     void lock() { pthread_mutex_lock(&pointer); }
     /// Atomically lock the mutex only if unlocked.
