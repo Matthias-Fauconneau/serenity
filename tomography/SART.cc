@@ -23,7 +23,7 @@ void SART::step() {
     project(Ax, x); // Ax = A x
     delta(h, b, Ax, Ai); // h = ( b - Ax ) / Ai
     backproject(L, At, h); // L = At h
-    const float lambda = 1./4;
+    const float lambda = 1./2;
     update(x, x, lambda, L, Ati); // x = | x + λ L / Ati |+
 
     k++; totalTime += time;

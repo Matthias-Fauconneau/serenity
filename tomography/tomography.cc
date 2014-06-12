@@ -7,14 +7,17 @@
 #include "view.h"
 #include "sum.h"
 
+Folder folder = 1 ? "ellipsoids"_ : "rock"_;
+const string name = arguments()[0];
+
 struct Application : Poll {
     // Evaluation
     Thread thread {19};
     const CLVolume projectionData;
     const CLVolume referenceVolume;
     const float SSQ = ::SSQ(referenceVolume);
-    //ConjugateGradient
     SART
+    //ConjugateGradient
     reconstruction {referenceVolume.size, projectionData};
 
     // Interface
@@ -31,7 +34,7 @@ struct Application : Poll {
     VBox layout {{&top, &bottom}};
     Window window {&layout, strx(projectionData.size)+" "_+strx(referenceVolume.size) , int2(3*projectionView.sizeHint().x,projectionView.sizeHint().y+512)}; // FIXME
 
-    Application(string projectionPath, string referencePath) : Poll(0,0,thread), projectionData(Map(projectionPath)),referenceVolume(Map(referencePath)) { queue(); thread.spawn(); }
+    Application() : Poll(0,0,thread), projectionData(Map(name+".proj"_, folder)),referenceVolume(Map(name+".ref"_, folder)) { queue(); thread.spawn(); }
     void event() {
         reconstruction.step();
         const float SSE = ::SSE(referenceVolume, reconstruction.x);
@@ -47,4 +50,4 @@ struct Application : Poll {
             queue();
         lastSSE = SSE;
     }
-} app ("data/"_+arguments()[0]+".proj"_, "data/"_+arguments()[0]+".ref"_);
+} app;

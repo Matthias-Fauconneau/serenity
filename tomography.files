@@ -73,3 +73,6 @@ tomography/volume.h
 tomography/downsample.cc
 tomography/acquisition.cc
 tomography/sum.cc
+tomography/phantom.cc
+tomography/phantom.h
+tomography/synthetic.cc
