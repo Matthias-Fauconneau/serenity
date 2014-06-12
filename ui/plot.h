@@ -20,7 +20,7 @@ struct Plot : virtual Widget {
     void render() override;
 
     String title, xlabel, ylabel;
-    bool log[2] = {true, false};
+    bool log[2] = {false, false};
     array<DataSet> dataSets;
     bool plotPoints = true, plotLines = false;
     LegendPosition legendPosition;

@@ -14,5 +14,5 @@ struct Reconstruction {
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
-inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.totalTime < b.totalTime; }
+inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.k < b.k /*a.totalTime < b.totalTime*/; }
 inline String str(const Reconstruction& r) { return str(r.k, r.totalTime); }
