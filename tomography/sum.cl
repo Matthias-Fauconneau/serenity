@@ -1,4 +1,5 @@
 #define blockSize 128
+#define size_t uint
 
 // Sum
 kernel void sum(global float*  A, global float* blockSums, size_t count, local volatile float* sdata) {

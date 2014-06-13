@@ -39,7 +39,7 @@ static uint64 project(const CLBufferF& buffer, int3 imageSize, const CLVolume& v
     float3 origin = imageToWorld[3].xyz();
     // dataOrigin uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
     //                                                    imageToWorld, plusMinusHalfHeightMinusOriginZ,                         c,                                                                     radiusSq,    halfHeight, dataOrigin
-    return CL::project(imageSize.xy(), imageToWorld, float2(1,-1) * (center.z-1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) + 1 /*fix OOB*/, sq(center.x), center.z, float4(origin + center + float3(1./2),0), volume, noneLinearSampler, imageSize.x, buffer);
+    return CL::project(imageSize.xy(), imageToWorld, float2(1,-1) * (center.z-1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) + 1 /*fix OOB*/, sq(center.x), center.z, float4(origin + center + float3(1./2),0), volume, noneLinearSampler, imageSize.x, buffer.pointer);
 }
 
 /// Projects \a volume onto \a image according to \a projection
@@ -72,5 +72,5 @@ uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageAr
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;
     // imageCenter uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
-    return CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter + float2(1./2), At.size, At, b, clampLinearSampler, Atb);
+    return emulateWriteTo3DImage(CL::backproject, Atb, float4(center,0), radiusSq, imageCenter + float2(1./2), uint(At.size), At, b, clampLinearSampler);
 }

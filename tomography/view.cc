@@ -21,6 +21,7 @@ void SliceView::render() {
     assert_(target.size() == image.size, target.size(), image.size);
     convert(target, image, 0);
     //Text(str(volume ? sum(*volume) : sum(*clVolume)),16,1).render(this->target, 0);
+    putImage(target);
 }
 
 Value VolumeView::staticIndex;
@@ -41,4 +42,5 @@ void VolumeView::render() {
     assert_(target.size() == image.size, target.size(), image.size);
     convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
     //Text(str(sum(volume)),16,1).render(this->target, 0);
+    putImage(target);
 }

@@ -55,6 +55,9 @@ void copy(const CLVolume& target, const CLVolume& source, const int3 origin=0);
 // Copy volume into buffer
 void copy(const CLBufferF& target, const CLVolume& source, const int3 origin=0, const int3 size=0);
 
+// Copy buffer into volume
+void copy(const CLVolume& target, const CLBufferF& source);
+
 // Inserts a slice buffer into volume
 void copy(const CLVolume& target, size_t index, const CLBufferF& source);
 
@@ -94,3 +97,10 @@ struct CLKernel {
 #define CL(file, name) \
     extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
     namespace CL { static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), str(#name)); }
+
+template<Type... Args> inline uint64 emulateWriteTo3DImage(CLKernel& kernel, const CLVolume& y, const Args&... args) {
+    CLBufferF buffer (y.size.z*y.size.y*y.size.x);
+    uint64 time = kernel(y.size, buffer.pointer, y.size.y*y.size.x, y.size.x, args...);
+    copy(y, buffer); // FIXME: Nvidia OpenCL doesn't support writes to 3D images
+    return time;
+}

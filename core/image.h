@@ -27,6 +27,7 @@ struct Image {
         assert(width); assert(height);
         buffer=::buffer<byte4>(height*(stride?:width)); data=buffer.begin();
     }
+    Image(int2 size) : Image(size.x, size.y) {}
 
     explicit operator bool() const { return data; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }

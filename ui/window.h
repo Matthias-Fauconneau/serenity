@@ -39,6 +39,8 @@ struct Window : Device {
     /// Registers global action on \a key
     function<void()>& globalAction(Key);
 
+    void render();
+
     /// Sends a partial update
     void putImage(Rect r=Rect(0));
 
@@ -89,9 +91,9 @@ struct Window : Device {
     /// Whether a motion event is pending processing
     bool motionPending = false;
     /// Whether to trigger full render after all events are processed
-    bool needRender = false;
+    //bool needRender = false;
     /// Whether to trigger full update after all events are processed
-    bool needUpdate = false;
+    Rect needUpdate = Rect(0);
     /// Whether the current display is active
     bool displayState = true;
     /// Pending long actions
@@ -103,8 +105,8 @@ struct Window : Device {
     /// Event handler
     void event();
     /// Schedules window rendering after all events have been processed (i.e Poll::wait())
-    void queueRender();
-    void immediateUpdate();
+    //void queueRender();
+    //void immediateUpdate();
 
     /// Processes one X event
     void processEvent(uint8 type, const XEvent& e);

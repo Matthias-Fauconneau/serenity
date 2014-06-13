@@ -7,6 +7,16 @@ bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(window->cursorPosition)) window->cursor=cursor; }
+void putImage(Rect region) { assert(window); window->putImage(region); }
+#include "trace.h"
+void putImage(const Image& target) {
+    assert(window);
+    assert(target.buffer == window->target.buffer);
+    uint delta = target.data - window->target.data;
+    uint x = delta % target.stride, y = delta / target.stride;
+    assert_(x+target.width<=window->target.width && y+target.height<=window->target.height);
+    window->putImage(int2(x,y)+Rect(target.size()));
+}
 
 #if X11
 #include "file.h"
@@ -134,53 +144,64 @@ void Window::event() {
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     if(motionPending) processEvent(LastEvent, XEvent());
-    if(needRender) {
-        assert(size);
-
-        //if(state!=Idle) { state=Wait; return; } // Synchronizes full render
-        if(target.size() != size) {
-            if(remote) target = Image(size.x, size.y);
-            else {
-                if(shm) {
-                    {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
-                    shmdt(target.data);
-                    shmctl(shm, IPC_RMID, 0);
-                }
-                target.width=size.x, target.height=size.y;
-                target.stride = remote ? size.x : align(16,size.x);
-                target.buffer.size = target.height*target.stride;
-                assert_(target.buffer.size < 4096*4096, target.width, target.height);
-                shm = check( shmget(0, target.buffer.size*sizeof(byte4), IPC_CREAT | 0777) );
-                target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
-                Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));
-            }
-        }
-
-        renderBackground(target);
-        {Locker lock(renderLock);
-            widget->render(target);
-        }
-        needRender = false;
-        needUpdate = true;
-    }
-    if(needUpdate) {
+    /*if(needRender) {
+        render(); // without putImage
+        //needRender = false;
+        //needUpdate = true;
+    }*/
+    if(needUpdate != Rect(0)) {
         if(!remote) if(state!=Idle) { state=Wait; return; }
-        putImage();
-        needUpdate = false;
+        putImage(needUpdate);
+        needUpdate = Rect(0);
     }
+}
+
+void Window::render() {
+    //if(state!=Idle) { state=Wait; return; } // Synchronizes full render
+    if(target.size() != size) {
+        if(remote) target = Image(size.x, size.y);
+        else {
+            if(shm) {
+                {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
+                shmdt(target.data);
+                shmctl(shm, IPC_RMID, 0);
+            }
+            target.width=size.x, target.height=size.y;
+            target.stride = remote ? size.x : align(16,size.x);
+            target.buffer.size = target.height*target.stride;
+            assert_(target.buffer.size < 4096*4096, target.width, target.height);
+            shm = check( shmget(0, target.buffer.size*sizeof(byte4), IPC_CREAT | 0777) );
+            target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
+            Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));
+        }
+    }
+
+    renderBackground(target);
+    {Locker lock(renderLock);
+        widget->render(target);
+    }
+    //putImage(); Each widget will call putImage on its target region once updated
 }
 
 void Window::putImage(Rect rect) {
     if(rect==Rect(0)) rect=Rect(target.size());
     assert_(id); assert_(rect.size());
+    //log(trace(1));
+    //log(rect);
     if(remote) {
+        Image target = share(this->target);
+        if(rect != Rect(target.size())) {
+            target = Image(rect.size());
+            copy(target, clip(this->target, rect));
+        }
         assert_(target.buffer.size == (size_t)target.size().x*target.size().y);
-        ::PutImage r; r.drawable=id+XWindow; r.context=id+GContext; r.w=target.size().x, r.h=target.size().y; r.size += target.buffer.size;
+        ::PutImage r; r.drawable=id+XWindow; r.context=id+GContext; r.w=target.size().x, r.h=target.size().y; r.x=rect.min.x, r.y=rect.min.y; r.size += target.buffer.size;
         assert_(raw(r).size + cast<byte>(target.buffer).size == r.size*4);
         send(String(raw(r)+cast<byte>(target.buffer)));
         assert_(r.size <= maximumRequestLength, r.size, maximumRequestLength);
     } else {
-        assert_(state==Idle);
+        if(state!=Idle) { assert_(needUpdate==Rect(0) || needUpdate==rect, needUpdate, rect); needUpdate=rect; return; }
+        assert_(state==Idle, uint(state));
         Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
         r.totalW=target.stride; r.totalH=target.height;
         r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
@@ -228,39 +249,39 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             if(motionPending) {
                 motionPending = false;
                 Cursor lastCursor = cursor; cursor=Cursor::Arrow;
-                if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid full surface update
-                else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) {} //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
+                else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::None)) {} //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
                 if(cursor!=lastCursor) setCursor(cursor);
             }
             if(type==ButtonPress) {
                 Widget* focus=this->focus; this->focus=0;
                 dragStart=int2(e.rootX,e.rootY), dragPosition=position, dragSize=size;
-                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key) || this->focus!=focus) {} //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
             }
             else if(type==ButtonRelease) {
                 drag=0;
-                if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key)) {} //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
             }
             else if(type==KeyPress) keyPress(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
             else if(type==KeyRelease) keyRelease(KeySym(e.key, focus==directInput ? 0 : e.state), (Modifiers)e.state);
             else if(type==EnterNotify || type==LeaveNotify) {
                 if(type==LeaveNotify && hideOnLeave) hide();
                 if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
-                                       e.state&Button1Mask?Widget::LeftButton:Widget::None) ) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                                       e.state&Button1Mask?Widget::LeftButton:Widget::None) ) {} //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
             }
-            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) needRender=true; }
+            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) /*needRender=true;*/render();/*immediate*/ }
             else if(type==UnmapNotify) mapped=false;
             else if(type==MapNotify) mapped=true;
             else if(type==ReparentNotify) {}
             else if(type==ConfigureNotify) {
                 position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-                if(this->size!=size) { this->size=size; needRender=true;  }
+                if(this->size!=size) { this->size=size; /*needRender=true;*/ render();/*immediate*/  }
             }
             else if(type==GravityNotify) {}
             else if(type==ClientMessage) {
                 function<void()>* action = actions.find(Escape); // Translates to Escape keyPress event
                 if(action) (*action)(); // Local window action
-                else if(focus && focus->keyPress(Escape, NoModifiers)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update
+                else if(focus && focus->keyPress(Escape, NoModifiers)) ; //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
                 else exit(0); // Exits application by default
             }
             else if(type==Shm::event+Shm::Completion) { assert_(!remote); /*int stateWas=state;*/ state=Idle; if(displayed) displayed(); /*if(stateWas==Wait) render();*/ }
@@ -289,8 +310,8 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-void Window::queueRender() { needRender=true; if(mapped) queue(); }
-void Window::immediateUpdate() { needUpdate=true; if(mapped) event(); }
+//void Window::queueRender() { needRender=true; if(mapped) queue(); }
+//void Window::immediateUpdate() { needUpdate=true; if(mapped) event(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
@@ -418,6 +439,7 @@ void Window::setCursor(Cursor) {}
 
 // Snapshot
 Image Window::getSnapshot() {
+    assert_(!remote);
     Image buffer;
     buffer.stride=buffer.width=displaySize.x, buffer.height=displaySize.y;
     int shm = check( shmget(0, buffer.height*buffer.stride*sizeof(byte4) , IPC_CREAT | 0777) );
@@ -609,7 +631,7 @@ void Window::renderBackground(Image& target) {
 }
 
 void Window::keyPress(Key key, Modifiers modifiers) {
-    if(focus && focus->keyPress(key, modifiers)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update // Normal keyPress event
+    if(focus && focus->keyPress(key, modifiers)) ; //needUpdate=true; //FIXME: Assumes all widgets supports partial updates; Normal keyPress event
     else {
         function<void()>* action = actions.find(key);
         function<void()>* longAction = longActions.find(key);
@@ -622,7 +644,7 @@ void Window::keyPress(Key key, Modifiers modifiers) {
 
 
 void Window::keyRelease(Key key, Modifiers modifiers) {
-    if(focus && focus->keyRelease(key, modifiers)) needUpdate=true; //FIXME: Assumes all widgets supports partial updates; FIXME: avoid update full surface update  // Normal keyRelease event
+    if(focus && focus->keyRelease(key, modifiers)) ; //needUpdate=true; //FIXME: Assumes all widgets supports partial updates; Normal keyRelease event
     else if(longActionTimers.contains(key)) {
         longActionTimers.remove(key); // Removes long action before it triggers
         function<void()>* action = actions.find(key);

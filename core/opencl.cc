@@ -33,8 +33,8 @@ CLKernel::CLKernel(string source, string name) : name(name) {
     kernel = clCreateKernel(program, strz(name), &status);
     assert_(!status && kernel, clErrors[-status]);
 }
-#include "trace.h"
-void CLKernel::setKernelArg(uint index, size_t size, const void* value) { clCheck( ::clSetKernelArg(kernel, index, size, value) ); }
+
+void CLKernel::setKernelArg(uint index, size_t size, const void* value) { clCheck( ::clSetKernelArg(kernel, index, size, value), name, index, size); }
 uint64 CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) {
     cl_event event;
     clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0, &event) );
@@ -75,6 +75,11 @@ void copy(const CLBufferF& target, const CLVolume& source, const int3 origin, in
     assert_(origin+size <= source.size);
     assert_(target.size == (size_t)size.x*size.y*size.z);
     clCheck( clEnqueueCopyImageToBuffer(queue, source, target, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0,0,0) );
+}
+
+void copy(const CLVolume& target, const CLBufferF& source) {
+    assert_(source.size == (size_t)target.size.x*target.size.y*target.size.z);
+    clCheck( clEnqueueCopyBufferToImage(queue, source, target, 0, (size_t[]){size_t(0),size_t(0),size_t(0)}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0) );
 }
 
 void copy(const CLVolume& target, size_t index, const CLBufferF& slice) {
