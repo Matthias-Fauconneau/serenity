@@ -14,7 +14,7 @@ struct Projection {
 uint64 project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index);
 
 /// Projects (A) \a x to \a Ax
-uint64 project(const ImageArray& Ax, const CLVolume& x);
+uint64 project(const ImageArray& Ax, const CLVolume& x, uint startIndex=0, uint projectionCount=0);
 
 // -- Backprojection --
 

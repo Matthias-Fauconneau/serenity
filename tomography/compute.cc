@@ -1,5 +1,5 @@
 #include "algebraic.h"
-#include "conjugate.h"
+//include "conjugate.h"
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -19,7 +19,8 @@ struct Application : Poll {
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
     const string labels[2] {"SIRT"_, "CG"_};
-    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)};
+    //unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)};
+    unique<Reconstruction> reconstructions[1] {unique<Algebraic>(size, projectionData)};
 
     // Interface
     int upsample = 256 / projectionData.size.x;

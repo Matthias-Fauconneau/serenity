@@ -70,13 +70,14 @@ CLVolume::CLVolume(int3 size, const ref<float>& data) : CLMem(clCreateImage3D(co
 
 const VolumeF& CLVolume::read(const VolumeF& target, int3 origin) const {
     assert_(origin+target.size <= size);
-    clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0, target.data, 0,0,0) );
+    clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0, target.data, 0,0,0) );
     return target;
 }
 
-void copy(const CLVolume& target, const CLVolume& source, const int3 origin) {
+const CLVolume& copy(const CLVolume& target, const CLVolume& source, const int3 origin) {
     assert_(origin+target.size <= source.size);
     clCheck( clEnqueueCopyImage(queue, source, target, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){0,0,0}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0) );
+    return target;
 }
 
 void copy(const CLBufferF& target, const CLVolume& source, const int3 origin, int3 size) {

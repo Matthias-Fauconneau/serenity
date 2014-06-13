@@ -2,6 +2,12 @@
 #include "opencl.h"
 
 Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
+    // Subset setup
+    const uint projectionCount = projectionSize.z;
+    const uint subsetSize = round(sqrt(float(projectionCount))), subsetCount = round(sqrt(float(projectionCount))); // FIXME
+    assert_(subsetSize * subsetCount == projectionCount, subsetSize, subsetCount, projectionCount);
+    const uint subsetIndex = index / subsetSize, localIndex = index % subsetSize;
+    index = localIndex * subsetCount + subsetIndex;
     // Projection setup (coordinates in view space)
     const float detectorHalfWidth = 1;
     const float cameraLength = 1;
@@ -15,8 +21,8 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
 
     const bool doubleHelix = true;
     const float pitch = 2;
-    float angle = doubleHelix ? 2*PI*pitch*float(index/2)/((projectionSize.z-1)/2) + (index%2?PI:0) : 2*PI*pitch*float(index)/(projectionSize.z-1); // Rotation angle (in radians) around vertical axis
-    float dz = doubleHelix ? float(index/2)/float((projectionSize.z-1)/2) : float(index)/float(projectionSize.z-1);
+    float angle = doubleHelix ? 2*PI*pitch*float(index/2)/((projectionCount-1)/2) + (index%2?PI:0) : 2*PI*pitch*float(index)/(projectionCount-1); // Rotation angle (in radians) around vertical axis
+    float dz = doubleHelix ? float(index/2)/float((projectionCount-1)/2) : float(index)/float(projectionCount-1);
     float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space
 
     const float3 halfVolumeSize = float3(volumeSize-int3(1))/2.f;
@@ -51,11 +57,12 @@ uint64 project(const ImageF& image, const CLVolume& volume, const uint projectio
 }
 
 /// Projects (A) \a x to \a Ax
-uint64 project(const ImageArray& Ax, const CLVolume& x) {
+uint64 project(const ImageArray& Ax, const CLVolume& x, uint startIndex, uint projectionCount) {
+    if(!projectionCount) { assert_(!startIndex); projectionCount = Ax.size.z; }
     CLBufferF buffer (Ax.size.y*Ax.size.x);
     uint64 time = 0;
     for(uint index: range(Ax.size.z)) { //FIXME: Queue all projections at once ?
-        time += ::project(buffer, Ax.size, x, index);
+        time += ::project(buffer, int3(Ax.size.xy(), projectionCount), x, startIndex+index);
         copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     }
     return time;

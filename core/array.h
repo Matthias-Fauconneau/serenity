@@ -123,9 +123,19 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=after; return move(a);
 }
 
-/// Returns an array of the application of a function to every index up to a size
+/*/// Returns an array of the application of a function to every index up to a size
 template<class Function, class... Args> auto apply(uint size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
     buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
+}
+
+/// Returns an array of the application of a function to every index up to a size
+template<class Function, class... Args> auto apply(uint start, uint end, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
+    buffer<decltype(function(0, args...))> r(size); for(uint i: range(start,end)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
+}*/
+
+/// Returns an array of the application of a function to every index up to a size
+template<class Function, class... Args> auto apply(range a, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
+    buffer<decltype(function(0, args...))> r(a.stop-a.start); for(uint i: range(a.stop-a.start)) new (&r[i]) decltype(function(0, args...))(function(a.start+i, args...)); return r;
 }
 
 /// Returns an array of the application of a function to every elements of a reference

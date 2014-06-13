@@ -25,6 +25,7 @@ VolumeF Ax (Map(File(strx(projectionSize)+".proj"_,currentWorkingDirectory(),Fla
 struct App {
     App() {
         for(uint index: range(Ax.size.z)) {
+            log(index);
             const bool oversample = false;
             if(oversample) {
                 ImageF fullSize(2*projectionSize.xy());
