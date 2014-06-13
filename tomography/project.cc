@@ -72,5 +72,5 @@ uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageAr
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;
     // imageCenter uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
-    return emulateWriteTo3DImage(CL::backproject, Atb, float4(center,0), radiusSq, imageCenter + float2(1./2), uint(At.size), At, b, clampLinearSampler);
+    return emulateWriteTo3DImage(CL::backproject, Atb, float4(center,0), radiusSq, imageCenter + float2(1./2), uint(At.size), At.pointer, b.pointer, clampLinearSampler);
 }

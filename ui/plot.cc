@@ -154,5 +154,6 @@ void Plot::render() {
         }
         //if(plotLines) for(uint i: range(data.size()-1)) line(target, points[i], points[i+1], color);
     }
+    putImage(target);
 }
 

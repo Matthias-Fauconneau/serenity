@@ -12,7 +12,7 @@ CLVolume volume (hostVolume);
 
 struct App {
     App() {
-        double hostSum = ::sum(hostVolume); double sum = ::sum(volume); log(hostSum / (size.x*size.y*size.z), sum / (size.x*size.y*size.z));
+        double sum = ::sum(volume); log(sum / (size.x*size.y*size.z));
         double SSQ = ::SSQ(volume); log(sqrt(SSQ / (size.x*size.y*size.z)));
     }
 } app;

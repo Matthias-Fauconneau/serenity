@@ -21,10 +21,12 @@ static float reduce1(CLKernel& kernel, const CLVolume& A, const int3 origin=0, i
 
 CL(sum, sum) float sum(const CLVolume& A, const int3 origin, const int3 size) {
     if(isIntel) return sum(A.read(A.size)); // reduce fails on Intel
-    else return reduce1(CL::sum, A, origin, size);
+    //error("");
+    return reduce1(CL::sum, A, origin, size);
 }
 CL(sum, SSQ) float SSQ(const CLVolume& A, const int3 origin, const int3 size) {
     if(isIntel) return SSQ(A.read(A.size)); // reduce fails on Intel
+    //error("");
     return reduce1(CL::SSQ, A, origin, size);
 }
 
@@ -49,9 +51,11 @@ static float reduce2(CLKernel& kernel, const CLVolume& A, const CLVolume& B, con
 
 CL(sum, SSE)  float SSE(const CLVolume& A, const CLVolume& B, const int3 origin, const int3 size) {
     if(isIntel) return SSE(A.read(A.size), B.read(B.size)); // reduce fails on Intel
+    //error("");
     return reduce2(CL::SSE, A, B, origin, size);
 }
 CL(sum, dotProduct)  float dotProduct(const CLVolume& A, const CLVolume& B, const int3 origin, const int3 size) {
     if(isIntel) return dotProduct(A.read(A.size), B.read(B.size)); // reduce fails on Intel
+    //error("");
     return reduce2(CL::dotProduct, A, B, origin, size);
 }

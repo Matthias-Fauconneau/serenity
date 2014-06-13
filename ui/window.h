@@ -194,3 +194,5 @@ struct Window : Device {
     int previousPressState = 0, pressState = 0;
 #endif
 };
+
+void setWindow(Window* window);

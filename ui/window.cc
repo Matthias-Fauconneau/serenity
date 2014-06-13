@@ -2,6 +2,7 @@
 #include "graphics.h"
 
 static thread_local Window* window; // Current window for Widget event and render methods
+void setWindow(Window* window) { ::window = window; }
 void setFocus(Widget* widget) { assert(window); window->focus=widget; }
 bool hasFocus(Widget* widget) { assert(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
@@ -10,9 +11,11 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 void putImage(Rect region) { assert(window); window->putImage(region); }
 #include "trace.h"
 void putImage(const Image& target) {
-    assert(window);
-    assert(target.buffer == window->target.buffer);
+    assert_(window);
+    assert_(target.buffer == window->target.buffer);
     uint delta = target.data - window->target.data;
+    if(!target.stride) return; // FIXME
+    assert_(target.stride);
     uint x = delta % target.stride, y = delta / target.stride;
     assert_(x+target.width<=window->target.width && y+target.height<=window->target.height);
     window->putImage(int2(x,y)+Rect(target.size()));

@@ -24,12 +24,12 @@ struct Application : Poll {
     // Interface
     int upsample = 256 / projectionData.size.x;
 
-    Value sliceIndex;
+    Value sliceIndex = (referenceVolume.size.z-1) / 2;
     SliceView x {referenceVolume, upsample, sliceIndex};
     HList<SliceView> rSlices {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return SliceView(r.x, upsample, sliceIndex);})};
     HBox slices {{&x, &rSlices}};
 
-    Value projectionIndex;
+    Value projectionIndex = (projectionData.size.z-1) / 2;
     SliceView b {projectionData, upsample, projectionIndex};
     HList<VolumeView> rViews {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return VolumeView(r.x, projectionData.size, upsample, projectionIndex);})};
     HBox views {{&b, &rViews}};
@@ -54,11 +54,12 @@ struct Application : Poll {
         const uint k = r.k;
         log(str(labels[index]+"\t"_+str(k)+"\t"_+str(MSE)+"\t"_+str(-PSNR)));
         {Locker lock(window.renderLock);
+            setWindow( &window );
             window.renderBackground(plot.target); plot[labels[index]].insertMulti(r.time/1000000000.f, -PSNR); plot.render();
             rSlices[index].render(); rViews[index].render();
-            window.immediateUpdate();
+            setWindow( 0 );
         }
-        cylinderCheck(r.x);
+        //cylinderCheck(r.x);
         queue();
     }
 } app;

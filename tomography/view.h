@@ -5,8 +5,9 @@
 struct GLTexture;
 
 struct Value {
-    uint value = 0;
+    uint value;
     array<Widget*> widgets;
+    Value(uint value) : value(value) {}
     Value& registerWidget(Widget* widget) { widgets << widget; return *this; }
     void render() { for(Widget* widget: widgets) widget->render(); }
 };
