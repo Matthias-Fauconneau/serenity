@@ -68,9 +68,9 @@ CLVolume::CLVolume(int3 size, const ref<float>& data) : CLMem(clCreateImage3D(co
     assert_(data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
 }
 
-const VolumeF& CLVolume::read(const VolumeF& target) const {
-    assert_(target.size == size);
-    clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){0,0,0}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0, target.data, 0,0,0) );
+const VolumeF& CLVolume::read(const VolumeF& target, int3 origin) const {
+    assert_(origin+target.size <= size);
+    clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0, target.data, 0,0,0) );
     return target;
 }
 

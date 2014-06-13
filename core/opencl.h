@@ -44,7 +44,7 @@ struct CLVolume : CLMem {
     //CLVolume(const ref<float>& data) : CLVolume(round(pow(data.size,1./3)), data) {} Implemented through VolumeF
     default_move(CLVolume);
 
-    const VolumeF& read(const VolumeF& target) const;
+    const VolumeF& read(const VolumeF& target, int3 origin=0) const;
 
     int3 size; // (width, height, depth/index)
 };
