@@ -1,5 +1,4 @@
 #include "project.h"
-#include "volume.h"
 #include "opencl.h"
 
 Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
@@ -14,11 +13,14 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
     float zExtent = (specimenDistance - volumeRadius) / cameraLength * detectorHalfHeight; // Fits cap tangent intersection to detector top edge
     const float deltaZ = volumeAspectRatio - zExtent/volumeRadius;
 
-    float angle = 2*PI*float(index)/projectionSize.z; // Rotation angle (in radians) around vertical axis
-    float distance = specimenDistance/volumeRadius; // Distance in world space
-    float z = -volumeAspectRatio + zExtent/volumeRadius + 2*float(index)/float(projectionSize.z)*deltaZ; // Z position in world space
+    const bool doubleHelix = true;
+    const float pitch = 2;
+    float angle = doubleHelix ? 2*PI*pitch*float(index/2)/((projectionSize.z-1)/2) + (index%2?PI:0) : 2*PI*pitch*float(index)/(projectionSize.z-1); // Rotation angle (in radians) around vertical axis
+    float dz = doubleHelix ? float(index/2)/float((projectionSize.z-1)/2) : float(index)/float(projectionSize.z-1);
+    float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space
 
     const float3 halfVolumeSize = float3(volumeSize-int3(1))/2.f;
+    float distance = specimenDistance/volumeRadius; // Distance in world space
     float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
     worldToView = mat4().scale(vec3(vec2(float(projectionSize.x-1)/extent),1/distance)).rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,z)).rotateZ(angle).scale(1.f/halfVolumeSize);
     mat4 viewToWorld = worldToView.inverse();
@@ -31,34 +33,32 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
 
 CL(project, project)
 
-static void project(const CLBufferF& buffer, int3 imageSize, const CLVolume& volume, const uint index) {
-    const float radius = float(volume.size.x-1)/2;
-    const float halfHeight = float(volume.size.z-1 -1 )/2;  //(N-1 [domain size] - epsilon)
-    float3 center = {radius, radius, halfHeight};
+static uint64 project(const CLBufferF& buffer, int3 imageSize, const CLVolume& volume, const uint index) {
+    float3 center = vec3(volume.size-int3(1))/2.f;
     mat4 imageToWorld = Projection(volume.size, imageSize, index).imageToWorld;
     float3 origin = imageToWorld[3].xyz();
-    CL::project(imageSize.xy(), imageToWorld, float2(1,-1) * halfHeight - origin.z, sq(origin.xy()) - sq(radius), sq(radius), halfHeight, float4(center + origin,0), volume, clampToEdgeSampler, imageSize.x, buffer);
+    // dataOrigin uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
+    //                                                    imageToWorld, plusMinusHalfHeightMinusOriginZ,                         c,                                                                     radiusSq,    halfHeight, dataOrigin
+    return CL::project(imageSize.xy(), imageToWorld, float2(1,-1) * (center.z-1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) + 1 /*fix OOB*/, sq(center.x), center.z, float4(origin + center + float3(1./2),0), volume, noneSampler, imageSize.x, buffer);
 }
 
 /// Projects \a volume onto \a image according to \a projection
-void project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index) {
+uint64 project(const ImageF& image, const CLVolume& volume, const uint projectionCount, const uint index) {
     CLBufferF buffer (image.data.size);
-    project(buffer, int3(image.size, projectionCount), volume, index);
+    uint64 time = project(buffer, int3(image.size, projectionCount), volume, index);
     buffer.read(image.data);
+    return time;
 }
 
 /// Projects (A) \a x to \a Ax
-void project(const ImageArray& Ax, const CLVolume& x) {
+uint64 project(const ImageArray& Ax, const CLVolume& x) {
     CLBufferF buffer (Ax.size.y*Ax.size.x);
+    uint64 time = 0;
     for(uint index: range(Ax.size.z)) { //FIXME: Queue all projections at once ?
-        ::project(buffer, Ax.size, x, index);
+        time += ::project(buffer, Ax.size, x, index);
         copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     }
-}
-
-/// Projects (A) \a x to \a Ax
-void project(const VolumeF& Ax, const CLVolume& x) {
-    for(uint index: range(Ax.size.z)) ::project(slice(Ax, index), x, Ax.size.z, index); //FIXME: Queue all projections at once ?
+    return time;
 }
 
 // -- Backprojection
@@ -66,10 +66,11 @@ void project(const VolumeF& Ax, const CLVolume& x) {
 CL(backproject, backproject) //const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, const struct mat4* worldToView, read_only image3d_t images, sampler_t imageSampler, image3d_t Y
 
 /// Backprojects (At) \a b to \a Atb
-void backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b) {
+uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b) {
     assert_(At.size);
     const float3 center = float3(Atb.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);
     const float2 imageCenter = float2(b.size.xy()-int2(1))/2.f;
-    CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter, At.size, At, b, clampSampler, Atb);
+    // imageCenter uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
+    return CL::backproject(Atb.size, float4(center,0), radiusSq, imageCenter + float2(1./2), At.size, At, b, clampSampler, Atb);
 }

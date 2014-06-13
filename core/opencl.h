@@ -4,6 +4,7 @@
 #include "vector.h"
 #include "data.h"
 #include "image.h"
+#include "volume.h"
 
 typedef struct _cl_kernel* cl_kernel;
 typedef struct _cl_mem* cl_mem;
@@ -30,6 +31,7 @@ generic struct CLBuffer : CLRawBuffer {
     default_move(CLBuffer);
 
     void read(const mref<T>& target) { CLRawBuffer::read(mcast<byte>(target)); }
+
     size_t size;
 };
 
@@ -38,26 +40,29 @@ typedef CLBuffer<float> CLBufferF;
 struct CLVolume : CLMem {
     CLVolume(int3 size, float value=0);
     CLVolume(int3 size, const ref<float>& data);
-    CLVolume(const ref<float>& data) : CLVolume(round(pow(data.size,1./3)), data) {}
+    CLVolume(const VolumeF& A) : CLVolume(A.size, A.data) {}
+    //CLVolume(const ref<float>& data) : CLVolume(round(pow(data.size,1./3)), data) {} Implemented through VolumeF
     default_move(CLVolume);
+
+    void read(const VolumeF& target);
 
     int3 size; // (width, height, depth/index)
 };
 
 // Copy volume into volume
-void copy(const CLVolume& buffer, const CLVolume& volume);
+void copy(const CLVolume& target, const CLVolume& source, const int3 origin=0);
 
 // Copy volume into buffer
-void copy(const CLBufferF& buffer, const CLVolume& volume);
+void copy(const CLBufferF& target, const CLVolume& source, const int3 origin=0, const int3 size=0);
 
 // Inserts a slice buffer into volume
-void copy(const CLVolume& volume, size_t index, const CLBufferF& slice);
+void copy(const CLVolume& target, size_t index, const CLBufferF& source);
 
-ImageF slice(const CLVolume& volume, size_t index /* Z slice or projection*/);
+ImageF slice(const CLVolume& source, size_t index /* Z slice or projection*/);
 
 typedef CLVolume ImageArray; // NVidia does not implement OpenCL 1.2 (2D image arrays)
 
-extern cl_sampler clampToEdgeSampler, clampSampler;
+extern cl_sampler noneSampler, clampToEdgeSampler, clampSampler;
 
 struct CLKernel {
     handle<cl_kernel> kernel;
@@ -74,16 +79,16 @@ struct CLKernel {
     template<Type... Args> void setKernelArgs(uint index, const CLRawBuffer& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
     template<Type... Args> void setKernelArgs(uint index, const CLVolume& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
 
-    void enqueueNDRangeKernel(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size);
-    template<Type... Args> void execute(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size, const Args&... args) {
+    uint64 enqueueNDRangeKernel(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size);
+    template<Type... Args> uint64 execute(uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size, const Args&... args) {
         Locker lock(this->lock);
         setKernelArgs(0, args...);
-        enqueueNDRangeKernel(work_dim, global_work_offset, global_work_size, local_work_size);
+        return enqueueNDRangeKernel(work_dim, global_work_offset, global_work_size, local_work_size);
     }
 
-    template<Type... Args> void operator()(size_t blockCount, size_t blockSize /*threadCount*/, const Args&... args) { execute(1, 0, (size_t[]){blockCount*blockSize}, &blockSize, args...); }
-    template<Type... Args> void operator()(int2 size, const Args&... args) { execute(2, 0, (size_t[]){size_t(size.x), size_t(size.y)}, 0, args...); }
-    template<Type... Args> void operator()(int3 size, const Args&... args) { execute(3, 0, (size_t[]){size_t(size.x), size_t(size.y), size_t(size.z)}, 0, args...); }
+    template<Type... Args> uint64 operator()(size_t blockCount, size_t blockSize /*threadCount*/, const Args&... args) { return execute(1, 0, (size_t[]){blockCount*blockSize}, &blockSize, args...); }
+    template<Type... Args> uint64 operator()(int2 size, const Args&... args) { return execute(2, 0, (size_t[]){size_t(size.x), size_t(size.y)}, 0, args...); }
+    template<Type... Args> uint64 operator()(int3 size, const Args&... args) { return execute(3, 0, (size_t[]){size_t(size.x), size_t(size.y), size_t(size.z)}, 0, args...); }
 };
 
 #define CL(file, name) \

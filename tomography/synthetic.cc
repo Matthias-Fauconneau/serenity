@@ -2,7 +2,6 @@
 #include "file.h"
 #include "data.h"
 #include "image.h"
-#include "volume.h"
 #include "project.h"
 #include "layout.h"
 #include "window.h"

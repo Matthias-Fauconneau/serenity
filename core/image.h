@@ -89,6 +89,6 @@ inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.data),o.s
 /// Converts a linear float image to sRGB
 float convert(const Image& target, const ImageF& source, float max=0);
 /// Downsamples by adding samples
-ImageF downsample(const ImageF& source);
+void downsample(const ImageF& target, const ImageF& source);
 /// Upsamples an image by duplicating samples
 ImageF upsample(const ImageF& source);

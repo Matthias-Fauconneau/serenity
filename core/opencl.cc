@@ -35,14 +35,14 @@ CLKernel::CLKernel(string source, string name) : name(name) {
 }
 #include "trace.h"
 void CLKernel::setKernelArg(uint index, size_t size, const void* value) { clCheck( ::clSetKernelArg(kernel, index, size, value) ); }
-void CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) {
+uint64 CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) {
     cl_event event;
     clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0, &event) );
-#if PROFILE
+#if 1
     clCheck( clWaitForEvents(1, &event) );
     cl_ulong start; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(start), &start, 0);
     cl_ulong end; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(end), &end, 0);
-    log(name, dec(round((end-start)/1000000.0))+"ms"_);
+    return end-start;
 #endif
 }
 
@@ -60,28 +60,36 @@ CLVolume::CLVolume(int3 size, const ref<float>& data) : CLMem(clCreateImage3D(co
     assert_(data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
 }
 
-void copy(const CLVolume& target, const CLVolume& source) {
-    assert_(target.size == source.size);
-    clCheck( clEnqueueCopyImage(queue, source, target, (size_t[]){0,0,0}, (size_t[]){0,0,0}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0) );
+void CLVolume::read(const VolumeF& target) {
+    assert_(target.size == size);
+    clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){0,0,0}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0, target.data, 0,0,0) );
 }
 
-void copy(const CLBufferF& buffer, const CLVolume& volume) {
-    assert_(buffer.size == (size_t)volume.size.x*volume.size.y*volume.size.z);
-    clCheck( clEnqueueCopyImageToBuffer(queue, volume, buffer, (size_t[]){0,0,0}, (size_t[]){size_t(volume.size.x),size_t(volume.size.y),size_t(volume.size.z)}, 0,0,0,0) );
+void copy(const CLVolume& target, const CLVolume& source, const int3 origin) {
+    assert_(origin+target.size <= source.size);
+    clCheck( clEnqueueCopyImage(queue, source, target, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){0,0,0}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0) );
 }
 
-void copy(const CLVolume& volume, size_t index, const CLBufferF& slice) {
-    assert_(index < (size_t)volume.size.z && (size_t)volume.size.x*volume.size.y == slice.size);
-    clCheck( clEnqueueCopyBufferToImage(queue, slice, volume, 0, (size_t[]){0,0,index}, (size_t[]){size_t(volume.size.x),size_t(volume.size.y),size_t(1)}, 0,0,0) );
+void copy(const CLBufferF& target, const CLVolume& source, const int3 origin, int3 size) {
+    size = size?:source.size;
+    assert_(origin+size <= source.size);
+    assert_(target.size == (size_t)size.x*size.y*size.z);
+    clCheck( clEnqueueCopyImageToBuffer(queue, source, target, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0,0,0) );
 }
 
-ImageF slice(const CLVolume& volume, size_t index /* Z slice or projection*/) {
-    int3 size = volume.size;
+void copy(const CLVolume& target, size_t index, const CLBufferF& slice) {
+    assert_(index < (size_t)target.size.z && (size_t)target.size.x*target.size.y == slice.size);
+    clCheck( clEnqueueCopyBufferToImage(queue, slice, target, 0, (size_t[]){0,0,index}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(1)}, 0,0,0) );
+}
+
+ImageF slice(const CLVolume& source, size_t index /* Z slice or projection*/) {
+    int3 size = source.size;
     ImageF image(size.xy());
     assert_(index < size_t(size.z), index);
-    clCheck( clEnqueueReadImage(queue, volume, true, (size_t[]){0,0,index}, (size_t[]){size_t(size.x),size_t(size.y),1}, 0,0, image.data, 0,0,0), "slice");
+    clCheck( clEnqueueReadImage(queue, source, true, (size_t[]){0,0,index}, (size_t[]){size_t(size.x),size_t(size.y),1}, 0,0, image.data, 0,0,0), "slice");
     return image;
 }
 
+cl_sampler noneSampler = clCreateSampler(context, false, CL_ADDRESS_NONE, CL_FILTER_LINEAR, 0);
 cl_sampler clampToEdgeSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0);
 cl_sampler clampSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0);

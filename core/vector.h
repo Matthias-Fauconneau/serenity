@@ -103,8 +103,6 @@ generic struct xyz {
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
-/// Unsigned integer x,y,z vector
-typedef vec<xyz,uint,3> uint3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> float3;
 typedef float3 vec3;

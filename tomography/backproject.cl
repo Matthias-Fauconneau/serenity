@@ -4,7 +4,6 @@ kernel void backproject(const float3 center, const float radiusSq, const float2 
     const float3 world = (float3)(x,y,z) - center;
     float Atb = 0;
     if(world.x*world.x + world.y*world.y <= radiusSq) {
-        int2 imageSize = get_image_dim(images).xy;
         for(uint projectionIndex=0; projectionIndex<projectionCount; projectionIndex++) {
             struct mat4 M = worldToView[projectionIndex];
             float3 view = world.x * M.columns[0].xyz + world.y * M.columns[1].xyz + world.z * M.columns[2].xyz + M.columns[3].xyz; // Homogeneous view coordinates

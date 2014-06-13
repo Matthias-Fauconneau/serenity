@@ -5,7 +5,7 @@ struct Reconstruction {
     CLVolume x;
 
     int k = 0;
-    uint64 totalTime = 0;
+    uint64 time = 0;
 
     ProjectionArray At;
     const ImageArray& b;
@@ -14,5 +14,4 @@ struct Reconstruction {
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
-inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.k < b.k /*a.totalTime < b.totalTime*/; }
-inline String str(const Reconstruction& r) { return str(r.k, r.totalTime); }
+inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.time < b.time; }
