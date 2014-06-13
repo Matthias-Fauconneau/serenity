@@ -9,6 +9,7 @@ string clErrors[] = {"CL_SUCCESS"_, "CL_DEVICE_NOT_FOUND"_, "CL_DEVICE_NOT_AVAIL
 static cl_context context;
 static cl_command_queue queue;
 static cl_device_id device;
+bool isIntel;
 
 void __attribute((constructor(1002))) setup_cl() {
     uint platformCount; clGetPlatformIDs(0, 0, &platformCount); assert_(platformCount);
@@ -17,6 +18,9 @@ void __attribute((constructor(1002))) setup_cl() {
     uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount); assert_(deviceCount);
     cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
     device = devices[0];
+    size_t size; clGetDeviceInfo(device, CL_DEVICE_NAME, 0, 0, &size);
+    char info[size]; clGetDeviceInfo(device, CL_DEVICE_NAME, size, info, 0);
+    isIntel = startsWith(string(info,size-1), "Intel"_);
     context = clCreateContext(0, 1, &device, &clNotify, 0, 0); assert_(context);
     queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, 0); assert_(queue);
 }
@@ -60,9 +64,10 @@ CLVolume::CLVolume(int3 size, const ref<float>& data) : CLMem(clCreateImage3D(co
     assert_(data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
 }
 
-void CLVolume::read(const VolumeF& target) {
+const VolumeF& CLVolume::read(const VolumeF& target) const {
     assert_(target.size == size);
     clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){0,0,0}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0, target.data, 0,0,0) );
+    return target;
 }
 
 void copy(const CLVolume& target, const CLVolume& source, const int3 origin) {

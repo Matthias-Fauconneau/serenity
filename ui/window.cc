@@ -144,20 +144,9 @@ void Window::event() {
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     if(motionPending) processEvent(LastEvent, XEvent());
-    /*if(needRender) {
-        render(); // without putImage
-        //needRender = false;
-        //needUpdate = true;
-    }*/
-    if(needUpdate != Rect(0)) {
-        if(!remote) if(state!=Idle) { state=Wait; return; }
-        putImage(needUpdate);
-        needUpdate = Rect(0);
-    }
 }
 
 void Window::render() {
-    //if(state!=Idle) { state=Wait; return; } // Synchronizes full render
     if(target.size() != size) {
         if(remote) target = Image(size.x, size.y);
         else {
@@ -180,14 +169,11 @@ void Window::render() {
     {Locker lock(renderLock);
         widget->render(target);
     }
-    //putImage(); Each widget will call putImage on its target region once updated
 }
 
 void Window::putImage(Rect rect) {
     if(rect==Rect(0)) rect=Rect(target.size());
     assert_(id); assert_(rect.size());
-    //log(trace(1));
-    //log(rect);
     if(remote) {
         Image target = share(this->target);
         if(rect != Rect(target.size())) {
@@ -200,14 +186,11 @@ void Window::putImage(Rect rect) {
         send(String(raw(r)+cast<byte>(target.buffer)));
         assert_(r.size <= maximumRequestLength, r.size, maximumRequestLength);
     } else {
-        if(state!=Idle) { assert_(needUpdate==Rect(0) || needUpdate==rect, needUpdate, rect); needUpdate=rect; return; }
-        assert_(state==Idle, uint(state));
         Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
         r.totalW=target.stride; r.totalH=target.height;
         r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
         r.dstX = rect.position().x, r.dstY = rect.position().y;
         send(raw(r));
-        state=Server;
     }
 }
 
@@ -284,7 +267,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 else if(focus && focus->keyPress(Escape, NoModifiers)) ; //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
                 else exit(0); // Exits application by default
             }
-            else if(type==Shm::event+Shm::Completion) { assert_(!remote); /*int stateWas=state;*/ state=Idle; if(displayed) displayed(); /*if(stateWas==Wait) render();*/ }
+            else if(type==Shm::event+Shm::Completion) { assert_(!remote); if(displayed) displayed(); }
             else if( type==DestroyNotify || type==MappingNotify || type==LastEvent) {}
             else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
             window=0;

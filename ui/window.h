@@ -90,10 +90,6 @@ struct Window : Device {
     int2 dragStart, dragPosition, dragSize;
     /// Whether a motion event is pending processing
     bool motionPending = false;
-    /// Whether to trigger full render after all events are processed
-    //bool needRender = false;
-    /// Whether to trigger full update after all events are processed
-    Rect needUpdate = Rect(0);
     /// Whether the current display is active
     bool displayState = true;
     /// Pending long actions
@@ -165,8 +161,6 @@ struct Window : Device {
 
     /// System V shared memory
     int shm = 0;
-    /// Shared window buffer state
-    enum { Idle, Server, Wait } state = Idle;
 
     /// bgra32 XRender PictFormat (for Cursor)
     uint format=0;
