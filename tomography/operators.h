@@ -6,9 +6,9 @@ float SSQ(const CLVolume& A, const int3 origin=0, const int3 size=0);
 float SSE(const CLVolume& A, const CLVolume& B, const int3 origin=0, const int3 size=0);
 float dotProduct(const CLVolume& A, const CLVolume& B, const int3 origin=0, const int3 size=0);
 
-CL(operators, add) inline uint64 add(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { return CL::add(y.size, y, alpha, a, beta, b); } // y = α a + β b
-CL(operators, delta) inline uint64 delta(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) { return CL::delta(y.size, y, a, b, c); } // y = ( a - b ) / c
-CL(operators, update) inline uint64 update(const CLVolume& y, const CLVolume& a, const float alpha, const CLVolume& b) { return CL::update(y.size, y, a, alpha, b); } // y = max(0, a + α b)
+CL(operators, add) inline uint64 add(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { return CL::add(y.size, noneNearestSampler, y, alpha, a, beta, b); } // y = α a + β b
+CL(operators, delta) inline uint64 delta(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) { return CL::delta(y.size, noneNearestSampler, y, a, b, c); } // y = ( a - b ) / c
+CL(operators, update) inline uint64 update(const CLVolume& y, const CLVolume& a, const float alpha, const CLVolume& b) { return CL::update(y.size, noneNearestSampler, y, a, alpha, b); } // y = max(0, a + α b)
 
 #include "volume.h"
 inline void cylinderCheck(CLVolume& A) {

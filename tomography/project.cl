@@ -1,6 +1,6 @@
 struct mat4 { float4 columns[4]; };
 kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/,
-                                read_only image3d_t volume, sampler_t volumeSampler, const uint width, global float* image) {
+                                read_only image3d_t volume, sampler_t sampler, const uint width, global float* image) {
     size_t x = get_global_id(0), y = get_global_id(1);
     const float3 ray = normalize(x * imageToWorld.columns[0].xyz + y * imageToWorld.columns[1].xyz + imageToWorld.columns[2].xyz);
     const float3 origin = imageToWorld.columns[3].xyz;
@@ -25,7 +25,7 @@ kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOri
     while(tmin < tmax) { // Uniform ray sampling with trilinear interpolation
         int3 size = get_image_dim(volume).xyz;
         //accumulator += position.x<0 || position.x>size.x-1 || position.y<0 || position.y>size.y-1 || position.z<0 || position.z>size.z-1;
-        accumulator += read_imagef(volume, volumeSampler, position.xyzz).x;
+        accumulator += read_imagef(volume, sampler, position.xyzz).x;
         tmin+=1; position += ray;
     }
     image[y*width+x] = accumulator;

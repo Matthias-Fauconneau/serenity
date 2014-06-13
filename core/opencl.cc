@@ -90,6 +90,7 @@ ImageF slice(const CLVolume& source, size_t index /* Z slice or projection*/) {
     return image;
 }
 
-cl_sampler noneSampler = clCreateSampler(context, false, CL_ADDRESS_NONE, CL_FILTER_LINEAR, 0);
-cl_sampler clampToEdgeSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0);
-cl_sampler clampSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0);
+cl_sampler noneNearestSampler = clCreateSampler(context, false, CL_ADDRESS_NONE, CL_FILTER_NEAREST, 0);
+cl_sampler noneLinearSampler = clCreateSampler(context, false, CL_ADDRESS_NONE, CL_FILTER_LINEAR, 0);
+cl_sampler clampToEdgeLinearSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0);
+cl_sampler clampLinearSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0);

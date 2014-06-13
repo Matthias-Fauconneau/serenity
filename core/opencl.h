@@ -62,7 +62,7 @@ ImageF slice(const CLVolume& source, size_t index /* Z slice or projection*/);
 
 typedef CLVolume ImageArray; // NVidia does not implement OpenCL 1.2 (2D image arrays)
 
-extern cl_sampler noneSampler, clampToEdgeSampler, clampSampler;
+extern cl_sampler noneNearestSampler, noneLinearSampler, clampToEdgeLinearSampler, clampLinearSampler;
 
 struct CLKernel {
     handle<cl_kernel> kernel;
