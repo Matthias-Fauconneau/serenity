@@ -183,7 +183,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             cursorPosition = int2(e.x,e.y);
             Cursor lastCursor = cursor; cursor=Cursor::Arrow;
             if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton)) render();
-            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::None)) render();
+            else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton)) render();
             if(cursor!=lastCursor) setCursor(cursor);
         }
         else if(type==ButtonPress) {
@@ -200,7 +200,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
         else if(type==EnterNotify || type==LeaveNotify) {
             if(type==LeaveNotify && hideOnLeave) hide();
             if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
-                                   e.state&Button1Mask?Widget::LeftButton:Widget::None) ) render();
+                                   e.state&Button1Mask?Widget::LeftButton:Widget::NoButton) ) render();
         }
         else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.y==0 && e.expose.w==1 && e.expose.h==1)) render(); }
         else if(type==UnmapNotify) mapped=false;

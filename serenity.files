@@ -74,3 +74,5 @@ audio/ffmpeg.cc
 music/music.cc
 music/MusicXML.cc
 music/music.h
+music/midi.h
+music/midi.cc

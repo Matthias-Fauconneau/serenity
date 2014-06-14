@@ -1,5 +1,5 @@
 #pragma once
-#include "core.h"
+typedef unsigned int uint;
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
@@ -69,21 +69,17 @@ struct Sign {
         struct Wedge wedge;
     };
 };
-/*inline bool operator <(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step; return a.time < b.time; }
-inline bool operator <=(const Sign& a, const Sign& b) { if(a.time==b.time && a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step; return a.time <= b.time; }*/
+
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
         if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
-        //if(a.type==Sign::Pedal && b.type==Sign::Measure) return a.type < b.type;
-        //if(b.type==Sign::Pedal && a.type==Sign::Measure) return a.type < b.type;
     }
     return a.time < b.time;
 }
+
 inline bool operator <=(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
         if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
-        //if(a.type==Sign::Pedal && b.type==Sign::Measure) return a.type <= b.type;
-        //if(b.type==Sign::Pedal && a.type==Sign::Measure) return a.type <= b.type;
-    }
+     }
     return a.time <= b.time;
 }
