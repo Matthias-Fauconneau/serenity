@@ -17,9 +17,11 @@ struct Note {
     int step; // 0 = C4
     Accidental accidental;
     Duration duration;
+    enum Tie { NoTie, TieStart, TieContinue, TieStop } tie;
     bool dot:1;
     bool slur:1; // toggle
     bool grace:1;
+    bool slash:1;
     bool staccato:1;
     bool tenuto:1;
     bool accent:1;

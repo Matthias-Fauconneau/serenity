@@ -12,15 +12,19 @@ struct MusicXML : Widget {
     // MusicXML
     uint divisions = 256; // Time steps per measure
     array<Sign> signs;
+    array<uint> notes; // MIDI key of notes
 
     // MIDI
     MidiFile midi;
+    array<uint> midiToNote; // Note index for each MIDI index (handles inversions)
 
     Window window {this, int2(0, 384), "MusicXML"_};
     MusicXML() : midi(readFile("Storytime.mid"_, Folder("Scores"_,home()))) {
         signs = parse(readFile("Storytime.xml"_, Folder("Scores"_,home())), divisions);
 
         layout();
+        synchronize();
+
         window.background = Window::White;
         window.actions[Escape] = []{exit();};
         window.show();
@@ -38,6 +42,7 @@ struct MusicXML : Widget {
     int Y(Sign sign) { assert_(sign.type==Sign::Note); return Y(sign.note.clef, sign.staff, sign.note.step); } // Clef dependent
     int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
+    Font graceFont {File("emmentaler-26.otf"_, Folder("Scores"_,home())), 4*halfLineInterval};
     Font font {File("emmentaler-26.otf"_, Folder("Scores"_,home())), 9*halfLineInterval};
     Font textFont{File("FreeSerifBold.ttf"_,Folder("Scores"_,home())), 6*halfLineInterval};
     Font smallFont{File("FreeSerifBold.ttf"_,Folder("Scores"_,home())), 2*halfLineInterval};
@@ -46,7 +51,7 @@ struct MusicXML : Widget {
     int2 noteSize = int2(round(glyphSize("noteheads.s2"_)));
 
     // Control
-    array<int> measures; // X position of measures
+    array<int> measures; // X position of measure starts
     array<uint> noteToBlit; // Blit index for each note index
 
     // Render
@@ -65,13 +70,15 @@ struct MusicXML : Widget {
 
     map<uint, vec3> colors; // Overrides color for Blit index
     uint position = 0; //200-1;
+    uint inversionErrors = 0, extraErrors = 0, missingErrors = 0, wrongErrors = 0;
 
-    float glyph(int2 position, const string name) {
+    float glyph(int2 position, const string name, Font& font) {
         uint16 index = font.index(name);
         const Glyph& glyph = font.glyph(index);
         blits << Blit{position+glyph.offset, share(glyph.image)}; // Lifetime of font
         return font.advance(index);
     }
+    float glyph(int2 position, const string name) { return glyph(position, name, font); }
 
     uint text(int2 position, const string& text, Font& font) {
         uint x = position.x;
@@ -86,7 +93,7 @@ struct MusicXML : Widget {
     uint text(int2 position, const string& text) { return this->text(position, text, textFont); }
     uint debug(int2 position, const string& text) { return this->text(position, text, smallFont); }
 
-    // Layouts first without immediate rendering for control (seek, ...)
+    // Layouts notations to graphic primitives (and parses notes to MIDI keys)
     void layout() {
         int x = 0;
         map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
@@ -119,7 +126,6 @@ struct MusicXML : Widget {
         x += noteSize.x;
         fills << Rect(int2(x-1, staffY(0, 0)), int2(x+1, staffY(1, -8)));
         measures << x;
-        uint midiIndex = 0;
         for(Sign& sign: signs) {
             // Layout accidentals
             Chord& chord = chords[sign.staff];
@@ -240,8 +246,9 @@ struct MusicXML : Widget {
                 int step = clefStep(note.clef.clefSign, note.step);
                 int2 p = int2(x, Y(sign));
                 Duration duration = note.duration;
-                noteToBlit << blits.size;
-                int dx = glyph(p, "noteheads.s"_+dec(min(2,int(duration))));
+                uint blitIndex = blits.size;
+                int dx = glyph(p, "noteheads.s"_+dec(min(2,int(duration))), note.grace?graceFont:font);
+                if(note.slash) parallelograms << Parallelogram{p+int2(-dx+dx/2,dx), p+int2(dx+dx/2,-dx), 1};
                 for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); fills << Rect(int2(x-dx/3,y),int2(x+dx*4/3,y+1)); }
                 for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); fills << Rect(int2(x-dx/3,y),int2(x+dx*4/3,y+1)); }
                 if(note.dot) glyph(p+int2(dx*4/3,0),"dots.dot"_);
@@ -256,8 +263,7 @@ struct MusicXML : Widget {
                     else { pendingSlurs[sign.staff] << move(slur); assert_(!slur); } // Stops
                 }
 
-                {// MIDI synchronization
-                    uint midiKey = midi.notes[midiIndex].key;
+                {// Converts note to MIDI key
                     int step = note.step;
                     int octave = note.clef.octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
                     step = (step - step/7*7 + 7)%7;
@@ -275,16 +281,10 @@ struct MusicXML : Widget {
                     accidental = measureAccidentals.value(note.step, accidental); // Any accidental overrides key signature
                     if(accidental==Flat) noteKey--;
                     if(accidental==Sharp) noteKey++;
-
-                    //assert_(midiKey == noteKey, midiIndex, midiKey, noteKey, int(note.clef.clefSign), keySignature.fifths, octave, step, int(accidental));
-                    //midi.notes.slice(midiIndex,2)
-                    debug(p+int2(noteSize.x, 0), str(midiKey, noteKey));
-                    if(midiKey != noteKey) {
-                        log(midiIndex, midiKey, noteKey, int(note.clef.clefSign), keySignature.fifths, octave, step, int(accidental));
-                        log(midi.notes.slice(midiIndex,3));
-                        position = measures.size-1;
+                    if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
+                        notes << noteKey;
+                        noteToBlit << blitIndex;
                     }
-                    midiIndex++;
                 }
             }
             else if(sign.type == Sign::Rest) {
@@ -319,7 +319,6 @@ struct MusicXML : Widget {
                         sx += textFont.advance(index);
                     }
                 }
-                if(position) break;
             }
             else if(sign.type == Sign::Pedal) {
                 int y = staffY(1, -24);
@@ -394,10 +393,53 @@ struct MusicXML : Widget {
         }        
     }
 
+    int measureIndex(int x0) {
+        for(uint i: range(measures.size-1)) if(measures[i]<=x0 && x0<measures[i+1]) return i; return -1;
+    }
+
+    void synchronize() {
+        for(uint noteIndex=0; noteIndex < notes.size;) {
+            uint midiIndex = midiToNote.size;
+            uint midiKey = midi.notes[midiIndex].key;
+            uint noteKey = notes[noteIndex];
+            int2 p = blits[noteToBlit[noteIndex]].position;
+            if(midiKey == noteKey) {
+                debug(p+int2(noteSize.x, 0), str(noteKey, midiKey));
+                midiToNote << noteIndex; noteIndex++;
+                continue;
+            }
+            log(midi.notes.slice(midiIndex,3),"\t", notes.slice(noteIndex,3));
+            position = measures[measureIndex(p.x)-1];
+            /**/ if(midi.notes[midiIndex].key == notes[noteIndex+1] && midi.notes[midiIndex+1].key == notes[noteIndex]) {
+                inversionErrors++; log("Inverted MIDI note ordering");
+                debug(blits[noteToBlit[noteIndex+1]].position+int2(noteSize.x, 0), str("<", notes[noteIndex+1], midiKey));
+                debug(p+int2(noteSize.x, 0), str(">", noteKey, midi.notes[midiIndex+1].key));
+                midiToNote << noteIndex+1 << noteIndex; noteIndex += 2;
+            }
+            else if(midi.notes[midiIndex+1].key == noteKey) {
+                extraErrors++; log("Extra MIDI note");
+                debug(p+int2(noteSize.x, 0), "+"_+str(midiKey));
+                debug(p+int2(noteSize.x, lineInterval), str(noteKey, midi.notes[midiIndex+1]));
+                midiToNote << -1 << noteIndex; noteIndex++;
+            }
+            else if(midiKey == notes[noteIndex+1]) {
+                missingErrors++; log("Missing MIDI note", measureIndex(p.x));
+                debug(p+int2(noteSize.x, 0), "!-"_+str(noteKey));
+                noteIndex++;
+            }
+            else {
+                wrongErrors++; log("Wrong MIDI note");
+                debug(p+int2(noteSize.x, 0), str(noteKey, midiKey));
+                midiToNote << -1; noteIndex++;
+            }
+            if(extraErrors>1 || wrongErrors>1 || missingErrors>1) break;
+        }
+    }
+
     // Render
     int2 sizeHint() { return int2(-1, staffY(1,-16)); }
     void render(const Image& target) {
-        int2 offset = int2(-measures[position], (target.height - sizeHint().y)/2 + 4*lineInterval);
+        int2 offset = int2(-position, (target.height - sizeHint().y)/2 + 4*lineInterval);
         // TODO: cull
         for(Rect r: fills) fill(target, offset+r);
         for(Parallelogram p: parallelograms) parallelogram(target, offset+p.min, offset+p.max, p.dy);
@@ -406,8 +448,9 @@ struct MusicXML : Widget {
     }
 
     bool mouseEvent(int2, int2, Event, Button button) {
-        if(button==WheelUp && position>0) { position--; return true; }
-        if(button==WheelDown && position<measures.size-1) { position++; return true; }
+        uint index = measureIndex(position);
+        if(button==WheelUp && int(index)>0) { position=measures[index-1]; return true; } //TODO: previous measure
+        if(button==WheelDown && uint(index)<measures.size-1) { position=measures[index+1]; return true; } //TODO: next measure
         return false;
     }
 } app;

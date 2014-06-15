@@ -7,7 +7,7 @@
 struct MidiNote { uint time, key, velocity; };
 inline bool operator ==(const MidiNote& a, uint key) { return a.key == key; }
 inline bool operator <=(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key <= b.key); }
-inline String str(const MidiNote& a) { return str(a.time, a.key, a.velocity); }
+inline String str(const MidiNote& a) { return str(a.time)+":"_+str(a.key); }
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {

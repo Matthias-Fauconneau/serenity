@@ -1,11 +1,13 @@
 #include "music.h"
 #include "xml.h"
 
-array<Sign> parse(string document, uint& divisions) {
+array<Sign> parse(string document, uint& divisions /*time unit per quarter note*/) {
     array<Sign> signs;
     Element root = parseXML(document);
     map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; uint time = 0, nextTime = 0, maxTime = 0;
     uint measureIndex=1;
+    uint appoggiaturaTime = 0;
+    array<Sign> acciaccaturas; // Acciaccatura graces for next note
     for(const Element& m: root("score-partwise"_)("part"_).children) {
         assert_(m.name=="measure"_, m);
         //log("Measure:", measureIndex);
@@ -15,12 +17,29 @@ array<Sign> parse(string document, uint& divisions) {
             maxTime = max(maxTime, time);
 
             if(e.name=="note"_) {
-                if(e("grace"_)) continue; // FIXME
-                uint duration = e("duration"_) ? fromInteger(e("duration"_).text()) : 0;
-                if(!e("chord"_)) nextTime = time+duration;
+                Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(e("type"_).text()));
+                uint duration;
+                if(e("grace"_)) {
+                    assert_(uint(type)<Sixteenth && divisions%16 == 0);
+                    duration = (uint[]){16,8,4,2,1}[uint(type)]*divisions/16;
+                } else {
+                    uint acciaccaturaTime = 0;
+                    if(acciaccaturas) log("if(acciaccaturas)");
+                    for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending Acciaccatura graces before principal
+                        acciaccaturaTime += grace.duration;
+                        grace.time = time-acciaccaturaTime;
+                        signs.insertSorted(grace);
+                        log(grace.time%divisions);
+                    }
+                    if(acciaccaturas) log(time%divisions);
+                    duration = fromInteger(e("duration"_).text()) - appoggiaturaTime;
+                    assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
+                    acciaccaturas.clear();
+                    appoggiaturaTime = 0;
+                }
+                if(!e("chord"_) && !e("grace"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
                 uint staff = fromInteger(e("staff"_).text())-1;
-                Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(e("type"_).text()));
                 assert_(int(type)>=0, e);
                 if(e("rest"_)) {
                     {Sign sign{time, duration, staff, Sign::Rest, {}}; sign.rest={type}; signs.insertSorted(sign);}
@@ -35,18 +54,29 @@ array<Sign> parse(string document, uint& divisions) {
                         else assert_(e("notations"_)("slur"_).attribute("type"_)=="start"_, e("notations"_)("slur"_).attribute("type"_), e);
                         slurs[staff] = !slurs[staff];
                     }
+                    Note::Tie tie = Note::NoTie;
+                    if(e("notations"_)("tied"_)) {
+                        /**/ if(e("notations"_)("tied"_)["type"_] == "start"_) tie = Note::TieStart;
+                        else if(e("notations"_)("tied"_)["type"_] == "stop"_) tie = Note::TieStop;
+                        else error("");
+                    }
                     {Sign sign{time, duration, staff, Sign::Note, {}};
-                        sign.note={clefs.at(staff), step, accidental, type,
+                        sign.note={clefs.at(staff), step, accidental, type, tie,
                                    e("dot"_) ? true : false,
                                    e("notations"_)("slur"_)?true:false,
                                    e("grace"_)?true:false,
+                                   e("grace"_)["slash"_]=="yes"_?true:false,
                                    e("notations"_)("articulations"_)("staccato"_)?true:false,
                                    e("notations"_)("articulations"_)("tenuto"_)?true:false,
                                    e("notations"_)("articulations"_)("accent"_)?true:false,
                                    e("stem").text() == "up"_
                                   };
-                        signs.insertSorted(sign);};
+                        // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
+                        if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas << sign;
+                        else signs.insertSorted(sign);
+                    }
                 }
+                if(e("grace"_) && e("grace"_)["slash"_]!="yes"_) appoggiaturaTime += duration; // Takes time away from principal (appoggiatura)
             }
             else if(e.name=="backup"_) {
                 int dt = fromInteger(e("duration"_).text());
