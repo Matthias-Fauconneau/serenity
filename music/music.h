@@ -29,6 +29,7 @@ struct Note {
     uint key;
     uint blitIndex;
 };
+inline bool operator ==(const Note& note, const uint& key) { return note.key == key; }
 struct Rest {
     Duration duration;
 };
@@ -73,17 +74,9 @@ struct Sign {
         struct Wedge wedge;
     };
 };
-
-inline bool operator <(const Sign& a, const Sign& b) {
-    if(a.time==b.time) {
-        if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
-    }
-    return a.time < b.time;
-}
-
 inline bool operator <=(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
         if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
-     }
+    }
     return a.time <= b.time;
 }

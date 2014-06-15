@@ -5,6 +5,8 @@
 #include "utf8.h"
 #include "midi.h"
 
+inline String str(const Note& a) { return str(a.key); }
+
 //#include "MusicXML.cc"
 array<Sign> parse(string text, uint& divisions);
 
@@ -12,7 +14,7 @@ struct MusicXML : Widget {
     // MusicXML
     uint divisions = 256; // Time steps per measure
     array<Sign> signs;    
-    array<Sign> notes; // Signs for notes (currently only using time)
+    map<uint,array<Note>> notes; // Signs for notes (time, key, blitIndex)
 
     // MIDI
     MidiFile midi;
@@ -69,7 +71,7 @@ struct MusicXML : Widget {
 
     map<uint, vec3> colors; // Overrides color for Blit index
     uint position = 0; //200-1;
-    uint unorderedErrors = 0, extraErrors = 0, missingErrors = 0, wrongErrors = 0;
+    uint extraErrors = 0, missingErrors = 0, wrongErrors = 0;
 
     float glyph(int2 position, const string name, Font& font) {
         uint16 index = font.index(name);
@@ -262,7 +264,7 @@ struct MusicXML : Widget {
                     else { pendingSlurs[sign.staff] << move(slur); assert_(!slur); } // Stops
                 }
 
-                if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes << sign;
+                if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time) << note;
             }
             else if(sign.type == Sign::Rest) {
                 int2 p = int2(x, staffY(staff, -4));
@@ -373,7 +375,7 @@ struct MusicXML : Widget {
         for(uint i: range(measures.size-1)) if(measures[i]<=x0 && x0<measures[i+1]) return i; return -1;
     }
 
-    /// Returns index of note matching key between notes played at the same time as \a noteIndex (-1 if none found)
+    /*/// Returns index of note matching key between notes played at the same time as \a noteIndex (-1 if none found)
     int find(const array<Sign>& notes, uint key) {
         uint time = notes[0].time;
         for(uint index: range(notes.size)) {
@@ -383,49 +385,88 @@ struct MusicXML : Widget {
             if(sign.note.key == key) return index;
         }
         return -1;
-    }
+    }*/
 
     void synchronize() {
-#if 0
-        for(Sign sign: notes) {
-            int2 p = blits[sign.note.blitIndex].position;
-            text(p+int2(noteSize.x, 2), str(sign.note.key), smallFont);
-        }
-        position = measures[13-1];
-#else
-        array<Sign> notes = copy(this->notes);
+        map<uint, array<Note>> notes = copy(this->notes);
+        array<uint> chordExtra;
         while(notes) {
             uint midiIndex = midiToBlit.size;
             uint midiKey = midi.notes[midiIndex].key;
-            Note note; note.blitIndex=0, note.key=0; // DEBUG
+            Note note;
             String debug;
-            int match = find(notes, midiKey);
-            if(match >= 0) {
-                note = notes.take(match).note;
-                assert_(note.key == midiKey);
-                midiToBlit << note.blitIndex;
-                //if(match>0) { log("Unordered MIDI note"); debug<<'!'; unorderedErrors++; }
-            } else {
-                log(apply(midi.notes.slice(midiIndex,4), [](const MidiNote& note){return note.key;}));
-                log(apply(notes.slice(0,4), [](const Sign& sign){return sign.note.key;}));
-
-                int nextMatch = find(notes, midi.notes[midiIndex+1].key);
-                assert_(nextMatch >= 0, "Double fault"_);
-                note = notes[nextMatch].note;
-                midiToBlit << -1;
-                debug << '!';
-                if(nextMatch==0) { log("Extra MIDI note"_); debug<<'+'; extraErrors++; }
-                else if(nextMatch==1) {
-                    log("Wrong MIDI note"); debug<<'!'; wrongErrors++;
-                    notes.removeAt(nextMatch);
+            if(!notes.values[0]) {
+                notes.keys.removeAt(0); notes.values.removeAt(0);
+                if(chordExtra) {
+                    log("Extra!", apply(chordExtra, [&](const uint index){return midi.notes[index];}));
+                    assert_(chordExtra.size<=2, chordExtra.size);
+                    extraErrors+=chordExtra.size;
+                    chordExtra.clear();
                 }
             }
+            //uint time = notes.keys[0];
+            array<Note>& chord = notes.values[0];
+
+            if(extraErrors > 7 || wrongErrors > 6 || missingErrors > 3) {
+                log(midi.notes.slice(midiIndex,4));
+                log(chord);
+                log(extraErrors, wrongErrors, missingErrors);
+                break;
+            }
+
+            int match = chord.indexOf(midiKey);
+            if(match >= 0) {
+                note = chord.take(match);
+                assert_(note.key == midiKey);
+                midiToBlit << note.blitIndex;
+                log("Match", match, note.key);
+            } else if(chordExtra && notes.values[0].size == chordExtra.size) {
+                /*if(notes.values[0].size>2) {
+                    log("Triple fault", notes.values[0].size);
+                    log("MID",apply(chordExtra, [&](const uint index){return midi.notes[index];}));
+                    log("XML",notes.values[0]);
+                    break;
+                }
+                assert_(notes.values[0].size==1, notes.values[0], apply(chordExtra, [&](const uint index){return midi.notes[index];}));*/
+                int match = notes.values[1].indexOf(midi.notes[chordExtra[0]].key);
+                if(match >= 0) {
+                    assert_(notes.values[0].size==1);
+                    log("<Missing", notes.values[0]);
+                    missingErrors++;
+                    notes.values[0].clear();
+                    midiKey = midi.notes[chordExtra[0]].key;
+                    note = notes.values[1].take(match);
+                    assert_(midiKey == note.key);
+                    log(">Match", match, midiKey);
+                    midiToBlit[chordExtra[0]] = note.blitIndex;
+                    chordExtra.clear();
+                } else {
+                    assert_(midiKey != notes.values[0][0].key);
+                    log(">Wrong");
+                    log("MID",apply(chordExtra, [&](const uint index){return midi.notes[index];}));
+                    log("XML",notes.values[0]);
+                    for(uint i: range(notes.values[0].size)) {
+                        Note note = notes.values[0][i];
+                        int2 p = blits[note.blitIndex].position;
+                        text(p+int2(noteSize.x, 2), "!!"_+str(midi.notes[chordExtra[i]]), smallFont);
+                    }
+                    assert_(chordExtra.size);
+                    wrongErrors += chordExtra.size;
+                    note = notes.values[0][0];
+                    notes.values[0].clear();
+                    chordExtra.clear();
+                }
+            } else {
+                log(midi.notes.slice(midiIndex,4));
+                log(chord);
+                note = chord[0];
+                midiToBlit << -1;
+                log("Extra?"_, midiKey); debug<<'+'; chordExtra << midiIndex;
+            }
             int2 p = blits[note.blitIndex].position;
-            text(p+int2(noteSize.x, 2), debug+str(note.key, midiKey), smallFont);
+            text(p+int2(noteSize.x, 2), debug+str(note.key), smallFont);
             if(debug) position = measures[max(0,measureIndex(p.x)-1)];
-            if(extraErrors>0 || wrongErrors>2 || missingErrors>0) break;
         }
-#endif
     }
 
     // Render
