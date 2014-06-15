@@ -51,7 +51,7 @@ generic T min(T a, T b) { return a<b ? a : b; }
 generic T max(T a, T b) { return a<b ? b : a; }
 generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
 
-// Basic types
+// Integer types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;
@@ -63,9 +63,30 @@ typedef unsigned int uint;
 typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
+typedef __INTPTR_TYPE__  intptr_t;
 typedef __SIZE_TYPE__ 	size_t;
 constexpr size_t invalid = -1; // Invalid index
 
+// Integer operations
+generic T abs(T x) { return x>=0 ? x : -x; }
+
+/// Numeric range
+struct range {
+    range(int start, int stop) : start(start), stop(stop){}
+    range(uint size) : range(0, size){}
+    struct iterator {
+        int i;
+        int operator*() { return i; }
+        iterator& operator++() { i++; return *this; }
+        bool operator !=(const iterator& o) const{ return i<o.i; }
+    };
+    iterator begin() const { return {start}; }
+    iterator end() const { return {stop}; }
+    explicit operator bool() const { return start < stop; }
+    int start, stop;
+};
+
+// std::initializer_list
 namespace std {
 generic struct initializer_list {
     const T* data; size_t len;
@@ -75,6 +96,8 @@ generic struct initializer_list {
     constexpr size_t size() const { return len; }
 };
 }
+
+// string
 generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;
@@ -105,22 +128,7 @@ template<> void abort(const string& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 
-/// Numeric range
-struct range {
-    range(int start, int stop) : start(start), stop(stop){}
-    range(uint size) : range(0, size){}
-    struct iterator {
-        int i;
-        int operator*() { return i; }
-        iterator& operator++() { i++; return *this; }
-        bool operator !=(const iterator& o) const{ return i<o.i; }
-    };
-    iterator begin() const { return {start}; }
-    iterator end() const { return {stop}; }
-    explicit operator bool() const { return start < stop; }
-    int start, stop;
-};
-
+// ref
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct ref {
     /// Default constructs an empty reference
@@ -158,7 +166,7 @@ generic struct ref {
             const T* pointer;
             const T& operator*() { return *pointer; }
             iterator& operator++() { pointer--; return *this; }
-            bool operator !=(const iterator& o) const { return pointer>=o.pointer; }
+            bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
         };
         iterator begin() const { return {start}; }
         iterator end() const { return {stop}; }

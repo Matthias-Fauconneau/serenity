@@ -26,6 +26,8 @@ struct Note {
     bool tenuto:1;
     bool accent:1;
     bool stem:1; // 0: down, 1: up
+    uint key;
+    uint blitIndex;
 };
 struct Rest {
     Duration duration;

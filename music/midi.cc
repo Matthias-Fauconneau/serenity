@@ -6,7 +6,7 @@ MidiFile::MidiFile(const ref<byte>& data) { /// parse MIDI header
     clear();
     BinaryData s(data,true);
     s.advance(10);
-    uint16 nofChunks = s.read(); ticksPerBeat = s.read(); log(ticksPerBeat/9);
+    uint16 nofChunks = s.read(); ticksPerBeat = s.read();
     for(int i=0; s && i<nofChunks;i++) {
         ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
@@ -56,8 +56,6 @@ void MidiFile::read(Track& track, uint time, State state) {
             if(state==Sort) {
                 uint nearest = 0;
                 for(const MidiNote& o: notes) { if(abs(int(o.time-note.time))<abs(int(note.time-nearest))) nearest=o.time; }
-                //log(abs(int(note.time-nearest)), ticksPerBeat/abs(int(note.time-nearest)) );
-                //if(abs(int(note.time-nearest))<ticksPerBeat/9) note.time=nearest; // Merges dates under an eighth note at 120 (~62ms, ~16Hz)
                 notes.insertSorted(MidiNote{note.time, note.key, note.velocity});
             }
         }
