@@ -57,7 +57,7 @@ void MidiFile::read(Track& track, uint time, State state) {
                 uint nearest = 0;
                 for(const MidiNote& o: notes) { if(abs(int(o.time-note.time))<abs(int(note.time-nearest))) nearest=o.time; }
                 //log(abs(int(note.time-nearest)), ticksPerBeat/abs(int(note.time-nearest)) );
-                if(abs(int(note.time-nearest))<ticksPerBeat/9) note.time=nearest; // Merges dates under an eighth note at 120 (~62ms, ~16Hz)
+                //if(abs(int(note.time-nearest))<ticksPerBeat/9) note.time=nearest; // Merges dates under an eighth note at 120 (~62ms, ~16Hz)
                 notes.insertSorted(MidiNote{note.time, note.key, note.velocity});
             }
         }

@@ -12,7 +12,8 @@ struct MusicXML : Widget {
     // MusicXML
     uint divisions = 256; // Time steps per measure
     array<Sign> signs;
-    array<uint> notes; // MIDI key of notes
+    array<Sign> noteSigns; // Signs for notes (currently only using time)
+    array<uint> noteKeys; // MIDI key for notes
 
     // MIDI
     MidiFile midi;
@@ -53,6 +54,7 @@ struct MusicXML : Widget {
     // Control
     array<int> measures; // X position of measure starts
     array<uint> noteToBlit; // Blit index for each note index
+    //array<uint> midiToBlit; // Blit index for each midi index
 
     // Render
     array<Rect> fills;
@@ -70,7 +72,7 @@ struct MusicXML : Widget {
 
     map<uint, vec3> colors; // Overrides color for Blit index
     uint position = 0; //200-1;
-    uint inversionErrors = 0, extraErrors = 0, missingErrors = 0, wrongErrors = 0;
+    uint unorderedErrors = 0, extraErrors = 0, missingErrors = 0, wrongErrors = 0;
 
     float glyph(int2 position, const string name, Font& font) {
         uint16 index = font.index(name);
@@ -282,7 +284,8 @@ struct MusicXML : Widget {
                     if(accidental==Flat) noteKey--;
                     if(accidental==Sharp) noteKey++;
                     if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
-                        notes << noteKey;
+                        noteKeys << noteKey;
+                        noteSigns << sign;
                         noteToBlit << blitIndex;
                     }
                 }
@@ -398,23 +401,39 @@ struct MusicXML : Widget {
     }
 
     void synchronize() {
-        for(uint noteIndex=0; noteIndex < notes.size;) {
+        array<uint> matched;
+        for(uint noteIndex=0; noteIndex < noteKeys.size;) {
+            while(matched.contains(noteIndex)) noteIndex++;
             uint midiIndex = midiToNote.size;
             uint midiKey = midi.notes[midiIndex].key;
-            uint noteKey = notes[noteIndex];
+            uint noteKey = noteKeys[noteIndex];
             int2 p = blits[noteToBlit[noteIndex]].position;
             if(midiKey == noteKey) {
                 debug(p+int2(noteSize.x, 0), str(noteKey, midiKey));
                 midiToNote << noteIndex; noteIndex++;
                 continue;
             }
-            log(midi.notes.slice(midiIndex,3),"\t", notes.slice(noteIndex,3));
+            log(midi.notes.slice(midiIndex,3),"\t", noteKeys.slice(noteIndex,3));
             position = measures[measureIndex(p.x)-1];
-            /**/ if(midi.notes[midiIndex].key == notes[noteIndex+1] && midi.notes[midiIndex+1].key == notes[noteIndex]) {
-                inversionErrors++; log("Inverted MIDI note ordering");
-                debug(blits[noteToBlit[noteIndex+1]].position+int2(noteSize.x, 0), str("<", notes[noteIndex+1], midiKey));
-                debug(p+int2(noteSize.x, 0), str(">", noteKey, midi.notes[midiIndex+1].key));
-                midiToNote << noteIndex+1 << noteIndex; noteIndex += 2;
+            /*uint midiTime = midi.notes[midiIndex].time;
+            int match = -1;
+            for(uint index: range(midiIndex+1, midi.notes.size)) {
+                MidiNote note = midi.notes[index];
+                if(note.key == noteKey) { match=index; break; }
+                if(note.time > midiTime+midi.ticksPerBeat/9) break;
+            }*/
+            uint noteTime = noteSigns[noteIndex].time;
+            int match = -1;
+            for(uint index: range(noteIndex+1, noteSigns.size)) {
+                Sign note = noteSigns[index];
+                if(note.time >= noteTime+divisions/16) break;
+                if(noteKeys[index] == midiKey) { match=index; break; }
+            }
+            /**/
+            if(match >= 0) {
+                unorderedErrors++; log("Unordered MIDI note");
+                debug(blits[noteToBlit[match]].position+int2(noteSize.x, 0), str("?", noteKeys[match], midiKey));
+                midiToNote << match; matched << match;
             }
             else if(midi.notes[midiIndex+1].key == noteKey) {
                 extraErrors++; log("Extra MIDI note");
@@ -422,7 +441,7 @@ struct MusicXML : Widget {
                 debug(p+int2(noteSize.x, lineInterval), str(noteKey, midi.notes[midiIndex+1]));
                 midiToNote << -1 << noteIndex; noteIndex++;
             }
-            else if(midiKey == notes[noteIndex+1]) {
+            else if(midiKey == noteKeys[noteIndex+1]) {
                 missingErrors++; log("Missing MIDI note", measureIndex(p.x));
                 debug(p+int2(noteSize.x, 0), "!-"_+str(noteKey));
                 noteIndex++;
