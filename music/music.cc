@@ -71,7 +71,7 @@ struct MusicXML : Widget {
 
     map<uint, vec3> colors; // Overrides color for Blit index
     uint position = 0; //200-1;
-    uint extraErrors = 0, missingErrors = 0, wrongErrors = 0;
+    uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 
     float glyph(int2 position, const string name, Font& font) {
         uint16 index = font.index(name);
@@ -397,20 +397,37 @@ struct MusicXML : Widget {
             String debug;
             if(!notes.values[0]) {
                 notes.keys.removeAt(0); notes.values.removeAt(0);
+                array<Note>& chord = notes.values[0];
+                chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
+                    uint midiKey = midi.notes[midiIndex].key;
+                    int match = chord.indexOf(midiKey);
+                    if(match < 0) return false; // Keeps
+                    note = chord.take(match);
+                    assert_(note.key == midiKey);
+                    midiToBlit[midiIndex] = note.blitIndex;
+                    log(">Order", match, note.key);
+                    int2 p = blits[note.blitIndex].position;
+                    text(p+int2(noteSize.x, 2), "O"_+str(note.key), smallFont);
+                    orderErrors++;
+                    return true; // Discards
+                });
                 if(chordExtra) {
                     log("Extra!", apply(chordExtra, [&](const uint index){return midi.notes[index];}));
                     assert_(chordExtra.size<=2, chordExtra.size);
                     extraErrors+=chordExtra.size;
                     chordExtra.clear();
                 }
+                if(!notes.values[0]) { notes.keys.removeAt(0); notes.values.removeAt(0); }
+
             }
             //uint time = notes.keys[0];
             array<Note>& chord = notes.values[0];
+            assert_(chord);
 
-            if(extraErrors > 7 || wrongErrors > 6 || missingErrors > 3) {
-                log(midi.notes.slice(midiIndex,4));
-                log(chord);
-                log(extraErrors, wrongErrors, missingErrors);
+            if(extraErrors > 9 || wrongErrors > 6 || missingErrors > 5 || orderErrors > 7) {
+                log("MID", midi.notes.slice(midiIndex,7));
+                log("XML", chord);
+                log(extraErrors, wrongErrors, missingErrors, orderErrors);
                 break;
             }
 
@@ -420,20 +437,24 @@ struct MusicXML : Widget {
                 assert_(note.key == midiKey);
                 midiToBlit << note.blitIndex;
                 log("Match", match, note.key);
-            } else if(chordExtra && notes.values[0].size == chordExtra.size) {
-                /*if(notes.values[0].size>2) {
-                    log("Triple fault", notes.values[0].size);
+            } else if(chordExtra && chord.size == chordExtra.size) {
+                /*if(chord.size>2) {
+                    log("Triple fault", chord.size);
                     log("MID",apply(chordExtra, [&](const uint index){return midi.notes[index];}));
-                    log("XML",notes.values[0]);
+                    log("XML",chord);
                     break;
                 }
-                assert_(notes.values[0].size==1, notes.values[0], apply(chordExtra, [&](const uint index){return midi.notes[index];}));*/
+                assert_(chord.size==1, chord, apply(chordExtra, [&](const uint index){return midi.notes[index];}));*/
                 int match = notes.values[1].indexOf(midi.notes[chordExtra[0]].key);
                 if(match >= 0) {
-                    assert_(notes.values[0].size==1);
-                    log("<Missing", notes.values[0]);
+                    if(chord.size != 1) {
+                        log("chord.size != 1", chord);
+                        break;
+                    }
+                    assert_(chord.size==1, chord);
+                    log("<Missing", chord);
                     missingErrors++;
-                    notes.values[0].clear();
+                    chord.clear();
                     midiKey = midi.notes[chordExtra[0]].key;
                     note = notes.values[1].take(match);
                     assert_(midiKey == note.key);
@@ -441,27 +462,32 @@ struct MusicXML : Widget {
                     midiToBlit[chordExtra[0]] = note.blitIndex;
                     chordExtra.clear();
                 } else {
-                    assert_(midiKey != notes.values[0][0].key);
-                    log(">Wrong");
-                    log("MID",apply(chordExtra, [&](const uint index){return midi.notes[index];}));
-                    log("XML",notes.values[0]);
-                    for(uint i: range(notes.values[0].size)) {
-                        Note note = notes.values[0][i];
+                    assert_(midiKey != chord[0].key);
+                    uint previousSize = chord.size;
+                    chord.filter([&](const Note& note) {
+                        for(const MidiNote& midiNote: midi.notes.slice(midiIndex,5)) if(midiNote.key == note.key) return false; // Keeps as extra (FIXME: check time)
+                        uint midiIndex = chordExtra.take(0);
+                        uint midiKey = midi.notes[midiIndex].key;
+                        log(">Wrong: Expected", note.key, "got", midiKey);
                         int2 p = blits[note.blitIndex].position;
-                        text(p+int2(noteSize.x, 2), "!!"_+str(midi.notes[chordExtra[i]]), smallFont);
+                        text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont);
+                        wrongErrors++;
+                        return true; // Discards as wrong
+                    });
+                    if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
+                        assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
+                        log("Extra!", apply(chordExtra, [&](const uint index){return midi.notes[index];}));
+                        extraErrors += chordExtra.size;
+                        chordExtra.clear();
                     }
-                    assert_(chordExtra.size);
-                    wrongErrors += chordExtra.size;
-                    note = notes.values[0][0];
-                    notes.values[0].clear();
-                    chordExtra.clear();
                 }
             } else {
-                log(midi.notes.slice(midiIndex,4));
-                log(chord);
+                log("MID", midi.notes.slice(midiIndex,7));
+                log("XML", chord);
+                log("Extra?", midiKey);
                 note = chord[0];
                 midiToBlit << -1;
-                log("Extra?"_, midiKey); debug<<'+'; chordExtra << midiIndex;
+                debug<<'+'; chordExtra << midiIndex;
             }
             int2 p = blits[note.blitIndex].position;
             text(p+int2(noteSize.x, 2), debug+str(note.key), smallFont);

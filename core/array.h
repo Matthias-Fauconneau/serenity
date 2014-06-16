@@ -172,4 +172,4 @@ generic void quicksort(const mref<T>& at, int left, int right) {
     }
 }
 /// Quicksorts the array in-place
-generic void quicksort(const mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); }
+generic const mref<T>& quicksort(const mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); return at; }
