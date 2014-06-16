@@ -51,9 +51,8 @@ struct TextLayout {
     }
 
     TextLayout(const ref<uint>& text, int size, int wrap, Font* font=0):size(size),wrap(wrap) {
-        static Folder dejavu( existsFolder("dejavu"_,fonts()) ?  "dejavu"_ : existsFolder("truetype/ttf-dejavu"_,fonts()) ? "truetype/ttf-dejavu/"_ : "TTF"_, fonts());
-        if(!font) {
-            if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("DejaVuSans.ttf"_,dejavu), size));
+       if(!font) {
+            if(!defaultSans.contains(size)) defaultSans.insert(size,Font::byName("DejaVuSans.ttf"_, size));
             font = &defaultSans.at(size);
         }
         uint16 spaceIndex = font->index(' ');
@@ -87,13 +86,13 @@ struct TextLayout {
                     lines << Line{underlineBegin, current()};
                 format=newFormat;
                 if(format&Bold) {
-                    if(!defaultBold.contains(size)) defaultBold.insert(size,Font(File("DejaVuSans-Bold.ttf"_,dejavu), size));
+                    if(!defaultBold.contains(size)) defaultBold.insert(size,Font::byName("DejaVuSans-Bold.ttf"_, size));
                     font = &defaultBold.at(size);
                 } else if(format&Italic) {
-                    if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font(File("DejaVuSans-Oblique.ttf"_,dejavu), size));
+                    if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font::byName("DejaVuSans-Oblique.ttf"_, size));
                     font = &defaultItalic.at(size);
                 } else {
-                    if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("DejaVuSans.ttf"_,dejavu), size));
+                    if(!defaultSans.contains(size)) defaultSans.insert(size,Font::byName("DejaVuSans.ttf"_, size));
                     font = &defaultSans.at(size);
                 }
                 if(format&Underline) underlineBegin=current();

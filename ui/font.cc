@@ -5,18 +5,8 @@
 #include "font.h"
 #include "file.h"
 
-const Folder& fonts() { static Folder folder("/usr/share/fonts"_); return folder; }
-
 static FT_Library ft; static int fontCount=0;
-Font::Font(const File& file, int size) : keep(Map(file)) { load(keep,size); }
-Font::Font(array<byte>&& data, int size):data(move(data)){ load(this->data,size); }
-Font::~Font(){
-    if(face) {
-        FT_Done_Face(face); face=0; fontCount--;
-        assert(fontCount>=0); if(fontCount == 0) { assert(ft); FT_Done_FreeType(ft), ft=0; }
-    }
-}
-void Font::load(const ref<byte>& data, int size) {
+Font::Font(const ref<byte>& data, int size) {
     if(!ft) {
         FT_Init_FreeType(&ft);
         FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
@@ -26,11 +16,17 @@ void Font::load(const ref<byte>& data, int size) {
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_REAL_DIM,size*64,size*64,0,0}; FT_Request_Size(face,&req);
     ascender=((FT_FaceRec*)face)->size->metrics.ascender*0x1p-6;
 }
-void Font::setSize(float size) {
-    if(fontSize==size) return; fontSize=size;
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,long(size*0x1p6),long(size*0x1p6),0,0}; FT_Request_Size(face,&req);
-    ascender=face->size->metrics.ascender*0x1p-6;
+Font::Font(::buffer<byte>&& data, int size) : Font(data, size) { buffer = move(data); }
+Font::Font(Map&& data, int size) : Font(data, size) { map = move(data); }
+Font Font::byName(string name, int size) { for(Folder folder: {"/usr/share/fonts"_,""_}) for(string path: folder.list(Files|Recursive)) if(find(path,name)) return Font(File(path, folder), size); error("No such font",name); }
+
+Font::~Font(){
+    if(face) {
+        FT_Done_Face(face); face=0; fontCount--;
+        assert(fontCount>=0); if(fontCount == 0) { assert(ft); FT_Done_FreeType(ft), ft=0; }
+    }
 }
+
 
 uint16 Font::index(const string& name) {
     uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));

@@ -10,7 +10,7 @@ const int3 projectionSize = int3(N);
 const bool oversample = false;
 const int3 volumeSize = int3(oversample ? 2*N : N);
 
-CLVolume x (Map(/*"cylinder."_+*/strx(volumeSize)+".ref"_));
+CLVolume x (Map(strx(volumeSize)+".ref"_));
 
 VolumeF Ax (Map(File(strx(projectionSize)+".proj"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write)));
 

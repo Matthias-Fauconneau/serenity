@@ -8,8 +8,6 @@
 #include "thread.h"
 struct  FT_FaceRec_;
 
-const Folder& fonts();
-
 struct Glyph {
     bool valid=false;
     int2 offset; // (left bearing, min.y-baseline)
@@ -18,16 +16,18 @@ struct Glyph {
 
 /// Freetype wrapper
 struct Font {
-    /// Loads font at /a path scaled to /a size pixels high
-    Font(const File& file, int size);
     /// Loads font /a data scaled to /a size pixels high
-    Font(array<byte>&& data, int size=0);
+    Font(const ref<byte>& data, int size);
+    /// Loads font /a data scaled to /a size pixels high
+    Font(buffer<byte>&& buffer, int size=0);
+    /// Loads font /a data scaled to /a size pixels high
+    Font(Map&& map, int size);
+
+    static Font byName(string name, int size);
+
     default_move(Font);
     ~Font();
-    /// Loads font /a data scaled to /a size pixels high
-    void load(const ref<byte>& data, int size);
-    /// Sets font size
-    void setSize(float size);
+
     /// Returns font glyph index for glyph \a name
     uint16 index(const string& name);
     /// Returns font glyph index for Unicode codepoint \a code
@@ -46,9 +46,11 @@ struct Font {
     /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster
     void render(struct Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 
-    Map keep; array<byte> data;
     handle<FT_FaceRec_*> face;
     float fontSize=0, ascender=0;
     map<uint, map<uint16, Glyph>> cache;
     Lock lock;
+
+    buffer<byte> buffer;
+    Map map;
 };
