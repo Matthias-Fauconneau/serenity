@@ -15,12 +15,14 @@ int2 SliceView::sizeHint() { return upsampleFactor * this->size.xy(); }
 
 void SliceView::render() {
     ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
+    for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) assert_(isNumber(image(x,y)), name);
     while(image.size < this->target.size()) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     float max = convert(target, image);
-    Text(str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,1).render(this->target, 0);
+    float min = ::min(image.data);
+    Text(name+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);
 }
 
@@ -41,6 +43,7 @@ void VolumeView::render() {
     if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
-    Text(str(mean(volume))+"\n"_+str(max),16,1).render(this->target, 0);
+    float min = ::min(image.data);
+    Text(name+"\n"_+str(min)+"\n"_+str(mean(volume))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);
 }

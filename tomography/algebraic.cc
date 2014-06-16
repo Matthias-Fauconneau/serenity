@@ -11,8 +11,10 @@ Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size
         const ProjectionArray& At = subset.At;
         CLVolume Ati (size);
         backproject(Ati, At, i); // Backprojects identity projections
+        const ImageArray& b = subset.b;
         new (&AAti[subsetIndex]) ImageArray(b.size);
         project(AAti[subsetIndex], Ati, subsetIndex*subsetSize, projectionCount); // Projects coefficents volume
+        //backproject(x, At, b, subsetIndex==0?0:1/*add*/); // FIXME: Initial estimate
     }
 }
 

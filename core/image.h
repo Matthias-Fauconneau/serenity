@@ -19,6 +19,13 @@ inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,off
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
+// Colors
+constexpr vec3 black (0, 0, 0);
+constexpr vec3 white (1, 1, 1);
+constexpr vec3 blue (1, 0, 0);
+constexpr vec3 green (0, 1, 0);
+constexpr vec3 red (0, 0, 1);
+
 struct Image {
     Image(){}
     Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha=false, bool sRGB=false) :

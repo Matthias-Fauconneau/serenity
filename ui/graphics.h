@@ -2,10 +2,6 @@
 /// \file graphics.h 2D graphics primitives (fill, blit, line)
 #include "image.h"
 
-// Colors
-constexpr vec3 black {0,0,0};
-constexpr vec3 white {1,1,1};
-
 /// Converts lightness, chroma, hue to linear sRGB
 /// sRGB primaries:
 /// Red: L~53.23, C~179.02, h~0.21

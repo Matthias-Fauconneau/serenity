@@ -90,7 +90,8 @@ struct VBox : Vertical, Widgets {
 };
 /// Horizontal layout of homogenous items. \sa Array
 template<class T> struct HList : Horizontal, Array<T> {
-    HList(array<T>&& widgets):Array<T>(move(widgets)){}
+    HList(const mref<T>& widgets):Array<T>(widgets){}
+    //HList(array<T>&& widgets):Array<T>(move(widgets)){}
     HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of homogenous items. \sa Array

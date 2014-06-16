@@ -172,6 +172,7 @@ void Window::render() {
     {Locker lock(renderLock);
         widget->render(target);
     }
+    putImage();
 }
 
 void Window::putImage(Rect rect) {
@@ -525,7 +526,7 @@ void Window::render() {
     renderBackground(target);
     assert(&widget);
     widget->render(target);
-    putImage(0, size);
+    putImage();
 }
 
 void Window::show() {

@@ -20,27 +20,36 @@ struct Application : Poll {
     int3 size = referenceVolume.size;
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
-#if 0
+#define COMPARE 0
+#if COMPARE
     const string labels[3] {"SIRT"_, "CG"_,"OSTR"_};
-    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData), unique<OSTR>(size, projectionData)};
+    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)/*, unique<OSTR>(size, projectionData)*/};
 #else
     const string labels[1] {""_};
-    //unique<Reconstruction> reconstructions[1] {unique<Algebraic>(size, projectionData)};
-    //unique<Reconstruction> reconstructions[1] {unique<ConjugateGradient>(size, projectionData)};
-    unique<Reconstruction> reconstructions[1] {unique<OSTR>(size, projectionData)};
+    ::OSTR OSTR {size, projectionData};
 #endif
 
     // Interface
     int upsample = 256 / projectionData.size.x;
 
     Value sliceIndex = (referenceVolume.size.z-1) / 2;
+    Value projectionIndex = 0; //(projectionData.size.z-1) / 2;
+
     SliceView x {referenceVolume, upsample, sliceIndex};
+#if COMPARE
     HList<SliceView> rSlices {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return SliceView(r.x, upsample, sliceIndex);})};
+#else
+    HList<SliceView> rSlices {{SliceView(OSTR.Ax, upsample, projectionIndex,"Ax"_), SliceView(OSTR.h, upsample, projectionIndex,"h"_), SliceView(OSTR.Aic, upsample, projectionIndex,"Aic"_), SliceView(OSTR.L, upsample, sliceIndex,"L"_), SliceView(OSTR.d, upsample, sliceIndex,"d"_),
+                    SliceView(OSTR.x, upsample, sliceIndex,"x"_)}};
+#endif
     HBox slices {{&x, &rSlices}};
 
-    Value projectionIndex = (projectionData.size.z-1) / 2;
     SliceView b {projectionData, upsample, projectionIndex};
+#if COMPARE
     HList<VolumeView> rViews {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return VolumeView(r.x, projectionData.size, upsample, projectionIndex);})};
+#else
+    HList<VolumeView> rViews {{VolumeView(OSTR.L, projectionData.size, upsample, sliceIndex, "L"_), VolumeView(OSTR.d, projectionData.size, upsample, sliceIndex, "d"_), VolumeView(OSTR.x, projectionData.size, upsample, sliceIndex, "x"_) }};
+#endif
     HBox views {{&b, &rViews}};
 
     Plot plot;
@@ -54,11 +63,16 @@ struct Application : Poll {
         referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder))
     {
         queue(); thread.spawn();
-        //window.actions[Space] = [this]{ queue(); };
+        window.actions[Space] = [this]{ queue(); };
     }
     void event() {
+#if COMPARE
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
+#else
+        uint index = 0;
+        Reconstruction& r = OSTR;
+#endif
         r.step();
         const float SSE = ::SSE(referenceVolume, r.x, evaluationOrigin, evaluationSize);
         const float MSE = SSE / SSQ;
@@ -68,10 +82,16 @@ struct Application : Poll {
         {Locker lock(window.renderLock);
             setWindow( &window );
             window.renderBackground(plot.target); plot[labels[index]].insertMulti(r.time/1000000000.f, -PSNR); plot.render();
+#if COMPARE
             rSlices[index].render(); rViews[index].render();
+#else
+            rSlices.render(); rViews.render();
+#endif
             setWindow( 0 );
         }
         //cylinderCheck(r.x);
+#if COMPARE
         queue();
+#endif
     }
 } app;
