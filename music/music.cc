@@ -375,34 +375,19 @@ struct MusicXML : Widget {
         for(uint i: range(measures.size-1)) if(measures[i]<=x0 && x0<measures[i+1]) return i; return -1;
     }
 
-    /*/// Returns index of note matching key between notes played at the same time as \a noteIndex (-1 if none found)
-    int find(const array<Sign>& notes, uint key) {
-        uint time = notes[0].time;
-        for(uint index: range(notes.size)) {
-            Sign sign = notes[index];
-            assert_(sign.time >= time);
-            if(sign.time > time) break;
-            if(sign.note.key == key) return index;
-        }
-        return -1;
-    }*/
-
     void synchronize() {
         map<uint, array<Note>> notes = copy(this->notes);
         array<uint> chordExtra;
         while(notes) {
-            uint midiIndex = midiToBlit.size;
-            uint midiKey = midi.notes[midiIndex].key;
-            Note note;
-            String debug;
             if(!notes.values[0]) {
                 notes.keys.removeAt(0); notes.values.removeAt(0);
+                if(!notes) break;
                 array<Note>& chord = notes.values[0];
                 chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
                     uint midiKey = midi.notes[midiIndex].key;
                     int match = chord.indexOf(midiKey);
                     if(match < 0) return false; // Keeps
-                    note = chord.take(match);
+                    Note note = chord.take(match);
                     assert_(note.key == midiKey);
                     midiToBlit[midiIndex] = note.blitIndex;
                     log(">Order", match, note.key);
@@ -418,13 +403,20 @@ struct MusicXML : Widget {
                     chordExtra.clear();
                 }
                 if(!notes.values[0]) { notes.keys.removeAt(0); notes.values.removeAt(0); }
-
+                assert_(notes);
+                if(!notes) break;
             }
-            //uint time = notes.keys[0];
+            assert_(notes);
             array<Note>& chord = notes.values[0];
-            assert_(chord);
+            assert_(chord, notes);
 
-            if(extraErrors > 9 || wrongErrors > 6 || missingErrors > 5 || orderErrors > 7) {
+            uint midiIndex = midiToBlit.size;
+            assert_(midiIndex < midi.notes.size, notes);
+            uint midiKey = midi.notes[midiIndex].key;
+            Note note;
+            String debug;
+
+            if(extraErrors > 9 || wrongErrors > 6 || missingErrors > 9 || orderErrors > 7) {
                 log("MID", midi.notes.slice(midiIndex,7));
                 log("XML", chord);
                 log(extraErrors, wrongErrors, missingErrors, orderErrors);
@@ -447,20 +439,24 @@ struct MusicXML : Widget {
                 assert_(chord.size==1, chord, apply(chordExtra, [&](const uint index){return midi.notes[index];}));*/
                 int match = notes.values[1].indexOf(midi.notes[chordExtra[0]].key);
                 if(match >= 0) {
-                    if(chord.size != 1) {
-                        log("chord.size != 1", chord);
-                        break;
-                    }
-                    assert_(chord.size==1, chord);
+                    assert_(chord.size<=3, chord);
                     log("<Missing", chord);
-                    missingErrors++;
+                    missingErrors += chord.size;
                     chord.clear();
-                    midiKey = midi.notes[chordExtra[0]].key;
-                    note = notes.values[1].take(match);
-                    assert_(midiKey == note.key);
-                    log(">Match", match, midiKey);
-                    midiToBlit[chordExtra[0]] = note.blitIndex;
-                    chordExtra.clear();
+                    chordExtra.filter([&](uint index){
+                        if(!chord) { notes.keys.removeAt(0); notes.values.removeAt(0); }
+                        assert_(chord);
+                        int match = chord.indexOf(midi.notes[index].key);
+                        if(match<0) return false; // Keeps as extra
+                        midiKey = midi.notes[index].key;
+                        note = chord.take(match);
+                        assert_(midiKey == note.key);
+                        log(">Match", match, midiKey);
+                        midiToBlit[index] = note.blitIndex;
+                        int2 p = blits[note.blitIndex].position;
+                        text(p+int2(noteSize.x, 2), str(note.key), smallFont);
+                        return true; // Discards extra as matched to next chord
+                    });
                 } else {
                     assert_(midiKey != chord[0].key);
                     uint previousSize = chord.size;
@@ -468,6 +464,7 @@ struct MusicXML : Widget {
                         for(const MidiNote& midiNote: midi.notes.slice(midiIndex,5)) if(midiNote.key == note.key) return false; // Keeps as extra (FIXME: check time)
                         uint midiIndex = chordExtra.take(0);
                         uint midiKey = midi.notes[midiIndex].key;
+                        assert_(note.key != midiKey);
                         log(">Wrong: Expected", note.key, "got", midiKey);
                         int2 p = blits[note.blitIndex].position;
                         text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont);
@@ -493,6 +490,7 @@ struct MusicXML : Widget {
             text(p+int2(noteSize.x, 2), debug+str(note.key), smallFont);
             if(debug) position = measures[max(0,measureIndex(p.x)-1)];
         }
+        log(extraErrors, wrongErrors, missingErrors, orderErrors);
     }
 
     // Render
