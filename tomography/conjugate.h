@@ -2,6 +2,7 @@
 #include "reconstruction.h"
 
 struct ConjugateGradient : Reconstruction  {
+    ProjectionArray At;
     // Persistent
     real residualEnergy = 0;
     const CLVolume p, r;

@@ -7,7 +7,7 @@
 
 const uint N = fromInteger(arguments()[0]);
 const int3 size = int3(N, N, N);
-VolumeF hostVolume = Map(strx(size)+".ref"_);
+VolumeF hostVolume = Map("cylinder"_+"."_+strx(size)+".ref"_);
 CLVolume volume (hostVolume);
 
 struct App {

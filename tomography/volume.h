@@ -20,11 +20,21 @@ inline ImageF slice(const VolumeF& volume, size_t index /* Z slice or projection
     return ImageF(buffer<float>(volume.data.slice(index*size.y*size.x,size.y*size.x)), int2(size.x,size.y));
 }
 
+inline float mean(const ref<float>& A) { return sum(A) / A.size; }
 inline float SSQ(const ref<float>& A) { float SSQ=0; for(float a: A) SSQ+=a*a; return SSQ; }
 inline float SSE(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float SSE=0; for(uint i: range(A.size)) SSE+=sq(A[i]-B[i]); return SSE; }
 inline float dotProduct(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float dot=0; for(uint i: range(A.size)) dot+=A[i]*B[i]; return dot; }
 
 inline float sum(const VolumeF& volume) { return sum(volume.data); }
+inline float mean(const VolumeF& volume) { return mean(volume.data); }
 inline float SSQ(const VolumeF& volume) { return SSQ(volume.data); }
 inline float SSE(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return SSE(A.data, B.data); }
 inline float dotProduct(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return dotProduct(A.data, B.data); }
+
+inline const VolumeF& cylinder(const VolumeF& target) {
+    int3 size = target.size;
+    const float2 center = float2(size.xy()-int2(1))/2.f;
+    const float radiusSq = sq(center.x);
+    for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) target(x,y,z) = sq(float2(x,y)-center)<=radiusSq;
+    return target;
+}

@@ -12,6 +12,7 @@ void downsample(const VolumeF& target, const VolumeF& source) {
 struct App {
     App() {
         const int N = fromInteger(arguments()[0]);
-        downsample(VolumeF(Map(File("data/"_+dec(N)+".ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map("data/"_+dec(N*2)+".ref"_)));
+        //downsample(VolumeF(Map(File(strx(int3(N))+".ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write))), VolumeF(Map(strx(int3(N*2))+".ref"_)));
+        cylinder(VolumeF(Map(File("cylinder."_+strx(int3(N))+".ref"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write))));
     }
 } app;

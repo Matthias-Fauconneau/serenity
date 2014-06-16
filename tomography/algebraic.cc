@@ -2,7 +2,7 @@
 #include "operators.h"
 #include "time.h"
 
-Algebraic::Algebraic(int3 size, const ImageArray& b) : Reconstruction(size, b), Ax(subsets[0].b.size), p(size) {
+Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size, b), Ax(subsets[0].b.size), p(size) {
     AAti = buffer<ImageArray>(subsets.size);
     for(uint subsetIndex: range(subsets.size)) {
         log("AAti", subsetIndex);

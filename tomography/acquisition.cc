@@ -7,18 +7,10 @@
 
 const uint N = fromInteger(arguments()[0]);
 const int3 projectionSize = int3(N);
-const int3 volumeSize = int3(2*N);
+const bool oversample = false;
+const int3 volumeSize = int3(oversample ? 2*N : N);
 
-const VolumeF& cylinder(const VolumeF& target) {
-    int3 size = target.size;
-    const float2 center = float2(size.xy()-int2(1))/2.f;
-    const float radiusSq = sq(center.x);
-    for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) target(x,y,z) = sq(float2(x,y)-center)<=radiusSq;
-    return target;
-}
-
-CLVolume x (Map(strx(volumeSize)+".ref"_));
-//CLVolume x = cylinder(volumeSize);
+CLVolume x (Map(/*"cylinder."_+*/strx(volumeSize)+".ref"_));
 
 VolumeF Ax (Map(File(strx(projectionSize)+".proj"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write)));
 
@@ -26,7 +18,6 @@ struct App {
     App() {
         for(uint index: range(Ax.size.z)) {
             log(index);
-            const bool oversample = false;
             if(oversample) {
                 ImageF fullSize(2*projectionSize.xy());
                 ::project(fullSize, x, Ax.size.z, index);

@@ -19,8 +19,8 @@ void SliceView::render() {
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
-    convert(target, image, 0);
-    //Text(str(volume ? sum(*volume) : sum(*clVolume)),16,1).render(this->target, 0);
+    float max = convert(target, image);
+    Text(str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,1).render(this->target, 0);
     putImage(target);
 }
 
@@ -40,7 +40,7 @@ void VolumeView::render() {
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
-    convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
-    //Text(str(sum(volume)),16,1).render(this->target, 0);
+    float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
+    Text(str(mean(volume))+"\n"_+str(max),16,1).render(this->target, 0);
     putImage(target);
 }

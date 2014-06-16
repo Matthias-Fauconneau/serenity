@@ -12,5 +12,5 @@ kernel void backproject(global float* Y, const uint XY, const uint X, const floa
             Atb += read_imagef(images, sampler, (float4)(image,projectionIndex,0)).x;
         }
     }
-    Y[z*XY+y*X+x] = Atb;
+    Y[z*XY+y*X+x] = Atb / projectionCount; // / projectionCount necessary ?
 }

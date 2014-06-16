@@ -2,6 +2,7 @@
 #include "opencl.h"
 
 float sum(const CLVolume& A, const int3 origin=0, int3 size=0);
+inline float mean(const CLVolume& A) { return sum(A) / (A.size.x*A.size.y*A.size.z); }
 float SSQ(const CLVolume& A, const int3 origin=0, int3 size=0);
 float SSE(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
 float dotProduct(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);

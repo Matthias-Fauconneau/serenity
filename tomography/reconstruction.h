@@ -3,20 +3,27 @@
 
 struct Reconstruction {
     CLVolume x;
-
+    const uint projectionCount;
     int k = 0;
     uint64 time = 0;
 
+    Reconstruction(int3 size, const ImageArray& b) : x(size), projectionCount(b.size.z) {}
+    virtual ~Reconstruction() {}
+    virtual void step() abstract;
+};
+inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.time < b.time; }
+
+struct SubsetReconstruction : Reconstruction {
+    const uint subsetSize, subsetCount;
     struct Subset {
         ProjectionArray At;
         ImageArray b;
     };
     buffer<Subset> subsets;
-    const uint projectionCount, subsetSize, subsetCount;
 
     uint subsetIndex = 0;
 
-    Reconstruction(int3 size, const ImageArray& b) : x(size), projectionCount(b.size.z), subsetSize(round(sqrt(float(projectionCount)))), subsetCount(round(sqrt(float(projectionCount)))) { // FIXME
+    SubsetReconstruction(int3 size, const ImageArray& b) : Reconstruction(size, b), subsetSize(round(sqrt(float(projectionCount)))), subsetCount(round(sqrt(float(projectionCount)))) { // FIXME
         assert_(subsetCount*subsetSize == projectionCount);
         subsets = buffer<Subset>(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {
@@ -27,7 +34,4 @@ struct Reconstruction {
             new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return Projection(size, b.size, index).worldToView; }), move(subsetB)};
         }
     }
-    virtual ~Reconstruction() {}
-    virtual void step() abstract;
 };
-inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.time < b.time; }
