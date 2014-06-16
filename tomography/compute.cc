@@ -1,5 +1,7 @@
 #include "algebraic.h"
 #include "conjugate.h"
+#include "OSTR.h"
+
 #include "plot.h"
 #include "window.h"
 #include "layout.h"
@@ -18,13 +20,14 @@ struct Application : Poll {
     int3 size = referenceVolume.size;
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
-#if 1
-    const string labels[2] {"SIRT"_, "CG"_};
-    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)};
+#if 0
+    const string labels[3] {"SIRT"_, "CG"_,"OSTR"_};
+    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData), unique<OSTR>(size, projectionData)};
 #else
     const string labels[1] {""_};
-    unique<Reconstruction> reconstructions[1] {unique<Algebraic>(size, projectionData)};
+    //unique<Reconstruction> reconstructions[1] {unique<Algebraic>(size, projectionData)};
     //unique<Reconstruction> reconstructions[1] {unique<ConjugateGradient>(size, projectionData)};
+    unique<Reconstruction> reconstructions[1] {unique<OSTR>(size, projectionData)};
 #endif
 
     // Interface

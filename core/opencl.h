@@ -37,12 +37,22 @@ generic struct CLBuffer : CLRawBuffer {
 
 typedef CLBuffer<float> CLBufferF;
 
+struct CLImage : CLMem {
+    CLImage(int2 size, const float value=0);
+    CLImage(int2 size, const ref<float>& data);
+    //CLImage(const ImageF& A) : CLImage(A.size, A.data) {}
+    default_move(CLImage);
+
+    //const CLImage& read(const CLImage& target, int2 origin=0) const;
+
+    int2 size; // width, height
+};
+
 struct CLVolume : CLMem {
-    CLVolume(int3 size, float value=0);
+    CLVolume(int3 size, const float value=0);
     CLVolume(int3 size, const ref<float>& data);
     CLVolume(const VolumeF& A) : CLVolume(A.size, A.data) {}
-    //CLVolume(const ref<float>& data) : CLVolume(round(pow(data.size,1./3)), data) {} Implemented through VolumeF
-    default_move(CLVolume);
+     default_move(CLVolume);
 
     const VolumeF& read(const VolumeF& target, int3 origin=0) const;
 
@@ -81,6 +91,7 @@ struct CLKernel {
     template<Type T, Type... Args> void setKernelArgs(uint index, const T& value, const Args&... args) { setKernelArg(index, sizeof(value), &value); setKernelArgs(index+1, args...); }
     template<Type... Args> void setKernelArgs(uint index, const CLRawBuffer& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
     template<Type... Args> void setKernelArgs(uint index, const CLBufferF& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
+    template<Type... Args> void setKernelArgs(uint index, const CLImage& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
     template<Type... Args> void setKernelArgs(uint index, const CLVolume& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
     //template<Type... Args> void setKernelArgs(uint index, const ImageArray& value, const Args&... args) { setKernelArg(index, sizeof(value.pointer), &value.pointer); setKernelArgs(index+1, args...); }
 

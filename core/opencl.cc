@@ -56,14 +56,12 @@ CLRawBuffer::CLRawBuffer(size_t size) : CLMem(clCreateBuffer(context, CL_MEM_REA
 CLRawBuffer::CLRawBuffer(const ref<byte> data) : CLMem(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, data.size, (byte*)data.data, 0)) {}
 void CLRawBuffer::read(const mref<byte>& target) { clEnqueueReadBuffer(queue, pointer, true, 0, target.size, target, 0,0,0); }
 
-#if OPENCL_1_2
-CLVolume::CLVolume(int3 size, const float value) : CLMem(clCreateImage3D(context, CL_MEM_READ_WRITE, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, size.z, 0,0, 0, 0)), size(size) {
-    clEnqueueFillImage(queue, pointer, (float[]){value,0,0,0},  (size_t[]){0,0,0}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0,0); // Requires OpenCL 1.2
+CLImage::CLImage(int2 size, const float value) : CLImage(size, buffer<float>(size.x*size.y, size.x*size.y, value)) {} // NVidia OpenCL doesn't support clEnqueueFillImage (OpenCL 1.2)
+CLImage::CLImage(int2 size, const ref<float>& data) : CLMem(clCreateImage2D(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, 0, (float*)data.data, 0)), size(size) {
+    assert_(data.size == (size_t)size.x*size.y, data.size, (size_t)size.x*size.y);
 }
-#else
-CLVolume::CLVolume(int3 size, const float value) : CLVolume(size, buffer<float>(size.x*size.y*size.z, size.x*size.y*size.z, value)) {}
-#endif
 
+CLVolume::CLVolume(int3 size, const float value) : CLVolume(size, buffer<float>(size.x*size.y*size.z, size.x*size.y*size.z, value)) {} // NVidia OpenCL doesn't support clEnqueueFillImage (OpenCL 1.2)
 CLVolume::CLVolume(int3 size, const ref<float>& data) : CLMem(clCreateImage3D(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, size.z, 0,0, (float*)data.data, 0)), size(size) {
     assert_(data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
 }

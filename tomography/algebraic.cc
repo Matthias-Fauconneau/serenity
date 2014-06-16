@@ -4,13 +4,11 @@
 
 Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size, b), Ax(subsets[0].b.size), p(size) {
     AAti = buffer<ImageArray>(subsets.size);
+    ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
         log("AAti", subsetIndex);
         Subset& subset = subsets[subsetIndex];
         const ProjectionArray& At = subset.At;
-        const ImageArray& b = subset.b;
-        buffer<float> ones (b.size.x*b.size.y*b.size.z); ones.clear(1);
-        ImageArray i (b.size, 1.f);
         CLVolume Ati (size);
         backproject(Ati, At, i); // Backprojects identity projections
         new (&AAti[subsetIndex]) ImageArray(b.size);
