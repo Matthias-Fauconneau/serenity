@@ -1,6 +1,6 @@
 #define size_t uint
 struct mat4 { float4 columns[4]; };
-kernel void backproject(global float* Y, const uint XY, const uint X, const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, global const struct mat4* worldToView, read_only image3d_t images, sampler_t sampler, const float lambda) {
+kernel void backproject(global float* Y, const uint XY, const uint X, const float3 center, const float radiusSq, const float2 imageCenter, const size_t projectionCount, global const struct mat4* worldToView, read_only image3d_t images, sampler_t sampler) {
     size_t x = get_global_id(0); size_t y = get_global_id(1); size_t z = get_global_id(2);
     const float3 world = (float3)(x,y,z) - center;
     float Atb = 0;
@@ -12,5 +12,5 @@ kernel void backproject(global float* Y, const uint XY, const uint X, const floa
             Atb += read_imagef(images, sampler, (float4)(image,projectionIndex,0)).x;
         }
     }
-    Y[z*XY+y*X+x] = /*lambda * Y[z*XY+y*X+x] +*/ Atb / projectionCount; // / projectionCount necessary ? helps normalization
+    Y[z*XY+y*X+x] = Atb;
 }

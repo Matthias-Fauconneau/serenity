@@ -173,7 +173,7 @@ String repeat(const string& s, uint times) {
 String pad(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
 String left(const string& s, uint length, const string& pad) { return s+repeat(pad, max<int>(0,length-s.size/pad.size)); }
 
-stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r << s; r << '\0'; return r; }
+stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r.append(s); r.append('\0'); return r; }
 
 /// array<string>
 
@@ -203,7 +203,7 @@ template<uint base> String utoa(uint64 n, int pad, char padChar) {
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = padChar;
-    return String(string(buf+i,64-i));
+    return copy(String(string(buf+i,64-i)));
 }
 template String utoa<2>(uint64,int, char padChar);
 template String utoa<8>(uint64,int, char padChar);
@@ -219,7 +219,7 @@ template<uint base> String itoa(int64 number, int pad, char padChar) {
     } while( n!=0 );
     if(number<0) buf[--i]='-';
     while(64-i<pad) buf[--i] = padChar;
-    return String(string(buf+i,64-i));
+    return copy(String(string(buf+i,64-i)));
 }
 template String itoa<10>(int64,int,char);
 
@@ -246,7 +246,7 @@ String ftoa(double n, int precision, uint pad, int exponent) {
 }
 
 String percent(const float f) { return dec(round(100*f))+"%"_; }
-String percent(const uint64 a, const uint64 b) { return b ? dec((100*a+50)/b)+"%"_ : ""_; }
+String percent(const uint64 a, const uint64 b) { return b ? dec((100*a+50)/b)+"%"_ : String(); }
 
 String binaryPrefix(size_t value, string unit) {
     if(value < 1u<<10) return str(value, unit);

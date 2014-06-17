@@ -30,6 +30,7 @@ enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4
 
 /// Abstract component to compose user interfaces
 struct Widget {
+    Widget(const Widget&)=delete; Widget& operator=(const Widget&)=delete; Widget(){}
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.

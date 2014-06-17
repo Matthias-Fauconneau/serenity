@@ -50,7 +50,7 @@ struct Data {
     /// Creates a Data interface to an \a array
     Data(::buffer<byte>&& array) : buffer(move(array)) {}
     /// Creates a Data interface to a \a reference
-    explicit Data(const ref<byte>& reference) : buffer(reference.data,reference.size) {}
+    explicit Data(const ref<byte>& reference) : buffer(reference) {}
     /// Slices a reference to the buffer from \a pos to \a pos + \a size
     ref<byte> slice(uint pos, uint size) const { return buffer.slice(pos,size); }
     /// Slices a reference to the buffer from \a pos to the end of the buffer

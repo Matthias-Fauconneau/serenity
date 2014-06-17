@@ -8,15 +8,19 @@ generic struct array : buffer<T> {
     default_move(array);
     /// Default constructs an empty array
     array() {}
+    /// References \a o.size elements from \a o.data pointer
+    explicit array(const ref<T>& o): buffer<T>(o) {}
+
+    /// Moves elements from a reference
+    //explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
+    /// Copies elements from a reference
+    //array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
+    //array(const std::initializer_list<T>& list) : array(ref<T>(list)) {}
+
+    /// Converts a buffer to an array (move constructor)
+    array(buffer<T>&& o) : buffer<T>(move(o)) {}
     /// Allocates an uninitialized buffer for \a capacity elements
     explicit array(size_t capacity) : buffer<T>(capacity, 0) {}
-    /// Moves elements from a reference
-    explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
-    /// Copies elements from a reference
-    array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
-    array(const std::initializer_list<T>& list) : array(ref<T>(list)) {}
-    /// Converts a buffer to an array
-    array(buffer<T>&& o) : buffer<T>(move(o)) {}
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
 
@@ -42,20 +46,22 @@ generic struct array : buffer<T> {
     void clear() { if(size) shrink(0); }
 
     /// Appends a new element constructing it directly into the array (avoids using a move operations)
-    template<Type... Args> void append(Args&&... args) { size_t s=size+1; reserve(s); new (end()) T(forward<Args>(args)...); size=s;}
+    template<Type... Args> void append(Args&&... args) { reserve(size+1); buffer<T>::append(forward<Args>(args)...); }
+    array& operator<<(const T& e) { append(e); return *this; }
+    array& operator<<(T&& e) { append(move(e)); return *this; }
 
-    /// \name Append operators
-    array& operator<<(T&& e) { size_t s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
-    array& operator<<(array<T>&& a) {size_t s=size; reserve(size=s+a.size); move(slice(s,a.size), a); return *this; }
-    array& operator<<(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
-    array& operator<<(const ref<T>& a) {size_t s=size; reserve(size=s+a.size); copy(slice(s,a.size), a); return *this; }
-    /// \}
+    /// Appends values
+    void append(const ref<T>& a) { reserve(size+a.size); buffer<T>::append(a); }
+    array& operator<<(const ref<T>& a) { append(a); return *this; }
+
+    /// Appends elements
+    void append(buffer<T>&& a) { reserve(size+a.size); buffer<T>::append(move(a)); }
+    array& operator<<(buffer<T>&& a) { append(move(a)); return *this; }
 
     /// \name Appends once (if not already contained) operators
-    array& operator +=(T&& v) { if(!contains(v)) *this<< move(v); return *this; }
-    array& operator +=(const T& v) { if(!contains(v)) *this<<v; return *this; }
-    array& operator +=(const ref<T>& o) { for(const T& v: o) *this+=v; return *this; }
-    /// \}
+    array& operator+=(const T& e) { if(!contains(e)) append(e); return *this; }
+    array& operator+=(T&& e) { if(!contains(e)) append(move(e)); return *this; }
+    array& operator +=(const ref<T>& o) { for(const T& v: o) *this += v; return *this; }
 
     /// Inserts an element at \a index
     template<Type V> T& insertAt(int index, V&& e) {
@@ -106,32 +112,17 @@ generic struct array : buffer<T> {
     using buffer<T>::data;
     using buffer<T>::size;
     using buffer<T>::capacity;
-    using buffer<T>::end;
-    using buffer<T>::at;
     using buffer<T>::slice;
+    using buffer<T>::at;
 };
+
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
-//generic buffer<T> copy(const array<T>& o) { return copy((const ref<T>&)(o)); }
-//generic array<T> copy(const array<T>& o) { return copy((const ref<T>&)(o)); }
-
-/// Concatenates two arrays
-generic inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }
 
 /// Replaces in \a array every occurence of \a before with \a after
 generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=after; return move(a);
 }
-
-/*/// Returns an array of the application of a function to every index up to a size
-template<class Function, class... Args> auto apply(uint size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
-    buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
-}
-
-/// Returns an array of the application of a function to every index up to a size
-template<class Function, class... Args> auto apply(uint start, uint end, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
-    buffer<decltype(function(0, args...))> r(size); for(uint i: range(start,end)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
-}*/
 
 /// Returns an array of the application of a function to every index up to a size
 template<class Function, class... Args> auto apply(range a, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
@@ -145,10 +136,15 @@ template<class T, class Function, class... Args> auto apply(const ref<T>& a, Fun
     return r;
 }
 
-/// Converts arrays to references
-generic array<ref<T> > toRefs(const ref<array<T>>& o) {
-    array<ref<T>> r; for(const array<T>& e: o) r << (const ref<T>&)e; return r;
+/// Returns an array of the application of a function to every elements of a reference
+template<class T, class Function, class... Args> auto apply(const mref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
+    buffer<decltype(function(a[0], args...))> r(a.size);
+    for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...));
+    return r;
 }
+
+/// Converts arrays to references
+generic buffer<ref<T> > toRefs(const ref<array<T>>& o) { return apply(o, [](const array<T>& o)->ref<T>{return o;}); }
 
 /// String is an array of bytes
 typedef array<byte> String;

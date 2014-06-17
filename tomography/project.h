@@ -22,4 +22,4 @@ uint64 project(const ImageArray& Ax, const CLVolume& x, uint startIndex=0, uint 
 typedef CLBuffer<mat4> ProjectionArray;
 
 /// Backprojects (At) \a b to \a Atb
-uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b, const float lambda=0 /*0: replace, 1: add*/);
+uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b);

@@ -75,7 +75,7 @@ void Plot::render() {
             if(log[axis]) value = exp2(value);
             String label = ftoa(value, precision, 0, value>=10e5 ? 3 : value <=10e-2 ? 1 : 0);
             assert(label);
-            ticks[axis] <<Tick(value, label);
+            ticks[axis].append(value, label);
             tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
         }
     }

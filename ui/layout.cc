@@ -2,12 +2,12 @@
 
 // Layout
 void Layout::render() {
-    array<Rect> widgets = layout(target.size());
+    buffer<Rect> widgets = layout(target.size());
     for(uint i: range(count())) at(i).render(clip(target, widgets[i]));
 }
 
 bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
-    array<Rect> widgets = layout(size);
+    buffer<Rect> widgets = layout(size);
     for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(widgets[i],cursor,event,button)) return true;
     return false;
 }
@@ -26,7 +26,7 @@ int2 Linear::sizeHint() {
     return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
 
-array<Rect> Linear::layout(int2 size) {
+buffer<Rect> Linear::layout(int2 size) {
     uint count=this->count();
     if(!count) return {};
     size = xy(size);
@@ -78,14 +78,14 @@ array<Rect> Linear::layout(int2 size) {
     else if(side==AlignCenter) pen.y+=(size.y-height)/2;
     else if(side==AlignRight) pen.y+=size.y-height;
     else height=size.y;
-    array<Rect> widgets(count);
+    buffer<Rect> widgets(count);
     for(uint i: range(count)) {
         int y=0;
         if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand) heights[i]=height;
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];
-        widgets<< xy(pen+int2(0,y))+Rect(xy(int2(widths[i],heights[i])));
+        widgets[i] = xy(pen+int2(0,y))+Rect(xy(int2(widths[i],heights[i])));
         pen.x += widths[i]+margin;
     }
     return widgets;

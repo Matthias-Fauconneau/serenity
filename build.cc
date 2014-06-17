@@ -14,15 +14,15 @@ bool operator ==(const Node& a, const string& b) { return a.name==b; }
 // Locates an executable
 String which(string name) {
     if(!name) return {};
-    if(existsFile(name)) return String(name);
+    if(existsFile(name)) return copy(String(name));
     for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFile(name, folder)) return folder+"/"_+name;
     return {};
 }
 
 struct Build {
     const Folder folder {"."_};
-    const String base { section(folder.name(),'/',-2,-1) };
-    const String target = arguments().size>=1 ? String(arguments()[0]) : copy(base);
+    const String base = copy(String(section(folder.name(),'/',-2,-1)));
+    const string target = arguments().size>=1 ? arguments()[0] : (string)base;
     array<String> defines;
     array<string> flags;
     const String tmp {"/var/tmp/"_+base};
@@ -36,7 +36,7 @@ struct Build {
 
     array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
-    String find(const string& file) { for(String& path: sources) if(section(path,'/',-2,-1)==file) return String(path.contains('.')?section(path,'.',0,-2):path); return String(); }
+    string find(const string& file) { for(String& path: sources) if(section(path,'/',-2,-1)==file) return path.contains('.')?section(path,'.',0,-2):path; return ""_; }
 
     string tryParseIncludes(TextData& s) {
         if(!s.match("#include "_) && !s.match("//#include "_)) return ""_;
@@ -47,7 +47,7 @@ struct Build {
             for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
                 s.whileAny(" \t"_);
                 string library=s.identifier("_"_);
-                if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += String(library); }
+                if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += copy(String(library)); }
                 break;
             }
             return ""_;
@@ -89,7 +89,7 @@ struct Build {
 
         String filesPath = tmp+"/files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
         Folder(filesPath, root(), true);
-        String path = find(file);
+        string path = find(file);
         assert(path, "No such file to embed", file);
         Folder subfolder = Folder(section(path,'/',0,-2), folder);
         String object = filesPath+"/"_+file+".o"_;
@@ -111,9 +111,9 @@ struct Build {
         for(TextData s = file.read(file.size()); s; s.line()) {
             string name = tryParseIncludes(s);
             if(name) {
-                String header = find(name+".h"_);
+                string header = find(name+".h"_);
                 if(header) lastEdit = max(lastEdit, parse(header+".h"_, parent));
-                String module = find(name+".cc"_);
+                string module = find(name+".cc"_);
                 if(!module || module == parent) continue;
                 if(!modules.contains(module)) compileModule(module);
                 parent.children << modules[modules.indexOf(module)].pointer;
@@ -135,7 +135,7 @@ struct Build {
         String object = tmp+"/"_+join(flags,"-"_)+"/"_+target+".o"_;
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
             array<String> args;
-            args << copy(object) << target+".cc"_;
+            args << String((string)object) << target+".cc"_;
             if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
             else args << String("-I/usr/include/freetype2"_);
             if(flags.contains("arm"_)) {}
@@ -150,7 +150,7 @@ struct Build {
                     args << String("-finstrument-functions-exclude-file-list=core,array,string,trace,profile"_);
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
-            args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
+            args << apply(folder.list(Folders), [this](const string& subfolder)->String{ return "-iquote"_+subfolder; });
             log(target);
             while(pids.size>=1) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
@@ -187,11 +187,11 @@ struct Build {
         compileModule( find(target+".cc"_) );
         String binary = tmp+"/"_+join(flags,"-"_)+"/"_+target+(flags?"."_:""_)+join(flags,"-"_);
         if(!existsFile(binary) || needLink) {
-            array<String> args; args<<String("-o"_)<<copy(binary);
+            array<String> args; args<<String("-o"_)<<String((string)binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
             //args << apply(modules, [this](const unique<Node>& module){ return tmp+"/"_+join(flags,"-"_)+"/"_+module->name+".o"_; });
-            args << copy(files);
-            args << apply(libraries, [this](const String& library){ return "-l"_+library; });
+            args << apply(files, [](const string& file){return String(file);});
+            args << apply(libraries, [this](const String& library)->String{ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
             if(execute(CXX, toRefs(args))) fail();
         }

@@ -18,7 +18,7 @@ enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK =
 
 // Handle
 Handle::~Handle() { if(fd>0) close(fd); }
-String Handle::name() const { if(fd==AT_FDCWD) return String("."_); String s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd); return s; }
+String Handle::name() const { if(fd==AT_FDCWD) return String("."_); buffer<byte> s(256, 0); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd); return move(s); }
 
 // Folder
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
@@ -46,7 +46,7 @@ array<String> Folder::list(uint flags) const {
             //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
             if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==DT_UNKNOWN/*NFS*/) && flags&Files) || (type==DT_CHR && flags&Devices)
                     || (type==DT_BLK && flags&Drives)) {
-                if(flags&Sorted) list.insertSorted(String(name)); else list << String(name);
+                if(flags&Sorted) list.insertSorted(copy(name)); else list << copy(String(name));
             }
             if(type==DT_DIR && flags&Recursive) {
                 for(const String& file: Folder(name,*this).list(flags)) {

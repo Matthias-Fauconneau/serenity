@@ -5,8 +5,7 @@
 
 Image clip(const Image& image, Rect r) {
     r = r & Rect(image.size());
-    return Image(unsafeReference(image.buffer),
-                 image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
+    return Image(buffer<byte4>((ref<byte4>)image.buffer), image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
 }
 
 Image upsample(const Image& source) {

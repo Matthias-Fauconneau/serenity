@@ -61,7 +61,7 @@ inline Image copy(const Image& source) {
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha,o.sRGB); }
+inline Image share(const Image& o) { return Image(buffer<byte4>((ref<byte4>)o.buffer),o.data,o.width,o.height,o.stride,o.alpha,o.sRGB); }
 
 /// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, Rect region);
@@ -91,7 +91,7 @@ struct ImageF {
     buffer<float> data;
     int2 size;
 };
-inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.data),o.size); }
+inline ImageF share(const ImageF& o) { return ImageF(buffer<float>((ref<float>)o.data),o.size); }
 //inline ImageF operator*(float scale, ImageF&& image) { for(float& v: image.data) v *= scale; return move(image); }
 
 /// Converts a linear float image to sRGB

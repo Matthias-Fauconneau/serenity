@@ -30,7 +30,7 @@ struct Time {
     float toFloat() const { return elapsed()/1000000000.f; }
 };
 inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
-inline String operator/(const Time& a, const Time& b) { return b ? dec(round(100*a.toFloat()/b.toFloat()))+"%"_ : ""_; }
+inline String operator/(const Time& a, const Time& b) { return b ? dec(round(100*a.toFloat()/b.toFloat()))+"%"_ : String(); }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

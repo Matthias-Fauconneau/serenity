@@ -27,5 +27,5 @@ kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOri
         accumulator += read_imagef(volume, sampler, position.xyzz).x;
         tmin+=1; position += ray;
     }
-    image[y*width+x] = accumulator;
+    image[y*width+x] = accumulator; // Should be exactly: * ray length / steps (i.e (tmax-tmin) / (t-tmin))
 }

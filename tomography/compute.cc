@@ -33,16 +33,17 @@ struct Application : Poll {
     int upsample = 256 / projectionData.size.x;
 
     Value sliceIndex = (referenceVolume.size.z-1) / 2;
-    Value projectionIndex = 0; //(projectionData.size.z-1) / 2;
+    Value projectionIndex = (projectionData.size.z-1) / 2;
+    Value subsetIndex = (MLTR.subsetSize-1) / 2;
 
     SliceView x {referenceVolume, upsample, sliceIndex};
 #if COMPARE
     HList<SliceView> rSlices {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return SliceView(r.x, upsample, sliceIndex);})};
 #else
-    HList<SliceView> rSlices {{SliceView(MLTR.Ax, upsample, projectionIndex,"Ax"_),
-                    SliceView(MLTR.r, upsample, projectionIndex,"r"_), SliceView(MLTR.Atr, upsample, projectionIndex,"Atr"_),
-                    SliceView(MLTR.w, upsample, projectionIndex,"w"_), SliceView(MLTR.Atw, upsample, projectionIndex,"Atw"_),
-                    SliceView(MLTR.x, upsample, sliceIndex,"x"_)}};
+    SliceView sliceViews[7] {{MLTR.Ax, upsample, subsetIndex,"Ax"_}, {MLTR.r, upsample, subsetIndex,"r"_}, {MLTR.Atr, upsample, sliceIndex,"Atr"_}, {MLTR.w, upsample, subsetIndex,"w"_}, {MLTR.Atw, upsample, sliceIndex,"Atw"_}, {MLTR.AtrAtw, upsample, sliceIndex,"Atr / Atw"_}, {MLTR.x, upsample, sliceIndex,"x"_}};
+    //HList<SliceView> rSlices {buffer<SliceView>(ref<SliceView>(sliceViews,7))};
+    //HTuple<SliceView> rSlices {{MLTR.Ax, upsample, subsetIndex,"Ax"_}};
+    HBox rSlices{ apply(mref<SliceView>(sliceViews), [](SliceView& o)->Widget*{return &o;}) };
 #endif
     HBox slices {{&x, &rSlices}};
 
@@ -50,7 +51,8 @@ struct Application : Poll {
 #if COMPARE
     HList<VolumeView> rViews {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return VolumeView(r.x, projectionData.size, upsample, projectionIndex);})};
 #else
-    HList<VolumeView> rViews {{VolumeView(MLTR.Atr, projectionData.size, upsample, sliceIndex, "Atr"_), VolumeView(MLTR.Atw, projectionData.size, upsample, sliceIndex, "Atw"_), VolumeView(MLTR.x, projectionData.size, upsample, sliceIndex, "x"_) }};
+    VolumeView volumeViews [3] {{MLTR.Atr, projectionData.size, upsample, sliceIndex, "Atr"_}, {MLTR.Atw, projectionData.size, upsample, sliceIndex, "Atw"_}, {MLTR.x, projectionData.size, upsample, sliceIndex, "x"_}};
+    HList<VolumeView> rViews {volumeViews};
 #endif
     HBox views {{&b, &rViews}};
 
@@ -64,7 +66,7 @@ struct Application : Poll {
         projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)),
         referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder))
     {
-        queue(); thread.spawn();
+        //queue(); thread.spawn();
         window.actions[Space] = [this]{ queue(); };
     }
     void event() {
@@ -87,7 +89,7 @@ struct Application : Poll {
 #if COMPARE
             rSlices[index].render(); rViews[index].render();
 #else
-            rSlices.render(); rViews.render();
+            //rSlices.render(); rViews.render();
 #endif
             setWindow( 0 );
         }

@@ -39,5 +39,12 @@ kernel void adddiv(global float* Y, const uint XY, const uint X, sampler_t sampl
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
     float c = read_imagef(C, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = max(0.f, a + c ? b / c : 0);
+    Y[i.z*XY+i.y*X+i.x] = max(0.f, a + (c ? b / c : 0));
+}
+
+kernel void div(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B) { // Difference with exponential: y = b ? a / b : 0 [DEBUG]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    float b = read_imagef(B, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = b ? a / b : 0;
 }
