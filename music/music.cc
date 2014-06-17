@@ -4,7 +4,7 @@
 #include "encoder.h"
 #include "window.h"
 
-struct Music : Timer {
+struct Music : Poll {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
     MidiFile midi = readFile(name+".mid"_);
@@ -63,10 +63,12 @@ struct Music : Timer {
 
         queue();
     }
+    uint64 frame = 0;
     void event() override {
         if(midi.time > midi.duration) return;
-        midi.read(preview ? time*48 : encoder.videoTime*encoder.rate/encoder.fps);
-        // Smooth scroll animation (assumes constant time step) (FIXME: use Timer for constant preview timesteps)
+        if(preview && time*48 < encoder.videoTime*encoder.rate/encoder.fps) { queue(); /*FIXME: busy waiting*/ return; }
+        midi.read(encoder.videoTime*encoder.rate/encoder.fps);
+        // Smooth scroll animation (assumes constant time step)
         const float k=1./60, b=1./60; // Stiffness and damping constants
         speed = b*speed + k*(target-position); // Euler integration of speed from forces of spring equation
         position = position + speed; // Euler integration of position from speed
@@ -77,8 +79,8 @@ struct Music : Timer {
             assert_(image);
             contentChanged=false;
         }
-        if(!preview) encoder.writeVideoFrame(image);
-        setRelative(1000/30); // Absolute would be more proper
+        if(preview) encoder.videoTime++; else encoder.writeVideoFrame(image);
+        queue();
     }
 } app;
 
