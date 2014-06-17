@@ -18,7 +18,7 @@ void ConjugateGradient::step() {
     assert_(pAtAp);
     float alpha = residualEnergy / pAtAp;
     time += add(r, 1, r, -alpha, AtAp); // Residual: r = r - α AtAp
-    time += update(x, x, alpha, p); // Estimate: x = max(0, x + α p)
+    time += maxadd(x, x, alpha, p); // Estimate: x = max(0, x + α p)
     float newResidual = SSQ(r); // |r|²
     float beta = newResidual / residualEnergy;
     time += add(p, 1, r, beta, p); //Search direction: p = r + β p

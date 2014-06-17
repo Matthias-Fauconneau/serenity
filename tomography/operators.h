@@ -7,14 +7,12 @@ float SSQ(const CLVolume& A, const int3 origin=0, int3 size=0);
 float SSE(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
 float dotProduct(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
 
-CL(operators, delta) inline uint64 delta(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) { return emulateWriteTo3DImage(CL::delta, y, noneNearestSampler, a, b, c); } // y = ( a - b ) / c [SIRT]
-CL(operators, update) inline uint64 update(const CLVolume& y, const CLVolume& a, const float alpha, const CLVolume& b) { return emulateWriteTo3DImage(CL::update, y, noneNearestSampler, a, alpha, b); } // y = max(0, a + α b) [SIRT, CG]
+CL(operators, divdiff) inline uint64 divdiff(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) { return emulateWriteTo3DImage(CL::divdiff, y, noneNearestSampler, a, b, c); } // y = ( a - b ) / c [SIRT]
+CL(operators, maxadd) inline uint64 maxadd(const CLVolume& y, const CLVolume& a, const float alpha, const CLVolume& b) { return emulateWriteTo3DImage(CL::maxadd, y, noneNearestSampler, a, alpha, b); } // y = max(0, a + α b) [SIRT, CG]
 CL(operators, add) inline uint64 add(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { return emulateWriteTo3DImage(CL::add, y, noneNearestSampler, alpha, a, beta, b); } // y = α a + β b [CG]
-CL(operators, estimate) inline uint64  estimate(const ImageArray& y, const ImageArray& b, const CLImage& b0, const CLImage& b1, const ImageArray& Ax) { return emulateWriteTo3DImage(CL::estimate, y, noneNearestSampler, b, b0, b1, Ax); } // [OSTR]
-CL(operators, curvature) inline uint64 curvature(const ImageArray& y, const ImageArray& b, const CLImage& b0, const CLImage& b1, const ImageArray& Ax, const ImageArray& Ai, const ImageArray& h) { // [OSTR]
-    return emulateWriteTo3DImage(CL::curvature, y, noneNearestSampler, b, b0, b1, Ax, Ai, h);
-}
-CL(operators, maximize) inline uint64 maximize(const ImageArray& y, const ImageArray& x, const ImageArray& L, const ImageArray& d) { return emulateWriteTo3DImage(CL::maximize, y, noneNearestSampler, x, L, d); } // [OSTR]
+CL(operators, mulexp) inline uint64 mulexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) { return emulateWriteTo3DImage(CL::mulexp, y, noneNearestSampler, a, b); } // y = a · exp(-b) [MLTR]
+CL(operators, diffexp) inline uint64 diffexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) { return emulateWriteTo3DImage(CL::diffexp, y, noneNearestSampler, a, b); } // y = exp(-a) - exp(-b) [MLTR]
+CL(operators, adddiv) inline uint64 adddiv(const CLVolume& y, const CLVolume& a, const CLVolume& b, const CLVolume& c) { return emulateWriteTo3DImage(CL::adddiv, y, noneNearestSampler, a, b, c); } // y = max(0, a + c ? b / c : 0) [MLTR]
 
 #include "volume.h"
 inline void cylinderCheck(CLVolume& A) {

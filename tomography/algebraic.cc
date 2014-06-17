@@ -2,7 +2,7 @@
 #include "operators.h"
 #include "time.h"
 
-Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size, b), Ax(subsets[0].b.size), p(size) {
+Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size, b), Ax(subsets[0].b.size), Atr(size) {
     AAti = buffer<ImageArray>(subsets.size);
     ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
@@ -20,10 +20,10 @@ Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size
 
 void Algebraic::step() {
     time += project(Ax, x, subsetIndex*subsetSize, projectionCount); // Ax = A x
-    const ImageArray& e = Ax; // In-place
-    time += delta(e, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // e = ( b - Ax ) / A At i
-    time += backproject(p, subsets[subsetIndex].At, e); // p = At e
-    time += update(x, x, 1, p); // x := max(0, x + p)
+    const ImageArray& r = Ax; // In-place: residual
+    time += divdiff(r, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // r = ( b - Ax ) / A At i
+    time += backproject(Atr, subsets[subsetIndex].At, r); // Ate = At r
+    time += maxadd(x, x, 1, Atr); // x := max(0, x + At r)
     subsetIndex = (subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
     k++;
 }

@@ -1,6 +1,6 @@
 #include "algebraic.h"
 #include "conjugate.h"
-#include "OSTR.h"
+#include "MLTR.h"
 
 #include "plot.h"
 #include "window.h"
@@ -22,11 +22,11 @@ struct Application : Poll {
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
 #define COMPARE 0
 #if COMPARE
-    const string labels[3] {"SIRT"_, "CG"_,"OSTR"_};
-    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)/*, unique<OSTR>(size, projectionData)*/};
+    const string labels[3] {"SIRT"_, "CG"_,"MLTR"_};
+    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)/*, unique<MLTR>(size, projectionData)*/};
 #else
     const string labels[1] {""_};
-    ::OSTR OSTR {size, projectionData};
+    ::MLTR MLTR {size, projectionData};
 #endif
 
     // Interface
@@ -39,8 +39,10 @@ struct Application : Poll {
 #if COMPARE
     HList<SliceView> rSlices {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return SliceView(r.x, upsample, sliceIndex);})};
 #else
-    HList<SliceView> rSlices {{SliceView(OSTR.Ax, upsample, projectionIndex,"Ax"_), SliceView(OSTR.h, upsample, projectionIndex,"h"_), SliceView(OSTR.Aic, upsample, projectionIndex,"Aic"_), SliceView(OSTR.L, upsample, sliceIndex,"L"_), SliceView(OSTR.d, upsample, sliceIndex,"d"_),
-                    SliceView(OSTR.x, upsample, sliceIndex,"x"_)}};
+    HList<SliceView> rSlices {{SliceView(MLTR.Ax, upsample, projectionIndex,"Ax"_),
+                    SliceView(MLTR.r, upsample, projectionIndex,"r"_), SliceView(MLTR.Atr, upsample, projectionIndex,"Atr"_),
+                    SliceView(MLTR.w, upsample, projectionIndex,"w"_), SliceView(MLTR.Atw, upsample, projectionIndex,"Atw"_),
+                    SliceView(MLTR.x, upsample, sliceIndex,"x"_)}};
 #endif
     HBox slices {{&x, &rSlices}};
 
@@ -48,7 +50,7 @@ struct Application : Poll {
 #if COMPARE
     HList<VolumeView> rViews {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return VolumeView(r.x, projectionData.size, upsample, projectionIndex);})};
 #else
-    HList<VolumeView> rViews {{VolumeView(OSTR.L, projectionData.size, upsample, sliceIndex, "L"_), VolumeView(OSTR.d, projectionData.size, upsample, sliceIndex, "d"_), VolumeView(OSTR.x, projectionData.size, upsample, sliceIndex, "x"_) }};
+    HList<VolumeView> rViews {{VolumeView(MLTR.Atr, projectionData.size, upsample, sliceIndex, "Atr"_), VolumeView(MLTR.Atw, projectionData.size, upsample, sliceIndex, "Atw"_), VolumeView(MLTR.x, projectionData.size, upsample, sliceIndex, "x"_) }};
 #endif
     HBox views {{&b, &rViews}};
 
@@ -71,7 +73,7 @@ struct Application : Poll {
         Reconstruction& r = reconstructions[index];
 #else
         uint index = 0;
-        Reconstruction& r = OSTR;
+        Reconstruction& r = MLTR;
 #endif
         r.step();
         const float SSE = ::SSE(referenceVolume, r.x, evaluationOrigin, evaluationSize);
