@@ -50,8 +50,8 @@ struct Sheet : Widget {
     int measureIndex(int x0);
 
     // Control
-    array<int> measures; // X position of measure starts
-    int position = 0;
+    array<uint> measures; // X position of measure starts
+    uint position = 0;
 
     int2 sizeHint() { return int2(-1, staffY(1,-16)); }
     void render(const Image& target);

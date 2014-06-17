@@ -158,7 +158,7 @@ Date parseDate(TextData& s) {
 
 Timer::Timer(long msec, function<void()> timeout, Thread& thread)
     : Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC), POLLIN, thread), timeout(timeout) {
-    setRelative(msec);
+    if(msec) setRelative(msec);
 }
 Timer::~Timer(){ close(fd); }
 void Timer::setAbsolute(long sec, long nsec) {

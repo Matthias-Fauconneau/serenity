@@ -4,7 +4,7 @@
 #include "encoder.h"
 #include "window.h"
 
-struct Music : Poll {
+struct Music : Timer {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
     MidiFile midi = readFile(name+".mid"_);
@@ -13,13 +13,14 @@ struct Music : Poll {
     Encoder encoder {name /*, {&audioFile, &AudioFile::read}*/}; //TODO: remux without reencoding
     bool preview = true;
     Time time;
-    Window window {&sheet, encoder.size()/(preview?2:1), "MusicXML"_};
+    Window window {&sheet, encoder.size()/(preview?1:1), "MusicXML"_};
     Image image;
     bool contentChanged = true;
 
     map<uint,uint> active; // Maps active keys to notes (indices)
     map<uint,uint> expected; // Maps expected keys to notes (indices)
     uint chordIndex = 0;
+    float target=0, speed=0, position=0; // X target/speed/position of sheet view
 
     void expect() {
         while(!expected && chordIndex<sheet.notes.size()-1) {
@@ -52,6 +53,7 @@ struct Music : Poll {
             expect();
             sheet.colors.clear();
             for(uint index: active.values) sheet.colors.insert(index, red);
+            if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
             contentChanged = true;
         });
 
@@ -61,11 +63,14 @@ struct Music : Poll {
 
         queue();
     }
-    void event() {
+    void event() override {
         if(midi.time > midi.duration) return;
         midi.read(preview ? time*48 : encoder.videoTime*encoder.rate/encoder.fps);
-        int position = int64(sheet.measures.last()-window.size.x) * int64(midi.time-midi.tracks[0].startTime) / int64(midi.duration);
-        if(sheet.position != position) sheet.position = position, contentChanged = true;
+        // Smooth scroll animation (assumes constant time step) (FIXME: use Timer for constant preview timesteps)
+        const float k=1./60, b=1./60; // Stiffness and damping constants
+        speed = b*speed + k*(target-position); // Euler integration of speed from forces of spring equation
+        position = position + speed; // Euler integration of position from speed
+        if(sheet.position != round(position)) sheet.position = round(position), contentChanged = true;
         if(contentChanged) {
             window.render(); window.event();
             image = share(window.target);
@@ -73,7 +78,7 @@ struct Music : Poll {
             contentChanged=false;
         }
         if(!preview) encoder.writeVideoFrame(image);
-        queue();
+        setRelative(1000/30); // Absolute would be more proper
     }
 } app;
 
