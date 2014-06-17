@@ -1,11 +1,10 @@
-#include "music.h"
+#include "MusicXML.h"
 #include "xml.h"
 
-array<Sign> parse(string document, uint& divisions /*time unit per quarter note*/) {
-    array<Sign> signs;
+MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
     map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; uint time = 0, nextTime = 0, maxTime = 0;
-    uint measureIndex=1;    
+    uint measureIndex=1;
     for(const Element& m: root("score-partwise"_)("part"_).children) {
         assert_(m.name=="measure"_, m);
         //log("Measure:", measureIndex);
@@ -59,25 +58,25 @@ array<Sign> parse(string document, uint& divisions /*time unit per quarter note*
                         else error("");
                     }
                     uint key = ({// Converts note to MIDI key
-                        int step = noteStep;
-                        int octave = clefs.at(staff).octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
-                        step = (step - step/7*7 + 7)%7;
-                        uint stepToKey[] = {0,2,4,5,7,9,11}; // C [C#] D [D#] E F [F#] G [G#] A [A#] B
-                        //assert_(step>=0 && step<8, step, midiIndex, midiKey);
-                        uint key = 60 + octave*12 + stepToKey[step];
+                                 int step = noteStep;
+                                 int octave = clefs.at(staff).octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
+                                 step = (step - step/7*7 + 7)%7;
+                                 uint stepToKey[] = {0,2,4,5,7,9,11}; // C [C#] D [D#] E F [F#] G [G#] A [A#] B
+                                 //assert_(step>=0 && step<8, step, midiIndex, midiKey);
+                                 uint key = 60 + octave*12 + stepToKey[step];
 
-                        Accidental accidental = None;
-                        int fifths = keySignature.fifths;
-                        for(int i: range(abs(fifths))) {
-                            int fifthStep = (fifths>0?2:4) + ((fifths>0 ? 4 : 3) * i +2)%7; // FIXME: Simplify
-                            if(step == fifthStep%7) accidental = fifths>0?Sharp:Flat;
-                        }
-                        if(noteAccidental!=None) measureAccidentals[noteStep] = noteAccidental;
-                        accidental = measureAccidentals.value(noteStep, accidental); // Any accidental overrides key signature
-                        if(accidental==Flat) key--;
-                        if(accidental==Sharp) key++;
-                        key;
-                    });
+                                 Accidental accidental = None;
+                                 int fifths = keySignature.fifths;
+                                 for(int i: range(abs(fifths))) {
+                                     int fifthStep = (fifths>0?2:4) + ((fifths>0 ? 4 : 3) * i +2)%7; // FIXME: Simplify
+                                     if(step == fifthStep%7) accidental = fifths>0?Sharp:Flat;
+                                 }
+                                 if(noteAccidental!=None) measureAccidentals[noteStep] = noteAccidental;
+                                 accidental = measureAccidentals.value(noteStep, accidental); // Any accidental overrides key signature
+                                 if(accidental==Flat) key--;
+                                 if(accidental==Sharp) key++;
+                                 key;
+                                });
                     {Sign sign{time, duration, staff, Sign::Note, {}};
                         sign.note={clefs.at(staff), noteStep, noteAccidental, type, tie,
                                    e("dot"_) ? true : false,
@@ -165,5 +164,4 @@ array<Sign> parse(string document, uint& divisions /*time unit per quarter note*
         //if(time%(timeSignature.beats*divisions)!=0) break;
         //assert_(time%(timeSignature.beats*divisions)==0, measureIndex, time, timeSignature.beats, divisions);
     }
-    return signs;
 }

@@ -1,4 +1,5 @@
 #pragma once
+/// notation.h Music notation definitions
 typedef unsigned int uint;
 
 enum ClefSign { Bass, Treble };

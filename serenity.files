@@ -71,8 +71,14 @@ audio/audio.h
 audio/audio.cc
 audio/ffmpeg.cc
 
-music/music.cc
+music/sheet.cc
 music/MusicXML.cc
-music/music.h
+music/notation.h
 music/midi.h
 music/midi.cc
+music/MusicXML.h
+music/music.cc
+music/music.cc
+music/sheet.h
+music/encoder.cc
+music/encoder.h
