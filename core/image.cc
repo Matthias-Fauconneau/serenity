@@ -64,3 +64,9 @@ ImageF upsample(const ImageF& source) {
     for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
     return target;
 }
+
+ImageF clip(const ImageF& image, Rect r) {
+    r = r & Rect(image.size);
+    assert_(r.size().x == image.size.x);
+    return ImageF(buffer<float>(image.data.slice(r.position().y*image.size.x+r.position().x, r.size().y*r.size().x)), r.size());
+}

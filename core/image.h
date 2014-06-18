@@ -100,3 +100,5 @@ float convert(const Image& target, const ImageF& source, float max=0);
 void downsample(const ImageF& target, const ImageF& source);
 /// Upsamples an image by duplicating samples
 ImageF upsample(const ImageF& source);
+
+ImageF clip(const ImageF& image, Rect r);

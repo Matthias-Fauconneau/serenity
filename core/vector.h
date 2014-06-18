@@ -82,7 +82,7 @@ generic float norm(const vec& a) { return sqrt(dot(a,a)); }
 generic vec normalize(const vec& a){ return a/norm(a); }
 generic bool isNaN(const vec& v){ for(uint i=0;i<N;i++) if(isNaN(v[i])) return true; return false; }
 
-generic String str(const vec& v) { String s("("_); for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
+generic String str(const vec& v) { String s; s<<"("_; for(uint i=0;i<N;i++) { s<<str(v[i]); if(i<N-1) s<<", "_; } s<<")"_; return s; }
 
 #undef vec
 #undef generic

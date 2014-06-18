@@ -116,7 +116,7 @@ struct GridLayout : virtual Layout {
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : GridLayout, WidgetReferences {
     WidgetGrid(){}
-    WidgetGrid(const ref<Widget*>& widgets):WidgetReferences(widgets){}
+    WidgetGrid(buffer<Widget*>&& widgets):WidgetReferences(move(widgets)){}
 };
 template<class T> struct UniformGrid : GridLayout,  WidgetValues<T> {
     UniformGrid(const ref<T>& items={}, int width=0) : GridLayout(width), WidgetValues<T>(buffer<T>(items)) {}

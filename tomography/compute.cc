@@ -9,8 +9,8 @@
 #include "view.h"
 #include "operators.h"
 
-const Folder& folder = currentWorkingDirectory();
-const uint N = fromInteger(arguments()[0]);
+const Folder& folder = "Data"_;
+const uint N = arguments() ? fromInteger(arguments()[0]) : 64;
 
 struct Application : Poll {
     // Evaluation
@@ -36,29 +36,26 @@ struct Application : Poll {
     Value projectionIndex = (projectionData.size.z-1) / 2;
     Value subsetIndex = (MLTR.subsetSize-1) / 2;
 
-    SliceView x {referenceVolume, upsample, sliceIndex};
 #if COMPARE
     HList<SliceView> rSlices {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return SliceView(r.x, upsample, sliceIndex);})};
 #else
-    SliceView sliceViews[9] {
+    SliceView slices[10] {
+        {referenceVolume, upsample, sliceIndex, "x0"_},
         {MLTR.Ax, upsample, subsetIndex,"Ax"_}, {MLTR.b, upsample, subsetIndex,"b"_}, {MLTR.r, upsample, subsetIndex,"r=exp(-Ax) - exp(-b)"_}, {MLTR.Atr, upsample, sliceIndex,"Atr"_},
         {MLTR.w, upsample, subsetIndex,"Ai"_}, {MLTR.w, upsample, subsetIndex,"w=Ai exp(-Ax)"_}, {MLTR.Atw, upsample, sliceIndex,"Atw"_}, {MLTR.AtrAtw, upsample, sliceIndex,"Atr / Atw"_}, {MLTR.x, upsample, sliceIndex,"x"_}};
-    UniformGrid<SliceView> rSlices {sliceViews};
 #endif
-    HBox slices {{&x, &rSlices}};
 
-    SliceView b {projectionData, upsample, projectionIndex};
 #if COMPARE
     HList<VolumeView> rViews {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return VolumeView(r.x, projectionData.size, upsample, projectionIndex);})};
 #else
-    VolumeView volumeViews[3] {{MLTR.Atr, projectionData.size, upsample, projectionIndex, "Atr"_}, {MLTR.Atw, projectionData.size, upsample, projectionIndex, "Atw"_}, {MLTR.x, projectionData.size, upsample, projectionIndex, "x"_}};
-    HList<VolumeView> rViews {volumeViews};
+    SliceView b {projectionData, upsample, projectionIndex, "b"_};
+    VolumeView views[3] {{MLTR.Atr, projectionData.size, upsample, projectionIndex, "Atr"_}, {MLTR.Atw, projectionData.size, upsample, projectionIndex, "Atw"_}, {MLTR.x, projectionData.size, upsample, projectionIndex, "x"_}};
 #endif
-    HBox views {{&b, &rViews}};
 
+    WidgetGrid grid {apply(mref<SliceView>(slices),[](SliceView& o)->Widget*{return &o;})+ref<Widget*>{&b}+apply(mref<VolumeView>(views),[](VolumeView& o)->Widget*{return &o;})};
     Plot plot;
 
-    VBox layout {{&slices, &views, &plot}};
+    VBox layout {{&grid, &plot}};
 
     Window window {&layout, strx(projectionData.size)+" "_+strx(size)}; // FIXME
 
@@ -89,7 +86,7 @@ struct Application : Poll {
 #if COMPARE
             rSlices[index].render(); rViews[index].render();
 #else
-            rSlices.render(); rViews.render();
+            grid.render();
 #endif
             setWindow( 0 );
         }

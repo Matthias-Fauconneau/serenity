@@ -19,8 +19,9 @@ void SliceView::render() {
     while(image.size < this->target.size()) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
-    assert_(target.size() == image.size, target.size(), image.size);
-    float max = convert(target, image);
+    ImageF source = clip(image, (image.size-target.size())/2+Rect(target.size()));
+    assert_(target.size() == source.size, target.size(), source.size, image.size, (this->target.size()-image.size)/2+Rect(image.size));
+    float max = convert(target, source);
     float min = ::min(image.data);
     Text(name+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);

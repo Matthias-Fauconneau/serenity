@@ -137,9 +137,10 @@ struct Window : Socket, Poll {
     /// This window base resource id
     uint id = 0;
 
-    /// Synchronizes access to connection and event queue
+    /// Synchronizes access to connection, event queue
     Lock lock;
-    Lock renderLock; // Maybe used by application to synchronize rendering (e.g Font is not thread-safe)
+    /// Synchronizes access to target buffer, Widgets need to lock before accessing their target pointer as it may be modified by a full render triggered by resize
+    Lock renderLock;
 
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;

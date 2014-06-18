@@ -150,6 +150,7 @@ void Window::event() {
 }
 
 void Window::render() {
+    Locker lock(renderLock);
     if(target.size() != size) {
         if(remote) target = Image(size.x, size.y);
         else {
@@ -169,9 +170,7 @@ void Window::render() {
     }
 
     renderBackground(target);
-    {Locker lock(renderLock);
-        widget->render(target);
-    }
+    widget->render(target);
     putImage();
 }
 
@@ -420,7 +419,7 @@ void Window::setDisplay(bool displayState) { log("Unimplemented X11 setDisplay",
 #endif
 
 void Window::renderBackground(Image& target) {
-    assert_(target.data >= this->target.buffer.begin() && target.data+target.height*target.stride <= this->target.buffer.end(), this->target.buffer.begin(), target.data, target.data+target.height*target.stride, this->target.buffer.end());
+    assert_(target.data >= this->target.buffer.begin() && target.data+target.height*target.stride <= this->target.buffer.end());
     if(background==Oxygen) { // Oxygen-like radial gradient background
         assert_(target.size() == this->target.size());
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
