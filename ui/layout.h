@@ -32,38 +32,8 @@ struct WidgetReferences : virtual Layout, buffer<Widget*> {
 template<class T> struct WidgetValues : virtual Layout, buffer<T> {
     WidgetValues(){}
     WidgetValues(buffer<T>&& items) : buffer<T>(move(items)){}
-    uint count() const override { log("count", buffer<T>::size); return buffer<T>::size; }
-    Widget& at(int i) override { log("at", i); return buffer<T>::at(i); }
-};
-
-/// item is an helper to instanciate a class and append the instance to the tuple offset table
-template<class B, class T> struct item : T { //FIXME: static register
-    void registerInstance(byte* object, uint8* list, int& i) { int d=(byte*)(B*)this-object; assert_(d>=0&&d<256); list[i++]=d; }
-    item(byte* object, uint8* list, int& i) { registerInstance(object,list,i); }
-    item(T&& t, byte* object, uint8* list, int& i) : T(forward<T>(t)) { registerInstance(object,list,i); }
-};
-/// \a tuple with static indexing by type and dynamic indexing using an offset table
-template<class B, class... T> struct tuple  : item<B,T>... {
-    static uint8 offsets[sizeof...(T)];
-    tuple(int i=0) : item<B,T>((byte*)this, offsets,i)... {}
-    tuple(int i,T&&... t) : item<B,T>(move(t), (byte*)this, offsets,i)... {}
-    int size() const { return sizeof...(T); }
-    template<class A> A& get() { return static_cast<A&>(*this); }
-    template<class A> const A& get() const { return static_cast<const A&>(*this); }
-    B& at(int i) { return *(B*)((byte*)this+offsets[i]); }
-};
-template<class B, class... T> uint8 tuple<B,T...>::offsets[sizeof...(T)];
-
-/// Tuple implements Layout storage using static inheritance
-/// \note It allows a layout to directly contain heterogenous Widgets without managing heap pointers.
-template<class... T> struct Tuple : virtual Layout {
-    tuple<Widget,T...> items;
-    Tuple() : items() {}
-    Tuple(T&&... t) : items(0,forward<T>(t)...) {}
-    Widget& at(int i) override { return items.at(i); }
-    uint count() const override { return items.size(); }
-    template<class A> A& get() { return items.template get<A>(); }
-    template<class A> const A& get() const { return items.template get<A>(); }
+    uint count() const override { return buffer<T>::size; }
+    Widget& at(int i) override { return buffer<T>::at(i); }
 };
 
 /// Layouts widgets on an axis
@@ -121,18 +91,33 @@ struct VBox : Vertical, WidgetReferences {
 /// Horizontal layout of homogenous items. \sa WidgetValues
 template<class T> struct HList : Horizontal, WidgetValues<T> {
     HList(buffer<T>&& widgets):WidgetValues<T>(move(widgets)){}
-    //HList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){}
+    HList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){} // by reference
     HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of homogenous items. \sa WidgetValues
 template<class T> struct VList : Vertical, WidgetValues<T> {
     VList(buffer<T>&& widgets):WidgetValues<T>(move(widgets)){}
-    //VList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){}
+    VList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){} // by reference
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
-/// Horizontal layout of homogenous items. \sa WidgetValues
-template<Type... T> struct HTuple : Horizontal, Tuple<T...> {
-    HTuple(T&&... t) : Tuple<T...>(forward<T>(t)...) {}
+/// Layouts items on an uniform #width x #height grid
+struct GridLayout : virtual Layout {
+    /// Horizontal element count, 0 means automatic
+    int width;
+    /// Vertical element count, 0 means automatic
+    int height;
+    /// Margin between elements
+    int2 margin;
+    GridLayout(int width=0, int height=0, int margin=0):width(width),height(height),margin(margin){}
+    int2 sizeHint();
+    buffer<Rect> layout(int2 size) override;
 };
-template<Type... T> HTuple<T...> hTuple(T&&... t) { return HTuple<T...>(forward<T>(t)...); }
+/// Grid of heterogenous widgets. \sa Widgets
+struct WidgetGrid : GridLayout, WidgetReferences {
+    WidgetGrid(){}
+    WidgetGrid(const ref<Widget*>& widgets):WidgetReferences(widgets){}
+};
+template<class T> struct UniformGrid : GridLayout,  WidgetValues<T> {
+    UniformGrid(const ref<T>& items={}, int width=0) : GridLayout(width), WidgetValues<T>(buffer<T>(items)) {}
+};

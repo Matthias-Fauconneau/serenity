@@ -31,12 +31,6 @@ core/trace.h
 core/vector.h
 core/interface.h
 
-io/deflate.cc
-io/deflate.h
-io/jpeg.cc
-io/png.cc
-io/png.h
-
 ui/graphics.cc
 ui/graphics.h
 ui/font.cc

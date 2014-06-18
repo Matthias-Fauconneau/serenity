@@ -232,7 +232,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             cursorPosition = int2(e.x,e.y);
             cursorState = e.state;
             motionPending = true;
-        } else {
+        }
+        else if(type==Shm::event+Shm::Completion) { assert_(!remote); if(displayed) displayed(); }
+        else {
             if(motionPending) {
                 motionPending = false;
                 Cursor lastCursor = cursor; cursor=Cursor::Arrow;
@@ -271,7 +273,6 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 else if(focus && focus->keyPress(Escape, NoModifiers)) ; //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
                 else exit(0); // Exits application by default
             }
-            else if(type==Shm::event+Shm::Completion) { assert_(!remote); if(displayed) displayed(); }
             else if( type==DestroyNotify || type==MappingNotify || type==LastEvent) {}
             else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
             window=0;
@@ -297,8 +298,6 @@ template<class T> T Window::readReply(const ref<byte>& request) {
         else { eventQueue << QEvent{type, unique<XEvent>(read<XEvent>())}; semaphore.release(1); pendingEvents=true; } // Queues events to avoid reentrance
     }
 }
-//void Window::queueRender() { needRender=true; if(mapped) queue(); }
-//void Window::immediateUpdate() { needUpdate=true; if(mapped) event(); }
 
 void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
@@ -398,31 +397,7 @@ String Window::getSelection(bool clipboard) {
     return getProperty<byte>(id,"UTF8_STRING"_);
 }
 
-#if CURSOR
-#include "png.h"
-ICON(arrow) ICON(horizontal) ICON(vertical) ICON(fdiagonal) ICON(bdiagonal) ICON(move) ICON(text)
-void Window::setCursor(Cursor cursor) {
-    static const Image& (*icons[])() = { arrowIcon, horizontalIcon, verticalIcon, fdiagonalIcon, bdiagonalIcon, moveIcon, textIcon };
-    const Image& icon = icons[uint(cursor)]();
-    static constexpr int2 hotspots[] = { int2(5,0), int2(11,11), int2(11,11), int2(11,11), int2(11,11), int2(16,15), int2(4,9) };
-    int2 hotspot = hotspots[uint(cursor)];
-    Image premultiplied(icon.width,icon.height);
-    for(uint y: range(icon.height)) for(uint x: range(icon.width)) {
-        byte4 p=icon(x,y); premultiplied(x,y)=byte4(p.b*p.a/255,p.g*p.a/255,p.r*p.a/255,p.a);
-    }
-    {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=icon.width, r.h=icon.height; send(raw(r));}
-    {::PutImage r; r.drawable=id+Pixmap; r.context=id+GContext; r.w=icon.width, r.h=icon.height; r.size+=r.w*r.h;
-        send(String(raw(r)+ref<byte>(premultiplied)));}
-    {XRender::CreatePicture r; r.picture=id+Picture; r.drawable=id+Pixmap; r.format=format; send(raw(r));}
-    {XRender::CreateCursor r; r.cursor=id+XCursor; r.picture=id+Picture; r.x=hotspot.x; r.y=hotspot.y; send(raw(r));}
-    {SetWindowCursor r; r.window=id; r.cursor=id+XCursor; send(raw(r));}
-    {FreeCursor r; r.cursor=id+XCursor; send(raw(r));}
-    {FreePicture r; r.picture=id+Picture; send(raw(r));}
-    {FreePixmap r; r.pixmap=id+Pixmap; send(raw(r));}
-}
-#else
 void Window::setCursor(Cursor) {}
-#endif
 
 // Snapshot
 Image Window::getSnapshot() {
@@ -442,146 +417,10 @@ Image Window::getSnapshot() {
 }
 
 void Window::setDisplay(bool displayState) { log("Unimplemented X11 setDisplay", displayState); }
-#else
-
-#include <unistd.h>
-#include <linux/vt.h>
-#include <linux/kd.h>
-#include <linux/fb.h>
-#include <linux/input.h>
-
-Window::Window(Widget* widget, int2, const string& title _unused, const Image& icon _unused) : Device("/dev/fb0"_), widget(widget) {
-    fb_var_screeninfo var; ioctl(FBIOGET_VSCREENINFO, &var);
-    fb_fix_screeninfo fix; ioctl(FBIOGET_FSCREENINFO, &fix);
-    this->size = this->displaySize = int2(var.xres_virtual, var.yres_virtual);
-    assert_(var.bits_per_pixel % 8 == 0);
-    bytesPerPixel = var.bits_per_pixel/8;
-    assert_(fix.line_length % bytesPerPixel == 0);
-    stride = fix.line_length / bytesPerPixel;
-    framebuffer = Map(Device::fd, 0, var.yres_virtual * fix.line_length, Map::Prot(Map::Read|Map::Write));
-    touchscreen.eventReceived = {this, &Window::touchscreenEvent};
-    buttons.eventReceived = {this, &Window::buttonEvent};
-    if(existsFile("/dev/input/event5"_)) new (&keyboard) PollDevice("/dev/input/event5"_); // FIXME: Watch /dev and opens keyboard device on plug
-    keyboard.eventReceived = {this, &Window::keyboardEvent};
-}
-
-void Window::touchscreenEvent() {
-    window=this;
-    for(input_event e; ::read(touchscreen.Device::fd, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_ABS && e.code<2) {
-            int i = e.code, v = e.value;
-            static int min[]={130,210}, max[2]={3920,3790}; // Touchbook calibration
-            if(v<min[i]) min[i]=v; else if(v>max[i]) max[i]=v;
-            cursorPosition[i] = displaySize[i]*(max[i]-v)/uint(max[i]-min[i]);
-        }
-        if(e.type == EV_KEY && e.code==BTN_TOUCH) pressState = e.value;
-        if(e.type == EV_SYN) {
-            if(pressState != previousPressState) {
-                if(pressState==1) {
-                    Widget* focus=this->focus; this->focus=0;
-                    dragStart=cursorPosition, dragPosition=position, dragSize=size;
-                    if(widget->mouseEvent(cursorPosition, size, Widget::Press, Widget::LeftButton) || this->focus!=focus) needRender=true;
-                }
-                if(pressState==0) {
-                    drag=0;
-                    if(widget->mouseEvent(cursorPosition, size, Widget::Release, Widget::LeftButton)) needRender=true;
-                }
-                previousPressState = pressState;
-            }
-            if(drag && pressState==1 && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton)) needRender=true;
-            else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, pressState==1?Widget::LeftButton:Widget::None)) needRender=true;
-        }
-    }
-    window=0;
-    if(needRender) render();
-}
-
-void Window::buttonEvent() {
-    window=this;
-    for(input_event e; ::read(buttons.Device::fd, &e, sizeof(e)) > 0;) {
-        if(e.code == Power) e.value = !e.value; // Touchbook power button seems to be wired in reverse
-        if(e.type == EV_KEY && e.value==1) keyPress(Key(e.code), NoModifiers);
-        if(e.type == EV_KEY && e.value==0) keyRelease(Key(e.code), NoModifiers);
-    }
-    window=0;
-    if(needRender) render();
-}
-
-void Window::keyboardEvent() {
-    window=this;
-    for(input_event e; ::read(keyboard.Device::fd, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY && e.value==1) keyPress(Key(e.code), NoModifiers);
-        if(e.type == EV_KEY && e.value==0) keyRelease(Key(e.code), NoModifiers);
-    }
-    window=0;
-    if(needRender) render();
-}
-
-
-void Window::render() {
-    if(!displayState) return;
-    if(!mapped) return;
-    if(target.size() != size) target = Image(size.x, size.y);
-    needRender = false;
-    renderBackground(target);
-    assert(&widget);
-    widget->render(target);
-    putImage();
-}
-
-void Window::show() {
-    if(mapped) return;
-    int index=2;
-    vt.ioctl(VT_OPENQRY, &index);
-    vt = Device("/dev/tty"_+dec(index));
-    vt_stat vts;  vt.ioctl(VT_GETSTATE, &vts); previousVT = vts.v_active;
-    vt.ioctl(VT_ACTIVATE, (void*)index);
-    vt.ioctl(VT_WAITACTIVE, (void*)index);
-    //vt.ioctl(KDSETMODE, (void*)KD_GRAPHICS);
-    writeFile("/sys/class/graphics/fbcon/cursor_blink"_,"0"_);
-    writeFile("/proc/sys/kernel/printk"_,"3 4 1 3"_);
-    mapped=true;
-    render();
-}
-void Window::hide() {
-    vt.ioctl(KDSETMODE, KD_TEXT);
-    vt.ioctl(VT_ACTIVATE, (void*)previousVT);
-    mapped=false;
-}
-void Window::setTitle(const string& title _unused) {}
-void Window::setIcon(const Image& icon _unused) {}
-String Window::getSelection(bool _unused clipboard) { return String(); }
-function<void()>& Window::globalAction(Key key) { return actions.insert(key); }
-void Window::putImage(int2 position, int2 size) {
-    assert(displayState);
-    if(!displayState) return;
-    if(bytesPerPixel==4) {
-        byte4* BGRX8888 = (byte4*)framebuffer.data.pointer;
-        for(uint y: range(position.y, position.y+size.y)) for(uint x: range(position.x, position.x+size.x)) BGRX8888[y*stride+x] = target(x,y);
-    } else if(bytesPerPixel==2) {
-        uint16* RGB565 = (uint16*)framebuffer.data.pointer;
-        for(uint y: range(position.y, position.y+size.y)) for(uint x: range(position.x, position.x+size.x)) {
-            byte4 BGRA8 = target(x,y);
-            uint B8 = BGRA8.b, G8 = BGRA8.g, R8 = BGRA8.r;
-            uint B5 = (B8 * 249 + 1014 ) >> 11;
-            uint G6 = (G8 * 253 +  505 ) >> 10;
-            uint R5 = (R8 * 249 + 1014 ) >> 11;
-            RGB565[y*stride+x] = (R5 << 11) | (G6 << 5) | B5;
-        }
-    }
-    else error("Unsupported format", bytesPerPixel);
-}
-
-void Window::setDisplay(bool displayState) {
-    this->displayState = displayState;
-    int blank_level = displayState ? VESA_NO_BLANKING : VESA_POWERDOWN;
-    ioctl(FBIOBLANK, (void*)blank_level);
-    if(displayState) render();
-}
-
 #endif
 
 void Window::renderBackground(Image& target) {
+    assert_(target.data >= this->target.buffer.begin() && target.data+target.height*target.stride <= this->target.buffer.end(), this->target.buffer.begin(), target.data, target.data+target.height*target.stride, this->target.buffer.end());
     if(background==Oxygen) { // Oxygen-like radial gradient background
         assert_(target.size() == this->target.size());
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);

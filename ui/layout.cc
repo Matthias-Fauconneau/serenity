@@ -90,3 +90,34 @@ buffer<Rect> Linear::layout(int2 size) {
     }
     return widgets;
 }
+
+
+// Grid
+int2 GridLayout::sizeHint() {
+    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
+    int2 max(0,0);
+    for(uint i: range(count())) max = ::max(max,at(i).sizeHint());
+    return int2(w,h)*(max+margin);
+}
+
+buffer<Rect> GridLayout::layout(int2 size) {
+    buffer<Rect> widgets(count(), 0);
+    if(count()) {
+        uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
+        assert(w && h);
+#if 1 // Uniform element size
+        int2 elementSize = int2(size.x/w,size.y/h);
+        int2 margin = (size - int2(w,h)*elementSize) / 2;
+        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) widgets<< margin + int2(x,y)*elementSize + Rect(elementSize);
+#else // TODO: Layout with all the Linear complexity (probably best to merge with Linear and make a special case of Grid)
+        int widths[w];, heights[h];
+        clear(widths), clear(heights);
+        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) {
+            int2 size = at(i).sizeHint();
+            widths[x] = max(widths[x], size.x)
+            heights[y] = max(heights[y], size.y)
+        }
+#endif
+    }
+    return widgets;
+}
