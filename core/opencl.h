@@ -49,14 +49,15 @@ struct CLImage : CLMem {
 };
 
 struct CLVolume : CLMem {
-    CLVolume(int3 size, const float value=0);
-    CLVolume(int3 size, const ref<float>& data);
+    CLVolume(int3 size, const float value=0, string name=""_);
+    CLVolume(int3 size, const ref<float>& data, string name=""_);
     CLVolume(const VolumeF& A) : CLVolume(A.size, A.data) {}
      default_move(CLVolume);
 
     const VolumeF& read(const VolumeF& target, int3 origin=0) const;
 
     int3 size; // (width, height, depth/index)
+    string name;
 };
 
 // Copy volume into volume

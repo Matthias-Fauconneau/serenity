@@ -18,11 +18,12 @@ struct SliceView : Widget {
     const CLVolume* clVolume = 0;
     const int upsampleFactor;
     Value& index;
-    string name;
 
     static Value staticIndex;
-    SliceView(const VolumeF& volume, const int upsampleFactor, Value& index=staticIndex, string name=""_) : size(volume.size), volume(&volume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)), name(name) {}
-    SliceView(const CLVolume& clVolume, const int upsampleFactor, Value& index=staticIndex, string name=""_) : size(clVolume.size), clVolume(&clVolume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)), name(name) {}
+    SliceView(const VolumeF* volume, const int upsampleFactor, Value& index=staticIndex) : size(volume->size), volume(volume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    SliceView(const VolumeF& volume, const int upsampleFactor, Value& index=staticIndex) : SliceView(&volume, upsampleFactor, index) {}
+    SliceView(const CLVolume* clVolume, const int upsampleFactor, Value& index=staticIndex) : size(clVolume->size), clVolume(clVolume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    SliceView(const CLVolume& clVolume, const int upsampleFactor, Value& index=staticIndex) : SliceView(&clVolume, upsampleFactor, index) {}
     default_move(SliceView);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
@@ -34,10 +35,10 @@ struct VolumeView : Widget {
     const int3 size;
     const int upsampleFactor;
     Value& index;
-    string name;
 
     static Value staticIndex;
-    VolumeView(const CLVolume& volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex, string name=""_) : volume(volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)), name(name) {}
+    VolumeView(const CLVolume* volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : volume(*volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    VolumeView(const CLVolume& clVolume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : VolumeView(&clVolume, projectionSize, upsampleFactor, index) {}
     default_move(VolumeView);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;

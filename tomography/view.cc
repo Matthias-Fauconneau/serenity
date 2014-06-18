@@ -15,7 +15,7 @@ int2 SliceView::sizeHint() { return upsampleFactor * this->size.xy(); }
 
 void SliceView::render() {
     ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
-    for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) assert_(isNumber(image(x,y)), name);
+    for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) assert_(isNumber(image(x,y)));
     while(image.size < this->target.size()) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
@@ -23,7 +23,7 @@ void SliceView::render() {
     assert_(target.size() == source.size, target.size(), source.size, image.size, (this->target.size()-image.size)/2+Rect(image.size));
     float max = convert(target, source);
     float min = ::min(image.data);
-    Text(name+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
+    Text((volume?""_:clVolume->name)+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);
 }
 
@@ -45,6 +45,6 @@ void VolumeView::render() {
     assert_(target.size() == image.size, target.size(), image.size);
     float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
     float min = ::min(image.data);
-    Text(name+"\n"_+str(min)+"\n"_+str(mean(volume))+"\n"_+str(max),16,green).render(this->target, 0);
+    Text(volume.name+"\n"_+str(min)+"\n"_+str(mean(volume))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);
 }

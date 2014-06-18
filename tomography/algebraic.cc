@@ -2,11 +2,11 @@
 #include "operators.h"
 #include "time.h"
 
-Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size, b), Ax(subsets[0].b.size), Atr(size) {
+// Simultaneous iterative algebraic reconstruction technique
+Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size, b, "SART"_), Ax(subsets[0].b.size), Atr(size) {
     AAti = buffer<ImageArray>(subsets.size);
     ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
-        log("AAti", subsetIndex);
         Subset& subset = subsets[subsetIndex];
         const ProjectionArray& At = subset.At;
         CLVolume Ati (size);
@@ -14,7 +14,6 @@ Algebraic::Algebraic(int3 size, const ImageArray& b) : SubsetReconstruction(size
         const ImageArray& b = subset.b;
         new (&AAti[subsetIndex]) ImageArray(b.size);
         project(AAti[subsetIndex], Ati, subsetIndex*subsetSize, projectionCount); // Projects coefficents volume
-        //backproject(x, At, b, subsetIndex==0?0:1/*add*/); // FIXME: Initial estimate
     }
 }
 

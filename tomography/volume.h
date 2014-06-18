@@ -4,9 +4,9 @@
 
 struct VolumeF {
     VolumeF(int3 size) : size(size), data(size.z*size.y*size.x) {}
-    VolumeF(int3 size, const ref<float>& data) : size(size), data(data) { assert_(data.size == (size_t)size.x*size.y*size.z); }
-    VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
-    VolumeF(Map&& map) : VolumeF((ref<float>)map) { this->map = move(map); }
+    VolumeF(int3 size, buffer<float>&& data) : size(size), data(move(data)) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
+    //VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
+    VolumeF(int3 size, Map&& map) : VolumeF(size, buffer<float>((ref<float>)map)) { this->map = move(map); }
     inline float& operator()(uint x, uint y, uint z) const {assert_(x<uint(size.x) && y<uint(size.y) && z<uint(size.z), x,y,z, size); return data[(size_t)z*size.y*size.x+y*size.x+x]; }
 
     int3 size = 0;
@@ -24,12 +24,19 @@ inline float mean(const ref<float>& A) { return sum(A) / A.size; }
 inline float SSQ(const ref<float>& A) { float SSQ=0; for(float a: A) SSQ+=a*a; return SSQ; }
 inline float SSE(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float SSE=0; for(uint i: range(A.size)) SSE+=sq(A[i]-B[i]); return SSE; }
 inline float dotProduct(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float dot=0; for(uint i: range(A.size)) dot+=A[i]*B[i]; return dot; }
+inline void scale(mref<float>& A, float factor) { for(float& a: A) a *= factor; }
+inline buffer<float> operator*(float a, const ref<float>& A) { buffer<float> P(A.size); for(uint i: range(A.size)) P[i] = a*A[i]; return P; }
 
 inline float sum(const VolumeF& volume) { return sum(volume.data); }
 inline float mean(const VolumeF& volume) { return mean(volume.data); }
 inline float SSQ(const VolumeF& volume) { return SSQ(volume.data); }
 inline float SSE(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return SSE(A.data, B.data); }
 inline float dotProduct(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return dotProduct(A.data, B.data); }
+inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor); return move(volume); }
+
+inline VolumeF normalize(VolumeF&& volume) { float sum = ::sum(volume); assert_(sum); return scale(move(volume), 1./sum); }
+inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data); }
+inline VolumeF normalize(const VolumeF& volume) { float sum = ::sum(volume); assert_(sum); return (1.f/sum) * volume; }
 
 inline const VolumeF& cylinder(const VolumeF& target) {
     int3 size = target.size;

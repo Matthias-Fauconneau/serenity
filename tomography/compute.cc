@@ -20,79 +20,44 @@ struct Application : Poll {
     int3 size = referenceVolume.size;
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
-#define COMPARE 0
-#if COMPARE
-    const string labels[3] {"SIRT"_, "CG"_,"MLTR"_};
-    unique<Reconstruction> reconstructions[2] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData)/*, unique<MLTR>(size, projectionData)*/};
-#else
-    const string labels[1] {""_};
-    ::MLTR MLTR {size, projectionData};
-#endif
+    unique<Reconstruction> reconstructions[3] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData), unique<MLTR>(size, projectionData)};
 
     // Interface
     int upsample = 256 / projectionData.size.x;
 
     Value sliceIndex = (referenceVolume.size.z-1) / 2;
     Value projectionIndex = (projectionData.size.z-1) / 2;
-    Value subsetIndex = (MLTR.subsetSize-1) / 2;
 
-#if COMPARE
-    HList<SliceView> rSlices {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return SliceView(r.x, upsample, sliceIndex);})};
-#else
-    SliceView slices[10] {
-        {referenceVolume, upsample, sliceIndex, "x0"_},
-        {MLTR.Ax, upsample, subsetIndex,"Ax"_}, {MLTR.b, upsample, subsetIndex,"b"_}, {MLTR.r, upsample, subsetIndex,"r=exp(-Ax) - exp(-b)"_}, {MLTR.Atr, upsample, sliceIndex,"Atr"_},
-        {MLTR.w, upsample, subsetIndex,"Ai"_}, {MLTR.w, upsample, subsetIndex,"w=Ai exp(-Ax)"_}, {MLTR.Atw, upsample, sliceIndex,"Atw"_}, {MLTR.AtrAtw, upsample, sliceIndex,"Atr / Atw"_}, {MLTR.x, upsample, sliceIndex,"x"_}};
-#endif
-
-#if COMPARE
-    HList<VolumeView> rViews {apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return VolumeView(r.x, projectionData.size, upsample, projectionIndex);})};
-#else
-    SliceView b {projectionData, upsample, projectionIndex, "b"_};
-    VolumeView views[3] {{MLTR.Atr, projectionData.size, upsample, projectionIndex, "Atr"_}, {MLTR.Atw, projectionData.size, upsample, projectionIndex, "Atw"_}, {MLTR.x, projectionData.size, upsample, projectionIndex, "x"_}};
-#endif
-
-    WidgetGrid grid {apply(mref<SliceView>(slices),[](SliceView& o)->Widget*{return &o;})+ref<Widget*>{&b}+apply(mref<VolumeView>(views),[](VolumeView& o)->Widget*{return &o;})};
+    SliceView x {&referenceVolume, upsample, sliceIndex};
+    buffer<const CLVolume*> volumes = apply(ref<unique<Reconstruction>>(reconstructions), [&](const Reconstruction& r){ return &r.x;});
+    HList<SliceView> rSlices { apply<SliceView>(volumes, upsample, sliceIndex) };
+    HBox slices {{&x, &rSlices}};
+    SliceView b {&projectionData, upsample, projectionIndex};
+    HList<VolumeView> rViews { apply<VolumeView>(volumes, projectionData.size, upsample, projectionIndex) };
+    HBox views {{&b, &rViews}};
     Plot plot;
 
-    VBox layout {{&grid, &plot}};
+    VBox layout {{&slices, &views, &plot}};
 
     Window window {&layout, strx(projectionData.size)+" "_+strx(size)}; // FIXME
 
-    Application() : Poll(0,0,thread),
-        projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)),
-        referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder))
-    {
-        queue(); thread.spawn();
-        window.actions[Space] = [this]{ queue(); };
-    }
+    Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)), referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) { queue(); thread.spawn(); }
     void event() {
-#if COMPARE
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
-#else
-        uint index = 0;
-        Reconstruction& r = MLTR;
-#endif
+        if(r.time==uint64(-1)) return; // All reconstructions stopped converging
         r.step();
         const float SSE = ::SSE(referenceVolume, r.x, evaluationOrigin, evaluationSize);
+        if(SSE > r.SSE) { r.time = -1; queue(); return; } r.SSE = SSE;
         const float MSE = SSE / SSQ;
         const float PSNR = 10*log10( MSE );
-        const uint k = r.k;
-        log(str(labels[index]+"\t"_+str(k)+"\t"_+str(MSE)+"\t"_+str(-PSNR)));
+        log(str(r.x.name+"\t"_+str(r.k)+"\t"_+str(MSE)+"\t"_+str(-PSNR)));
         {Locker lock(window.renderLock);
             setWindow( &window );
-            window.renderBackground(plot.target); plot[labels[index]].insertMulti(r.time/1000000000.f, -PSNR); plot.render();
-#if COMPARE
+            window.renderBackground(plot.target); plot[r.x.name].insertMulti(r.time/1000000000.f, -PSNR); plot.render();
             rSlices[index].render(); rViews[index].render();
-#else
-            grid.render();
-#endif
-            setWindow( 0 );
+            setWindow(0);
         }
-        //cylinderCheck(r.x);
-#if COMPARE
         queue();
-#endif
     }
 } app;

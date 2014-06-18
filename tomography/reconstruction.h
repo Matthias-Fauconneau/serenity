@@ -6,8 +6,9 @@ struct Reconstruction {
     const uint projectionCount;
     int k = 0;
     uint64 time = 0;
+    float SSE = inf;
 
-    Reconstruction(int3 size, const ImageArray& b) : x(size), projectionCount(b.size.z) {}
+    Reconstruction(int3 size, const ImageArray& b, string name) : x(size, 0, name), projectionCount(b.size.z) {}
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
@@ -23,7 +24,7 @@ struct SubsetReconstruction : Reconstruction {
 
     uint subsetIndex = 0;
 
-    SubsetReconstruction(int3 size, const ImageArray& b) : Reconstruction(size, b), subsetSize(round(sqrt(float(projectionCount)))), subsetCount(round(sqrt(float(projectionCount)))) { // FIXME
+    SubsetReconstruction(int3 size, const ImageArray& b, string name) : Reconstruction(size, b, name), subsetSize(round(sqrt(float(projectionCount)))), subsetCount(round(sqrt(float(projectionCount)))) { // FIXME
         assert_(subsetCount*subsetSize == projectionCount);
         subsets = buffer<Subset>(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {

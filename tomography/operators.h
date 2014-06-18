@@ -14,6 +14,7 @@ CL(operators, mulexp) inline uint64 mulexp(const CLVolume& y, const CLVolume& a,
 CL(operators, diffexp) inline uint64 diffexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) { return emulateWriteTo3DImage(CL::diffexp, y, noneNearestSampler, a, b); } // y = exp(-a) - exp(-b) [MLTR]
 CL(operators, adddiv) inline uint64 adddiv(const CLVolume& y, const CLVolume& a, const CLVolume& b, const CLVolume& c) { return emulateWriteTo3DImage(CL::adddiv, y, noneNearestSampler, a, b, c); } // y = max(0, a + c ? b / c : 0) [MLTR]
 CL(operators, div) inline uint64 div(const CLVolume& y, const CLVolume& a, const CLVolume& b) { return emulateWriteTo3DImage(CL::div, y, noneNearestSampler, a, b); } // y = b ? a / b : 0 [DEBUG]
+CL(operators, Exp) inline uint64 exp(const CLVolume& y, const CLVolume& a) { return emulateWriteTo3DImage(CL::Exp, y, noneNearestSampler, a); } //  [DEBUG]
 
 #include "volume.h"
 inline void cylinderCheck(CLVolume& A) {

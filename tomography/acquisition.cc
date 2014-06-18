@@ -10,9 +10,8 @@ const int3 projectionSize = int3(N);
 const bool oversample = false;
 const int3 volumeSize = int3(oversample ? 2*N : N);
 
-CLVolume x (Map(strx(volumeSize)+".ref"_));
-
-VolumeF Ax (Map(File(strx(projectionSize)+".proj"_,currentWorkingDirectory(),Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write)));
+CLVolume x (VolumeF(volumeSize, Map(strx(volumeSize)+".ref"_,"Data"_)));
+VolumeF Ax (projectionSize, Map(File(strx(projectionSize)+".proj"_,"Data"_,Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write)));
 
 struct App {
     App() {
@@ -31,7 +30,7 @@ struct App {
     }
 } app;
 
-SliceView sliceView (x, 1024/volumeSize.x);
-SliceView volumeView (Ax, 1024/projectionSize.x, VolumeView::staticIndex);
-HBox layout ({ &sliceView , &volumeView });
+SliceView sliceView (x, 512/volumeSize.x);
+SliceView volumeView (Ax, 512/projectionSize.x, VolumeView::staticIndex);
+HBox layout ({&sliceView, &volumeView});
 Window window (&layout, strx(volumeSize));

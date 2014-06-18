@@ -86,7 +86,7 @@ static const Image& name ## Icon() { \
 struct ImageF {
     ImageF(){}
     ImageF(buffer<float>&& data, int2 size) : data(move(data)), size(size) { assert_(this->data.size==size_t(size.x*size.y)); }
-    ImageF(int2 size) : size(size) { assert(size); data=::buffer<float>(size.x*size.y); }
+    ImageF(int2 size) : size(size) { assert_(size>int2(0)); data=::buffer<float>(size.x*size.y); }
     inline float& operator()(uint x, uint y) const {assert(x<uint(size.x) && y<uint(size.y)); return data[y*size.x+x]; }
     buffer<float> data;
     int2 size;

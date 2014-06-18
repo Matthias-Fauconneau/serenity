@@ -7,13 +7,13 @@
 
 const uint N = fromInteger(arguments()[0]);
 const int3 size = int3(N, N, N);
-VolumeF hostVolume = Map("cylinder"_+"."_+strx(size)+".ref"_);
+VolumeF hostVolume (size, Map(strx(size)+".ref"_, "Data"_));
 CLVolume volume (hostVolume);
 
 struct App {
     App() {
-        double sum = ::sum(volume); log(sum / (size.x*size.y*size.z));
-        double SSQ = ::SSQ(volume); log(sqrt(SSQ / (size.x*size.y*size.z)));
+        double sum = ::sum(volume); log(sum, sum / (size.x*size.y*size.z));
+        double SSQ = ::SSQ(volume); log(sqrt(SSQ), sqrt(SSQ / (size.x*size.y*size.z)));
     }
 } app;
 

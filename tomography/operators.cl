@@ -48,3 +48,9 @@ kernel void div(global float* Y, const uint XY, const uint X, sampler_t sampler,
     float b = read_imagef(B, sampler, i).x;
     Y[i.z*XY+i.y*X+i.x] = b ? a / b : 0;
 }
+
+kernel void Exp(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Multiplication with exponential: y = a exp(-b) [MLTR]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = exp(-a);
+}
