@@ -7,7 +7,7 @@ CG::CG(int3 size, const ImageArray& b) : Reconstruction(size, b, "CG"_), At(appl
     backproject(r, At, b); // p = At b (x=0)
     residualEnergy = SSQ(r);
     assert_(residualEnergy);
-    copy(p, r);
+    copy(r, p); // r -> p
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]

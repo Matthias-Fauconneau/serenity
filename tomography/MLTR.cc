@@ -8,12 +8,12 @@ MLTR::MLTR(int3 size, const ImageArray& b, const uint subsetSize) : SubsetRecons
         Subset& subset = subsets[subsetIndex];
         const ImageArray& b = subset.b;
         new (&Ai[subsetIndex]) ImageArray(b.size);
-        project(Ai[subsetIndex], i, subsetIndex*subsetSize, projectionCount); // Ai = A i
+        project(Ai[subsetIndex], i, subsetIndex, subsetSize, subsetCount); // Ai = A i
     }
 }
 
 void MLTR::step() {
-    time += project(Ax, x, subsetIndex*subsetSize, projectionCount); // Ax = A x
+    time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     time += diffexp(r, Ax, subsets[subsetIndex].b); // r = exp(-Ax) - exp(-b) FIXME: precompute exp(-b)
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r
     const ImageArray& w = r; // Reuse for normalization

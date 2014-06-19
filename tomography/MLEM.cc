@@ -15,7 +15,7 @@ MLEM::MLEM(int3 size, const ImageArray& b, const uint subsetSize) : SubsetRecons
 
 // FIXME: <=> SART step on log (would have better precision)
 void MLEM::step() {
-    time += project(Ax, x, subsetIndex*subsetSize, projectionCount); // Ax = A x
+    time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     const ImageArray& r = Ax; // In-place: residual
 
     time += div(r, subsets[subsetIndex].b, Ax); // r = b / Ax

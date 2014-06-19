@@ -31,7 +31,7 @@ struct SubsetReconstruction : Reconstruction {
             Subset& subset = subsets[subsetIndex];
             uint startIndex = subsetIndex*subsetSize, endIndex = startIndex+subsetSize;
             CLVolume subsetB = int3(b.size.xy(),subsetSize);
-            for(uint index: range(subsetSize)) copy(subsetB, b, int3(0,0,index), int3(0,0,interleave(subsetSize, subsetCount, startIndex+index)), int3(b.size.xy(),1));
+            for(uint index: range(subsetSize)) copy(b, subsetB, int3(0,0,interleave(subsetSize, subsetCount, startIndex+index)), int3(0,0,index), int3(b.size.xy(),1));
             new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return Projection(size, b.size, interleave(subsetSize, subsetCount, index)).worldToView; }), move(subsetB)};
         }
     }

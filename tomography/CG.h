@@ -5,7 +5,7 @@ struct CG : Reconstruction  {
     ProjectionArray At;
     // Persistent
     real residualEnergy = 0;
-    const CLVolume p, r;
+    CLVolume p, r;
     // Temporary
     const ImageArray Ap;
     const CLVolume AtAp;

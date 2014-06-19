@@ -12,12 +12,12 @@ SART::SART(int3 size, const ImageArray& b, const uint subsetSize) : SubsetRecons
         backproject(Ati, At, i); // Backprojects identity projections
         const ImageArray& b = subset.b;
         new (&AAti[subsetIndex]) ImageArray(b.size);
-        project(AAti[subsetIndex], Ati, subsetIndex*subsetSize, projectionCount); // Projects coefficents volume
+        project(AAti[subsetIndex], Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
     }
 }
 
 void SART::step() {
-    time += project(Ax, x, subsetIndex*subsetSize, projectionCount); // Ax = A x
+    time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     const ImageArray& r = Ax; // In-place: residual
     time += divdiff(r, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // r = ( b - Ax ) / A At i
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r

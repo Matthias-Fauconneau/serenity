@@ -52,12 +52,12 @@ uint64 project(const ImageF& image, const CLVolume& volume, const uint projectio
 }
 
 /// Projects (A) \a x to \a Ax
-uint64 project(const ImageArray& Ax, const CLVolume& x, uint startIndex, uint projectionCount) {
-    if(!projectionCount) { assert_(!startIndex); projectionCount = Ax.size.z; }
+uint64 project(const ImageArray& Ax, const CLVolume& x, uint subsetIndex, uint subsetSize, uint subsetCount) {
+    const uint projectionCount = subsetSize * subsetCount;
     CLBufferF buffer (Ax.size.y*Ax.size.x);
     uint64 time = 0;
-    for(uint index: range(Ax.size.z)) { //FIXME: Queue all projections at once ?
-        time += ::project(buffer, int3(Ax.size.xy(), projectionCount), x, startIndex+index);
+    for(uint index: range(subsetSize)) { //FIXME: Queue all projections at once ?
+        time += ::project(buffer, int3(Ax.size.xy(), projectionCount), x, interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index));
         copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     }
     return time;

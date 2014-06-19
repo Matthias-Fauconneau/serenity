@@ -61,7 +61,7 @@ struct CLVolume : CLMem {
 };
 
 // Copy volume into volume
-const CLVolume& copy(const CLVolume& target, const CLVolume& source, const int3 origin=0, const int3 targetOrigin=0, int3 size=0);
+const CLVolume& copy(const CLVolume& source, CLVolume& target, const int3 sourceOrigin=0, const int3 targetOrigin=0, int3 size=0);
 
 // Copy volume into buffer
 void copy(const CLBufferF& target, const CLVolume& source, const int3 origin=0, const int3 size=0);
