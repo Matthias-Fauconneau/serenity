@@ -88,8 +88,7 @@ struct Window : Socket, Poll {
     /// Event handler
     void event();
     /// Schedules window rendering after all events have been processed (i.e Poll::wait())
-    //void queueRender();
-    //void immediateUpdate();
+    bool needRender = false; // on ConfigureNotify
 
     /// Processes one X event
     void processEvent(uint8 type, const XEvent& e);

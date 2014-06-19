@@ -79,5 +79,3 @@ tomography/MLEM.h
 tomography/MLEM.cc
 tomography/MART.cc
 tomography/MART.h
-tomography/SARTL.h
-tomography/SARTL.cc

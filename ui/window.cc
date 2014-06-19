@@ -147,6 +147,7 @@ void Window::event() {
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     if(motionPending) processEvent(LastEvent, XEvent());
+    if(needRender) { render(); needRender=false; }
 }
 
 void Window::render() {
@@ -170,7 +171,10 @@ void Window::render() {
     }
 
     renderBackground(target);
+    assert_(!window);
+    window=this;
     widget->render(target);
+    window=0;
     putImage();
 }
 
@@ -226,6 +230,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
     }
     else if(type==1) error("Unexpected reply");
     else { const XEvent& e=event; type&=0b01111111; //msb set if sent by SendEvent
+        assert_(!window);
         window=this;
         /**/ if(type==MotionNotify) {
             cursorPosition = int2(e.x,e.y);
@@ -257,13 +262,13 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                        e.state&Button1Mask?Widget::LeftButton:Widget::None) ) {} //needUpdate=true; //FIXME: Assumes all widgets supports partial updates
             }
-            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) /*needRender=true;*/render();/*immediate*/ }
+            else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.w<=2)) needRender=true; }
             else if(type==UnmapNotify) mapped=false;
             else if(type==MapNotify) mapped=true;
             else if(type==ReparentNotify) {}
             else if(type==ConfigureNotify) {
                 position=int2(e.configure.x,e.configure.y); int2 size=int2(e.configure.w,e.configure.h);
-                if(this->size!=size) { this->size=size; /*needRender=true;*/ render();/*immediate*/  }
+                if(this->size!=size) { this->size=size; needRender=true; }
             }
             else if(type==GravityNotify) {}
             else if(type==ClientMessage) {
@@ -274,8 +279,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             }
             else if( type==DestroyNotify || type==MappingNotify || type==LastEvent) {}
             else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
-            window=0;
         }
+        window=0;
     }
 }
 uint Window::send(const ref<byte>& request) { write(request); return ++sequence; }

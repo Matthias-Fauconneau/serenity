@@ -1,5 +1,4 @@
 #include "SART.h"
-#include "SARTL.h"
 #include "MART.h"
 #include "MLEM.h"
 #include "CG.h"
@@ -25,9 +24,12 @@ struct Application : Poll {
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
     const uint subsetSize = projectionData.size.z;
-    //unique<Reconstruction> reconstructions[4] {unique<SART>(size, projectionData,subsetSize), unique<SARTL>(size, projectionData,subsetSize), unique<MART>(size, projectionData,subsetSize), unique<MLEM>(size, projectionData,subsetSize)};
-    //unique<Reconstruction> reconstructions[2] {unique<CG>(size, projectionData), unique<MLTR>(size, projectionData),unique<PMLTR>(size, projectionData)};
-    unique<Reconstruction> reconstructions[1] {unique<SARTL>(size, projectionData,subsetSize)};
+    //unique<Reconstruction> reconstructions[3] {unique<SART>(size, projectionData,subsetSize), unique<MART>(size, projectionData,subsetSize), unique<MLEM>(size, projectionData,subsetSize)};
+    //unique<Reconstruction> reconstructions[2] {unique<CG>(size, projectionData), unique<MLTR>(size, projectionData,subsetSize),unique<PMLTR>(size, projectionData,subsetSize)};
+    unique<Reconstruction> reconstructions[6] {
+        unique<SART>(size, projectionData,subsetSize), unique<MART>(size, projectionData,subsetSize), unique<MLEM>(size, projectionData,subsetSize),
+                unique<CG>(size, projectionData), unique<MLTR>(size, projectionData,subsetSize),unique<PMLTR>(size, projectionData,subsetSize)
+                                              };
 
     // Interface
     int upsample = 256 / projectionData.size.x;
@@ -46,9 +48,9 @@ struct Application : Poll {
 
     VBox layout {{&slices, &views, &plot}};
 
-    Window window {&layout, strx(projectionData.size)+" "_+strx(size)}; // FIXME
+    Window window {&layout, strx(projectionData.size)+" "_+strx(size), int2(-1, -1024)};
 
-    Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)), referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) { /*queue();*/ thread.spawn(); window.actions[Space] = [this]{ queue(); }; }
+    Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)), referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) { queue(); thread.spawn(); /*window.actions[Space] = [this]{ queue(); };*/ }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
@@ -65,6 +67,6 @@ struct Application : Poll {
             rSlices[index].render(); rViews[index].render();
             setWindow(0);
         }
-        //queue();
+        queue();
     }
 } app;
