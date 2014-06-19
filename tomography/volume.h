@@ -3,10 +3,10 @@
 #include "file.h"
 
 struct VolumeF {
-    VolumeF(int3 size, string name=""_) : size(size), data(size.z*size.y*size.x), name(name) {}
-    VolumeF(int3 size, buffer<float>&& data, string name) : size(size), data(move(data)), name(name) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
+    VolumeF(int3 size, string name=""_) : size(size), data(size.z*size.y*size.x), name(name) { assert(name.size <= 16); }
+    VolumeF(int3 size, buffer<float>&& data, string name=""_) : size(size), data(move(data)), name(name) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
     //VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
-    VolumeF(int3 size, Map&& map, string name) : VolumeF(size, buffer<float>((ref<float>)map), name) { this->map = move(map); }
+    VolumeF(int3 size, Map&& map, string name=""_) : VolumeF(size, buffer<float>((ref<float>)map), name) { this->map = move(map); }
     inline float& operator()(uint x, uint y, uint z) const {assert_(x<uint(size.x) && y<uint(size.y) && z<uint(size.z), x,y,z, size); return data[(size_t)z*size.y*size.x+y*size.x+x]; }
 
     int3 size = 0;
@@ -21,10 +21,11 @@ inline ImageF slice(const VolumeF& volume, size_t index /* Z slice or projection
     return ImageF(buffer<float>(volume.data.slice(index*size.y*size.x,size.y*size.x)), int2(size.x,size.y));
 }
 
+inline float sum(const ref<float>& A) { double sum=0; for(float a: A) sum+=a; return sum; }
 inline float mean(const ref<float>& A) { return sum(A) / A.size; }
-inline float SSQ(const ref<float>& A) { float SSQ=0; for(float a: A) SSQ+=a*a; return SSQ; }
-inline float SSE(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float SSE=0; for(uint i: range(A.size)) SSE+=sq(A[i]-B[i]); return SSE; }
-inline float dotProduct(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float dot=0; for(uint i: range(A.size)) dot+=A[i]*B[i]; return dot; }
+inline float SSQ(const ref<float>& A) { double SSQ=0; for(float a: A) SSQ+=a*a; return SSQ; }
+inline float SSE(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); double SSE=0; for(uint i: range(A.size)) SSE+=sq(A[i]-B[i]); return SSE; }
+inline float dotProduct(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); double dot=0; for(uint i: range(A.size)) dot+=A[i]*B[i]; return dot; }
 inline buffer<float> operator*(float a, const ref<float>& A) { buffer<float> P(A.size); for(uint i: range(A.size)) P[i] = a*A[i]; return P; }
 
 inline float sum(const VolumeF& volume) { return sum(volume.data); }

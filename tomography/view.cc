@@ -23,7 +23,7 @@ void SliceView::render() {
     assert_(target.size() == source.size, target.size(), source.size, image.size, (this->target.size()-image.size)/2+Rect(image.size));
     float max = convert(target, source);
     float min = ::min(image.data);
-    Text((volume?""_:clVolume->name)+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
+    Text((clVolume?clVolume->name:""_)+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);
 }
 

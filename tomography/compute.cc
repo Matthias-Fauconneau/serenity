@@ -24,8 +24,8 @@ struct Application : Poll {
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
     const uint subsetSize = round(sqrt(float(projectionData.size.z)));
-    //unique<Reconstruction> reconstructions[4] {unique<SART>(size, projectionData,subsetSize), unique<CG>(size, projectionData), unique<MLTR>(size, projectionData,subsetSize), unique<PMLTR>(size, projectionData,subsetSize)};
-    unique<Reconstruction> reconstructions[2] {unique<MART>(size, projectionData,subsetSize), unique<MLEM>(size, projectionData,subsetSize)};
+    unique<Reconstruction> reconstructions[4] {unique<SART>(size, projectionData,subsetSize), unique<CG>(size, projectionData), unique<MLTR>(size, projectionData,subsetSize), unique<PMLTR>(size, projectionData,subsetSize)};
+    //unique<Reconstruction> reconstructions[2] {unique<MART>(size, projectionData,subsetSize), unique<MLEM>(size, projectionData,subsetSize)};
 
     // Interface
     int upsample = 256 / projectionData.size.x;
@@ -50,7 +50,7 @@ struct Application : Poll {
     Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)), referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) {
         queue(); thread.spawn();
         window.actions[Space] = [this]{ if(wait) { wait=false; queue(); } else wait=true; };
-        window.actions[PrintScreen] = [this]{ writeFile("snapshot.png"_,encodePNG(window.getSnapshot())); };
+        window.actions[PrintScreen] = [this]{ Locker lock(window.renderLock); writeFile("snapshot.png"_,window.target); };
     }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
@@ -58,7 +58,7 @@ struct Application : Poll {
         if(r.time==uint64(-1)) return; // All reconstructions stopped converging
         r.step();
         const float SSE = ::SSE(referenceVolume, r.x, evaluationOrigin, evaluationSize);
-        //if(SSE > r.SSE) { r.time = -1; queue(); return; } r.SSE = SSE;
+        if(SSE > r.SSE) { r.time = -1; queue(); return; } r.SSE = SSE;
         const float MSE = SSE / SSQ;
         const float PSNR = 10*log10( MSE );
         log(str(r.x.name+"\t"_+str(r.k)+"\t"_+str(MSE)+"\t"_+str(-PSNR)));

@@ -7,11 +7,12 @@
 
 const uint N = fromInteger(arguments()[0]);
 const int3 projectionSize = int3(N);
-const bool oversample = false;
+const bool oversample = true;
 const int3 volumeSize = int3(oversample ? 2*N : N);
+const float photonCount = 1;
 
-CLVolume x (VolumeF(volumeSize, Map(strx(volumeSize)+".ref"_,"Data"_)));
-VolumeF Ax (projectionSize, Map(File(strx(projectionSize)+".proj"_,"Data"_,Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write)));
+CLVolume x (VolumeF(volumeSize, Map(strx(volumeSize)+".ref"_,"Data"_), "x"_));
+VolumeF Ax (projectionSize, Map(File(strx(projectionSize)+".proj"_,"Data"_,Flags(ReadWrite|Create|Truncate)).resize(cb(N)*sizeof(float)), Map::Prot(Map::Read|Map::Write)), "Ax"_);
 
 struct App {
     App() {
@@ -20,7 +21,9 @@ struct App {
             if(oversample) {
                 ImageF fullSize(2*projectionSize.xy());
                 ::project(fullSize, x, Ax.size.z, index);
-                scale(downsample(slice(Ax, index), fullSize), 1.f/8);
+                ImageF slice = ::slice(Ax, index);
+                downsample(slice, fullSize);
+                for(float& y: slice.data) y = photonCount * exp(-y); // TODO: Poisson realization
             } else {
                 ::project(slice(Ax, index), x, Ax.size.z, index);
             }

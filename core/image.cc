@@ -55,9 +55,9 @@ float convert(const Image& target, const ImageF& source, float max) {
     return max;
 }
 
-ImageF downsample(ImageF&& target, const ImageF& source) {
-    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
-    return move(target);
+ImageF& downsample(ImageF& target, const ImageF& source) {
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) target(x,y) = 1.f/4 * (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1));
+    return target;
 }
 
 ImageF upsample(const ImageF& source) {

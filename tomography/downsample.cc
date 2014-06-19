@@ -19,5 +19,6 @@ struct App {
         downsample(target, source);
         assert_(target.size.x == target.size.y && target.size.y == target.size.z);
         target = scale(move(target), sq(target.size.x)/sum(target));
+        assert_(sum(target) == sq(target.size.x), sum(target), sq(target.size.x));
     }
 } app;

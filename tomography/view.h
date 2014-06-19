@@ -39,6 +39,7 @@ struct VolumeView : Widget {
     static Value staticIndex;
     VolumeView(const CLVolume* volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : volume(*volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
     VolumeView(const CLVolume& clVolume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : VolumeView(&clVolume, projectionSize, upsampleFactor, index) {}
+
     default_move(VolumeView);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     int2 sizeHint() override;
