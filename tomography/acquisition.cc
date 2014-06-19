@@ -7,7 +7,7 @@
 
 const uint N = fromInteger(arguments()[0]);
 const int3 projectionSize = int3(N);
-const bool oversample = false;
+const bool oversample = true;
 const int3 volumeSize = int3(oversample ? 2*N : N);
 
 CLVolume x (VolumeF(volumeSize, Map(strx(volumeSize)+".ref"_,"Data"_)));
@@ -20,7 +20,7 @@ struct App {
             if(oversample) {
                 ImageF fullSize(2*projectionSize.xy());
                 ::project(fullSize, x, Ax.size.z, index);
-                downsample(slice(Ax, index), fullSize);
+                scale(downsample(slice(Ax, index), fullSize), 1.f/8);
             } else {
                 ::project(slice(Ax, index), x, Ax.size.z, index);
             }

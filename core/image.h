@@ -102,3 +102,6 @@ void downsample(const ImageF& target, const ImageF& source);
 ImageF upsample(const ImageF& source);
 
 ImageF clip(const ImageF& image, Rect r);
+
+inline void scale(mref<float>& A, float factor) { for(float& a: A) a *= factor; }
+inline ImageF scale(ImageF&& image, float factor) { scale(image.data, factor); return move(image); }

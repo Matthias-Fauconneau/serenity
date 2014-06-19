@@ -24,7 +24,6 @@ inline float mean(const ref<float>& A) { return sum(A) / A.size; }
 inline float SSQ(const ref<float>& A) { float SSQ=0; for(float a: A) SSQ+=a*a; return SSQ; }
 inline float SSE(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float SSE=0; for(uint i: range(A.size)) SSE+=sq(A[i]-B[i]); return SSE; }
 inline float dotProduct(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); float dot=0; for(uint i: range(A.size)) dot+=A[i]*B[i]; return dot; }
-inline void scale(mref<float>& A, float factor) { for(float& a: A) a *= factor; }
 inline buffer<float> operator*(float a, const ref<float>& A) { buffer<float> P(A.size); for(uint i: range(A.size)) P[i] = a*A[i]; return P; }
 
 inline float sum(const VolumeF& volume) { return sum(volume.data); }

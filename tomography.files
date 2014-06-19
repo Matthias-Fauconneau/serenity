@@ -73,3 +73,5 @@ tomography/synthetic.cc
 tomography/viewer.cc
 tomography/MLTR.h
 tomography/MLTR.cc
+tomography/PMLTR.h
+tomography/PMLTR.cc

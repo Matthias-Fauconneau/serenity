@@ -34,7 +34,7 @@ kernel void diffexp(global float* Y, const uint XY, const uint X, sampler_t samp
     Y[i.z*XY+i.y*X+i.x] = exp(-a) - exp(-b);
 }
 
-kernel void adddiv(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Difference with exponential: y = max(0, a + c ? b / c : 0) [MLTR]
+kernel void adddiv(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Addition of division: y = max(0, a + c ? b / c : 0) [MLTR]
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
@@ -42,15 +42,10 @@ kernel void adddiv(global float* Y, const uint XY, const uint X, sampler_t sampl
     Y[i.z*XY+i.y*X+i.x] = max(0.f, a + (c ? b / c : 0));
 }
 
-kernel void div(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B) { // Difference with exponential: y = b ? a / b : 0 [DEBUG]
+kernel void muldiv(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Multiplication of division: y = max(0, a + (c ? a * b / c : 0)) [P-MLTR]
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = b ? a / b : 0;
-}
-
-kernel void Exp(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Multiplication with exponential: y = a exp(-b) [MLTR]
-    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
-    float a = read_imagef(A, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = exp(-a);
+    float c = read_imagef(C, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = max(0.f, a + (c ? a * b / c : 0));
 }

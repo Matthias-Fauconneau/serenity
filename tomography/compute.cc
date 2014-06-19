@@ -1,6 +1,7 @@
 #include "algebraic.h"
 #include "conjugate.h"
 #include "MLTR.h"
+#include "PMLTR.h"
 
 #include "plot.h"
 #include "window.h"
@@ -20,7 +21,7 @@ struct Application : Poll {
     int3 size = referenceVolume.size;
     int3 evaluationOrigin =  int3(0,0,size.z/4), evaluationSize = int3(size.xy(), size.z/2);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
-    unique<Reconstruction> reconstructions[3] {unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData), unique<MLTR>(size, projectionData)};
+    unique<Reconstruction> reconstructions[1] {/*unique<Algebraic>(size, projectionData), unique<ConjugateGradient>(size, projectionData), unique<MLTR>(size, projectionData),*/ unique<PMLTR>(size, projectionData)};
 
     // Interface
     int upsample = 256 / projectionData.size.x;
@@ -41,7 +42,7 @@ struct Application : Poll {
 
     Window window {&layout, strx(projectionData.size)+" "_+strx(size)}; // FIXME
 
-    Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)), referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) { queue(); thread.spawn(); }
+    Application() : Poll(0,0,thread), projectionData(int3(N,N,N), Map(strx(int3(N,N,N))+".proj"_, folder)), referenceVolume(int3(N,N,N), Map(strx(int3(N,N,N))+".ref"_, folder)) { queue(); thread.spawn(); window.actions[Space] = [this]{ queue(); }; }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
@@ -58,6 +59,6 @@ struct Application : Poll {
             rSlices[index].render(); rViews[index].render();
             setWindow(0);
         }
-        queue();
+        //queue();
     }
 } app;
