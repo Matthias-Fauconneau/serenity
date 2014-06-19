@@ -1,4 +1,18 @@
-kernel void divdiff(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Division of difference: y = c ? ( a - b ) / c : 0 [SIRT]
+kernel void mul(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B) { // Product: y = a * b [MLEM]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    float b = read_imagef(B, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = a * b;
+}
+
+kernel void div(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B) { // Division: y = a / b [MLEM]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    float b = read_imagef(B, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = b ? a / b : 0;
+}
+
+kernel void divdiff(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Division of difference: y = c ? ( a - b ) / c : 0 [SART]
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
@@ -6,7 +20,15 @@ kernel void divdiff(global float* Y, const uint XY, const uint X, sampler_t samp
     Y[i.z*XY+i.y*X+i.x] = c ? ( a - b ) / c : 0;
 }
 
-kernel void maxadd(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, const float alpha, read_only image3d_t B) { // Maximum of zero and addition: y = max(0, a + α b) [SIRT, CG]
+kernel void divdiv(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Division of division: y = c ? ( b ? a / b : 0 ) / c : 0 [MLEM]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    float b = read_imagef(B, sampler, i).x;
+    float c = read_imagef(C, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = c ? ( b ? a / b : 0 ) / c : 0;
+}
+
+kernel void maxadd(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, const float alpha, read_only image3d_t B) { // Maximum of zero and addition: y = max(0, a + α b) [SART, CG]
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
@@ -48,4 +70,16 @@ kernel void muldiv(global float* Y, const uint XY, const uint X, sampler_t sampl
     float b = read_imagef(B, sampler, i).x;
     float c = read_imagef(C, sampler, i).x;
     Y[i.z*XY+i.y*X+i.x] = max(0.f, a + (c ? a * b / c : 0));
+}
+
+kernel void ln(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Product: y = log a [SARTL]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = a>0 ? log(a) : -1024; //INFINITY;
+}
+
+kernel void _exp(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Product: y = exp a [SARTL]
+    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
+    float a = read_imagef(A, sampler, i).x;
+    Y[i.z*XY+i.y*X+i.x] = exp(a);
 }

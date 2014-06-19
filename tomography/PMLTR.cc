@@ -2,7 +2,7 @@
 #include "operators.h"
 #include "time.h"
 
-PMLTR::PMLTR(int3 size, const ImageArray& b) : SubsetReconstruction(size, b, "P-MLTR"_), Ax(subsets[0].b.size), r(Ax.size), Atr(size), Atw(size) {
+PMLTR::PMLTR(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, b, subsetSize, "P-MLTR"_), Ax(subsets[0].b.size), r(Ax.size), Atr(size), Atw(size) {
     ProjectionArray At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; }));
     backproject(x, At, b);
 }

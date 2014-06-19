@@ -1,11 +1,12 @@
 #pragma once
 #include "reconstruction.h"
 
-struct Algebraic : SubsetReconstruction {
+struct SARTL : SubsetReconstruction {
     buffer<ImageArray> AAti; // A At i
     ImageArray Ax; // At x
     CLVolume Atr; // At r
+    CLVolume lnX; // ln x
 
-    Algebraic(int3 volumeSize, const ImageArray& b);
+    SARTL(int3 volumeSize, const ImageArray& b, const uint subsetSize);
     void step() override;
 };

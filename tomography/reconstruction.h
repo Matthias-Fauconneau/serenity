@@ -8,7 +8,7 @@ struct Reconstruction {
     uint64 time = 0;
     float SSE = inf;
 
-    Reconstruction(int3 size, const ImageArray& b, string name) : x(size, 0, name), projectionCount(b.size.z) {}
+    Reconstruction(int3 size, const ImageArray& b, string name) : x(cylinder(VolumeF(size, name), 1.f/size.x)), projectionCount(b.size.z) { assert_(size.x==size.y); }
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
@@ -24,15 +24,15 @@ struct SubsetReconstruction : Reconstruction {
 
     uint subsetIndex = 0;
 
-    SubsetReconstruction(int3 size, const ImageArray& b, string name) : Reconstruction(size, b, name), subsetSize(round(sqrt(float(projectionCount)))), subsetCount(round(sqrt(float(projectionCount)))) { // FIXME
+    SubsetReconstruction(int3 size, const ImageArray& b, const uint subsetSize, string name) : Reconstruction(size, b, name), subsetSize(subsetSize), subsetCount(projectionCount/subsetSize) { // FIXME
         assert_(subsetCount*subsetSize == projectionCount);
         subsets = buffer<Subset>(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {
             Subset& subset = subsets[subsetIndex];
             uint startIndex = subsetIndex*subsetSize, endIndex = startIndex+subsetSize;
             CLVolume subsetB = int3(b.size.xy(),subsetSize);
-            copy(subsetB, b, int3(0,0,startIndex));
-            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return Projection(size, b.size, index).worldToView; }), move(subsetB)};
+            for(uint index: range(subsetSize)) copy(subsetB, b, int3(0,0,index), int3(0,0,interleave(subsetSize, subsetCount, startIndex+index)), int3(b.size.xy(),1));
+            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return Projection(size, b.size, interleave(subsetSize, subsetCount, index)).worldToView; }), move(subsetB)};
         }
     }
 };

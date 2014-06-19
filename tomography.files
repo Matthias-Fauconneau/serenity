@@ -50,10 +50,10 @@ ui/plot.h
 
 tomography/operators.cl
 tomography/backproject.cl
-tomography/conjugate.cc
-tomography/conjugate.h
-tomography/algebraic.cc
-tomography/algebraic.h
+tomography/CG.cc
+tomography/CG.h
+tomography/SART.cc
+tomography/SART.h
 tomography/project.cc
 tomography/project.cl
 tomography/project.h
@@ -75,3 +75,9 @@ tomography/MLTR.h
 tomography/MLTR.cc
 tomography/PMLTR.h
 tomography/PMLTR.cc
+tomography/MLEM.h
+tomography/MLEM.cc
+tomography/MART.cc
+tomography/MART.h
+tomography/SARTL.h
+tomography/SARTL.cc

@@ -51,7 +51,7 @@ struct CLImage : CLMem {
 struct CLVolume : CLMem {
     CLVolume(int3 size, const float value=0, string name=""_);
     CLVolume(int3 size, const ref<float>& data, string name=""_);
-    CLVolume(const VolumeF& A) : CLVolume(A.size, A.data) {}
+    CLVolume(const VolumeF& A) : CLVolume(A.size, A.data, A.name) {}
      default_move(CLVolume);
 
     const VolumeF& read(const VolumeF& target, int3 origin=0) const;
@@ -61,7 +61,7 @@ struct CLVolume : CLMem {
 };
 
 // Copy volume into volume
-const CLVolume& copy(const CLVolume& target, const CLVolume& source, const int3 origin=0);
+const CLVolume& copy(const CLVolume& target, const CLVolume& source, const int3 origin=0, const int3 targetOrigin=0, int3 size=0);
 
 // Copy volume into buffer
 void copy(const CLBufferF& target, const CLVolume& source, const int3 origin=0, const int3 size=0);

@@ -7,7 +7,7 @@
 
 const uint N = fromInteger(arguments()[0]);
 const int3 projectionSize = int3(N);
-const bool oversample = true;
+const bool oversample = false;
 const int3 volumeSize = int3(oversample ? 2*N : N);
 
 CLVolume x (VolumeF(volumeSize, Map(strx(volumeSize)+".ref"_,"Data"_)));

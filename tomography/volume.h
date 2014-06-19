@@ -3,15 +3,16 @@
 #include "file.h"
 
 struct VolumeF {
-    VolumeF(int3 size) : size(size), data(size.z*size.y*size.x) {}
-    VolumeF(int3 size, buffer<float>&& data) : size(size), data(move(data)) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
+    VolumeF(int3 size, string name=""_) : size(size), data(size.z*size.y*size.x), name(name) {}
+    VolumeF(int3 size, buffer<float>&& data, string name) : size(size), data(move(data)), name(name) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
     //VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
-    VolumeF(int3 size, Map&& map) : VolumeF(size, buffer<float>((ref<float>)map)) { this->map = move(map); }
+    VolumeF(int3 size, Map&& map, string name) : VolumeF(size, buffer<float>((ref<float>)map), name) { this->map = move(map); }
     inline float& operator()(uint x, uint y, uint z) const {assert_(x<uint(size.x) && y<uint(size.y) && z<uint(size.z), x,y,z, size); return data[(size_t)z*size.y*size.x+y*size.x+x]; }
 
     int3 size = 0;
     buffer<float> data;
     Map map;
+    string name;
 };
 
 inline ImageF slice(const VolumeF& volume, size_t index /* Z slice or projection*/) {
@@ -34,13 +35,13 @@ inline float dotProduct(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.
 inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor); return move(volume); }
 
 inline VolumeF normalize(VolumeF&& volume) { float sum = ::sum(volume); assert_(sum); return scale(move(volume), 1./sum); }
-inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data); }
+inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data, A.name); }
 inline VolumeF normalize(const VolumeF& volume) { float sum = ::sum(volume); assert_(sum); return (1.f/sum) * volume; }
 
-inline const VolumeF& cylinder(const VolumeF& target) {
+inline const VolumeF& cylinder(const VolumeF& target, const float value=1) {
     int3 size = target.size;
     const float2 center = float2(size.xy()-int2(1))/2.f;
     const float radiusSq = sq(center.x);
-    for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) target(x,y,z) = sq(float2(x,y)-center)<=radiusSq;
+    for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) target(x,y,z) = sq(float2(x,y)-center)<=radiusSq ? value : 0;
     return target;
 }

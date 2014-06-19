@@ -2,13 +2,6 @@
 #include "opencl.h"
 
 Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
-    // Subset setup
-    const uint projectionCount = projectionSize.z;
-    const uint subsetSize = round(sqrt(float(projectionCount))), subsetCount = round(sqrt(float(projectionCount))); // FIXME
-    assert_(subsetSize * subsetCount == projectionCount, subsetSize, subsetCount, projectionCount);
-    assert_(index < projectionCount);
-    const uint subsetIndex = index / subsetSize, localIndex = index % subsetSize;
-    index = localIndex * subsetCount + subsetIndex;
     // Projection setup (coordinates in view space)
     const float detectorHalfWidth = 1;
     const float cameraLength = 1;
@@ -22,6 +15,7 @@ Projection::Projection(int3 volumeSize, int3 projectionSize, uint index) {
 
     const bool doubleHelix = true;
     const float pitch = 2;
+    const uint projectionCount = projectionSize.z;
     float angle = doubleHelix ? 2*PI*pitch*float(index/2)/((projectionCount-1)/2) + (index%2?PI:0) : 2*PI*pitch*float(index)/(projectionCount-1); // Rotation angle (in radians) around vertical axis
     float dz = doubleHelix ? float(index/2)/float((projectionCount-1)/2) : float(index)/float(projectionCount-1);
     float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space

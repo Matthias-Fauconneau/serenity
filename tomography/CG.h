@@ -1,7 +1,7 @@
 #pragma once
 #include "reconstruction.h"
 
-struct ConjugateGradient : Reconstruction  {
+struct CG : Reconstruction  {
     ProjectionArray At;
     // Persistent
     real residualEnergy = 0;
@@ -10,6 +10,6 @@ struct ConjugateGradient : Reconstruction  {
     const ImageArray Ap;
     const CLVolume AtAp;
 
-    ConjugateGradient(int3 volumeSize, const ImageArray& images);
+    CG(int3 volumeSize, const ImageArray& images);
     void step() override;
 };

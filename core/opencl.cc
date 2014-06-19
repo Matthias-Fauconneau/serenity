@@ -72,9 +72,10 @@ const VolumeF& CLVolume::read(const VolumeF& target, int3 origin) const {
     return target;
 }
 
-const CLVolume& copy(const CLVolume& target, const CLVolume& source, const int3 origin) {
-    assert_(origin+target.size <= source.size);
-    clCheck( clEnqueueCopyImage(queue, source, target, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){0,0,0}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0) );
+const CLVolume& copy(const CLVolume& target, const CLVolume& source, const int3 origin, const int3 targetOrigin, int3 size) {
+    size = size?:target.size;
+    assert_(origin+size <= source.size && targetOrigin+size <= target.size);
+    clCheck( clEnqueueCopyImage(queue, source, target, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(targetOrigin.x),size_t(targetOrigin.y),size_t(targetOrigin.z)}, (size_t[]){size_t(size.x),size_t(size.y),size_t(size.z)}, 0,0,0) );
     return target;
 }
 

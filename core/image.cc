@@ -42,9 +42,12 @@ Image decodeImage(const ref<byte>& file) {
 }
 
 float convert(const Image& target, const ImageF& source, float max) {
-    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) { assert_(isNumber(source(x,y))); max=::max(max, abs(source(x,y))); }
+    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) { assert_(!isNaN(source(x,y))); if(isNumber(source(x,y))) max=::max(max, abs(source(x,y))); }
     if(max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
         float v = source(x,y)/max;
+        //v = clip(-1, v, 1); // -inf, inf
+        if(source(x,y)==-inf) v=-1;
+        if(source(x,y)==inf) v=1;
         assert_(abs(v) <= 1, source(x,y), max);
         uint linear12 = 0xFFF*abs(v);
         extern uint8 sRGB_forward[0x1000];
@@ -55,8 +58,9 @@ float convert(const Image& target, const ImageF& source, float max) {
     return max;
 }
 
-void downsample(const ImageF& target, const ImageF& source) {
+ImageF downsample(ImageF&& target, const ImageF& source) {
     for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
+    return move(target);
 }
 
 ImageF upsample(const ImageF& source) {

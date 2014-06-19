@@ -1,8 +1,8 @@
-#include "conjugate.h"
+#include "CG.h"
 #include "operators.h"
 #include "time.h"
 
-ConjugateGradient::ConjugateGradient(int3 size, const ImageArray& b) : Reconstruction(size, b, "CG"_), At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; })), p(size), r(size), Ap(b.size), AtAp(size) {
+CG::CG(int3 size, const ImageArray& b) : Reconstruction(size, b, "CG"_), At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; })), p(size), r(size), Ap(b.size), AtAp(size) {
      /// Computes residual r=p=Atb
     backproject(r, At, b); // p = At b (x=0)
     residualEnergy = SSQ(r);
@@ -11,7 +11,7 @@ ConjugateGradient::ConjugateGradient(int3 size, const ImageArray& b) : Reconstru
 }
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
-void ConjugateGradient::step() {
+void CG::step() {
     time += project(Ap, p); // A p
     time += backproject(AtAp, At, Ap); // At Ap
     float pAtAp = dotProduct(p, AtAp); // |p·AtAp|

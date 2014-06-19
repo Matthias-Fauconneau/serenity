@@ -2,6 +2,11 @@
 #include "matrix.h"
 #include "opencl.h"
 
+inline uint interleave(const uint subsetSize, const uint subsetCount, const uint index) {
+    const uint subsetIndex = index / subsetSize, localIndex = index % subsetSize;
+    return localIndex * subsetCount + subsetIndex;
+}
+
 struct Projection {
     Projection(int3 volumeSize, int3 projectionSize, uint index);
     mat4 worldToView; // Transforms from world coordinates [±1] to view coordinates [±size/2, 1] (cannot directly transform to image coordinates because of perspective division)

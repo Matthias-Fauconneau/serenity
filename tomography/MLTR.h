@@ -8,6 +8,6 @@ struct MLTR : SubsetReconstruction {
     CLVolume Atr; // At r
     CLVolume Atw; // At w
 
-    MLTR(int3 volumeSize, const ImageArray& b);
+    MLTR(int3 volumeSize, const ImageArray& b, const uint subsetSize);
     void step() override;
 };

@@ -15,7 +15,7 @@ int2 SliceView::sizeHint() { return upsampleFactor * this->size.xy(); }
 
 void SliceView::render() {
     ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
-    for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) assert_(isNumber(image(x,y)));
+    //for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) assert_(isNumber(image(x,y)));
     while(image.size < this->target.size()) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
