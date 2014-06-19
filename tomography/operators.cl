@@ -53,7 +53,7 @@ kernel void diffexp(global float* Y, const uint XY, const uint X, sampler_t samp
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = exp(-a) - exp(-b);
+    Y[i.z*XY+i.y*X+i.x] = exp(-a) - b;
 }
 
 kernel void adddiv(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Addition of division: y = max(0, a + c ? b / c : 0) [MLTR]
@@ -72,14 +72,8 @@ kernel void muldiv(global float* Y, const uint XY, const uint X, sampler_t sampl
     Y[i.z*XY+i.y*X+i.x] = max(0.f, a + (c ? a * b / c : 0));
 }
 
-kernel void ln(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Product: y = log a [SARTL]
+kernel void negln(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Product: y = log a [SART, CG]
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = a>0 ? log(a) : -1024; //INFINITY;
-}
-
-kernel void _exp(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Product: y = exp a [SARTL]
-    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
-    float a = read_imagef(A, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = exp(a);
+    Y[i.z*XY+i.y*X+i.x] = -log(a);
 }

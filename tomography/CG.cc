@@ -2,7 +2,7 @@
 #include "operators.h"
 #include "time.h"
 
-CG::CG(int3 size, const ImageArray& b) : Reconstruction(size, b, "CG"_), At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; })), p(size), r(size), Ap(b.size), AtAp(size) {
+CG::CG(int3 size, const ImageArray& b) : Reconstruction(size, negln(b), "CG"_), At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; })), p(size), r(size), Ap(b.size), AtAp(size) {
      /// Computes residual r=p=Atb
     backproject(r, At, b); // p = At b (x=0)
     residualEnergy = SSQ(r);

@@ -14,7 +14,7 @@ MLTR::MLTR(int3 size, const ImageArray& b, const uint subsetSize) : SubsetRecons
 
 void MLTR::step() {
     time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
-    time += diffexp(r, Ax, subsets[subsetIndex].b); // r = exp(-Ax) - exp(-b) FIXME: precompute exp(-b)
+    time += diffexp(r, Ax, subsets[subsetIndex].b); // r = exp(-Ax) - b
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r
     const ImageArray& w = r; // Reuse for normalization
     time += mulexp(w, Ai[subsetIndex], Ax); // w = Ai exp(-Ax) FIXME: compute exp(-Ax) once
