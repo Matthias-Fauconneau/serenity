@@ -60,7 +60,7 @@ tomography/project.h
 tomography/reconstruction.h
 tomography/sum.cl
 tomography/operators.h
-tomography/compute.cc
+tomography/tomography.cc
 tomography/view.cc
 tomography/view.h
 tomography/volume.h

@@ -159,7 +159,7 @@ buffer<byte> filter(const Image& image) {
 }
 
 buffer<byte> encodePNG(const Image& image) {
-    array<byte> file = String("\x89PNG\r\n\x1A\n"_);
+    array<byte> file; file<<"\x89PNG\r\n\x1A\n"_;
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr { bswap(image.width), bswap(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"_+raw(ihdr);
     file<< raw(bswap(uint32(IHDR.size-4))) << IHDR << raw(bswap(crc32(IHDR)));

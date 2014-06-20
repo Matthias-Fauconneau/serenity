@@ -1,7 +1,4 @@
 #include "SART.h"
-#include "MART.h"
-#include "MLEM.h"
-#include "CG.h"
 #include "MLTR.h"
 #include "PMLTR.h"
 
@@ -15,13 +12,14 @@
 #include "png.h"
 
 /// Projects with Poisson noise
-ImageArray project(const Projection& A, const CLVolume& x, const int oversample) {
+ImageArray project(Projection A, const CLVolume& x, const int oversample) {
     VolumeF Ax(A.projectionSize);
+    A.volumeSize *= oversample;
+    A.projectionSize *= oversample;
     for(uint index: range(Ax.size.z)) {
-        log(index);
         ImageF slice = ::slice(Ax, index);
         if(oversample==2) {
-            ImageF fullSize(oversample*A.projectionSize.xy());
+            ImageF fullSize(A.projectionSize.xy());
             ::project(fullSize, A, x, index);
             downsample(slice, fullSize); //TODO: CL downsample
         } else if(oversample==1) {
@@ -39,15 +37,15 @@ struct Application : Poll {
     const uint N = arguments() ? fromInteger(arguments()[0]) : 64;
     int3 volumeSize = N;
     const CLVolume referenceVolume {volumeSize, Map(strx(volumeSize)+".ref"_, folder)};
-    const int oversample = 1; // 2: oversample
+    const int oversample = 2; // 2: oversample
     const CLVolume acquisitionVolume {oversample*volumeSize, Map(strx(oversample*volumeSize)+".ref"_, folder)};
-    //int3 evaluationOrigin =  int3(0,0,volumeSize.z/4), evaluationSize = int3(volumeSize.xy(), volumeSize.z/2);
-    int3 evaluationOrigin =  int3(0,0,0), evaluationSize = volumeSize;
+    int3 evaluationOrigin =  int3(0,0,volumeSize.z/4), evaluationSize = int3(volumeSize.xy(), volumeSize.z/2);
+    //int3 evaluationOrigin =  int3(0,0,0), evaluationSize = volumeSize;
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
     // Projection
     const int3 projectionSize = N;
     Projection projections[1] = {Projection(volumeSize, projectionSize, /*doubleHelix*/true, /*pitch*/2)};
-    buffer<ImageArray> projectionData = apply(ref<Projection>(projections), [this](Projection p) {p.volumeSize = acquisitionVolume.size; return project(p, acquisitionVolume, oversample);});
+    buffer<ImageArray> projectionData = apply(ref<Projection>(projections), [this](const Projection& A) { return project(A, acquisitionVolume, oversample);});
 
     const uint subsetSize = round(sqrt(float(projectionSize.z)));
     unique<Reconstruction> reconstructions[3] {unique<SART>(projections[0], projectionData[0], subsetSize), unique<MLTR>(projections[0], projectionData[0], subsetSize), unique<PMLTR>(projections[0], projectionData[0], subsetSize)};
