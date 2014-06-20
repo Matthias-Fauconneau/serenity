@@ -22,38 +22,48 @@ VolumeF porousRock(int3 size) {
         }
     }
 
-    const float rate = 1./400; // 1/vx
-    buffer<vec4> centers (2*rate*size.z*size.y*size.x, 0); // 2 * Expected grain count (to avoid reallocation)
-    Random random; // Unseeded sequence (for repeatability)
-    while(centers.size < centers.capacity) {
-        const float maximumRadius = 8; // vx
-        const float radius = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
-        const vec2 p = vec2(random(), random()) * vec2(size.xy());
-        if(sq(p-vec2(volumeRadius)) > sq(innerRadius-radius)) continue;
-        centers << vec4(p, radius+random()*(size.z-2*radius), radius);
-    }
-
-    {Time time;
     const struct GrainType { const float probability; /*relative concentration*/ const float density; } types[] = {/*Rutile*/{0.7, 4.20}, /*Siderite*/{0.2, 3.96}, /*NaMontmorillonite*/{0.1, 2.65}};
     assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
-    uint begin = 0;
+    const float rate = 1./400; // 1/vx
+    const uint grainCount = rate*size.z*size.y*size.x;
+    Random random; // Unseeded sequence (for repeatability)
+    Time time;
     for(GrainType type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
-        uint end = begin + type.probability * centers.size;
-        assert_(end <= centers.size);
-        for(vec4 p : centers(begin, end)) {
-            assert_(p.xyz()-vec3(p.w) >= vec3(0) && p.xyz()+vec3(p.w) < vec3(size), p);
+        float* volumeData = volume.data;
+        const uint XY = size.x*size.x;
+        const uint X = size.x;
+        for(uint count=0; count < type.probability * grainCount;) {
+            const float maximumRadius = 8; // vx
+            const float r = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
+            const vec2 xy = vec2(random(), random()) * vec2(size.xy());
+            if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
+            count++;
+            float cx = xy.x, cy=xy.y, cz=r+random()*((size.z-1)-2*r);
+            float r2 = r*r;
+            float v = type.density;
             // Rasterizes grains as spheres
-            for(int z: range(max(0, int(floor(p.z-p.w))), min(size.z, int(ceil(p.z+p.w))))) { // Grains may be cut by cylinder caps
-                for(int y: range(floor(p.y-p.w), ceil(p.y+p.w))) {
-                    for(int x: range(floor(p.x-p.w), ceil(p.x+p.w))) {
-                        if(sq(vec3(x,y,z)-p.xyz()) < sq(p.w)) volume(x,y,z) = type.density; // TODO: Correct coverage (antialiasing)
+            int iz = cz-r, iy = cy-r, ix = cx-r;
+            float fz = cz-iz, fy=cy-iy, fx=cx-ix;
+            uint grainSize = ceil(2*r);
+            float* volume0 = volumeData + iz*XY + iy*X + ix;
+            for(uint z=0; z<grainSize; z++) { // Grains may be cut by cylinder caps
+                float* volumeZ = volume0 + z*XY;
+                float rz = float(z) - fz;
+                float RZ = rz*rz;
+                for(uint y=0; y<grainSize; y++) {
+                    float* volumeZY = volumeZ + y*X;
+                    float ry = float(y) - fy;
+                    float RZY = RZ + ry*ry;
+                    for(uint x=0; x<grainSize; x++) {
+                        float rx = float(x) - fx;
+                        float RZYX = RZY + rx*rx;
+                        if(RZYX < r2) volumeZY[x] = v; // TODO: Correct coverage (antialiasing)
                     }
                 }
             }
         }
-        begin = end;
     }
-    log("Rasterization",time);}
+    log(time);
     return volume;
 }
 
