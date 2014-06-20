@@ -3,7 +3,7 @@
 #include "time.h"
 
 // Simultaneous iterative algebraic reconstruction technique
-MLEM::MLEM(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, b, subsetSize, "MLEM"_), Ati(subsets.size), Ax(subsets[0].b.size), Atr(size) {
+MLEM::MLEM(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, negln(b), subsetSize, "MLEM"_), Ati(subsets.size), Ax(subsets[0].b.size), Atr(size) {
     ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];

@@ -20,12 +20,13 @@ kernel void divdiff(global float* Y, const uint XY, const uint X, sampler_t samp
     Y[i.z*XY+i.y*X+i.x] = c ? ( a - b ) / c : 0;
 }
 
-kernel void divdiv(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Division of division: y = c ? ( b ? a / b : 0 ) / c : 0 [MLEM]
+kernel void divmul(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, read_only image3d_t B, read_only image3d_t C) { // Division of division: y = b*c ? a / (b*c) : d [MLEM]
     int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
     float a = read_imagef(A, sampler, i).x;
     float b = read_imagef(B, sampler, i).x;
     float c = read_imagef(C, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = c ? ( b ? a / b : 0 ) / c : 0;
+    float d = b * c;
+    Y[i.z*XY+i.y*X+i.x] = d ? a / d : 0;
 }
 
 kernel void maxadd(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A, const float alpha, read_only image3d_t B) { // Maximum of zero and addition: y = max(0, a + α b) [SART, CG]

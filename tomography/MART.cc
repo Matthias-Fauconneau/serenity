@@ -3,7 +3,7 @@
 #include "time.h"
 
 // Simultaneous iterative algebraic reconstruction technique
-MART::MART(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, b, subsetSize, "MART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(size) {
+MART::MART(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, negln(b), subsetSize, "MART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(size) {
     AAti = buffer<ImageArray>(subsets.size);
     ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
@@ -22,7 +22,7 @@ void MART::step() {
     time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     const ImageArray& r = Ax; // In-place: residual
 
-    time += divdiv(r, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // r = ( b / Ax ) / A At i
+    time += divmul(r, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // r = b / (Ax . A At i)
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r
     time += mul(x, x, Atr); // x := x * Atr
 
