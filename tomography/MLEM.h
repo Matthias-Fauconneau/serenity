@@ -7,6 +7,6 @@ struct MLEM : SubsetReconstruction {
     ImageArray Ax; // At x
     CLVolume Atr; // At r
 
-    MLEM(int3 volumeSize, const ImageArray& b, const uint subsetSize);
+    MLEM(const Projection& projection, const ImageArray& b, const uint subsetSize);
     void step() override;
 };

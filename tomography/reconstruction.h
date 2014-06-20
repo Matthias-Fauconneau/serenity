@@ -2,13 +2,13 @@
 #include "project.h"
 
 struct Reconstruction {
+    Projection A; // Projection operator
     CLVolume x;
-    const uint projectionCount;
     int k = 0;
     uint64 time = 0;
     float SSE = inf;
 
-    Reconstruction(int3 size, const ImageArray& b, string name) : x(cylinder(VolumeF(size, name), 1.f/size.x)), projectionCount(b.size.z) { assert_(size.x==size.y); }
+    Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, name), 1.f/A.volumeSize.x)) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
@@ -24,15 +24,15 @@ struct SubsetReconstruction : Reconstruction {
 
     uint subsetIndex = 0;
 
-    SubsetReconstruction(int3 size, const ImageArray& b, const uint subsetSize, string name) : Reconstruction(size, b, name), subsetSize(subsetSize), subsetCount(projectionCount/subsetSize) { // FIXME
-        assert_(subsetCount*subsetSize == projectionCount);
+    SubsetReconstruction(const Projection& projection, const ImageArray& b, const uint subsetSize, string name) : Reconstruction(projection, name), subsetSize(subsetSize), subsetCount(projection.count/subsetSize) { // FIXME
+        assert_(subsetCount*subsetSize == projection.count);
         subsets = buffer<Subset>(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {
             Subset& subset = subsets[subsetIndex];
             uint startIndex = subsetIndex*subsetSize, endIndex = startIndex+subsetSize;
             CLVolume subsetB = int3(b.size.xy(),subsetSize);
             for(uint index: range(subsetSize)) copy(b, subsetB, int3(0,0,interleave(subsetSize, subsetCount, startIndex+index)), int3(0,0,index), int3(b.size.xy(),1));
-            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return Projection(size, b.size, interleave(subsetSize, subsetCount, index)).worldToView; }), move(subsetB)};
+            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return projection.worldToView(interleave(subsetSize, subsetCount, index)); }), move(subsetB)};
         }
     }
 };

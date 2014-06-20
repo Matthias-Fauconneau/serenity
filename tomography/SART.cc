@@ -3,21 +3,21 @@
 #include "time.h"
 
 // Simultaneous iterative algebraic reconstruction technique
-SART::SART(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, negln(b), subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(size) {
+SART::SART(const Projection& projection, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(projection, negln(b), subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
     ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         const ProjectionArray& At = subset.At;
-        CLVolume Ati (size);
+        CLVolume Ati (x.size);
         backproject(Ati, At, i); // Backprojects identity projections
         const ImageArray& b = subset.b;
         new (&AAti[subsetIndex]) ImageArray(b.size);
-        project(AAti[subsetIndex], Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
+        project(AAti[subsetIndex], A, Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
     }
 }
 
 void SART::step() {
-    time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
+    time += project(Ax, A, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     const ImageArray& r = Ax; // In-place: residual
     time += divdiff(r, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // r = ( b - Ax ) / A At i
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r

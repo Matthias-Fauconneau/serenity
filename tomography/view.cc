@@ -30,21 +30,21 @@ void SliceView::render() {
 Value VolumeView::staticIndex = 0;
 
 bool VolumeView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
-    if(button) { index.value = clip(0, int(cursor.x*(this->size.z-1)/(size.x-1)), int(this->size.z-1)); index.render(); return true; }
+    if(button) { index.value = clip(0, int(cursor.x*(A.count-1)/(size.x-1)), int(A.count-1)); index.render(); return true; }
     return false;
 }
 
-int2 VolumeView::sizeHint() { return upsampleFactor * size.xy(); }
+int2 VolumeView::sizeHint() { return upsampleFactor * A.projectionSize.xy(); }
 
 void VolumeView::render() {
-    ImageF image = ImageF( size.xy() );
-    project(image, volume, size.z, index.value);
+    ImageF image = ImageF(A.projectionSize.xy());
+    project(image, A, x, index.value);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
     float min = ::min(image.data);
-    Text(volume.name+"\n"_+str(min)+"\n"_+str(mean(volume))+"\n"_+str(max),16,green).render(this->target, 0);
+    Text(x.name+"\n"_+str(min)+"\n"_+str(mean(x))+"\n"_+str(max),16,green).render(this->target, 0);
     putImage(target);
 }

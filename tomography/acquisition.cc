@@ -9,7 +9,7 @@ const uint N = fromInteger(arguments()[0]);
 const int3 projectionSize = int3(N);
 const bool oversample = true;
 const int3 volumeSize = int3(oversample ? 2*N : N);
-const float photonCount = 4096; // Photon count per pixel for a blank scan (without attenuation) of same duration
+const float photonCount = 64; // Photon count per pixel for a blank scan (without attenuation) of same duration
 const bool noise = true;
 
 CLVolume x (VolumeF(volumeSize, Map(strx(volumeSize)+".ref"_,"Data"_), "x"_));

@@ -79,3 +79,4 @@ tomography/MLEM.h
 tomography/MLEM.cc
 tomography/MART.cc
 tomography/MART.h
+core/random.h

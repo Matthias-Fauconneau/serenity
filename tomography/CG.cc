@@ -2,9 +2,9 @@
 #include "operators.h"
 #include "time.h"
 
-CG::CG(int3 size, const ImageArray& b) : Reconstruction(size, negln(b), "CG"_), At(apply(b.size.z, [&](uint index){ return Projection(size, b.size, index).worldToView; })), p(size), r(size), Ap(b.size), AtAp(size) {
+CG::CG(const Projection& projection, const ImageArray& b) : Reconstruction(projection, "CG"_), At(apply(b.size.z, [&](uint index){ return projection.worldToView(index); })), p(x.size), r(x.size), Ap(b.size), AtAp(x.size) {
      /// Computes residual r=p=Atb
-    backproject(r, At, b); // p = At b (x=0)
+    backproject(r, At, negln(b)); // p = At b (x=0)
     residualEnergy = SSQ(r);
     assert_(residualEnergy);
     copy(r, p); // r -> p
@@ -12,7 +12,7 @@ CG::CG(int3 size, const ImageArray& b) : Reconstruction(size, negln(b), "CG"_), 
 
 /// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 void CG::step() {
-    time += project(Ap, p); // A p
+    time += project(Ap, A, p); // Ap = A p
     time += backproject(AtAp, At, Ap); // At Ap
     float pAtAp = dotProduct(p, AtAp); // |p·AtAp|
     assert_(pAtAp);

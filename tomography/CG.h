@@ -10,6 +10,6 @@ struct CG : Reconstruction  {
     const ImageArray Ap;
     const CLVolume AtAp;
 
-    CG(int3 volumeSize, const ImageArray& images);
+    CG(const Projection& projection, const ImageArray& b);
     void step() override;
 };

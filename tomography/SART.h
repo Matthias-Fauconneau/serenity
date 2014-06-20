@@ -6,6 +6,6 @@ struct SART : SubsetReconstruction {
     ImageArray Ax; // At x
     CLVolume Atr; // At r
 
-    SART(int3 volumeSize, const ImageArray& b, const uint subsetSize);
+    SART(const Projection& projection, const ImageArray& b, const uint subsetSize);
     void step() override;
 };

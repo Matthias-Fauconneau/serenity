@@ -7,6 +7,6 @@ struct PMLTR : SubsetReconstruction {
     CLVolume Atr; // At r
     CLVolume Atw; // At w
 
-    PMLTR(int3 volumeSize, const ImageArray& b, const uint subsetSize);
+    PMLTR(const Projection& projection, const ImageArray& b, const uint subsetSize);
     void step() override;
 };

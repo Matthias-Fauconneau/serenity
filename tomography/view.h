@@ -31,14 +31,14 @@ struct SliceView : Widget {
 };
 
 struct VolumeView : Widget {
-    const CLVolume& volume;
-    const int3 size;
+    const CLVolume& x;
+    const Projection A;
     const int upsampleFactor;
     Value& index;
 
     static Value staticIndex;
-    VolumeView(const CLVolume* volume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : volume(*volume), size(projectionSize), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
-    VolumeView(const CLVolume& clVolume, const int3 projectionSize, const int upsampleFactor, Value& index=staticIndex) : VolumeView(&clVolume, projectionSize, upsampleFactor, index) {}
+    VolumeView(const CLVolume* x, const Projection& A, const int upsampleFactor, Value& index=staticIndex) : x(*x), A(A), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    VolumeView(const CLVolume& x, const Projection& A, const int upsampleFactor, Value& index=staticIndex) : VolumeView(&x, A, upsampleFactor, index) {}
 
     default_move(VolumeView);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;

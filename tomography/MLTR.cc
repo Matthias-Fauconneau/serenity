@@ -2,18 +2,18 @@
 #include "operators.h"
 #include "time.h"
 
-MLTR::MLTR(int3 size, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(size, b, subsetSize, "MLTR"_), Ai(subsets.size), Ax(subsets[0].b.size), r(Ax.size), Atr(size), Atw(size) {
-    CLVolume i = cylinder(size);
+MLTR::MLTR(const Projection& projection, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(projection, b, subsetSize, "MLTR"_), Ai(subsets.size), Ax(subsets[0].b.size), r(Ax.size), Atr(x.size), Atw(x.size) {
+    CLVolume i = cylinder(x.size);
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         const ImageArray& b = subset.b;
         new (&Ai[subsetIndex]) ImageArray(b.size);
-        project(Ai[subsetIndex], i, subsetIndex, subsetSize, subsetCount); // Ai = A i
+        project(Ai[subsetIndex], A, i, subsetIndex, subsetSize, subsetCount); // Ai = A i
     }
 }
 
 void MLTR::step() {
-    time += project(Ax, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
+    time += project(Ax, A, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     time += diffexp(r, Ax, subsets[subsetIndex].b); // r = exp(-Ax) - b
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r
     const ImageArray& w = r; // Reuse for normalization
