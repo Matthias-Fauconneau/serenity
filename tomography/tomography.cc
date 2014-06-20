@@ -9,7 +9,6 @@
 #include "layout.h"
 #include "window.h"
 #include "view.h"
-#include "png.h"
 
 /// Projects with Poisson noise
 ImageArray project(Projection A, const CLVolume& x, const int oversample) {
@@ -74,7 +73,6 @@ struct Application : Poll {
         queue(); thread.spawn();
         window.actions[Space] = [this]{ for(Reconstruction& r: reconstructions) { r.divergent=0; if(r.time==uint64(-1)) r.time=r.stopTime; }/*Force diverging iteration*/ if(wait) { wait=false; queue(); } else wait=true; };
         window.actions[RightArrow] = [this]{ for(Reconstruction& r: reconstructions) { r.divergent=0; if(r.time==uint64(-1)) r.time=r.stopTime; } /*Force diverging iteration*/ queue(); };
-        window.actions[PrintScreen] = [this]{ Locker lock(window.renderLock); writeFile("snapshot.png"_,encodePNG(window.target)); };
     }
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));

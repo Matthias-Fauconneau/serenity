@@ -1,5 +1,6 @@
 #include "window.h"
 #include "graphics.h"
+#include "png.h"
 
 static thread_local Window* window; // Current window for Widget event and render methods
 void setWindow(Window* window) { ::window = window; }
@@ -128,6 +129,7 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
     setTitle(title);
     setIcon(icon);
     actions[Escape] = []{ exit(); };
+    actions[PrintScreen] = [this]{ Locker lock(renderLock); writeFile("snapshot.png"_,encodePNG(target)); };
     show();
 }
 Window::~Window() {
