@@ -79,7 +79,7 @@ struct Application : Poll {
     void event() {
         uint index = argmin(mref<unique<Reconstruction>>(reconstructions));
         Reconstruction& r = reconstructions[index];
-        if(r.divergent) return; // All reconstructions stopped converging
+        if(r.divergent || r.k >= 256) return; // All reconstructions stopped converging or first completed 256 steps
         r.step();
         const float SSE = ::SSE(referenceVolume, r.x, evaluationOrigin, evaluationSize);
         const float MSE = SSE / SSQ;

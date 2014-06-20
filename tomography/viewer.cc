@@ -6,9 +6,8 @@
 #include "window.h"
 
 const uint N = fromInteger(arguments()[0]);
-const int3 size = int3(N, N, N);
-VolumeF hostVolume (size, Map(strx(size)+".ref"_, "Data"_));
-CLVolume volume (hostVolume);
+const int3 size = N;
+CLVolume volume (size, Map(strx(size)+".ref"_, "Data"_));
 
 struct App {
     App() {

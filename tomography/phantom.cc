@@ -1,5 +1,5 @@
 #include "phantom.h"
-#include "time.h" // Random
+#include "random.h"
 #include "project.h"
 #include "image.h"
 
@@ -83,7 +83,7 @@ buffer<float> Phantom::volume(int3 size) const {
     for(float v: data) assert_(v>=0);
     return data;
 }
-
+#if 0
 void Phantom::project(const ImageF& target, int3 volumeSize, const Projection& projection) const {
     vec3 scale = 1.f/(vec3(volumeSize-int3(1))/2.f);
     target.data.clear();
@@ -114,3 +114,4 @@ void Phantom::project(const ImageF& target, int3 volumeSize, const Projection& p
         }
     }
 }
+#endif
