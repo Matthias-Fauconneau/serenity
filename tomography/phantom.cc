@@ -48,7 +48,7 @@ Phantom::Phantom(uint count) {
     }
 }
 
-buffer<float> Phantom::volume(int3 size) const {
+VolumeF Phantom::volume(int3 size) const {
     buffer<float> data (size.x*size.y*size.z);
     for(float& v: data) v=0;
     for(Ellipsoid e: ellipsoids) { // Rasterizes ellipsoids
@@ -81,8 +81,9 @@ buffer<float> Phantom::volume(int3 size) const {
         }
     }
     for(float v: data) assert_(v>=0);
-    return data;
+    return VolumeF(size, move(data));
 }
+
 #if 0
 void Phantom::project(const ImageF& target, int3 volumeSize, const Projection& projection) const {
     vec3 scale = 1.f/(vec3(volumeSize-int3(1))/2.f);

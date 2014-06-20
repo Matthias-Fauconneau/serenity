@@ -1,4 +1,5 @@
 #pragma once
+#include "math.h"
 //#include "time.h"
 
 /// Returns a sequence of uniformly distributed pseudo-random 64bit integers or 32bit floats

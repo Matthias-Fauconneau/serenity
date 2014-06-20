@@ -3,7 +3,7 @@
 #include "file.h"
 
 struct VolumeF {
-    VolumeF(int3 size, string name=""_) : size(size), data(size.z*size.y*size.x), name(name) { assert(name.size <= 16); }
+    VolumeF(int3 size, float value=0, string name=""_) : size(size), data(size.z*size.y*size.x, size.z*size.y*size.x, value), name(name) { assert(name.size <= 16); }
     VolumeF(int3 size, buffer<float>&& data, string name=""_) : size(size), data(move(data)), name(name) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
     //VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
     VolumeF(int3 size, Map&& map, string name=""_) : VolumeF(size, buffer<float>((ref<float>)map), name) { this->map = move(map); }
