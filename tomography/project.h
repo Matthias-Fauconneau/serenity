@@ -18,7 +18,7 @@ struct Projection {
     float specimenDistance = 1./16;
     bool doubleHelix;
     float pitch;
-    const float photonCount = 0; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
+    float photonCount = 0; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
 
     Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix = false, const float pitch = 1) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), pitch(pitch) {}
 
@@ -30,11 +30,15 @@ struct Projection {
 
 // -- Projection --
 
-/// Projects \a volume into \a image according to \a projection
-uint64 project(const ImageF& image, const Projection& A, const CLVolume& volume, const uint index);
+/// Projects (\a Ax = \a A \a x) projection index and copy to host memory
+uint64 project(const ImageF& Ax, const Projection& A, const CLVolume& volume, const uint index);
 
-/// Projects (A) \a x to \a Ax
+/// Projects (\a Ax = \a A \a x) projection \a index to slice \a index
+uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint index);
+
+/// Projects (\a Ax = \a A \a x) interleaved projections to contiguous slices
 uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint subsetIndex, uint subsetSize, uint subsetCount);
+/// Projects (\a Ax = \a A \a x) all contiguous projections to contiguous slices
 inline uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x) { return project(Ax, A, x, 0, Ax.size.z, 1); }
 
 // -- Backprojection --

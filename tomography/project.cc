@@ -32,7 +32,7 @@ mat4 Projection::imageToWorld(uint index) const {
 
 CL(project, project)
 
-static uint64 project(const CLBufferF& buffer, const CLVolume& volume, const Projection& projection, const uint index) {
+static uint64 project(const CLBufferF& buffer, const Projection& projection, const CLVolume& volume, const uint index) {
     float3 center = vec3(volume.size-int3(1))/2.f;
     mat4 imageToWorld = projection.imageToWorld(index);
     float3 origin = imageToWorld[3].xyz();
@@ -41,10 +41,18 @@ static uint64 project(const CLBufferF& buffer, const CLVolume& volume, const Pro
     return CL::project(projection.projectionSize.xy(), imageToWorld, float2(1,-1) * (center.z-1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) + 1 /*fix OOB*/, sq(center.x), center.z, float4(origin + center + float3(1./2),0), volume, noneLinearSampler, projection.projectionSize.x, buffer.pointer);
 }
 
+/// Projects (A) \a x to \a Ax
+uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint index) {
+    CLBufferF buffer (Ax.size.y*Ax.size.x);
+    uint64 time = ::project(buffer, A, x, index);
+    copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
+    return time;
+}
+
 /// Projects \a volume onto \a image according to \a projection
 uint64 project(const ImageF& image, const Projection& A, const CLVolume& volume, const uint index) {
     CLBufferF buffer (image.data.size);
-    uint64 time = project(buffer, volume, A, index);
+    uint64 time = project(buffer, A, volume, index);
     buffer.read(image.data);
     return time;
 }
@@ -55,7 +63,7 @@ uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uin
     CLBufferF buffer (Ax.size.y*Ax.size.x);
     uint64 time = 0;
     for(uint index: range(subsetSize)) { //FIXME: Queue all projections at once ?
-        time += ::project(buffer, x, A, interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index));
+        time += ::project(buffer, A, x, interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index));
         copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     }
     return time;

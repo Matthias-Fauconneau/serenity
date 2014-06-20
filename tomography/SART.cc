@@ -3,7 +3,7 @@
 #include "time.h"
 
 // Simultaneous iterative algebraic reconstruction technique
-SART::SART(const Projection& projection, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(projection, negln(b), subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
+SART::SART(const Projection& A, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(A, negln(b), subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
     ImageArray i (Ax.size, 1.f);
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
