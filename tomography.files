@@ -74,8 +74,4 @@ tomography/MLTR.h
 tomography/MLTR.cc
 tomography/PMLTR.h
 tomography/PMLTR.cc
-tomography/MLEM.h
-tomography/MLEM.cc
-tomography/MART.cc
-tomography/MART.h
 core/random.h
