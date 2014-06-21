@@ -34,7 +34,7 @@ struct HWParams {
     Mask& mask(int i) { assert(i<3); return masks[i]; }
 };
 struct SWParams {
- int tstamp_mode=0;
+ int tstamp_mode=1;
  uint period_step=1, sleep_min=0;
  long avail_min=0, xfer_align=0, start_threshold=0, stop_threshold=0, silence_threshold=0, silence_size=0, boundary=0;
  byte reserved[64];
@@ -69,7 +69,7 @@ Device getPlaybackDevice() {
 
 AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 
-void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
+uint64 AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
     if(!Device::fd) Device::fd = move(getPlaybackDevice().fd);
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
@@ -122,7 +122,14 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
     if(status->state < Prepared) io<PREPARE>();
+    extern int64 realTime();
+    //uint64 before = realTime();
     event();
+    //uint64 start = uint64(status->sec) * 1000000000ull + uint64(status->nsec);
+    //uint64 after = realTime();
+    //assert_(before <= start && start <= after, before, start, after, status->state, status->hwPointer, status->sec, status->nsec);
+    //return start;
+    return realTime();
 }
 
 void AudioOutput::stop() {

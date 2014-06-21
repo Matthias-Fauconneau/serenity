@@ -572,7 +572,7 @@ void Window::keyPress(Key key, Modifiers modifiers) {
         function<void()>* action = actions.find(key);
         function<void()>* longAction = longActions.find(key);
         if(longAction) { // Schedules long action
-            longActionTimers.insert(key, unique<Timer>(1000, [this,key,longAction]{longActionTimers.remove(key); (*longAction)();}));
+            longActionTimers.insert(key, unique<Timer>(1, [this,key,longAction]{longActionTimers.remove(key); (*longAction)();}));
         }
         else if(action) (*action)(); // Local window action
     }

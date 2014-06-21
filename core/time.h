@@ -5,6 +5,9 @@
 #include "function.h"
 #include "string.h"
 
+/// A second in nanoseconds
+const uint64 second = 1000000000ull;
+
 /// Returns Unix real-time in seconds
 long currentTime();
 /// Returns Unix real-time in nanoseconds
@@ -67,10 +70,9 @@ Date parseDate(TextData& s);
 inline Date parseDate(const string& s) { TextData t(s); return parseDate(t); }
 
 struct Timer : Poll {
-    Timer(long msec=0, function<void()> timeout={}, Thread& thread=mainThread);
+    Timer(long sec=0, function<void()> timeout={}, Thread& thread=mainThread);
     virtual ~Timer();
-    void setAbsolute(long sec, long nsec=0);
-    void setRelative(long msec);
+    void setAbsolute(uint64 nsec);
     const function<void()> timeout;
     virtual void event() { timeout(); }
 };

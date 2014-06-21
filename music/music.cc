@@ -6,7 +6,7 @@
 #include "window.h"
 #include "audio.h"
 
-struct Music {
+struct Music : Timer {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
     Sheet sheet {xml.signs, xml.divisions};
@@ -28,9 +28,19 @@ struct Music {
 
     // Preview
     bool preview = true;
+    Timer timer;
     Window window {&sheet, encoder.size()/(preview?1:1), "MusicXML"_};
     AudioOutput audio {{this,&Music::read}};
+    uint64 audioStartTime;
     uint64 audioTime = 0, videoTime = 0;
+
+    Music() {
+        expect();
+        midi.noteEvent.connect(this, &Music::noteEvent);
+        window.background = Window::White;
+        if(preview) { step(); window.show(); audioStartTime = audio.start(mp3.rate, 8192/*mp3.rate/encoder.fps*/); setAbsolute(audioStartTime+second/encoder.fps); }
+        else while(step()) {};
+    }
 
     void expect() {
         while(!expected && chordIndex<sheet.notes.size()-1) {
@@ -46,47 +56,32 @@ struct Music {
         }
     }
 
-    Music() {
+    void noteEvent(const uint key, const uint vel){
+        assert_(key);
+        if(vel && expected.contains(key)) { active.insertMulti(key,expected.at(key)); expected.remove(key); }
+        else if(!vel && active.contains(key)) while(active.contains(key)) active.remove(key);
+        else return; // No changes
         expect();
-        midi.noteEvent.connect([this](const uint key, const uint vel){
-            if(vel) {
-                if(expected.contains(key)) {
-                    active.insertMulti(key,expected.at(key));
-                    expected.remove(key);
-                }
-                //else if(!showExpected) { errors++; if(errors>1) showExpected = true; } // Shows expected notes on errors (allows one error before showing)
-                else return; // No changes
-            } else if(key) {
-                if(active.contains(key)) while(active.contains(key)) active.remove(key);
-                else return; // No changes
-            }
-            expect();
-            sheet.colors.clear();
-            for(uint index: active.values) sheet.colors.insert(index, red);
-            if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
-            contentChanged = true;
-        });
-
-        window.background = Window::White;
-        if(preview) { window.show(); audio.start(mp3.rate, mp3.rate/encoder.fps); }
-        else while(step()) {};
+        sheet.colors.clear();
+        for(uint index: active.values) sheet.colors.insert(index, red);
+        if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
+        contentChanged = true;
     }
 
     uint read(const mref<short2>& output) {
-        assert(preview);
-        assert(audio.rate == mp3.rate);
         size_t readSize = mp3.read(output);
-        assert(readSize <= output.size);
-
-        if(audioTime*encoder.fps > videoTime*mp3.rate) step(); // FIXME: Previews jitters with period size granularity
-
         audioTime += readSize;
         return readSize;
     }
 
+    void event() override {
+        step();
+        setAbsolute(audioStartTime+videoTime*second/encoder.fps);
+    }
+
     bool step() {
         if(midi.time > midi.duration) return false;
-        midi.read(encoder.videoTime*encoder.rate/encoder.fps);
+        midi.read(videoTime*mp3.rate/encoder.fps);
         // Smooth scroll animation (assumes constant time step)
         const float k=1./60, b=1./60; // Stiffness and damping constants
         speed = b*speed + k*(target-position); // Euler integration of speed from forces of spring equation
