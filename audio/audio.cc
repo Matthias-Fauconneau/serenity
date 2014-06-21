@@ -105,6 +105,7 @@ uint64 AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
         iowr<HW_PARAMS>(hparams);
         this->sampleBits = hparams.interval(SampleBits);
         this->rate = hparams.interval(Rate);
+        log(rate);
         this->periodSize = hparams.interval(PeriodSize);
         bufferSize = hparams.interval(Periods) * this->periodSize;
         buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);

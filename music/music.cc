@@ -35,14 +35,11 @@ struct Music : Timer {
     uint64 audioTime = 0, videoTime = 0;
 
     Music() {
-        log(midi.duration/48000., mp3.duration/48000.);
-        log(midi.ticksPerBeat, uint64(mp3.duration) * uint64(midi.ticksPerBeat) / uint64(midi.duration));
         midi.ticksPerBeat = uint64(mp3.duration) * uint64(midi.ticksPerBeat) / uint64(midi.duration); //FIXME
-        log(midi.ticksPerBeat);
         expect();
         midi.noteEvent.connect(this, &Music::noteEvent);
         window.background = Window::White;
-        if(preview) { nextStepTimestamp=realTime(); step(); window.show(); audioStartTime = audio.start(mp3.rate, 8192); setAbsolute(audioStartTime+second/encoder.fps); }
+        if(preview) { step(); window.show(); audioStartTime = audio.start(mp3.rate, 1024); setAbsolute(audioStartTime+1*second/encoder.fps); }
         else while(step()) {};
     }
 
@@ -75,21 +72,12 @@ struct Music : Timer {
         return readSize;
     }
 
-    int64 nextStepTimestamp = 0;
     void event() override {
-        assert_(realTime() > nextStepTimestamp);
         step();
-        while(window.lastCompletion < nextStepTimestamp) window.Poll::poll();
-        int64 displayDelay = second; //window.lastCompletion-nextStepTimestamp;
-        int64 videoTime = this->videoTime*second/encoder.fps;
-        nextStepTimestamp = audioStartTime+videoTime-displayDelay;
-        //int64 now = realTime();
-        //assert_(nextStepTimestamp > now, int64(nextStepTimestamp-now)*1000/second, displayDelay*1000/second);
-        setAbsolute(nextStepTimestamp);
+        setAbsolute(audioStartTime+videoTime*second/encoder.fps);
     }
 
     bool step() {
-        assert_(audioTime < videoTime*mp3.rate/encoder.fps);
         if(midi.time > midi.duration) return false;
         midi.read(videoTime*mp3.rate/encoder.fps);
         // Smooth scroll animation (assumes constant time step)
@@ -105,6 +93,7 @@ struct Music : Timer {
         } else window.lastCompletion=realTime();
         if(encode) encoder.writeVideoFrame(image);
         videoTime++;
+        assert_(audioTime-audio.periodSize <= videoTime*mp3.rate/encoder.fps, audioTime, videoTime*mp3.rate/encoder.fps);
         return true;
     }
 } app;
