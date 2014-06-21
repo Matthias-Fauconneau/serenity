@@ -98,6 +98,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
     setTitle(title);
     setIcon(icon);
+    actions[Escape] = []{exit();};
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}

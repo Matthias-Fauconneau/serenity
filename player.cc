@@ -84,9 +84,8 @@ struct Player {
         for(mref<short2> chunk=output;;) {
             if(!file) break;
             assert(readSize<output.size);
-            size_t read = 0;
             if(audio.rate != file->rate) audio.start(file->rate, periodSize);
-            read = file->read(chunk);
+            size_t read = read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
             if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk

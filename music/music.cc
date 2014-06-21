@@ -1,26 +1,36 @@
 #include "MusicXML.h"
 #include "midi.h"
 #include "sheet.h"
+#include "ffmpeg.h"
 #include "encoder.h"
 #include "window.h"
+#include "audio.h"
 
-struct Music : Poll {
+struct Music {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
-    MidiFile midi = readFile(name+".mid"_);
     Sheet sheet {xml.signs, xml.divisions};
+    MidiFile midi = readFile(name+".mid"_);
     buffer<uint> midiToBlit = sheet.synchronize(apply(midi.notes,[](MidiNote o){return o.key;}));
-    Encoder encoder {name /*, {&audioFile, &AudioFile::read}*/}; //TODO: remux without reencoding
-    bool preview = true;
-    Time time;
-    Window window {&sheet, encoder.size()/(preview?1:1), "MusicXML"_};
-    Image image;
-    bool contentChanged = true;
+    AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
 
+    // Highlighting
     map<uint,uint> active; // Maps active keys to notes (indices)
     map<uint,uint> expected; // Maps expected keys to notes (indices)
     uint chordIndex = 0;
     float target=0, speed=0, position=0; // X target/speed/position of sheet view
+
+    // Encoding
+    Image image;
+    bool contentChanged = true;
+    bool encode = false;
+    Encoder encoder {name /*, {&audioFile, &AudioFile::read}*/}; //TODO: remux without reencoding
+
+    // Preview
+    bool preview = true;
+    Window window {&sheet, encoder.size()/(preview?1:1), "MusicXML"_};
+    AudioOutput audio {{this,&Music::read}};
+    uint64 audioTime = 0, videoTime = 0;
 
     void expect() {
         while(!expected && chordIndex<sheet.notes.size()-1) {
@@ -58,15 +68,24 @@ struct Music : Poll {
         });
 
         window.background = Window::White;
-        window.actions[Escape] = []{exit();};
-        window.show();
-
-        queue();
+        if(preview) { window.show(); audio.start(mp3.rate, mp3.rate/encoder.fps); }
+        else while(step()) {};
     }
-    uint64 frame = 0;
-    void event() override {
-        if(midi.time > midi.duration) return;
-        if(preview && time*48 < encoder.videoTime*encoder.rate/encoder.fps) { queue(); /*FIXME: busy waiting*/ return; }
+
+    uint read(const mref<short2>& output) {
+        assert(preview);
+        assert(audio.rate == mp3.rate);
+        size_t readSize = mp3.read(output);
+        assert(readSize <= output.size);
+
+        if(audioTime*encoder.fps > videoTime*mp3.rate) step(); // FIXME: Previews jitters with period size granularity
+
+        audioTime += readSize;
+        return readSize;
+    }
+
+    bool step() {
+        if(midi.time > midi.duration) return false;
         midi.read(encoder.videoTime*encoder.rate/encoder.fps);
         // Smooth scroll animation (assumes constant time step)
         const float k=1./60, b=1./60; // Stiffness and damping constants
@@ -79,8 +98,9 @@ struct Music : Poll {
             assert_(image);
             contentChanged=false;
         }
-        if(preview) encoder.videoTime++; else encoder.writeVideoFrame(image);
-        queue();
+        if(encode) encoder.writeVideoFrame(image);
+        videoTime++;
+        return true;
     }
 } app;
 
