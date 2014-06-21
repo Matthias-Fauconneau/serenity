@@ -2,11 +2,11 @@
 #include "file.h"
 #include "math.h"
 
-MidiFile::MidiFile(const ref<byte>& data) { /// parse MIDI header
+MidiFile::MidiFile(const ref<byte>& data, uint userTicksPerSeconds) : userTicksPerSeconds(userTicksPerSeconds) { /// parse MIDI header
     clear();
     BinaryData s(data,true);
     s.advance(10);
-    uint16 nofChunks = s.read(); ticksPerBeat = s.read();
+    uint16 nofChunks = s.read(); ticksPerSeconds = 2*(uint16)s.read(); // Ticks per second (*2 as actually defined for MIDI as ticks per beat at 120bpm)
     for(int i=0; s && i<nofChunks;i++) {
         ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
@@ -23,7 +23,7 @@ MidiFile::MidiFile(const ref<byte>& data) { /// parse MIDI header
         track.startTime = track.time-minTime; // Time of the first event
         track.startIndex = track.data.index; // Index of the first event
         read(track,-1,Sort);
-        duration = max(duration, uint(track.time*uint64(48*60000/120)/ticksPerBeat));
+        duration = max(duration, uint(uint64(track.time)*uint64(userTicksPerSeconds)/uint64(ticksPerSeconds)));
         track.reset();
     }
     seek(0);
@@ -32,7 +32,7 @@ MidiFile::MidiFile(const ref<byte>& data) { /// parse MIDI header
 void MidiFile::read(Track& track, uint time, State state) {
     BinaryData& s = track.data;
     if(!s) { endOfFile(); return; }
-    while(uint(track.time*uint64(48*60000/120)/ticksPerBeat) < time) {
+    while(track.time*userTicksPerSeconds <= time*ticksPerSeconds) {
         uint8 key=s.read();
         if(key & 0x80) { track.type_channel=key; key=s.read(); }
         uint8 type=track.type_channel>>4;
@@ -76,7 +76,7 @@ void MidiFile::read(Track& track, uint time, State state) {
 void MidiFile::seek(uint time) {
     active.clear();
     for(Track& track: tracks) {
-        if(time < track.time*(48*60000/120)/ticksPerBeat) track.reset();
+        if(time*ticksPerSeconds < track.time*userTicksPerSeconds) track.reset();
         read(track,time,Seek);
     }
     this->time=time;

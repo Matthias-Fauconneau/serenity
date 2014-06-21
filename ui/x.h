@@ -17,13 +17,16 @@ union XEvent {
     struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } packed property;
     struct { byte pad; uint16 seq; uint time, requestor,selection,target,property; } packed selection;
     struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
+    struct { uint8 ext; uint16 seq; uint size; uint16 type; } packed xge;
     byte pad[31];
 } fixed(XEvent);
 struct XError { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(XError);
 
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4, WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, CursorMask=1<<14 };
 enum EventMask { KeyPressMask=1<<0, KeyReleaseMask=1<<1, ButtonPressMask=1<<2, ButtonReleaseMask=1<<3, EnterWindowMask=1<<4, LeaveWindowMask=1<<5, PointerMotionMask=1<<6, ExposureMask=1<<15, StructureNotifyMask=1<<17, SubstructureNotifyMask=1<<19, SubstructureRedirectMask=1<<20, FocusChangeMask=1<<21, PropertyChangeMask=1<<22 };
-enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify };
+enum { KeyPress=2, KeyRelease, ButtonPress, ButtonRelease, MotionNotify, EnterNotify, LeaveNotify, FocusIn, FocusOut, KeymapNotify, Expose, GraphicsExpose, NoExpose,
+       VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify, ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest,
+       CirculateNotify, CirculateRequest, PropertyNotify, SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify, XGE };
 enum ModifierMask { ShiftMask=1<<0, LockMask=1<<1, ControlMask=1<<2, Mod1Mask=1<<3, Mod2Mask=1<<4, Mod3Mask=1<<5, Mod4Mask=1<<6, Mod5Mask=1<<7, Button1Mask=1<<8, Button2Mask=1<<9, Button3Mask=1<<10, Button4Mask=1<<11, Button5Mask=1<<12, AnyModifier=1<<15 };
 enum MapState { IsUnmapped, IsUnviewable, IsViewable };
 enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
@@ -130,6 +133,17 @@ struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; u
 constexpr string requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPictIndexValues"_, "QueryFilters"_, "CreatePicture"_, "ChangePicture"_, "SetPictureClipRectangles"_, "SetPictureTransform"_, "SetPictureFilter"_, "FreePicture"_, "Composite"_};
 constexpr string xErrors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
 constexpr int errorCount = sizeof(errors)/sizeof(*xErrors);
+}
+
+namespace Present {
+extern int EXT;
+enum { ConfigureNotifyMask=1<<0, CompleteNotifyMask=1<<1, RedirectNotifyMask=1<<2 };
+struct Pixmap { int8 ext=EXT,req=1; uint16 size=18; uint window, pixmap, serial=0, validArea=0, updateArea=0; int16 xOffset=0, yOffset=0; uint targetCRTC=0;
+                uint waitFence=0, idleFence=0; uint options=0; uint64 targetMSC=0, divisor=0, remainder=0; };
+struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pad; uint64 targetMSC=0, divisor=0, remainder=0; };
+struct SelectInput { int8 ext=EXT,req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
+enum { ConfigureNotify, CompleteNotify, RedirectNotify };
+struct CompleteNotify { uint16 kind; uint event_id; uint window; uint serial; uint64 ust; uint64 msc; } packed;
 }
 
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width

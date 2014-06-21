@@ -16,6 +16,11 @@ struct PollDevice : Device, Poll {
 };
 #endif
 
+// -> graphics
+/// Background style
+enum Background { NoBackground, Black, White, Oxygen };
+void renderBackground(const Image& target, Background background);
+
 /// Interfaces \a widget as a window on an X11 display server
 #if X11
 struct Window : Socket, Poll {
@@ -70,10 +75,8 @@ struct Window : Device {
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
-    enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
+    Background background = Oxygen;
 
-    /// Renders window background to \a target
-    void renderBackground(Image& target);
     /// Gets current text selection
     /// \note The selection owner might lock this process if it fails to notify
     String getSelection(bool clipboard=false);
@@ -134,9 +137,6 @@ struct Window : Device {
     /// If set, this window will always be anchored to this position
     Anchor anchor = Float;
 
-    /// Signals sent frames
-    function<void()> frameSent;
-
     /// Root window
     uint root = 0;
     /// Root visual
@@ -150,13 +150,15 @@ struct Window : Device {
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment };
+    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment, PresentEvent };
 
     /// System V shared memory
     int shm = 0;
     /// Shared window buffer state
-    enum { Idle, Server, Wait } state = Idle;
-    int64 lastCompletion = 0;
+    enum State { Idle, Server, Wait, WaitPresent } state = Idle;
+    /// Present state
+    State presentState = Idle;
+    void present();
 
     /// bgra32 XRender PictFormat (for Cursor)
     uint format=0;

@@ -90,8 +90,6 @@ struct Poll : pollfd {
     void queue();
     /// Callback on new poll events (or when thread is idle when triggered by \a queue)
     virtual void event() =0;
-    /// Waits for an event
-    void poll();
 };
 //inline bool operator==(const Poll* a, const Poll& b) { return a->fd==b.fd; }
 

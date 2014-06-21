@@ -20,6 +20,7 @@ void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
+namespace Present { int EXT, event, errorBase; }
 
 Window::Window(Widget* widget, int2 size, const string& unused title, const Image& unused icon) :
     Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN), widget(widget) {
@@ -99,6 +100,14 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     setTitle(title);
     setIcon(icon);
     actions[Escape] = []{exit();};
+
+
+    {QueryExtensionReply r=readReply<QueryExtensionReply>((
+        {QueryExtension r; r.length="Present"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"Present"_+pad(4,r.length));}));
+        Present::EXT=r.major; Present::event=r.firstEvent; Present::errorBase=r.firstError;}
+    {Present::SelectInput r; r.window=id+XWindow; r.eid=id+PresentEvent; send(raw(r));}
+    //{Present::NotifyMSC r; r.window=id+XWindow; send(raw(r));}
+    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
@@ -109,7 +118,7 @@ Window::~Window() {
 void Window::event() {
     if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
         lock.lock();
-        if(!Stream::poll()) { lock.unlock(); break; }
+        if(!poll()) { lock.unlock(); break; }
         uint8 type = read<uint8>();
         XEvent e = read<XEvent>();
         lock.unlock();
@@ -117,10 +126,9 @@ void Window::event() {
     }
     while(semaphore.tryAcquire(1)) { lock.lock(); QEvent e = eventQueue.take(0); lock.unlock(); processEvent(e.type, e.event); }
     if(needUpdate) {
+        if(state!=Idle) { if(state==Server) state=Wait; return; }
         needUpdate = false;
         assert(size);
-
-        if(state!=Idle) { state=Wait; return; }
         if(target.size() != size) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
@@ -131,24 +139,32 @@ void Window::event() {
             shm = check( shmget(0, target.height*target.stride*sizeof(byte4) , IPC_CREAT | 0777) );
             target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
+            {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=size.x, r.h=size.y; send(raw(r));}
         }
 
-        renderBackground(target);
+        renderBackground(target, background);
         widget->render(target);
 
         putImage(0, size);
-        state=Server;
-        if(frameSent) frameSent();
+        present();
     }
 }
 
 void Window::putImage(int2 position, int2 size) {
-    assert_(state != Server);
-    Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
+    assert_(state == Idle);
+    Shm::PutImage r; r.window=id+Pixmap/*XWindow*/; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
     r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
     r.dstX = position.x, r.dstY = position.y;
     send(raw(r));
+    state=Server;
+}
+
+void Window::present() {
+    if(presentState==Server) { presentState=Wait; return; }
+    assert_(presentState == Idle);
+    {Present::Pixmap r; assert_(sizeof(r)==r.size*4, sizeof(r)); r.window=id+XWindow; r.pixmap=id+Pixmap; send(raw(r));}
+    presentState = Server;
 }
 
 // Events
@@ -216,7 +232,27 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
             else exit(0); // Exits application by default
         }
-        else if(type==Shm::event+Shm::Completion) { lastCompletion=realTime(); if(state==Wait) render(); state=Idle; }
+        else if(type==Shm::event+Shm::Completion) {
+            assert_(state==Server || state==Wait);
+            if(state==Wait && presentState==Wait) state=WaitPresent;
+            else {
+                State was = state;
+                state = Idle;
+                if(was==Wait) { assert_(needUpdate); if(mapped) queue(); }
+            }
+        }
+        else if(type==XGE) {
+            byte event[sizeof(e)+e.xge.size*4];
+            copy(mref<byte>(event,sizeof(e)), raw(e));
+            read(event+sizeof(e), e.xge.size*4);
+            if(e.xge.ext == Present::EXT && e.xge.type==Present::CompleteNotify) {
+                assert_(presentState==Server || presentState==Wait);
+                State was = presentState;
+                presentState = Idle;
+                if(was==Wait) present();
+                if(state==WaitPresent) { state=Idle; assert_(needUpdate); if(mapped) queue(); }
+            }
+        }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
         window=0;
@@ -528,7 +564,8 @@ void Window::setDisplay(bool displayState) {
 
 #endif
 
-void Window::renderBackground(Image& target) {
+void renderBackground(const Image& target, Background background) {
+    int2 size = target.size();
     if(background==Oxygen) { // Oxygen-like radial gradient background
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
         const vec3 radial = vec3(246./255); // linear

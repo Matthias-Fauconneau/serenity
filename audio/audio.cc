@@ -69,7 +69,7 @@ Device getPlaybackDevice() {
 
 AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 
-uint64 AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
+void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
     if(!Device::fd) Device::fd = move(getPlaybackDevice().fd);
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
@@ -105,7 +105,6 @@ uint64 AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
         iowr<HW_PARAMS>(hparams);
         this->sampleBits = hparams.interval(SampleBits);
         this->rate = hparams.interval(Rate);
-        log(rate);
         this->periodSize = hparams.interval(PeriodSize);
         bufferSize = hparams.interval(Periods) * this->periodSize;
         buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
@@ -123,10 +122,7 @@ uint64 AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
     syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
     if(status->state < Prepared) io<PREPARE>();
-    extern int64 realTime();
-    uint64 startTime = realTime(); //FIXME: inexact
     event();
-    return startTime;
 }
 
 void AudioOutput::stop() {

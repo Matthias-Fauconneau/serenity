@@ -5,9 +5,9 @@
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
     /// Starts a new file recording video (and audio if enabled)
-    Encoder(const string& name, bool audio=false, int width=1280, int height=720, int fps=30, int rate=48000);
+    Encoder(const string& name, bool audio=false, int width=1280, int height=720, int fps=60, int rate=48000);
     Encoder(const string& name, function<uint(const mref<float2>& output)> readAudio,
-            int width=1280, int height=720, int fps=30, int rate=48000) : Encoder(name, true, width, height, fps, rate) {
+            int width=1280, int height=720, int fps=60, int rate=48000) : Encoder(name, true, width, height, fps, rate) {
         this->readAudio = readAudio;
     }
 

@@ -82,3 +82,4 @@ music/music.cc
 music/sheet.h
 music/encoder.cc
 music/encoder.h
+test.cc
