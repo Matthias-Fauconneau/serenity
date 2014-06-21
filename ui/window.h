@@ -156,6 +156,7 @@ struct Window : Device {
     int shm = 0;
     /// Shared window buffer state
     enum { Idle, Server, Wait } state = Idle;
+    int64 lastCompletion = 0;
 
     /// bgra32 XRender PictFormat (for Cursor)
     uint format=0;

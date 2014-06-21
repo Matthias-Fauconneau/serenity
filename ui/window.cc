@@ -109,7 +109,7 @@ Window::~Window() {
 void Window::event() {
     if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
         lock.lock();
-        if(!poll()) { lock.unlock(); break; }
+        if(!Stream::poll()) { lock.unlock(); break; }
         uint8 type = read<uint8>();
         XEvent e = read<XEvent>();
         lock.unlock();
@@ -143,6 +143,7 @@ void Window::event() {
 }
 
 void Window::putImage(int2 position, int2 size) {
+    assert_(state != Server);
     Shm::PutImage r; r.window=id+XWindow; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
     r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
@@ -215,7 +216,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
             else exit(0); // Exits application by default
         }
-        else if(type==Shm::event+Shm::Completion) { if(state==Wait) render(); state=Idle; }
+        else if(type==Shm::event+Shm::Completion) { lastCompletion=realTime(); if(state==Wait) render(); state=Idle; }
         else if( type==DestroyNotify || type==MappingNotify) {}
         else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
         window=0;

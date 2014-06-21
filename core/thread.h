@@ -75,6 +75,7 @@ inline String str(const Semaphore& o) { return str(o.counter); }
 
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {
+    enum { IDLE=64 };
     Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
     Thread& thread; /// Thread monitoring this pollfd
     /// Creates an handle to participate in an event loop, use \a registerPoll when ready
@@ -87,9 +88,10 @@ struct Poll : pollfd {
     void unregisterPoll();
     /// Schedules an \a event call from \a thread's next poll iteration
     void queue();
-    /// Callback on new poll events (or when thread is idle when triggered by \a wait)
+    /// Callback on new poll events (or when thread is idle when triggered by \a queue)
     virtual void event() =0;
-    enum { IDLE=64 };
+    /// Waits for an event
+    void poll();
 };
 //inline bool operator==(const Poll* a, const Poll& b) { return a->fd==b.fd; }
 

@@ -35,6 +35,7 @@ void Poll::registerPoll() {
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered<<this;}
 void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}
+void Poll::poll() { assert(fd); assert_(::poll(this,1,-1)==1 && (revents&POLLIN)); event(); }
 
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 

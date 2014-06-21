@@ -123,13 +123,9 @@ uint64 AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
 #endif
     if(status->state < Prepared) io<PREPARE>();
     extern int64 realTime();
-    //uint64 before = realTime();
+    uint64 startTime = realTime(); //FIXME: inexact
     event();
-    //uint64 start = uint64(status->sec) * 1000000000ull + uint64(status->nsec);
-    //uint64 after = realTime();
-    //assert_(before <= start && start <= after, before, start, after, status->state, status->hwPointer, status->sec, status->nsec);
-    //return start;
-    return realTime();
+    return startTime;
 }
 
 void AudioOutput::stop() {

@@ -35,10 +35,14 @@ struct Music : Timer {
     uint64 audioTime = 0, videoTime = 0;
 
     Music() {
+        log(midi.duration/48000., mp3.duration/48000.);
+        log(midi.ticksPerBeat, uint64(mp3.duration) * uint64(midi.ticksPerBeat) / uint64(midi.duration));
+        midi.ticksPerBeat = uint64(mp3.duration) * uint64(midi.ticksPerBeat) / uint64(midi.duration); //FIXME
+        log(midi.ticksPerBeat);
         expect();
         midi.noteEvent.connect(this, &Music::noteEvent);
         window.background = Window::White;
-        if(preview) { step(); window.show(); audioStartTime = audio.start(mp3.rate, 8192/*mp3.rate/encoder.fps*/); setAbsolute(audioStartTime+second/encoder.fps); }
+        if(preview) { nextStepTimestamp=realTime(); step(); window.show(); audioStartTime = audio.start(mp3.rate, 8192); setAbsolute(audioStartTime+second/encoder.fps); }
         else while(step()) {};
     }
 
@@ -47,10 +51,7 @@ struct Music : Timer {
             const array<Note>& chord = sheet.notes.values[chordIndex];
             for(uint i: range(chord.size)) {
                 uint key = chord[i].key, index = chord[i].blitIndex;
-                if(!expected.contains(key)) {
-                    expected.insert(key, index);
-                    //errors = 0; showExpected = false; // Hides highlighting while succeeding
-                }
+                if(!expected.contains(key)) expected.insert(key, index);
             }
             chordIndex++;
         }
@@ -74,12 +75,21 @@ struct Music : Timer {
         return readSize;
     }
 
+    int64 nextStepTimestamp = 0;
     void event() override {
+        assert_(realTime() > nextStepTimestamp);
         step();
-        setAbsolute(audioStartTime+videoTime*second/encoder.fps);
+        while(window.lastCompletion < nextStepTimestamp) window.Poll::poll();
+        int64 displayDelay = second; //window.lastCompletion-nextStepTimestamp;
+        int64 videoTime = this->videoTime*second/encoder.fps;
+        nextStepTimestamp = audioStartTime+videoTime-displayDelay;
+        //int64 now = realTime();
+        //assert_(nextStepTimestamp > now, int64(nextStepTimestamp-now)*1000/second, displayDelay*1000/second);
+        setAbsolute(nextStepTimestamp);
     }
 
     bool step() {
+        assert_(audioTime < videoTime*mp3.rate/encoder.fps);
         if(midi.time > midi.duration) return false;
         midi.read(videoTime*mp3.rate/encoder.fps);
         // Smooth scroll animation (assumes constant time step)
@@ -92,7 +102,7 @@ struct Music : Timer {
             image = share(window.target);
             assert_(image);
             contentChanged=false;
-        }
+        } else window.lastCompletion=realTime();
         if(encode) encoder.writeVideoFrame(image);
         videoTime++;
         return true;

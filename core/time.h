@@ -6,7 +6,7 @@
 #include "string.h"
 
 /// A second in nanoseconds
-const uint64 second = 1000000000ull;
+const int64 second = 1000000000ull;
 
 /// Returns Unix real-time in seconds
 long currentTime();
