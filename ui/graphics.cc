@@ -62,7 +62,7 @@ static void fill(uint* target, uint stride, uint w, uint h, uint value) {
 
 void fill(const Image& target, Rect rect, vec3 color, float alpha) {
     rect = rect & Rect(target.size());
-    if(rect.min < rect.max) {
+    if(rect) {
         color = clip(vec3(0), color, vec3(1));
         if(alpha<1) {
             for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
@@ -195,7 +195,7 @@ static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 }
 
 // Renders cubic spline (two control points between each end point)
-void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha) {
+void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha, const uint oversample) {
     vec2 pMin = vec2(target.size()), pMax = 0;
     for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
     pMin = floor(pMin), pMax = ceil(pMax);
@@ -203,7 +203,6 @@ void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha
     const int2 cMin = max(int2(0),iMin), cMax = min(target.size(), iMax);
     if(!(cMin < cMax)) return;
     const int2 size = iMax-iMin;
-    const uint oversample = 8;
     Image8 raster(oversample*size.x+1,oversample*size.y+1);
     lastStepY = 0;
     for(uint i=0;i<points.size; i+=3) {
@@ -211,7 +210,7 @@ void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha
                 float(oversample)*(points[(i+3)%points.size]-pMin));
     }
     for(uint y: range(cMin.y, cMax.y)) {
-        int acc[oversample]={};
+        int acc[oversample]; mref<int>(acc,oversample).clear(0);
         for(uint x: range(iMin.x, cMin.x)) for(uint j: range(oversample)) for(uint i: range(oversample)) acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);
         for(uint x: range(cMin.x, cMax.x)) { //Supersampled rasterization
             int coverage = 0;

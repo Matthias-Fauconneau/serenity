@@ -21,7 +21,7 @@ uint Sheet::text(int2 position, const string& text, Font& font, array<Blit>& bli
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(const ref<Sign>& signs, uint divisions) { // Time steps per measure
+Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time steps per measure
     int x = 0;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
@@ -52,6 +52,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions) { // Time steps per measure
     x += noteSize.x;
     fills << Rect(int2(x-1, staffY(0, 0)), int2(x+1, staffY(1, -8)));
     measures << x;
+    measureToChord << 0;
     for(Sign sign: signs) {
         // Layout accidentals
         Chord& chord = chords[sign.staff];
@@ -60,9 +61,10 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions) { // Time steps per measure
             for(Sign sign: chord.reverse()) {
                 if(!sign.note.accidental) continue;
                 int y = Y(sign);
-                if(abs(y-lastY)<=lineInterval) dx -= noteSize.x;
+                if(abs(y-lastY)<=lineInterval) dx -= noteSize.x/2;
                 else dx = 0;
-                glyph(int2(X(sign)-noteSize.x+dx, y), "accidentals."_+ref<string>({"flat"_,"sharp"_,"natural"_})[sign.note.accidental-1]);
+                String name = "accidentals."_+ref<string>({"flat"_,"sharp"_,"natural"_})[sign.note.accidental-1];
+                glyph(int2(X(sign)-glyphSize(name).x+dx, y), name);
                 lastY = y;
             }
             chord.clear();
@@ -179,7 +181,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions) { // Time steps per measure
             for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); fills << Rect(int2(x-dx/3,y),int2(x+dx*4/3,y+1)); }
             if(note.slash) parallelograms << Parallelogram{p+int2(-dx+dx/2,dx), p+int2(dx+dx/2,-dx), 1};
             if(note.dot) glyph(p+int2(dx*4/3,0),"dots.dot"_);
-            x += 3*dx;
+            x += 2*dx;
 
             chord.insertSorted(sign);
 
@@ -215,7 +217,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions) { // Time steps per measure
                     }
                 }
                 measures << x;
-                x += 2*noteSize.x;
+                measureToChord << notes.size();
+                x += noteSize.x;
                 timeTrack.at(sign.time).direction = x;
                 uint sx = x;
                 for(uint8 code: dec(sign.measure.index)) {
@@ -297,6 +300,13 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions) { // Time steps per measure
         if(timeTrack.contains(sign.time+sign.duration)) timeTrack.at(sign.time+sign.duration) = x; // Updates end position for future signs
         else timeTrack.insert(sign.time+sign.duration, x);
     }
+
+    // Vertical center align
+    int2 offset = int2(0/*-position*/, (height - sizeHint().y)/2 + 4*lineInterval);
+    for(Rect& r: fills) r = offset+r;
+    for(Parallelogram& p: parallelograms) p.min+=offset, p.max+=offset;
+    for(Blit& b: blits) b.position+=offset;
+    for(Cubic& c: cubics) for(vec2& p: c) p+=vec2(offset);
 }
 
 buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
@@ -304,11 +314,12 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
     map<uint, array<Note>> notes = copy(this->notes);
     array<uint> chordExtra;
     array<Blit> debug;
-    while(notes) {
-        if(!notes.values[0]) {
-            notes.keys.removeAt(0); notes.values.removeAt(0);
-            if(!notes) break;
-            array<Note>& chord = notes.values[0];
+    uint chordIndex = 0;
+    for(;chordIndex<notes.size();) {
+        if(!notes.values[chordIndex]) {
+            chordIndex++; chordToNote << midiToBlit.size;
+            if(chordIndex==notes.size()) break;
+            array<Note>& chord = notes.values[chordIndex];
             chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
                 uint midiKey = midiNotes[midiIndex];
                 int match = chord.indexOf(midiKey);
@@ -328,16 +339,16 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                 extraErrors+=chordExtra.size;
                 chordExtra.clear();
             }
-            if(!notes.values[0]) { notes.keys.removeAt(0); notes.values.removeAt(0); }
-            assert_(notes);
-            if(!notes) break;
+            if(!notes.values[chordIndex]) { chordIndex++; chordToNote << midiToBlit.size; }
+            assert_(chordIndex<notes.size());
+            if(chordIndex==notes.size()) break;
         }
-        assert_(notes);
-        array<Note>& chord = notes.values[0];
-        assert_(chord, notes);
+        assert_(chordIndex<notes.size());
+        array<Note>& chord = notes.values[chordIndex];
+        assert_(chord);
 
         uint midiIndex = midiToBlit.size;
-        assert_(midiIndex < midiNotes.size, notes);
+        assert_(midiIndex < midiNotes.size);
         uint midiKey = midiNotes[midiIndex];
 
         if(extraErrors > 9 || wrongErrors > 6 || missingErrors > 9 || orderErrors > 7) {
@@ -356,15 +367,16 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             int2 p = blits[note.blitIndex].position;
             text(p+int2(noteSize.x, 2), str(note.key), smallFont, debug);
         } else if(chordExtra && chord.size == chordExtra.size) {
-            int match = notes.values[1].indexOf(midiNotes[chordExtra[0]]);
+            int match = notes.values[chordIndex+1].indexOf(midiNotes[chordExtra[0]]);
             if(match >= 0) {
                 assert_(chord.size<=3, chord);
                 //log_("-"_+str(chord));
                 missingErrors += chord.size;
                 chord.clear();
                 chordExtra.filter([&](uint index){
-                    if(!chord) { notes.keys.removeAt(0); notes.values.removeAt(0); }
-                    assert_(chord);
+                    if(!notes.values[chordIndex]) { chordIndex++; chordToNote << midiToBlit.size; }
+                    array<Note>& chord = notes.values[chordIndex];
+                    assert_(chord, chordIndex, notes.size());
                     int match = chord.indexOf(midiNotes[index]);
                     if(match<0) return false; // Keeps as extra
                     midiKey = midiNotes[index];
@@ -401,17 +413,17 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             chordExtra << midiIndex;
         }
     }
+    assert_(chordToNote.size == this->notes.size());
     log(extraErrors, wrongErrors, missingErrors, orderErrors);
     return move(midiToBlit);
 }
 
-void Sheet::render(const Image& target) {
-    int2 offset = int2(-position, (target.height - sizeHint().y)/2 + 4*lineInterval);
+void Sheet::render(const Image& target, Rect clip) {
     // TODO: cull
-    for(Rect r: fills) fill(target, offset+r);
-    for(Parallelogram p: parallelograms) parallelogram(target, offset+p.min, offset+p.max, p.dy);
-    for(uint i: range(blits.size)) { const Blit& b=blits[i]; blit(target, offset+b.position, b.image, colors.value(i, black)); }
-    for(const Cubic& c: cubics) { buffer<vec2> points(c.size); for(uint i: range(c.size)) points[i]=vec2(offset)+c[i]; cubic(target, points); }
+    for(Rect r: fills) fill(target, r&clip);
+    for(Parallelogram p: parallelograms) if(Rect(p.min,p.max)&clip) parallelogram(target, p.min, p.max, p.dy);
+    for(uint i: range(blits.size)) { const Blit& b=blits[i]; if((b.position+Rect(b.image.size()))&clip) blit(target, b.position, b.image, colors.value(i, black)); }
+    for(const Cubic& c: cubics) if(Rect(int2(min(c)),int2(max(c)))&clip) cubic(target, c, black, 1, 8/4/*oversample*/);
 }
 
 int Sheet::measureIndex(int x0) {
@@ -420,9 +432,9 @@ int Sheet::measureIndex(int x0) {
     assert_(x0 >= measures.last()); return measures.size;
 }
 
-bool Sheet::mouseEvent(int2, int2, Event, Button button) {
+/*bool Sheet::mouseEvent(int2, int2, Event, Button button) {
     int index = measureIndex(position);
     if(button==WheelUp && index>0) { position=measures[index-1]; return true; } //TODO: previous measure
     if(button==WheelDown && index<int(measures.size-1)) { position=measures[index+1]; return true; } //TODO: next measure
     return false;
-}
+}*/

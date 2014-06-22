@@ -5,11 +5,12 @@
 
 inline String str(const Note& a) { return str(a.key); }
 
-struct Sheet : Widget {
+struct Sheet /*: Widget*/ {
     // Layout parameters
+    static const int oversample = 4;
     const int staffCount = 2;
-    const int halfLineInterval = 5, lineInterval = 2*halfLineInterval;
-    const int lineWidth = 1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
+    const int halfLineInterval = 5*oversample, lineInterval = 2*halfLineInterval;
+    const int lineWidth = 1*oversample, stemWidth = 1*oversample, stemLength = 4*lineInterval, beamWidth = 6*oversample;
     const int shortStemLength = 5*halfLineInterval;
     // Layout helpers
     int clefStep(ClefSign clefSign, int step) { return step - (clefSign==Treble ? 10 : -2); } // Translates C4 step to top line step using clef
@@ -40,7 +41,7 @@ struct Sheet : Widget {
     uint text(int2 position, const string& text, Font& font) { return this->text(position, text, font, blits); }
 
     // Layouts notations to graphic primitives
-    Sheet(const ref<Sign>& signs, uint divisions = 256);
+    Sheet(const ref<Sign>& signs, uint divisions, uint height);
 
     // MIDI Synchronization
     map<uint,array<Note>> notes; // Signs for notes (time, key, blitIndex)
@@ -54,9 +55,11 @@ struct Sheet : Widget {
 
     // Control
     array<int> measures; // X position of measure starts
-    int position = 0;
+    array<int> measureToChord; // first chord index of measure
+    array<int> chordToNote; // first note index of chord
+    //int position = 0;
 
     int2 sizeHint() { return int2(-1, staffY(1,-16)); }
-    void render(const Image& target);
-    bool mouseEvent(int2, int2, Event, Button button);
+    void render(const Image& target, Rect clip);
+    //bool mouseEvent(int2, int2, Event, Button button);
 };

@@ -17,6 +17,31 @@ Image upsample(const Image& source) {
     return target;
 }
 
+Image downsample(const Image& source) {
+    int w=source.width, h=source.height;
+    Image target(w/2, h/2);
+    assert_(w%2==0 && h%2==0);
+#if 0 // Exact
+    extern float sRGB_reverse[0x100];
+    extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
+    for(uint y: range(h/2)) for(uint x: range(w/2)) {
+        for(uint c: range(3)) {
+            float linear =
+                    ( sRGB_reverse[source(x*2+0,y*2+0)[c]]
+                    + sRGB_reverse[source(x*2+1,y*2+0)[c]]
+                    + sRGB_reverse[source(x*2+0,y*2+1)[c]]
+                    + sRGB_reverse[source(x*2+1,y*2+1)[c]] ) / 4;
+            target(x,y)[c] = sRGB_forward[int(round(0xFFF*linear))];
+        }
+        target(x,y).a = 0xFF;
+    }
+#else
+    for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
+                                                                   int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);
+#endif
+    return target;
+}
+
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
     else if(startsWith(file,"\x89PNG"_)) return "PNG"_;

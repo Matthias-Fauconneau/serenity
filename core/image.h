@@ -7,12 +7,15 @@ struct Rect {
     int2 min,max;
     Rect(int2 min, int2 max):min(min),max(max){}
     explicit Rect(int2 max):min(0,0),max(max){}
+    explicit operator bool() { return min<max; }
     bool contains(int2 p) { return p>=min && p<max; }
     int2 position() { return min; }
     int2 size() { return max-min; }
 };
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 inline Rect operator &(Rect a, Rect b) { return Rect(min(max(a.min,b.min),b.max),max(min(a.max,b.max),b.min)); }
+inline Rect operator |(Rect a, Rect b) { return a && b ? Rect(min(a.min,b.min),max(a.max,b.max)) : (a ? a : b); }
+inline Rect& operator |=(Rect& a, Rect b) { return a = a|b; }
 inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
 struct Image {
@@ -38,6 +41,7 @@ inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
 /// Copies an image
 inline void copy(const Image& target, const Image& source) {
+    assert_(target.size() == source.size(), target.size(), source.size());
     for(uint y: range(source.height)) for(uint x: range(source.width)) target(x,y) = source(x,y);
 }
 
@@ -53,6 +57,9 @@ inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.da
 
 /// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, Rect region);
+
+/// Downsamples an image by averaging samples
+Image downsample(const Image& source);
 
 /// Upsamples an image by duplicating samples
 Image upsample(const Image& source);

@@ -101,12 +101,10 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     setIcon(icon);
     actions[Escape] = []{exit();};
 
-
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="Present"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"Present"_+pad(4,r.length));}));
         Present::EXT=r.major; Present::event=r.firstEvent; Present::errorBase=r.firstError;}
     {Present::SelectInput r; r.window=id+XWindow; r.eid=id+PresentEvent; send(raw(r));}
-    //{Present::NotifyMSC r; r.window=id+XWindow; send(raw(r));}
     show();
 }
 Window::~Window() {

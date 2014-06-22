@@ -39,4 +39,4 @@ inline void line(const Image& target, int2 p1, int2 p2, vec3 color=black, float 
 void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color=black, float alpha=1);
 
 // Draws a filled cubic spline loop (two control points between each end point)
-void cubic(const Image& target, const ref<vec2>& points, vec3 color=black, float alpha=1);
+void cubic(const Image& target, const ref<vec2>& points, vec3 color=black, float alpha=1, const uint oversample = 8);

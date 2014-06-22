@@ -144,6 +144,7 @@ void AudioOutput::event() {
 #if !MMAP
         syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
 #endif
+        log("Overrun");
     }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
