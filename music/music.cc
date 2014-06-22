@@ -9,8 +9,7 @@
 struct Music : Widget {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
-    const uint oversample = 4;
-    Sheet sheet {xml.signs, xml.divisions, uint(720/2*4)};
+    Sheet sheet {xml.signs, xml.divisions, 720};
     AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
     MidiFile midi = readFile(name+".mid"_);
     buffer<uint> noteToBlit = sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
@@ -21,17 +20,17 @@ struct Music : Widget {
     float target=0, speed=0, position=0; // X target/speed/position of sheet view
 
     // Encoding
-    bool contentChanged = true;
+    //bool contentChanged = true;
     bool encode = false;
     Encoder encoder {name /*, {&audioFile, &AudioFile::read}*/}; //TODO: remux without reencoding
 
     // Preview
     bool preview = true;
     Timer timer;
-    Window window {this, int2(1280,720/2), "MusicXML"_};
+    Window window {this, int2(1280,720), "MusicXML"_};
     AudioOutput audio {{this,&Music::read}};
     uint64 audioTime = 0, videoTime = 0;
-    Image image {uint(sheet.measures.last()), uint(window.size.y*oversample)};
+    Image image {uint(sheet.measures.last()), uint(window.size.y)};
     uint lastPosition = 0;
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
@@ -88,13 +87,37 @@ struct Music : Widget {
             }
         }
         if(!update) return;
-        contentChanged = true;
+        //contentChanged = true;
 
         sheet.colors.clear();
         for(uint index: active.values) sheet.colors.insert(index, red);
         if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
 
-        //sheet.render(image, update);
+        sheet.render(image, update);
+    }
+
+    // -> image
+    void resampleX(const Image& target, const Image& source, float offset) {
+        int i = int(offset);
+        float u = fract(offset);
+        uint b8 = 256*u, a8 = 256-b8;
+        for(uint y: range(target.height)) for(uint x: range(target.width)) {
+            for(uint c: range(3)) {
+#if 0
+                extern float sRGB_reverse[0x100];
+                extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
+                float a = sRGB_reverse[source(i+x,y)[c]];
+                float b = sRGB_reverse[source(i+x+1,y)[c]];
+                float linear = (1-u) * a + u * b;
+                target(x,y)[c] = sRGB_forward[int(round(0xFFF*linear))];
+#else
+                uint a = source(i+x, y)[c];
+                uint b = source(i+x+1, y)[c];
+                target(x,y)[c] = (a8 * a + b8 * b) / 256;
+#endif
+            }
+            target(x,y).a = 0xFF;
+        }
     }
 
     // Render loop
@@ -109,11 +132,12 @@ struct Music : Widget {
         //position = target - (image.size().x-1)/2; // Snap to current note
         //position = sheet.measures[max(0, sheet.measureIndex(target)/3*3-1)]; // Snap several measures at a time
         //if(sheet.position != round(position)) sheet.position = round(position), contentChanged = true;
-        if(lastPosition != round(position)) lastPosition = round(position), contentChanged = true;
-        if(contentChanged) {
-            Image full = clip(this->image, int2(lastPosition, 0)+Rect(/*oversample*/4*image.size()));
-            log(image.size(), oversample, full.size());
-            copy(image, downsample(downsample(full))); contentChanged=false; }
+        //if(lastPosition != round(position)) lastPosition = round(position), contentChanged = true;
+        //if(contentChanged) {
+            //Image full = clip(this->image, int2(lastPosition, 0)+Rect(image.size()));
+            resampleX(image, this->image, position); // TODO: resample (+motion blur)?
+            //contentChanged=false;
+        //}
         if(encode) encoder.writeVideoFrame(image);
         videoTime++;
         window.render();

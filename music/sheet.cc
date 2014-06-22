@@ -423,7 +423,7 @@ void Sheet::render(const Image& target, Rect clip) {
     for(Rect r: fills) fill(target, r&clip);
     for(Parallelogram p: parallelograms) if(Rect(p.min,p.max)&clip) parallelogram(target, p.min, p.max, p.dy);
     for(uint i: range(blits.size)) { const Blit& b=blits[i]; if((b.position+Rect(b.image.size()))&clip) blit(target, b.position, b.image, colors.value(i, black)); }
-    for(const Cubic& c: cubics) if(Rect(int2(min(c)),int2(max(c)))&clip) cubic(target, c, black, 1, 8/4/*oversample*/);
+    for(const Cubic& c: cubics) if(Rect(int2(min(c)),int2(max(c)))&clip) cubic(target, c, black, 1, 8);
 }
 
 int Sheet::measureIndex(int x0) {
