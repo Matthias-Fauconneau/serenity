@@ -11,12 +11,12 @@ struct Music : Widget {
     MusicXML xml = readFile(name+".xml"_);
     Sheet sheet {xml.signs, xml.divisions};
     AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
-    MidiFile midi {readFile(name+".mid"_), mp3.rate /*Time resolution*/};
-    buffer<uint> midiToBlit = sheet.synchronize(apply(midi.notes,[](MidiNote o){return o.key;}));
+    MidiFile midi = readFile(name+".mid"_);
+    buffer<uint> noteToBlit = sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
 
     // Highlighting
     map<uint,uint> active; // Maps active keys to notes (indices)
-    uint midiIndex = 0;
+    uint midiIndex = 0, noteIndex = 0;
     float target=0, speed=0, position=0; // X target/speed/position of sheet view
 
     // Encoding
@@ -34,22 +34,10 @@ struct Music : Widget {
 
     Music() {
         if(sheet.synchronizationFailed) { window.background=White; return; }
-        midi.noteEvent.connect(this, &Music::noteEvent);
         window.background = NoBackground; // Only clear on changes
         window.widget = this;
         if(preview) audio.start(mp3.rate, 1024);
         //else while(midi.time < midi.duration) step();
-    }
-
-    void noteEvent(const uint key, const uint vel) {
-        assert_(key);
-        if(vel) { if(midiToBlit[midiIndex]!=uint(-1)) active.insertMulti(key,midiToBlit[midiIndex]); midiIndex++; }
-        else if(!vel && active.contains(key)) while(active.contains(key)) active.remove(key);
-        else return; // No changes
-        sheet.colors.clear();
-        for(uint index: active.values) sheet.colors.insert(index, red);
-        if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
-        contentChanged = true;
     }
 
     uint read(const mref<short2>& output) {
@@ -60,10 +48,22 @@ struct Music : Widget {
 
     // Render loop
     void render(const Image& image) override {
-        midi.read(videoTime*midi.userTicksPerSeconds/encoder.fps);
+        for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time <= videoTime*midi.ticksPerSeconds/encoder.fps; midiIndex++) {
+            uint key = midi.notes[midiIndex].key;
+            uint vel = midi.notes[midiIndex].velocity;
+            assert_(key);
+            if(vel) { if(noteToBlit[noteIndex]!=uint(-1)) { active.insertMulti(key,noteToBlit[noteIndex]); contentChanged=true; } noteIndex++; }
+            else if(!vel && active.contains(key)) { while(active.contains(key)) active.remove(key); contentChanged=true; }
+            if(!contentChanged) continue;
+            sheet.colors.clear();
+            for(uint index: active.values) sheet.colors.insert(index, red);
+            if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
+        }
+
         // Smooth scroll animation (assumes constant time step)
         const float k=1./encoder.fps, b=1./encoder.fps; // Stiffness and damping constants
-        speed = b*speed + k*(target-position); // Euler integration of speed from forces of spring equation
+        //log(float(sheet.measures.last()*midi.ticksPerSeconds)/float(midi.duration*encoder.fps));
+        speed = min(5.f, b*speed + k*(target-position)); // Euler integration of speed from forces of spring equation (capped to 5px/frame)
         position = position + speed; // Euler integration of position from speed
         if(sheet.position != round(position)) sheet.position = round(position), contentChanged = true;
         if(contentChanged) { renderBackground(image, White); sheet.render(image); contentChanged=false; }

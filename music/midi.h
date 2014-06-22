@@ -23,17 +23,8 @@ struct MidiFile {
     int trackCount=0;
     uint ticksPerSeconds=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
-    array<MidiNote> active;
     array<MidiNote> notes;
-    signal<uint, uint> noteEvent;
-    signal<> endOfFile;
-    uint time=0; // Current time in user ticks
-    uint duration=0; // Duration in user ticks
-    uint userTicksPerSeconds;
-    MidiFile(const ref<byte>& data, uint userTicksPerSeconds);
-    enum State { Seek=0, Play=1, Sort=2 };
-    void read(Track& track, uint time, State state);
-    void seek(uint time);
-    void read(uint sinceStart);
-    void clear() { tracks.clear(); trackCount=0; ticksPerSeconds=0; notes.clear(); active.clear(); duration=0; time=0; }
+    uint duration=0; // Duration in ticks
+    MidiFile(const ref<byte>& data);
+    void read(Track& track);
 };

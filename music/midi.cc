@@ -2,8 +2,7 @@
 #include "file.h"
 #include "math.h"
 
-MidiFile::MidiFile(const ref<byte>& data, uint userTicksPerSeconds) : userTicksPerSeconds(userTicksPerSeconds) { /// parse MIDI header
-    clear();
+MidiFile::MidiFile(const ref<byte>& data) { /// parse MIDI header
     BinaryData s(data,true);
     s.advance(10);
     uint16 nofChunks = s.read(); ticksPerSeconds = 2*(uint16)s.read(); // Ticks per second (*2 as actually defined for MIDI as ticks per beat at 120bpm)
@@ -22,17 +21,16 @@ MidiFile::MidiFile(const ref<byte>& data, uint userTicksPerSeconds) : userTicksP
     for(Track& track: tracks) {
         track.startTime = track.time-minTime; // Time of the first event
         track.startIndex = track.data.index; // Index of the first event
-        read(track,-1,Sort);
-        duration = max(duration, uint(uint64(track.time)*uint64(userTicksPerSeconds)/uint64(ticksPerSeconds)));
+        read(track);
+        duration = max(duration, track.time);
         track.reset();
     }
-    seek(0);
 }
 
-void MidiFile::read(Track& track, uint time, State state) {
+void MidiFile::read(Track& track) {
     BinaryData& s = track.data;
-    if(!s) { endOfFile(); return; }
-    while(track.time*userTicksPerSeconds <= time*ticksPerSeconds) {
+    assert_(s);
+    for(;;) {
         uint8 key=s.read();
         if(key & 0x80) { track.type_channel=key; key=s.read(); }
         uint8 type=track.type_channel>>4;
@@ -50,31 +48,12 @@ void MidiFile::read(Track& track, uint time, State state) {
             else if(key==KeySignature) this->key=(int8)data[0], scale=data[1]?Minor:Major;
         }
 
-        if(type==NoteOff || (type==NoteOn && vel==0)) {
-            if(state==Play) noteEvent(key,0);
-        }
-        if(type==NoteOn && vel) {
-            if(state==Sort) notes.insertSorted(MidiNote{track.time, key, vel});
-            if(state==Play) noteEvent(key,vel);
-        }
+        if(type==NoteOff) type=NoteOn, vel=0;
+        if(type==NoteOn) notes.insertSorted(MidiNote{track.time, key, vel});
 
         if(!s) return;
         uint8 c=s.read(); uint t=c&0x7f;
         if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
         track.time += t;
     }
-}
-
-void MidiFile::seek(uint time) {
-    active.clear();
-    for(Track& track: tracks) {
-        if(time*ticksPerSeconds < track.time*userTicksPerSeconds) track.reset();
-        read(track,time,Seek);
-    }
-    this->time=time;
-}
-
-void MidiFile::read(uint time) {
-    for(Track& track: tracks) read(track, time, Play);
-    this->time = time;
 }
