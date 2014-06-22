@@ -17,7 +17,7 @@ union XEvent {
     struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } packed property;
     struct { byte pad; uint16 seq; uint time, requestor,selection,target,property; } packed selection;
     struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
-    struct { uint8 ext; uint16 seq; uint size; uint16 type; } packed xge;
+    struct XGE { uint8 ext; uint16 seq; uint size; uint16 type; } packed xge;
     byte pad[31];
 } fixed(XEvent);
 struct XError { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; byte pad[21]; } fixed(XError);
@@ -143,7 +143,7 @@ struct Pixmap { int8 ext=EXT,req=1; uint16 size=18; uint window, pixmap, serial=
 struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pad; uint64 targetMSC=0, divisor=0, remainder=0; };
 struct SelectInput { int8 ext=EXT,req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
 enum { ConfigureNotify, CompleteNotify, RedirectNotify };
-struct CompleteNotify { uint16 kind; uint event_id; uint window; uint serial; uint64 ust; uint64 msc; } packed;
+struct CompleteNotify : XEvent::XGE { uint8 kind, mode; uint event_id; uint window; uint serial; uint64 ust; uint64 msc; } packed;
 }
 
 /// Returns padding zeroes to append in order to align an array of \a size bytes to \a width

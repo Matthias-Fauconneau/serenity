@@ -159,6 +159,8 @@ struct Window : Device {
     /// Present state
     State presentState = Idle;
     void present();
+    uint firstMSC = 0;
+    uint msc;
 
     /// bgra32 XRender PictFormat (for Cursor)
     uint format=0;

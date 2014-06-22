@@ -7,6 +7,7 @@
 #include "audio.h"
 
 struct Music : Widget {
+    Thread audioThread;
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
     Sheet sheet {xml.signs, xml.divisions, 360};
@@ -17,7 +18,7 @@ struct Music : Widget {
     // Highlighting
     map<uint,uint> active; // Maps active keys to notes (indices)
     uint midiIndex = 0, noteIndex = 0;
-    float target=0, speed=0, position=0; // X target/speed/position of sheet view
+    float targetPosition=0, speed=0, position=0; // X target/speed/position of sheet view
 
     // Encoding
     //bool contentChanged = true;
@@ -28,9 +29,11 @@ struct Music : Widget {
     bool preview = true;
     Timer timer;
     Window window {this, int2(1280,360), "MusicXML"_};
-    AudioOutput audio {{this,&Music::read}};
+    AudioOutput audio {{this,&Music::read}, audioThread};
     uint64 audioTime = 0, videoTime = 0;
-    Image image {uint(sheet.measures.last()), uint(window.size.y)};
+    Image image {uint(sheet.measures.last()+4), uint(window.size.y)};
+    Image blurred = image.size()-int2(4, 0);
+    static constexpr uint blurWidth = 4;
     uint lastPosition = 0;
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
@@ -42,11 +45,14 @@ struct Music : Widget {
     Music() {
         renderBackground(image, White);
         sheet.render(image, Rect(image.size()));
+        blurred.buffer.clear(0xFF);
+        blurX<blurWidth>(blurred, image);
+
         if(sheet.synchronizationFailed) { window.background=White; return; }
         window.background = NoBackground; // Only clear on changes
         window.widget = this;
         //seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[100+1]])].time );
-        if(preview) audio.start(mp3.rate, 1024);
+        if(preview) { audio.start(mp3.rate, 1024); audioThread.spawn(); }
         //else while(midi.time < midi.duration) step();
     }
 
@@ -62,7 +68,7 @@ struct Music : Widget {
         videoTime = audioTime*encoder.fps/mp3.rate; // FIXME: remainder
         //log(videoTime/float(encoder.fps), audioTime/float(mp3.rate), midiTime/float(midi.ticksPerSeconds));
         follow();
-        position = target;
+        position = targetPosition;
     }
 
     void follow() {
@@ -91,28 +97,42 @@ struct Music : Widget {
 
         sheet.colors.clear();
         for(uint index: active.values) sheet.colors.insert(index, red);
-        if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
+        if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
 
         sheet.render(image, update);
+        update.min.x -= 4;
+        Rect update2 = update; update2.max.x += 4;
+        blurX<blurWidth>(clip(blurred,update), clip(image,update2));
     }
 
     // -> image
-    void blurX(const Image& target, const Image& source, float min, float max) {
-        const uint width = 6; //iMax-iMin;
-        max = min + width;
-        uint iMin = uint(min), iMax = uint(max);
-        float fMin = 1-fract(min), fMax = fract(max);
-        uint min8 = 256*fMin, max8 = 256*fMax;
-        uint sum8 = min8+max8+256*(iMax-(iMin+1));
-        //assert_(sum8);
+    template<uint width> void blurX(const Image& target, const Image& source) {
+        assert_(target.size()+int2(width, 0) == source.size());
         for(uint y: range(target.height)) {
             for(uint c: range(3)) { // FIXME: planar
-                uint8 const* row = &source(iMin, y)[c];
+                uint8 const* row = &source(0, y)[c];
                 uint8* const targetRow = &target(0, y)[c];
                 uint sum = 0;
-                for(uint x: range(1,width-1)) sum += row[x*4];
+                for(uint x: range(width)) sum += row[x*4];
                 for(uint x: range(target.width)) {
+                    uint8 const* source = row+x*4;
+                    sum += source[width*4];
+                    targetRow[x*4] = sum / (width+1);
+                    sum -= source[0];
+                }
+            }
+        }
+    }
 
+    // -> image
+    void resampleX(const Image& target, const Image& source, float fract) {
+        assert_(target.size()+int2(1, 0) == source.size());
+        uint b8 = 256*fract, a8 = 256-b8;
+        for(uint y: range(target.height)) {
+            for(uint c: range(3)) { // FIXME: planar
+                uint8 const* row = &source(0, y)[c];
+                uint8* const targetRow = &target(0, y)[c];
+                for(uint x: range(target.width)) {
 #if 0
                     extern float sRGB_reverse[0x100];
                     extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
@@ -120,25 +140,9 @@ struct Music : Widget {
                     float b = sRGB_reverse[source(i+x+1,y)[c]];
                     float linear = (1-u) * a + u * b;
                     target(x,y)[c] = sRGB_forward[int(round(0xFFF*linear))];
-#elif 0
-                    uint sum = min8 * uint(source(x+iMin, y)[c]);
-                    for(uint i=iMin+1; i<iMax; i++) sum += 256 * uint(source(x+i, y)[c]);
-                    sum += max8 * uint(source(x+iMax, y)[c]);
-                    target(x,y)[c] = sum / sum8;
-#elif 0
-                    uint sum = 0;
-                    for(uint i=iMin; i<iMax; i++) sum += uint(source(x+i, y)[c]);
-                    target(x,y)[c] = sum / (iMax-iMin);
-#elif 0
+#elif 1
                     uint8 const* source = row+x*4;
-                    sum += source[width*4];
-                    targetRow[x*4] = sum / (width+1);
-                    sum -= source[0];
-#else
-                    uint8 const* source = row+x*4;
-                    sum += source[(width-1)*4];
-                    targetRow[x*4] = (min8 * uint(source[0]) + 256 * sum + max8 * uint(source[width*4])) / sum8;
-                    sum -= source[1*4];
+                    targetRow[x*4] = (a8 * uint(source[0]) + b8 * uint(source[4])) / 256;
 #endif
                 }
             }
@@ -146,26 +150,31 @@ struct Music : Widget {
     }
 
     // Render loop
-    void render(const Image& image) override {
+    void render(const Image& target) override {
+        uint nextTime = window.msc-window.firstMSC;
+        if(videoTime+1 != nextTime) log("Dropped", nextTime-(videoTime+1));
+        videoTime = nextTime;
         follow();
         // Smooth scroll animation (assumes constant time step)
         const float k=4./window.size.x, b=1./encoder.fps; // Stiffness and damping constants
-        speed = b*speed + k*(target-position); // Euler integration of speed from forces of spring equation (capped)
+        speed = b*speed + k*(targetPosition-position); // Euler integration of speed from forces of spring equation (capped)
+        static float maxSpeed = 0; if(speed > maxSpeed) { maxSpeed = speed; log(maxSpeed); }
         //speed = min(2.f, speed);
         //speed = float((sheet.measures.last()-image.width)*midi.ticksPerSeconds)/float(midi.duration*encoder.fps);
-        float lastPosition = position;
+        //float lastPosition = position;
         position = position + speed; // Euler integration of position from speed
         //position = target - (image.size().x-1)/2; // Snap to current note
         //position = sheet.measures[max(0, sheet.measureIndex(target)/3*3-1)]; // Snap several measures at a time
         //if(sheet.position != round(position)) sheet.position = round(position), contentChanged = true;
         //if(lastPosition != round(position)) lastPosition = round(position), contentChanged = true;
         //if(contentChanged) {
-            //Image full = clip(this->image, int2(lastPosition, 0)+Rect(image.size()));
-            blurX(image, this->image, lastPosition, position+1); // TODO: resample (+motion blur)?
+        Image source = clip(blurred, int2(floor(position), 0)+Rect(target.size()+int2(1,0)));
+            //blurX(image, this->image, lastPosition, position+1); // TODO: resample (+motion blur)?
+        resampleX(target, source, fract(position)); // TODO: resample
             //contentChanged=false;
         //}
         if(encode) encoder.writeVideoFrame(image);
-        videoTime++;
+        //videoTime++;
         window.render();
     }
 } app;

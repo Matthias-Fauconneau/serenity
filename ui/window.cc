@@ -248,6 +248,9 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             copy(mref<byte>(event,sizeof(e)), raw(e));
             read(event+sizeof(e), e.xge.size*4);
             if(e.xge.ext == Present::EXT && e.xge.type==Present::CompleteNotify) {
+                assert_(sizeof(e)+e.xge.size*4 == sizeof(struct Present::CompleteNotify), sizeof(e), e.xge.size*4, sizeof(struct Present::CompleteNotify));
+                msc = (*(struct Present::CompleteNotify*)event).msc;
+                if(!firstMSC) firstMSC = msc;
                 assert_(presentState==Server || presentState==Wait);
                 State was = presentState;
                 presentState = Idle;
