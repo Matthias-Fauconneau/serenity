@@ -303,6 +303,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
     array<uint> midiToBlit (midiNotes.size);
     map<uint, array<Note>> notes = copy(this->notes);
     array<uint> chordExtra;
+    const bool debug = false;
     while(notes) {
         if(!notes.values[0]) {
             notes.keys.removeAt(0); notes.values.removeAt(0);
@@ -317,7 +318,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                 midiToBlit[midiIndex] = note.blitIndex;
                 //log_("O"_+str(note.key));
                 int2 p = blits[note.blitIndex].position;
-                text(p+int2(noteSize.x, 2), "O"_+str(note.key), smallFont);
+                if(debug) text(p+int2(noteSize.x, 2), "O"_+str(note.key), smallFont);
                 orderErrors++;
                 return true; // Discards
             });
@@ -352,7 +353,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             assert_(note.key == midiKey);
             midiToBlit << note.blitIndex;
             int2 p = blits[note.blitIndex].position;
-            text(p+int2(noteSize.x, 2), str(note.key), smallFont);
+            if(debug) text(p+int2(noteSize.x, 2), str(note.key), smallFont);
         } else if(chordExtra && chord.size == chordExtra.size) {
             int match = notes.values[1].indexOf(midiNotes[chordExtra[0]]);
             if(match >= 0) {
@@ -370,7 +371,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     assert_(midiKey == note.key);
                     midiToBlit[index] = note.blitIndex;
                     int2 p = blits[note.blitIndex].position;
-                    text(p+int2(noteSize.x, 2), str(note.key), smallFont);
+                    if(debug) text(p+int2(noteSize.x, 2), str(note.key), smallFont);
                     return true; // Discards extra as matched to next chord
                 });
             } else {
@@ -383,7 +384,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     assert_(note.key != midiKey);
                     //log_("!"_+str(note.key, midiKey));
                     int2 p = blits[note.blitIndex].position;
-                    text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont);
+                    if(debug) text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont);
                     wrongErrors++;
                     return true; // Discards as wrong
                 });

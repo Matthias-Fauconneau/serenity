@@ -16,8 +16,7 @@ struct Music : Widget {
 
     // Highlighting
     map<uint,uint> active; // Maps active keys to notes (indices)
-    map<uint,uint> expected; // Maps expected keys to notes (indices)
-    uint chordIndex = 0;
+    uint midiIndex = 0;
     float target=0, speed=0, position=0; // X target/speed/position of sheet view
 
     // Encoding
@@ -34,30 +33,17 @@ struct Music : Widget {
     uint64 audioTime = 0, videoTime = 0;
 
     Music() {
-        expect();
         midi.noteEvent.connect(this, &Music::noteEvent);
         window.background = NoBackground; // Only clear on changes
         if(preview) { window.show(); audio.start(mp3.rate, 1024); }
         //else while(midi.time < midi.duration) step();
     }
 
-    void expect() {
-        while(!expected && chordIndex<sheet.notes.size()-1) {
-            const array<Note>& chord = sheet.notes.values[chordIndex];
-            for(uint i: range(chord.size)) {
-                uint key = chord[i].key, index = chord[i].blitIndex;
-                if(!expected.contains(key)) expected.insert(key, index);
-            }
-            chordIndex++;
-        }
-    }
-
-    void noteEvent(const uint key, const uint vel){
+    void noteEvent(const uint key, const uint vel) {
         assert_(key);
-        if(vel && expected.contains(key)) { active.insertMulti(key,expected.at(key)); expected.remove(key); }
+        if(vel) { if(midiToBlit[midiIndex]!=uint(-1)) active.insertMulti(key,midiToBlit[midiIndex]); midiIndex++; }
         else if(!vel && active.contains(key)) while(active.contains(key)) active.remove(key);
         else return; // No changes
-        expect();
         sheet.colors.clear();
         for(uint index: active.values) sheet.colors.insert(index, red);
         if(active) target = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
@@ -72,8 +58,6 @@ struct Music : Widget {
 
     // Render loop
     void render(const Image& image) override {
-        static Time time; log(time*60/1000.);
-        if((videoTime+1)*audio.rate > audioTime*encoder.fps) { renderBackground(image, White); window.render(); return; } // Duplicate frame to sync with audio (DEBUG: clear)
         midi.read(videoTime*midi.userTicksPerSeconds/encoder.fps);
         // Smooth scroll animation (assumes constant time step)
         const float k=1./encoder.fps, b=1./encoder.fps; // Stiffness and damping constants
