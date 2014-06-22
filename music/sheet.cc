@@ -208,7 +208,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
         else if(sign.type == Sign::Measure) {
             //if(sign.staff==1 && x > int(target.width) && !slurs[0] && !slurs[1]) break;
             if(sign.staff==0) {
-                fills << Rect(int2(x-1, staffY(0,0)),int2(x+1, staffY(1,-8))); // Bar
+                fills << Rect(int2(x-barWidth+barWidth/2, staffY(0,0)),int2(x+barWidth/2, staffY(1,-8))); // Bar
                 // Raster
                 for(int staff: range(staffCount)) {
                     for(int line: range(5)) {

@@ -9,7 +9,7 @@ struct Sheet /*: Widget*/ {
     // Layout parameters
     const int staffCount = 2;
     const int halfLineInterval = 5, lineInterval = 2*halfLineInterval;
-    const int lineWidth = 1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
+    const int lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
     const int shortStemLength = 5*halfLineInterval;
     // Layout helpers
     int clefStep(ClefSign clefSign, int step) { return step - (clefSign==Treble ? 10 : -2); } // Translates C4 step to top line step using clef
