@@ -28,7 +28,6 @@ struct Sheet : Widget {
     int2 noteSize = int2(round(glyphSize("noteheads.s2"_)));
     float glyph(int2 position, const string name, Font& font);
     float glyph(int2 position, const string name) { return glyph(position, name, font); }
-    uint text(int2 position, const string& text, Font& font);
 
     // Graphic primitives
     array<Rect> fills;
@@ -37,12 +36,16 @@ struct Sheet : Widget {
     typedef array<vec2> Cubic; array<Cubic> cubics;
     map<uint, vec3> colors; // Overrides color for Blit index
 
+    uint text(int2 position, const string& text, Font& font, array<Blit>& blits);
+    uint text(int2 position, const string& text, Font& font) { return this->text(position, text, font, blits); }
+
     // Layouts notations to graphic primitives
     Sheet(const ref<Sign>& signs, uint divisions = 256);
 
     // MIDI Synchronization
     map<uint,array<Note>> notes; // Signs for notes (time, key, blitIndex)
     uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
+    bool synchronizationFailed = false;
 
     /// Synchronizes with MIDI notes and layouts additional debug output if necessary
     /// \return Returns blit index of corresponding note for each MIDI note

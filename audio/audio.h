@@ -31,7 +31,7 @@ struct AudioOutput : Device, Poll {
     uint periodSize = 0, bufferSize = 0;
 
     AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread=mainThread);
-    virtual ~AudioOutput() { stop(); }
+    virtual ~AudioOutput() { if(status) stop(); }
 
     /// Configures PCM for 16bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples

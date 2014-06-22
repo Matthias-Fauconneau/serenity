@@ -9,7 +9,7 @@ float Sheet::glyph(int2 position, const string name, Font& font) {
     return font.advance(index);
 }
 
-uint Sheet::text(int2 position, const string& text, Font& font) {
+uint Sheet::text(int2 position, const string& text, Font& font, array<Blit>& blits) {
     uint x = position.x;
     for(uint code: toUTF32(text)) {
         uint16 index = font.index(code);
@@ -303,7 +303,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
     array<uint> midiToBlit (midiNotes.size);
     map<uint, array<Note>> notes = copy(this->notes);
     array<uint> chordExtra;
-    const bool debug = false;
+    array<Blit> debug;
     while(notes) {
         if(!notes.values[0]) {
             notes.keys.removeAt(0); notes.values.removeAt(0);
@@ -318,7 +318,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                 midiToBlit[midiIndex] = note.blitIndex;
                 //log_("O"_+str(note.key));
                 int2 p = blits[note.blitIndex].position;
-                if(debug) text(p+int2(noteSize.x, 2), "O"_+str(note.key), smallFont);
+                text(p+int2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
                 orderErrors++;
                 return true; // Discards
             });
@@ -343,7 +343,8 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
         if(extraErrors > 9 || wrongErrors > 6 || missingErrors > 9 || orderErrors > 7) {
             log("MID", midiNotes.slice(midiIndex,7));
             log("XML", chord);
-            log(extraErrors, wrongErrors, missingErrors, orderErrors);
+            synchronizationFailed = true;
+            blits << move(debug);
             break;
         }
 
@@ -353,7 +354,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             assert_(note.key == midiKey);
             midiToBlit << note.blitIndex;
             int2 p = blits[note.blitIndex].position;
-            if(debug) text(p+int2(noteSize.x, 2), str(note.key), smallFont);
+            text(p+int2(noteSize.x, 2), str(note.key), smallFont, debug);
         } else if(chordExtra && chord.size == chordExtra.size) {
             int match = notes.values[1].indexOf(midiNotes[chordExtra[0]]);
             if(match >= 0) {
@@ -371,7 +372,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     assert_(midiKey == note.key);
                     midiToBlit[index] = note.blitIndex;
                     int2 p = blits[note.blitIndex].position;
-                    if(debug) text(p+int2(noteSize.x, 2), str(note.key), smallFont);
+                    text(p+int2(noteSize.x, 2), str(note.key), smallFont, debug);
                     return true; // Discards extra as matched to next chord
                 });
             } else {
@@ -384,7 +385,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     assert_(note.key != midiKey);
                     //log_("!"_+str(note.key, midiKey));
                     int2 p = blits[note.blitIndex].position;
-                    if(debug) text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont);
+                    text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
                     wrongErrors++;
                     return true; // Discards as wrong
                 });

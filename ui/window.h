@@ -150,7 +150,7 @@ struct Window : Device {
     /// KeyCode range
     uint minKeyCode=8, maxKeyCode=255;
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Picture, XCursor, SnapshotSegment, PresentEvent };
+    enum Resource { XWindow, GContext, Colormap, Segment, Pixmap, Pixmap2, Picture, XCursor, SnapshotSegment, PresentEvent };
 
     /// System V shared memory
     int shm = 0;

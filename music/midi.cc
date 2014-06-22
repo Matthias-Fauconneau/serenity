@@ -50,20 +50,12 @@ void MidiFile::read(Track& track, uint time, State state) {
             else if(key==KeySignature) this->key=(int8)data[0], scale=data[1]?Minor:Major;
         }
 
-        if((type==NoteOff || type==NoteOn) && active.contains(key)) {
+        if(type==NoteOff || (type==NoteOn && vel==0)) {
             if(state==Play) noteEvent(key,0);
-            MidiNote note = active.take(active.indexOf(key));
-            if(state==Sort) {
-                uint nearest = 0;
-                for(const MidiNote& o: notes) { if(abs(int(o.time-note.time))<abs(int(note.time-nearest))) nearest=o.time; }
-                notes.insertSorted(MidiNote{note.time, note.key, note.velocity});
-            }
         }
         if(type==NoteOn && vel) {
-            if(!active.contains(key)) {
-                if(state==Play) noteEvent(key,vel);
-                active.append(MidiNote{track.time, key, vel});
-            }
+            if(state==Sort) notes.insertSorted(MidiNote{track.time, key, vel});
+            if(state==Play) noteEvent(key,vel);
         }
 
         if(!s) return;

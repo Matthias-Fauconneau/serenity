@@ -126,6 +126,7 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
 }
 
 void AudioOutput::stop() {
+    assert_(status);
     if(status->state < Suspended) io<DRAIN>();
     unregisterPoll();
     int state = status->state;

@@ -27,15 +27,17 @@ struct Music : Widget {
     // Preview
     bool preview = true;
     Timer timer;
-    Window window {this, encoder.size()/(preview?1:1), "MusicXML"_};
+    Window window {&sheet, encoder.size()/(preview?1:1), "MusicXML"_};
     AudioOutput audio {{this,&Music::read}};
     uint64 audioStartTime;
     uint64 audioTime = 0, videoTime = 0;
 
     Music() {
+        if(sheet.synchronizationFailed) { window.background=White; return; }
         midi.noteEvent.connect(this, &Music::noteEvent);
         window.background = NoBackground; // Only clear on changes
-        if(preview) { window.show(); audio.start(mp3.rate, 1024); }
+        window.widget = this;
+        if(preview) audio.start(mp3.rate, 1024);
         //else while(midi.time < midi.duration) step();
     }
 

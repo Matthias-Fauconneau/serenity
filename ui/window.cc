@@ -140,6 +140,7 @@ void Window::event() {
             target.buffer.data = target.data = (byte4*)check( shmat(shm, 0, 0) ); assert(target.data);
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=size.x, r.h=size.y; send(raw(r));}
+            {::CreatePixmap r; r.pixmap=id+Pixmap2; r.window=id; r.w=size.x, r.h=size.y; send(raw(r));}
         }
 
         renderBackground(target, background);
@@ -152,7 +153,9 @@ void Window::event() {
 
 void Window::putImage(int2 position, int2 size) {
     assert_(state == Idle);
-    Shm::PutImage r; r.window=id+Pixmap/*XWindow*/; r.context=id+GContext; r.seg=id+Segment;
+    static uint pixmap = Pixmap;
+    pixmap = pixmap==Pixmap2 ? Pixmap : Pixmap2; // Double buffer
+    Shm::PutImage r; r.window=id+pixmap; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
     r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
     r.dstX = position.x, r.dstY = position.y;
@@ -161,8 +164,7 @@ void Window::putImage(int2 position, int2 size) {
 }
 
 void Window::present() {
-    if(presentState==Server) { presentState=Wait; return; }
-    assert_(presentState == Idle);
+    if(presentState != Idle) { presentState=Wait; return; }
     {Present::Pixmap r; assert_(sizeof(r)==r.size*4, sizeof(r)); r.window=id+XWindow; r.pixmap=id+Pixmap; send(raw(r));}
     presentState = Server;
 }
