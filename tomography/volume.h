@@ -39,7 +39,7 @@ inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor
 //inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data, A.name); }
 //inline VolumeF normalize(const VolumeF& volume) { float sum = ::sum(volume); assert_(sum); return (1.f/sum) * volume; }
 
-VolumeF normalize(VolumeF&& target) {
+inline VolumeF normalize(VolumeF&& target) {
     target = scale(move(target), sq(target.size.x)/sum(target));
     assert_(abs(sum(target) -sq(target.size.x))<=0x1p-6, log2(abs(sum(target) -sq(target.size.x))));
     return move(target);

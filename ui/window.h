@@ -44,6 +44,8 @@ struct Window : Socket, Poll {
     bool mapped = false;
     /// Geometry
     int2 position=0, size=0;
+    /// Title (for snapshots)
+    String title;
     /// Actions triggered when a key is pressed (or on release for key mapped with a long action)
     map<Key, function<void()>> actions;
     /// Actions triggered when a key is pressed for a long time

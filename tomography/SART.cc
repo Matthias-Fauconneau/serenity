@@ -5,6 +5,7 @@
 // Simultaneous iterative algebraic reconstruction technique
 SART::SART(const Projection& A, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(A, negln(b), subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
     ImageArray i (Ax.size, 1.f);
+    log_("SART: AAti... "_);
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         const ProjectionArray& At = subset.At;
@@ -14,6 +15,7 @@ SART::SART(const Projection& A, const ImageArray& b, const uint subsetSize) : Su
         new (&AAti[subsetIndex]) ImageArray(b.size);
         project(AAti[subsetIndex], A, Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
     }
+    log("Done");
 }
 
 void SART::step() {

@@ -29,7 +29,35 @@ ImageArray project(Projection A, const CLVolume& x, const int oversample) {
     return Ax;
 }
 
+struct Variant : String {
+    Variant(){}
+    default_move(Variant);
+    Variant(String&& s) : String(move(s)) {}
+    Variant(double decimal) : String(ftoa(decimal)){}
+    explicit operator bool() const { return size; }
+    operator int() const { return *this ? fromInteger(*this) : 0; }
+    operator uint() const { return *this ? fromInteger(*this) : 0; }
+    operator float() const { return fromDecimal(*this); }
+    operator double() const { return fromDecimal(*this); }
+    generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
+};
+
+// Parses process arguments into parameter=value pairs
+map<string, Variant> parseParameters(const ref<string> arguments) {
+    map<string, Variant> parameters;
+    for(const string& argument: arguments) {
+        TextData s (argument);
+        string key = s.until("="_);
+        if(s) { // Explicit argument
+            string value = s.untilEnd();
+            parameters.insert(key, Variant(String(value)));
+        }
+    }
+    return parameters;
+}
+
 struct Application : Poll {
+    map<string, Variant> parameters = parseParameters(arguments());
     Thread thread {19};
     // Reference volume
     Folder folder {"Data"_};
@@ -40,10 +68,11 @@ struct Application : Poll {
     const CLVolume acquisitionVolume {oversample*volumeSize, Map(strx(oversample*volumeSize)+".ref"_, folder)};
     int3 evaluationOrigin =  int3(0,0,volumeSize.z/4), evaluationSize = int3(volumeSize.xy(), volumeSize.z/2);
     //int3 evaluationOrigin =  int3(0,0,0), evaluationSize = volumeSize;
+    const float mean = ::mean(referenceVolume);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
     // Projection
     const int3 projectionSize = N;
-    Projection projections[1] = {Projection(volumeSize, projectionSize, /*doubleHelix*/true, /*pitch*/2)};
+    Projection projections[1] = {Projection(volumeSize, projectionSize, parameters.value("doubleHelix"_, true), parameters.value("pitch"_, 2), parameters.value("photonCount"_,256))};
     buffer<ImageArray> projectionData = apply(ref<Projection>(projections), [this](const Projection& A) { return project(A, acquisitionVolume, oversample);});
 
     const uint subsetSize = round(sqrt(float(projectionSize.z)));
@@ -55,7 +84,7 @@ struct Application : Poll {
 
     Value sliceIndex = (volumeSize.z-1) / 2;
     SliceView x {&referenceVolume, upsample, sliceIndex};
-    HList<SliceView> rSlices { apply<SliceView>(volumes, upsample, sliceIndex) };
+    HList<SliceView> rSlices { apply<SliceView>(volumes, upsample, sliceIndex, 0/*2*mean*/) };
     HBox slices {{&x, &rSlices}};
 
     Value projectionIndex = (projectionSize.z-1) / 2;
@@ -66,7 +95,7 @@ struct Application : Poll {
     Plot plot;
 
     VBox layout {{&slices, &views, &plot}};
-    Window window {&layout, strx(volumeSize), int2(-1, -1024)};
+    Window window {&layout, str(N), int2(-1, -1024)};
     bool wait = false;
 
     Application() : Poll(0,0,thread) {

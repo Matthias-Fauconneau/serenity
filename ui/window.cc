@@ -129,7 +129,7 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
     setTitle(title);
     setIcon(icon);
     actions[Escape] = []{ exit(); };
-    actions[PrintScreen] = [this]{ Locker lock(renderLock); writeFile("snapshot.png"_,encodePNG(target)); };
+    actions[PrintScreen] = [this]{ Locker lock(renderLock); writeFile(this->title+".png"_,encodePNG(target)); };
     show();
 }
 Window::~Window() {
@@ -378,6 +378,7 @@ void Window::setType(const string& type) {
     r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom(type))));
 }
 void Window::setTitle(const string& title) {
+    this->title = copy(String(title));
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
     r.length=title.size; r.size+=align(4, r.length)/4; send(String(raw(r)+title+pad(4,title.size)));
 }
