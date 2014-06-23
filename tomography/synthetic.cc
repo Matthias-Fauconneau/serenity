@@ -1,6 +1,7 @@
 #include "random.h"
 #include "file.h"
 #include "view.h"
+#include "text.h"
 #include "layout.h"
 #include "window.h"
 
@@ -99,8 +100,8 @@ inline void intersects(const float halfHeight, const float radius, const float3 
     const float2 sideT = (-b + float2(sqrtDelta,-sqrtDelta)) / (2*a); // t±
     const float2 sideZ = abs(origin.z + sideT * ray.z); // |z±|
     tmin=inf, tmax=-inf;
-    if(capR2[0] < radiusSq) tmin=min(tmin, capT[0]), tmax=max(tmax, capT[0]); // top
-    if(capR2[1] < radiusSq) tmin=min(tmin, capT[1]), tmax=max(tmax, capT[1]); // bottom
+    if(capR2[0] <= radiusSq) tmin=min(tmin, capT[0]), tmax=max(tmax, capT[0]); // top
+    if(capR2[1] <= radiusSq) tmin=min(tmin, capT[1]), tmax=max(tmax, capT[1]); // bottom
     if(sideZ[0] <= halfHeight) tmin=min(tmin, sideT[0]), tmax=max(tmax, sideT[0]); // side+
     if(sideZ[1] <= halfHeight) tmin=min(tmin, sideT[1]), tmax=max(tmax, sideT[1]); // side-
 }
@@ -125,7 +126,7 @@ inline bool intersects(const float radius, const float3 origin, const float3 ray
 }
 
 struct Intersection { float t; float density; };
-inline bool operator <(const Intersection& a, const Intersection& b) { return a.t < b.t; }
+inline bool operator <(const Intersection& a, const Intersection& b) { return a.t < b.t /*|| (a.t == b.t && a.density > b.density)*/; } // Sort by t /*, push before pop*/ checked before insert
 inline String str(const Intersection& a) { return str(a.t, a.density); }
 
 ImageF porousRock(const Projection& A, uint index) {
@@ -161,7 +162,7 @@ ImageF porousRock(const Projection& A, uint index) {
     const float containerDensity = 5.6; // Pure iron
     const float3 origin = imageToWorld[3].xyz();
     array<Intersection> intersections (2*grainCount); // Conservative bound on intersection count
-    buffer<float> stack (grainCount, 0); // Conservative bound on intersection count
+    buffer<float> stack (grainCount+1, 0); // Conservative bound on intersection count
     stack.append( airDensity );
     for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) {
         const float3 ray = normalize(float(x) * imageToWorld[0].xyz() + float(y) * imageToWorld[1].xyz() + imageToWorld[2].xyz());
@@ -183,8 +184,10 @@ ImageF porousRock(const Projection& A, uint index) {
         intersections.size = 0;
         for(const Grain& grain: grains) {
             float tmin, tmax;
-            if(intersects(grain.radius, grain.center-origin, ray, tmin, tmax)) {
+            if(intersects(grain.radius, grain.center-origin, ray, tmin, tmax) && tmax>tmin /*i.e tmax != tmin*/) {
+                assert_(intersections.size < intersections.capacity);
                 intersections.insertSorted( Intersection{tmin, grain.density} );
+                assert_(intersections.size < intersections.capacity);
                 intersections.insertSorted( Intersection{tmax, 0} );
             }
         }
@@ -199,15 +202,17 @@ ImageF porousRock(const Projection& A, uint index) {
                 assert_(isNumber(stack.last()));
                 if(length > 0) densityRayIntegral += length * stack.last();
                 float density = intersection.density;
+                assert_(stack.size >= 1 && stack.size<stack.capacity, stack.size);
                 if(density) stack.append(density); else stack.size--;
             }
             assert_(stack.size == 1, stack.size, stack, intersections.size, intersections);
             float length = inner[1] - lastT;
             assert_(isNumber(length), inner[1], lastT);
+            assert_(length >= 0, length);
             densityRayIntegral += length * stack.last(); // airDensity
             assert_(isNumber(densityRayIntegral), densityRayIntegral);
         }
-        image(x,y) = densityRayIntegral;
+        image(x,y) = densityRayIntegral / A.volumeSize.x;
     }
     return image;
 }
@@ -222,7 +227,8 @@ struct Analytic : Widget {
     void render() override {
         ImageF image = porousRock(A, index.value);
         while(image.size < this->target.size()) image = upsample(image);
-        convert(target, image);
+        float max = convert(target, image);
+        Text(str(index.value, max),16,green).render(this->target, 0);
         putImage(target);
     }
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
@@ -237,10 +243,10 @@ struct App {
     CLVolume volume {hostVolume};
     SliceView sliceView {volume, 512/N};
     Projection A {volume.size, volume.size};
-    Value projectionIndex {0};
+    Value projectionIndex {20};
     VolumeView volumeView {volume, A, 512/N, projectionIndex};
     Analytic analyticView {A, 512/N, projectionIndex};
     HBox layout {{ &sliceView, &volumeView, &analyticView }};
     Window window {&layout, str(N)};
-    //App1() { //writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data)); }
+    //App() { //writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data)); }
 } app;

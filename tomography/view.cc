@@ -2,7 +2,7 @@
 #include "text.h"
 #include "operators.h"
 
-Value SliceView::staticIndex = 0;
+Value SliceView::staticIndex (0);
 
 bool SliceView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
     if(button == WheelDown) { index.value = clip(0u, index.value-1, uint(this->size.z-1)); index.render(); return true; }
@@ -26,7 +26,7 @@ void SliceView::render() {
     putImage(target);
 }
 
-Value VolumeView::staticIndex = 0;
+Value VolumeView::staticIndex (0);
 
 bool VolumeView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
     if(button) { index.value = clip(0, int(cursor.x*(A.count-1)/(size.x-1)), int(A.count-1)); index.render(); return true; }
