@@ -105,12 +105,6 @@ inline void intersects(const float halfHeight, const float radius, const float3 
     if(sideZ[0] <= halfHeight) tmin=min(tmin, sideT[0]), tmax=max(tmax, sideT[0]); // side+
     if(sideZ[1] <= halfHeight) tmin=min(tmin, sideT[1]), tmax=max(tmax, sideT[1]); // side-
 }
-// Length of ray inside cylinder
-inline float length(const float halfHeight, const float radius, const float3 origin, const float3 ray) {
-    float tmin, tmax;
-    intersects(halfHeight, radius, origin, ray, tmin, tmax);
-    return tmax-tmin;
-}
 
 inline bool intersects(const float radius, const float3 origin, const float3 ray, float& tmin, float& tmax) {
     float a = sq(ray);
@@ -164,45 +158,36 @@ ImageF porousRock(const Projection& A, uint index) {
     const float containerDensity = 5.6; // Pure iron
     const float3 origin = imageToWorld[3].xyz();
     array<Intersection> intersections (2*grainCount); // Conservative bound on intersection count
-    //buffer<float> stack (grainCount+1, 0); // Conservative bound on intersection count
-    //stack.append( airDensity );
     int counts[typeCount]; mref<int>(counts,typeCount).clear(0);
     for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) {
         const float3 ray = normalize(float(x) * imageToWorld[0].xyz() + float(y) * imageToWorld[1].xyz() + imageToWorld[2].xyz());
-        //float length = ::length(halfHeight, volumeRadius, origin, ray);
         float densityRayIntegral = 0;
-        //if(length > 0) densityRayIntegral += length * airDensity;
         float outer[2]; intersects(halfHeight, outerRadius, origin, ray, outer[0], outer[1]);
         float inner[2]; intersects(halfHeight, innerRadius, origin, ray, inner[0], inner[1]);
         if(outer[0]<inf) {
             float length = inner[0] - outer[0];
-            if(length>=0 && length<inf) //assert_(length>=0, length, inner[0], outer[0], "0");
-            densityRayIntegral += length * containerDensity;
+            if(length>=0 && length<inf) //assert_(length>=0, length, inner[0], outer[0], "0"); //FIXME
+                densityRayIntegral += length * containerDensity;
         }
         if(outer[1]>-inf) {
             float length = outer[1] - inner[1];
-            if(length>=0 && length<inf) //assert_(length>=0, length, outer[0], inner[0], inner[1], outer[1], "1");
-            densityRayIntegral += length * containerDensity;
+            if(length>=0 && length<inf) //assert_(length>=0, length, outer[0], inner[0], inner[1], outer[1], "1"); //FIXME
+                densityRayIntegral += length * containerDensity;
         }
         intersections.size = 0;
         for(const Grain& grain: grains) {
             float tmin, tmax;
             if(intersects(grain.radius, grain.center-origin, ray, tmin, tmax) && tmax>tmin /*i.e tmax != tmin*/) {
-                assert_(intersections.size < intersections.capacity);
                 intersections.insertSorted( Intersection{tmin, int(1+grain.type)} );
-                assert_(intersections.size < intersections.capacity);
                 intersections.insertSorted( Intersection{tmax, -int(1+grain.type)} );
             }
         }
         if(inner[0]<inf && inner[1]>-inf) {
             float lastT = inner[0];
-            for(uint type: range(typeCount)) assert_(counts[type] == 0, ref<int>(counts,typeCount), intersections, "before");
             for(const Intersection& intersection: intersections) {
                 float t = intersection.t;
                 float length = t - lastT;
                 lastT = t;
-                //assert_(length >= 0, lastT, t);
-                assert_(isNumber(length), lastT, t);
                 if(length > 0) {
                     float density = airDensity;
                     for(uint type: range(typeCount)) if(counts[type]) density = types[type].density; // In order so that lighter grains overrides heavier grains
@@ -212,13 +197,8 @@ ImageF porousRock(const Projection& A, uint index) {
                 if(index > 0) counts[index-1]++;
                 if(index < 0) counts[-index-1]--;
             }
-            for(uint type: range(typeCount)) assert_(counts[type] == 0, ref<int>(counts,typeCount), intersections);
-            //assert_(stack.size == 1, stack.size, stack, intersections.size, intersections);
             float length = inner[1] - lastT;
-            assert_(isNumber(length), inner[1], lastT);
-            assert_(length >= 0, length);
-            densityRayIntegral += length * airDensity; // airDensity
-            assert_(isNumber(densityRayIntegral), densityRayIntegral);
+            densityRayIntegral += length * airDensity;
         }
         image(x,y) = densityRayIntegral / A.volumeSize.x;
     }
