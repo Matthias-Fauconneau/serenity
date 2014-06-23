@@ -40,7 +40,7 @@ void VolumeView::render() {
     project(image, A, x, index.value);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
-    if(!target) return; // FIXME
+    if(!target) { log("Empty clip"); return; } // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, this->max);
     string name = x.name;

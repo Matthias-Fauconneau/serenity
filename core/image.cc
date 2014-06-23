@@ -69,6 +69,6 @@ ImageF upsample(const ImageF& source) {
 
 ImageF clip(const ImageF& image, Rect r) {
     r = r & Rect(image.size);
-    assert_(r.size().x == image.size.x);
+    assert_(r.size().x == image.size.x, r.size(), image.size);
     return ImageF(buffer<float>(image.data.slice(r.position().y*image.size.x+r.position().x, r.size().y*r.size().x)), r.size());
 }

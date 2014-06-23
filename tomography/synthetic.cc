@@ -212,31 +212,35 @@ ImageF porousRock(const Projection& A, uint index) {
     return image;
 }
 
-struct App1 {
+struct Analytic : Widget {
+   const Projection& A;
+   const int upsampleFactor;
+   Value& index;
+
+   Analytic(const Projection& A, const int upsampleFactor, Value& index=VolumeView::staticIndex) : A(A), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    int2 sizeHint() override { return upsampleFactor * A.projectionSize.xy(); }
+    void render() override {
+        ImageF image = porousRock(A, index.value);
+        while(image.size < this->target.size()) image = upsample(image);
+        convert(target, image);
+        putImage(target);
+    }
+    bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
+        if(button) { index.value = clip(0, int(cursor.x*(A.projectionSize.z-1)/(size.x-1)), int(A.projectionSize.z-1)); index.render(); return true; }
+        return false;
+    }
+};
+
+struct App {
     const int N = fromInteger(arguments()[0]);
     VolumeF hostVolume = normalize(porousRock(N));
     CLVolume volume {hostVolume};
-    SliceView sliceView {volume, 1024/N};
+    SliceView sliceView {volume, 512/N};
     Projection A {volume.size, volume.size};
-    VolumeView volumeView {volume, A, 1024/N};
-    HBox layout {{ &sliceView , &volumeView }};
+    Value projectionIndex {0};
+    VolumeView volumeView {volume, A, 512/N, projectionIndex};
+    Analytic analyticView {A, 512/N, projectionIndex};
+    HBox layout {{ &sliceView, &volumeView, &analyticView }};
     Window window {&layout, str(N)};
     //App1() { //writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data)); }
-} app1;
-
-struct App2 : Widget {
-    const int N = fromInteger(arguments()[0]);
-    Window window {this, str(N)};
-    Projection A {N, N};
-    uint index = 0;
-    int2 sizeHint() override { return 512; }
-    void render() override {
-        ImageF image = porousRock(A, index);
-        while(image.size < this->target.size()) image = upsample(image);
-        convert(target, image);
-    }
-    bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
-        if(button) { index = clip(0, int(cursor.x*(A.projectionSize.z-1)/(size.x-1)), int(A.projectionSize.z-1)); render(); putImage(target); return true; }
-        return false;
-    }
-} app2;
+} app;
