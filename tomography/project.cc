@@ -37,7 +37,7 @@ static uint64 project(const CLBufferF& buffer, const Projection& projection, con
     mat4 imageToWorld = projection.imageToWorld(index);
     float3 origin = imageToWorld[3].xyz();
     // dataOrigin uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
-    //                                                    imageToWorld, plusMinusHalfHeightMinusOriginZ,                         c,                                                                     radiusSq,    halfHeight, dataOrigin
+    //                                                                          imageToWorld, plusMinusHalfHeightMinusOriginZ,                         c,                                                                     radiusSq,    halfHeight, dataOrigin
     return CL::project(projection.projectionSize.xy(), imageToWorld, float2(1,-1) * (center.z-1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) + 1 /*fix OOB*/, sq(center.x), center.z, float4(origin + center + float3(1./2),0), volume, noneLinearSampler, projection.projectionSize.x, buffer.pointer);
 }
 

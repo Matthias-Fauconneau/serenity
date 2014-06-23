@@ -41,7 +41,7 @@ inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor
 
 inline VolumeF normalize(VolumeF&& target) {
     target = scale(move(target), sq(target.size.x)/sum(target));
-    assert_(abs(sum(target) -sq(target.size.x))<=0x1p-6, log2(abs(sum(target) -sq(target.size.x))));
+    assert(abs(sum(target) -sq(target.size.x))<=0x1p-4, log2(abs(sum(target) -sq(target.size.x))));
     return move(target);
 }
 

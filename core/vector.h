@@ -88,8 +88,12 @@ generic String str(const vec& v) { String s; s<<"("_; for(uint i=0;i<N;i++) { s<
 #undef generic
 #define generic template<Type T>
 
+generic struct abcd {
+    T a, b, c, d;
+};
 generic struct xy {
     T x,y;
+    vec< ::abcd, T, 4> xxyy() const { return {x,x,y,y}; }
 };
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
@@ -100,6 +104,8 @@ typedef float2 vec2;
 generic struct xyz {
     T x,y,z;
     vec< ::xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
+    vec< ::abcd, T, 4> xyxy() const { return {x,y,x,y}; }
+    vec< ::abcd, T, 4> xxyy() const { return {x,x,y,y}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
@@ -111,7 +117,10 @@ generic struct xyzw {
     T x,y,z,w;
     vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
-    vec< ::xy,T,2> xy()const{ return *(vec< ::xy,T,2>*)this; }
+    vec< ::xy,T,2> xy() const { return *(vec< ::xy,T,2>*)this; }
+    vec< ::xy,T,2> xz() const { return {x,z}; }
+    vec< ::xy,T,2> yw() const { return {y,w}; }
+    vec< ::xyzw,T,4> xyxy() const { return {x,y,x,y}; }
 };
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> float4;

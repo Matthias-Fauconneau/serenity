@@ -16,8 +16,9 @@ struct App {
     }
 } app;
 
-SliceView sliceView (volume, 512/N);
+const int upsample = max(1, 512/N);
+SliceView sliceView (volume, upsample);
 Projection A(volume.size, volume.size);
-VolumeView volumeView (volume, A, 512/N);
+VolumeView volumeView (volume, A, upsample);
 HBox layout ({ &sliceView , &volumeView });
 Window window (&layout, strx(size));
