@@ -125,9 +125,9 @@ inline bool intersects(const float radius, const float3 origin, const float3 ray
     return true;
 }
 
-struct Intersection { float t; float density; };
+struct Intersection { float t; int index; };
 inline bool operator <(const Intersection& a, const Intersection& b) { return a.t < b.t /*|| (a.t == b.t && a.density > b.density)*/; } // Sort by t /*, push before pop*/ checked before insert
-inline String str(const Intersection& a) { return str(a.t, a.density); }
+inline String str(const Intersection& a) { return str(a.t, a.index); }
 
 ImageF porousRock(const Projection& A, uint index) {
     const vec3 center = vec3(A.volumeSize-int3(1))/2.f;
@@ -139,10 +139,12 @@ ImageF porousRock(const Projection& A, uint index) {
     const float rate = 1./cb(maximumRadius); // 1/vx
     int3 size = A.volumeSize;
     const uint grainCount = rate*size.z*size.y*size.x;
-    struct Grain { vec3 center; float radius, density; };
+    struct Grain { vec3 center; float radius; uint type; };
     buffer<Grain> grains(grainCount, 0);
+    uint typeCount = ref<GrainType>(types).size;
     Random random; // Unseeded sequence (for repeatability)
-    for(GrainType type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
+    for(uint index: range(typeCount)) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
+        GrainType type = types[index];
         for(uint count=0; count < type.probability * grainCount && grains.size < grains.capacity;) {
             const float r = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
             const vec2 xy = vec2(random(), random()) * vec2(size.xy());
@@ -150,7 +152,7 @@ ImageF porousRock(const Projection& A, uint index) {
             count++;
             vec3 p(xy.x, xy.y, r+random()*((size.z-1)-2*r));
             p -= center;
-            grains.append( Grain{p, r, type.density} );
+            grains.append( Grain{p, r, index} );
         }
     }
 
@@ -162,8 +164,9 @@ ImageF porousRock(const Projection& A, uint index) {
     const float containerDensity = 5.6; // Pure iron
     const float3 origin = imageToWorld[3].xyz();
     array<Intersection> intersections (2*grainCount); // Conservative bound on intersection count
-    buffer<float> stack (grainCount+1, 0); // Conservative bound on intersection count
-    stack.append( airDensity );
+    //buffer<float> stack (grainCount+1, 0); // Conservative bound on intersection count
+    //stack.append( airDensity );
+    int counts[typeCount]; mref<int>(counts,typeCount).clear(0);
     for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) {
         const float3 ray = normalize(float(x) * imageToWorld[0].xyz() + float(y) * imageToWorld[1].xyz() + imageToWorld[2].xyz());
         //float length = ::length(halfHeight, volumeRadius, origin, ray);
@@ -186,30 +189,35 @@ ImageF porousRock(const Projection& A, uint index) {
             float tmin, tmax;
             if(intersects(grain.radius, grain.center-origin, ray, tmin, tmax) && tmax>tmin /*i.e tmax != tmin*/) {
                 assert_(intersections.size < intersections.capacity);
-                intersections.insertSorted( Intersection{tmin, grain.density} );
+                intersections.insertSorted( Intersection{tmin, int(1+grain.type)} );
                 assert_(intersections.size < intersections.capacity);
-                intersections.insertSorted( Intersection{tmax, 0} );
+                intersections.insertSorted( Intersection{tmax, -int(1+grain.type)} );
             }
         }
         if(inner[0]<inf && inner[1]>-inf) {
             float lastT = inner[0];
+            for(uint type: range(typeCount)) assert_(counts[type] == 0, ref<int>(counts,typeCount), intersections, "before");
             for(const Intersection& intersection: intersections) {
                 float t = intersection.t;
                 float length = t - lastT;
                 lastT = t;
                 //assert_(length >= 0, lastT, t);
                 assert_(isNumber(length), lastT, t);
-                assert_(isNumber(stack.last()));
-                if(length > 0) densityRayIntegral += length * stack.last();
-                float density = intersection.density;
-                assert_(stack.size >= 1 && stack.size<stack.capacity, stack.size);
-                if(density) stack.append(density); else stack.size--;
+                if(length > 0) {
+                    float density = airDensity;
+                    for(uint type: range(typeCount)) if(counts[type]) density = types[type].density; // In order so that lighter grains overrides heavier grains
+                    densityRayIntegral += length * density;
+                }
+                int index =  intersection.index;
+                if(index > 0) counts[index-1]++;
+                if(index < 0) counts[-index-1]--;
             }
-            assert_(stack.size == 1, stack.size, stack, intersections.size, intersections);
+            for(uint type: range(typeCount)) assert_(counts[type] == 0, ref<int>(counts,typeCount), intersections);
+            //assert_(stack.size == 1, stack.size, stack, intersections.size, intersections);
             float length = inner[1] - lastT;
             assert_(isNumber(length), inner[1], lastT);
             assert_(length >= 0, length);
-            densityRayIntegral += length * stack.last(); // airDensity
+            densityRayIntegral += length * airDensity; // airDensity
             assert_(isNumber(densityRayIntegral), densityRayIntegral);
         }
         image(x,y) = densityRayIntegral / A.volumeSize.x;
