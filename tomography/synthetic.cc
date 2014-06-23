@@ -17,8 +17,19 @@ VolumeF porousRock(int3 size) {
     const float containerDensity = 5.6; // Pure iron
     for(uint y: range(size.y)) for(uint x: range(size.x)) {
         float r2 = sq(vec2(x,y)-vec2(size.xy()-1)/2.f);
-        if(sq(innerRadius) < r2 && r2 < sq(outerRadius)) {
-            for(uint z: range(size.z)) volume(x,y,z) = containerDensity;
+        if(sq(innerRadius-1./2) < r2 && r2 < sq(outerRadius+1./2)) {
+            for(uint z: range(size.z)) {
+                if(sq(innerRadius+1./2) <= r2 && r2 <= sq(outerRadius-1./2)) volume(x,y,z) = containerDensity;
+                else if(r2 < sq(innerRadius+1./2)) {
+                    float r = sqrt(r2);
+                    float c = r - (innerRadius-1./2);
+                    volume(x,y,z) = c * containerDensity;
+                } else if(sq(outerRadius-1./2) < r2) {
+                    float r = sqrt(r2);
+                    float c = (outerRadius+1./2) - r;
+                    volume(x,y,z) = c * containerDensity;
+                } else error(r2);
+            }
         }
     }
 
@@ -39,7 +50,9 @@ VolumeF porousRock(int3 size) {
             if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
             count++;
             float cx = xy.x, cy=xy.y, cz=r+random()*((size.z-1)-2*r);
-            float r2 = r*r;
+            float innerR2 = sq(r-1.f/2);
+            float outerRadius = r+1.f/2;
+            float outerR2 = sq(outerRadius);
             float v = type.density;
             // Rasterizes grains as spheres
             int iz = cz-r, iy = cy-r, ix = cx-r;
@@ -56,8 +69,14 @@ VolumeF porousRock(int3 size) {
                     float RZY = RZ + ry*ry;
                     for(uint x=0; x<grainSize; x++) {
                         float rx = float(x) - fx;
-                        float RZYX = RZY + rx*rx;
-                        if(RZYX < r2) volumeZY[x] = v; // TODO: Correct coverage (antialiasing)
+                        float r2 = RZY + rx*rx;
+                        if(r2 < outerR2) {
+                            if(r2 <= innerR2) volumeZY[x] = v;
+                            else {
+                                float c = outerRadius - sqrt(r2);
+                                volumeZY[x] = (1-c) * volumeZY[x] + c * v; // Alpha blending
+                            }
+                        }
                     }
                 }
             }
@@ -67,9 +86,16 @@ VolumeF porousRock(int3 size) {
     return volume;
 }
 
-const uint N = fromInteger(arguments()[0]);
-CLVolume volume (porousRock(N));
-SliceView sliceView (volume, 512/N);
-VolumeView volumeView (volume, Projection(volume.size, volume.size), 512/N);
-HBox layout ({ &sliceView , &volumeView });
-Window window (&layout, str(N));
+struct App {
+    const int N = fromInteger(arguments()[0]);
+    VolumeF hostVolume = normalize(porousRock(N));
+    CLVolume volume {hostVolume};
+    SliceView sliceView {volume, 512/N};
+    Projection A {volume.size, volume.size};
+    VolumeView volumeView {volume, A, 512/N};
+    HBox layout {{ &sliceView , &volumeView }};
+    Window window {&layout, str(N)};
+    App() {
+        writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data));
+    }
+} app;

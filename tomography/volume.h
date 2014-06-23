@@ -35,9 +35,15 @@ inline float SSE(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); 
 inline float dotProduct(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return dotProduct(A.data, B.data); }
 inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor); return move(volume); }
 
-inline VolumeF normalize(VolumeF&& volume) { float sum = ::sum(volume); assert_(sum); return scale(move(volume), 1./sum); }
-inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data, A.name); }
-inline VolumeF normalize(const VolumeF& volume) { float sum = ::sum(volume); assert_(sum); return (1.f/sum) * volume; }
+//inline VolumeF normalize(VolumeF&& volume) { float sum = ::sum(volume); assert_(sum); return scale(move(volume), 1./sum); }
+//inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data, A.name); }
+//inline VolumeF normalize(const VolumeF& volume) { float sum = ::sum(volume); assert_(sum); return (1.f/sum) * volume; }
+
+VolumeF normalize(VolumeF&& target) {
+    target = scale(move(target), sq(target.size.x)/sum(target));
+    assert_(abs(sum(target) -sq(target.size.x))<=0x1p-6, log2(abs(sum(target) -sq(target.size.x))));
+    return move(target);
+}
 
 inline const VolumeF& cylinder(const VolumeF& target, const float value=1) {
     int3 size = target.size;

@@ -17,10 +17,10 @@ struct Projection {
     float cameraLength = 1;
     float specimenDistance = 1./16;
     bool doubleHelix;
-    float pitch;
+    float numberOfRotations;
     float photonCount = 0; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
 
-    Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix = false, const float pitch = 1) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), pitch(pitch) {}
+    Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix = false, const float numberOfRotations = 1) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), numberOfRotations(numberOfRotations) {}
 
     // Transforms from world coordinates [±1] to view coordinates [±size/2, 1] (cannot directly transform to image coordinates because of perspective division)
     mat4 worldToView(uint index) const;

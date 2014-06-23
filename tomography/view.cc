@@ -24,7 +24,6 @@ void SliceView::render() {
     float max = convert(target, source);
     float min = ::min(image.data);
     Text((clVolume?clVolume->name:""_)+"\n"_+str(min)+"\n"_+str(volume ? mean(*volume) : mean(*clVolume))+"\n"_+str(max),16,green).render(this->target, 0);
-    putImage(target);
 }
 
 Value VolumeView::staticIndex = 0;
@@ -46,5 +45,4 @@ void VolumeView::render() {
     float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
     float min = ::min(image.data);
     Text(x.name+"\n"_+str(min)+"\n"_+str(mean(x))+"\n"_+str(max),16,green).render(this->target, 0);
-    putImage(target);
 }

@@ -17,8 +17,6 @@ struct App {
         VolumeF target (N, Map(targetFile, Map::Prot(Map::Read|Map::Write)));
         VolumeF source(N*2, Map(strx(int3(N*2))+".ref"_, "Data"_));
         downsample(target, source);
-        assert_(target.size.x == target.size.y && target.size.y == target.size.z);
-        target = scale(move(target), sq(target.size.x)/sum(target));
-        assert_(sum(target) == sq(target.size.x), sum(target), sq(target.size.x));
+        target = normalize(move(target));
     }
 } app;

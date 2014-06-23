@@ -10,7 +10,7 @@ struct Reconstruction {
     int divergent = 0; // Divergent iterations
     uint64 stopTime = 0;
 
-    Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, name), 1.f/A.volumeSize.x)) { assert_(x.size.x==x.size.y); }
+    Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), 1.f/A.volumeSize.x)) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };

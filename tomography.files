@@ -75,3 +75,4 @@ tomography/MLTR.cc
 tomography/PMLTR.h
 tomography/PMLTR.cc
 core/random.h
+test.cc

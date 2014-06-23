@@ -10,7 +10,7 @@ mat4 Projection::worldToView(uint index) const {
     float zExtent = (specimenDistance - volumeRadius) / cameraLength * detectorHalfHeight; // Fits cap tangent intersection to detector top edge
     const float deltaZ = volumeAspectRatio - zExtent/volumeRadius;
 
-    float angle = doubleHelix ? 2*PI*pitch*float(index/2)/((count-1)/2) + (index%2?PI:0) : 2*PI*pitch*float(index)/(count-1); // Rotation angle (in radians) around vertical axis
+    float angle = doubleHelix ? 2*PI*numberOfRotations*float(index/2)/((count-1)/2) + (index%2?PI:0) : 2*PI*numberOfRotations*float(index)/(count-1); // Rotation angle (in radians) around vertical axis
     float dz = doubleHelix ? float(index/2)/float((count-1)/2) : float(index)/float(count-1);
     float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space
 

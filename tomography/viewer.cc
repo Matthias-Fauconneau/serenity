@@ -17,6 +17,7 @@ struct App {
 } app;
 
 SliceView sliceView (volume, 512/N);
-VolumeView volumeView (volume, volume.size, 512/N);
+Projection A(volume.size, volume.size);
+VolumeView volumeView (volume, A, 512/N);
 HBox layout ({ &sliceView , &volumeView });
 Window window (&layout, strx(size));
