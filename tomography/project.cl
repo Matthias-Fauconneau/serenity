@@ -2,8 +2,9 @@ struct mat4 { float4 columns[4]; };
 kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOriginZ /*±z/2 - origin.z*/, float c /*origin.xy² - r²*/, float radiusSq, float halfHeight, float3 dataOrigin /*origin + (volumeSize-1)/2*/,
                                 read_only image3d_t volume, sampler_t sampler, const uint width, global float* image) {
     size_t x = get_global_id(0), y = get_global_id(1);
+    //const float3 ray = normalize( (x-(width-1)/2.f) * imageToWorld.columns[0].xyz + (y-(height-1)/2.f) * imageToWorld.columns[1].xyz + 1 * imageToWorld.columns[2].xyz);
     const float3 ray = normalize(x * imageToWorld.columns[0].xyz + y * imageToWorld.columns[1].xyz + imageToWorld.columns[2].xyz);
-    const float3 origin = imageToWorld.columns[3].xyz;
+    const float3 origin = imageToWorld.columns[3].xyz; // imageToWorld * (0,0,0,1)
     // Intersects cap disks
     const float2 capT = plusMinusHalfHeightMinusOriginZ / ray.z; // top bottom
     const float4 capXY = origin.xyxy + capT.xxyy * ray.xyxy; // topX topY bottomX bottomY

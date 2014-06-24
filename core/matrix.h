@@ -2,6 +2,19 @@
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
 
+/// 2D linear transformation
+struct mat2 {
+    float data[2*2];
+    mat2(float m00, float m01, float m10, float m11):data{m00,m01,m10,m11}{}
+
+    float M(int i, int j) const {assert(i<2 && j<2); return data[j*2+i]; }
+    float& M(int i, int j) {assert(i<2 && j<2); return data[j*2+i]; }
+    float operator()(int i, int j) const { return M(i,j); }
+    float& operator()(int i, int j) { return M(i,j); }
+
+    vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1); return r; }
+};
+
 /// 2D affine transformation
 struct mat3x2 {
     float data[3*2];
@@ -75,9 +88,11 @@ struct mat4 {
     /*constexpr*/ float& operator()(int i, int j) { return M(i,j); }
     float4& operator[](int j) { return (float4&)data[j*4]; }
     const float4& operator[](int j) const { return (float4&)data[j*4]; }
+    const float3 row(int i) const { float3 v; for(int j=0;j<3;j++) v[j]=M(i,j); return v; }
 
     //vec2 operator*(vec2 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,3); return r.xy()/r.w; }
     //vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
+    vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); assert_(r.w==1); return r.xyz(); }
     float4 operator*(float4 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
     mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
 

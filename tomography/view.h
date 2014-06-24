@@ -2,15 +2,7 @@
 #include "volume.h"
 #include "matrix.h"
 #include "project.h"
-struct GLTexture;
-
-struct Value {
-    uint value;
-    array<Widget*> widgets;
-    explicit Value(uint value) : value(value) {}
-    Value& registerWidget(Widget* widget) { widgets << widget; return *this; }
-    void render() { for(Widget* widget: widgets) widget->render(); }
-};
+#include "layout.h"
 
 struct SliceView : Widget {
     int3 size;

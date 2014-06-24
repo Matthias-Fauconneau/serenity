@@ -1,32 +1,12 @@
 #pragma once
 #include "matrix.h"
+#include "projection.h"
 #include "opencl.h"
 
 inline uint interleave(const uint subsetSize, const uint subsetCount, const uint index) {
     const uint subsetIndex = index / subsetSize, localIndex = index % subsetSize;
     return localIndex * subsetCount + subsetIndex;
 }
-
-// Projection settings
-struct Projection {
-    int3 volumeSize;
-    int3 projectionSize;
-    uint count = projectionSize.z;
-
-    float detectorHalfWidth = 1;
-    float cameraLength = 1;
-    float specimenDistance = 1./16;
-    bool doubleHelix;
-    float numberOfRotations;
-    float photonCount; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
-
-    Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix = false, const float numberOfRotations = 1, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
-
-    // Transforms from world coordinates [±1] to view coordinates [±size/2, 1] (cannot directly transform to image coordinates because of perspective division)
-    mat4 worldToView(uint index) const;
-    // Transforms from image coordinates (origin: [0,0,0,1], ray: [size,1,0]) to world coordinates [±1/2]
-    mat4 imageToWorld(uint index) const;
-};
 
 // -- Projection --
 

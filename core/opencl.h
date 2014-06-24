@@ -111,6 +111,9 @@ struct CLKernel {
 #define CL(file, name) \
     extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
     namespace CL { static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), str(#name)); }
+#define cl(file, name) \
+    extern char _binary_ ## file ##_cl_start[], _binary_ ## file ##_cl_end[]; \
+    static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), str(#name));
 
 template<Type... Args> inline uint64 emulateWriteTo3DImage(CLKernel& kernel, const CLVolume& y, const Args&... args) {
     CLBufferF buffer (y.size.z*y.size.y*y.size.x);

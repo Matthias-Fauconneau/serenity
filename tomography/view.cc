@@ -1,6 +1,5 @@
 #include "view.h"
 #include "text.h"
-#include "operators.h"
 
 Value SliceView::staticIndex (0);
 

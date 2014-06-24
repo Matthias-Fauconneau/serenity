@@ -1,5 +1,5 @@
 #pragma once
-#include "project.h"
+#include "projection.h"
 
 struct Reconstruction {
     Projection A; // Projection operator
@@ -34,7 +34,7 @@ struct SubsetReconstruction : Reconstruction {
             uint startIndex = subsetIndex*subsetSize, endIndex = startIndex+subsetSize;
             CLVolume subsetB = int3(b.size.xy(),subsetSize);
             for(uint index: range(subsetSize)) copy(b, subsetB, int3(0,0,interleave(subsetSize, subsetCount, startIndex+index)), int3(0,0,index), int3(b.size.xy(),1));
-            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return A.worldToView(interleave(subsetSize, subsetCount, index)); }), move(subsetB)};
+            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return A.worldToDevice(interleave(subsetSize, subsetCount, index)); }), move(subsetB)};
         }
     }
 };
