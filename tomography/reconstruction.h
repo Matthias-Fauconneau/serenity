@@ -1,10 +1,10 @@
 #pragma once
-#include "projection.h"
+#include "project.h"
 
 struct Reconstruction {
     Projection A; // Projection operator
     CLVolume x;
-    int k = 0;
+    uint k = 0;
     uint64 time = 0;
     float SSE = inf;
     int divergent = 0; // Divergent iterations

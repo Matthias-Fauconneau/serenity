@@ -35,7 +35,7 @@ uint64 project(const ImageF& image, const Projection& A, const CLVolume& volume,
 
 /// Projects (A) \a x to \a Ax
 uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint subsetIndex, uint subsetSize, uint subsetCount) {
-    assert_(subsetSize * subsetCount == uint(A.count));
+    assert_(uint(Ax.size.z) == subsetSize && subsetSize * subsetCount == uint(A.count));
     CLBufferF buffer (Ax.size.y*Ax.size.x);
     uint64 time = 0;
     for(uint index: range(subsetSize)) { //FIXME: Queue all projections at once ?

@@ -8,89 +8,6 @@
 #include "window.h"
 #include "view.h"
 
-const float airDensity = 0.001; // Houndsfield ?
-const float containerDensity = 5.6; // Pure iron
-const float maximumRadius = 32; // vx
-const float rate = 1./cb(maximumRadius); // 1/vx
-const struct GrainType { const float probability; /*relative concentration*/ const float density; } types[] = {/*Rutile*/{0.7, 4.20}, /*Siderite*/{0.2, 3.96}, /*NaMontmorillonite*/{0.1, 2.65}};
-
-VolumeF porousRock(int3 size) {
-    assert(size.x == size.y);
-
-    VolumeF volume (size, airDensity);
-
-    const vec2 center = vec2(size.xy()-int2(1))/2.f;
-    const float volumeRadius = center.x;
-    const float innerRadius = (1-4./100) * volumeRadius;
-    const float outerRadius = (1-2./100) * volumeRadius;
-    for(uint y: range(size.y)) for(uint x: range(size.x)) {
-        float r2 = sq(vec2(x,y)-vec2(size.xy()-1)/2.f);
-        if(sq(innerRadius-1./2) < r2 && r2 < sq(outerRadius+1./2)) {
-            float c = 0;
-            if(r2 < sq(innerRadius+1./2)) {
-                float r = sqrt(r2);
-                c = r - (innerRadius-1./2);
-            }
-            else if(sq(outerRadius-1./2) < r2) {
-                float r = sqrt(r2);
-                c = (outerRadius+1./2) - r;
-            }
-            else c = 1;
-            for(uint z: range(size.z)) volume(x,y,z) = (1-c) * volume(x,y,z) + c *  containerDensity;
-        }
-    }
-
-    assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
-    const uint grainCount = rate*size.z*size.y*size.x;
-    Random random; // Unseeded sequence (for repeatability)
-    Time time;
-    for(GrainType type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
-        float* volumeData = volume.data;
-        const uint XY = size.x*size.x;
-        const uint X = size.x;
-        for(uint count=0; count < type.probability * grainCount; count++) {
-            const float r0 = random();
-            const float r1 = random();
-            const float r2 = random();
-            const float r3 = random();
-            const float r = r0*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
-            const vec2 xy = vec2(r1, r2) * vec2(size.xy());
-            if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
-            float cx = xy.x, cy=xy.y, cz=r+r3*((size.z-1)-2*r);
-            float innerR2 = sq(r-1.f/2);
-            float outerRadius = r+1.f/2;
-            float outerR2 = sq(outerRadius);
-            float v = type.density;
-            // Rasterizes grains as spheres
-            int iz = cz-r, iy = cy-r, ix = cx-r;
-            float fz = cz-iz, fy=cy-iy, fx=cx-ix;
-            uint grainSize = ceil(2*r);
-            float* volume0 = volumeData + iz*XY + iy*X + ix;
-            for(uint z=0; z<grainSize; z++) { // Grains may be cut by cylinder caps
-                float* volumeZ = volume0 + z*XY;
-                float rz = float(z) - fz;
-                float RZ = rz*rz;
-                for(uint y=0; y<grainSize; y++) {
-                    float* volumeZY = volumeZ + y*X;
-                    float ry = float(y) - fy;
-                    float RZY = RZ + ry*ry;
-                    for(uint x=0; x<grainSize; x++) {
-                        float rx = float(x) - fx;
-                        float r2 = RZY + rx*rx;
-                        if(r2 <= innerR2) volumeZY[x] = v;
-                        else if(r2 < outerR2) {
-                            float c = outerRadius - sqrt(r2);
-                            volumeZY[x] = (1-c) * volumeZY[x] + c * v; // Alpha blending
-                        }
-                    }
-                }
-            }
-        }
-    }
-    log(time);
-    return volume;
-}
-
 inline void intersects(const float halfHeight, const float radius, const float3 origin, const float3 ray, float& tmin, float& tmax) {
     float2 plusMinusHalfHeightMinusOriginZ = float2(1,-1) * (halfHeight-1.f/2/*fix OOB*/) - origin.z; // sq(origin.xy()) - sq(radius) + 1 /*fix OOB*/, sq(radius), center.
     float radiusSq = sq(radius);
@@ -155,19 +72,104 @@ RectF getBoundingBox(const vec3& center, float radius, const mat4& projMatrix) {
     return {vec2(minX, minY), vec2(maxX, maxY)};
 }
 
-void porousRock(const ImageF& target, const Projection& A, uint index) {
-    Time totalTime;
-    const vec3 volumeCenter = vec3(A.volumeSize-int3(1))/2.f;
+struct PorousRock {
+    const float airDensity = 0.001; // Houndsfield ?
+    const float containerDensity = 5.6; // Pure iron
+    int3 size;
+    const float maximumRadius = 8; // vx
+    const float rate = 1./cb(maximumRadius); // 1/vx
+    struct GrainType { const float probability; /*relative concentration*/ const float density; buffer<vec4> grains; } types[3] = {/*Rutile*/{0.7, 4.20,{}}, /*Siderite*/{0.2, 3.96,{}}, /*NaMontmorillonite*/{0.1, 2.65,{}}};
+    const vec3 volumeCenter = vec3(size-int3(1))/2.f;
     const float volumeRadius = volumeCenter.x;
     const float innerRadius = (1-4./100) * volumeRadius;
-    const struct GrainType { const float probability; /*relative concentration*/ const float density; } types[] = {/*Rutile*/{0.7, 4.20}, /*Siderite*/{0.2, 3.96}, /*NaMontmorillonite*/{0.1, 2.65}};
-    assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
-    const float maximumRadius = 32; // vx
-    const float rate = 1./cb(maximumRadius); // 1/vx
-    int3 size = A.volumeSize;
+    const float outerRadius = (1-2./100) * volumeRadius;
     const uint grainCount = rate*size.z*size.y*size.x;
-    //struct Grain { vec3 center; float radius; uint type; };
-    //buffer<Grain> grains(grainCount, 0);
+
+    PorousRock(int3 size, const float maximumRadius);
+    VolumeF volume();
+    void project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const;
+};
+
+PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maximumRadius(maximumRadius) {
+    assert(size.x == size.y);
+    assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
+
+    Random random;
+    for(GrainType& type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
+        type.grains = buffer<vec4>(type.probability * grainCount, 0);
+        while(type.grains.size < type.grains.capacity) {
+            const float r = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
+            const vec2 xy = vec2(random(), random()) * vec2(size.xy());
+            if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
+            type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
+        }
+    }
+}
+
+VolumeF PorousRock::volume() {
+    VolumeF volume (size, airDensity);
+
+    for(uint y: range(size.y)) for(uint x: range(size.x)) {
+        float r2 = sq(vec2(x,y)-vec2(size.xy()-1)/2.f);
+        if(sq(innerRadius-1./2) < r2 && r2 < sq(outerRadius+1./2)) {
+            float c = 0;
+            if(r2 < sq(innerRadius+1./2)) {
+                float r = sqrt(r2);
+                c = r - (innerRadius-1./2);
+            }
+            else if(sq(outerRadius-1./2) < r2) {
+                float r = sqrt(r2);
+                c = (outerRadius+1./2) - r;
+            }
+            else c = 1;
+            for(uint z: range(size.z)) volume(x,y,z) = (1-c) * volume(x,y,z) + c *  containerDensity;
+        }
+    }
+
+    Time time;
+    for(const GrainType& type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
+        float* volumeData = volume.data;
+        const uint XY = size.x*size.x;
+        const uint X = size.x;
+        for(vec4 grain: type.grains) {
+            float cx = grain.x, cy=grain.y, cz=grain.z, r=grain.w;
+            float innerR2 = sq(r-1.f/2);
+            float outerRadius = r+1.f/2;
+            float outerR2 = sq(outerRadius);
+            float v = type.density;
+            // Rasterizes grains as spheres
+            int iz = cz-r-1./2, iy = cy-r-1./2, ix = cx-r-1./2;
+            float fz = cz-iz, fy=cy-iy, fx=cx-ix;
+            uint grainSize = ceil(2*(r+1./2));
+            float* volume0 = volumeData + iz*XY + iy*X + ix;
+            for(uint z=0; z<grainSize; z++) { // Grains may be cut by cylinder caps
+                float* volumeZ = volume0 + z*XY;
+                float rz = float(z) - fz;
+                float RZ = rz*rz;
+                for(uint y=0; y<grainSize; y++) {
+                    float* volumeZY = volumeZ + y*X;
+                    float ry = float(y) - fy;
+                    float RZY = RZ + ry*ry;
+                    for(uint x=0; x<grainSize; x++) {
+                        float rx = float(x) - fx;
+                        float r2 = RZY + rx*rx;
+                        if(r2 <= innerR2) volumeZY[x] = v;
+                        else if(r2 < outerR2) {
+                            float c = outerRadius - sqrt(r2);
+                            volumeZY[x] = (1-c) * volumeZY[x] + c * v; // Alpha blending
+                        }
+                    }
+                }
+            }
+        }
+    }
+    log(time);
+    return volume;
+}
+
+void PorousRock::project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const {
+    Time totalTime;
+
     mat4 worldToView = A.worldToView(index);
     const int3 projectionSize = A.projectionSize;
     const float2 imageCenter = float2(projectionSize.xy()-int2(1))/2.f;
@@ -175,26 +177,18 @@ void porousRock(const ImageF& target, const Projection& A, uint index) {
     const float3 viewOrigin = viewToWorld[3].xyz();
     mat4 projectionMatrix; projectionMatrix(3,2) = 1;  projectionMatrix(3,3) = 0;
     projectionMatrix = projectionMatrix * mat4().scale(vec3(vec2(float(A.projectionSize.x-1)/A.extent),1/A.distance)).scale(1.f/A.halfVolumeSize);
-    //log(worldToView, viewOrigin);
+
     uint typeCount = ref<GrainType>(types).size;
-    Random random; // Unseeded sequence (for repeatability)
-    buffer<float> randomSeq (grainCount*4 *2 /*Just to be sure*/);
-    for(float& v: randomSeq) v= random(); // Cannot be kept consistent and parallelized (FIXME: do once)
-    uint randomIndex = 0;
-    static buffer<buffer<Intersection>> intersections (target.size.y*target.size.x, target.size.y*target.size.x, 2*grainCount);
+
+    static buffer<buffer<Intersection>> intersections (target.size.y*target.size.x, target.size.y*target.size.x, 2*grainCount); // FIXME: -> field
     for(auto& e: intersections) e.size = 0;
+
     Time rasterizationTime;
     for(uint index: range(typeCount)) { // Rasterizes each grain type in order so that lighter grains overrides heavier grains
-        GrainType type = types[index];
-        //for(uint count=0; count < type.probability * grainCount;) {
-        uint count = type.probability * grainCount;
-        const float* random = randomSeq.data + randomIndex;
-        parallel(count, [&](const uint, const uint grainIndex) {
-            const float radius = random[grainIndex*4+0]*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
-            const vec2 xy = vec2(random[grainIndex*4+1], random[grainIndex*4+2]) * vec2(size.xy());
-            if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-radius)) return;
-            vec3 C(xy.x, xy.y, radius+random[grainIndex*4+3]*((size.z-1)-2*radius));
-            C -= volumeCenter; // Translates from data [0..size] to world [±size]
+        const GrainType& type = types[index];
+        parallel(type.grains, [&](const uint, const vec4& grain) {
+            float radius = grain.w;
+            vec3 C = grain.xyz() - volumeCenter; // Translates from data [0..size] to world [±size]
             vec3 vC = worldToView * C; // Transforms from world to homogeneous view coordinates
             RectF r = getBoundingBox(vC, radius, projectionMatrix);
             r.min += imageCenter, r.max += imageCenter;
@@ -211,9 +205,9 @@ void porousRock(const ImageF& target, const Projection& A, uint index) {
                 }
             }
         });
-        randomIndex += count * 4;
     }
     rasterizationTime.stop();
+
     Time integrationTime;
     const float halfHeight = (A.volumeSize.z-1)/2;
     const float outerRadius = (1-2./100) * volumeRadius;
@@ -226,16 +220,9 @@ void porousRock(const ImageF& target, const Projection& A, uint index) {
             float inner[2]; intersects(halfHeight, innerRadius, viewOrigin, ray, inner[0], inner[1]);
 
             if(inner[0]<inf) {
-                assert_(inner[1]>-inf);
-                {assert_(outer[0]<inf);
-                float length = inner[0] - outer[0];
-                assert_(length>=0, length, inner[0], outer[0], "0"); //FIXME
-                if(length>=0)
-                    densityRayIntegral += length * containerDensity;}
-                assert_(outer[1]>-inf);
-                {float length = outer[1] - inner[1];
-                //assert_(length>=0 && length<inf, length, outer[0], inner[0], inner[1], outer[1], "1"); //FIXME
-                    if(length>0) densityRayIntegral += length * containerDensity;}
+                densityRayIntegral += (inner[0] - outer[0]) * containerDensity;
+                //assert_((outer[1] - inner[1]) >= 0); // FIXME
+                if((outer[1] - inner[1]) >= 0) densityRayIntegral += (outer[1] - inner[1]) * containerDensity;
 
                 float lastT = inner[0];
                 quicksort(intersections[y*target.size.x+x]);
@@ -252,16 +239,11 @@ void porousRock(const ImageF& target, const Projection& A, uint index) {
                     if(index > 0) counts[index-1]++;
                     if(index < 0) counts[-index-1]--;
                 }
-                float length = inner[1] - lastT;
-                densityRayIntegral += length * airDensity;
+                densityRayIntegral += (inner[1] - lastT) * airDensity;
             } else if(outer[0]<inf) {
-                assert_(outer[1]>-inf);
-                float length = outer[1] - outer[0];
-                assert_(length>=0, length, outer[1], outer[0], "outer"); //FIXME
-                if(length>=0)
-                    densityRayIntegral += length * containerDensity;
+                densityRayIntegral += (outer[1] - outer[0]) * containerDensity;
             }
-            target(x,y) = densityRayIntegral / A.volumeSize.x;
+            target(x,y) = scaleFactor * densityRayIntegral;
         }
     });
     integrationTime.stop();
@@ -270,18 +252,20 @@ void porousRock(const ImageF& target, const Projection& A, uint index) {
 }
 
 struct Analytic : Widget {
-   const Projection& A;
-   const int upsampleFactor;
-   Value& index;
+    const PorousRock& rock;
+    const Projection& A;
+    const float scaleFactor;
+    const int upsampleFactor;
+    Value& index;
 
-   Analytic(const Projection& A, const int upsampleFactor, Value& index) : A(A), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    Analytic(const PorousRock& rock, const Projection& A, const float scaleFactor, const int upsampleFactor, Value& index) : rock(rock), A(A), scaleFactor(scaleFactor), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
     int2 sizeHint() override { return upsampleFactor * A.projectionSize.xy(); }
     void render() override {
         ImageF image (A.projectionSize.xy());
-        porousRock(image, A, index.value);
+        rock.project(image, A, index.value, scaleFactor);
         while(image.size < this->target.size()) image = upsample(image);
         float max = convert(target, image);
-        Text(str(index.value, max),16,green).render(this->target, 0);
+        Text(str(max),16,green).render(this->target, 0);
         putImage(target);
     }
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
@@ -291,24 +275,59 @@ struct Analytic : Widget {
 };
 
 const int N = fromInteger(arguments()[0]);
-VolumeF hostVolume = normalize(porousRock(N));
+const int3 volumeSize = N;
+const int3 projectionSize = N;
+map<string, Variant> parameters = parseParameters(arguments());
+PorousRock rock {N, parameters.value("radius"_, 8.f)};
+VolumeF rockVolume = rock.volume();
+const float factor = sq(rockVolume.size.x)/sum(rockVolume);
+VolumeF hostVolume = scale(move(rockVolume), factor);
 CLVolume volume {hostVolume};
 SliceView sliceView {volume, 512/N};
-Projection A {N, N};
-Value projectionIndex {20};
-VolumeView volumeView {volume, A, 512/N, projectionIndex};
-Analytic analyticView {A, 512/N, projectionIndex};
-HBox layout {{ &sliceView, &volumeView, &analyticView }};
+Projection A {volumeSize, projectionSize, parameters.value("double"_, false), parameters.value("rotations"_, 1u)};
+Value value1 {0};
+VolumeView volumeView {volume, A, 512/N, value1};
+Value value2 {0};
+Analytic analyticView {rock, A, factor, 512/N, value2};
+/*struct Toggle : Widget {
+
+    Widget* widget = widgets[0];
+    void render() override { return widget->render(); }
+    void mouseEvent(int2 cursor, int2 size, Event event, Button button) override { return widget->mouseEvent(cursor, size, event, button); }
+} toggle;*/
+HBox layout {{ &sliceView, &analyticView/*&toggle*/ /*&volumeView, &analyticView*/ }};
 struct App {
     App() {
+        log(parameters);
         writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data));
         VolumeF projectionData (A.projectionSize);
+        Time time;
         for(uint index: range(projectionData.size.z)) {
             log(index);
             ImageF target = ::slice(projectionData, index);
-            porousRock(target, A, index);
+            //if(parameters.value("analytic"_, false))
+                rock.project(target, A, index);
+            /*else
+                project(target, A, volume, index);*/
         }
-        writeFile("Data/"_+strx(projectionData.size)+".proj"_, cast<byte>(projectionData.data));
+        log(time);
+        writeFile("Data/"_+str(A), cast<byte>(projectionData.data));
     }
 } app;
 Window window {&layout, str(N)};
+struct App2 {
+    App2() {
+        window.actions[Space] = [&](){
+            if(layout[1] == &volumeView) {
+                layout[1] = &analyticView;
+                analyticView.index.value = volumeView.index.value;
+                analyticView.target=share(volumeView.target);
+            } else {
+                layout[1] = &volumeView;
+                volumeView.index.value = analyticView.index.value;
+                volumeView.target=share(analyticView.target);
+            }
+            layout[1]->render();
+        }; //toggle.widget == toggle.volumeView
+    }
+} app2;

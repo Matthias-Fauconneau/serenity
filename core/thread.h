@@ -186,3 +186,32 @@ string homePath(); //$HOME
 const Folder& home(); //$HOME
 const Folder& config(); //$HOME/.config
 const Folder& cache(); //$HOME/.cache
+
+struct Variant : String {
+    Variant(){}
+    default_move(Variant);
+    Variant(String&& s) : String(move(s)) {}
+    Variant(double decimal) : String(ftoa(decimal)){}
+    explicit operator bool() const { return size; }
+    operator int() const { return *this ? fromInteger(*this) : 0; }
+    operator uint() const { return *this ? fromInteger(*this) : 0; }
+    operator float() const { return fromDecimal(*this); }
+    operator double() const { return fromDecimal(*this); }
+    generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
+};
+inline String str(const Variant& v) { return String((string&)v); }
+
+#include "map.h"
+#include "data.h"
+// Parses process arguments into parameter=value pairs
+inline map<string, Variant> parseParameters(const ref<string> arguments) {
+    map<string, Variant> parameters;
+    for(const string& argument: arguments) {
+        TextData s (argument);
+        string key = s.until("="_);
+        // Explicit argument
+        string value = s.untilEnd();
+        parameters.insert(key, Variant(String(value?:"1"_)));
+    }
+    return parameters;
+}

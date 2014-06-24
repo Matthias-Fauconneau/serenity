@@ -13,6 +13,7 @@ void putImage(Rect region) { assert(window); window->putImage(region); }
 #include "trace.h"
 void putImage(const Image& target) {
     assert_(window);
+    if(target.buffer != window->target.buffer) { log("target.buffer == window->target.buffer"); return; }
     assert_(target.buffer == window->target.buffer);
     uint delta = target.data - window->target.data;
     if(!target.stride) return; // FIXME

@@ -7,10 +7,11 @@ float SSQ(const CLVolume& A, const int3 origin=0, int3 size=0);
 float SSE(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
 float dotProduct(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
 
+CL(operators, divdiff) //FIXME: dummy as cl() is not parsed by build
 //inline uint64 mul(const ImageArray& y, const ImageArray& a, const ImageArray& b) { cl(operators, mul); return emulateWriteTo3DImage(mul, y, noneNearestSampler, a, b); } // y = a * b [MLEM]
 //inline uint64 div(const ImageArray& y, const ImageArray& a, const ImageArray& b) { cl(operators, div) return emulateWriteTo3DImage(div, y, noneNearestSampler, a, b); } // y = a / b [MLEM]
 inline uint64 divdiff(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) { cl(operators, divdiff) return emulateWriteTo3DImage(divdiff, y, noneNearestSampler, a, b, c); } // y = ( a - b ) / c [SART]
-inline uint64 divmul(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) {cl(operators, divmul) return emulateWriteTo3DImage(divdiff, y, noneNearestSampler, a, b, c); } // y = a / (b * c) [MLEM]
+inline uint64 divmul(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) {cl(operators, divmul) return emulateWriteTo3DImage(divmul, y, noneNearestSampler, a, b, c); } // y = a / (b * c) [MLEM]
 inline uint64 maxadd(const CLVolume& y, const CLVolume& a, const float alpha, const CLVolume& b) { cl(operators, maxadd) return emulateWriteTo3DImage(maxadd, y, noneNearestSampler, a, alpha, b); } // y = max(0, a + α b) [SART, CG]
 //inline uint64 add(const CLVolume& y, const float alpha, const CLVolume& a, const float beta, const CLVolume& b) { cl(operators, add) return emulateWriteTo3DImage(add, y, noneNearestSampler, alpha, a, beta, b); } // y = α a + β b [CG]
 inline uint64 mulexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) { cl(operators, mulexp) return emulateWriteTo3DImage(mulexp, y, noneNearestSampler, a, b); } // y = a · exp(-b) [MLTR]

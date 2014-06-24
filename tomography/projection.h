@@ -1,5 +1,6 @@
 #pragma once
 #include "matrix.h"
+#include "image.h"
 
 // Projection settings
 struct Projection {
@@ -12,7 +13,7 @@ struct Projection {
     float cameraLength = 1;
     float specimenDistance = 1./16;
     bool doubleHelix;
-    float numberOfRotations;
+    uint numberOfRotations;
     float photonCount; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
 
     // Projection setup (coordinates in view space)
@@ -26,13 +27,13 @@ struct Projection {
     const float distance = specimenDistance/volumeRadius; // Distance in world space
     const float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
 
-    Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix = false, const float numberOfRotations = 1, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
+    Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix = false, const uint numberOfRotations = 1, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
 
-    // Transforms from world coordinates to view coordinates (only rotation and translation)
+    // Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation)
     mat4 worldToView(uint index) const;
-    // Transforms from world coordinates to view coordinates (scaled to [±size/2, 1]) (FIXME)
+    // Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME)
     mat4 worldToScaledView(uint index) const;
-    // Transforms from world coordinates [±size] to device coordinates [±size/2, 1]
+    // Transforms from world coordinates [±size] to device coordinates [±size/2]
     mat4 worldToDevice(uint index) const;
 };
 
@@ -51,3 +52,5 @@ inline mat4 Projection::worldToDevice(uint index) const {
     mat4 projectionMatrix; projectionMatrix(3,2) = 1;  projectionMatrix(3,3) = 0; // copies Z to W (FIXME: move scale(vec3(vec2(float(projectionSize.x-1)/extent),1/distance)) from worldToView to projectionMatrix
     return projectionMatrix * worldToScaledView(index);
 }
+
+inline String str(const Projection& A) { return strx(A.volumeSize)+"."_+(A.doubleHelix?"double"_:"simple"_)+"."_+str(A.numberOfRotations); }
