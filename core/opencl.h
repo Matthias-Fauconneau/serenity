@@ -57,7 +57,7 @@ struct CLVolume : CLMem {
     const VolumeF& read(const VolumeF& target, int3 origin=0) const;
 
     int3 size; // (width, height, depth/index)
-    string name;
+    String name;
 };
 
 // Copy volume into volume

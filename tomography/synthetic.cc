@@ -87,7 +87,7 @@ struct PorousRock {
 
     PorousRock(int3 size, const float maximumRadius);
     VolumeF volume();
-    void project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const;
+    float project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const;
 };
 
 PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maximumRadius(maximumRadius) {
@@ -107,7 +107,7 @@ PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maxim
 }
 
 VolumeF PorousRock::volume() {
-    VolumeF volume (size, airDensity);
+    VolumeF volume (size, airDensity, "x0"_);
 
     for(uint y: range(size.y)) for(uint x: range(size.x)) {
         float r2 = sq(vec2(x,y)-vec2(size.xy()-1)/2.f);
@@ -167,7 +167,7 @@ VolumeF PorousRock::volume() {
     return volume;
 }
 
-void PorousRock::project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const {
+float PorousRock::project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const {
     Time totalTime;
 
     mat4 worldToView = A.worldToView(index);
@@ -211,6 +211,7 @@ void PorousRock::project(const ImageF& target, const Projection& A, uint index, 
     Time integrationTime;
     const float halfHeight = (A.volumeSize.z-1)/2;
     const float outerRadius = (1-2./100) * volumeRadius;
+    float maxAttenuation = 0;
     parallel(target.size.y, [&](const uint, const uint y) {
         int counts[typeCount]; mref<int>(counts,typeCount).clear(0);
         for(uint x: range(target.size.x)) {
@@ -243,12 +244,16 @@ void PorousRock::project(const ImageF& target, const Projection& A, uint index, 
             } else if(outer[0]<inf) {
                 densityRayIntegral += (outer[1] - outer[0]) * containerDensity;
             }
-            target(x,y) = scaleFactor * densityRayIntegral;
+            maxAttenuation = ::max(maxAttenuation, densityRayIntegral);
+            float v = scaleFactor * densityRayIntegral;
+            assert_(v>=0 && v<=1/*-expUnderflow*/, scaleFactor, densityRayIntegral, v);
+            target(x,y) = v;
         }
     });
     integrationTime.stop();
     totalTime.stop();
     //log(rasterizationTime, integrationTime, totalTime);
+    return maxAttenuation;
 }
 
 struct Analytic : Widget {
@@ -280,54 +285,33 @@ const int3 projectionSize = N;
 map<string, Variant> parameters = parseParameters(arguments());
 PorousRock rock {N, parameters.value("radius"_, 8.f)};
 VolumeF rockVolume = rock.volume();
-const float factor = sq(rockVolume.size.x)/sum(rockVolume);
+const float maxVoxel = max(rockVolume);
+const float factor = 1./(sqrt(float(sq(rock.size.x)+sq(rock.size.y)+sq(rock.size.z)))*maxVoxel); // FIXME: overly conservative, use maximum attenuation over analytic projection instead
 VolumeF hostVolume = scale(move(rockVolume), factor);
 CLVolume volume {hostVolume};
 SliceView sliceView {volume, 512/N};
 Projection A {volumeSize, projectionSize, parameters.value("double"_, false), parameters.value("rotations"_, 1u)};
-Value value1 {0};
-VolumeView volumeView {volume, A, 512/N, value1};
-Value value2 {0};
-Analytic analyticView {rock, A, factor, 512/N, value2};
-/*struct Toggle : Widget {
-
-    Widget* widget = widgets[0];
-    void render() override { return widget->render(); }
-    void mouseEvent(int2 cursor, int2 size, Event event, Button button) override { return widget->mouseEvent(cursor, size, event, button); }
-} toggle;*/
-HBox layout {{ &sliceView, &analyticView/*&toggle*/ /*&volumeView, &analyticView*/ }};
+Value projectionIndex {0};
+VolumeView volumeView {volume, A, 512/N, projectionIndex};
+Analytic analyticView {rock, A, factor, 512/N, projectionIndex};
+HBox layout {{ &sliceView, &volumeView, &analyticView}};
 struct App {
     App() {
-        log(parameters);
+        log(parameters, maxVoxel, factor);
         writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data));
-        VolumeF projectionData (A.projectionSize);
+        VolumeF projectionData (A.projectionSize, 0, "b0"_);
         Time time;
+        float maxAttenuation = 0;
         for(uint index: range(projectionData.size.z)) {
             log(index);
             ImageF target = ::slice(projectionData, index);
             //if(parameters.value("analytic"_, false))
-                rock.project(target, A, index);
-            /*else
-                project(target, A, volume, index);*/
+            maxAttenuation = ::max(maxAttenuation, rock.project(target, A, index, factor));
+            //else
+            //project(target, A, volume, index);
         }
-        log(time);
+        log(time, maxVoxel, maxAttenuation);
         writeFile("Data/"_+str(A), cast<byte>(projectionData.data));
     }
 } app;
 Window window {&layout, str(N)};
-struct App2 {
-    App2() {
-        window.actions[Space] = [&](){
-            if(layout[1] == &volumeView) {
-                layout[1] = &analyticView;
-                analyticView.index.value = volumeView.index.value;
-                analyticView.target=share(volumeView.target);
-            } else {
-                layout[1] = &volumeView;
-                volumeView.index.value = analyticView.index.value;
-                volumeView.target=share(analyticView.target);
-            }
-            layout[1]->render();
-        }; //toggle.widget == toggle.volumeView
-    }
-} app2;

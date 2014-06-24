@@ -25,12 +25,17 @@ struct Application : Poll {
     // Projection
     const int3 projectionSize = N;
     Projection projections[1] = {Projection(volumeSize, projectionSize, parameters.value("double"_, false), parameters.value("rotations"_, 1), parameters.value("photonCount"_,0))};
-    buffer<ImageArray> projectionData = apply(ref<Projection>(projections), [this](const Projection& A) {  // Map projection data files, convert to transmission data, simulate noise and upload to device
+    buffer<ImageArray> projectionData = apply(ref<Projection>(projections), [this](const Projection& A){ return load(A); }); // Map projection data files, convert to transmission data, simulate noise and upload to device
+    ImageArray load(const Projection& A) {
         VolumeF source(projectionSize, Map(str(A), folder));
-        VolumeF target(projectionSize);
-        for(uint i: range(target.data.size)) target.data[i] = A.photonCount ? poisson(A.photonCount * exp(-source.data[i])) / A.photonCount : exp(-source.data[i]); //TODO: CL noise (also would remove one of the two copies)
+        VolumeF target(projectionSize, 0, "b"_);
+        for(uint i: range(target.data.size)) {
+            float x = source.data[i];
+            assert_(x>=0 && x<expOverflow, x);
+            target.data[i] = /*A.photonCount ? poisson(A.photonCount * exp(-x)) / A.photonCount :*/ exp(-x); //TODO: CL noise (also would remove one of the two copies)
+        }
         return ImageArray(target);
-    });
+    }
 
     //const uint subsetSize = 1;
     //const uint subsetSize = projectionSize.z;

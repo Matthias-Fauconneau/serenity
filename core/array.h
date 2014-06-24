@@ -125,30 +125,23 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
 }
 
 /// Returns an array of the application of a function to every index up to a size
-template<class Function, class... Args> auto apply(range a, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
+template<Type Function, Type... Args> auto apply(range a, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
     buffer<decltype(function(0, args...))> r(a.stop-a.start); for(uint i: range(a.stop-a.start)) new (&r[i]) decltype(function(0, args...))(function(a.start+i, args...)); return r;
 }
 
 /// Returns an array of the application of a function to every elements of a reference
-template<class T, class Function, class... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
+template<Type T, Type Function, Type... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
     buffer<decltype(function(a[0], args...))> r(a.size);
     for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...));
     return r;
 }
 
 /// Returns an array of the application of a constructor to every elements of a reference
-template<class C, class T, class... Args> auto apply(const ref<T>& a, Args&&... args) -> buffer<C> {
+template<Type C, Type T, Type... Args> auto apply(const ref<T>& a, Args&&... args) -> buffer<C> {
     buffer<C> r(a.size);
     for(uint i: range(a.size)) new (&r[i]) C(a[i], args...);
     return r;
 }
-
-/*/// Returns an array of the application of a function to every elements of a reference
-template<class T, class Function, class... Args> auto apply(const mref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
-    buffer<decltype(function(a[0], args...))> r(a.size);
-    for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...));
-    return r;
-}*/
 
 /// Converts arrays to references
 generic buffer<ref<T> > toRefs(const ref<array<T>>& o) { return apply(o, [](const array<T>& o)->ref<T>{return o;}); }

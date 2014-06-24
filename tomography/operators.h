@@ -1,6 +1,24 @@
 #pragma once
 #include "opencl.h"
 
+inline void PositiveCheck(const CLVolume& A) {
+    int3 size = A.size;
+    VolumeF volume(size, A.name); A.read(volume); for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) assert_(isNumber(volume(x,y,z) && volume(x,y,z)>0), volume.name, x,y,z, volume(x,y,z));
+}
+
+inline void NaNCheck(const CLVolume& A) {
+    int3 size = A.size;
+    VolumeF volume(size, A.name); A.read(volume); for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) assert_(isNumber(volume(x,y,z)), volume.name, x,y,z, volume(x,y,z));
+}
+
+inline void cylinderCheck(const CLVolume& A) {
+    int3 size = A.size;
+    const float2 center = float2(size.xy()-int2(1))/2.f;
+    const float radiusSq = sq(center.x);
+    VolumeF volume(size, A.name); A.read(volume); for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) if(sq(float2(x,y)-center)>radiusSq) assert_(volume(x,y,z) == 0, x,y,z);
+}
+
+
 float sum(const CLVolume& A, const int3 origin=0, int3 size=0);
 inline float mean(const CLVolume& A) { return sum(A) / (A.size.x*A.size.y*A.size.z); }
 float SSQ(const CLVolume& A, const int3 origin=0, int3 size=0);
@@ -19,12 +37,4 @@ inline uint64 diffexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) {
 inline uint64 adddiv(const CLVolume& y, const CLVolume& a, const CLVolume& b, const CLVolume& c) { cl(operators, adddiv) return emulateWriteTo3DImage(adddiv, y, noneNearestSampler, a, b, c); } // y = max(0, a + c ? b / c : 0) [MLTR]
 inline uint64 muldiv(const CLVolume& y, const CLVolume& a, const CLVolume& b, const CLVolume& c) { cl(operators, muldiv) return emulateWriteTo3DImage(muldiv, y, noneNearestSampler, a, b, c); } // y = max(0, a + c ? a * b / c : 0) [MLTR, MLEM]
 inline uint64 negln(const ImageArray& y, const ImageArray& a) { cl(operators, negln) return emulateWriteTo3DImage(negln, y, noneNearestSampler, a); } // y = ln(a) [SART, CG]
-inline ImageArray negln(const ImageArray& a) { ImageArray y(a.size, 0, "ln "_+a.name); negln(y, a); return y; }
-
-#include "volume.h"
-inline void cylinderCheck(CLVolume& A) {
-    int3 size = A.size;
-    const float2 center = float2(size.xy()-int2(1))/2.f;
-    const float radiusSq = sq(center.x);
-    VolumeF volume(size); A.read(volume); for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) if(sq(float2(x,y)-center)>radiusSq) assert_(volume(x,y,z) == 0, x,y,z);
-}
+inline ImageArray negln(const ImageArray& a) { ImageArray y(a.size, 0, "ln "_+a.name); PositiveCheck(a); negln(y, a); NaNCheck(y); return y; }

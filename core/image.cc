@@ -42,7 +42,7 @@ Image decodeImage(const ref<byte>& file) {
 }
 
 float convert(const Image& target, const ImageF& source, float max) {
-    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) { assert_(isNumber(source(x,y))); max=::max(max, abs(source(x,y))); }
+    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) { /*assert_(isNumber(source(x,y)));*/ if(isNumber(source(x,y))) max=::max(max, abs(source(x,y))); }
     if(max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
         float v = source(x,y)/max;
         //assert_(abs(v) <= 1, source(x,y), max);

@@ -3,8 +3,9 @@
 #include "file.h"
 
 struct VolumeF {
-    VolumeF(int3 size, float value=0, string name=""_) : size(size), data(size.z*size.y*size.x, size.z*size.y*size.x, value), name(name) { assert(name.size <= 16); }
-    VolumeF(int3 size, buffer<float>&& data, string name=""_) : size(size), data(move(data)), name(name) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
+    VolumeF(int3 size, string name) : size(size), data(size.z*size.y*size.x), name(copy(String(name))) { assert(name.size <= 16); }
+    VolumeF(int3 size, float value, string name) : size(size), data(size.z*size.y*size.x, size.z*size.y*size.x, value), name(copy(String(name))) { assert(name.size <= 16); }
+    VolumeF(int3 size, buffer<float>&& data, string name) : size(size), data(move(data)), name(copy(String(name))) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
     //VolumeF(const ref<float>& data) : VolumeF(round(pow(data.size,1./3)), data) {}
     VolumeF(int3 size, Map&& map, string name=""_) : VolumeF(size, buffer<float>((ref<float>)map), name) { this->map = move(map); }
     inline float& operator()(uint x, uint y, uint z) const {assert_(x<uint(size.x) && y<uint(size.y) && z<uint(size.z), x,y,z, size); return data[(size_t)z*size.y*size.x+y*size.x+x]; }
@@ -12,7 +13,7 @@ struct VolumeF {
     int3 size = 0;
     buffer<float> data;
     Map map;
-    string name;
+    String name;
 };
 
 inline ImageF slice(const VolumeF& volume, size_t index /* Z slice or projection*/) {
@@ -28,6 +29,7 @@ inline float SSE(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.s
 inline float dotProduct(const ref<float>& A, const ref<float>& B) { assert_(A.size==B.size); double dot=0; for(uint i: range(A.size)) dot+=A[i]*B[i]; return dot; }
 inline buffer<float> operator*(float a, const ref<float>& A) { buffer<float> P(A.size); for(uint i: range(A.size)) P[i] = a*A[i]; return P; }
 
+inline float max(const VolumeF& volume) { return max(volume.data); }
 inline float sum(const VolumeF& volume) { return sum(volume.data); }
 inline float mean(const VolumeF& volume) { return mean(volume.data); }
 inline float SSQ(const VolumeF& volume) { return SSQ(volume.data); }
