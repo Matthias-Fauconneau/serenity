@@ -2,6 +2,7 @@
 #include "matrix.h"
 #include "projection.h"
 #include "opencl.h"
+#include "random.h"
 
 inline uint interleave(const uint subsetSize, const uint subsetCount, const uint index) {
     const uint subsetIndex = index / subsetSize, localIndex = index % subsetSize;

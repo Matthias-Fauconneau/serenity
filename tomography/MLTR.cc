@@ -15,6 +15,7 @@ MLTR::MLTR(const Projection& projection, const ImageArray& b, const uint subsetS
 }
 
 void MLTR::step() {
+    uint subsetIndex = shuffle[this->subsetIndex];
     time += project(Ax, A, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     time += diffexp(r, Ax, subsets[subsetIndex].b); // r = exp(-Ax) - b
     time += backproject(Atr, subsets[subsetIndex].At, r); // Atr = At r
@@ -22,6 +23,6 @@ void MLTR::step() {
     time += mulexp(w, Ai[subsetIndex], Ax); // w = Ai exp(-Ax) FIXME: compute exp(-Ax) once
     time += backproject(Atw, subsets[subsetIndex].At, w); // Atw = At w
     time += adddiv(x, x, Atr, Atw);
-    subsetIndex = (subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
+    this->subsetIndex = (this->subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
     k++;
 }

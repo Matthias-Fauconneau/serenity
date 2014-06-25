@@ -1,4 +1,4 @@
-#if 0
+#if 1
 #include "project.h"
 #include "window.h"
 
@@ -28,7 +28,7 @@ struct TamDanielson : Widget {
         return false;
     }
 } app;
-#endif
+#else
 
 #include "thread.h"
 #include "matrix.h"
@@ -106,3 +106,4 @@ struct Test {
         }
     }
 } test;
+#endif

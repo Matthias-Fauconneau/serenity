@@ -20,10 +20,10 @@ struct Random {
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
 
-Random random;
 extern "C" double lgamma(double x);
 /// Returns a sequence of poisson distributed pseudo-random integers
-uint poisson(double lambda) {
+inline uint poisson(double lambda) {
+    static Random random;
     double c = 0.767 - 3.36/lambda;
     double beta = PI/sqrt(3.0*lambda);
     double alpha = beta*lambda;

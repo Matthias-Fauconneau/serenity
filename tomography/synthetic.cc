@@ -279,10 +279,10 @@ struct Analytic : Widget {
     }
 };
 
-const int N = fromInteger(arguments()[0]);
+map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"radius"_});
+const int N = parameters.value("size"_, 256);
 const int3 volumeSize = N;
 const int3 projectionSize = N;
-map<string, Variant> parameters = parseParameters(arguments());
 PorousRock rock {N, parameters.value("radius"_, 16.f)};
 VolumeF rockVolume = rock.volume();
 const float maxVoxel = max(rockVolume);

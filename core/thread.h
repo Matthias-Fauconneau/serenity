@@ -204,14 +204,15 @@ inline String str(const Variant& v) { return String((string&)v); }
 #include "map.h"
 #include "data.h"
 // Parses process arguments into parameter=value pairs
-inline map<string, Variant> parseParameters(const ref<string> arguments) {
-    map<string, Variant> parameters;
-    for(const string& argument: arguments) {
+inline map<string, Variant> parseParameters(const ref<string> args, const ref<string> parameters) {
+    map<string, Variant> arguments;
+    for(const string& argument: args) {
         TextData s (argument);
         string key = s.until("="_);
+        if(!parameters.contains(key)) error("Unknown parameter", key, parameters);
         // Explicit argument
         string value = s.untilEnd();
-        parameters.insert(key, Variant(String(value?:"1"_)));
+        arguments.insert(key, Variant(String(value?:"1"_)));
     }
-    return parameters;
+    return arguments;
 }

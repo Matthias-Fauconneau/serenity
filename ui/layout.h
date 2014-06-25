@@ -91,13 +91,13 @@ struct VBox : Vertical, WidgetReferences {
 /// Horizontal layout of homogenous items. \sa WidgetValues
 template<class T> struct HList : Horizontal, WidgetValues<T> {
     HList(buffer<T>&& widgets):WidgetValues<T>(move(widgets)){}
-    HList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){} // by reference
+    //HList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){} // by reference
     HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of homogenous items. \sa WidgetValues
 template<class T> struct VList : Vertical, WidgetValues<T> {
     VList(buffer<T>&& widgets):WidgetValues<T>(move(widgets)){}
-    VList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){} // by reference
+    //VList(const ref<T>& widgets):WidgetValues<T>(buffer<T>(widgets)){} // by reference
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
