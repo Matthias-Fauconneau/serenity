@@ -32,7 +32,7 @@ struct Application : Poll {
         for(uint i: range(target.data.size)) {
             float x = source.data[i];
             assert_(x>=0 && x<expOverflow, x);
-            target.data[i] = /*A.photonCount ? poisson(A.photonCount * exp(-x)) / A.photonCount :*/ exp(-x); //TODO: CL noise (also would remove one of the two copies)
+            target.data[i] = A.photonCount ? poisson(A.photonCount * exp(-x)) / A.photonCount : exp(-x); //TODO: CL noise (also would remove one of the two copies)
         }
         return ImageArray(target);
     }
@@ -71,19 +71,23 @@ struct Application : Poll {
     void event() {
         uint index = argmin(mref<unique<SubsetReconstruction>>(reconstructions));
         SubsetReconstruction& r = reconstructions[index];
-        if(r.divergent || r.k >= 16*r.subsetCount) return; // All reconstructions stopped converging or first to complete several supersteps
+        if(r.divergent) { log("Divergent"_); return; }
+        if(r.k >= 256*r.subsetCount) { log("Asymptotic"); return; } // All reconstructions stopped converging or first to complete several supersteps
         r.step();
         const float SSE = ::SSE(referenceVolume, r.x, evaluationOrigin, evaluationSize);
         const float MSE = SSE / SSQ;
         const float PSNR = 10*log10(MSE);
-        log(r.x.name+"\t"_+str(r.k)+"\t"_+str(MSE)+"\t"_+str(-PSNR));
+        String info;
+        if(ref<unique<SubsetReconstruction>>(reconstructions).size>1) info << r.x.name << '\t';
+        if(r.subsetCount>1) info << str(r.subsetSize) << '\t';
+        log(info+str(r.k)+"\t"_+str(-PSNR));
         {Locker lock(window.renderLock);
             setWindow( &window );
             window.renderBackground(plot.target); plot[r.x.name].insertMulti(r.time/1000000000.f, -PSNR); plot.render();
             rSlices[index].render(); rViews[index].render();
             setWindow(0);
         }
-        //if(SSE > r.SSE) { r.divergent++; r.stopTime=r.time; r.time=-1; log(r.x.name, SSE, r.SSE, SSE>r.SSE, r.divergent); } else r.divergent=0;
+        if(SSE > r.SSE) { r.divergent++; r.stopTime=r.time; r.time=-1; log(r.x.name, SSE, r.SSE, SSE>r.SSE, r.divergent); } else r.divergent=0;
         r.SSE = SSE;
         if(!wait) queue();
     }

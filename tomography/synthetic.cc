@@ -246,7 +246,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
             }
             maxAttenuation = ::max(maxAttenuation, densityRayIntegral);
             float v = scaleFactor * densityRayIntegral;
-            assert_(v>=0 && v<=1/*-expUnderflow*/, scaleFactor, densityRayIntegral, v);
+            //assert_(v>=0 && v<=1/*-expUnderflow*/, v);
             target(x,y) = v;
         }
     });
@@ -283,7 +283,7 @@ const int N = fromInteger(arguments()[0]);
 const int3 volumeSize = N;
 const int3 projectionSize = N;
 map<string, Variant> parameters = parseParameters(arguments());
-PorousRock rock {N, parameters.value("radius"_, 8.f)};
+PorousRock rock {N, parameters.value("radius"_, 16.f)};
 VolumeF rockVolume = rock.volume();
 const float maxVoxel = max(rockVolume);
 const float factor = 1./(sqrt(float(sq(rock.size.x)+sq(rock.size.y)+sq(rock.size.z)))*maxVoxel); // FIXME: overly conservative, use maximum attenuation over analytic projection instead
@@ -305,10 +305,11 @@ struct App {
         for(uint index: range(projectionData.size.z)) {
             log(index);
             ImageF target = ::slice(projectionData, index);
-            //if(parameters.value("analytic"_, false))
-            maxAttenuation = ::max(maxAttenuation, rock.project(target, A, index, factor));
-            //else
-            //project(target, A, volume, index);
+            if(parameters.value("analytic"_, true) && !parameters.value("sample"_, false))
+                maxAttenuation = ::max(maxAttenuation, rock.project(target, A, index, factor));
+            else if(!parameters.value("analytic"_, false) && parameters.value("sample"_, false))
+                project(target, A, volume, index);
+            else error(parameters);
         }
         log(time, maxVoxel, maxAttenuation);
         writeFile("Data/"_+str(A), cast<byte>(projectionData.data));

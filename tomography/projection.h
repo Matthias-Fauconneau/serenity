@@ -38,8 +38,8 @@ struct Projection {
 };
 
 inline mat4 Projection::worldToView(uint index) const {
-    const float angle = doubleHelix ? 2*PI*numberOfRotations*float(index/2)/((count-1)/2) + (index%2?PI:0) : 2*PI*numberOfRotations*float(index)/(count-1); // Rotation angle (in radians) around vertical axis
-    const float dz = doubleHelix ? float(index/2)/float((count-1)/2) : float(index)/float(count-1);
+    const float angle = doubleHelix ? 2*PI*numberOfRotations*float(index%(count/2))/((count-1)/2) + (index/(count/2)?PI:0) : 2*PI*numberOfRotations*float(index)/(count-1); // Rotation angle (in radians) around vertical axis
+    const float dz = doubleHelix ? float(index%(count/2))/float((count-1)/2) : float(index)/float(count-1);
     const float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space
     return mat4().rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,z)*halfVolumeSize).rotateZ(angle);
 }

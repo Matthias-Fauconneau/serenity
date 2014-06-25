@@ -8,11 +8,9 @@ SART::SART(const Projection& A, const ImageArray& b, const uint subsetSize) : Su
     log_("SART: AAti... "_);
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
-        const ProjectionArray& At = subset.At;
         CLVolume Ati (x.size);
-        backproject(Ati, At, i); // Backprojects identity projections
-        const ImageArray& b = subset.b;
-        new (&AAti[subsetIndex]) ImageArray(b.size);
+        backproject(Ati, subset.At, i); // Backprojects identity projections
+        new (&AAti[subsetIndex]) ImageArray(subset.b.size);
         project(AAti[subsetIndex], A, Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
     }
     log("Done");
