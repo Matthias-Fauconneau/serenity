@@ -51,16 +51,23 @@ struct Application : Poll {
 
     // Interface
     buffer<const CLVolume*> volumes = apply(reconstructions, [&](const SubsetReconstruction& r){ return &r.x;});
-    int upsample = max(1, 512 / projectionSize.x);
+    int upsample = max(1, 256 / projectionSize.x);
 
     Value sliceIndex = Value((volumeSize.z-1) / 2);
     SliceView x {&referenceVolume, upsample, sliceIndex};
     HList<SliceView> rSlices { apply<SliceView>(volumes, upsample, sliceIndex, 0/*2*mean*/) };
-    SliceView AAti {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->AAti[0], upsample};
-    HBox slices {{&x, &rSlices, &AAti}};
+    SliceView AAti {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->AAti[1], upsample};
+    Value subIndex = Value(0);
+    SliceView b2 {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->subsets[1].b, upsample, subIndex};
+    SliceView r {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->Ax, upsample, subIndex}; // r
+    SliceView Atr {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->Atr, upsample};
+    HBox slices {{&x, &rSlices, &AAti, &b2, &r, &Atr}};
 
     Value projectionIndex = Value((projectionSize.z-1) / 2);
-    VolumeView b {&referenceVolume, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex};
+    //VolumeView b {&referenceVolume, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex};
+    const ImageArray refB = negln(projectionData[0]);
+    Value bIndex = Value(0);
+    SliceView b {&refB, upsample, bIndex};
     HList<VolumeView> rViews { apply<VolumeView>(volumes, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex) };
     HBox views {{&b, &rViews}};
 
@@ -68,7 +75,7 @@ struct Application : Poll {
 
     VBox layout {{&slices, &views, &plot}};
     Window window {&layout, str(strx(volumeSize), strx(projectionSize), strx(int2(projectionSize.z/subsetSize, subsetSize))), int2(-1, -1024)};
-    bool wait = false;
+    bool wait = true;
 
     Application() : Poll(0,0,thread) {
         log(parameters);

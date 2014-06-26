@@ -17,7 +17,9 @@ SART::SART(const Projection& A, const ImageArray& b, const uint subsetSize) : Su
 }
 
 void SART::step() {
-    uint subsetIndex = shuffle[this->subsetIndex];
+    uint subsetIndex = this->subsetIndex; //shuffle[this->subsetIndex];
+    log(subsetIndex);
+    for(uint index: range(subsetIndex*subsetSize,subsetIndex*subsetSize+subsetSize)) log(index, interleave(subsetSize, subsetCount, index), A.angle(interleave(subsetSize, subsetCount, index))/(2*PI));
     time += project(Ax, A, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
     const ImageArray& r = Ax; // In-place: residual
     time += divdiff(r, subsets[subsetIndex].b, Ax, AAti[subsetIndex]); // r = ( b - Ax ) / A At i

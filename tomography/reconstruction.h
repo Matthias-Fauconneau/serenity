@@ -11,7 +11,7 @@ struct Reconstruction {
     int divergent = 0; // Divergent iterations
     uint64 stopTime = 0;
 
-    Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), 1.f/A.volumeSize.x)) { assert_(x.size.x==x.size.y); }
+    Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), /*1.f/A.volumeSize.x*/0)) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
@@ -40,11 +40,24 @@ struct SubsetReconstruction : Reconstruction {
         assert_(subsetCount*subsetSize == A.count);
         subsets = buffer<Subset>(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {
-            Subset& subset = subsets[subsetIndex];
-            uint startIndex = subsetIndex*subsetSize, endIndex = startIndex+subsetSize;
-            CLVolume subsetB = int3(b.size.xy(),subsetSize);
-            for(uint index: range(subsetSize)) copy(b, subsetB, int3(0,0,interleave(subsetSize, subsetCount, startIndex+index)), int3(0,0,index), int3(b.size.xy(),1));
-            new (&subset) Subset{ apply(range(startIndex, endIndex), [&](uint index){ return  A.worldToDevice(interleave(subsetSize, subsetCount, index)); }), move(subsetB)};
+            /*CLVolume subsetB = int3(b.size.xy(), subsetSize);
+            for(uint index: range(subsetSize)) {
+                log(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index),"->", subsetIndex, index);
+                copy(b, subsetB, int3(0,0,interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)), int3(0,0,index), int3(b.size.xy(),1));
+            }
+            new (subsets+subsetIndex) Subset{ apply(subsetSize, [&](uint index){ return A.worldToDevice(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)); }), move(subsetB)};*/
+            /*new (subsets+subsetIndex) Subset{ apply(subsetSize, [&](uint index){ return A.worldToDevice(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)); }), int3(b.size.xy(), subsetSize)};
+            for(uint index: range(subsetSize)) {
+                log(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index),"->", subsetIndex, index);
+                copy(b, subsets[subsetIndex].b, int3(0,0,interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)), int3(0,0,index), int3(b.size.xy(),1));
+            }*/
+            VolumeF source(b.size,"b"_); b.read(source);
+            VolumeF target(int3(b.size.xy(), subsetSize), "b"_);
+            for(uint index: range(subsetSize)) {
+                log(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index),"->", subsetIndex, index);
+                copy(slice(target,index).data,slice(source,interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)).data);
+            }
+            new (subsets+subsetIndex) Subset{ apply(subsetSize, [&](uint index){ return A.worldToDevice(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)); }), CLVolume(target.size, target.data) };
         }
     }
 };

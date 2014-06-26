@@ -97,7 +97,7 @@ float convert(const Image& target, const ImageF& source, float max=0);
 ImageF& downsample(ImageF& target, const ImageF& source);
 /// Upsamples an image by duplicating samples
 ImageF upsample(const ImageF& source);
-
+ImageF upsampleY(const ImageF& source);
 ImageF clip(const ImageF& image, Rect r);
 
 inline void scale(mref<float>& A, float factor) { for(float& a: A) a *= factor; }

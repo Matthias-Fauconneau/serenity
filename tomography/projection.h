@@ -28,19 +28,19 @@ struct Projection {
 
     Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix, const uint numberOfRotations, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
 
+    float angle(uint index) const { return doubleHelix ? 2*PI*numberOfRotations*float(index%(count/2))/((count)/2) + (index/(count/2)?PI:0) : 2*PI*numberOfRotations*float(index)/count; } // Rotation angle (in radians) around vertical axis
+
     // Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation)
     mat4 worldToView(uint index) const;
     // Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME)
     mat4 worldToScaledView(uint index) const;
     // Transforms from world coordinates [±size] to device coordinates [±size/2]
-    mat4 worldToDevice(uint index) const;
-};
+    mat4 worldToDevice(uint index) const; };
 
 inline mat4 Projection::worldToView(uint index) const {
-    const float angle = count > 1 ? (doubleHelix ? 2*PI*numberOfRotations*float(index%(count/2))/((count-1)/2) + (index/(count/2)?PI:0) : 2*PI*numberOfRotations*float(index)/(count-1)) : 0; // Rotation angle (in radians) around vertical axis
     const float dz = count > 1 ? (doubleHelix ? float(index%(count/2))/float((count-1)/2) : float(index)/float(count-1)) : 0;
     const float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space
-    return mat4().rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,z)*((volumeSize.x-1)/2.f)).rotateZ(angle);
+    return mat4().rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,z)*((volumeSize.x-1)/2.f)).rotateZ(angle(index));
 }
 
 inline mat4 Projection::worldToScaledView(uint index) const {

@@ -67,6 +67,12 @@ ImageF upsample(const ImageF& source) {
     return target;
 }
 
+ImageF upsampleY(const ImageF& source) {
+    ImageF target(source.size*int2(1,2));
+    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) target(x,y*2+0) = target(x,y*2+0) = target(x,y*2+1) = target(x,y*2+1) = source(x,y);
+    return target;
+}
+
 ImageF clip(const ImageF& image, Rect r) {
     r = r & Rect(image.size);
     assert_(r.size().x == image.size.x, r.size(), image.size);
