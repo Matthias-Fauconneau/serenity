@@ -9,7 +9,7 @@ kernel void backproject(global float* Y, const uint XY, const uint X, const floa
             struct mat4 M = worldToDevice[projectionIndex];
             float4 view = world.x * M.columns[0] + world.y * M.columns[1] + world.z * M.columns[2] + M.columns[3]; // Homogeneous view coordinates
             float2 image = view.xy / view.w + imageCenter; // Perspective divide + Image coordinates offset
-            Atb += read_imagef(images, sampler, (float4)(image,projectionIndex,0)).x;
+            Atb += read_imagef(images, sampler, (float4)(image,projectionIndex+1./2,0)).x;
         }
     }
     Y[z*XY+y*X+x] = Atb;
