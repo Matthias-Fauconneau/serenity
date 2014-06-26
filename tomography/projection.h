@@ -10,7 +10,7 @@ struct Projection {
     uint count = projectionSize.z;
     // Parameters
     float detectorHalfWidth = 1;
-    float cameraLength = 64;
+    float cameraLength = 1;
     float specimenDistance = 1./16;
     bool doubleHelix;
     uint numberOfRotations;

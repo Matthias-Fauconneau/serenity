@@ -12,7 +12,7 @@
 #include "variant.h"
 
 struct Application : Poll {
-    map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"proj"_,"subset"_,"noise"_,"double"_,"SART"_,"MLTR"_});
+    map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"proj"_,"subset"_,"noise"_,"double"_,"SART"_,"MLTR"_,"PMLTR"_});
     Thread thread {19};
     // Reference volume
     Folder folder {"Data"_};
@@ -45,6 +45,7 @@ struct Application : Poll {
         array<unique<SubsetReconstruction>> reconstructions;
         if(parameters.contains("SART"_)) reconstructions << unique<SART>(projections[0], projectionData[0], subsetSize);
         if(parameters.contains("MLTR"_)) reconstructions << unique<MLTR>(projections[0], projectionData[0], subsetSize);
+        if(parameters.contains("PMLTR"_)) reconstructions << unique<PMLTR>(projections[0], projectionData[0], subsetSize);
         assert_(reconstructions);
         return move(reconstructions);
     }
@@ -56,26 +57,19 @@ struct Application : Poll {
     Value sliceIndex = Value((volumeSize.z-1) / 2);
     SliceView x {&referenceVolume, upsample, sliceIndex};
     HList<SliceView> rSlices { apply<SliceView>(volumes, upsample, sliceIndex, 0/*2*mean*/) };
-    SliceView AAti {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->AAti[1], upsample};
-    Value subIndex = Value(0);
-    SliceView b2 {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->subsets[1].b, upsample, subIndex};
-    SliceView r {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->Ax, upsample, subIndex}; // r
-    SliceView Atr {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->Atr, upsample};
-    HBox slices {{&x, &rSlices, &AAti, &b2, &r, &Atr}};
+    HBox slices {{&x, &rSlices}};
 
     Value projectionIndex = Value((projectionSize.z-1) / 2);
-    //VolumeView b {&referenceVolume, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex};
-    const ImageArray refB = negln(projectionData[0]);
-    Value bIndex = Value(0);
-    SliceView b {&refB, upsample, bIndex};
+    const ImageArray b = negln(projectionData[0]);
+    SliceView bView {&b, upsample, projectionIndex};
     HList<VolumeView> rViews { apply<VolumeView>(volumes, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex) };
-    HBox views {{&b, &rViews}};
+    HBox views {{&bView, &rViews}};
 
     Plot plot;
 
     VBox layout {{&slices, &views, &plot}};
     Window window {&layout, str(strx(volumeSize), strx(projectionSize), strx(int2(projectionSize.z/subsetSize, subsetSize))), int2(-1, -1024)};
-    bool wait = true;
+    bool wait = false;
 
     Application() : Poll(0,0,thread) {
         log(parameters);
