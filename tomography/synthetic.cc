@@ -7,6 +7,7 @@
 #include "layout.h"
 #include "window.h"
 #include "view.h"
+#include "variant.h"
 
 inline void intersects(const float halfHeight, const float radius, const float3 origin, const float3 ray, float& tmin, float& tmax) {
     float2 plusMinusHalfHeightMinusOriginZ = float2(1,-1) * (halfHeight-1.f/2/*fix OOB*/) - origin.z; // sq(origin.xy()) - sq(radius) + 1 /*fix OOB*/, sq(radius), center.
@@ -77,7 +78,7 @@ struct PorousRock {
     const float containerDensity = 5.6; // Pure iron
     int3 size;
     const float maximumRadius = 8; // vx
-    const float rate = 1./cb(maximumRadius); // 1/vx
+    const float rate = 1./(size.z==1?sq(maximumRadius):cb(maximumRadius)); // 1/vx
     struct GrainType { const float probability; /*relative concentration*/ const float density; buffer<vec4> grains; } types[3] = {/*Rutile*/{0.7, 4.20,{}}, /*Siderite*/{0.2, 3.96,{}}, /*NaMontmorillonite*/{0.1, 2.65,{}}};
     const vec3 volumeCenter = vec3(size-int3(1))/2.f;
     const float volumeRadius = volumeCenter.x;
@@ -92,7 +93,7 @@ struct PorousRock {
 
 PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maximumRadius(maximumRadius) {
     assert(size.x == size.y);
-    assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
+    //assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
 
     Random random;
     for(GrainType& type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
@@ -101,7 +102,8 @@ PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maxim
             const float r = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
             const vec2 xy = vec2(random(), random()) * vec2(size.xy());
             if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
-            type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
+            type.grains.append( vec4(xy, random()*(size.z-1), r) );
+            //type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
         }
     }
 }
@@ -141,9 +143,11 @@ VolumeF PorousRock::volume() {
             int iz = cz-r-1./2, iy = cy-r-1./2, ix = cx-r-1./2;
             float fz = cz-iz, fy=cy-iy, fx=cx-ix;
             uint grainSize = ceil(2*(r+1./2));
-            float* volume0 = volumeData + iz*XY + iy*X + ix;
+            //float* volume0 = volumeData + iz*XY + iy*X + ix;
+            float* volume0 = volumeData + iz*int(XY)/*Necessary only if grains may cross caps*/ + iy*X + ix;
             for(uint z=0; z<grainSize; z++) { // Grains may be cut by cylinder caps
                 float* volumeZ = volume0 + z*XY;
+                if(iz+int(z) < 0 || iz+int(z) >= size.z) continue; // Necessary only if grains may cross caps
                 float rz = float(z) - fz;
                 float RZ = rz*rz;
                 for(uint y=0; y<grainSize; y++) {
@@ -176,7 +180,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
     mat4 viewToWorld = A.worldToScaledView(index).inverse();
     const float3 viewOrigin = viewToWorld[3].xyz();
     mat4 projectionMatrix; projectionMatrix(3,2) = 1;  projectionMatrix(3,3) = 0;
-    projectionMatrix = projectionMatrix * mat4().scale(vec3(vec2(float(A.projectionSize.x-1)/A.extent),1/A.distance)).scale(1.f/A.halfVolumeSize);
+    projectionMatrix = projectionMatrix * mat4().scale(vec3(vec2(float(A.projectionSize.x-1)/A.extent),1/A.distance)).scale(vec3(1.f/A.volumeRadius));
 
     uint typeCount = ref<GrainType>(types).size;
 
@@ -209,7 +213,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
     rasterizationTime.stop();
 
     Time integrationTime;
-    const float halfHeight = (A.volumeSize.z-1)/2;
+    const float halfHeight = (A.volumeSize.z/*-1*/)/2.f;
     const float outerRadius = (1-2./100) * volumeRadius;
     float maxAttenuation = 0;
     parallel(target.size.y, [&](const uint, const uint y) {
@@ -269,8 +273,9 @@ struct Analytic : Widget {
         ImageF image (A.projectionSize.xy());
         rock.project(image, A, index.value, scaleFactor);
         while(image.size < this->target.size()) image = upsample(image);
-        float max = convert(target, image);
+        float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
         Text(str(max),16,green).render(this->target, 0);
+
         putImage(target);
     }
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
@@ -279,21 +284,20 @@ struct Analytic : Widget {
     }
 };
 
-map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"radius"_});
-const int N = parameters.value("size"_, 256);
-const int3 volumeSize = N;
-const int3 projectionSize = N;
-PorousRock rock {N, parameters.value("radius"_, 16.f)};
+map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"proj"_,"radius"_,"sample"_});
+const int3 volumeSize = fromInt3(parameters.value("size"_)) ?: 256;
+const int3 projectionSize = fromInt3(parameters.value("proj"_)) ?: volumeSize;
+PorousRock rock {volumeSize, parameters.value("radius"_, 16.f)};
 VolumeF rockVolume = rock.volume();
 const float maxVoxel = max(rockVolume);
 const float factor = 1./(sqrt(float(sq(rock.size.x)+sq(rock.size.y)+sq(rock.size.z)))*maxVoxel); // FIXME: overly conservative, use maximum attenuation over analytic projection instead
 VolumeF hostVolume = scale(move(rockVolume), factor);
 CLVolume volume {hostVolume};
-SliceView sliceView {volume, 512/N};
+SliceView sliceView {volume, 512/projectionSize.x};
 Projection A {volumeSize, projectionSize, parameters.value("double"_, false), parameters.value("rotations"_, 1u)};
 Value projectionIndex {0};
-VolumeView volumeView {volume, A, 512/N, projectionIndex};
-Analytic analyticView {rock, A, factor, 512/N, projectionIndex};
+VolumeView volumeView {volume, A, 512/projectionSize.x, projectionIndex};
+Analytic analyticView {rock, A, factor, 512/projectionSize.x, projectionIndex};
 HBox layout {{ &sliceView, &volumeView, &analyticView}};
 struct App {
     App() {
@@ -315,4 +319,4 @@ struct App {
         writeFile("Data/"_+str(A), cast<byte>(projectionData.data));
     }
 } app;
-Window window {&layout, str(N)};
+Window window {&layout, str(volumeSize)};

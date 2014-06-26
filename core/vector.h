@@ -16,7 +16,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array
-    template<Type... Args> explicit vec(const T o[N]){ for(uint i=0;i<N;i++) at(i)=(T)o[i]; }
+    ///*template<Type... Args>*/ explicit vec(const T o[N]){ for(uint i=0;i<N;i++) at(i)=(T)o[i]; }
     /// Initializes first components from another vec \a o and initializes remaining components with args...
     template<template<typename> class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
         for(int i: range(N-sizeof...(Args))) at(i)=o[i];
@@ -140,3 +140,6 @@ generic struct bgra {
 typedef vec<bgra,uint8,4> byte4;
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;
+
+inline String strx(int2 N) { return str(N.x)+"x"_+str(N.y); }
+inline String strx(int3 N) { return str(N.x)+"x"_+str(N.y)+"x"_+str(N.z); }

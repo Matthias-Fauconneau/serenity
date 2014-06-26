@@ -9,21 +9,21 @@
 #include "layout.h"
 #include "window.h"
 #include "view.h"
+#include "variant.h"
 
 struct Application : Poll {
-    map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"subset"_,"noise"_,"double"_,"SART"_,"MLTR"_});
+    map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"proj"_,"subset"_,"noise"_,"double"_,"SART"_,"MLTR"_});
     Thread thread {19};
     // Reference volume
     Folder folder {"Data"_};
-    const uint N = parameters.value("size"_, 64);
-    int3 volumeSize = N;
+    int3 volumeSize = fromInt3(parameters.value("size"_)) ?: 64;
     const CLVolume referenceVolume {volumeSize, Map(strx(volumeSize)+".ref"_, folder)};
     //int3 evaluationOrigin =  int3(0,0,volumeSize.z/4), evaluationSize = int3(volumeSize.xy(), volumeSize.z/2);
     int3 evaluationOrigin =  int3(0,0,0), evaluationSize = volumeSize;
     const float mean = ::mean(referenceVolume);
     const float SSQ = ::SSQ(referenceVolume, evaluationOrigin, evaluationSize);
     // Projection
-    const int3 projectionSize = N;
+    const int3 projectionSize = fromInt3(parameters.value("proj"_)) ?: volumeSize;
     Projection projections[1] = {Projection(volumeSize, projectionSize, parameters.value("double"_, false), parameters.value("rotations"_, 1), 1<<parameters.value("noise"_,0))};
     buffer<ImageArray> projectionData = apply(ref<Projection>(projections), [this](const Projection& A){ return load(A); }); // Map projection data files, convert to transmission data, simulate noise and upload to device
     ImageArray load(const Projection& A) {
@@ -45,6 +45,7 @@ struct Application : Poll {
         array<unique<SubsetReconstruction>> reconstructions;
         if(parameters.contains("SART"_)) reconstructions << unique<SART>(projections[0], projectionData[0], subsetSize);
         if(parameters.contains("MLTR"_)) reconstructions << unique<MLTR>(projections[0], projectionData[0], subsetSize);
+        assert_(reconstructions);
         return move(reconstructions);
     }
 
@@ -55,17 +56,18 @@ struct Application : Poll {
     Value sliceIndex = Value((volumeSize.z-1) / 2);
     SliceView x {&referenceVolume, upsample, sliceIndex};
     HList<SliceView> rSlices { apply<SliceView>(volumes, upsample, sliceIndex, 0/*2*mean*/) };
-    HBox slices {{&x, &rSlices}};
+    SliceView AAti {&(const CLVolume&)((const SART*)(reconstructions[0].pointer))->AAti[0], upsample};
+    HBox slices {{&x, &rSlices, &AAti}};
 
     Value projectionIndex = Value((projectionSize.z-1) / 2);
-    VolumeView b {&referenceVolume, Projection(volumeSize, projectionSize), upsample, projectionIndex};
-    HList<VolumeView> rViews { apply<VolumeView>(volumes, Projection(volumeSize, projectionSize), upsample, projectionIndex) };
+    VolumeView b {&referenceVolume, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex};
+    HList<VolumeView> rViews { apply<VolumeView>(volumes, Projection(volumeSize, projectionSize, false, 1), upsample, projectionIndex) };
     HBox views {{&b, &rViews}};
 
     Plot plot;
 
     VBox layout {{&slices, &views, &plot}};
-    Window window {&layout, str(N), int2(-1, -1024)};
+    Window window {&layout, str(strx(volumeSize), strx(projectionSize), strx(int2(projectionSize.z/subsetSize, subsetSize))), int2(-1, -1024)};
     bool wait = false;
 
     Application() : Poll(0,0,thread) {

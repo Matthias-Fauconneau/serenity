@@ -2,9 +2,6 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 
-inline String strx(int2 N) { return str(N.x)+"x"_+str(N.y); }
-inline String strx(int3 N) { return str(N.x)+"x"_+str(N.y)+"x"_+str(N.z); }
-
 /// Axis-aligned rectangle
 struct Rect {
     int2 min,max;

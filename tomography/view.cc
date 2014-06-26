@@ -10,7 +10,7 @@ bool SliceView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
     return false;
 }
 
-int2 SliceView::sizeHint() { return upsampleFactor * this->size.xy(); }
+int2 SliceView::sizeHint() { return ::max(int2(64), upsampleFactor * this->size.xy()); }
 
 void SliceView::render() {
     ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
@@ -32,7 +32,7 @@ bool VolumeView::mouseEvent(int2 cursor, int2 size, Event, Button button) {
     return false;
 }
 
-int2 VolumeView::sizeHint() { return upsampleFactor * A.projectionSize.xy(); }
+int2 VolumeView::sizeHint() { return ::max(int2(64), upsampleFactor * A.projectionSize.xy()); }
 
 void VolumeView::render() {
     ImageF image = ImageF(A.projectionSize.xy());

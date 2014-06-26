@@ -61,7 +61,7 @@ static void fill(uint* target, uint stride, uint w, uint h, uint value) {
 
 void fill(const Image& target, Rect rect, vec3 color, float alpha) {
     rect = rect & Rect(target.size());
-    color = clip(vec3(0), color, vec3(1));
+    color = clip(vec3(0.f), color, vec3(1));
     if(alpha<1) {
         for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
             blend(target, x, y, color, alpha);
@@ -75,8 +75,8 @@ void fill(const Image& target, Rect rect, vec3 color, float alpha) {
 
 void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
     Rect rect = (position+Rect(source.size())) & Rect(target.size());
-    color = clip(vec3(0), color, vec3(1));
-    if(color!=vec3(0) || alpha<1 || source.sRGB) {
+    color = clip(vec3(0.f), color, vec3(1));
+    if(color!=vec3(0.f) || alpha<1 || source.sRGB) {
         for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
             byte4 RGBA = source(x-position.x,y-position.y);
             vec3 linear = source.sRGB ? vec3(sRGB_reverse[RGBA[0]], sRGB_reverse[RGBA[1]], sRGB_reverse[RGBA[2]]) : vec3(RGBA.bgr())/float(0xFF);
@@ -101,7 +101,7 @@ void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool tr
 }
 
 void line(const Image& target, float x1, float y1, float x2, float y2, vec3 color, float alpha) {
-    color = clip(vec3(0), color, vec3(1));
+    color = clip(vec3(0.f), color, vec3(1));
     float dx = x2 - x1, dy = y2 - y1;
     bool transpose=false;
     if(abs(dx) < abs(dy)) { swap(x1, y1); swap(x2, y2); swap(dx, dy); transpose=true; }

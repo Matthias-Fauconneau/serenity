@@ -24,7 +24,6 @@ kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOri
     float3 position = dataOrigin + tmin * ray; // [-(size-1)/2, (size-1)/2] -> [0, size-1]
     float accumulator = 0;
     while(tmin < tmax) { // Uniform ray sampling with trilinear interpolation
-        //accumulator += position.x<0 || position.x>size.x-1 || position.y<0 || position.y>size.y-1 || position.z<0 || position.z>size.z-1;
         accumulator += read_imagef(volume, sampler, position.xyzz).x;
         tmin+=1; position += ray;
     }

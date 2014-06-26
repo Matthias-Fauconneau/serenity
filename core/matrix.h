@@ -92,7 +92,7 @@ struct mat4 {
 
     //vec2 operator*(vec2 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,3); return r.xy()/r.w; }
     //vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
-    vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); assert_(r.w==1); return r.xyz(); }
+    vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); assert(r.w==1); return r.xyz(); }
     float4 operator*(float4 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
     mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
 
