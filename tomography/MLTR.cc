@@ -24,5 +24,4 @@ void MLTR::step() {
     time += backproject(Atw, subsets[subsetIndex].At, w); // Atw = At w
     time += adddiv(x, x, Atr, Atw);
     this->subsetIndex = (this->subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
-    k++;
 }

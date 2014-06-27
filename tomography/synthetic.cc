@@ -235,7 +235,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
             }
             maxAttenuation = ::max(maxAttenuation, densityRayIntegral);
             float v = factor * densityRayIntegral;
-            v = poisson(A.photonCount * exp(-v)) / A.photonCount;
+            v = poisson(A.photonCount) / A.photonCount * exp(-v); // TODO: precompute poisson
             target(x,y) = v;
         }
     });

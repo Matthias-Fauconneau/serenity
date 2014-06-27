@@ -20,6 +20,14 @@ struct Random {
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
 
+inline buffer<uint> shuffleSequence(uint size) {
+    buffer<uint> seq(size);
+    Random random;
+    for(uint i: range(size)) seq[i] = i;
+    for(uint i=size-1; i>0; i--) swap(seq[i], seq[random%(i+1)]);
+    return seq;
+}
+
 extern "C" float lgammaf(float x);
 /// Returns a sequence of poisson distributed pseudo-random integers
 inline uint poisson(float lambda) {

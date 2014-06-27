@@ -140,7 +140,7 @@ Window::~Window() {
 
 // Render
 void Window::event() {
-    if(revents!=IDLE) for(;;) { // Always process any pending X input events before rendering
+    /*if(revents!=IDLE)*/ for(;;) { // Always process any pending X input events before rendering
         lock.lock();
         if(!poll()) { lock.unlock(); break; }
         uint8 type = read<uint8>();

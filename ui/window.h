@@ -87,7 +87,7 @@ struct Window : Socket, Poll {
     /// Properly destroys X GC and Window
     virtual ~Window();
 
-    /// Event handler
+    /// Event handler: processes input and renders
     void event();
     /// Schedules window rendering after all events have been processed (i.e Poll::wait())
     bool needRender = false; // on ConfigureNotify

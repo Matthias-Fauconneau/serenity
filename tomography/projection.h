@@ -62,5 +62,3 @@ inline mat4 Projection::worldToDevice(uint index) const {
     mat4 projectionMatrix; projectionMatrix(3,2) = 1;  projectionMatrix(3,3) = 0; // copies Z to W (FIXME: move scale(vec3(vec2(float(projectionSize.x-1)/extent),1/distance)) from worldToView to projectionMatrix
     return projectionMatrix * worldToScaledView(index);
 }
-
-inline String str(const Projection& A) { return str(strx(A.volumeSize), strx(A.projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, A.photonCount); }
