@@ -47,7 +47,7 @@ static array<Thread*> threads __attribute((init_priority(102)));
 // Handle for the main thread (group leader)
 Thread mainThread __attribute((init_priority(102))) (20);
 // Flag to cleanly terminate all threads
-static bool terminate = false;
+bool terminate = false;
 // Exit status to return for process (group)
 static int exitStatus = 0;
 

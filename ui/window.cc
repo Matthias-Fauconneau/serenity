@@ -131,7 +131,6 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
     setIcon(icon);
     actions[Escape] = []{ exit(); };
     actions[PrintScreen] = [this]{ Locker lock(renderLock); writeFile(this->title+".png"_,encodePNG(target)); };
-    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
@@ -306,7 +305,7 @@ template<class T> T Window::readReply(const ref<byte>& request) {
     }
 }
 
-void Window::show() { {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
+void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {

@@ -4,14 +4,14 @@
 
 MLTR::MLTR(const Projection& projection, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(projection, b, subsetSize, "MLTR"_), Ai(subsets.size), Ax(subsets[0].b.size), r(Ax.size), Atr(x.size), Atw(x.size) {
     CLVolume i = cylinder(VolumeF(x.size,"i"_));
-    log_("MLTR: Ai... "_);
+    log_("MLTR: Ai... "_); Time time;
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         const ImageArray& b = subset.b;
         new (&Ai[subsetIndex]) ImageArray(b.size);
         project(Ai[subsetIndex], A, i, subsetIndex, subsetSize, subsetCount); // Ai = A i
     }
-    log("Done");
+    log(time);
 }
 
 void MLTR::step() {

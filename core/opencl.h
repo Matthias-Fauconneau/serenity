@@ -54,8 +54,9 @@ struct CLVolume : CLMem {
     CLVolume(const VolumeF& A) : CLVolume(A.size, A.data, A.name) {}
     default_move(CLVolume);
 
-    VolumeF read(VolumeF&& target, int3 origin=0) const;
-    VolumeF read() const { return read(size); }
+    void read(const VolumeF& target, int3 origin=0) const;
+    VolumeF read(VolumeF&& target, int3 origin=0) const { read(target, origin); return move(target); }
+    //VolumeF read() const { return read(size); }
 
     int3 size; // (width, height, depth/index)
     String name;

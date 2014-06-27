@@ -66,10 +66,9 @@ CLVolume::CLVolume(int3 size, const ref<float>& data, string name) : CLMem(clCre
     assert_(data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
 }
 
-VolumeF CLVolume::read(VolumeF&& target, int3 origin) const {
+void CLVolume::read(const VolumeF& target, int3 origin) const {
     assert_(origin+target.size <= size);
     clCheck( clEnqueueReadImage(queue, pointer, true, (size_t[]){size_t(origin.x),size_t(origin.y),size_t(origin.z)}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0, target.data, 0,0,0) );
-    return move(target);
 }
 
 const CLVolume& copy(const CLVolume& source, CLVolume& target, const int3 sourceOrigin, const int3 targetOrigin, int3 size) {

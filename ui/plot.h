@@ -10,11 +10,11 @@ inline bool operator <(const DataSet& a, const DataSet& b) { return a.data && b.
 
 struct Plot : virtual Widget {
     enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
-    Plot(const string& title=""_, bool plotPoints=true, bool plotLines=true, LegendPosition legendPosition=TopRight)
+    Plot(const string& title=""_, bool plotPoints=false, bool plotLines=true, LegendPosition legendPosition=TopRight)
         : title(title), plotPoints(plotPoints), plotLines(plotLines), legendPosition(legendPosition) {}
     map<real,real>& operator[](const string& label) {
         for(DataSet& dataSet: dataSets) if(dataSet.label==label) return dataSet.data;
-        dataSets << DataSet{String(label), {}}; return dataSets.last().data;
+        dataSets << DataSet{copy(String(label)), {}}; return dataSets.last().data;
     }
     int2 sizeHint() override;
     void render() override;
@@ -22,7 +22,7 @@ struct Plot : virtual Widget {
     String title, xlabel, ylabel;
     bool log[2] = {false, false};
     array<DataSet> dataSets;
-    bool plotPoints = false, plotLines = true;
+    bool plotPoints, plotLines;
     LegendPosition legendPosition;
     vec2 min = 0, max = 0;
 };

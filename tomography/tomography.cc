@@ -7,78 +7,92 @@
 #include "layout.h"
 #include "window.h"
 
+inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
+
 struct Application {
     Plot plot;
-    //map<string, Variant> parameters = parseParameters(arguments(),{"volumeSize"_,"radius"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"method"_,"subsetSize"_}); TODO: parse sequences
+    Window window;
     Application() {
+        // Reference parameters
         for(const int3 volumeSize: apply(range(6,9 +1), &exp2)) {
             for(const uint grainRadius:  apply(range(4,8 +1), &exp2)) {
-                // Reference volume
+
+                // Reference
                 PorousRock rock (volumeSize, grainRadius);
                 const VolumeF referenceVolume = rock.volume();
                 const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
                 const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
 
-                for(const uint projectionWidth:  apply(range(4,9 +1), &exp2)) {
+                // Projection parameters
+                for(const uint projectionWidth:  apply(range(6,9 +1), &exp2)) {
                     for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
                         for(uint rotationCount: range(1,5 +1)) {
                             for(const uint photonCount: apply(range(8,16 +1), &exp2)) {
-                                for(const uint projectionCount:  apply(range(4,9 +1), &exp2)) {
+                                for(const uint projectionCount:  apply(range(6,9 +1), &exp2)) {
                                     int3 projectionSize (projectionWidth,projectionWidth*3/4, projectionCount);
+
                                     // Projection
                                     const Projection A (volumeSize, projectionSize, trajectory, rotationCount, photonCount);
                                     ImageArray intensity = project(rock, A);
                                     ImageArray attenuation = negln(intensity);
-                                    //const string method = parameters.at("method"_);
-                                    for(const uint subsetSize: {1, int(round(sqrt(float(projectionSize.z)))), projectionSize.z}) {
-                                        const uint iterationCount = 64; //parameters.value("iterationCount"_,64);
-                                        String parameters = str(strx(A.volumeSize), grainRadius, strx(A.projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, uint(A.photonCount), subsetSize);
-                                        log(parameters);
+
+                                    // Reconstruction parameters
+                                    for(const uint subsetSize: {1, int(nearestDivisorToSqrt(projectionSize.z)), projectionSize.z}) {
+                                        const uint iterationCount = 64;
 
                                         // Reconstruction
                                         MLTR reconstruction {A, intensity, subsetSize};
 
                                         // Interface
-                                        const int upsample = max(1, 256 / A.projectionSize.x);
-
                                         Value sliceIndex = Value((volumeSize.z-1) / 2);
-                                        SliceView x0 {referenceVolume, upsample, sliceIndex};
-                                        SliceView x {reconstruction.x, upsample, sliceIndex};
+                                        SliceView x0 {referenceVolume, max(1, 256 / referenceVolume.size.x), sliceIndex};
+                                        SliceView x {reconstruction.x, max(1, 256 / reconstruction.x.size.x), sliceIndex};
                                         HBox slices {{&x0, &x}};
 
                                         Value projectionIndex = Value((A.projectionSize.z-1) / 2);
-                                        SliceView b0 {attenuation, upsample, projectionIndex};
-                                        VolumeView b {reconstruction.x, A, upsample, projectionIndex};
+                                        SliceView b0 {attenuation, max(1, 256 / attenuation.size.x), projectionIndex};
+                                        VolumeView b {reconstruction.x, A, max(1, 256 / A.projectionSize.x), projectionIndex};
                                         HBox projections {{&b0, &b}};
 
                                         VBox layout {{&slices, &projections, &plot}};
-                                        Window window {&layout, parameters};
+                                        window.widget = &layout;
+                                        window.setSize(min(int2(-1), -window.size));
+                                        String parameters = str(strx(A.volumeSize), grainRadius, strx(A.projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, uint(A.photonCount), subsetSize);
+                                        window.setTitle(parameters);
+                                        window.show();
 
-                                        uint bestK = 0;
-                                        float bestCenterSSE = inf, bestExtremeSSE = inf;
+                                        // Evaluation
                                         Folder results = "Results"_;
                                         File resultFile (parameters, results, Flags(WriteOnly|Create|Truncate));
+                                        uint bestK = 0;
+                                        float bestCenterSSE = inf, bestExtremeSSE = inf;
+                                        VolumeF best (volumeSize);
+                                        Time time;
                                         for(uint k: range(iterationCount)) {
                                             reconstruction.step();
 
                                             float centerSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                                             float extremeSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction.x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                                             float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                                            String result = str(bestK, k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE);
+                                            String result = str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE);
                                             resultFile.write(result);
-                                            log(result);
+                                            //log(result);
                                             plot[parameters].insert(k, 100*totalNMSE);
                                             window.needRender = true;
                                             window.event();
 
                                             if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) {
                                                 bestK=k;
-                                                writeFile(parameters+".best"_, cast<byte>(reconstruction.x.read().data), results);
+                                                reconstruction.x.read(best);
                                                 if(k == iterationCount-1) log("WARNING: Slow convergence stopped by low iteration count");
                                             }
                                             bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
+
+                                            extern bool terminate;
+                                            if(terminate) { log("Terminated"_); return; }
                                         }
-                                        log(repeat("-"_,128));
+                                        writeFile(parameters+".best"_, cast<byte>(best.data), results);
+                                        log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), time);
                                     }
                                 }
                             }

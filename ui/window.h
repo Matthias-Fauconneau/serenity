@@ -11,7 +11,7 @@ union XEvent;
 struct Window : Socket, Poll {
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, const string& name=""_, int2 size=int2(-1,-1), const Image& icon=Image());
+    Window(Widget* widget=0, const string& name=""_, int2 size=int2(-1), const Image& icon=Image());
 
     /// Shows window.
     void show();
