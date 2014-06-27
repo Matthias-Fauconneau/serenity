@@ -76,3 +76,4 @@ core/random.h
 test.cc
 tomography/projection.h
 core/variant.h
+tomography/synthetic.h

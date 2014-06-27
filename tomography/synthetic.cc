@@ -1,6 +1,6 @@
+#include "synthetic.h"
 #include "random.h"
 #include "file.h"
-#include "volume.h"
 #include "matrix.h"
 #include "projection.h"
 #include "text.h"
@@ -72,24 +72,6 @@ RectF getBoundingBox(const vec3& center, float radius, const mat4& projMatrix) {
     float minY = dot(minYHomogenous, projMatrix.row(1)) / dot(minYHomogenous, projMatrix.row(3));
     return {vec2(minX, minY), vec2(maxX, maxY)};
 }
-
-struct PorousRock {
-    const float airDensity = 0.001; // Houndsfield ?
-    const float containerDensity = 5.6; // Pure iron
-    int3 size;
-    const float maximumRadius = 8; // vx
-    const float rate = 1./(size.z==1?sq(maximumRadius):cb(maximumRadius)); // 1/vx
-    struct GrainType { const float probability; /*relative concentration*/ const float density; buffer<vec4> grains; } types[3] = {/*Rutile*/{0.7, 4.20,{}}, /*Siderite*/{0.2, 3.96,{}}, /*NaMontmorillonite*/{0.1, 2.65,{}}};
-    const vec3 volumeCenter = vec3(size-int3(1))/2.f;
-    const float volumeRadius = volumeCenter.x;
-    const float innerRadius = (1-4./100) * volumeRadius;
-    const float outerRadius = (1-2./100) * volumeRadius;
-    const uint grainCount = rate*size.z*size.y*size.x;
-
-    PorousRock(int3 size, const float maximumRadius);
-    VolumeF volume();
-    float project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const;
-};
 
 PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maximumRadius(maximumRadius) {
     assert(size.x == size.y);
@@ -167,6 +149,9 @@ VolumeF PorousRock::volume() {
             }
         }
     }
+    const float maxVoxel = max(volume);
+    factor = 1./(sqrt(float(sq(size.x)+sq(size.y)+sq(size.z)))*maxVoxel); // FIXME: overly conservative, use maximum attenuation over analytic projection instead
+    scale(volume, factor);
     log(time);
     return volume;
 }
@@ -260,6 +245,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
     return maxAttenuation;
 }
 
+/*
 struct Analytic : Widget {
     const PorousRock& rock;
     const Projection& A;
@@ -283,40 +269,4 @@ struct Analytic : Widget {
         return false;
     }
 };
-
-map<string, Variant> parameters = parseParameters(arguments(),{"size"_,"proj"_,"radius"_,"sample"_});
-const int3 volumeSize = fromInt3(parameters.value("size"_)) ?: 256;
-const int3 projectionSize = fromInt3(parameters.value("proj"_)) ?: volumeSize;
-PorousRock rock {volumeSize, parameters.value("radius"_, 16.f)};
-VolumeF rockVolume = rock.volume();
-const float maxVoxel = max(rockVolume);
-const float factor = 1./(sqrt(float(sq(rock.size.x)+sq(rock.size.y)+sq(rock.size.z)))*maxVoxel); // FIXME: overly conservative, use maximum attenuation over analytic projection instead
-VolumeF hostVolume = scale(move(rockVolume), factor);
-CLVolume volume {hostVolume};
-SliceView sliceView {volume, 512/projectionSize.x};
-Projection A {volumeSize, projectionSize, parameters.value("double"_, false), parameters.value("rotations"_, 1u)};
-Value projectionIndex {0};
-VolumeView volumeView {volume, A, 512/projectionSize.x, projectionIndex};
-Analytic analyticView {rock, A, factor, 512/projectionSize.x, projectionIndex};
-HBox layout {{ &sliceView, &volumeView, &analyticView}};
-struct App {
-    App() {
-        log(parameters, maxVoxel, factor);
-        writeFile("Data/"_+strx(hostVolume.size)+".ref"_, cast<byte>(hostVolume.data));
-        VolumeF projectionData (A.projectionSize, 0, "b0"_);
-        Time time;
-        float maxAttenuation = 0;
-        for(uint index: range(projectionData.size.z)) {
-            log(index);
-            ImageF target = ::slice(projectionData, index);
-            if(parameters.value("analytic"_, true) && !parameters.value("sample"_, false))
-                maxAttenuation = ::max(maxAttenuation, rock.project(target, A, index, factor));
-            else if(!parameters.value("analytic"_, false) && parameters.value("sample"_, false))
-                project(target, A, volume, index);
-            else error(parameters);
-        }
-        log(time, maxVoxel, maxAttenuation);
-        writeFile("Data/"_+str(A), cast<byte>(projectionData.data));
-    }
-} app;
-Window window {&layout, str(volumeSize)};
+*/

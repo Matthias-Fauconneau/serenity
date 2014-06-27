@@ -10,7 +10,7 @@
     assert_(!s); return int2(x,y);
 }*/
 
-int3 fromInt3(string vector) {
+inline int3 fromInt3(string vector) {
     if(!vector) return int3(0);
     TextData s (vector);
     int x=s.integer(); if(!s) return int3(x);

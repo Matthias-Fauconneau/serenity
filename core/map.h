@@ -36,14 +36,18 @@ template<Type K, Type V> struct map {
         return values[i];
     }
 
-    template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
+    template<Type KK, Type VV> VV value(const KK& key, VV value) const {
         size_t i = keys.indexOf(key);
-        return i!=invalid ? VV(values[i]) : move(value);
+        return i!=invalid ? copy(VV(values[i])) : value;
     }
-    template<Type KK> const V& value(const KK& key, const V& value=V()) const {
+    /*template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
         size_t i = keys.indexOf(key);
-        return i!=invalid ? values[i] : value;
-    }
+        return i!=invalid ? copy(VV(values[i])) : forward<VV>(value);
+    }*/
+    /*template<Type KK, Type VV> const VV& value(const KK& key, const VV value=VV()) const {
+        size_t i = keys.indexOf(key);
+        return i!=invalid ? VV(values[i]) : value;
+    }*/
 
     template<Type KK> const V* find(const KK& key) const { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V* find(const KK& key) { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }

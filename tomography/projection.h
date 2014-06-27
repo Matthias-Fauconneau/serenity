@@ -12,7 +12,7 @@ struct Projection {
     float detectorHalfWidth = 1;
     float cameraLength = 1;
     float specimenDistance = 1./16;
-    bool doubleHelix;
+    enum Trajectory { Single, Double, Adaptive } trajectory;
     uint numberOfRotations;
     float photonCount; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
 
@@ -22,13 +22,26 @@ struct Projection {
     const float detectorHalfHeight = projectionAspectRatio * detectorHalfWidth; //image_height * pixel_size; // [mm] ~ 397 mm
     const float volumeRadius = detectorHalfWidth / sqrt(sq(detectorHalfWidth)+sq(cameraLength)) * specimenDistance;
     const float zExtent = (specimenDistance - volumeRadius) / cameraLength * detectorHalfHeight; // Fits cap tangent intersection to detector top edge
-    const float deltaZ = volumeAspectRatio - zExtent/volumeRadius;
+    const float deltaZ = volumeAspectRatio - zExtent/volumeRadius; // Scales normalized Z to Z view origin in world space so that the cylinder caps exactly fits the view at the trajectory extremes
     const float distance = specimenDistance/volumeRadius; // Distance in world space
     const float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
 
-    Projection(int3 volumeSize, int3 projectionSize, const bool doubleHelix, const uint numberOfRotations, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), doubleHelix(doubleHelix), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
+    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const uint numberOfRotations, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
 
-    float angle(uint index) const { return doubleHelix ? 2*PI*numberOfRotations*float(index%(count/2))/((count)/2) + (index/(count/2)?PI:0) : 2*PI*numberOfRotations*float(index)/count; } // Rotation angle (in radians) around vertical axis
+    // Rotation angle (in radians) around vertical axis
+    float angle(uint index) const {
+        if(trajectory==Single || trajectory==Adaptive) return 2*PI*numberOfRotations*float(index)/count;
+        if(trajectory==Double) return 2*PI*numberOfRotations*float(index%(count/2))/((count)/2) + (index/(count/2)?PI:0);
+        error(int(trajectory));
+    }
+
+    // Normalized Z coordinate
+    float dz(uint index) const {
+        if(trajectory==Single) return float(index)/float(count-1);
+        if(trajectory==Double) return float(index%(count/2))/float((count-1)/2);
+        if(trajectory==Adaptive) return clip(0.f, float(int(index)-int(count/(2*numberOfRotations)))/float(count-count/numberOfRotations), 1.f);
+        error(int(trajectory));
+    }
 
     // Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation)
     mat4 worldToView(uint index) const;
@@ -38,9 +51,7 @@ struct Projection {
     mat4 worldToDevice(uint index) const; };
 
 inline mat4 Projection::worldToView(uint index) const {
-    const float dz = count > 1 ? (doubleHelix ? float(index%(count/2))/float((count-1)/2) : float(index)/float(count-1)) : 0;
-    const float z = -volumeAspectRatio + zExtent/volumeRadius + 2*dz*deltaZ; // Z position in world space
-    return mat4().rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,z)*((volumeSize.x-1)/2.f)).rotateZ(angle(index));
+    return mat4().rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,(2*dz(index)-1)*deltaZ)*((volumeSize.x-1)/2.f)).rotateZ(angle(index));
 }
 
 inline mat4 Projection::worldToScaledView(uint index) const {
@@ -52,4 +63,4 @@ inline mat4 Projection::worldToDevice(uint index) const {
     return projectionMatrix * worldToScaledView(index);
 }
 
-inline String str(const Projection& A) { return strx(A.volumeSize)+"."_+(A.doubleHelix?"double"_:"simple"_)+"."_+str(A.numberOfRotations); }
+inline String str(const Projection& A) { return strx(A.volumeSize)+"."_+strx(A.projectionSize)+"."_+(A.trajectory==A.Double?"double"_:A.trajectory==A.Adaptive?"adaptive"_:"simple"_)+"."_+str(A.numberOfRotations); }

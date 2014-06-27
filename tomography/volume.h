@@ -3,6 +3,7 @@
 #include "file.h"
 
 struct VolumeF {
+    VolumeF() {}
     VolumeF(int3 size, string name) : size(size), data(size.z*size.y*size.x), name(copy(String(name))) { assert(name.size <= 16); }
     VolumeF(int3 size, float value, string name) : size(size), data(size.z*size.y*size.x, size.z*size.y*size.x, value), name(copy(String(name))) { assert(name.size <= 16); }
     VolumeF(int3 size, buffer<float>&& data, string name) : size(size), data(move(data)), name(copy(String(name))) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
@@ -35,17 +36,18 @@ inline float mean(const VolumeF& volume) { return mean(volume.data); }
 inline float SSQ(const VolumeF& volume) { return SSQ(volume.data); }
 inline float SSE(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return SSE(A.data, B.data); }
 inline float dotProduct(const VolumeF& A, const VolumeF& B) { assert_(A.size==B.size); return dotProduct(A.data, B.data); }
-inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor); return move(volume); }
+//inline VolumeF scale(VolumeF&& volume, float factor) { scale(volume.data, factor); return move(volume); }
+inline void scale(VolumeF& volume, float factor) { scale(volume.data, factor); }
 
 //inline VolumeF normalize(VolumeF&& volume) { float sum = ::sum(volume); assert_(sum); return scale(move(volume), 1./sum); }
 //inline VolumeF operator*(float a, const VolumeF& A) { return VolumeF(A.size, a*A.data, A.name); }
 //inline VolumeF normalize(const VolumeF& volume) { float sum = ::sum(volume); assert_(sum); return (1.f/sum) * volume; }
 
-inline VolumeF normalize(VolumeF&& target) {
+/*inline VolumeF normalize(VolumeF&& target) {
     target = scale(move(target), sq(target.size.x)/sum(target));
     assert(abs(sum(target) -sq(target.size.x))<=0x1p-4, log2(abs(sum(target) -sq(target.size.x))));
     return move(target);
-}
+}*/
 
 inline const VolumeF& cylinder(const VolumeF& target, const float value=1) {
     int3 size = target.size;
