@@ -7,7 +7,7 @@ CL(project, project)
 
 static uint64 project(const CLBufferF& buffer, const Projection& projection, const CLVolume& volume, const uint index) {
     float3 center = vec3(volume.size-int3(1))/2.f;
-    float halfHeight = center.z ?: 1./2;
+    float halfHeight = center.z;
     mat4 viewToWorld = projection.worldToScaledView(index).inverse();  // view coordinates [±size/2] to world coordinates [±1]
     float3 origin = viewToWorld[3].xyz(); // imageToWorld * vec2(size/2, 0, 1)
     mat4 imageToWorld = viewToWorld; // image coordinates [size, 1] to world coordinates [±1]

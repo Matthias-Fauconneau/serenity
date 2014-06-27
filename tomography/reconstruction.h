@@ -7,16 +7,14 @@ struct Reconstruction {
     uint k = 0;
     uint64 time = 0;
     float centerSSE = inf, extremeSSE = inf;
-    uint bestK = 0;
     float bestCenterSSE = inf, bestExtremeSSE = inf;
-    int divergent = 0; // Divergent iterations
-    uint64 stopTime = 0;
+    uint bestK = 0;
 
     Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), 1.f/sqrt(float(sq(A.volumeSize.x)+sq(A.volumeSize.y)+sq(A.volumeSize.z))))) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}
     virtual void step() abstract;
 };
-inline bool operator <(const Reconstruction& a, const Reconstruction& b) { return a.time < b.time; }
+inline String str(const Reconstruction& r) { return str(r.A, r.x.name); }
 
 inline buffer<uint> shuffleSequence(uint size) {
     buffer<uint> seq(size);
@@ -47,25 +45,6 @@ struct SubsetReconstruction : Reconstruction {
     }
 };
 
-inline String str(const SubsetReconstruction& r) {
-    String s;
-    s << strx(r.A.projectionSize) << " "_;
-    s << strx(r.A.volumeSize) << " "_;
-    s << ref<string>({"single"_,"double"_,"adaptive"_})[int(r.A.trajectory)] << " "_;
-    s << str(r.A.numberOfRotations)+" "_;
-    s << str(r.A.photonCount) << " "_;
-    s << r.x.name << " "_;
-    s << str(r.subsetSize)+" "_;
-    return s;
-}
-
-inline String bestNMSE(const SubsetReconstruction& r, const float centerSSQ, const float extremeSSQ) {
-    String s;
-    s << str(r.bestK);
-    s << 100*r.bestCenterSSE/centerSSQ;
-    s << 100*r.bestExtremeSSE/extremeSSQ;
-    s << 100*(r.bestCenterSSE+r.bestExtremeSSE)/(centerSSQ+extremeSSQ);
-    return s;
-}
-
+inline String str(const SubsetReconstruction& r) { return str((const Reconstruction&)r, r.subsetSize); }
+inline String bestNMSE(const Reconstruction& r, const float centerSSQ, const float extremeSSQ) { return str(r.bestK, 100*r.bestCenterSSE/centerSSQ, 100*r.bestExtremeSSE/extremeSSQ, 100*(r.bestCenterSSE+r.bestExtremeSSE)/(centerSSQ+extremeSSQ)); }
 inline String str(const SubsetReconstruction& r, const float centerSSQ, const float extremeSSQ) { return str(r, bestNMSE(r, centerSSQ, extremeSSQ)); }

@@ -1,6 +1,7 @@
 #pragma once
 #include "projection.h"
 #include "volume.h"
+#include "time.h"
 
 struct PorousRock {
     const float airDensity = 0.001; // Houndsfield ?
@@ -18,5 +19,13 @@ struct PorousRock {
 
     PorousRock(int3 size, const float maximumRadius);
     VolumeF volume();
-    float project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const;
+    float project(const ImageF& target, const Projection& A, uint index) const;
 };
+
+inline VolumeF project(const PorousRock& rock, const Projection& A) {
+    VolumeF volume(A.projectionSize, "b"_);
+    Time time;
+    for(uint index: range(volume.size.z)) { rock.project(::slice(volume, index), A, index); }
+    log("Poisson•A", time);
+    return volume;
+}

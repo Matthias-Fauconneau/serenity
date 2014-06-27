@@ -156,7 +156,7 @@ VolumeF PorousRock::volume() {
     return volume;
 }
 
-float PorousRock::project(const ImageF& target, const Projection& A, uint index, const float scaleFactor) const {
+float PorousRock::project(const ImageF& target, const Projection& A, uint index) const {
     Time totalTime;
 
     mat4 worldToView = A.worldToView(index);
@@ -198,7 +198,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
     rasterizationTime.stop();
 
     Time integrationTime;
-    const float halfHeight = (A.volumeSize.z/*-1*/)/2.f;
+    const float halfHeight = (A.volumeSize.z-1)/2.f;
     const float outerRadius = (1-2./100) * volumeRadius;
     float maxAttenuation = 0;
     parallel(target.size.y, [&](const uint, const uint y) {
@@ -234,8 +234,8 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
                 densityRayIntegral += (outer[1] - outer[0]) * containerDensity;
             }
             maxAttenuation = ::max(maxAttenuation, densityRayIntegral);
-            float v = scaleFactor * densityRayIntegral;
-            //assert_(v>=0 && v<=1/*-expUnderflow*/, v);
+            float v = factor * densityRayIntegral;
+            v = poisson(A.photonCount * exp(-v)) / A.photonCount;
             target(x,y) = v;
         }
     });
@@ -244,29 +244,3 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index,
     //log(rasterizationTime, integrationTime, totalTime);
     return maxAttenuation;
 }
-
-/*
-struct Analytic : Widget {
-    const PorousRock& rock;
-    const Projection& A;
-    const float scaleFactor;
-    const int upsampleFactor;
-    Value& index;
-
-    Analytic(const PorousRock& rock, const Projection& A, const float scaleFactor, const int upsampleFactor, Value& index) : rock(rock), A(A), scaleFactor(scaleFactor), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
-    int2 sizeHint() override { return upsampleFactor * A.projectionSize.xy(); }
-    void render() override {
-        ImageF image (A.projectionSize.xy());
-        rock.project(image, A, index.value, scaleFactor);
-        while(image.size < this->target.size()) image = upsample(image);
-        float max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image);
-        Text(str(max),16,green).render(this->target, 0);
-
-        putImage(target);
-    }
-    bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
-        if(button) { index.value = clip(0, int(cursor.x*(A.projectionSize.z-1)/(size.x-1)), int(A.projectionSize.z-1)); index.render(); return true; }
-        return false;
-    }
-};
-*/

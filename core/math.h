@@ -34,7 +34,9 @@ inline real pow(real x, real y) { return __builtin_pow(x,y); }
 const real e = 2.71828;
 const real expUnderflow = -7.45133219101941108420e+02;
 const real expOverflow = 7.09782712893383973096e+02;
+inline float exp(float x) { assert(x>expUnderflow && x<expOverflow); return __builtin_expf(x); }
 inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
+inline float ln(float x) { return __builtin_logf(x); }
 inline real ln(real x) { return __builtin_log(x); }
 
 inline real cos(real t) { return __builtin_cos(t); }

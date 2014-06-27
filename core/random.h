@@ -20,23 +20,23 @@ struct Random {
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
 
-extern "C" double lgamma(double x);
+extern "C" float lgammaf(float x);
 /// Returns a sequence of poisson distributed pseudo-random integers
-inline uint poisson(double lambda) {
+inline uint poisson(float lambda) {
     static Random random;
-    double c = 0.767 - 3.36/lambda;
-    double beta = PI/sqrt(3.0*lambda);
-    double alpha = beta*lambda;
-    double k = ln(c) - lambda - ln(beta);
+    float c = 0.767f - 3.36f/lambda;
+    float beta = PI/sqrt(3*lambda);
+    float alpha = beta*lambda;
+    float k = ln(c) - lambda - ln(beta);
     for(;;) {
         float u = random();
-        double x = (alpha - ln((1.0 - u)/u))/beta;
+        float x = (alpha - ln((1 - u)/u))/beta;
         int n = floor(x + 1./2);
         if(n < 0) continue;
-        double v = random();
-        double y = alpha - beta*x;
-        double lhs = y + ln(v/sq(1.0 + exp(y)));
-        double rhs = k + n*ln(lambda) - lgamma(n+1);
+        float v = random();
+        float y = alpha - beta*x;
+        float lhs = y + ln(v/sq(1.0 + exp(y)));
+        float rhs = k + n*ln(lambda) - lgammaf(n+1);
         if (lhs <= rhs) return n;
     }
 }

@@ -64,16 +64,13 @@ tomography/tomography.cc
 tomography/view.cc
 tomography/view.h
 tomography/volume.h
-tomography/downsample.cc
 tomography/operators.cc
 tomography/synthetic.cc
-tomography/viewer.cc
 tomography/MLTR.h
 tomography/MLTR.cc
 tomography/PMLTR.h
 tomography/PMLTR.cc
 core/random.h
-test.cc
 tomography/projection.h
 core/variant.h
 tomography/synthetic.h

@@ -13,12 +13,12 @@ struct Projection {
     float cameraLength = 1;
     float specimenDistance = 1./16;
     enum Trajectory { Single, Double, Adaptive } trajectory;
-    uint numberOfRotations;
+    uint rotationCount;
     float photonCount; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
 
     // Projection setup (coordinates in view space)
-    const float volumeAspectRatio = float(volumeSize.z/*-1*/) / float(volumeSize.x/*-1*/);
-    const float projectionAspectRatio = float(projectionSize.y/*-1*/) / float(projectionSize.x/*-1*/);
+    const float volumeAspectRatio = float(volumeSize.z-1) / float(volumeSize.x-1);
+    const float projectionAspectRatio = float(projectionSize.y-1) / float(projectionSize.x-1);
     const float detectorHalfHeight = projectionAspectRatio * detectorHalfWidth; //image_height * pixel_size; // [mm] ~ 397 mm
     const float volumeRadius = detectorHalfWidth / sqrt(sq(detectorHalfWidth)+sq(cameraLength)) * specimenDistance;
     const float zExtent = (specimenDistance - volumeRadius) / cameraLength * detectorHalfHeight; // Fits cap tangent intersection to detector top edge
@@ -26,12 +26,12 @@ struct Projection {
     const float distance = specimenDistance/volumeRadius; // Distance in world space
     const float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
 
-    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const uint numberOfRotations, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), numberOfRotations(numberOfRotations), photonCount(photonCount) {}
+    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const uint rotationCount, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount), photonCount(photonCount) {}
 
     // Rotation angle (in radians) around vertical axis
     float angle(uint index) const {
-        if(trajectory==Single || trajectory==Adaptive) return 2*PI*numberOfRotations*float(index)/count;
-        if(trajectory==Double) return 2*PI*numberOfRotations*float(index%(count/2))/((count)/2) + (index/(count/2)?PI:0);
+        if(trajectory==Single || trajectory==Adaptive) return 2*PI*rotationCount*float(index)/count;
+        if(trajectory==Double) return 2*PI*rotationCount*float(index%(count/2))/((count)/2) + (index/(count/2)?PI:0);
         error(int(trajectory));
     }
 
@@ -39,7 +39,7 @@ struct Projection {
     float dz(uint index) const {
         if(trajectory==Single) return float(index)/float(count-1);
         if(trajectory==Double) return float(index%(count/2))/float((count-1)/2);
-        if(trajectory==Adaptive) return clip(0.f, float(int(index)-int(count/(2*numberOfRotations)))/float(count-count/numberOfRotations), 1.f);
+        if(trajectory==Adaptive) return clip(0.f, float(int(index)-int(count/(2*rotationCount)))/float(count-count/rotationCount), 1.f);
         error(int(trajectory));
     }
 
@@ -63,4 +63,4 @@ inline mat4 Projection::worldToDevice(uint index) const {
     return projectionMatrix * worldToScaledView(index);
 }
 
-inline String str(const Projection& A) { return strx(A.volumeSize)+"."_+strx(A.projectionSize)+"."_+(A.trajectory==A.Double?"double"_:A.trajectory==A.Adaptive?"adaptive"_:"simple"_)+"."_+str(A.numberOfRotations); }
+inline String str(const Projection& A) { return str(strx(A.volumeSize), strx(A.projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, A.photonCount); }
