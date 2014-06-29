@@ -84,8 +84,8 @@ PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maxim
             const float r = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
             const vec2 xy = vec2(random(), random()) * vec2(size.xy());
             if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
-            type.grains.append( vec4(xy, random()*(size.z-1), r) );
-            //type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
+            type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
+            if(&type==&types[2] && r > largestGrain.w) largestGrain = type.grains.last(); // Only last type as heavier largest grains  might be overriden
         }
     }
 }

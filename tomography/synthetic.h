@@ -16,6 +16,7 @@ struct PorousRock {
     const float outerRadius = (1-2./100) * volumeRadius;
     const uint grainCount = rate*size.z*size.y*size.x;
     float factor = 0;
+    vec4 largestGrain = 0;
 
     PorousRock(int3 size, const float maximumRadius);
     VolumeF volume();

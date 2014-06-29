@@ -65,16 +65,29 @@ struct Application {
                                         Folder results = "Results"_;
                                         File resultFile (parameters, results, Flags(WriteOnly|Create|Truncate));
                                         uint bestK = 0;
-                                        float bestCenterSSE = inf, bestExtremeSSE = inf;
+                                        float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
                                         VolumeF best (volumeSize);
                                         Time time;
                                         for(uint k: range(iterationCount)) {
                                             reconstruction.step();
 
+                                            vec3 center = rock.largestGrain.xyz(); float r = rock.largestGrain.w;
+                                            int3 size = ceil(r); int3 origin = int3(round(center))-size;
+                                            VolumeF grain = reconstruction.x.read(2*size, origin);
+                                            center -= vec3(origin);
+                                            float sum=0; float count=0;
+                                            for(int z: range(grain.size.z)) for(int y: range(grain.size.y)) for(int x: range(grain.size.x))  if(sq(vec3(x,y,z)-center)<=sq(r-1./2)) sum += grain(x,y,z), count++;
+                                            float mean = sum / count; float deviation = 0;
+                                            for(int z: range(grain.size.z)) for(int y: range(grain.size.y)) for(int x: range(grain.size.x))  if(sq(vec3(x,y,z)-center)<=sq(r-1./2)) deviation += abs(grain(x,y,z)-mean);
+                                            deviation /= count;
+                                            float expected = rock.factor * rock.types[2].density;
+                                            float SNR = mean/deviation;
+                                            //log(mean/expected, SNR, 10*log10(SNR));
+
                                             float centerSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                                             float extremeSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction.x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                                             float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                                            String result = str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE);
+                                            String result = str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR);
                                             resultFile.write(result);
                                             //log(result);
                                             plot[parameters].insert(k, 100*totalNMSE);
@@ -86,13 +99,13 @@ struct Application {
                                                 reconstruction.x.read(best);
                                                 if(k == iterationCount-1) log("WARNING: Slow convergence stopped by low iteration count");
                                             }
-                                            bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
+                                            bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
 
                                             extern bool terminate;
                                             if(terminate) { log("Terminated"_); return; }
                                         }
                                         writeFile(parameters+".best"_, cast<byte>(best.data), results);
-                                        log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), time);
+                                        log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
                                     }
                                 }
                             }
