@@ -13,6 +13,8 @@ struct Application {
     Plot plot;
     Window window;
     Application() {
+        Time totalTime, totalReconstructionTime;
+        uint completed = 0;
         // Reference parameters
         //for(const int3 volumeSize: apply(range(6,9 +1), &exp2)) {
         extern bool isIntel;
@@ -74,7 +76,7 @@ struct Application {
                                             window.setSize(min(int2(-1), -window.size));
                                             String parameters = str(A.volumeSize.x, grainRadius, strx(A.projectionSize.xy()), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, uint(A.photonCount), projectionCount, subsetSize);
                                             log(parameters);
-                                            window.setTitle(parameters);
+                                            window.setTitle(str(completed)+"/"_+str(3*5*4*2/*120*/));
                                             window.show();
 
                                             // Evaluation
@@ -83,7 +85,7 @@ struct Application {
                                             uint bestK = 0;
                                             float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
                                             VolumeF best (volumeSize);
-                                            Time time;
+                                            Time time; totalReconstructionTime.start();
                                             uint k=0; for(;k < maxIterationCount; k++) {
                                                 reconstruction.step();
 
@@ -118,8 +120,10 @@ struct Application {
                                                 extern bool terminate;
                                                 if(terminate) { log("Terminated"_); return; }
                                             }
+                                            totalReconstructionTime.stop();
                                             writeFile(parameters+".best"_, cast<byte>(best.data), results);
                                             log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
+                                            completed++;
                                         }
                                     }
                                     //assert_(CLMem::handles.size == 0, apply(CLMem::handles,[](const CLMem* h)->string{return h->name;}));
@@ -131,7 +135,7 @@ struct Application {
                 }
             }
         }
-        log("Done"_);
+        log("Done"_,totalReconstructionTime, totalTime);
         exit();
     }
 } app;
