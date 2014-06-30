@@ -93,6 +93,7 @@ generic struct abcd {
 };
 generic struct xy {
     T x,y;
+    vec< ::xy, T, 2> yx() const { return {y,x}; }
     vec< ::abcd, T, 4> xxyy() const { return {x,x,y,y}; }
 };
 /// Integer x,y vector (32bit)

@@ -40,8 +40,8 @@ struct Application {
                                         ImageArray attenuation = negln(intensity);
 
                                         // Reconstruction parameters
-                                        for(const uint subsetSize: {int(nearestDivisorToSqrt(projectionSize.z))/*, projectionSize.z*/}) {
-                                            const uint minIterationCount = 16, maxIterationCount = 64;
+                                        const uint subsetSize = int(nearestDivisorToSqrt(projectionSize.z)); {
+                                            const uint minIterationCount = 16, maxIterationCount = 128;
 
                                             // Reconstruction
                                             MLTR reconstruction {A, intensity, subsetSize};
@@ -89,8 +89,7 @@ struct Application {
                                                 float centerSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                                                 float extremeSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction.x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                                                 float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                                                String result = str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR);
-                                                resultFile.write(result);
+                                                resultFile.write(str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR)+"\n"_);
                                                 plot[parameters].insert(k, -10*log10(totalNMSE));
                                                 window.needRender = true;
                                                 window.event();
@@ -109,7 +108,7 @@ struct Application {
                                             }
                                             writeFile(parameters+".best"_, cast<byte>(best.data), results);
                                             log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
-                                            if(bestK != k) writeFile(parameters+".last"_, cast<byte>(reconstruction.x.read(move(best)).data), results);
+                                            //if(bestK != k-1) writeFile(parameters+".last"_, cast<byte>(reconstruction.x.read(move(best)).data), results); // Only useful to resume converging reconstruction (i.e when last==best anyway)
                                         }
                                     }
                                     //assert_(CLMem::handles.size == 0, apply(CLMem::handles,[](const CLMem* h)->string{return h->name;}));
@@ -121,5 +120,7 @@ struct Application {
                 }
             }
         }
+        log("Done"_);
+        exit();
     }
 } app;

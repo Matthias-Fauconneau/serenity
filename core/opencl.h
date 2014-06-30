@@ -12,11 +12,9 @@ typedef struct _cl_sampler* cl_sampler;
 
 struct CLMem : handle<cl_mem> {
     String name;
-
-    //static array<CLMem*> handles;
     static uint handleCount;
 
-    CLMem(cl_mem mem, string name) : handle(mem), name(copy(String(name))) { assert_(mem); /*handles << this;*/ handleCount++; }
+    CLMem(cl_mem mem, string name) : handle(mem), name(copy(String(name))) { assert_(mem); handleCount++; }
     default_move(CLMem);
     ~CLMem();
 };

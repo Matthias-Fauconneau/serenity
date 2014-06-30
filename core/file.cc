@@ -46,7 +46,7 @@ array<String> Folder::list(uint flags) const {
             //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
             if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==DT_UNKNOWN/*NFS*/) && flags&Files) || (type==DT_CHR && flags&Devices)
                     || (type==DT_BLK && flags&Drives)) {
-                if(flags&Sorted) list.insertSorted(copy(name)); else list << copy(String(name));
+                if(flags&Sorted) list.insertSorted(copy(String(name))); else list << copy(String(name));
             }
             if(type==DT_DIR && flags&Recursive) {
                 for(const String& file: Folder(name,*this).list(flags)) {
