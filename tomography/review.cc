@@ -21,16 +21,16 @@ struct Application : Widget {
             array<string> arguments = split(name);
             assert_(arguments.size == parameters.size, parameters, arguments);
             for(uint i: range(parameters.size)) if(!values[i].contains(arguments[i])) values[i].insertSorted(Variant(String(arguments[i])));
-            float bestTotalNMSE = inf;
+            float bestNMSE = inf;
             for(TextData s = readFile(name, results);s;) {
                 uint _unused k = s.integer(); s.skip(" "_);
                 float _unused centerNMSE = s.decimal(); s.skip(" "_);
                 float _unused extremeNMSE = s.decimal(); s.skip(" "_);
-                float totalNMSE = s.decimal(); s.skip(" "_);
+                float _unused totalNMSE = s.decimal(); s.skip(" "_);
                 float _unused SNR = s.decimal(); s.skip("\n"_);
-                bestTotalNMSE = ::min(bestTotalNMSE, totalNMSE);
+                bestNMSE = ::min(bestNMSE, SNR);
             }
-            float value = bestTotalNMSE;
+            float value = bestNMSE;
             min = ::min(min, value), max = ::max(max, value);
             points.insert(move(arguments), value);
         }
