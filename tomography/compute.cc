@@ -30,13 +30,20 @@ struct Application {
                 const uint projectionWidth = volumeSize.z; {
                     for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
                         for(uint rotationCount: range(1,5 +1)) {
-                            for(const uint photonCount: apply(range(8,12 +1), &exp2)) {
+                            for(const uint photonCount: apply(range(8,12 +1), &exp2)) { // FIXME: project once, postprocess noise
+                                int3 allProjectionSize (projectionWidth,projectionWidth*3/4, 512);
+                                const Projection allProjections (volumeSize, allProjectionSize, trajectory, rotationCount, photonCount);
+                                ImageArray allIntensity = project(rock, allProjections);
+
                                 for(const uint projectionCount:  apply(range(8,9 +1), &exp2)) {
                                     int3 projectionSize (projectionWidth,projectionWidth*3/4, projectionCount);
 
                                     {// Projection
                                         const Projection A (volumeSize, projectionSize, trajectory, rotationCount, photonCount);
-                                        ImageArray intensity = project(rock, A);
+                                        ImageArray intensity (A.projectionSize, 0, "b"_);
+                                        const CLVolume& copy(const CLVolume& source, CLVolume& target, const int3 sourceOrigin=0, const int3 targetOrigin=0, int3 size=0);
+                                        assert_(allIntensity.size.z%intensity.size.z==0);
+                                        for(uint index: range(intensity.size.z)) copy(allIntensity, intensity, int3(0,0,index*allIntensity.size.z/intensity.size.z), int3(0,0,index), int3(intensity.size.xy(),1)); // FIXME: do not copy for full resolution cases
                                         ImageArray attenuation = negln(intensity);
 
                                         // Reconstruction parameters
@@ -108,7 +115,6 @@ struct Application {
                                             }
                                             writeFile(parameters+".best"_, cast<byte>(best.data), results);
                                             log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
-                                            //if(bestK != k-1) writeFile(parameters+".last"_, cast<byte>(reconstruction.x.read(move(best)).data), results); // Only useful to resume converging reconstruction (i.e when last==best anyway)
                                         }
                                     }
                                     //assert_(CLMem::handles.size == 0, apply(CLMem::handles,[](const CLMem* h)->string{return h->name;}));
