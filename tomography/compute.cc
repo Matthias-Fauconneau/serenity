@@ -14,9 +14,10 @@ struct Application {
     Window window;
     Application() {
         // Reference parameters
-        for(const int3 volumeSize: apply(range(6,9 +1), &exp2)) {
-            for(const uint grainRadius:  apply(range(4,8 +1), &exp2)) {
-
+        //for(const int3 volumeSize: apply(range(6,9 +1), &exp2)) {
+        const int3 volumeSize = 128; {
+            //for(const uint grainRadius:  apply(range(4,8 +1), &exp2)) {
+            const uint grainRadius = 16; {
                 // Reference
                 PorousRock rock (volumeSize, grainRadius);
                 const VolumeF referenceVolume = rock.volume();
@@ -24,11 +25,12 @@ struct Application {
                 const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
 
                 // Projection parameters
-                for(const uint projectionWidth:  apply(range(6,9 +1), &exp2)) {
+                //for(const uint projectionWidth:  apply(range(6,9 +1), &exp2)) {
+                const uint projectionWidth = 128; {
                     for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
                         for(uint rotationCount: range(1,5 +1)) {
-                            for(const uint photonCount: apply(range(8,16 +1), &exp2)) {
-                                for(const uint projectionCount:  apply(range(6,9 +1), &exp2)) {
+                            for(const uint photonCount: apply(range(8,12 +1), &exp2)) {
+                                for(const uint projectionCount:  apply(range(7,9 +1), &exp2)) {
                                     int3 projectionSize (projectionWidth,projectionWidth*3/4, projectionCount);
 
                                     // Projection
@@ -38,7 +40,7 @@ struct Application {
 
                                     // Reconstruction parameters
                                     for(const uint subsetSize: {1, int(nearestDivisorToSqrt(projectionSize.z)), projectionSize.z}) {
-                                        const uint iterationCount = 64;
+                                        const uint minIterationCount = 64, maxIterationCount = 128;
 
                                         // Reconstruction
                                         MLTR reconstruction {A, intensity, subsetSize};
@@ -58,6 +60,7 @@ struct Application {
                                         window.widget = &layout;
                                         window.setSize(min(int2(-1), -window.size));
                                         String parameters = str(strx(A.volumeSize), grainRadius, strx(A.projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, uint(A.photonCount), subsetSize);
+                                        log(parameters);
                                         window.setTitle(parameters);
                                         window.show();
 
@@ -68,7 +71,7 @@ struct Application {
                                         float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
                                         VolumeF best (volumeSize);
                                         Time time;
-                                        for(uint k: range(iterationCount)) {
+                                        uint k=0; for(;k < maxIterationCount; k++) {
                                             reconstruction.step();
 
                                             vec3 center = rock.largestGrain.xyz(); float r = rock.largestGrain.w;
@@ -80,32 +83,32 @@ struct Application {
                                             float mean = sum / count; float deviation = 0;
                                             for(int z: range(grain.size.z)) for(int y: range(grain.size.y)) for(int x: range(grain.size.x))  if(sq(vec3(x,y,z)-center)<=sq(r-1./2)) deviation += abs(grain(x,y,z)-mean);
                                             deviation /= count;
-                                            float expected = rock.factor * rock.types[2].density;
                                             float SNR = mean/deviation;
-                                            //log(mean/expected, SNR, 10*log10(SNR));
 
                                             float centerSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                                             float extremeSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction.x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                                             float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
                                             String result = str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR);
                                             resultFile.write(result);
-                                            //log(result);
-                                            plot[parameters].insert(k, 100*totalNMSE);
+                                            plot[parameters].insert(k, -10*log10(totalNMSE));
                                             window.needRender = true;
                                             window.event();
 
                                             if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) {
                                                 bestK=k;
                                                 reconstruction.x.read(best);
-                                                if(k == iterationCount-1) log("WARNING: Slow convergence stopped by low iteration count");
-                                            }
+                                                if(k >= maxIterationCount-1) log("WARNING: Slow convergence stopped after maximum iteration count");
+                                            } else if(k >= minIterationCount-1) { log("WARNING: Divergence stopped after minimum iteration count"); break; }
                                             bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
+
+                                            if(totalNMSE > 1) { log("WARNING: Divergence stopped after large error"); break; }
 
                                             extern bool terminate;
                                             if(terminate) { log("Terminated"_); return; }
                                         }
                                         writeFile(parameters+".best"_, cast<byte>(best.data), results);
                                         log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
+                                        if(bestK != k) writeFile(parameters+".last"_, cast<byte>(reconstruction.x.read(move(best)).data), results);
                                     }
                                 }
                             }

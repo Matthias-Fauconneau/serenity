@@ -32,6 +32,7 @@ void Plot::render() {
         for(uint i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
     }
     if(min.x == max.x) return;
+    min.y = 0;
     assert(min.x < max.x && min.y < max.y, min, max);
 
     int tickCount[2]={};

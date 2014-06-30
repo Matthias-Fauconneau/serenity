@@ -87,12 +87,12 @@ void copy(const CLBufferF& target, const CLVolume& source, const int3 origin, in
 
 void copy(const CLVolume& target, const CLBufferF& source) {
     assert_(source.size == (size_t)target.size.x*target.size.y*target.size.z);
-    clCheck( clEnqueueCopyBufferToImage(queue, source, target, 0, (size_t[]){size_t(0),size_t(0),size_t(0)}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0) );
+    clCheck( clEnqueueCopyBufferToImage(queue, source, target, 0, (size_t[]){size_t(0),size_t(0),size_t(0)}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(target.size.z)}, 0,0,0), target.size);
 }
 
 void copy(const CLVolume& target, size_t index, const CLBufferF& slice) {
     assert_(index < (size_t)target.size.z && (size_t)target.size.x*target.size.y == slice.size);
-    clCheck( clEnqueueCopyBufferToImage(queue, slice, target, 0, (size_t[]){0,0,index}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(1)}, 0,0,0) );
+    clCheck( clEnqueueCopyBufferToImage(queue, slice, target, 0, (size_t[]){0,0,index}, (size_t[]){size_t(target.size.x),size_t(target.size.y),size_t(1)}, 0,0,0), index, target.size);
 }
 
 ImageF slice(const CLVolume& source, size_t index /* Z slice or projection*/) {

@@ -60,7 +60,7 @@ tomography/project.h
 tomography/reconstruction.h
 tomography/sum.cl
 tomography/operators.h
-tomography/tomography.cc
+tomography/compute.cc
 tomography/view.cc
 tomography/view.h
 tomography/volume.h
@@ -74,3 +74,4 @@ core/random.h
 tomography/projection.h
 core/variant.h
 tomography/synthetic.h
+tomography/review.cc
