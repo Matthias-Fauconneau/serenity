@@ -3,21 +3,13 @@
 #include "data.h"
 #include "map.h"
 
-/*int2 fromInt2(string vector) {
-    TextData s (vector);
-    int x=s.integer(); if(!s) return int2(x);
-    s.whileAny("x, "_); int y=s.integer();
-    assert_(!s); return int2(x,y);
-}*/
-
-inline int3 fromInt3(string vector) {
-    if(!vector) return int3(0);
-    TextData s (vector);
+inline int3 fromInt3(TextData& s) {
     int x=s.integer(); if(!s) return int3(x);
     s.whileAny("x, "_); int y=s.integer();
     s.whileAny("x, "_); int z=s.integer();
     assert_(!s); return int3(x,y,z);
 }
+inline int3 fromInt3(string str) { TextData s(str); return fromInt3(s); }
 
 struct Variant : String {
     Variant(){}
@@ -34,6 +26,7 @@ struct Variant : String {
     //generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
 };
 inline String str(const Variant& v) { return String((string&)v); }
+inline bool operator <(const Variant& a, const Variant& b) { if(isDecimal(a) && isDecimal(b)) return fromDecimal(a) < fromDecimal(b); else return (string)a < (string)b; }
 
 // Parses process arguments into parameter=value pairs
 inline map<string, Variant> parseParameters(const ref<string> args, const ref<string> parameters) {

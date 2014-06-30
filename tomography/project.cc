@@ -20,24 +20,24 @@ static uint64 project(const CLBufferF& buffer, const Projection& projection, con
 
 /// Projects (A) \a x to \a Ax
 uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint index) {
-    CLBufferF buffer (Ax.size.y*Ax.size.x);
+    CLBufferF buffer (Ax.size.y*Ax.size.x, "A"_+x.name);
     uint64 time = ::project(buffer, A, x, index);
     copy(Ax, index, buffer); //FIXME: NVidia OpenCL doesn't implement writes to 3D images
     return time;
 }
 
 /// Projects \a volume onto \a image according to \a projection
-uint64 project(const ImageF& image, const Projection& A, const CLVolume& volume, const uint index) {
-    CLBufferF buffer (image.data.size);
-    uint64 time = project(buffer, A, volume, index);
-    buffer.read(image.data);
+uint64 project(const ImageF& Ax, const Projection& A, const CLVolume& x, const uint index) {
+    CLBufferF buffer (Ax.data.size, "A"_+x.name);
+    uint64 time = project(buffer, A, x, index);
+    buffer.read(Ax.data);
     return time;
 }
 
 /// Projects (A) \a x to \a Ax
 uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint subsetIndex, uint subsetSize, uint subsetCount) {
     assert_(uint(Ax.size.z) == subsetSize && subsetSize * subsetCount == uint(A.count));
-    CLBufferF buffer (Ax.size.y*Ax.size.x);
+    CLBufferF buffer (Ax.size.y*Ax.size.x, "A"_+x.name);
     uint64 time = 0;
     for(uint index: range(subsetSize)) { //FIXME: Queue all projections at once ?
         time += ::project(buffer, A, x, interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index));

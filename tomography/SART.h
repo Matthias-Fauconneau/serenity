@@ -2,7 +2,7 @@
 #include "reconstruction.h"
 
 struct SART : SubsetReconstruction {
-    buffer<ImageArray> AAti; // A At i
+    array<ImageArray> AAti; // A At i
     ImageArray Ax; // At x
     CLVolume Atr; // At r
 

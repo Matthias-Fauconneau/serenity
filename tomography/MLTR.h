@@ -2,7 +2,7 @@
 #include "reconstruction.h"
 
 struct MLTR : SubsetReconstruction {
-    buffer<ImageArray> Ai; // A i
+    array<ImageArray> Ai; // A i
     ImageArray Ax; // A x
     ImageArray r;
     CLVolume Atr; // At r

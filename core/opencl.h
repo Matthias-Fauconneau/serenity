@@ -10,24 +10,28 @@ typedef struct _cl_kernel* cl_kernel;
 typedef struct _cl_mem* cl_mem;
 typedef struct _cl_sampler* cl_sampler;
 
-
 struct CLMem : handle<cl_mem> {
-    CLMem(cl_mem mem) : handle(mem) { assert_(mem); }
+    String name;
+
+    //static array<CLMem*> handles;
+    static uint handleCount;
+
+    CLMem(cl_mem mem, string name) : handle(mem), name(copy(String(name))) { assert_(mem); /*handles << this;*/ handleCount++; }
     default_move(CLMem);
     ~CLMem();
 };
 
 struct CLRawBuffer : CLMem {
-    CLRawBuffer(size_t size);
-    CLRawBuffer(const ref<byte> data);
+    CLRawBuffer(size_t size, string name);
+    CLRawBuffer(const ref<byte> data, string name);
     default_move(CLRawBuffer);
 
     void read(const mref<byte>& target);
 };
 
 generic struct CLBuffer : CLRawBuffer {
-    CLBuffer(size_t size) : CLRawBuffer(size*sizeof(T)), size(size) {}
-    CLBuffer(const ref<T>& data) : CLRawBuffer(cast<byte>(data)), size(data.size) {}
+    CLBuffer(size_t size, string name) : CLRawBuffer(size*sizeof(T), name), size(size) {}
+    CLBuffer(const ref<T>& data, string name) : CLRawBuffer(cast<byte>(data), name), size(data.size) {}
     default_move(CLBuffer);
 
     void read(const mref<T>& target) { CLRawBuffer::read(mcast<byte>(target)); }
@@ -38,8 +42,8 @@ generic struct CLBuffer : CLRawBuffer {
 typedef CLBuffer<float> CLBufferF;
 
 struct CLImage : CLMem {
-    CLImage(int2 size, const float value=0);
-    CLImage(int2 size, const ref<float>& data);
+    CLImage(int2 size, const float value, string name);
+    CLImage(int2 size, const ref<float>& data, string name);
     //CLImage(const ImageF& A) : CLImage(A.size, A.data) {}
     default_move(CLImage);
 
@@ -49,8 +53,8 @@ struct CLImage : CLMem {
 };
 
 struct CLVolume : CLMem {
-    CLVolume(int3 size, const float value=0, string name=""_);
-    CLVolume(int3 size, const ref<float>& data, string name=""_);
+    CLVolume(int3 size, const float value, string name);
+    CLVolume(int3 size, const ref<float>& data, string name);
     CLVolume(const VolumeF& A) : CLVolume(A.size, A.data, A.name) {}
     default_move(CLVolume);
 
@@ -59,7 +63,6 @@ struct CLVolume : CLMem {
     //VolumeF read() const { return read(size); }
 
     int3 size; // (width, height, depth/index)
-    String name;
 };
 
 // Copy volume into volume
@@ -118,7 +121,7 @@ struct CLKernel {
     static CLKernel name (ref<byte>(_binary_ ## file ##_cl_start,_binary_ ## file ##_cl_end), str(#name));
 
 template<Type... Args> inline uint64 emulateWriteTo3DImage(CLKernel& kernel, const CLVolume& y, const Args&... args) {
-    CLBufferF buffer (y.size.z*y.size.y*y.size.x);
+    CLBufferF buffer (y.size.z*y.size.y*y.size.x, y.name);
     uint64 time = kernel(y.size, buffer.pointer, y.size.y*y.size.x, y.size.x, args...);
     copy(y, buffer); // FIXME: Nvidia OpenCL doesn't support writes to 3D images
     return time;

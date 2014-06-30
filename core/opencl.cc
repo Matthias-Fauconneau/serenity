@@ -9,6 +9,8 @@ static cl_context context;
 static cl_command_queue queue;
 static cl_device_id device;
 bool isIntel;
+//array<CLMem*> CLMem::handles;
+uint CLMem::handleCount = 0;
 
 void __attribute((constructor(1002))) setup_cl() {
     uint platformCount; clGetPlatformIDs(0, 0, &platformCount); assert_(platformCount);
@@ -40,29 +42,33 @@ CLKernel::CLKernel(string source, string name) : name(name) {
 
 void CLKernel::setKernelArg(uint index, size_t size, const void* value) { clCheck( ::clSetKernelArg(kernel, index, size, value), name, index, size); }
 uint64 CLKernel::enqueueNDRangeKernel(cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size) {
+#if 0
     cl_event event;
     clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0, &event) );
-#if 1
     clCheck( clWaitForEvents(1, &event) );
     cl_ulong start; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(start), &start, 0);
     cl_ulong end; clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(end), &end, 0);
+    clReleaseEvent(event);
     return end-start;
+#else
+    clCheck( ::clEnqueueNDRangeKernel(queue, kernel, work_dim, global_work_offset, global_work_size, local_work_size, 0,0, 0) );
+    return 0;
 #endif
 }
 
-CLMem::~CLMem() { if(pointer) clReleaseMemObject(pointer); pointer=0; }
+CLMem::~CLMem() { if(pointer) { clReleaseMemObject(pointer); /*assert_(handles.contains(this), name, apply(CLMem::handles,[](const CLMem* h)->string{return h->name;})); log("<<"_, name); handles.remove(this);*/ handleCount--; } pointer=0; }
 
-CLRawBuffer::CLRawBuffer(size_t size) : CLMem(clCreateBuffer(context, CL_MEM_READ_WRITE, size, 0, 0)) {}
-CLRawBuffer::CLRawBuffer(const ref<byte> data) : CLMem(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, data.size, (byte*)data.data, 0)) {}
+CLRawBuffer::CLRawBuffer(size_t size, string name) : CLMem(clCreateBuffer(context, CL_MEM_READ_WRITE, size, 0, 0), "RawBuffer "_+name) {}
+CLRawBuffer::CLRawBuffer(const ref<byte> data, string name) : CLMem(clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, data.size, (byte*)data.data, 0), "RawBuffer "_+name) {}
 void CLRawBuffer::read(const mref<byte>& target) { clEnqueueReadBuffer(queue, pointer, true, 0, target.size, target, 0,0,0); }
 
-CLImage::CLImage(int2 size, const float value) : CLImage(size, buffer<float>(size.x*size.y, size.x*size.y, value)) {} // NVidia OpenCL doesn't support clEnqueueFillImage (OpenCL 1.2)
-CLImage::CLImage(int2 size, const ref<float>& data) : CLMem(clCreateImage2D(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, 0, (float*)data.data, 0)), size(size) {
+CLImage::CLImage(int2 size, const float value, string name) : CLImage(size, buffer<float>(size.x*size.y, size.x*size.y, value), name) {} // NVidia OpenCL doesn't support clEnqueueFillImage (OpenCL 1.2)
+CLImage::CLImage(int2 size, const ref<float>& data, string name) : CLMem(clCreateImage2D(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, 0, (float*)data.data, 0), "Image2D "_+name), size(size) {
     assert_(data.size == (size_t)size.x*size.y, data.size, (size_t)size.x*size.y);
 }
 
 CLVolume::CLVolume(int3 size, const float value, string name) : CLVolume(size, buffer<float>(size.x*size.y*size.z, size.x*size.y*size.z, value), name) {} // NVidia OpenCL doesn't support clEnqueueFillImage (OpenCL 1.2)
-CLVolume::CLVolume(int3 size, const ref<float>& data, string name) : CLMem(clCreateImage3D(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, size.z, 0,0, (float*)data.data, 0)), size(size), name(copy(String(name))) {
+CLVolume::CLVolume(int3 size, const ref<float>& data, string name) : CLMem(clCreateImage3D(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (cl_image_format[]){{CL_R, CL_FLOAT}}, size.x, size.y, size.z, 0,0, (float*)data.data, 0), "Image3D "_+name), size(size) {
     assert_(data.size == (size_t)size.x*size.y*size.z, data.size, (size_t)size.x*size.y*size.z);
 }
 

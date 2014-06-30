@@ -32,7 +32,11 @@ generic struct array : buffer<T> {
         if(nextCapacity>capacity) {
             assert(nextCapacity>=size);
             if(capacity) {
-                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+                //data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary) (FIXME: invalidates references)
+                T* oldPointer = (T*)data;
+                if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error(__FILE__, nextCapacity);
+                move(mref<T>((T*)data, size), mref<T>(oldPointer, size)); // FIXME: use realloc when possible
+                free(oldPointer);
                 assert(size_t(data)%alignof(T)==0);
             } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error(__FILE__, nextCapacity);
             capacity=nextCapacity;

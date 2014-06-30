@@ -2,13 +2,13 @@
 
 static float reduce(CLKernel& kernel, const CLVolume& A, const CLVolume& B, const int3 origin, int3 size) {
     assert_(A.size == B.size);
-    CLBufferF Abuffer (size.x*size.y*size.z); copy(Abuffer, A, origin, size);
-    CLBufferF Bbuffer (size.x*size.y*size.z); copy(Bbuffer, B, origin, size);
+    CLBufferF Abuffer (size.x*size.y*size.z, A.name); copy(Abuffer, A, origin, size);
+    CLBufferF Bbuffer (size.x*size.y*size.z, B.name); copy(Bbuffer, B, origin, size);
     size_t elementCount = size.z*size.y*size.x;
     size_t blockSize = 128; // threadCount
     assert_(elementCount % blockSize == 0); //FIXME
     size_t blockCount = elementCount / blockSize;
-    CLBufferF output (blockCount);
+    CLBufferF output (blockCount, "reduce "_+A.name+", "_+B.name);
     kernel.localSpace = blockSize*sizeof(float);
     kernel(blockCount, blockSize, Abuffer.pointer, Bbuffer.pointer, output.pointer, uint(elementCount));
     float blockSums[blockCount];

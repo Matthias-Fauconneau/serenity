@@ -8,7 +8,7 @@ MLTR::MLTR(const Projection& projection, const ImageArray& b, const uint subsetS
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         const ImageArray& b = subset.b;
-        new (&Ai[subsetIndex]) ImageArray(b.size);
+        Ai << ImageArray(b.size);
         project(Ai[subsetIndex], A, i, subsetIndex, subsetSize, subsetCount); // Ai = A i
     }
     log(time);
