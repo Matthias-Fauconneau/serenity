@@ -30,20 +30,25 @@ struct Application {
                 const uint projectionWidth = volumeSize.z; {
                     for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
                         for(uint rotationCount: range(1,5 +1)) {
-                            for(const uint photonCount: apply(range(8,12 +1), &exp2)) { // FIXME: project once, postprocess noise
-                                int3 allProjectionSize (projectionWidth,projectionWidth*3/4, 512);
-                                const Projection allProjections (volumeSize, allProjectionSize, trajectory, rotationCount, photonCount);
-                                ImageArray allIntensity = project(rock, allProjections);
+                            int3 projectionSize0 (projectionWidth,projectionWidth*3/4, 512);
+                            const Projection A0 (volumeSize, projectionSize0, trajectory, rotationCount, 0);
+                            VolumeF attenuation0 = project(rock, A0);
+
+                            for(const uint photonCount: apply(range(8,12 +1), &exp2)) {
+                                VolumeF intensity0 (attenuation0.size);
+                                {Time time;
+                                    for(uint i: range(intensity0.data.size)) intensity0.data[i] = poisson(photonCount) / photonCount * exp(-attenuation0.data[i]); // TODO: precompute poisson
+                                log("Poisson", time);}
 
                                 for(const uint projectionCount:  apply(range(8,9 +1), &exp2)) {
                                     int3 projectionSize (projectionWidth,projectionWidth*3/4, projectionCount);
 
                                     {// Projection
                                         const Projection A (volumeSize, projectionSize, trajectory, rotationCount, photonCount);
-                                        ImageArray intensity (A.projectionSize, 0, "b"_);
-                                        const CLVolume& copy(const CLVolume& source, CLVolume& target, const int3 sourceOrigin=0, const int3 targetOrigin=0, int3 size=0);
-                                        assert_(allIntensity.size.z%intensity.size.z==0);
-                                        for(uint index: range(intensity.size.z)) copy(allIntensity, intensity, int3(0,0,index*allIntensity.size.z/intensity.size.z), int3(0,0,index), int3(intensity.size.xy(),1)); // FIXME: do not copy for full resolution cases
+                                        VolumeF hostIntensity (A.projectionSize, 0, "b"_);
+                                        assert_(intensity0.size.z%hostIntensity.size.z==0);
+                                        for(uint index: range(hostIntensity.size.z)) copy(slice(hostIntensity, index).data, slice(intensity0, index*intensity0.size.z/hostIntensity.size.z).data); // FIXME: upload slice-wise instead of host copy + full upload
+                                        ImageArray intensity = hostIntensity; // Uploads
                                         ImageArray attenuation = negln(intensity);
 
                                         // Reconstruction parameters

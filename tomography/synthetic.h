@@ -27,6 +27,6 @@ inline VolumeF project(const PorousRock& rock, const Projection& A) {
     VolumeF volume(A.projectionSize, "b"_);
     Time time;
     for(uint index: range(volume.size.z)) { rock.project(::slice(volume, index), A, index); }
-    log("Poisson•A", time);
+    log("A", time);
     return volume;
 }
