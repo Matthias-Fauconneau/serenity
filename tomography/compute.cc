@@ -13,6 +13,7 @@ struct Application {
     Plot plot;
     Window window;
     Application() {
+        Folder results = "Results"_;
         Time totalTime, totalReconstructionTime;
         uint completed = 0;
         // Reference parameters
@@ -26,39 +27,53 @@ struct Application {
 
         // Projection parameters
         const uint projectionWidth = volumeSize.z;
+        int2 projectionSize (projectionWidth,projectionWidth*3/4);
         for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
             for(uint rotationCount: trajectory==Projection::Adaptive?ref<uint>({2,3,5}):ref<uint>({1,2,4})) {
+                bool skip = true;
+                for(const uint photonCount: ref<uint>({1024,512,256})) {
+                    for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
+                        const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
+                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        skip &= existsFile(parameters, results);
+                    }
+                }
+                if(skip) { log("Skipping trajectory", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); continue; }
                 // Full resolution exact projection data
-                int3 projectionSize0 (projectionWidth,projectionWidth*3/4, 512);
-                const Projection A0 (volumeSize, projectionSize0, trajectory, rotationCount, 0);
+                const Projection A0 (volumeSize, int3(projectionSize, 1024), trajectory, rotationCount, 0);
                 VolumeF attenuation0 = project(rock, A0);
 
-                for(const uint photonCount: ref<uint>({256,512,1024})) {
+                for(const uint photonCount: ref<uint>({1024,512,256})) {
+                    bool skip = true;
+                    for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
+                        const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
+                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        skip &= existsFile(parameters, results);
+                    }
+                    if(skip) { log("Skipping photonCount", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); continue; }
+
                     // Full resolution poisson projection data
                     VolumeF intensity0 (attenuation0.size);
                     {Time time;
-                        for(uint i: range(intensity0.data.size)) intensity0.data[i] = poisson(photonCount) / photonCount * exp(-attenuation0.data[i]); // TODO: precompute poisson
+                        for(uint i: range(intensity0.data.size)) intensity0.data[i] = float(poisson(photonCount)) / float(photonCount) * exp(-attenuation0.data[i]); // TODO: precompute poisson
                         log("Poisson", time);}
 
                     for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
-                        int3 projectionSize (projectionWidth,projectionWidth*3/4, projectionCount);
-                        const Projection A (volumeSize, projectionSize, trajectory, rotationCount, photonCount);
-                        const uint subsetSize = int(nearestDivisorToSqrt(projectionSize.z));
+                        const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
+                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
 
-                        String parameters = str(A.volumeSize.x, grainRadius, strx(A.projectionSize.xy()), ref<string>({"single"_,"double"_,"adaptive"_})[int(A.trajectory)], A.rotationCount, uint(A.photonCount), projectionCount, subsetSize);
-                        Folder results = "Results"_;
-                        if(existsFile(parameters, results)) { log("WARNING: Skipping", parameters); continue; }
+                        if(existsFile(parameters, results)) { log("Skipping projectionCount", parameters); continue; }
                         log(parameters);
-                        File resultFile (parameters, results, Flags(WriteOnly|Create|Truncate));
 
                         // Partial resolution poisson projection data
-                        VolumeF hostIntensity (A.projectionSize, 0, "b"_);
-                        assert_(intensity0.size.z%hostIntensity.size.z==0);
+                        VolumeF hostIntensity (int3(projectionSize, projectionCount), 0, "b"_);
+                        assert_(intensity0.size.z%hostIntensity.size.z==0, intensity0.size.z, hostIntensity.size.z);
                         for(uint index: range(hostIntensity.size.z)) copy(slice(hostIntensity, index).data, slice(intensity0, index*intensity0.size.z/hostIntensity.size.z).data); // FIXME: upload slice-wise instead of host copy + full upload
                         ImageArray intensity = hostIntensity; // Uploads
                         ImageArray attenuation = negln(intensity);
 
                         // Reconstruction
+                        const Projection A (volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount, photonCount);
                         MLTR reconstruction {A, intensity, subsetSize};
 
                         // Interface
@@ -75,7 +90,7 @@ struct Application {
                         VBox layout {{&slices, &projections, &plot}};
                         window.widget = &layout;
                         window.setSize(min(int2(-1), -window.size));
-                        window.setTitle(str(completed)+"/"_+str(3*5*4*2/*120*/));
+                        window.setTitle(str(completed)+"/"_+str(3*3*3*5/*135*/));
                         window.show();
 
                         // Evaluation
@@ -84,6 +99,7 @@ struct Application {
                         VolumeF best (volumeSize);
                         Time time; totalReconstructionTime.start();
                         const uint minIterationCount = 16, maxIterationCount = 128;
+                        File resultFile (parameters, results, Flags(WriteOnly|Create|Truncate));
                         uint k=0; for(;k < maxIterationCount; k++) {
                             reconstruction.step();
 
@@ -110,10 +126,11 @@ struct Application {
                                 bestK=k;
                                 reconstruction.x.read(best);
                                 if(k >= maxIterationCount-1) log("WARNING: Slow convergence stopped after maximum iteration count");
-                            } else if(k >= minIterationCount-1) { log("WARNING: Divergence stopped after minimum iteration count"); break; }
+                            } else {
+                                if(k >= minIterationCount-1) { log("WARNING: Divergence stopped after minimum iteration count"); break; }
+                                //if(totalNMSE > 1 && k >= minIterationCount-1) { log("WARNING: Divergence stopped after large error"); break; }
+                            }
                             bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
-
-                            if(totalNMSE > 1) { log("WARNING: Divergence stopped after large error"); break; }
 
                             extern bool terminate;
                             if(terminate) { log("Terminated"_); return; }
