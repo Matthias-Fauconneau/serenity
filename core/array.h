@@ -12,7 +12,7 @@ generic struct array : buffer<T> {
     explicit array(const ref<T>& o): buffer<T>(o) {}
 
     /// Moves elements from a reference
-    //explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
+    explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
     /// Copies elements from a reference
     //array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
     //array(const std::initializer_list<T>& list) : array(ref<T>(list)) {}

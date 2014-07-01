@@ -14,7 +14,7 @@ struct Application {
     Window window;
     Application() {
         Folder results = "Results"_;
-        Time totalTime, totalReconstructionTime;
+        Time totalTime, reconstructionTime, projectionTime, poissonTime;
         uint completed = 0;
         // Reference parameters
         const int3 volumeSize = 256;
@@ -38,10 +38,13 @@ struct Application {
                         skip &= existsFile(parameters, results);
                     }
                 }
-                if(skip) { log("Skipping trajectory", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); continue; }
+                if(skip) { log("Skipping trajectory", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); completed+=3*5; continue; }
+                log("Trajectory", ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)]);
+
                 // Full resolution exact projection data
-                const Projection A0 (volumeSize, int3(projectionSize, 1024), trajectory, rotationCount, 0);
-                VolumeF attenuation0 = project(rock, A0);
+                Time time; projectionTime.start();
+                VolumeF attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, 1024), trajectory, rotationCount));
+                projectionTime.stop(); log("A", time);
 
                 for(const uint photonCount: ref<uint>({1024,512,256})) {
                     bool skip = true;
@@ -50,13 +53,14 @@ struct Application {
                         String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
                         skip &= existsFile(parameters, results);
                     }
-                    if(skip) { log("Skipping photonCount", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); continue; }
+                    if(skip) { log("Skipping photon count", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); completed+=5; continue; }
+                    log("Photon count", photonCount);
 
                     // Full resolution poisson projection data
                     VolumeF intensity0 (attenuation0.size);
-                    {Time time;
-                        for(uint i: range(intensity0.data.size)) intensity0.data[i] = float(poisson(photonCount)) / float(photonCount) * exp(-attenuation0.data[i]); // TODO: precompute poisson
-                        log("Poisson", time);}
+                    Time time; poissonTime.start();
+                    for(uint i: range(intensity0.data.size)) intensity0.data[i] = float(poisson(photonCount)) / float(photonCount) * exp(-attenuation0.data[i]); // TODO: precompute poisson
+                    poissonTime.stop(); log("Poisson", time);
 
                     for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
@@ -73,7 +77,7 @@ struct Application {
                         ImageArray attenuation = negln(intensity);
 
                         // Reconstruction
-                        const Projection A (volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount, photonCount);
+                        const Projection A (volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount);
                         MLTR reconstruction {A, intensity, subsetSize};
 
                         // Interface
@@ -97,9 +101,9 @@ struct Application {
                         uint bestK = 0;
                         float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
                         VolumeF best (volumeSize);
-                        Time time; totalReconstructionTime.start();
-                        const uint minIterationCount = 16, maxIterationCount = 128;
-                        File resultFile (parameters, results, Flags(WriteOnly|Create|Truncate));
+                        Time time; reconstructionTime.start();
+                        const uint minIterationCount = 32, maxIterationCount = 128;
+                        String result;
                         uint k=0; for(;k < maxIterationCount; k++) {
                             reconstruction.step();
 
@@ -117,7 +121,7 @@ struct Application {
                             float centerSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                             float extremeSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction.x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                             float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                            resultFile.write(str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR)+"\n"_);
+                            result << str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR)+"\n"_;
                             plot[parameters].insert(k, -10*log10(totalNMSE));
                             window.needRender = true;
                             window.event();
@@ -135,7 +139,8 @@ struct Application {
                             extern bool terminate;
                             if(terminate) { log("Terminated"_); return; }
                         }
-                        totalReconstructionTime.stop();
+                        reconstructionTime.stop();
+                        writeFile(parameters, result, results);
                         writeFile(parameters+".best"_, cast<byte>(best.data), results);
                         log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
                         completed++;
@@ -144,7 +149,7 @@ struct Application {
                 }
             }
         }
-        log("Done"_,totalReconstructionTime, totalTime);
+        log(projectionTime, poissonTime, reconstructionTime, totalTime);
         exit();
     }
 } app;

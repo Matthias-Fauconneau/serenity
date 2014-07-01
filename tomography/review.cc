@@ -4,38 +4,42 @@
 #include "window.h"
 #include "graphics.h"
 
-struct Application : Widget {
+struct ArrayView : Widget {
     Folder results = "Results"_;
     array<String> names = results.list(); // Kept for references
-    array<string> parameters = split("Size,Grain Radius,Resolution,Trajectory,Rotations,Photons,Projections,Subsets size"_,',');
+    array<string> parameters = split("Size,Grain Radius,Resolution,Trajectory,Rotations,Photons,Projections"_,',');
+    string valueName = "NMSE"_;
     array<array<Variant>> values;
-    map<array<string>, float/*Variant*/> points;
+    map<array<String>, float/*Variant*/> points;
     float min = inf, max = -inf;
 
-    Window window {this, "Results"_};
-    Application() {
+    ArrayView() {
         values.grow(parameters.size);
         values[parameters.indexOf("Trajectory"_)] << Variant(String("single"_)) << Variant(String("double"_)) << Variant(String("adaptive"_)); // Force this specific order
         for(string name: names) {
             if(name.contains('.')) continue;
-            array<string> arguments = split(name);
+            array<String> arguments = apply(split(name), [](string s){return String(s);});
+            arguments.pop(); // Ignores subset size
             assert_(arguments.size == parameters.size, parameters, arguments);
-            for(uint i: range(parameters.size)) if(!values[i].contains(arguments[i])) values[i].insertSorted(Variant(String(arguments[i])));
+            for(uint i: range(parameters.size)) if(!values[i].contains(arguments[i])) values[i].insertSorted(Variant(String(string(arguments[i]))));
             float bestNMSE = inf;
             for(TextData s = readFile(name, results);s;) {
-                uint _unused k = s.integer(); s.skip(" "_);
-                float _unused centerNMSE = s.decimal(); s.skip(" "_);
-                float _unused extremeNMSE = s.decimal(); s.skip(" "_);
-                float _unused totalNMSE = s.decimal(); s.skip(" "_);
-                float _unused SNR = s.decimal(); s.skip("\n"_);
-                bestNMSE = ::min(bestNMSE, SNR);
+                map<string, Variant> values;
+                values["k"_] = s.integer(); s.skip(" "_);
+                values["Center NMSE"_] = s.decimal(); s.skip(" "_);
+                values["Extreme NMSE"_] = s.decimal(); s.skip(" "_);
+                values["NMSE"_] = s.decimal(); s.skip(" "_);
+                values["SNR"_] = -s.decimal(); /*Negates as best is maximum*/ s.skip("\n"_);
+                bestNMSE = ::min<float>(bestNMSE, values[valueName]);
             }
             float value = bestNMSE;
             min = ::min(min, value), max = ::max(max, value);
+            max = ::min(100.f, max); // clip to 100%
+            if(arguments[parameters.indexOf("Trajectory"_)]=="adaptive"_) arguments[parameters.indexOf("Rotations"_)] = str(fromInteger(arguments[parameters.indexOf("Rotations"_)])-1); // Converts adaptive total rotation count to helical rotation count
             points.insert(move(arguments), value);
         }
-        window.setSize(-1);
-        window.show();
+        values[parameters.indexOf("Photons"_)] = array<Variant>(mref<Variant>({String("256"_),String("512"_),String("1024"_)})); // Overrides interesting photon counts
+        values[parameters.indexOf("Rotations"_)] = array<Variant>(mref<Variant>({String("1"_),String("2"_),String("4"_)})); // Overrides interesting rotation counts
     }
     array<string> dimensions[2] = {split("Trajectory Photons"_),split("Rotations Projections"_)};
     /// Returns number of cells for \a axis at \a level
@@ -71,13 +75,13 @@ struct Application : Widget {
                         x = x % cellCount(axis, level+1);
                     }
                 }
-                array<string> key;
+                array<String> key;
                 for(uint i: range(parameters.size)) {
                     string parameter = parameters[i];
-                    if(arguments.contains(parameter)) key << arguments[parameter];
+                    if(arguments.contains(parameter)) key << String(arguments[parameter]);
                     else {
                         assert_(values[i].size == 1, "Multiple values for",parameter,":",values[i]);
-                        key << values[i][0];
+                        key << String(string(values[i][0]));
                     }
                 }
                 if(points.contains(key)) {
@@ -85,7 +89,8 @@ struct Application : Widget {
                     float value = points.at(key);
                     float v = (value-min)/(max-min);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
-                    Text((value==min?format(TextFormat(Bold|Italic|Underline)):""_)+str(value),16+16*(1-v),textColor).render(cell);
+                    float realValue = abs(value); // Values where maximum is best have been negated
+                    Text((value==min?format(TextFormat(Bold|Italic|Underline)):""_)+str(realValue),16+16*(1-v),textColor).render(cell);
                 }
             }
         }
@@ -116,4 +121,37 @@ struct Application : Widget {
             }
         }
     }
+};
+
+// -> file.cc
+#include <sys/inotify.h>
+/// Watches a folder for new files
+struct FileWatcher : File, Poll {
+    FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted={})
+        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
+          fileCreated(fileCreated), fileDeleted(fileDeleted) {}
+    void event() override {
+        while(poll()) {
+            //::buffer<byte> buffer = readUpTo(2*sizeof(inotify_event)+4); // Maximum size fitting only a single event (FIXME)
+            ::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
+            inotify_event e = *(inotify_event*)buffer.data;
+            string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
+            if((e.mask&IN_CREATE) && fileCreated) fileCreated(name);
+            if((e.mask&IN_DELETE) && fileDeleted) fileDeleted(name);
+        }
+    }
+    const uint watch;
+    function<void(string)> fileCreated;
+    function<void(string)> fileDeleted;
+};
+
+struct Application {
+    ArrayView view;
+    Window window {&view, "Results"_};
+    FileWatcher watcher{"Results"_, [this](string){ view=ArrayView();/*Reloads*/ window.render(); } };
+    Application() {
+        window.setSize(-1);
+        window.show();
+    }
 } app;
+

@@ -14,7 +14,6 @@ struct Projection {
     float specimenDistance = 1./16;
     enum Trajectory { Single, Double, Adaptive } trajectory;
     uint rotationCount;
-    float photonCount; // Photon count per pixel for a blank scan (without attenuation) of same duration (0: no noise)
 
     // Projection setup (coordinates in view space)
     const float volumeAspectRatio = float(volumeSize.z-1) / float(volumeSize.x-1);
@@ -26,7 +25,7 @@ struct Projection {
     const float distance = specimenDistance/volumeRadius; // Distance in world space
     const float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
 
-    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const uint rotationCount, const float photonCount = 0) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount), photonCount(photonCount) {}
+    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const uint rotationCount) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount) {}
 
     // Rotation angle (in radians) around vertical axis
     float angle(uint index) const {
