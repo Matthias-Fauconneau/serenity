@@ -20,7 +20,7 @@ inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+
 
 struct Image {
     Image(){}
-    Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha=false, bool sRGB=false) :
+    Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha, bool sRGB) :
         buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha),sRGB(sRGB){}
     Image(uint width, uint height, bool alpha=false, bool sRGB=true) : width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
         assert(width); assert(height);

@@ -5,7 +5,7 @@
 
 inline String str(const Note& a) { return str(a.key); }
 
-struct Sheet /*: Widget*/ {
+struct Sheet : Widget {
     // Layout parameters
     const int staffCount = 2;
     const int halfLineInterval = 5, lineInterval = 2*halfLineInterval;
@@ -59,6 +59,7 @@ struct Sheet /*: Widget*/ {
     //int position = 0;
 
     int2 sizeHint() { return int2(-1, staffY(1,-16)); }
-    void render(const Image& target, Rect clip);
+    void render(const Image& target, int2 offset, int2 size) override;
+    void render(const Image& target) override { render(target, 0, target.size()); }
     //bool mouseEvent(int2, int2, Event, Button button);
 };

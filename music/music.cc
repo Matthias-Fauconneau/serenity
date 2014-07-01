@@ -10,7 +10,7 @@ struct Music : Widget {
     Thread audioThread;
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
-    Sheet sheet {xml.signs, xml.divisions, 360};
+    Sheet sheet {xml.signs, xml.divisions, 720};
     AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
     MidiFile midi = readFile(name+".mid"_);
     buffer<uint> noteToBlit = sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
@@ -21,19 +21,15 @@ struct Music : Widget {
     float targetPosition=0, speed=0, position=0; // X target/speed/position of sheet view
 
     // Encoding
-    //bool contentChanged = true;
     bool encode = false;
     Encoder encoder {name /*, {&audioFile, &AudioFile::read}*/}; //TODO: remux without reencoding
 
     // Preview
-    bool preview = true;
+    bool preview = !encode;
     Timer timer;
-    Window window {this, int2(1280,360), "MusicXML"_};
+    Window window {this, int2(1280,720), "MusicXML"_};
     AudioOutput audio {{this,&Music::read}, audioThread};
     uint64 audioTime = 0, videoTime = 0;
-    static constexpr uint blurWidth = 6; // 2*maxSpeed
-    Image image {uint(sheet.measures.last()+blurWidth), uint(window.size.y)};
-    Image blurred = image.size()-int2(blurWidth, 0);
     uint lastPosition = 0;
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
@@ -43,17 +39,19 @@ struct Music : Widget {
     }
 
     Music() {
-        renderBackground(image, White);
-        sheet.render(image, Rect(image.size()));
-        blurred.buffer.clear(0xFF);
-        blurX<blurWidth>(blurred, image);
-
-        if(sheet.synchronizationFailed) { window.background=White; return; }
-        window.background = NoBackground; // Only clear on changes
-        window.widget = this;
+        window.background = White;
         //seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[100+1]])].time );
         if(preview) { audio.start(mp3.rate, 1024); audioThread.spawn(); }
-        //else while(midi.time < midi.duration) step();
+        else {
+            Image target(window.size);
+            while(mp3.position < mp3.duration) {
+                step();
+                renderBackground(target, White);
+                position = min(float(sheet.measures.last()-target.size().x), position);
+                sheet.render(target, int2(floor(-position), 0), target.size());
+                encoder.writeVideoFrame(target);
+            }
+        }
     }
 
     uint read(const mref<short2>& output) {
@@ -93,93 +91,26 @@ struct Music : Widget {
             }
         }
         if(!update) return;
-        //contentChanged = true;
 
         sheet.colors.clear();
         for(uint index: active.values) sheet.colors.insert(index, red);
         if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
-
-        sheet.render(image, update);
-        update.min.x -= blurWidth;
-        Rect update2 = update; update2.max.x += blurWidth;
-        blurX<blurWidth>(clip(blurred,update), clip(image,update2));
-    }
-
-    // -> image
-    template<uint width> void blurX(const Image& target, const Image& source) {
-        assert_(target.size()+int2(width, 0) == source.size());
-        for(uint y: range(target.height)) {
-            for(uint c: range(3)) { // FIXME: planar
-                uint8 const* row = &source(0, y)[c];
-                uint8* const targetRow = &target(0, y)[c];
-                uint sum = 0;
-                for(uint x: range(width)) sum += row[x*4];
-                for(uint x: range(target.width)) {
-                    uint8 const* source = row+x*4;
-                    sum += source[width*4];
-                    targetRow[x*4] = sum / (width+1);
-                    sum -= source[0];
-                }
-            }
-        }
-    }
-
-    // -> image
-    void resampleX(const Image& target, const Image& source, float fract) {
-        assert_(target.size()+int2(1, 0) == source.size());
-        //const uint b8 = 256*fract, a8 = 256-b8;
-        for(uint y: range(target.height)) {
-            for(uint c: range(3)) { // FIXME: planar
-                uint8 const* row = &source(0, y)[c];
-                uint8* const targetRow = &target(0, y)[c];
-                for(uint x: range(target.width)) {
-#if 1
-                    extern float sRGB_reverse[0x100];
-                    extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
-                    uint8 const* source = row+x*4;
-                    float a = sRGB_reverse[source[0]];
-                    float b = sRGB_reverse[source[4]];
-                    float linear = (1-fract) * a + fract * b;
-                    targetRow[x*4] = sRGB_forward[int(round(0xFFF*linear))];
-#else
-                    uint8 const* source = row+x*4;
-                    targetRow[x*4] = (a8 * uint(source[0]) + b8 * uint(source[4])) / 256;
-#endif
-                }
-            }
-        }
     }
 
     // Render loop
     void render(const Image& target) override {
         uint nextTime = window.msc-window.firstMSC;
         if(videoTime+1 != nextTime) { static int dropCount=0; int drop=nextTime-(videoTime+1); if(drop>0) { dropCount+=drop; log("Dropped",drop,dropCount); } }
-        while(videoTime < nextTime) {
-            follow();
-            // Smooth scroll animation (assumes constant time step)
-            const float k=4./window.size.x, b=1./encoder.fps; // Stiffness and damping constants
-            speed = b*speed + k*(targetPosition-position); // Euler integration of speed from forces of spring equation (capped)
-            static float maxSpeed = 3.32; if(speed > maxSpeed) { maxSpeed = speed; log(maxSpeed); }
-            //speed = min(2.f, speed);
-            //speed = float((sheet.measures.last()-image.width)*midi.ticksPerSeconds)/float(midi.duration*encoder.fps);
-            //float lastPosition = position;
-            speed = clip(2.f, speed, 3.f);
-            position = position + speed; // Euler integration of position from speed
-            position = min(float(blurred.size().x-target.size().x-1-blurWidth/*just to be sure*/), position);
-            videoTime++;
-        }
-        //position = target - (image.size().x-1)/2; // Snap to current note
-        //position = sheet.measures[max(0, sheet.measureIndex(target)/3*3-1)]; // Snap several measures at a time
-        //if(sheet.position != round(position)) sheet.position = round(position), contentChanged = true;
-        //if(lastPosition != round(position)) lastPosition = round(position), contentChanged = true;
-        //if(contentChanged) {
-        Image source = clip(blurred, int2(floor(position), 0)+Rect(target.size()+int2(1,0)));
-            //blurX(image, this->image, lastPosition, position+1); // TODO: resample (+motion blur)?
-        resampleX(target, source, fract(position)); // TODO: resample
-            //contentChanged=false;
-        //}
-        if(encode) encoder.writeVideoFrame(image);
-        //videoTime++;
+        while(videoTime < nextTime) step();
+        position = min(float(sheet.measures.last()-target.size().x), position);
+        sheet.render(target, int2(floor(-position), 0), target.size());
         window.render();
+    }
+    void step() {
+        follow();
+        const float dt=1./encoder.fps, k=dt, b=-1; // Time step, stiffness (1/frame) and damping (1) constants
+        speed += dt * (b*speed + k*(targetPosition-position)); // Euler integration of speed (px/frame) from forces of spring equation
+        position += speed; // Euler integration of position (in pixels) from speed (in pixels per frame)
+        videoTime++;
     }
 } app;

@@ -418,12 +418,12 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
     return move(midiToBlit);
 }
 
-void Sheet::render(const Image& target, Rect clip) {
+void Sheet::render(const Image& target, int2 offset, int2) {
     // TODO: cull
-    for(Rect r: fills) fill(target, r&clip);
-    for(Parallelogram p: parallelograms) if(Rect(p.min,p.max)&clip) parallelogram(target, p.min, p.max, p.dy);
-    for(uint i: range(blits.size)) { const Blit& b=blits[i]; if((b.position+Rect(b.image.size()))&clip) blit(target, b.position, b.image, colors.value(i, black)); }
-    for(const Cubic& c: cubics) if(Rect(int2(min(c)),int2(max(c)))&clip) cubic(target, c, black, 1, 8);
+    for(Rect r: fills) fill(target, offset+r);
+      for(Parallelogram p: parallelograms) parallelogram(target, offset+p.min, offset+p.max, p.dy);
+      for(uint i: range(blits.size)) { const Blit& b=blits[i]; blit(target, offset+b.position, b.image, colors.value(i, black)); }
+      for(const Cubic& c: cubics) { buffer<vec2> points(c.size); for(uint i: range(c.size)) points[i]=vec2(offset)+c[i]; cubic(target, points); }
 }
 
 int Sheet::measureIndex(int x0) {
