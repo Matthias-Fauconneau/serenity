@@ -153,7 +153,6 @@ void Window::event() {
 
 void Window::putImage(int2 position, int2 size) {
     assert_(state == Idle);
-    static uint pixmap = Pixmap;
     pixmap = pixmap==Pixmap2 ? Pixmap : Pixmap2; // Double buffer
     Shm::PutImage r; r.window=id+pixmap; r.context=id+GContext; r.seg=id+Segment;
     r.totalW=target.stride; r.totalH=target.height;
@@ -165,7 +164,7 @@ void Window::putImage(int2 position, int2 size) {
 
 void Window::present() {
     if(presentState != Idle) { presentState=Wait; return; }
-    {Present::Pixmap r; assert_(sizeof(r)==r.size*4, sizeof(r)); r.window=id+XWindow; r.pixmap=id+Pixmap; send(raw(r));}
+    {Present::Pixmap r; assert_(sizeof(r)==r.size*4, sizeof(r)); r.window=id+XWindow; r.pixmap=id+pixmap; send(raw(r));}
     presentState = Server;
 }
 

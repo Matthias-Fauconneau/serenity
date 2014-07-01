@@ -4,6 +4,7 @@ TODO
 build.sh
 build.cc
 player.cc
+test.cc
 
 core/array.h
 core/core.h

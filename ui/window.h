@@ -154,6 +154,8 @@ struct Window : Device {
 
     /// System V shared memory
     int shm = 0;
+    /// Current pixmap for double buffer
+    uint pixmap = Pixmap;
     /// Shared window buffer state
     enum State { Idle, Server, Wait, WaitPresent } state = Idle;
     /// Present state
