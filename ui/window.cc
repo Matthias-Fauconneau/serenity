@@ -105,7 +105,6 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
         {QueryExtension r; r.length="Present"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"Present"_+pad(4,r.length));}));
         Present::EXT=r.major; Present::event=r.firstEvent; Present::errorBase=r.firstError;}
     {Present::SelectInput r; r.window=id+XWindow; r.eid=id+PresentEvent; send(raw(r));}
-    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}

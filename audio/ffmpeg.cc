@@ -31,7 +31,7 @@ bool AudioFile::open() {
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
                 rate = audio->sample_rate;
-                duration = audioStream->duration*audioStream->time_base.num*rate/audioStream->time_base.den;
+                duration = audioStream->duration*rate*audioStream->time_base.num/audioStream->time_base.den;
                 break;
             }
         }

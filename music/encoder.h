@@ -1,30 +1,21 @@
 #pragma once
 #include "function.h"
 #include "image.h"
+#include "ffmpeg.h" // AudioFile
 
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
-    /// Starts a new file recording video (and audio if enabled)
-    Encoder(const string& name, bool audio=false, int width=1280, int height=720, int fps=60, int rate=48000);
-    Encoder(const string& name, function<uint(const mref<float2>& output)> readAudio,
-            int width=1280, int height=720, int fps=60, int rate=48000) : Encoder(name, true, width, height, fps, rate) {
-        this->readAudio = readAudio;
-    }
-
-    ~Encoder() { stop(); }
+    /// Starts a new file recording video and audio
+    Encoder(const string& name, int width, int height, int fps, const AudioFile& audio);
+    /// Flushes all encoders and close the file
+    ~Encoder();
     operator bool() { return context; }
     int2 size() { return int2(width, height); }
-
 
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
     void writeAudioFrame(const ref<float2>& audio);
-    /// Flushes all encoders and close the file
-    void stop();
-
-    /// readAudio will be called back to request an \a audio frame of \a size samples as needed to follow video time
-    function<uint(const mref<float2>& output)> readAudio =[](const mref<float2>&){return 0;};
 
     const uint width, height, fps, rate, audioSize = 1024;
     struct AVFormatContext* context=0;
