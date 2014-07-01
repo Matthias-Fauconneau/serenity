@@ -12,11 +12,13 @@ inline int3 fromInt3(TextData& s) {
 inline int3 fromInt3(string str) { TextData s(str); return fromInt3(s); }
 
 struct Variant : String {
+    bool isInteger = false; // for proper display of integers (without decimal points)
     Variant(){}
     default_move(Variant);
     Variant(String&& s) : String(move(s)) {}
+    Variant(int integer) : String(dec(integer)), isInteger(true) {}
     Variant(double decimal) : String(ftoa(decimal)){}
-    Variant(int3 v) : String(strx(v)) {}
+    //Variant(int3 v) : String(strx(v)) {}
     explicit operator bool() const { return size; }
     operator int() const { return *this ? fromInteger(*this) : 0; }
     operator uint() const { return *this ? fromInteger(*this) : 0; }

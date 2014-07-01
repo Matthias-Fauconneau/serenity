@@ -3,43 +3,44 @@
 #include "text.h"
 #include "window.h"
 #include "graphics.h"
+#include "png.h"
 
 struct ArrayView : Widget {
     Folder results = "Results"_;
     array<String> names = results.list(); // Kept for references
     array<string> parameters = split("Size,Grain Radius,Resolution,Trajectory,Rotations,Photons,Projections"_,',');
-    string valueName = "NMSE"_;
+    string valueName;
+    string bestName = valueName=="k"_? "NMSE"_ : valueName;
     array<array<Variant>> values;
-    map<array<String>, float/*Variant*/> points;
+    map<array<String>, Variant> points;
     float min = inf, max = -inf;
 
-    ArrayView() {
+    ArrayView(string valueName) : valueName(valueName) {
         values.grow(parameters.size);
         values[parameters.indexOf("Trajectory"_)] << Variant(String("single"_)) << Variant(String("double"_)) << Variant(String("adaptive"_)); // Force this specific order
         for(string name: names) {
             if(name.contains('.')) continue;
             array<String> arguments = apply(split(name), [](string s){return String(s);});
+            if(arguments[parameters.indexOf("Trajectory"_)]=="adaptive"_) arguments[parameters.indexOf("Rotations"_)] = str(fromInteger(arguments[parameters.indexOf("Rotations"_)])-1); // Converts adaptive total rotation count to helical rotation count
             arguments.pop(); // Ignores subset size
             assert_(arguments.size == parameters.size, parameters, arguments);
             for(uint i: range(parameters.size)) if(!values[i].contains(arguments[i])) values[i].insertSorted(Variant(String(string(arguments[i]))));
-            float bestNMSE = inf;
+            float best = inf; Variant value;
             for(TextData s = readFile(name, results);s;) {
                 map<string, Variant> values;
                 values["k"_] = s.integer(); s.skip(" "_);
-                values["Center NMSE"_] = s.decimal(); s.skip(" "_);
-                values["Extreme NMSE"_] = s.decimal(); s.skip(" "_);
+                values["Central"_] = s.decimal(); s.skip(" "_);
+                values["Extreme"_] = s.decimal(); s.skip(" "_);
                 values["NMSE"_] = s.decimal(); s.skip(" "_);
                 values["SNR"_] = -s.decimal(); /*Negates as best is maximum*/ s.skip("\n"_);
-                bestNMSE = ::min<float>(bestNMSE, values[valueName]);
+                if((float)values[bestName] < best) {
+                    best = values[bestName];
+                    value = move(values[valueName]);
+                }
             }
-            float value = bestNMSE;
-            min = ::min(min, value), max = ::max(max, value);
-            max = ::min(100.f, max); // clip to 100%
-            if(arguments[parameters.indexOf("Trajectory"_)]=="adaptive"_) arguments[parameters.indexOf("Rotations"_)] = str(fromInteger(arguments[parameters.indexOf("Rotations"_)])-1); // Converts adaptive total rotation count to helical rotation count
-            points.insert(move(arguments), value);
+            min = ::min(min, (float)value), max = ::max(max, (float)value);
+            points.insert(move(arguments), move(value));
         }
-        values[parameters.indexOf("Photons"_)] = array<Variant>(mref<Variant>({String("256"_),String("512"_),String("1024"_)})); // Overrides interesting photon counts
-        values[parameters.indexOf("Rotations"_)] = array<Variant>(mref<Variant>({String("1"_),String("2"_),String("4"_)})); // Overrides interesting rotation counts
     }
     array<string> dimensions[2] = {split("Trajectory Photons"_),split("Rotations Projections"_)};
     /// Returns number of cells for \a axis at \a level
@@ -62,6 +63,8 @@ struct ArrayView : Widget {
         String fixed;
         for(uint i: range(parameters.size)) if(values[i].size==1) fixed << parameters[i]+": "_+str(values[i])+"\n"_;
         Text(fixed).render(clip(target, Rect(int2(dimensions[1].size,dimensions[0].size)*cellSize)));
+        // Value name in unused top-left cell
+        Text(format(TextFormat::Bold)+valueName).render(clip(target, int2(dimensions[1].size,dimensions[0].size)*cellSize+Rect(cellSize)));
         // Content
         for(uint X: range(cellCount(0))) {
             for(uint Y: range(cellCount(1))) {
@@ -90,7 +93,7 @@ struct ArrayView : Widget {
                     float v = (value-min)/(max-min);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
-                    Text((value==min?format(TextFormat(Bold|Italic|Underline)):""_)+str(realValue),16+16*(1-v),textColor).render(cell);
+                    Text((value==min?format(TextFormat(Bold|Italic|Underline)):""_)+(points.at(key).isInteger?dec(realValue):ftoa(realValue)),16+16*(1-v),textColor).render(cell);
                 }
             }
         }
@@ -146,10 +149,17 @@ struct FileWatcher : File, Poll {
 };
 
 struct Application {
-    ArrayView view;
+    ArrayView view {"NMSE"_};
     Window window {&view, "Results"_};
-    FileWatcher watcher{"Results"_, [this](string){ view=ArrayView();/*Reloads*/ window.render(); } };
+    FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
     Application() {
+        for(string valueName: {"NMSE"_,"Central"_,"Extreme"_,"SNR"_,"k"_}) {
+            ArrayView view (valueName);
+            Image image ( view.sizeHint() );
+            fill(image, Rect(image.size()), white);
+            view.Widget::render( image );
+            writeFile(valueName, encodePNG(image));
+        }
         window.setSize(-1);
         window.show();
     }
