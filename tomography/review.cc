@@ -14,8 +14,9 @@ struct ArrayView : Widget {
     array<array<Variant>> values;
     map<array<String>, Variant> points;
     float min = inf, max = -inf;
+    uint textSize;
 
-    ArrayView(string valueName) : valueName(valueName) {
+    ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
         values.grow(parameters.size);
         values[parameters.indexOf("Trajectory"_)] << Variant(String("single"_)) << Variant(String("double"_)) << Variant(String("adaptive"_)); // Force this specific order
         for(string name: names) {
@@ -54,17 +55,16 @@ struct ArrayView : Widget {
     }
     int2 cellCount() { return int2(cellCount(0),cellCount(1)); }
     int2 levelCount() { return int2(dimensions[0].size,dimensions[1].size); }
-    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(80); }
+    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(5*textSize); }
     void render() override {
         assert_(cellCount(), cellCount());
         int2 cellSize = target.size() / (levelCount().yx()+int2(1)+cellCount());
-        const vec3 textColor = black;
         // Fixed parameters in unused top-left corner
         String fixed;
         for(uint i: range(parameters.size)) if(values[i].size==1) fixed << parameters[i]+": "_+str(values[i])+"\n"_;
-        Text(fixed).render(clip(target, Rect(int2(dimensions[1].size,dimensions[0].size)*cellSize)));
+        Text(fixed, textSize).render(clip(target, Rect(int2(dimensions[1].size,dimensions[0].size)*cellSize)));
         // Value name in unused top-left cell
-        Text(format(TextFormat::Bold)+valueName).render(clip(target, int2(dimensions[1].size,dimensions[0].size)*cellSize+Rect(cellSize)));
+        Text(format(TextFormat::Bold)+valueName, textSize).render(clip(target, int2(dimensions[1].size,dimensions[0].size)*cellSize+Rect(cellSize)));
         // Content
         for(uint X: range(cellCount(0))) {
             for(uint Y: range(cellCount(1))) {
@@ -93,7 +93,7 @@ struct ArrayView : Widget {
                     float v = (value-min)/(max-min);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
-                    Text((value==min?format(TextFormat(Bold|Italic|Underline)):""_)+(points.at(key).isInteger?dec(realValue):ftoa(realValue)),16+16*(1-v),textColor).render(cell);
+                    Text((value==min?format(Bold):""_)+(points.at(key).isInteger?dec(realValue):ftoa(realValue)),round(textSize*(1+(1-v))),black).render(cell);
                 }
             }
         }
@@ -103,7 +103,7 @@ struct ArrayView : Widget {
             for(uint level: range(dimensions[axis].size)) {
                 int2 origin = int2(dimensions[!axis].size-1+1, level);
                 if(axis) origin=origin.yx();
-                Text(dimensions[axis][level],16,textColor).render(clip(target, (origin*cellSize)+Rect(cellSize)));
+                Text(dimensions[axis][level],textSize,black).render(clip(target, (origin*cellSize)+Rect(cellSize)));
 
                 uint parameter = parameters.indexOf(dimensions[axis][level]);
                 uint size = values[parameter].size;
@@ -117,7 +117,7 @@ struct ArrayView : Widget {
                             if(!axis) fill(target, Rect(origin,int2(origin.x+1, target.size().y)));
                             if(axis) fill(target, Rect(origin,int2(target.size().x,origin.y+1)));
                         }
-                        Text(values[parameter][index],16,textColor).render(clip(target, origin+Rect(size*cellSize)));
+                        Text(values[parameter][index],textSize,black).render(clip(target, origin+Rect(size*cellSize)));
                     }
                 }
                 X *= size;
@@ -154,7 +154,7 @@ struct Application {
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
     Application() {
         for(string valueName: {"NMSE"_,"Central"_,"Extreme"_,"SNR"_,"k"_}) {
-            ArrayView view (valueName);
+            ArrayView view (valueName, 32);
             Image image ( view.sizeHint() );
             fill(image, Rect(image.size()), white);
             view.Widget::render( image );

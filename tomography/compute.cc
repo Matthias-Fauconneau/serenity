@@ -31,6 +31,22 @@ struct Application {
         // Projection parameters
         const uint projectionWidth = volumeSize.z;
         int2 projectionSize (projectionWidth,projectionWidth*3/4);
+
+        // Counts missing results
+        uint missing = 0;
+        for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
+            for(uint rotationCount: trajectory==Projection::Adaptive?ref<uint>({2,3,5}):ref<uint>({1,2,4})) {
+                for(const uint photonCount: photonCounts) {
+                    for(const uint projectionCount: projectionCounts) {
+                        const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
+                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        missing += !existsFile(parameters, results);
+                    }
+                }
+            }
+        }
+        uint total = 3*3*photonCounts.size*projectionCounts.size;
+
         for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
             for(uint rotationCount: trajectory==Projection::Adaptive?ref<uint>({2,3,5}):ref<uint>({1,2,4})) {
                 bool skip = true;
@@ -97,7 +113,7 @@ struct Application {
                         VBox layout {{&slices, &projections, &plot}};
                         window.widget = &layout;
                         window.setSize(min(int2(-1), -window.size));
-                        window.setTitle(str(completed)+"/"_+str(3*3*3*5/*135*/));
+                        window.setTitle(str(completed)+"/"_+str(missing)+"/"_+str(total));
                         window.show();
 
                         // Evaluation
