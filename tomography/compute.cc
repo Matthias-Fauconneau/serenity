@@ -13,6 +13,9 @@ struct Application {
     Plot plot;
     Window window;
     Application() {
+        const ref<uint> photonCounts = {1024,512,256,2048,4096,8192};
+        const ref<uint> projectionCounts = {64,128,256,512,1024};
+
         Folder results = "Results"_;
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
         uint completed = 0;
@@ -31,8 +34,8 @@ struct Application {
         for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
             for(uint rotationCount: trajectory==Projection::Adaptive?ref<uint>({2,3,5}):ref<uint>({1,2,4})) {
                 bool skip = true;
-                for(const uint photonCount: ref<uint>({1024,512,256})) {
-                    for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
+                for(const uint photonCount: photonCounts) {
+                    for(const uint projectionCount: projectionCounts) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
                         String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
                         skip &= existsFile(parameters, results);
@@ -46,9 +49,9 @@ struct Application {
                 VolumeF attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, 1024), trajectory, rotationCount));
                 projectionTime.stop(); log("A", time);
 
-                for(const uint photonCount: ref<uint>({1024,512,256})) {
+                for(const uint photonCount: photonCounts) {
                     bool skip = true;
-                    for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
+                    for(const uint projectionCount: projectionCounts) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
                         String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
                         skip &= existsFile(parameters, results);
@@ -62,7 +65,7 @@ struct Application {
                     for(uint i: range(intensity0.data.size)) intensity0.data[i] = float(poisson(photonCount)) / float(photonCount) * exp(-attenuation0.data[i]); // TODO: precompute poisson
                     poissonTime.stop(); log("Poisson", time);
 
-                    for(const uint projectionCount: ref<uint>({64,128,256,512,1024})) {
+                    for(const uint projectionCount: projectionCounts) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
                         String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
 
@@ -102,7 +105,7 @@ struct Application {
                         float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
                         VolumeF best (volumeSize);
                         Time time; reconstructionTime.start();
-                        const uint minIterationCount = 32, maxIterationCount = 128;
+                        const uint minIterationCount = 16, maxIterationCount = 128;
                         String result;
                         uint k=0; for(;k < maxIterationCount; k++) {
                             reconstruction.step();
