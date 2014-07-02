@@ -1,7 +1,7 @@
 #include "volume-operation.h"
 
 /// Downsamples a volume by averaging 2x2x2 samples
-void downsample(Volume16& target, const Volume16& source) {
+generic void downsample(VolumeT<T>& target, const VolumeT<T>& source) {
     assert_(!source.tiled());
     int X = source.sampleCount.x, Y = source.sampleCount.y, Z = source.sampleCount.z, XY = X*Y;
     assert_(X%2==0 && Y%2==0 && Z%2==0);
@@ -10,16 +10,16 @@ void downsample(Volume16& target, const Volume16& source) {
     assert(source.margin.x%2==0 && source.margin.y%2==0 && source.margin.z%2==0);
     target.margin = source.margin/2;
     target.maximum=source.maximum;
-    const uint16* const sourceData = source;
-    uint16* const targetData = target;
+    const T* const sourceData = source;
+    T* const targetData = target;
     for(int z=0; z<Z/2; z++) {
-        const uint16* const sourceZ = sourceData+z*2*XY;
-        uint16* const targetZ = targetData+z*XY/2/2;
+        const T* const sourceZ = sourceData+z*2*XY;
+        T* const targetZ = targetData+z*XY/2/2;
         for(int y=0; y<Y/2; y++) {
-            const uint16* const sourceZY = sourceZ+y*2*X;
-            uint16* const targetZY = targetZ+y*X/2;
+            const T* const sourceZY = sourceZ+y*2*X;
+            T* const targetZY = targetZ+y*X/2;
             for(int x=0; x<X/2; x++) {
-                const uint16* const sourceZYX = sourceZY+x*2;
+                const T* const sourceZYX = sourceZY+x*2;
                 targetZY[x] =
                         (
                             ( sourceZYX[0*XY+0*X+0] + sourceZYX[0*XY+0*X+1] +
@@ -33,7 +33,7 @@ void downsample(Volume16& target, const Volume16& source) {
 }
 
 /// Resamples a volume using nearest neighbour (FIXME: linear, cubic)
-void resample(Volume16& target, const Volume16& source, int sourceResolution, int targetResolution) {
+generic void resample(VolumeT<T>& target, const VolumeT<T>& source, int sourceResolution, int targetResolution) {
     assert_(targetResolution > sourceResolution && targetResolution < sourceResolution*2, sourceResolution, targetResolution);
     assert_(!source.tiled());
     int X = source.sampleCount.x, Y = source.sampleCount.y, XY = X*Y;
@@ -45,14 +45,14 @@ void resample(Volume16& target, const Volume16& source, int sourceResolution, in
     target.margin = (target.sampleCount - targetSize)/2;
     assert_(target.margin >= int3(0) && 2*target.margin < target.sampleCount/2, target.sampleCount, targetSize, target.margin);
     target.maximum=source.maximum;
-    const uint16* const sourceData = source + source.index(source.margin);
-    uint16* const targetData = target + target.index(target.margin);
+    const T* const sourceData = source + source.index(source.margin);
+    T* const targetData = target + target.index(target.margin);
     for(int z=0; z<targetSize.z; z++) {
-        const uint16* const sourceZ = sourceData+(z*sourceResolution/targetResolution)*XY;
-        uint16* const targetZ = targetData+z*XY;
+        const T* const sourceZ = sourceData+(z*sourceResolution/targetResolution)*XY;
+        T* const targetZ = targetData+z*XY;
         for(int y=0; y<targetSize.y; y++) {
-            const uint16* const sourceZY = sourceZ+(y*sourceResolution/targetResolution)*X;
-            uint16* const targetZY = targetZ+y*X;
+            const T* const sourceZY = sourceZ+(y*sourceResolution/targetResolution)*X;
+            T* const targetZY = targetZ+y*X;
             for(int x=0; x<targetSize.x; x++) {
                 targetZY[x] = sourceZY[x*sourceResolution/targetResolution]; // FIXME: linear
             }
@@ -62,7 +62,7 @@ void resample(Volume16& target, const Volume16& source, int sourceResolution, in
 
 /// Resamples data
 struct Resample : VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {
         uint sourceResolution = round(TextData(otherInputs[0]->data).decimal()*1000), targetResolution = round(TextData(otherInputs[1]->data).decimal()*1000);
         if(sourceResolution == targetResolution) { copy(outputs[0].data, inputs[0].data); return; }
@@ -73,7 +73,9 @@ struct Resample : VolumeOperation {
         if(times%2) swap(mipmap[0], mipmap[1]);
         if(targetResolution==(sourceResolution<<times)) swap(mipmap[0], mipmap[1]);
         for(int unused pass: range(times)) {
-            downsample(*mipmap[0], *source);
+            /**/  if(source->sampleSize==sizeof(uint8)) downsample<uint8>(*mipmap[0], *source);
+            else if(source->sampleSize==sizeof(uint16)) downsample<uint16>(*mipmap[0], *source);
+            else error(source->sampleSize);
             sourceResolution *= 2;
             swap(mipmap[0], mipmap[1]);
             source = mipmap[1];
@@ -81,7 +83,9 @@ struct Resample : VolumeOperation {
         if(sourceResolution == targetResolution) assert_(mipmap[1]==&outputs[0]);
         else {
             assert_(mipmap[1]==&outputs[1]);
-            resample(outputs[0], *source, sourceResolution, targetResolution);
+            if(source->sampleSize==sizeof(uint8)) resample<uint8>(outputs[0], *source, sourceResolution, targetResolution);
+            else if(source->sampleSize==sizeof(uint16)) resample<uint16>(outputs[0], *source, sourceResolution, targetResolution);
+            else error(source->sampleSize);
         }
         assert_(outputs[0].data.size == outputs[0].size() * outputs[0].sampleSize, outputs[0].size(), outputs[0].sampleSize, outputs[0].sampleCount, outputs[0].data.size, outputs[0].size() * outputs[0].sampleSize);
     }
