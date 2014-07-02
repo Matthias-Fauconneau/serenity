@@ -57,10 +57,10 @@ struct Music /*: Widget*/ {
 #else
         /*else*/ {
             Image target(encoder.size());
-            for(int lastReport=0;;) {
+            for(int lastReport=0, done=0;!done;) {
                 while(encoder.audioTime*encoder.fps <= encoder.videoTime*encoder.rate) {
                     AVPacket packet;
-                    if(av_read_frame(mp3.file, &packet) < 0) break;
+                    if(av_read_frame(mp3.file, &packet) < 0) { done=1; break; }
                     assert_(mp3.file->streams[packet.stream_index]==mp3.audioStream);
                     assert_(mp3.audioStream->time_base.num==1);
                     assert_(packet.pts*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0, packet.pts, packet.pts/float(mp3.audioStream->time_base.den));

@@ -41,7 +41,6 @@ Encoder::Encoder(const string& name, int width, int height, int fps, const Audio
 
         AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
         videoStream = avformat_new_stream(context, codec);
-        //videoStream->id = 0;
         videoCodec = videoStream->codec;
         avcodec_get_context_defaults3(videoCodec, codec);
         videoCodec->codec_id = AV_CODEC_ID_H264;
@@ -59,10 +58,8 @@ Encoder::Encoder(const string& name, int width, int height, int fps, const Audio
     {// Audio
         AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
         audioStream = avformat_new_stream(context, codec);
-        //audioStream->id = 1;
         audioCodec = audioStream->codec;
         avcodec_copy_context(audioCodec, audio.audio);
-        //avcodec_open2(audioCodec, codec, 0);
     }
 
     avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
@@ -118,33 +115,17 @@ void Encoder::writeAudioFrame(const ref<float2>& audio) {
 }
 
 Encoder::~Encoder() {
-    assert_(context);
+    assert_(context && videoStream);
     for(;;) {
+        AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
         int gotVideoPacket = 0;
-        if(videoStream) {
-            AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-            avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
-            if(gotVideoPacket) {
-                pkt.pts = av_rescale_q(videoEncodedTime, videoCodec->time_base, videoStream->time_base);
-                if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
-                pkt.stream_index = videoStream->index;
-                av_interleaved_write_frame(context, &pkt);
-                videoEncodedTime++;
-            }
-        }
-
-        int gotAudioPacket = 0;
-        /*if(audioStream) {
-            AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-            avcodec_encode_audio2(audioCodec, &pkt, 0, &gotAudioPacket);
-            if(gotAudioPacket) {
-                pkt.pts = av_rescale_q(audioEncodedTime, audioCodec->time_base, audioStream->time_base);
-                pkt.stream_index = audioStream->index;
-                av_interleaved_write_frame(context, &pkt);
-            }
-        }*/
-
-        if(!gotVideoPacket && !gotAudioPacket) break;
+        avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
+        if(!gotVideoPacket) break;
+        pkt.pts = av_rescale_q(videoEncodedTime, videoCodec->time_base, videoStream->time_base);
+        if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
+        pkt.stream_index = videoStream->index;
+        av_interleaved_write_frame(context, &pkt);
+        videoEncodedTime++;
     }
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
