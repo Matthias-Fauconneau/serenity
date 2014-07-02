@@ -29,7 +29,7 @@ struct ArrayView : Widget {
             float best = inf; Variant value;
             for(TextData s = readFile(name, results);s;) {
                 map<string, Variant> values;
-                values["k"_] = s.integer(); s.skip(" "_);
+                values["k"_] = s.integer()+1; s.skip(" "_);
                 values["Central"_] = s.decimal(); s.skip(" "_);
                 values["Extreme"_] = s.decimal(); s.skip(" "_);
                 values["NMSE"_] = s.decimal(); s.skip(" "_);

@@ -113,8 +113,8 @@ VolumeF PorousRock::volume() {
     Time time;
     for(const GrainType& type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
         float* volumeData = volume.data;
-        const uint XY = size.x*size.x;
-        const uint X = size.x;
+        const int XY = size.x*size.x;
+        const int X = size.x;
         for(vec4 grain: type.grains) {
             float cx = grain.x, cy=grain.y, cz=grain.z, r=grain.w;
             float innerR2 = sq(r-1.f/2);
@@ -125,11 +125,10 @@ VolumeF PorousRock::volume() {
             int iz = cz-r-1./2, iy = cy-r-1./2, ix = cx-r-1./2;
             float fz = cz-iz, fy=cy-iy, fx=cx-ix;
             uint grainSize = ceil(2*(r+1./2));
-            //float* volume0 = volumeData + iz*XY + iy*X + ix;
-            float* volume0 = volumeData + iz*int(XY)/*Necessary only if grains may cross caps*/ + iy*X + ix;
+            float* volume0 = volumeData + iz*XY + iy*X + ix;
             for(uint z=0; z<grainSize; z++) { // Grains may be cut by cylinder caps
                 float* volumeZ = volume0 + z*XY;
-                if(iz+int(z) < 0 || iz+int(z) >= size.z) continue; // Necessary only if grains may cross caps
+                //if(iz+int(z) < 0 || iz+int(z) >= size.z) continue; // Necessary only if grains may cross caps
                 float rz = float(z) - fz;
                 float RZ = rz*rz;
                 for(uint y=0; y<grainSize; y++) {

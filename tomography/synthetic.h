@@ -4,12 +4,12 @@
 #include "time.h"
 
 struct PorousRock {
-    const float airDensity = 0.001; // Houndsfield ?
-    const float containerDensity = 5.6; // Pure iron
+    const float airDensity = 0.001; // Attenuation coefficient [1/m?]
+    const float containerDensity = 5.60; // Pure iron [1/m]
     int3 size;
     const float maximumRadius = 8; // vx
     const float rate = 1./(size.z==1?sq(maximumRadius):cb(maximumRadius)); // 1/vx
-    struct GrainType { const float probability; /*relative concentration*/ const float density; buffer<vec4> grains; } types[3] = {/*Rutile*/{0.7, 4.20,{}}, /*Siderite*/{0.2, 3.96,{}}, /*NaMontmorillonite*/{0.1, 2.65,{}}};
+    struct GrainType { const float probability; /*relative concentration*/ const float density; /*Attenuation coefficient [1/m]*/ buffer<vec4> grains; } types[3] = {/*Rutile*/{0.7, 4.20,{}}, /*Siderite*/{0.2, 3.96,{}}, /*NaMontmorillonite*/{0.1, 2.65,{}}};
     const vec3 volumeCenter = vec3(size-int3(1))/2.f;
     const float volumeRadius = volumeCenter.x;
     const float innerRadius = (1-4./100) * volumeRadius;
