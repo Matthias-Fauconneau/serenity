@@ -8,8 +8,8 @@ uint ResultFile::indirectID = 0;
 
 /// Relevant operation parameters
 array<string> Rule::parameters() const {
-    array<string> parameters;
-    if(condition.parameter) parameters << condition.parameter;
+    array<string> parameters = copy(processParameters);
+    if(condition.parameter) parameters += condition.parameter;
     if(operation) parameters += split(Interface<Operation>::instance(this->operation)->parameters());
     return parameters;
 }
@@ -68,8 +68,13 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
                     s.whileAny(" \t"_);
                     rule.arguments.insert(String(key), String(s.whileNo(" \t\n"_)));
                 }
-                else if(resultNames.contains(key)) rule.inputs << key; // Result input
-                else if(rule.operation) rule.inputs << key; // Argument value
+                else if(resultNames.contains(key)) {
+                    rule.processParameters += key; // FIXME: only valid in case where the same name is either an argument or a result depending on arguments
+                    rule.inputs << key; // Result input
+                } else if(rule.operation) {
+                    rule.processParameters += key;
+                    rule.inputs << key; // Argument value
+                }
             }
             resultNames += outputs; //for(string output: outputs) { assert_(!resultNames.contains(output), "Multiple result definitions for", output); resultNames << output; }
             rule.outputs = move(outputs);
