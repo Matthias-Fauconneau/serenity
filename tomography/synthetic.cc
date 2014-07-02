@@ -73,15 +73,15 @@ RectF getBoundingBox(const vec3& center, float radius, const mat4& projMatrix) {
     return {vec2(minX, minY), vec2(maxX, maxY)};
 }
 
-PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maximumRadius(maximumRadius) {
+PorousRock::PorousRock(int3 size) : size(size) {
     assert(size.x == size.y);
     //assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
 
     Random random;
     for(GrainType& type: types) { // Rasterize each grain type in order so that lighter grains overrides heavier grains
-        type.grains = buffer<vec4>(type.probability * grainCount, 0);
+        type.grains = buffer<vec4>(type.relativeGrainCount * grainCount, 0);
         while(type.grains.size < type.grains.capacity) {
-            const float r = random()*maximumRadius; // Uniform distribution of radius between [0, maximumRadius[
+            const float r = minimumGrainRadiusVx+random()*(maximumGrainRadiusVx-minimumGrainRadiusVx); // Uniform distribution of radius (TODO: gaussian)
             const vec2 xy = vec2(random(), random()) * vec2(size.xy());
             if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
             type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
@@ -91,7 +91,7 @@ PorousRock::PorousRock(int3 size, const float maximumRadius) : size(size), maxim
 }
 
 VolumeF PorousRock::volume() {
-    VolumeF volume (size, airDensity, "x0"_);
+    VolumeF volume (size, airAttenuation, "x0"_);
 
     for(uint y: range(size.y)) for(uint x: range(size.x)) {
         float r2 = sq(vec2(x,y)-vec2(size.xy()-1)/2.f);
@@ -106,7 +106,7 @@ VolumeF PorousRock::volume() {
                 c = (outerRadius+1./2) - r;
             }
             else c = 1;
-            for(uint z: range(size.z)) volume(x,y,z) = (1-c) * volume(x,y,z) + c *  containerDensity;
+            for(uint z: range(size.z)) volume(x,y,z) = (1-c) * volume(x,y,z) + c *  containerAttenuation;
         }
     }
 
@@ -120,7 +120,7 @@ VolumeF PorousRock::volume() {
             float innerR2 = sq(r-1.f/2);
             float outerRadius = r+1.f/2;
             float outerR2 = sq(outerRadius);
-            float v = type.density;
+            float v = type.attenuation;
             // Rasterizes grains as spheres
             int iz = cz-r-1./2, iy = cy-r-1./2, ix = cx-r-1./2;
             float fz = cz-iz, fy=cy-iy, fx=cx-ix;
@@ -149,8 +149,8 @@ VolumeF PorousRock::volume() {
         }
     }
     const float maxVoxel = max(volume);
-    factor = 1./(sqrt(float(sq(size.x)+sq(size.y)+sq(size.z)))*maxVoxel); // FIXME: overly conservative, use maximum attenuation over analytic projection instead
-    scale(volume, factor);
+    float maxAttenuation = sqrt(float(sq(size.x)+sq(size.y)+sq(size.z)))*maxVoxel; // FIXME: overly conservative, use maximum attenuation over analytic projection instead
+    assert_(maxAttenuation>0.2 && maxAttenuation < 1, maxAttenuation);
     log(time);
     return volume;
 }
@@ -204,14 +204,14 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
         int counts[typeCount]; mref<int>(counts,typeCount).clear(0);
         for(uint x: range(target.size.x)) {
             const float3 ray = normalize( (x-float(target.size.x-1)/2) * viewToWorld[0].xyz() + (y-float(target.size.y-1)/2) * viewToWorld[1].xyz() + 1.f * viewToWorld[2].xyz()); // FIXME: store view->image translation in viewToWorld[2] (as in project.cl)
-            float densityRayIntegral = 0;
+            float attenuationSum = 0;
             float outer[2]; intersects(halfHeight, outerRadius, viewOrigin, ray, outer[0], outer[1]);
             float inner[2]; intersects(halfHeight, innerRadius, viewOrigin, ray, inner[0], inner[1]);
 
             if(inner[0]<inf) {
-                densityRayIntegral += (inner[0] - outer[0]) * containerDensity;
+                attenuationSum += (inner[0] - outer[0]) * containerAttenuation;
                 //assert_((outer[1] - inner[1]) >= 0); // FIXME
-                if((outer[1] - inner[1]) >= 0) densityRayIntegral += (outer[1] - inner[1]) * containerDensity;
+                if((outer[1] - inner[1]) >= 0) attenuationSum += (outer[1] - inner[1]) * containerAttenuation;
 
                 float lastT = inner[0];
                 quicksort(intersections[y*target.size.x+x]);
@@ -220,21 +220,20 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
                     float length = t - lastT;
                     lastT = t;
                     if(length > 0) {
-                        float density = airDensity;
-                        for(uint type: range(typeCount)) if(counts[type]) density = types[type].density; // In order so that lighter grains overrides heavier grains
-                        densityRayIntegral += length * density;
+                        float attenuation = airAttenuation;
+                        for(uint type: range(typeCount)) if(counts[type]) attenuation = types[type].attenuation; // In order so that heavier grains overrides lighter grains
+                        attenuationSum += length * attenuation;
                     }
                     int index =  intersection.index;
                     if(index > 0) counts[index-1]++;
                     if(index < 0) counts[-index-1]--;
                 }
-                densityRayIntegral += (inner[1] - lastT) * airDensity;
+                attenuationSum += (inner[1] - lastT) * airAttenuation;
             } else if(outer[0]<inf) {
-                densityRayIntegral += (outer[1] - outer[0]) * containerDensity;
+                attenuationSum += (outer[1] - outer[0]) * containerAttenuation;
             }
-            maxAttenuation = ::max(maxAttenuation, densityRayIntegral);
-            float v = factor * densityRayIntegral;
-            target(x,y) = v;
+            maxAttenuation = ::max(maxAttenuation, attenuationSum);
+            target(x,y) = attenuationSum;
         }
     });
     integrationTime.stop();

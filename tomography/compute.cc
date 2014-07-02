@@ -10,14 +10,14 @@
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 
 struct Application {
+#define UI 1
 #if UI
     Plot plot;
     Window window;
 #endif
     Application() {
         // Reference parameters
-        const int3 volumeSize = 512;
-        const uint grainRadius = 16;
+        const int3 volumeSize = 256;
         // Projection parameters
         int2 projectionSize (volumeSize.z,volumeSize.z*3/4);
         const ref<uint> photonCounts = {1024,512,256,2048,4096,8192};
@@ -27,7 +27,7 @@ struct Application {
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
         uint completed = 0;
         // Reference
-        PorousRock rock (volumeSize, grainRadius);
+        PorousRock rock (volumeSize);
         const VolumeF referenceVolume = rock.volume();
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
         const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
@@ -39,7 +39,7 @@ struct Application {
                 for(const uint photonCount: photonCounts) {
                     for(const uint projectionCount: projectionCounts) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
-                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        String parameters = str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
                         missing += !existsFile(parameters, results);
                     }
                 }
@@ -52,12 +52,11 @@ struct Application {
                 bool skip = true;
                 for(const uint photonCount: photonCounts) {
                     for(const uint projectionCount: projectionCounts) {
-                        const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
-                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        String parameters = str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount);
                         skip &= existsFile(parameters, results);
                     }
                 }
-                if(skip) { log("Skipping trajectory", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); completed+=3*5; continue; }
+                if(skip) { log("Skipping trajectory", str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); completed+=3*5; continue; }
                 log("Trajectory", ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], max(projectionCounts));
 
                 // Full resolution exact projection data
@@ -68,11 +67,10 @@ struct Application {
                 for(const uint photonCount: photonCounts) {
                     bool skip = true;
                     for(const uint projectionCount: projectionCounts) {
-                        const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
-                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        String parameters = str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount);
                         skip &= existsFile(parameters, results);
                     }
-                    if(skip) { log("Skipping photon count", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); completed+=5; continue; }
+                    if(skip) { log("Skipping photon count", str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); completed+=5; continue; }
                     log("Photon count", photonCount);
 
                     // Full resolution poisson projection data
@@ -83,7 +81,7 @@ struct Application {
 
                     for(const uint projectionCount: projectionCounts) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
-                        String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
+                        String parameters = str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount);
                         if(existsFile(parameters, results)) { log("Skipping projectionCount", parameters); continue; }
                         log(str(completed)+"/"_+str(missing)+"/"_+str(total));
                         log(parameters);
