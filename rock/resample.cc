@@ -7,8 +7,7 @@ generic void downsample(VolumeT<T>& target, const VolumeT<T>& source) {
     assert_(X%2==0 && Y%2==0 && Z%2==0);
     target.sampleCount = source.sampleCount/2;
     target.data.size = source.data.size/8;
-    assert(source.margin.x%2==0 && source.margin.y%2==0 && source.margin.z%2==0);
-    target.margin = source.margin/2;
+    target.margin = (source.margin+int3(1))/2;
     target.maximum=source.maximum;
     const T* const sourceData = source;
     T* const targetData = target;
