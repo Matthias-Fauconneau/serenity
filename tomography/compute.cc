@@ -78,7 +78,7 @@ struct Application {
                     // Full resolution poisson projection data
                     VolumeF intensity0 (attenuation0.size);
                     Time time; poissonTime.start();
-                    for(uint i: range(intensity0.data.size)) intensity0.data[i] = float(poisson(photonCount)) / float(photonCount) * exp(-attenuation0.data[i]); // TODO: precompute poisson
+                    for(uint i: range(intensity0.data.size)) intensity0.data[i] = (poisson(photonCount) * exp(-attenuation0.data[i])) / float(photonCount);
                     poissonTime.stop(); log("Poisson", time);
 
                     for(const uint projectionCount: projectionCounts) {
