@@ -3,15 +3,14 @@
 #include "time.h"
 
 /// Denoises a volume using a cubic median filter
-/*template<int size>*/ void median(Volume16& target, const Volume16& source) {
-    constexpr int size=1;
+template<int size, Type T> void median(VolumeT<T>& target, const VolumeT<T>& source) {
     assert_(source.sampleCount-2*source.margin>int3(size+1+size), "Input too small for ",size+1+size,"³ median filter", source.sampleCount-2*source.margin);
     assert_(!source.tiled());
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const int marginX=source.margin.x+size, marginY=source.margin.y+size, marginZ=source.margin.z+size;
     target.margin = int3(marginX, marginY, marginZ);
-    const uint16* const sourceData = source;
-    uint16* const targetData = target;
+    const T* const sourceData = source;
+    T* const targetData = target;
     uint maximum[8] = {};
     Time time; Time report;
     parallel(marginZ, Z-marginZ, [&](uint id, uint z) {
@@ -21,14 +20,14 @@
             uint8 histogram8[1<<8] = {};
             uint8 histogram12[1<<12] = {}; //4K
             uint8 histogram16[1<<16] = {}; //64K
-            const uint16* const sourceZX = sourceData + z*X*Y + y*X;
+            const T* const sourceZX = sourceData + z*X*Y + y*X;
             for(int dz=-size; dz<=size; dz++) for(int dy=-size; dy<=size; dy++) for(int x=marginX-size; x<marginX+size; x++) { // Initializes histograms
-                uint16 value = sourceZX[dz*X*Y+dy*X+x];
+                T value = sourceZX[dz*X*Y+dy*X+x];
                 histogram4[value>>12]++, histogram8[value>>8]++, histogram12[value>>4]++, histogram16[value]++;
             }
             for(int x: range(marginX, X-marginX)) { //TODO: vector
                 for(int dz=-size; dz<=size; dz++) for(int dy=-size; dy<=size; dy++) { // Updates histogram with values entering the window
-                    uint16 value = sourceZX[dz*X*Y+dy*X+x+1];
+                    T value = sourceZX[dz*X*Y+dy*X+x+1];
                     histogram4[value>>12]++, histogram8[value>>8]++, histogram12[value>>4]++, histogram16[value]++;
                 }
                 uint count=0;
@@ -45,7 +44,7 @@
                     }
                 }
                 for(int dz=-size; dz<=size; dz++) for(int dy=-size; dy<=size; dy++) { // Updates histogram with values leaving the window
-                    uint16 value = sourceZX[dz*X*Y+dy*X+x-1];
+                    T value = sourceZX[dz*X*Y+dy*X+x-1];
                     histogram4[value>>12]--, histogram8[value>>8]--, histogram12[value>>4]--, histogram16[value]--;
                 }
             }
@@ -53,13 +52,16 @@
     });
     target.maximum = max(ref<uint>(maximum));
 }
-struct Median : VolumePass<uint16> {
+
+struct Median : VolumeOperation {
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
     string parameters() const override { return "radius"_; }
-    void execute(const Dict& args, Volume16& target, const Volume& source) override {
-        assert_(source.sampleSize==2, "Median filter should be evaluated on 16bit data (Hint: use denoise=0 to skip)");
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         int radius = args.value("radius"_,1);
-        /***/ if(radius==1) median/*<1>*/(target, source); // Median in a 3³ window (27 samples)
-        //else if(radius==2) median<2>(target, source); // Median in a 5³ window (125 samples) FIXME: Introduces anisotropy because of the cubic window (instead of ball)
+        if(radius==1) {
+            /**/  if(inputs[0].sampleSize==sizeof(uint8)) median<1, uint8>(outputs[0], inputs[0]); // Median in a 3³ window (27 samples)
+            else if(inputs[0].sampleSize==sizeof(uint16)) median<1, uint16>(outputs[0], inputs[0]); // Median in a 3³ window (27 samples)
+        }
         else error("Unsupported radius",radius);
     }
 };
