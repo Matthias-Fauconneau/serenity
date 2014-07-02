@@ -10,27 +10,27 @@
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 
 struct Application {
+#if UI
     Plot plot;
     Window window;
+#endif
     Application() {
+        // Reference parameters
+        const int3 volumeSize = 512;
+        const uint grainRadius = 16;
+        // Projection parameters
+        int2 projectionSize (volumeSize.z,volumeSize.z*3/4);
         const ref<uint> photonCounts = {1024,512,256,2048,4096,8192};
         const ref<uint> projectionCounts = {64,128,256,512,1024};
 
         Folder results = "Results"_;
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
         uint completed = 0;
-        // Reference parameters
-        const int3 volumeSize = 256;
-        const uint grainRadius = 16;
         // Reference
         PorousRock rock (volumeSize, grainRadius);
         const VolumeF referenceVolume = rock.volume();
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
         const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
-
-        // Projection parameters
-        const uint projectionWidth = volumeSize.z;
-        int2 projectionSize (projectionWidth,projectionWidth*3/4);
 
         // Counts missing results
         uint missing = 0;
@@ -58,11 +58,11 @@ struct Application {
                     }
                 }
                 if(skip) { log("Skipping trajectory", str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); completed+=3*5; continue; }
-                log("Trajectory", ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)]);
+                log("Trajectory", ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], max(projectionCounts));
 
                 // Full resolution exact projection data
                 Time time; projectionTime.start();
-                VolumeF attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, 1024), trajectory, rotationCount));
+                VolumeF attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, max(projectionCounts)), trajectory, rotationCount));
                 projectionTime.stop(); log("A", time);
 
                 for(const uint photonCount: photonCounts) {
@@ -84,8 +84,8 @@ struct Application {
                     for(const uint projectionCount: projectionCounts) {
                         const uint subsetSize = int(nearestDivisorToSqrt(projectionCount));
                         String parameters = str(volumeSize.x, grainRadius, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount, subsetSize);
-
                         if(existsFile(parameters, results)) { log("Skipping projectionCount", parameters); continue; }
+                        log(str(completed)+"/"_+str(missing)+"/"_+str(total));
                         log(parameters);
 
                         // Partial resolution poisson projection data
@@ -93,12 +93,13 @@ struct Application {
                         assert_(intensity0.size.z%hostIntensity.size.z==0, intensity0.size.z, hostIntensity.size.z);
                         for(uint index: range(hostIntensity.size.z)) copy(slice(hostIntensity, index).data, slice(intensity0, index*intensity0.size.z/hostIntensity.size.z).data); // FIXME: upload slice-wise instead of host copy + full upload
                         ImageArray intensity = hostIntensity; // Uploads
-                        ImageArray attenuation = negln(intensity);
 
                         // Reconstruction
                         const Projection A (volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount);
                         MLTR reconstruction {A, intensity, subsetSize};
 
+#if UI
+                        ImageArray attenuation = negln(intensity);
                         // Interface
                         Value sliceIndex = Value((volumeSize.z-1) / 2);
                         SliceView x0 {referenceVolume, max(1, 256 / referenceVolume.size.x), sliceIndex};
@@ -115,13 +116,14 @@ struct Application {
                         window.setSize(min(int2(-1), -window.size));
                         window.setTitle(str(completed)+"/"_+str(missing)+"/"_+str(total));
                         window.show();
+#endif
 
                         // Evaluation
                         uint bestK = 0;
                         float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
                         VolumeF best (volumeSize);
                         Time time; reconstructionTime.start();
-                        const uint minIterationCount = 16, maxIterationCount = 128;
+                        const uint minIterationCount = 16, maxIterationCount = 512;
                         String result;
                         uint k=0; for(;k < maxIterationCount; k++) {
                             reconstruction.step();
@@ -141,10 +143,11 @@ struct Application {
                             float extremeSSE = ::SSE(referenceVolume, reconstruction.x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction.x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                             float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
                             result << str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR)+"\n"_;
+#if UI
                             plot[parameters].insert(k, -10*log10(totalNMSE));
                             window.needRender = true;
                             window.event();
-
+#endif
                             if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) {
                                 bestK=k;
                                 reconstruction.x.read(best);
