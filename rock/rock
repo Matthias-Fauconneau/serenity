@@ -225,7 +225,9 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-throat-colored-boxes = ToPNG throat-colored-boxes
 # Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
+  bmp-median = ToBMP median
   bmp-denoised = ToBMP denoised
+  bmp-resampled = ToBMP resampled
   bmp-distance = ToBMP distance
   bmp-skeleton = ToBMP skeleton
   bmp-maximum = ToBMP maximum
