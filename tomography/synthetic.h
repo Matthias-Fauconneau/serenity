@@ -6,33 +6,32 @@
 struct PorousRock {
     // Sapmle size
     int3 size; // [vx]
-    const double sampleSize = 4e-3; // [m]
+    const double sampleSize = 6e-3; // [m]
     const double mToVx = size.x / sampleSize; // [vx/m]
     // Source energy
     const double photonEnergy = 40.0; // [keV]
     const double electronEnergy = 511; // Electron rest mass mₑ [keV]
     const double alpha = photonEnergy/electronEnergy; // hν/mc²
     const double S = (1+alpha)/sq(alpha)*(2*(1+alpha)/(1+2*alpha) - ln(1+2*alpha)/alpha) + ln(1+2*alpha)/(2*alpha) - (1.+3.*alpha)/sq(1+2*alpha); // Scattering coefficient (Klein-Nishina 1928)
-    const double K2 = 0.0097; //1; // Experiment dependent empirical constant [m²/kg]
+    const double K2 = 0.01; // Experiment dependent empirical constant [m²/kg]
     const double B = K2*S; // Attenuation coefficient from Compton scattering (Alvarez 1976) [m²?] (Z/A?)
     // Materials
     const double Bvx = B / mToVx ; // Attenuation coefficient (1/vx) from density (kg/m³) [m³/kg·1/vx]
-    const double airDensity = 0.001; // [kg/m³]
+    const double airDensity = 0.001e3; // [kg/m³]
     const double airAttenuation = Bvx * airDensity; // [1/vx]
-    const double containerDensity = 2.70; // Pure aluminium [kg/m³]
+    const double containerDensity = 2.70e3; // Pure aluminium [kg/m³]
     const float containerAttenuation = Bvx * containerDensity;
     const double minimumGrainRadiusM = 100e-6; // [m]
     const float minimumGrainRadiusVx = minimumGrainRadiusM * mToVx; // [vx]
     const double maximumGrainRadiusM = 250e-6; // [m]
     const float maximumGrainRadiusVx = maximumGrainRadiusM * mToVx; // [vx]
     const float rate = 1./cb(maximumGrainRadiusVx); // Average number of grains per voxels [1/vx]
-    struct GrainType { const float relativeGrainCount; const float attenuation; /*[1/vx]*/ buffer<vec4> grains; } types[3] = {/*Kaolinite*/{0.2, float(Bvx*2.6e3), {}},/*Quartz*/{0.6, float(Bvx*2.65e3), {}}, /*Calcite*/{0.2, float(Bvx*2.71e3), {}}};
+    struct GrainType { const float relativeGrainCount; const float attenuation; /*[1/vx]*/ buffer<vec4> grains; } types[3] = {/*Kaolinite*/{0.2, float(Bvx*0.5/*50% air*/*2.6e3), {}},/*Quartz*/{0.6, float(Bvx*2.65e3), {}}, /*Calcite*/{0.2, float(Bvx*2.71e3), {}}};
     const vec3 volumeCenter = vec3(size-int3(1))/2.f;
     const float volumeRadius = volumeCenter.x;
     const float innerRadius = (1-4./100) * volumeRadius;
     const float outerRadius = (1-2./100) * volumeRadius;
     const uint grainCount = rate*size.z*size.y*size.x;
-    //float factor = 0;
     vec4 largestGrain = 0;
 
     PorousRock(int3 size);
@@ -43,7 +42,12 @@ struct PorousRock {
 inline VolumeF project(const PorousRock& rock, const Projection& A) {
     VolumeF volume(A.projectionSize, "b"_);
     Time time;
-    for(uint index: range(volume.size.z)) { rock.project(::slice(volume, index), A, index); }
-    log("A", time);
+    float minMaxAttenuation=inf, maxMaxAttenuation=-inf;
+    for(uint index: range(volume.size.z)) {
+        float maxAttenuation = rock.project(::slice(volume, index), A, index);
+        minMaxAttenuation = min(minMaxAttenuation, maxAttenuation);
+        maxMaxAttenuation = max(maxMaxAttenuation, maxAttenuation);
+    }
+    log("A", time, minMaxAttenuation, maxMaxAttenuation);
     return volume;
 }

@@ -151,7 +151,7 @@ VolumeF PorousRock::volume() {
     const float maxVoxel = max(volume);
     float maxAttenuation = sqrt(float(sq(size.x)+sq(size.y)+sq(size.z)))*maxVoxel; // FIXME: overly conservative, use maximum attenuation over analytic projection instead
     assert_(maxAttenuation>0.2 && maxAttenuation < 1, maxAttenuation);
-    log(time);
+    log(maxAttenuation, time);
     return volume;
 }
 
@@ -238,6 +238,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
     });
     integrationTime.stop();
     totalTime.stop();
-    //log(rasterizationTime, integrationTime, totalTime);
+    //log(rasterizationTime, integrationTime, totalTime, maxAttenuation);
+    assert_(maxAttenuation>0.18 && maxAttenuation < 1, maxAttenuation);
     return maxAttenuation;
 }

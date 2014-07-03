@@ -8,7 +8,7 @@
 struct ArrayView : Widget {
     Folder results = "Results"_;
     array<String> names = results.list(); // Kept for references
-    array<string> parameters = split("Size,Grain Radius,Resolution,Trajectory,Rotations,Photons,Projections"_,',');
+    array<string> parameters = split("Size,Resolution,Trajectory,Rotations,Photons,Projections"_,',');
     string valueName;
     string bestName = valueName=="k"_? "NMSE"_ : valueName;
     array<array<Variant>> values;
@@ -23,7 +23,6 @@ struct ArrayView : Widget {
             if(name.contains('.')) continue;
             array<String> arguments = apply(split(name), [](string s){return String(s);});
             if(arguments[parameters.indexOf("Trajectory"_)]=="adaptive"_) arguments[parameters.indexOf("Rotations"_)] = str(fromInteger(arguments[parameters.indexOf("Rotations"_)])-1); // Converts adaptive total rotation count to helical rotation count
-            arguments.pop(); // Ignores subset size
             assert_(arguments.size == parameters.size, parameters, arguments);
             for(uint i: range(parameters.size)) if(!values[i].contains(arguments[i])) values[i].insertSorted(Variant(String(string(arguments[i]))));
             float best = inf; Variant value;
