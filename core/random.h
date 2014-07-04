@@ -30,6 +30,7 @@ inline buffer<uint> shuffleSequence(uint size) {
 
 extern "C" float lgammaf(float x);
 /// Returns a sequence of poisson distributed pseudo-random integers
+/// \note The expected value \a lambda must be greater than 3.36/0.767~4.38
 inline uint poisson(float lambda) {
     static Random random;
     float c = 0.767f - 3.36f/lambda;

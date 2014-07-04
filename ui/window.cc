@@ -106,30 +106,9 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
         read<uint>(r.numSubpixels);
     }
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
-
-    if((size.x<0||size.y<0) && widget) {
-        int2 hint=widget->sizeHint();
-        if(size.x<0) size.x=max(abs(hint.x),-size.x);
-        if(size.y<0) size.y=max(abs(hint.y),-size.y);
-    }
-    if(size.x==0) size.x=displaySize.x;
-    if(size.y==0) size.y=displaySize.y-16;
-    if(anchor==Bottom) position.y=displaySize.y-size.y;
     this->size=size;
-    {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y;
-        r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
-        r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
-                |EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
-        log(position, size);
-        send(raw(r));
-    }
-    {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
-    {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
-        r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-    {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
-        r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
-    setTitle(title);
-    setIcon(icon);
+    this->title = copy(String(title));
+    if(icon) this->icon = copy(icon);
     actions[Escape] = []{ exit(); };
     actions[PrintScreen] = [this]{ Locker lock(renderLock); writeFile(this->title+".png"_,encodePNG(target)); };
 }
@@ -306,7 +285,34 @@ template<class T> T Window::readReply(const ref<byte>& request) {
     }
 }
 
-void Window::show() { if(mapped) return; {MapWindow r; r.id=id; send(raw(r));} {RaiseWindow r; r.id=id; send(raw(r));} }
+void Window::show() {
+    if(mapped) return;
+    if(!created) {
+        if(size.x<0||size.y<0) {
+            int2 hint=widget->sizeHint();
+            if(size.x<0) size.x=max(abs(hint.x),-size.x);
+            if(size.y<0) size.y=max(abs(hint.y),-size.y);
+        }
+        if(size.x==0 || size.x>displaySize.x) size.x=displaySize.x;
+        if(size.y==0 || size.y>displaySize.y-16) size.y=displaySize.y-16;
+        {CreateWindow r; r.id=id+XWindow; r.parent=root; r.x=position.x; r.y=position.y; r.width=size.x, r.height=size.y;
+            r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
+            r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
+                    |EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
+            send(raw(r));
+        }
+        created = true;
+        {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
+        {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
+            r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
+        {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
+            r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
+        setTitle(title);
+        if(icon) setIcon(icon);
+    }
+    {MapWindow r; r.id=id; send(raw(r));}
+    {RaiseWindow r; r.id=id; send(raw(r));}
+}
 void Window::hide() { UnmapWindow r; r.id=id; send(raw(r)); }
 // Configuration
 void Window::setPosition(int2 position) {
@@ -320,8 +326,7 @@ void Window::setSize(int2 size) {
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
-    if(size.x==0) size.x=displaySize.x;
-    if(size.x>displaySize.x) size.x=max(1280,displaySize.x);
+    if(size.x==0 || size.x>displaySize.x) size.x=displaySize.x;
     if(size.y==0 || size.y>displaySize.y-16) size.y=displaySize.y-16;
     setGeometry(this->position,size);
 }
@@ -332,6 +337,7 @@ void Window::setGeometry(int2 position, int2 size) {
     if(anchor&Top && anchor&Bottom) position.y=16+(displaySize.y-16-size.y)/2;
     else if(anchor&Top) position.y=16;
     else if(anchor&Bottom) position.y=displaySize.y-size.y;
+    if(!created) return;
     if(position!=this->position && size!=this->size) {
         SetGeometry r; r.id=id+XWindow; r.x=position.x; r.y=position.y; r.w=size.x, r.h=size.y; send(raw(r));
     }
@@ -380,10 +386,13 @@ void Window::setType(const string& type) {
 }
 void Window::setTitle(const string& title) {
     this->title = copy(String(title));
+    if(!created) return;
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_NAME"_); r.type=Atom("UTF8_STRING"_); r.format=8;
     r.length=title.size; r.size+=align(4, r.length)/4; send(String(raw(r)+title+pad(4,title.size)));
 }
 void Window::setIcon(const Image& icon) {
+    this->icon = copy(icon);
+    if(!created) return;
     ChangeProperty r; r.window=id+XWindow; r.property=Atom("_NET_WM_ICON"_); r.type=Atom("CARDINAL"_); r.format=32;
     r.length=2+icon.width*icon.height; r.size+=r.length; send(String(raw(r)+raw(icon.width)+raw(icon.height)+(ref<byte>)icon));
 }

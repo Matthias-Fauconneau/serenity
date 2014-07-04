@@ -37,15 +37,19 @@ struct Window : Socket, Poll {
     inline void toggleDisplay() { setDisplay(!displayState); }
 
     /// Display size
-    int2 displaySize=0;
+    int2 displaySize = 0;
     /// Widget managed by this window
-    Widget* widget;
+    Widget* widget = 0;
+    /// Whether this window was created.
+    bool created = false;
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
     /// Geometry
     int2 position=0, size=0;
     /// Title (for snapshots)
     String title;
+    /// Icon
+    Image icon;
     /// Actions triggered when a key is pressed (or on release for key mapped with a long action)
     map<Key, function<void()>> actions;
     /// Actions triggered when a key is pressed for a long time
@@ -122,7 +126,7 @@ struct Window : Socket, Poll {
     /// If set, this window will hide on leave events (e.g for dropdown menus)
     bool hideOnLeave = false;
     /// If set, this window will not be managed by the session window manager
-    bool overrideRedirect;
+    bool overrideRedirect = false;
     enum Anchor { Float, Left=1<<0, Right=1<<1, HCenter=Left|Right, Top=1<<2, Bottom=1<<3, VCenter=Top|Bottom,
                   Center=HCenter|VCenter, TopLeft=Top|Left, TopRight=Top|Right, BottomLeft=Bottom|Left, BottomRight=Bottom|Right };
     /// If set, this window will always be anchored to this position

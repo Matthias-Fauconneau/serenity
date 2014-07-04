@@ -33,6 +33,7 @@ void Plot::render() {
     }
     if(min.x == max.x) return;
     min.y = 0;
+    if(min.y == max.y) return;
     assert(min.x < max.x && min.y < max.y, min, max);
 
     int tickCount[2]={};

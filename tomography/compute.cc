@@ -14,7 +14,7 @@ inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i
 struct Compute {
     Plot plot; /// NMSE versus iterations plot
     map<string, Variant> parameters = parseParameters(arguments(),{"ui"_, "volumeSize"_,"projectionSize"_,"photonCounts"_,"projectionCounts"_,"method"_});
-    unique<Window> window = nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
+    unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
         const int3 volumeSize = parameters.value("volumeSize"_, int3(256)); // Reconstruction sample count along each dimensions
@@ -58,7 +58,7 @@ struct Compute {
                         skip &= existsFile(parameters, results);
                     }
                 }
-                if(skip) { log("Skipping trajectory",  ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, max(projectionCounts)); completed+=3*5; continue; }
+                if(skip) { log("Skipping trajectory",  ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, max(projectionCounts)); continue; }
                 log("Trajectory", ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, max(projectionCounts));
 
                 // Full resolution exact projection data
@@ -72,7 +72,7 @@ struct Compute {
                         String parameters = str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount, projectionCount);
                         skip &= existsFile(parameters, results);
                     }
-                    if(skip) { log("Skipping photon count", str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); completed+=5; continue; }
+                    if(skip) { log("Skipping photon count", str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, photonCount)); continue; }
                     log("Photon count", photonCount);
 
                     // Full resolution poisson projection data
@@ -111,8 +111,7 @@ struct Compute {
                         HBox projections {{&b0, &b}};
 
                         VBox layout {{&slices, &projections, &plot}};
-                        if(this->parameters.value("ui"_, false)) {
-                            if(!window) window = unique<Window>(&layout, str(completed)+"/"_+str(missing)+"/"_+str(total));
+                        if(window) {
                             window->widget = &layout;
                             window->setSize(min(int2(-1), -window->size));
                             window->setTitle(str(completed)+"/"_+str(missing)+"/"_+str(total));
