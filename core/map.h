@@ -9,7 +9,6 @@ template<Type K, Type V> struct key_value { K key; V value; };
 /// Associates keys with values
 template<Type K, Type V> struct map {
     map(){}
-    //map(size_t capacity) : keys(capacity), values(capacity) {}
     map(size_t size) { keys.grow(size); values.grow(size); }
     map(const ref<key_value<K,V>>& pairs) {
         for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
@@ -41,14 +40,6 @@ template<Type K, Type V> struct map {
         if(i!=invalid) return values[i];
         return value;
     }
-    /*template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
-        size_t i = keys.indexOf(key);
-        return i!=invalid ? copy(VV(values[i])) : forward<VV>(value);
-    }*/
-    /*template<Type KK, Type VV> const VV& value(const KK& key, const VV value=VV()) const {
-        size_t i = keys.indexOf(key);
-        return i!=invalid ? VV(values[i]) : value;
-    }*/
 
     template<Type KK> const V* find(const KK& key) const { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V* find(const KK& key) { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
@@ -148,10 +139,3 @@ template<Type K, Type V> String toASCII(const map<K,V>& m) {
     }
     return replace(move(s),'/','\\');
 }
-
-/*template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
-    for(const_pair<K, V> e: b) { assert_(!a.contains(e.key)); a.insert(copy(e.key), copy(e.value)); }
-}
-template<Type K, Type V> void operator<<(map<K,V>& a, map<K,V>&& b) {
-    for(pair<K, V> e: b) { a.insertMulti(move(e.key), move(e.value)); }
-}*/

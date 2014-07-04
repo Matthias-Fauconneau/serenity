@@ -33,8 +33,8 @@ struct Variant : String {
     Variant(String&& s) : String(move(s)) {}
     Variant(int integer) : String(dec(integer)), isInteger(true) {}
     Variant(double decimal) : String(ftoa(decimal)){}
-    //Variant(int3 v) : String(strx(v)) {}
-    //explicit operator bool() const { return size; }
+    Variant(int2 v) : String(strx(v)) {}
+    Variant(int3 v) : String(strx(v)) {}
     operator bool() const { return size && *this!="0"_; }
     operator int() const { return *this ? fromInteger(*this) : 0; }
     operator uint() const { return *this ? fromInteger(*this) : 0; }
@@ -42,7 +42,7 @@ struct Variant : String {
     operator double() const { return fromDecimal(*this); }
     operator int2() const { return fromInt2(*this); }
     operator int3() const { return fromInt3(*this); }
-    //generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
+    generic operator T() const { return T((const string&)*this); } // Enables implicit conversion to any type with an implicit string constructor
 };
 inline String str(const Variant& v) { return String((string&)v); }
 inline bool operator <(const Variant& a, const Variant& b) { if(isDecimal(a) && isDecimal(b)) return fromDecimal(a) < fromDecimal(b); else return (string)a < (string)b; }

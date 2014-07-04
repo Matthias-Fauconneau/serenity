@@ -3,7 +3,6 @@
 #include "array.h"
 #include "file.h"
 #include "function.h"
-#include "string.h"
 #include <poll.h>
 #include <pthread.h> //pthread
 
@@ -72,7 +71,6 @@ struct Semaphore {
     /// Returns available ressources \a count
     operator int() const { return counter; }
 };
-inline String str(const Semaphore& o) { return str(o.counter); }
 
 /// Poll is a convenient interface to participate in the event loops
 struct Poll : pollfd {

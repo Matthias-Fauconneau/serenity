@@ -1,7 +1,5 @@
 #pragma once
 #include "thread.h"
-#include "string.h"
-#include "vector.h"
 #include "data.h"
 #include "image.h"
 #include "volume.h"
@@ -10,15 +8,18 @@ typedef struct _cl_kernel* cl_kernel;
 typedef struct _cl_mem* cl_mem;
 typedef struct _cl_sampler* cl_sampler;
 
+/// Generic OpenCL MemObject
 struct CLMem : handle<cl_mem> {
     String name;
-    static uint handleCount;
+    static uint handleCount; // Counts currently allocated MemObjects (used to assert correct release)
 
     CLMem(cl_mem mem, string name) : handle(mem), name(copy(String(name))) { assert_(mem); handleCount++; }
     default_move(CLMem);
+    /// Releases the OpenCL MemObject.
     ~CLMem();
 };
 
+// Raw OpenCL Buffer (used by \a CLBuffer)
 struct CLRawBuffer : CLMem {
     CLRawBuffer(size_t size, string name);
     CLRawBuffer(const ref<byte> data, string name);
@@ -27,6 +28,7 @@ struct CLRawBuffer : CLMem {
     void read(const mref<byte>& target);
 };
 
+/// Generic typed OpenCL Buffer
 generic struct CLBuffer : CLRawBuffer {
     CLBuffer(size_t size, string name) : CLRawBuffer(size*sizeof(T), name), size(size) {}
     CLBuffer(const ref<T>& data, string name) : CLRawBuffer(cast<byte>(data), name), size(data.size) {}
@@ -37,6 +39,7 @@ generic struct CLBuffer : CLRawBuffer {
     size_t size;
 };
 
+/// Float OpenCL Buffer
 typedef CLBuffer<float> CLBufferF;
 
 struct CLImage : CLMem {

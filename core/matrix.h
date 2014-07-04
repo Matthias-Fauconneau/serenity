@@ -83,15 +83,13 @@ struct mat4 {
     mat4(mat3 m):mat4(1){for(int i=0;i<3;i++) for(int j=0;j<3;j++) M(i,j)=m(i,j); }
 
     constexpr float M(int i, int j) const { return data[j*4+i]; }
-    /*constexpr*/ float& M(int i, int j) { return data[j*4+i]; }
-    /*constexpr*/ float operator()(int i, int j) const { return M(i,j); }
-    /*constexpr*/ float& operator()(int i, int j) { return M(i,j); }
+    float& M(int i, int j) { return data[j*4+i]; }
+    float operator()(int i, int j) const { return M(i,j); }
+    float& operator()(int i, int j) { return M(i,j); }
     float4& operator[](int j) { return (float4&)data[j*4]; }
     const float4& operator[](int j) const { return (float4&)data[j*4]; }
     const float3 row(int i) const { float3 v; for(int j=0;j<3;j++) v[j]=M(i,j); return v; }
 
-    //vec2 operator*(vec2 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,3); return r.xy()/r.w; }
-    //vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
     vec3 operator*(vec3 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); assert(r.w==1); return r.xyz(); }
     float4 operator*(float4 v) const { float4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
     mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
@@ -132,8 +130,8 @@ struct mat4 {
         return M;
     }
     mat4 translate(vec3 v) const { mat4 M=*this; for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return M; }
-    /*constexpr*/ mat4 scale(const vec3 v) const { mat4 M=*this; for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
-    /*constexpr*/ mat4 scale(const vec4 v) const { mat4 M=*this; for(int j=0;j<4;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
+    mat4 scale(const vec3 v) const { mat4 M=*this; for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
+    mat4 scale(const vec4 v) const { mat4 M=*this; for(int j=0;j<4;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return M; }
     mat4 rotate(float angle, vec3 u) const {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;

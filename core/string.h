@@ -39,8 +39,6 @@ double fromDecimal(const string& str);
 
 /// Forwards string
 inline const string& str(const string& s) { return s; }
-/// Forwards mref<byte>
-//inline const mref<byte>& str(const mref<byte>& s) { return s; }
 
 /// Returns a bounded reference to the null-terminated String pointer
 string str(const char* s);

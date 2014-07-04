@@ -10,13 +10,8 @@ generic struct array : buffer<T> {
     array() {}
     /// References \a o.size elements from \a o.data pointer
     explicit array(const ref<T>& o): buffer<T>(o) {}
-
     /// Moves elements from a reference
     explicit array(const mref<T>& ref) : buffer<T>(ref.size) { move(*this, ref); }
-    /// Copies elements from a reference
-    //array(const ref<T>& ref) : buffer<T>(ref.size) { copy(*this, ref); }
-    //array(const std::initializer_list<T>& list) : array(ref<T>(list)) {}
-
     /// Converts a buffer to an array (move constructor)
     array(buffer<T>&& o) : buffer<T>(move(o)) {}
     /// Allocates an uninitialized buffer for \a capacity elements
@@ -33,7 +28,7 @@ generic struct array : buffer<T> {
             assert(nextCapacity>=size);
             if(capacity) {
 #if 1 //FIXME: invalidates references
-                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (raw copy is done by allocator if necessary)
 #else // FIXME: should use realloc when possible
                 T* oldPointer = (T*)data;
                 if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error(__FILE__, nextCapacity);

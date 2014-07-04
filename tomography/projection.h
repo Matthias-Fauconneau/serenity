@@ -1,6 +1,5 @@
 #pragma once
 #include "matrix.h"
-#include "image.h"
 
 /// Projection settings
 /// \note Defines all \a count projections using an index parameter
@@ -43,12 +42,13 @@ struct Projection {
         error(int(trajectory));
     }
 
-    // Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation)
+    /// Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation)
     mat4 worldToView(uint index) const;
-    // Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME)
+    /// Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME)
     mat4 worldToScaledView(uint index) const;
-    // Transforms from world coordinates [±size] to device coordinates [±size/2]
-    mat4 worldToDevice(uint index) const; };
+    /// Transforms from world coordinates [±size] to device coordinates [±size/2]
+    mat4 worldToDevice(uint index) const;
+};
 
 inline mat4 Projection::worldToView(uint index) const {
     return mat4().rotateZ(PI/2).rotateY(-PI/2).translate(vec3(distance,0,(2*dz(index)-1)*deltaZ)*((volumeSize.x-1)/2.f)).rotateZ(angle(index));

@@ -22,6 +22,7 @@ generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 generic T copy(const T& o) { return o; }
 
 /// Reference type with move semantics
+/// \note Move semantics ensures a single instance holds the pointer.
 generic struct handle {
     handle(T pointer=T()):pointer(pointer){}
     handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }

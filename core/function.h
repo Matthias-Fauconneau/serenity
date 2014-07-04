@@ -51,13 +51,6 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
     explicit operator bool() { return any[0]; }
 };
 
-/*/// Returns an array of the application of a function to every elements of a reference
-template<Type T, Type R, Type... Args> auto apply(const ref<T>& a, const function<R(T, Args...)>& f, Args... args) -> buffer<decltype(f(a[0], args...))> {
-    buffer<decltype(f(a[0], args...))> r(a.size);
-    for(uint i: range(a.size)) new (&r[i]) decltype(f(a[0], args...))(f(a[i], args...));
-    return r;
-}*/
-
 /// Helps modularization by binding unrelated objects through persistent connections
 template<Type... Args> struct signal {
     array<function<void(Args...)>> delegates;

@@ -14,8 +14,6 @@ extern "C" void free(void* buffer) throw();
 generic struct buffer : mref<T> {
     /// Default constructs an empty buffer
     buffer(){}
-    /// References \a size elements from const \a data pointer
-    //buffer(const T* data, size_t size) : mref<T>((T*)data, size) {}
     /// References \a o.size elements from \a o.data pointer
     explicit buffer(const ref<T>& o): mref<T>((T*)o.data, o.size) {}
     /// Move constructor

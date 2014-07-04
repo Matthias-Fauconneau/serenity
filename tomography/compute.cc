@@ -151,10 +151,9 @@ struct Compute {
                             if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) {
                                 bestK=k;
                                 reconstruction.x.read(best);
-                                if(k >= maxIterationCount-1) log("WARNING: Slow convergence stopped after maximum iteration count");
+                                if(k >= maxIterationCount-1) log("Slow convergence stopped after maximum iteration count");
                             } else {
-                                if(k >= minIterationCount-1) { log("WARNING: Divergence stopped after minimum iteration count"); break; }
-                                //if(totalNMSE > 1 && k >= minIterationCount-1) { log("WARNING: Divergence stopped after large error"); break; }
+                                if(k >= minIterationCount-1) { log("Divergence stopped after minimum iteration count"); break; }
                             }
                             bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
 
@@ -167,7 +166,7 @@ struct Compute {
                         log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
                         completed++;
                     }
-                    assert_(CLMem::handleCount == 0);
+                    assert_(CLMem::handleCount == 0, "Holding OpenCL MemObjects after completion"); // Asserts all MemObjects have been released, as this single process runs all cases (to reuse projection data and monitor window).
                 }
             }
         }
