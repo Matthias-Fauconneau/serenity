@@ -81,7 +81,7 @@ struct Build {
     }
     bool tryParseFiles(TextData& s) {
         string suffix;
-        if(s.match("FILE("_) || s.match("ICON("_)) {}
+        if(s.match("ICON("_)) {}
         else if(s.match("CL("_)) suffix=".cl"_;
         else return false;
         String file = s.identifier("_-"_)+suffix;
@@ -108,7 +108,7 @@ struct Build {
     int64 parse(const string& name, Node& parent) {
         File file(name, folder);
         int64 lastEdit = file.modifiedTime();
-        for(TextData s = file.read(file.size()); s; s.line()) {
+        for(TextData s = file.read(file.size()); s;) {
             string name = tryParseIncludes(s);
             if(name) {
                 string header = find(name+".h"_);
@@ -120,7 +120,7 @@ struct Build {
             }
             tryParseDefines(s);
             tryParseConditions(s);
-            do { s.whileAny(" "_); } while(tryParseFiles(s));
+            while(s && !s.match('\n')) if(!tryParseFiles(s)) s.next();
         }
         return lastEdit;
     }

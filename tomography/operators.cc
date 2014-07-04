@@ -19,13 +19,15 @@ static float reduce(CLKernel& kernel, const CLVolume& A, const CLVolume& B, cons
 }
 
 extern bool isIntel;
-CL(sum, SSE)  float SSE(const CLVolume& A, const CLVolume& B, const int3 origin, int3 size) {
+float SSE(const CLVolume& A, const CLVolume& B, const int3 origin, int3 size) {
     size = size?:A.size;
     if(isIntel) return SSE(A.read(VolumeF(size,A.name), origin), B.read(VolumeF(size,B.name), origin)); // reduce fails on Intel
-    return reduce(CL::SSE, A, B, origin, size);
+    CL(sum, SSE)
+    return reduce(SSE, A, B, origin, size);
 }
-CL(sum, dotProduct)  float dot(const CLVolume& A, const CLVolume& B, const int3 origin, int3 size) {
+float dot(const CLVolume& A, const CLVolume& B, const int3 origin, int3 size) {
     size = size?:A.size;
     if(isIntel) return dot(A.read(VolumeF(size,A.name), origin), B.read(VolumeF(size,B.name), origin)); // reduce fails on Intel
-    return reduce(CL::dotProduct, A, B, origin, size);
+    CL(sum, dotProduct)
+    return reduce(dotProduct, A, B, origin, size);
 }
