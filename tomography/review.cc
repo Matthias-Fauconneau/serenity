@@ -6,8 +6,6 @@
 #include "png.h"
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 struct ArrayView : Widget {
-    Folder results = "Results"_;
-    array<String> names = results.list(); // Kept for references
     array<string> parameters = split("Size,Resolution,Trajectory,Rotations,Photons,Projections"_,',');
     string valueName;
     string bestName = valueName=="k"_? "NMSE"_ : valueName;
@@ -19,7 +17,8 @@ struct ArrayView : Widget {
     ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
         values.grow(parameters.size);
         values[parameters.indexOf("Trajectory"_)] << Variant(String("single"_)) << Variant(String("double"_)) << Variant(String("adaptive"_)); // Force this specific order
-        for(string name: names) {
+        Folder results = "Results"_;
+        for(string name: results.list()) {
             if(name.contains('.')) continue;
             array<String> arguments = apply(split(name), [](string s){return String(s);});
             if(arguments[parameters.indexOf("Trajectory"_)]=="adaptive"_) arguments[parameters.indexOf("Rotations"_)] = str(fromInteger(arguments[parameters.indexOf("Rotations"_)])-1); // Converts adaptive total rotation count to helical rotation count

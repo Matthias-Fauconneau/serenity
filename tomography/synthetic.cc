@@ -183,8 +183,8 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
     for(uint typeIndex: range(typeCount)) {
         const GrainType& type = types[typeIndex];
         parallel(type.grains, [&](const uint, const vec4& grain) { // First rasterizes grains to per pixel intersection lists in order to avoid intersecting all grains with all pixels. Parallel processing is scheduled at a granularity ! of one grain per job.
-            size_t* const intersectionCounts = this->intersectionCounts.begin();
-            Intersection* const intersections = this->intersections.begin();
+            size_t* const intersectionCounts = this->intersectionCounts;
+            Intersection* const intersections = this->intersections;
             const size_t stride = grainCount*2;
             float radius = grain.w;
             vec3 C = grain.xyz() - volumeCenter; // Translates from data [0..size] to world [±size]

@@ -11,7 +11,6 @@ struct VolumeF {
 
     int3 size = 0;
     buffer<float> data;
-    Map map;
     String name;
 };
 

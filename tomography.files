@@ -76,3 +76,4 @@ tomography/projection.h
 core/variant.h
 tomography/synthetic.h
 tomography/review.cc
+tomography/compare.cc
