@@ -13,8 +13,8 @@ inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
     Plot plot; /// NMSE versus iterations plot
-    map<string, Variant> parameters = parseParameters(arguments(),{"volumeSize"_,"projectionSize"_,"method"_});
-    unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
+    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_, "volumeSize"_,"projectionSize"_,"photonCounts"_,"projectionCounts"_,"method"_});
+    unique<Window> window = nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
         const int3 volumeSize = parameters.value("volumeSize"_, int3(256)); // Reconstruction sample count along each dimensions
@@ -26,8 +26,8 @@ struct Compute {
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
         const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
 
-        const ref<uint> photonCounts = {8192,4096,2048,1024};
-        const ref<uint> projectionCounts = {128,256,512,1024};
+        const buffer<uint> photonCounts = apply(split(parameters.value("photonCounts"_,"8192,4096,2048,1024"_),','), [](string s)->uint{ return fromInteger(s); });
+        const buffer<uint> projectionCounts = apply(split(parameters.value("projectionCounts"_,"128,256,512,1024"_),','), [](string s)->uint{ return fromInteger(s); });
 
         Folder results = "Results"_;
 
@@ -111,7 +111,8 @@ struct Compute {
                         HBox projections {{&b0, &b}};
 
                         VBox layout {{&slices, &projections, &plot}};
-                        if(window) {
+                        if(this->parameters.value("ui"_, false)) {
+                            if(!window) window = unique<Window>(&layout, str(completed)+"/"_+str(missing)+"/"_+str(total));
                             window->widget = &layout;
                             window->setSize(min(int2(-1), -window->size));
                             window->setTitle(str(completed)+"/"_+str(missing)+"/"_+str(total));

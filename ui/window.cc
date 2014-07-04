@@ -120,6 +120,7 @@ Window::Window(Widget* widget, const string& title _unused, int2 size, const Ima
         r.visual=visual; r.colormap=id+Colormap; r.overrideRedirect=overrideRedirect;
         r.eventMask=StructureNotifyMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask
                 |EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
+        log(position, size);
         send(raw(r));
     }
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}

@@ -13,9 +13,9 @@
 /// \param tmin First intersection with the cylinder
 /// \param tmin Last intersection with the cylinder
 inline void intersects(const float halfHeight, const float radius, const float3 origin, const float3 ray, float& tmin, float& tmax) {
-    float2 plusMinusHalfHeightMinusOriginZ = float2(1,-1) * (halfHeight-1.f/2/*fix out of bounds*/) - origin.z;
+    float2 plusMinusHalfHeightMinusOriginZ = float2(1,-1) * (halfHeight/*-1.f/2*//*fix out of bounds*/) - origin.z;
     float radiusSq = sq(radius);
-    float c = sq(origin.xy()) - radiusSq + 1 /*fix out of bounds*/;
+    float c = sq(origin.xy()) - radiusSq /*+ 1*/ /*fix out of bounds*/;
     // Intersects cap disks
     const float2 capT = plusMinusHalfHeightMinusOriginZ / ray.z; // top bottom
     const float4 capXY = origin.xyxy() + capT.xxyy() * ray.xyxy(); // topX topY bottomX bottomY
@@ -83,7 +83,7 @@ RectF getBoundingRect(const vec3& center, float radius, const mat4& projMatrix) 
 
 PorousRock::PorousRock(int3 size) : size(size) {
     assert(size.x == size.y);
-    assert(sum(apply(ref<GrainType>(types), [](GrainType t){return t.probability;})) == 1);
+    assert(sum(apply(ref<GrainType>(types), [](const GrainType& t){return t.relativeGrainCount;})) == 1);
 
     Random random;
     for(GrainType& type: types) {
@@ -161,6 +161,14 @@ VolumeF PorousRock::volume() {
 float PorousRock::project(const ImageF& target, const Projection& A, uint index) {
     Time totalTime;
 
+    const uint typeCount = ref<GrainType>(types).size;
+
+    if(intersections.size != size_t(target.size.y*target.size.x*grainCount*2)) { // Reuses same allocation when possible to avoid unneeded page clearing
+        intersectionCounts = buffer<size_t>(target.size.y*target.size.x*grainCount*2); // Conservative allocation (to allow a ray to intersect all grains)
+        intersections = buffer<Intersection>(target.size.y*target.size.x*grainCount*2); // Conservative allocation (to allow a ray to intersect all grains)
+    }
+    intersectionCounts.clear();
+
     mat4 worldToView = A.worldToView(index);
     const int3 projectionSize = A.projectionSize;
     const float2 imageCenter = float2(projectionSize.xy()-int2(1))/2.f;
@@ -171,17 +179,9 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
     mat4 projectionMatrix; projectionMatrix(3,2) = 1;  projectionMatrix(3,3) = 0;
     projectionMatrix = projectionMatrix * mat4().scale(vec3(vec2(float(A.projectionSize.x-1)/A.extent),1/A.distance)).scale(vec3(1.f/A.volumeRadius));
 
-    uint typeCount = ref<GrainType>(types).size;
-
-    if(intersections.size != size_t(target.size.y*target.size.x*grainCount*2)) { // Reuses same allocation when possible to avoid unneeded page clearing
-        intersectionCounts = buffer<size_t>(target.size.y*target.size.x*grainCount*2); // Conservative allocation (to allow a ray to intersect all grains)
-        intersections = buffer<Intersection>(target.size.y*target.size.x*grainCount*2); // Conservative allocation (to allow a ray to intersect all grains)
-    }
-    intersectionCounts.clear();
-
     Time rasterizationTime;
-    for(uint index: range(typeCount)) {
-        const GrainType& type = types[index];
+    for(uint typeIndex: range(typeCount)) {
+        const GrainType& type = types[typeIndex];
         parallel(type.grains, [&](const uint, const vec4& grain) { // First rasterizes grains to per pixel intersection lists in order to avoid intersecting all grains with all pixels. Parallel processing is scheduled at a granularity ! of one grain per job.
             size_t* const intersectionCounts = this->intersectionCounts.begin();
             Intersection* const intersections = this->intersections.begin();
@@ -196,10 +196,10 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
                     const float3 ray = normalize(float(x) * imageToWorld[0].xyz() + float(y) * imageToWorld[1].xyz() + imageToWorld[2].xyz());
                     float tmin, tmax;
                     if(intersects(radius, C-viewOrigin, ray, tmin, tmax) && tmax>tmin /*i.e tmax != tmin (tangent intersection)*/) {
-                        uint index = y*target.size.x+x;
-                        size_t i = __sync_fetch_and_add(intersectionCounts+index, 2); // Atomically increments the intersection count
-                        intersections[index*stride+i] = Intersection{tmin, int(1+index)};
-                        intersections[index*stride+i+1] = Intersection{tmax, -int(1+index)};
+                        uint pixelIindex = y*target.size.x+x;
+                        size_t i = __sync_fetch_and_add(intersectionCounts+pixelIindex, 2); // Atomically increments the intersection count
+                        intersections[pixelIindex*stride+i] = Intersection{tmin, int(1+typeIndex)};
+                        intersections[pixelIindex*stride+i+1] = Intersection{tmax, -int(1+typeIndex)};
                     }
                 }
             }
@@ -208,10 +208,9 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
     rasterizationTime.stop();
 
     Time integrationTime;
-    const float halfHeight = (A.volumeSize.z-1)/2.f;
-    const float outerRadius = (1-2./100) * volumeRadius;
-    float maxAttenuation = 0;
-    parallel(target.size.y, [&](const uint, const uint y) { // Resolves pixels (parallel processing at one line per job).
+    float maxAttenuations[coreCount] = {};
+    parallel(target.size.y, [&](const uint id, const uint y) { // Resolves pixels (parallel processing at one line per job).
+        const float halfHeight = (A.volumeSize.z-1)/2.f;
         const size_t stride = grainCount*2;
         int counts[typeCount]; mref<int>(counts,typeCount).clear(0);
         for(uint x: range(target.size.x)) {
@@ -221,13 +220,13 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
             float inner[2]; intersects(halfHeight, innerRadius, viewOrigin, ray, inner[0], inner[1]); // Inner cylinder
 
             if(inner[0]<inf) { // Penetrates inner cylinder
+                assert_((outer[1] - inner[1]) >= 0 &&  (inner[0] - outer[0]) >= 0);
                 attenuationSum += (inner[0] - outer[0]) * containerAttenuation; // Integrates attenuation within cylinder shell (first intersection)
-                assert_((outer[1] - inner[1]) >= 0); // FIXME
                 if((outer[1] - inner[1]) >= 0) attenuationSum += (outer[1] - inner[1]) * containerAttenuation; // Integrates attenuation within cylinder shell (last intersection)
 
                 float lastT = inner[0];
-                int index = y*target.size.x+x;
-                mref<Intersection> intersections = this->intersections.slice(index*stride, intersectionCounts[index]);
+                int pixelIndex = y*target.size.x+x;
+                mref<Intersection> intersections = this->intersections.slice(pixelIndex*stride, intersectionCounts[pixelIndex]);
                 quicksort(intersections); // Sorts intersections list by distance along ray
                 for(const Intersection& intersection: intersections) {
                     float t = intersection.t;
@@ -238,21 +237,22 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
                         for(uint type: range(typeCount)) if(counts[type]) attenuation = types[type].attenuation; // In order so that heavier grains overrides lighter grains
                         attenuationSum += length * attenuation;
                     }
-                    int index =  intersection.index;
-                    if(index > 0) counts[index-1]++;
-                    if(index < 0) counts[-index-1]--;
+                    int typeIndex =  intersection.index;
+                    if(typeIndex > 0) counts[typeIndex-1]++;
+                    if(typeIndex < 0) counts[-typeIndex-1]--;
                 }
                 attenuationSum += (inner[1] - lastT) * airAttenuation;
             } else if(outer[0]<inf) {
                 attenuationSum += (outer[1] - outer[0]) * containerAttenuation;
             }
-            maxAttenuation = ::max(maxAttenuation, attenuationSum);
+            maxAttenuations[id] = ::max(maxAttenuations[id], attenuationSum);
             target(x,y) = attenuationSum;
         }
     });
     integrationTime.stop();
     totalTime.stop();
+    float maxAttenuation = max(maxAttenuations);
     //log(rasterizationTime, integrationTime, totalTime, maxAttenuation);
-    assert_(maxAttenuation>0.17 && maxAttenuation < 1, maxAttenuation); // Ensures attenuation is not too high (receiving few photons incurs high noise) nor too low (for contrast)
+    assert_(maxAttenuation>0.1 && maxAttenuation < 1, maxAttenuation); // Ensures attenuation is not too high (receiving few photons incurs high noise) nor too low (for contrast)
     return maxAttenuation;
 }

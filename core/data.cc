@@ -134,12 +134,12 @@ string TextData::whileInteger(bool sign) {
 int TextData::integer(bool sign) {
     string s = whileInteger(sign);
     if(!s) error("Expected integer", line(), lineIndex);
-    return fromInteger(s, 10);
+    return fromInteger(s);
 }
 
 int TextData::mayInteger(int defaultValue) {
     string s = whileInteger(true);
-    return s ? fromInteger(s, 10): defaultValue;
+    return s ? fromInteger(s): defaultValue;
 }
 
 string TextData::whileHexadecimal() {
