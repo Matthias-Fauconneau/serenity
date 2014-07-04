@@ -4,7 +4,7 @@
 #include "window.h"
 #include "graphics.h"
 #include "png.h"
-
+inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 struct ArrayView : Widget {
     Folder results = "Results"_;
     array<String> names = results.list(); // Kept for references
@@ -28,7 +28,8 @@ struct ArrayView : Widget {
             float best = inf; Variant value;
             for(TextData s = readFile(name, results);s;) {
                 map<string, Variant> values;
-                values["k"_] = s.integer()+1; s.skip(" "_);
+                const int subsetSize = int(nearestDivisorToSqrt(fromInteger(arguments[parameters.indexOf("Projections"_)])));
+                values["k"_] = subsetSize*(s.integer()+1); s.skip(" "_);
                 values["Central"_] = s.decimal(); s.skip(" "_);
                 values["Extreme"_] = s.decimal(); s.skip(" "_);
                 values["NMSE"_] = s.decimal(); s.skip(" "_);
@@ -148,7 +149,7 @@ struct FileWatcher : File, Poll {
 };
 
 struct Application {
-    ArrayView view {"NMSE"_};
+    ArrayView view { arguments()?arguments()[0]:"Extreme"_ };
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
     Application() {

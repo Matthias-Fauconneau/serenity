@@ -3,6 +3,7 @@
 #include "projection.h"
 #include "opencl.h"
 
+/// Interleaves \a index so that the local subset index becomes most significant
 inline uint interleave(const uint subsetSize, const uint subsetCount, const uint index) {
     const uint subsetIndex = index / subsetSize, localIndex = index % subsetSize;
     return localIndex * subsetCount + subsetIndex;
@@ -23,8 +24,6 @@ inline uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume&
 
 // -- Backprojection --
 
-// Projects voxel coordinates to image coordinates for bilinear sample
-typedef CLBuffer<mat4> ProjectionArray;
-
 /// Backprojects (At) \a b to \a Atb
-uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b);
+/// \param At Array of matrix for each index projecting voxel coordinates to image coordinates
+uint64 backproject(const CLVolume& Atb, const CLBuffer<mat4>& At, const ImageArray& b);

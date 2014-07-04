@@ -6,6 +6,7 @@
 #include "plot.h"
 #include "layout.h"
 #include "window.h"
+#include "png.h"
 
 /// Returns the first divisor of \a n below √\a n
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
@@ -13,7 +14,7 @@ inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
     Plot plot; /// NMSE versus iterations plot
-    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_, "volumeSize"_,"projectionSize"_,"photonCounts"_,"projectionCounts"_,"method"_});
+    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"photonCounts"_,"projectionCounts"_,"method"_});
     unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
@@ -23,11 +24,21 @@ struct Compute {
         // Reference sample generation
         PorousRock rock (volumeSize);
         const VolumeF referenceVolume = rock.volume();
+        if(parameters.value("reference"_, false)) {
+            Folder folder ("Reference"_, currentWorkingDirectory(), true);
+            Image target ( referenceVolume.size.xy() );
+            for(uint z: range(referenceVolume.size.z)) {
+                convert(target,slice(referenceVolume,z)); // Normalizes each slice by its maximum value
+                writeFile(dec(z), encodePNG(target),  folder);
+            }
+            exit();
+            return;
+        }
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
         const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
 
         const buffer<uint> photonCounts = apply(split(parameters.value("photonCounts"_,"8192,4096,2048,1024"_),','), [](string s)->uint{ return fromInteger(s); });
-        const buffer<uint> projectionCounts = apply(split(parameters.value("projectionCounts"_,"128,256,512,1024"_),','), [](string s)->uint{ return fromInteger(s); });
+        const buffer<uint> projectionCounts = apply(split(parameters.value("projectionCounts"_,"64,128,256,512,1024"_),','), [](string s)->uint{ return fromInteger(s); });
 
         Folder results = "Results"_;
 

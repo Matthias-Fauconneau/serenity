@@ -39,7 +39,7 @@ uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uin
     return time;
 }
 
-uint64 backproject(const CLVolume& Atb, const ProjectionArray& At, const ImageArray& b) {
+uint64 backproject(const CLVolume& Atb, const CLBuffer<mat4>& At, const ImageArray& b) {
     assert_(At.size);
     const float3 center = float3(Atb.size-int3(1))/2.f;
     const float radiusSq = sq(center.x);

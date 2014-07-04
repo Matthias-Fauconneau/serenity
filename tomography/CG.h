@@ -2,7 +2,7 @@
 #include "reconstruction.h"
 
 struct CG : Reconstruction  {
-    ProjectionArray At;
+    CLBuffer<mat4> At;
     // Persistent
     real residualEnergy = 0;
     CLVolume p, r;

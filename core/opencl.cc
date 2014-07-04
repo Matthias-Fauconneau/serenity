@@ -9,7 +9,6 @@ static cl_context context;
 static cl_command_queue queue;
 static cl_device_id device;
 bool isIntel;
-//array<CLMem*> CLMem::handles;
 uint CLMem::handleCount = 0;
 
 void __attribute((constructor(1002))) setup_cl() {
@@ -110,10 +109,6 @@ ImageF slice(const CLVolume& source, size_t index /* Z slice or projection*/) {
 }
 
 cl_sampler noneNearestSampler = clCreateSampler(context, false, CL_ADDRESS_NONE, CL_FILTER_NEAREST, 0);
-#if DEBUG
-cl_sampler noneLinearSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0);
-#else
 cl_sampler noneLinearSampler = clCreateSampler(context, false, CL_ADDRESS_NONE, CL_FILTER_LINEAR, 0);
-#endif
 cl_sampler clampToEdgeLinearSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP_TO_EDGE, CL_FILTER_LINEAR, 0);
 cl_sampler clampLinearSampler = clCreateSampler(context, false, CL_ADDRESS_CLAMP, CL_FILTER_LINEAR, 0);

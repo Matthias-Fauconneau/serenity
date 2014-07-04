@@ -1,9 +1,12 @@
 #pragma once
 #include "opencl.h"
 
+/// Returns sum of square differences betweeen A and B
 float SSE(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
+/// Returns sum of A multiplied by B
 float dot(const CLVolume& A, const CLVolume& B, const int3 origin=0, int3 size=0);
 
+// Element-wise operations
 inline uint64 mul(const ImageArray& y, const ImageArray& a, const ImageArray& b) { CL(operators, mul); return emulateWriteTo3DImage(mul, y, noneNearestSampler, a, b); } // y = a * b [MLEM]
 inline uint64 div(const ImageArray& y, const ImageArray& a, const ImageArray& b) { CL(operators, div) return emulateWriteTo3DImage(div, y, noneNearestSampler, a, b); } // y = a / b [MLEM]
 inline uint64 divdiff(const ImageArray& y, const ImageArray& a, const ImageArray& b, const ImageArray& c) { CL(operators, divdiff) return emulateWriteTo3DImage(divdiff, y, noneNearestSampler, a, b, c); } // y = ( a - b ) / c [SART]

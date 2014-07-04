@@ -35,7 +35,7 @@ struct Variant : String {
     Variant(double decimal) : String(ftoa(decimal)){}
     Variant(int2 v) : String(strx(v)) {}
     Variant(int3 v) : String(strx(v)) {}
-    operator bool() const { return size && *this!="0"_; }
+    operator bool() const { return size && *this!="0"_ && *this!="false"_; }
     operator int() const { return *this ? fromInteger(*this) : 0; }
     operator uint() const { return *this ? fromInteger(*this) : 0; }
     operator float() const { return fromDecimal(*this); }

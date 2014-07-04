@@ -16,7 +16,6 @@ int2 SliceView::sizeHint() { return ::max(int2(64), upsampleFactor * this->size.
 void SliceView::render() {
     ImageF image = volume ? slice(*volume, index.value) : slice(*clVolume, index.value);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
-    if(size.y == 1) while(image.size.y < this->target.size().y) image = upsampleY(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) return; // FIXME
     ImageF source = clip(image, (image.size-target.size())/2+Rect(target.size()));
@@ -41,7 +40,6 @@ void VolumeView::render() {
     ImageF image = ImageF(A.projectionSize.xy());
     project(image, A, x, index.value);
     for(uint _unused i: range(log2(upsampleFactor))) image = upsample(image);
-    if(A.projectionSize.y == 1) while(image.size.y < this->target.size().y) image = upsampleY(image);
     Image target = clip(this->target, (this->target.size()-image.size)/2+Rect(image.size));
     if(!target) { log("Empty clip"); return; } // FIXME
     assert_(target.size() == image.size, target.size(), image.size);

@@ -23,6 +23,7 @@ constexpr vec3 blue (1, 0, 0);
 constexpr vec3 green (0, 1, 0);
 constexpr vec3 red (0, 0, 1);
 
+/// 2D array of \a byte4
 struct Image {
     Image(){}
     Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha=false, bool sRGB=false) :
@@ -80,6 +81,7 @@ static const Image& name ## Icon() { \
     return icon; \
 }
 
+/// 2D array of floats
 struct ImageF {
     ImageF(){}
     ImageF(buffer<float>&& data, int2 size) : data(move(data)), size(size) { assert_(this->data.size==size_t(size.x*size.y)); }
@@ -89,7 +91,6 @@ struct ImageF {
     int2 size;
 };
 inline ImageF share(const ImageF& o) { return ImageF(buffer<float>((ref<float>)o.data),o.size); }
-//inline ImageF operator*(float scale, ImageF&& image) { for(float& v: image.data) v *= scale; return move(image); }
 
 /// Converts a linear float image to sRGB
 float convert(const Image& target, const ImageF& source, float max=0);
@@ -97,7 +98,6 @@ float convert(const Image& target, const ImageF& source, float max=0);
 ImageF& downsample(ImageF& target, const ImageF& source);
 /// Upsamples an image by duplicating samples
 ImageF upsample(const ImageF& source);
-ImageF upsampleY(const ImageF& source);
 ImageF clip(const ImageF& image, Rect r);
 
 inline void scale(mref<float>& A, float factor) { for(float& a: A) a *= factor; }
