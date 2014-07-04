@@ -3,8 +3,16 @@
 #include "volume.h"
 #include "time.h"
 
+/// Ray-grain intersection
+struct Intersection {
+    float t; /// Intersection distance along the ray
+    int index; /// 1+index of the grain type entered. Negated for an exit intersection.
+};
+inline bool operator <(const Intersection& a, const Intersection& b) { return a.t < b.t; }
+
+/// Synthetic sample model of a metallic cylinder filled with mineral grains
 struct PorousRock {
-    // Sapmle size
+    // Sample size
     int3 size; // [vx]
     const double sampleSize = 6e-3; // [m]
     const double mToVx = size.x / sampleSize; // [vx/m]
@@ -33,13 +41,20 @@ struct PorousRock {
     const float outerRadius = (1-2./100) * volumeRadius;
     const uint grainCount = rate*size.z*size.y*size.x;
     vec4 largestGrain = 0;
+    buffer<size_t> intersectionCounts;
+    buffer<Intersection> intersections;
 
+    /// Generates the explicit lists of grains inside the container fitting a support of size \a size (for each grain type) (to ensure consistenct between \a volume and \a project).
+    /// \note Grain intersections are explictly allowed and resolved as inclusions where heavier grains always overrides lighter grains.
     PorousRock(int3 size);
+    /// Rasterizes the container cylinder and all grains.
     VolumeF volume();
-    float project(const ImageF& target, const Projection& A, uint index) const;
+    /// Analytically projects the container cylinder and all grains along the \a index projection of \a A to \a target.
+    float project(const ImageF& target, const Projection& A, uint index);
 };
 
-inline VolumeF project(const PorousRock& rock, const Projection& A) {
+/// Projects \a rock for all projections defined by \a A
+inline VolumeF project(PorousRock& rock, const Projection& A) {
     VolumeF volume(A.projectionSize, "b"_);
     Time time;
     float minMaxAttenuation=inf, maxMaxAttenuation=-inf;

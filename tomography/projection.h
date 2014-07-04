@@ -2,7 +2,8 @@
 #include "matrix.h"
 #include "image.h"
 
-// Projection settings
+/// Projection settings
+/// \note Defines all \a count projections using an index parameter
 struct Projection {
     // Resolution
     int3 volumeSize;

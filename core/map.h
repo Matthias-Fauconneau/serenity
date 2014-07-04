@@ -38,7 +38,8 @@ template<Type K, Type V> struct map {
 
     template<Type KK, Type VV> VV value(const KK& key, VV value) const {
         size_t i = keys.indexOf(key);
-        return i!=invalid ? copy(VV(values[i])) : value;
+        if(i!=invalid) return values[i];
+        return value;
     }
     /*template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
         size_t i = keys.indexOf(key);

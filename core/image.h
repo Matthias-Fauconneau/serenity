@@ -2,7 +2,7 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 
-/// Axis-aligned rectangle
+/// Axis-aligned rectangle with 2D integer coordinates
 struct Rect {
     int2 min,max;
     Rect(int2 min, int2 max):min(min),max(max){}

@@ -7,27 +7,29 @@
 #include "layout.h"
 #include "window.h"
 
+/// Returns the first divisor of \a n below √\a n
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 
-struct Application {
-    Plot plot;
-    unique<Window> window = arguments().contains("ui"_) ? unique<Window>() : nullptr;
-    Application() {
-        // Reference parameters
-        const int3 volumeSize = 256;
-        // Projection parameters
-        int2 projectionSize (volumeSize.z,volumeSize.z*3/4);
-        const ref<uint> photonCounts = {8192,4096,2048,1024};
-        const ref<uint> projectionCounts = {128,256,512,1024};
+/// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
+struct Compute {
+    Plot plot; /// NMSE versus iterations plot
+    map<string, Variant> parameters = parseParameters(arguments(),{"volumeSize"_,"projectionSize"_,"method"_});
+    unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
-        Folder results = "Results"_;
-        Time totalTime, reconstructionTime, projectionTime, poissonTime;
-        uint completed = 0;
-        // Reference
+    Compute() {
+        const int3 volumeSize = parameters.value("volumeSize"_, int3(256)); // Reconstruction sample count along each dimensions
+        int2 projectionSize = parameters.value("projectionSize"_, int2(volumeSize.z, volumeSize.z*3/4)); // Detector sample count along each dimensions. Defaults to a 4:3 detector with a resolution comparable to the reconstruction.
+
+        // Reference sample generation
         PorousRock rock (volumeSize);
         const VolumeF referenceVolume = rock.volume();
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
         const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
+
+        const ref<uint> photonCounts = {8192,4096,2048,1024};
+        const ref<uint> projectionCounts = {128,256,512,1024};
+
+        Folder results = "Results"_;
 
         // Counts missing results
         uint missing = 0;
@@ -44,6 +46,9 @@ struct Application {
         }
         uint total = 3*3*photonCounts.size*projectionCounts.size;
 
+        Time totalTime, reconstructionTime, projectionTime, poissonTime;
+        uint completed = 0;
+
         for(Projection::Trajectory trajectory: {Projection::Single, Projection::Double, Projection::Adaptive}) {
             for(uint rotationCount: trajectory==Projection::Adaptive?ref<uint>({2,3,5}):ref<uint>({1,2,4})) {
                 bool skip = true;
@@ -53,7 +58,7 @@ struct Application {
                         skip &= existsFile(parameters, results);
                     }
                 }
-                if(skip) { log("Skipping trajectory", str(volumeSize.x, strx(projectionSize), ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)])); completed+=3*5; continue; }
+                if(skip) { log("Skipping trajectory",  ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, max(projectionCounts)); completed+=3*5; continue; }
                 log("Trajectory", ref<string>({"single"_,"double"_,"adaptive"_})[int(trajectory)], rotationCount, max(projectionCounts));
 
                 // Full resolution exact projection data
@@ -169,4 +174,4 @@ struct Application {
         log(projectionTime, poissonTime, reconstructionTime, totalTime, completed, total, missing, totalTime/missing);
         exit();
     }
-} app;
+} app; // Static object constructors executes before main. In this application, events are processed explicitly by calling window->event() in the innermost loop instead of using the event loop in main() as it makes parameter sweeps easier to write.
