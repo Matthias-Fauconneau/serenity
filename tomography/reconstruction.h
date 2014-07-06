@@ -2,7 +2,7 @@
 #include "project.h"
 #include "random.h"
 
-/// Reconstruction base class
+/// Base class for reconstruction
 struct Reconstruction {
     Projection A; // Projection settings
     CLVolume x; // Current reconstruction estimate
@@ -12,9 +12,12 @@ struct Reconstruction {
     /// \note Estimate \a x is initialized with an uniform estimate 1/√(x²+y²+z²) on the cylinder support
     Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), 1.f/sqrt(float(sq(A.volumeSize.x)+sq(A.volumeSize.y)+sq(A.volumeSize.z))))) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}
+    /// Executes one step of reconstruction
+    /// \note That is one substep for subset reconstructions
     virtual void step() abstract;
 };
 
+/// Derived class for subset reconstruction
 struct SubsetReconstruction : Reconstruction {
     const uint subsetSize, subsetCount;
     struct Subset {
