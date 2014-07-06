@@ -19,15 +19,17 @@ struct Reconstruction {
 
 /// Derived class for subset reconstruction
 struct SubsetReconstruction : Reconstruction {
-    const uint subsetSize, subsetCount;
+    const uint subsetSize; /// Number of projections per subsets
+    const uint subsetCount; /// Total number of subsets
+    /// Projection matrices and images for a subset
     struct Subset {
-        CLBuffer<mat4> At;
-        ImageArray b;
+        CLBuffer<mat4> At; /// Array of matrix projecting voxel coordinates to image coordinates
+        ImageArray b; /// Corresponding projection images
     };
     array<Subset> subsets;
 
-    uint subsetIndex = 0;
-    buffer<uint> shuffle = shuffleSequence(subsetCount);
+    uint subsetIndex = 0; /// Next subset to be iterated
+    buffer<uint> shuffle = shuffleSequence(subsetCount); /// Random
 
     SubsetReconstruction(const Projection& A, const ImageArray& b, const uint subsetSize, string name) : Reconstruction(A, name), subsetSize(subsetSize), subsetCount(A.count/subsetSize) {
         assert_(subsetCount*subsetSize == A.count);

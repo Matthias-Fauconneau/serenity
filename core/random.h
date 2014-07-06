@@ -19,12 +19,16 @@ struct Random {
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
 
-inline buffer<uint> shuffleSequence(uint size) {
-    buffer<uint> seq(size);
-    Random random;
-    for(uint i: range(size)) seq[i] = i;
-    for(uint i=size-1; i>0; i--) swap(seq[i], seq[random%(i+1)]);
-    return seq;
+/// Initializes an array of \a n elements to a randomly shuffled sequence
+inline buffer<uint> shuffleSequence(uint n) {
+    Random random; // Unseeded (to return the same sequence for a given size)
+    buffer<uint> a (n);
+    for(uint i: range(n)) {
+        uint j = random%(i+1);
+        a[i] = a[j];
+        a[j] = i;
+    }
+    return a;
 }
 
 extern "C" float lgammaf(float x);
