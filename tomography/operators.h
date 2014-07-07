@@ -17,5 +17,3 @@ inline uint64 mulexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) { 
 inline uint64 diffexp(const CLVolume& y, const CLVolume& a, const CLVolume& b) { CL(operators, diffexp) return emulateWriteTo3DImage(diffexp, y, noneNearestSampler, a, b); } // y = exp(-a) - exp(-b) [MLTR]
 inline uint64 adddiv(const CLVolume& y, const CLVolume& a, const CLVolume& b, const CLVolume& c) { CL(operators, adddiv) return emulateWriteTo3DImage(adddiv, y, noneNearestSampler, a, b, c); } // y = max(0, a + c ? b / c : 0) [MLTR]
 inline uint64 muldiv(const CLVolume& y, const CLVolume& a, const CLVolume& b, const CLVolume& c) { CL(operators, muldiv) return emulateWriteTo3DImage(muldiv, y, noneNearestSampler, a, b, c); } // y = max(0, a + c ? a * b / c : 0) [MLTR, MLEM]
-inline uint64 negln(const ImageArray& y, const ImageArray& a) { CL(operators, negln) return emulateWriteTo3DImage(negln, y, noneNearestSampler, a); } // y = ln(a) [SART, CG]
-inline ImageArray negln(const ImageArray& a) { ImageArray y(a.size, 0, "ln "_+a.name); negln(y, a); return y; }

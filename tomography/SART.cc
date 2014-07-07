@@ -3,9 +3,9 @@
 #include "time.h"
 
 // Simultaneous iterative algebraic reconstruction technique
-SART::SART(const Projection& A, const ImageArray& attenuation, const uint subsetSize) : SubsetReconstruction(A, attenuation, subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
+SART::SART(const Projection& A, ImageArray&& attenuation, const uint subsetSize) : SubsetReconstruction(A, attenuation, subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
     ImageArray i (Ax.size, 1.f, "i"_);
-    log_("SART: AAti... "_);
+    log_("SART::AAti ["_+str(subsets.size)+"]... "_); Time time;
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         CLVolume Ati (x.size);
@@ -13,7 +13,7 @@ SART::SART(const Projection& A, const ImageArray& attenuation, const uint subset
         AAti << ImageArray(subset.b.size);
         project(AAti[subsetIndex], A, Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
     }
-    log("Done");
+    log(time);
 }
 
 void SART::step() {
@@ -25,4 +25,3 @@ void SART::step() {
     time += maxadd(x, x, 1, Atr); // x := max(0, x + At r)
     this->subsetIndex = (this->subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
 }
-

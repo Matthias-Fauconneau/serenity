@@ -72,9 +72,3 @@ kernel void muldiv(global float* Y, const uint XY, const uint X, sampler_t sampl
     float c = read_imagef(C, sampler, i).x;
     Y[i.z*XY+i.y*X+i.x] = max(0.f, a + (c ? a * b / c : 0));
 }
-
-kernel void negln(global float* Y, const uint XY, const uint X, sampler_t sampler, read_only image3d_t A) { // Product: y = log a [SART, CG]
-    int4 i = {get_global_id(0), get_global_id(1), get_global_id(2), 0};
-    float a = read_imagef(A, sampler, i).x;
-    Y[i.z*XY+i.y*X+i.x] = -log(a);
-}

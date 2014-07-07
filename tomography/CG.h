@@ -5,11 +5,13 @@ struct CG : Reconstruction  {
     CLBuffer<mat4> At;
     // Persistent
     real residualEnergy = 0;
-    CLVolume p, r;
+    CLVolume r, p;
     // Temporary
-    const ImageArray Ap;
-    const CLVolume AtAp;
+    ImageArray Ap;
+    CLVolume AtAp;
 
-    CG(const Projection& projection, const ImageArray& attenuation);
+    ///
+    /// \note Releases \a attenuation after backprojection to \a r to ensure enough is left to allocate \a p, \a Ap, \a AtAp
+    CG(const Projection& projection, ImageArray&& attenuation);
     void step() override;
 };
