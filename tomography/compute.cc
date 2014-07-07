@@ -79,9 +79,10 @@ struct Compute {
         String intensity0Key; VolumeF intensity0;
         String intensityKey; VolumeF intensity;/*MLTR*/ VolumeF attenuation;/*UI, SART, CG*/
         uint maxProjectionCount=0; for(const Dict& configuration: configurations) maxProjectionCount=max<uint>(maxProjectionCount,configuration["projectionCount"_]);
-        for(const Dict& configuration: configurations) {
+        for(uint index: range(configurations.size)) {
+            const Dict& configuration = configurations[index];
             if(existsFile(toASCII(configuration), results)) continue;
-            log(configuration);
+            log(index, configuration);
 
             // Configuration parameters
             int3 volumeSize = configuration["volumeSize"_];
@@ -148,7 +149,7 @@ struct Compute {
                 if(window) {
                     window->widget = &layout;
                     window->setSize(min(int2(-1), -window->size));
-                    window->setTitle(str(completed)+"/"_+str(missing)+"/"_+str(total)+" "_+str(configuration));
+                    window->setTitle(str(completed)+"/"_+str(missing)+" "_+str(index)+"/"_+str(total)+" "_+str(configuration));
                     window->show();
                 }
 
@@ -158,7 +159,7 @@ struct Compute {
                 VolumeF best (volumeSize, "best"_);
                 Time time; reconstructionTime.start();
                 const uint minIterationCount = 16, maxIterationCount = 512;
-                String result;
+                array<map<string, Variant>> result;
                 uint k=0; for(;k < maxIterationCount; k++) {
                     reconstruction->step();
 
@@ -176,7 +177,15 @@ struct Compute {
                     float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                     float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                     float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                    result << str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR, time.toFloat())+"\n"_;
+                    {map<string, Variant> values;
+                        values["Iterations"_] = k;
+                        values["Iterations·Projection/Subsets"_] = k * subsetSize;
+                        values["Center NMSE %"_] = 100*centerSSE/centerSSQ;
+                        values["Extreme NMSE %"_] = 100*extremeSSE/extremeSSQ;
+                        values["Total NMSE %"_] = 100*totalNMSE;
+                        values["SNR"_] = SNR;
+                        values["Time (s)"_] = time.toFloat();
+                        result << move(values);}
                     plot[str(configuration)].insert(k, -10*log10(totalNMSE));
                     if(window) {
                         window->needRender = true;
@@ -191,19 +200,19 @@ struct Compute {
                     }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
 
-                    extern bool terminate;
-                    if(terminate) { log("Terminated"_); return; }
                 }
                 reconstructionTime.stop();
-                writeFile(toASCII(configuration), result, results);
+                writeFile(toASCII(configuration), str(result, '\n'), results);
                 writeFile(toASCII(configuration)+".best"_, cast<byte>(best.data), results);
                 log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
                 window->widget = 0;
             }
             completed++;
             assert_(CLMem::handleCount == 0, "Holding OpenCL MemObjects after completion", CLMem::handleCount); // Asserts all MemObjects have been released, as this single process runs all cases (to reuse projection data and monitor window).
+            extern bool terminate;
+            if(terminate) { log("Terminated"_); break; }
         }
-        log(projectionTime, poissonTime, reconstructionTime, totalTime, completed, total, missing, totalTime/missing);
+        log("Total", totalTime, "Projection", projectionTime, "Poisson", poissonTime, "Reconstruction", reconstructionTime, "Completed", completed, "from", missing, "on total", total, "in average", totalTime/missing);
         exit();
     }
 } app; // Static object constructors executes before main. In this application, events are processed explicitly by calling window->event() in the innermost loop instead of using the event loop in main() as it makes parameter sweeps easier to write.
