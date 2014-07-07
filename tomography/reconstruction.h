@@ -9,8 +9,8 @@ struct Reconstruction {
     uint64 time = 0; // Cumulated OpenCL kernel time (when enabled)
 
     /// Initializes reconstruction for projection configuration \a A
-    /// \note Estimate \a x is initialized with an uniform estimate 1/√(x²+y²+z²) on the cylinder support
-    Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), 1.f/sqrt(float(sq(A.volumeSize.x)+sq(A.volumeSize.y)+sq(A.volumeSize.z))))) { assert_(x.size.x==x.size.y); }
+    /// \note Estimate \a x is initialized with an uniform estimate \a value/√(x²+y²+z²) on the cylinder support
+    Reconstruction(const Projection& A, string name, float value=0) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), value/sqrt(float(sq(A.volumeSize.x)+sq(A.volumeSize.y)+sq(A.volumeSize.z))))) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}
     /// Executes one step of reconstruction
     /// \note That is one substep for subset reconstructions
@@ -31,7 +31,7 @@ struct SubsetReconstruction : Reconstruction {
     uint subsetIndex = 0; /// Next subset to be iterated
     buffer<uint> shuffle = shuffleSequence(subsetCount); /// Random
 
-    SubsetReconstruction(const Projection& A, const ImageArray& b, const uint subsetSize, string name) : Reconstruction(A, name), subsetSize(subsetSize), subsetCount(A.count/subsetSize) {
+    SubsetReconstruction(const Projection& A, const ImageArray& b, const uint subsetSize, string name, float value=0) : Reconstruction(A, name, value), subsetSize(subsetSize), subsetCount(A.count/subsetSize) {
         assert_(subsetCount*subsetSize == A.count);
         subsets.reserve(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {

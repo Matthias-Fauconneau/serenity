@@ -19,7 +19,7 @@ void __attribute((constructor(1002))) setup_cl() {
     cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
     device = devices[0];
     size_t size; clGetDeviceInfo(device, CL_DEVICE_NAME, 0, 0, &size);
-    char info[size]; clGetDeviceInfo(device, CL_DEVICE_NAME, size, info, 0);
+    char info[size]; clGetDeviceInfo(device, CL_DEVICE_NAME, size, info, 0); log(string(info,size-1));
     isIntel = startsWith(string(info,size-1), "Intel"_);
     context = clCreateContext(0, 1, &device, &clNotify, 0, 0); assert_(context);
     queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, 0); assert_(queue);

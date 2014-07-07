@@ -4,7 +4,7 @@
 
 CG::CG(const Projection& projection, const ImageArray& b) : Reconstruction(projection, "CG"_), At(apply(b.size.z, [&](uint index){ return projection.worldToDevice(index); }), "At"_), p(x.size), r(x.size), Ap(b.size), AtAp(x.size) {
      /// Computes residual r=p=Atb
-    backproject(r, At, negln(b)); // p = At b (x=0)
+    backproject(r, At, b); // p = At b (x=0)
     residualEnergy = dot(r, r);
     assert_(residualEnergy);
     copy(r, p); // r -> p

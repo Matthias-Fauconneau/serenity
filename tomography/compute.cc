@@ -16,7 +16,7 @@ inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
     Plot plot; /// NMSE versus iterations plot
-    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"photonCounts"_,"projectionCounts"_,"method"_});
+    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
     unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
@@ -40,16 +40,15 @@ struct Compute {
         const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
 
         // Explicits configurations
-        const buffer<uint> photonCounts = apply(split(parameters.value("photonCounts"_,"8192,4096,2048"_),','), [](string s)->uint{ return fromInteger(s); });
-        const buffer<uint> projectionCounts = apply(split(parameters.value("projectionCounts"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); });
         typedef map<String,Variant> Configuration;
         array<Configuration> configurations;
-        for(Trajectory trajectory: {Single, Double, Adaptive}) {
-            for(uint rotationCount: trajectory==Adaptive?ref<uint>({2,3,5}):ref<uint>({1,2,4})) {
-                for(const uint photonCount: photonCounts) {
-                    for(const uint projectionCount: projectionCounts) {
-                        for(const string method: {"SART"_,"MLTR"_,"CG"_}) {
-                            for(const uint subsetSize: {nearestDivisorToSqrt(projectionCount), nearestDivisorToSqrt(projectionCount)*2, projectionCount}) {
+        for(string trajectory: split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
+            for(uint rotationCount: apply(split(parameters.value("rotationCount"_,"4,2,1"_),','), [](string s)->uint{ return fromInteger(s); })) {
+                if(trajectory=="adaptive") rotationCount = rotationCount + 1;
+                for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048"_),','), [](string s)->uint{ return fromInteger(s); })) {
+                    for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
+                        for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
+                            for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), nearestDivisorToSqrt(projectionCount)*2, projectionCount})) {
                                 Configuration configuration;
                                 configuration["volumeSize"_] = volumeSize;
                                 configuration["projectionSize"_] = projectionSize;
@@ -80,6 +79,7 @@ struct Compute {
         String attenuation0Key; VolumeF attenuation0;
         String intensity0Key; VolumeF intensity0;
         String intensityKey; ImageArray intensity, attenuation;
+        uint maxProjectionCount=0; for(const Configuration& configuration: configurations) maxProjectionCount=max<uint>(maxProjectionCount,configuration["projectionCount"_]);
         for(const Configuration& configuration: configurations) {
             if(existsFile(toASCII(configuration), results)) continue;
             log(configuration);
@@ -95,16 +95,17 @@ struct Compute {
             uint subsetSize = configuration["subsetSize"_];
 
             {// Full resolution exact projection data
-                String key = str(volumeSize, int3(projectionSize, max(projectionCounts)), trajectory, rotationCount);
+                String key = str(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount);
                 if(attenuation0Key != key) { // Cache miss
                     Time time; projectionTime.start();
-                    attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, max(projectionCounts)), trajectory, rotationCount));
-                    projectionTime.stop(); log("A", time);
+                    log_("A["_+str(maxProjectionCount)+"]..."_);
+                    attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount));
+                    projectionTime.stop(); log(time);
                     attenuation0Key = move(key);
                 }}
 
             {// Full resolution poisson projection data
-                String key = str(volumeSize, int3(projectionSize, max(projectionCounts)), trajectory, rotationCount, photonCount);
+                String key = str(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount, photonCount);
                 if(intensity0Key != key) { // Cache miss
                     intensity0 = VolumeF(attenuation0.size);
                     Time time; poissonTime.start();
@@ -114,22 +115,22 @@ struct Compute {
                 }}
 
             {// Partial resolution poisson projection data
-                String key = str(volumeSize, int3(projectionSize, max(projectionCounts)), trajectory, rotationCount, photonCount, projectionCount);
+                String key = str(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount, photonCount, projectionCount);
                 if(intensityKey != key) { // Cache miss
                     VolumeF hostIntensity (int3(projectionSize, projectionCount), 0, "b"_);
                     assert_(intensity0.size.z%hostIntensity.size.z==0, intensity0.size.z, hostIntensity.size.z);
                     for(uint index: range(hostIntensity.size.z)) copy(slice(hostIntensity, index).data, slice(intensity0, index*intensity0.size.z/hostIntensity.size.z).data); // FIXME: upload slice-wise instead of host copy + full upload
                     intensity = hostIntensity; // Uploads
-                    if(window) attenuation = negln(intensity);
+                    attenuation = negln(intensity);
                     intensityKey = move(key);
                 }}
 
             // Reconstruction
             const Projection A (volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount);
             unique<Reconstruction> reconstruction = nullptr;
-            if(method=="SART"_) reconstruction = unique<SART>(A, intensity, subsetSize);
+            if(method=="SART"_) reconstruction = unique<SART>(A, attenuation, subsetSize);
             if(method=="MLTR"_) reconstruction = unique<MLTR>(A, intensity, subsetSize);
-            if(method=="CG"_) reconstruction = unique<CG>(A, intensity);
+            if(method=="CG"_) reconstruction = unique<CG>(A, attenuation);
             assert_(reconstruction, method);
 
             // Interface
@@ -175,7 +176,7 @@ struct Compute {
                 float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                 float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                 float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                result << str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR)+"\n"_;
+                result << str(k, 100*centerSSE/centerSSQ, 100*extremeSSE/extremeSSQ, 100*totalNMSE, SNR, time.toFloat())+"\n"_;
                 plot[str(configuration)].insert(k, -10*log10(totalNMSE));
                 if(window) {
                     window->needRender = true;
@@ -186,7 +187,7 @@ struct Compute {
                     reconstruction->x.read(best);
                     if(k >= maxIterationCount-1) log("Slow convergence stopped after maximum iteration count");
                 } else {
-                    if(k >= minIterationCount-1) { log("Divergence stopped after minimum iteration count"); break; }
+                    if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after minimum iteration count"); break; }
                 }
                 bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
 
