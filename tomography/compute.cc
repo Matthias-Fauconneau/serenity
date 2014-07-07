@@ -180,7 +180,7 @@ struct Compute {
                     {map<string, Variant> values;
                         values["Iterations"_] = k;
                         values["Iterations·Projection/Subsets"_] = k * subsetSize;
-                        values["Center NMSE %"_] = 100*centerSSE/centerSSQ;
+                        values["Central NMSE %"_] = 100*centerSSE/centerSSQ;
                         values["Extreme NMSE %"_] = 100*extremeSSE/extremeSSQ;
                         values["Total NMSE %"_] = 100*totalNMSE;
                         values["SNR"_] = SNR;

@@ -7,9 +7,9 @@
 
 struct ArrayView : Widget {
     Dict parameterLabels = parseDict("rotationCount:Rotations,photonCount:Photons,projectionCount:Projections,subsetSize:per subset"_);
-    Dict valueLabels = parseDict("Iterations count:Iterations,Center NMSE %:Center,Extreme NMSE %:Extreme,Total NMSE %:Total,Global NMSE %:Total"_);
+    Dict valueLabels = parseDict("Iterations count:Iterations,Center NMSE %:Central,Central NMSE %:Central,Extreme NMSE %:Extreme,Total NMSE %:Total,Global NMSE %:Total,Time (s):Time"_);
     string valueName;
-    string bestName = valueName=="Iterations"_? "Total"_ : valueName;
+    string bestName = (valueName=="Iterations"_ || valueName == "Time"_) ? "Total"_ : valueName;
     map<String, array<Variant>> arguments; // Arguments occuring for each parameter
     array<String> valueNames;
     map<Dict, Variant> points; // Data points
@@ -76,7 +76,7 @@ struct ArrayView : Widget {
     }
     int2 cellCount() { return int2(cellCount(0),cellCount(1)); }
     int2 levelCount() { return int2(dimensions[0].size,dimensions[1].size); }
-    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(5*textSize); }
+    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(80*textSize/16,24*textSize/16); }
     void render() override {
         assert_(cellCount(), cellCount(), arguments);
         int2 cellSize = target.size() / (levelCount().yx()+int2(1)+cellCount());
@@ -173,14 +173,14 @@ struct Application {
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
     Application() {
-        /*for(string valueName: view.valueNames) {
+        for(string valueName: view.valueNames) {
             ArrayView view (valueName, 32);
             Image image ( view.sizeHint() );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
             fill(image, Rect(image.size()), white);
             view.Widget::render( image );
             writeFile(valueName, encodePNG(image));
-        }*/
+        }
         window.setSize(-1);
         window.show();
     }
