@@ -220,7 +220,7 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
             float inner[2]; intersects(halfHeight, innerRadius, viewOrigin, ray, inner[0], inner[1]); // Inner cylinder
 
             if(inner[0]<inf) { // Penetrates inner cylinder
-                assert_((outer[1] - inner[1]) >= 0 &&  (inner[0] - outer[0]) >= 0);
+                assert((outer[1] - inner[1]) >= -0x1p-14 &&  (inner[0] - outer[0]) >= -0x1p-14, outer[0], inner[0], inner[1], outer[1], index, inner[0], log2(abs(outer[1]-inner[1])));
                 attenuationSum += (inner[0] - outer[0]) * containerAttenuation; // Integrates attenuation within cylinder shell (first intersection)
                 if((outer[1] - inner[1]) >= 0) attenuationSum += (outer[1] - inner[1]) * containerAttenuation; // Integrates attenuation within cylinder shell (last intersection)
 
