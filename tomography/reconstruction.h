@@ -8,7 +8,7 @@ struct Reconstruction {
     CLVolume x; // Current reconstruction estimate
     uint64 time = 0; // Cumulated OpenCL kernel time (when enabled)
 
-    /// Initializes reconstruction for projection settings \a A
+    /// Initializes reconstruction for projection configuration \a A
     /// \note Estimate \a x is initialized with an uniform estimate 1/√(x²+y²+z²) on the cylinder support
     Reconstruction(const Projection& A, string name) : A(A), x(cylinder(VolumeF(A.volumeSize, 0, name), 1.f/sqrt(float(sq(A.volumeSize.x)+sq(A.volumeSize.y)+sq(A.volumeSize.z))))) { assert_(x.size.x==x.size.y); }
     virtual ~Reconstruction() {}

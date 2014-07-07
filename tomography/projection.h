@@ -1,7 +1,10 @@
 #pragma once
 #include "matrix.h"
 
-/// Projection settings
+enum Trajectory { Single, Double, Adaptive };
+inline string str(const Trajectory& t) { return ref<string>({"single"_,"double"_,"adaptive"_})[int(t)]; }
+
+/// Projection configuration
 /// \note Defines all \a count projections using an index parameter
 struct Projection {
     // Resolution
@@ -12,7 +15,7 @@ struct Projection {
     float detectorHalfWidth = 1;
     float cameraLength = 1;
     float specimenDistance = 1./16;
-    enum Trajectory { Single, Double, Adaptive } trajectory;
+    Trajectory trajectory;
     uint rotationCount;
 
     // Projection setup (coordinates in view space)

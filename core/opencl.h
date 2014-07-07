@@ -13,6 +13,7 @@ struct CLMem : handle<cl_mem> {
     String name;
     static uint handleCount; // Counts currently allocated MemObjects (used to assert correct release)
 
+    CLMem(){}
     CLMem(cl_mem mem, string name) : handle(mem), name(copy(String(name))) { assert_(mem); handleCount++; }
     default_move(CLMem);
     /// Releases the OpenCL MemObject.
@@ -53,6 +54,7 @@ struct CLImage : CLMem {
 
 /// Single channel floating-point OpenCL 3D image
 struct CLVolume : CLMem {
+    CLVolume(){}
     CLVolume(int3 size, const float value, string name);
     CLVolume(int3 size, const ref<float>& data, string name);
     CLVolume(const VolumeF& A) : CLVolume(A.size, A.data, A.name) {}

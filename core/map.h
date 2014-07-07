@@ -29,6 +29,7 @@ template<Type K, Type V> struct map {
         if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
         return values[i];
     }
+    template<Type KK> const V& operator [](const KK& key) const { return at(key); }
     template<Type KK> V& at(const KK& key) {
         size_t i = keys.indexOf(key);
         if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);

@@ -32,9 +32,11 @@ struct Variant : String {
     default_move(Variant);
     Variant(String&& s) : String(move(s)) {}
     Variant(int integer) : String(dec(integer)), isInteger(true) {}
+    Variant(uint integer) : String(dec(integer)), isInteger(true) {}
     Variant(double decimal) : String(ftoa(decimal)){}
     Variant(int2 v) : String(strx(v)) {}
     Variant(int3 v) : String(strx(v)) {}
+    generic Variant(T v) : String(str(v)) {} // Enables implicit conversion from any type with string conversion
     operator bool() const { return size && *this!="0"_ && *this!="false"_; }
     operator int() const { return *this ? fromInteger(*this) : 0; }
     operator uint() const { return *this ? fromInteger(*this) : 0; }
