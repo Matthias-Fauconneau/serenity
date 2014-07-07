@@ -20,7 +20,7 @@ template<Type K, Type V> struct map {
     void clear() { keys.clear(); values.clear(); }
 
     explicit operator bool() const { return keys.size; }
-    bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
+    bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; } // Only if both have keys in same order
 
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
 
@@ -70,9 +70,9 @@ template<Type K, Type V> struct map {
         keys.append( forward<KK>(key) ), values.append( forward<VV>(value) );
         return values.last();
     }
-    template<Type KK, Type VV> V& insertSorted(const KK& key, VV& value) {
+    template<Type KK, Type VV> V& insertSorted(KK&& key, VV&& value) {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
-        return values.insertAt(keys.insertSorted(key),forward<VV>(value));
+        return values.insertAt(keys.insertSorted(forward<KK>(key)),forward<VV>(value));
     }
     template<Type KK> V& insertSortedMulti(const KK& key, const V& value) {
         return values.insertAt(keys.insertSorted(key),value);

@@ -4,95 +4,119 @@
 #include "window.h"
 #include "graphics.h"
 #include "png.h"
-inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
+
 struct ArrayView : Widget {
-    array<string> parameters = split("Size,Resolution,Trajectory,Rotations,Photons,Projections"_,',');
+    Dict parameterLabels = parseDict("rotationCount:Rotations,photonCount:Photons,projectionCount:Projections,subsetSize:per subset"_);
+    Dict valueLabels = parseDict("Iterations count:Iterations,Center NMSE %:Center,Extreme NMSE %:Extreme,Total NMSE %:Total,Global NMSE %:Total"_);
     string valueName;
-    string bestName = valueName=="k"_? "NMSE"_ : valueName;
-    array<array<Variant>> values;
-    map<array<String>, Variant> points;
+    string bestName = valueName=="Iterations"_? "Total"_ : valueName;
+    map<String, array<Variant>> arguments; // Arguments occuring for each parameter
+    array<String> valueNames;
+    map<Dict, Variant> points; // Data points
     float min = inf, max = -inf;
     uint textSize;
 
     ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
-        values.grow(parameters.size);
-        values[parameters.indexOf("Trajectory"_)] << Variant(String("single"_)) << Variant(String("double"_)) << Variant(String("adaptive"_)); // Force this specific order
+        arguments["Trajectory"_] << Variant(String("Single"_)) << Variant(String("Double"_)) << Variant(String("Adaptive"_)); // Force this specific order
         Folder results = "Results"_;
         for(string name: results.list()) {
             if(name.contains('.')) continue;
-            array<String> arguments = apply(split(name), [](string s){return String(s);});
-            if(arguments[parameters.indexOf("Trajectory"_)]=="adaptive"_) arguments[parameters.indexOf("Rotations"_)] = str(fromInteger(arguments[parameters.indexOf("Rotations"_)])-1); // Converts adaptive total rotation count to helical rotation count
-            assert_(arguments.size == parameters.size, parameters, arguments);
-            for(uint i: range(parameters.size)) if(!values[i].contains(arguments[i])) values[i].insertSorted(Variant(String(string(arguments[i]))));
+            Dict configuration = parseDict(name);
+            for(auto& parameter: configuration.keys) {
+                if(parameterLabels.contains(parameter)) parameter = copy(parameterLabels.at(parameter));
+                else { // Converts CamelCase identifier to user-facing labels
+                    String label; for(uint i: range(parameter.size)) {
+                        char c=parameter[i];
+                        if(i==0) label << toUpper(c);
+                        else {
+                            if(isUpper(c) && (!label || label.last()!=' ')) label << ' ';
+                            label << toLower(c);
+                        }
+                    }
+                    parameter = move(label);
+                }
+            }
+            for(auto& argument: configuration.values) argument[0]=toUpper(argument[0]); // Converts arguments to user-facing labels
+            if(configuration["Trajectory"_]=="Adaptive"_) configuration.at("Rotations"_) = int(configuration["Rotations"_])-1; // Converts adaptive total rotation count to helical rotation count
+
             float best = inf; Variant value;
-            for(TextData s = readFile(name, results);s;) {
-                map<string, Variant> values;
-                const int subsetSize = int(nearestDivisorToSqrt(fromInteger(arguments[parameters.indexOf("Projections"_)])));
-                values["k"_] = subsetSize*(s.integer()+1); s.skip(" "_);
-                values["Central"_] = s.decimal(); s.skip(" "_);
-                values["Extreme"_] = s.decimal(); s.skip(" "_);
-                values["NMSE"_] = s.decimal(); s.skip(" "_);
-                values["SNR"_] = -s.decimal(); /*Negates as best is maximum*/ s.skip("\n"_);
-                if((float)values[bestName] < best) {
+            String result = readFile(name, results);
+            for(string line: split(result, '\n')) {
+                Dict values;
+                if(startsWith(line, "{"_)) values = parseDict(line);
+                else {// Backward compatibility (REMOVEME)
+                    TextData s (line);
+                    const int subsetSize = configuration.at("per subset"_);
+                    values["Iterations"_] = subsetSize*(s.integer()+1); s.skip(" "_);
+                    values["Central"_] = s.decimal(); s.skip(" "_);
+                    values["Extreme"_] = s.decimal(); s.skip(" "_);
+                    values["Total"_] = s.decimal(); s.skip(" "_);
+                    values["SNR"_] = -s.decimal(); s.skip(" "_); /*Negates as best is maximum*/
+                    values["Time (s)"_] = s.decimal();
+                    assert_(!s, s.untilEnd(), "|", line);
+                }
+                for(auto& valueName: values.keys) if(valueLabels.contains(valueName)) valueName = copy(valueLabels.at(valueName));
+                for(const String& valueName: values.keys) valueNames += copy(valueName);
+                if(float(values.at(bestName)) < best) {
                     best = values[bestName];
-                    value = move(values[valueName]);
+                    value = move(values.at(valueName));
                 }
             }
             min = ::min(min, (float)value), max = ::max(max, (float)value);
-            points.insert(move(arguments), move(value));
+            for(const auto argument: (const Dict&)configuration) if(!arguments[copy(argument.key)].contains(argument.value)) arguments.at(argument.key).insertSorted(copy(argument.value));
+            points.insert(move(configuration), move(value));
         }
     }
-    array<string> dimensions[2] = {split("Trajectory Photons"_),split("Rotations Projections"_)};
+    array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Rotations,Projections,per subset"_,',')};
     /// Returns number of cells for \a axis at \a level
     int cellCount(uint axis, uint level=0) {
         int cellCount = 1;
-        for(string parameter: dimensions[axis].slice(level)) {
-            assert_(parameters.contains(parameter));
-            cellCount *= values[parameters.indexOf(parameter)].size;
-        }
+        for(string parameter: dimensions[axis].slice(level)) cellCount *= arguments.at(parameter).size;
         return cellCount;
     }
     int2 cellCount() { return int2(cellCount(0),cellCount(1)); }
     int2 levelCount() { return int2(dimensions[0].size,dimensions[1].size); }
     int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(5*textSize); }
     void render() override {
-        assert_(cellCount(), cellCount());
+        assert_(cellCount(), cellCount(), arguments);
         int2 cellSize = target.size() / (levelCount().yx()+int2(1)+cellCount());
         // Fixed parameters in unused top-left corner
         String fixed;
-        for(uint i: range(parameters.size)) if(values[i].size==1) fixed << parameters[i]+": "_+str(values[i])+"\n"_;
+        for(const auto& argument: arguments) if(argument.value.size==1) fixed << argument.key+": "_+str(argument.value)+"\n"_;
         Text(fixed, textSize).render(clip(target, Rect(int2(dimensions[1].size,dimensions[0].size)*cellSize)));
         // Value name in unused top-left cell
         Text(format(TextFormat::Bold)+valueName, textSize).render(clip(target, int2(dimensions[1].size,dimensions[0].size)*cellSize+Rect(cellSize)));
         // Content
         for(uint X: range(cellCount(0))) {
             for(uint Y: range(cellCount(1))) {
-                map<string, string> arguments; // Argument values corresponding to current cell
-                for(int axis: range(2)) {
+                Dict coordinates; // Argument values corresponding to current cell (i.e point coordinates)
+                for(int axis: range(2)) { // Coordinates from cell
                     uint x = ref<uint>({X,Y})[axis];
                     for(uint level: range(dimensions[axis].size)) {
                         string parameter = dimensions[axis][level];
                         uint index = x / cellCount(axis, level+1);
-                        arguments[parameter] = values[parameters.indexOf(parameter)][index];
+                        coordinates.insertSorted(parameter, copy(arguments.at(parameter)[index]));
                         x = x % cellCount(axis, level+1);
                     }
                 }
-                array<String> key;
-                for(uint i: range(parameters.size)) {
-                    string parameter = parameters[i];
-                    if(arguments.contains(parameter)) key << String(arguments[parameter]);
-                    else {
-                        assert_(values[i].size == 1, "Multiple values for",parameter,":",values[i]);
-                        key << String(string(values[i][0]));
+                for(const auto& argument: arguments) { // Fills in remaining fixed coordinates
+                    if(!coordinates.contains(argument.key)) {
+                        assert_(argument.value.size == 1, "Ambigous cell accepts multiple values for",argument.key,", got",argument.value);
+                        coordinates.insertSorted(copy(argument.key), copy(argument.value[0]));
                     }
                 }
-                if(points.contains(key)) {
+                if(points.contains(coordinates)) {
                     Image cell = clip(target, ((levelCount().yx()+int2(1)+int2(X,Y)) * cellSize)+Rect(cellSize));
-                    float value = points.at(key);
+                    const Variant& point = points.at(coordinates);
+                    float value = point;
                     float v = (value-min)/(max-min);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
-                    Text((value==min?format(Bold):""_)+(points.at(key).isInteger?dec(realValue):ftoa(realValue)),round(textSize*(1+(1-v))),black).render(cell);
+                    Text((value==0?format(Bold):""_)+(point.isInteger?dec(realValue):ftoa(realValue)),round(textSize*(1+(1-v))),black).render(cell);
+                } else {
+                    log(coordinates);
+                    log(points.keys[0]);
+                    error("");
                 }
             }
         }
@@ -102,13 +126,14 @@ struct ArrayView : Widget {
             for(uint level: range(dimensions[axis].size)) {
                 int2 origin = int2(dimensions[!axis].size-1+1, level);
                 if(axis) origin=origin.yx();
-                Text(dimensions[axis][level],textSize,black).render(clip(target, (origin*cellSize)+Rect(cellSize)));
 
-                uint parameter = parameters.indexOf(dimensions[axis][level]);
-                uint size = values[parameter].size;
+                string parameter = dimensions[axis][level];
+                Text(parameter,textSize,black).render(clip(target, (origin*cellSize)+Rect(cellSize)));
+
+                uint size = arguments[parameter].size;
                 for(uint x: range(X)) {
                     for(uint index: range(size)) {
-                        int2 origin = int2(dimensions[!axis].size +1 + x*size + index*cellCount(axis,level+1), level);
+                        int2 origin = int2(dimensions[!axis].size +1 + (x*size + index)*cellCount(axis,level+1), level);
                         int2 size = int2(cellCount(axis,level+1), 1);
                         if(axis) origin=origin.yx(), size=size.yx();
                         origin *= cellSize;
@@ -116,7 +141,7 @@ struct ArrayView : Widget {
                             if(!axis) fill(target, Rect(origin,int2(origin.x+1, target.size().y)));
                             if(axis) fill(target, Rect(origin,int2(target.size().x,origin.y+1)));
                         }
-                        Text(values[parameter][index],textSize,black).render(clip(target, origin+Rect(size*cellSize)));
+                        Text(arguments[parameter][index], textSize, black).render(clip(target, origin+Rect(size*cellSize)));
                     }
                 }
                 X *= size;
@@ -148,19 +173,19 @@ struct FileWatcher : File, Poll {
 };
 
 struct Application {
-    ArrayView view { arguments()?arguments()[0]:"Extreme"_ };
+    ArrayView view { arguments()?arguments()[0]:"Total"_ };
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
     Application() {
-        for(string valueName: {"NMSE"_,"Central"_,"Extreme"_,"SNR"_,"k"_}) {
+        /*for(string valueName: view.valueNames) {
             ArrayView view (valueName, 32);
             Image image ( view.sizeHint() );
+            assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
             fill(image, Rect(image.size()), white);
             view.Widget::render( image );
             writeFile(valueName, encodePNG(image));
-        }
+        }*/
         window.setSize(-1);
         window.show();
     }
 } app;
-

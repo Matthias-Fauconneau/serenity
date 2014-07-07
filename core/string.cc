@@ -106,6 +106,7 @@ bool isDecimal(const string& number) {
 }
 
 double fromDecimal(const string& number) {
+    assert_(number);
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
     double sign=1, eSign=1;
