@@ -20,7 +20,11 @@ template<Type K, Type V> struct map {
     void clear() { keys.clear(); values.clear(); }
 
     explicit operator bool() const { return keys.size; }
-    bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; } // Only if both have keys in same order
+    bool operator ==(const map<K,V>& o) const {
+        if(size() != o.size()) return false;
+        for(uint i: range(size())) if(!o.contains(keys[i]) || o.at(keys[i])!=values[i]) return false;
+        return true;
+    }
 
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
 

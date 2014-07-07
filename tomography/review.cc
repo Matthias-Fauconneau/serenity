@@ -113,10 +113,6 @@ struct ArrayView : Widget {
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
                     Text((value==0?format(Bold):""_)+(point.isInteger?dec(realValue):ftoa(realValue)),round(textSize*(1+(1-v))),black).render(cell);
-                } else {
-                    log(coordinates);
-                    log(points.keys[0]);
-                    error("");
                 }
             }
         }
