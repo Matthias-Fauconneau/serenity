@@ -39,7 +39,7 @@ struct PorousRock {
     const float volumeRadius = volumeCenter.x;
     const float innerRadius = (1-4./100) * volumeRadius;
     const float outerRadius = (1-2./100) * volumeRadius;
-    const uint grainCount = rate*size.z*size.y*size.x;
+    const size_t grainCount = rate*size.z*size.y*size.x;
     vec4 largestGrain = 0;
     buffer<size_t> intersectionCounts;
     buffer<Intersection> intersections;
@@ -56,13 +56,15 @@ struct PorousRock {
 /// Projects \a rock for all projections defined by \a A
 inline VolumeF project(PorousRock& rock, const Projection& A) {
     VolumeF volume(A.projectionSize, "b"_);
-    Time time;
+    //Time time;
+    //Time lastReport;
     float minMaxAttenuation=inf, maxMaxAttenuation=-inf;
     for(uint index: range(volume.size.z)) {
+        //if(lastReport.toFloat()>1) { log(index); lastReport=Time(); }
         float maxAttenuation = rock.project(::slice(volume, index), A, index);
         minMaxAttenuation = min(minMaxAttenuation, maxAttenuation);
         maxMaxAttenuation = max(maxMaxAttenuation, maxAttenuation);
     }
-    log("A", time, minMaxAttenuation, maxMaxAttenuation);
+    //log("A", time, minMaxAttenuation, maxMaxAttenuation);
     return volume;
 }

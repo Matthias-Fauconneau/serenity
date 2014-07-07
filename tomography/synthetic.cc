@@ -163,8 +163,8 @@ float PorousRock::project(const ImageF& target, const Projection& A, uint index)
 
     const uint typeCount = ref<GrainType>(types).size;
 
-    if(intersections.size != size_t(target.size.y*target.size.x*grainCount*2)) { // Reuses same allocation when possible to avoid unneeded page clearing
-        intersectionCounts = buffer<size_t>(target.size.y*target.size.x*grainCount*2); // Conservative allocation (to allow a ray to intersect all grains)
+    if(intersections.capacity != target.size.y*target.size.x*grainCount*2) { // Reuses same allocation when possible to avoid unneeded page clearing
+        intersectionCounts = buffer<size_t>(target.size.y*target.size.x);
         intersections = buffer<Intersection>(target.size.y*target.size.x*grainCount*2); // Conservative allocation (to allow a ray to intersect all grains)
     }
     intersectionCounts.clear();
