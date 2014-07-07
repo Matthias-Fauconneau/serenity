@@ -55,10 +55,16 @@ String join(const ref<string>& list, const string& separator);
 String join(const ref<String>& list, const string& separator);
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string& s, const string& before, const string& after);
+/// Returns whether \a c is uppercase
+bool isUpper(char c);
 /// Lowers case
 char toLower(char c);
 /// Lowers case
 String toLower(const string& s);
+/// Returns whether \a c is lowercase
+bool isLower(char c);
+/// Uppers case
+char toUpper(char c);
 /// Uppers case
 String toUpper(const string& s);
 /// Removes duplicate whitespace

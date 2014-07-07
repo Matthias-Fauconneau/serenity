@@ -35,7 +35,7 @@ struct SubsetReconstruction : Reconstruction {
         assert_(subsetCount*subsetSize == A.count);
         subsets.reserve(subsetCount);
         for(uint subsetIndex: range(subsetCount)) {
-            subsets << Subset{ CLBuffer<mat4>(apply(subsetSize, [&](uint index){ return A.worldToDevice(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)); }), "A"_), ImageArray(int3(b.size.xy(), subsetSize), 0, "b"_)};
+            subsets << Subset{ CLBuffer<mat4>(apply(subsetSize, [&](uint index){ return A.worldToDevice(interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)); }), "A"_), ImageArray(int3(b.size.xy(), subsetSize), "b"_, 0)};
             for(uint index: range(subsetSize)) copy(b, subsets[subsetIndex].b, int3(0,0,interleave(subsetSize, subsetCount, subsetIndex*subsetSize+index)), int3(0,0,index), int3(b.size.xy(),1));
         }
     }

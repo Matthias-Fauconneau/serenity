@@ -106,7 +106,7 @@ struct Compute {
             {// Full resolution poisson projection data
                 String key = str(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount, photonCount);
                 if(intensity0Key != key) { // Cache miss
-                    intensity0 = VolumeF(attenuation0.size);
+                    intensity0 = VolumeF(attenuation0.size, "intensity0"_);
                     log_("Poisson noise ["_+str(maxProjectionCount)+"]... "_);
                     Time time; poissonTime.start();
                     for(uint i: range(intensity0.data.size)) intensity0.data[i] = (poisson(photonCount) * exp(-attenuation0.data[i])) / float(photonCount);
@@ -155,7 +155,7 @@ struct Compute {
                 // Evaluation
                 uint bestK = 0;
                 float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
-                VolumeF best (volumeSize);
+                VolumeF best (volumeSize, "best"_);
                 Time time; reconstructionTime.start();
                 const uint minIterationCount = 16, maxIterationCount = 512;
                 String result;
@@ -164,7 +164,7 @@ struct Compute {
 
                     vec3 center = rock.largestGrain.xyz(); float r = rock.largestGrain.w;
                     int3 size = ceil(r); int3 origin = int3(round(center))-size;
-                    VolumeF grain = reconstruction->x.read(2*size, origin);
+                    VolumeF grain = reconstruction->x.read(VolumeF(2*size,"grain"_), origin);
                     center -= vec3(origin);
                     float sum=0; float count=0;
                     for(int z: range(grain.size.z)) for(int y: range(grain.size.y)) for(int x: range(grain.size.x))  if(sq(vec3(x,y,z)-center)<=sq(r-1./2)) sum += grain(x,y,z), count++;
@@ -198,9 +198,10 @@ struct Compute {
                 writeFile(toASCII(configuration), result, results);
                 writeFile(toASCII(configuration)+".best"_, cast<byte>(best.data), results);
                 log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
+                window->widget = 0;
             }
             completed++;
-            assert_(CLMem::handleCount == 0, "Holding OpenCL MemObjects after completion"); // Asserts all MemObjects have been released, as this single process runs all cases (to reuse projection data and monitor window).
+            assert_(CLMem::handleCount == 0, "Holding OpenCL MemObjects after completion", CLMem::handleCount); // Asserts all MemObjects have been released, as this single process runs all cases (to reuse projection data and monitor window).
         }
         log(projectionTime, poissonTime, reconstructionTime, totalTime, completed, total, missing, totalTime/missing);
         exit();

@@ -2,14 +2,11 @@
 #include "operators.h"
 #include "time.h"
 
-CG::CG(const Projection& projection, ImageArray&& attenuation) : Reconstruction(projection, "CG"_), At(apply(attenuation.size.z, [&](uint index){ return projection.worldToDevice(index); }), "At"_), r(x.size) {
+CG::CG(const Projection& projection, ImageArray&& attenuation) : Reconstruction(projection, "CG"_), At(apply(attenuation.size.z, [&](uint index){ return projection.worldToDevice(index); }), "At"_), r(x.size, "r"_), p(x.size,"p"_), Ap(attenuation.size,"Ap"_), AtAp(x.size,"AtAp"_) {
      /// Computes residual r=p=Atb
     backproject(r, At, attenuation); // p = At b (x=0)
     residualEnergy = dot(r, r);
     assert_(residualEnergy);
-    int3 projectionSize = attenuation.size;
-    attenuation = ImageArray(); // Releases attenuation before allocating p, Ap, AtAp
-    p = CLVolume(x.size); Ap = ImageArray(projectionSize); AtAp = CLVolume(x.size);
     copy(r, p); // r -> p
 }
 

@@ -3,14 +3,14 @@
 #include "time.h"
 
 // Simultaneous iterative algebraic reconstruction technique
-SART::SART(const Projection& A, ImageArray&& attenuation, const uint subsetSize) : SubsetReconstruction(A, attenuation, subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size), Atr(x.size) {
-    ImageArray i (Ax.size, 1.f, "i"_);
+SART::SART(const Projection& A, ImageArray&& attenuation, const uint subsetSize) : SubsetReconstruction(A, attenuation, subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size,"Ax"_), Atr(x.size,"Atr"_) {
+    ImageArray i (Ax.size, "i"_, 1.f);
     log_("SART::AAti ["_+str(subsets.size)+"]... "_); Time time;
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
-        CLVolume Ati (x.size);
+        CLVolume Ati (x.size, "Ati"_);
         backproject(Ati, subset.At, i); // Backprojects identity projections
-        AAti << ImageArray(subset.b.size);
+        AAti << ImageArray(subset.b.size, "AAti"_);
         project(AAti[subsetIndex], A, Ati, subsetIndex, subsetSize, subsetCount); // Projects coefficents volume
     }
     log(time);

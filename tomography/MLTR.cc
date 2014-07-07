@@ -2,13 +2,13 @@
 #include "operators.h"
 #include "time.h"
 
-MLTR::MLTR(const Projection& projection, ImageArray&& intensity, const uint subsetSize) : SubsetReconstruction(projection, intensity, subsetSize, "MLTR"_, 1), Ai(subsets.size), Ax(subsets[0].b.size), r(Ax.size), Atr(x.size), Atw(x.size) {
+MLTR::MLTR(const Projection& projection, ImageArray&& intensity, const uint subsetSize) : SubsetReconstruction(projection, intensity, subsetSize, "MLTR"_, 1), Ai(subsets.size), Ax(subsets[0].b.size, "Ax"_), r(Ax.size, "r"_), Atr(x.size, "Atr"_), Atw(x.size, "Atw"_) {
     CLVolume i = cylinder(VolumeF(x.size,"i"_));
     log_("MLTR::Ai ["_+str(subsets.size)+"]... "_); Time time;
     for(uint subsetIndex: range(subsets.size)) {
         Subset& subset = subsets[subsetIndex];
         const ImageArray& b = subset.b;
-        Ai << ImageArray(b.size);
+        Ai << ImageArray(b.size, "Ai"_);
         project(Ai[subsetIndex], A, i, subsetIndex, subsetSize, subsetCount); // Ai = A i
     }
     log(time);

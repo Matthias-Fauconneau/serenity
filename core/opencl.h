@@ -8,12 +8,12 @@ typedef struct _cl_kernel* cl_kernel;
 typedef struct _cl_mem* cl_mem;
 typedef struct _cl_sampler* cl_sampler;
 
+#include "trace.h"
 /// Generic OpenCL MemObject
 struct CLMem : handle<cl_mem> {
     String name;
     static uint handleCount; // Counts currently allocated MemObjects (used to assert correct release)
 
-    CLMem(){}
     CLMem(cl_mem mem, string name) : handle(mem), name(copy(String(name))) { assert_(mem); handleCount++; }
     default_move(CLMem);
     /// Releases the OpenCL MemObject.
@@ -45,7 +45,7 @@ typedef CLBuffer<float> CLBufferF;
 
 /// Single channel floating-point OpenCL 2D image
 struct CLImage : CLMem {
-    CLImage(int2 size, const float value, string name);
+    CLImage(int2 size, string name, const float value);
     CLImage(int2 size, const ref<float>& data, string name);
     default_move(CLImage);
 
@@ -54,8 +54,7 @@ struct CLImage : CLMem {
 
 /// Single channel floating-point OpenCL 3D image
 struct CLVolume : CLMem {
-    CLVolume(){}
-    CLVolume(int3 size, const float value, string name);
+    CLVolume(int3 size, string name, const float value=0);
     CLVolume(int3 size, const ref<float>& data, string name);
     CLVolume(const VolumeF& A) : CLVolume(A.size, A.data, A.name) {}
     default_move(CLVolume);

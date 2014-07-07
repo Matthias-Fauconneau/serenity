@@ -36,7 +36,7 @@ struct Variant : String {
     Variant(double decimal) : String(ftoa(decimal)){}
     Variant(int2 v) : String(strx(v)) {}
     Variant(int3 v) : String(strx(v)) {}
-    generic Variant(T v) : String(str(v)) {} // Enables implicit conversion from any type with string conversion
+    generic Variant(T v) : String(copy(String(str(v)))) {} // Enables implicit conversion from any type with string conversion (FIXME: copy is only needed for string str)
     operator bool() const { return size && *this!="0"_ && *this!="false"_; }
     operator int() const { return *this ? fromInteger(*this) : 0; }
     operator uint() const { return *this ? fromInteger(*this) : 0; }
@@ -48,6 +48,24 @@ struct Variant : String {
 };
 inline String str(const Variant& v) { return String((string&)v); }
 inline bool operator <(const Variant& a, const Variant& b) { if(isDecimal(a) && isDecimal(b)) return fromDecimal(a) < fromDecimal(b); else return (string)a < (string)b; }
+
+typedef map<String,Variant> Dict; /// Associative array of variants
+
+inline Dict parseDict(TextData& s) {
+    Dict dict;
+    if(s.match('{')) if(s.match('}')) return dict;
+    for(;;) {
+        string key = s.whileNo(":|},"_);
+        string value;
+        if(s.match(':')) value = s.whileNo("|,"_,'{','}');
+        dict.insert(String(key), replace(String(value),'\\','/'));
+        if(s.matchAny("|,"_)) continue;
+        else if(!s || s.match('}')) break;
+        else error(s.untilEnd());
+    }
+    return dict;
+}
+inline Dict parseDict(string str) { TextData s (str); return parseDict(s); }
 
 /// Parses process arguments into parameter=value pairs
 inline map<string, Variant> parseParameters(const ref<string> args, const ref<string> parameters) {

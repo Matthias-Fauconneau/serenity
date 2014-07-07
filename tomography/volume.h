@@ -4,7 +4,7 @@
 
 struct VolumeF {
     VolumeF() {}
-    VolumeF(int3 size, string name=""_) : size(size), data(size.z*size.y*size.x), name(copy(String(name))) { assert(name.size <= 16); }
+    VolumeF(int3 size, string name) : size(size), data(size.z*size.y*size.x), name(copy(String(name))) { assert(name.size <= 16); }
     VolumeF(int3 size, float value, string name) : size(size), data(size.z*size.y*size.x, size.z*size.y*size.x, value), name(copy(String(name))) { assert(name.size <= 16); }
     VolumeF(int3 size, buffer<float>&& data, string name) : size(size), data(move(data)), name(copy(String(name))) { assert_(this->data.size == (size_t)size.x*size.y*size.z); }
     inline float& operator()(uint x, uint y, uint z) const {assert_(x<uint(size.x) && y<uint(size.y) && z<uint(size.z), x,y,z, size); return data[(size_t)z*size.y*size.x+y*size.x+x]; }

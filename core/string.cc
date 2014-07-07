@@ -148,10 +148,12 @@ String replace(const string& s, const string& before, const string& after) {
     return r;
 }
 
-char toLower(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
+bool isUpper(char c) { return c>='A'&&c<='Z'; }
+char toLower(char c) { return isUpper(c) ? 'a'+c-'A' : c; }
 String toLower(const string& s) { String lower(s.size); for(char c: s) lower<<toLower(c); return lower; }
 
-char toUpper(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
+bool isLower(char c) { return c>='a'&&c<='z'; }
+char toUpper(char c) { return isLower(c) ? 'A'+c-'a' : c; }
 String toUpper(const string& s) { String upper(s.size); for(char c: s) upper<<toUpper(c); return upper; }
 
 String simplify(String&& s) {
