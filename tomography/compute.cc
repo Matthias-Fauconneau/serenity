@@ -43,7 +43,7 @@ struct Compute {
         array<Dict> configurations;
         for(string trajectory: split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
             for(uint rotationCount: apply(split(parameters.value("rotationCount"_,"4,2,1"_),','), [](string s)->uint{ return fromInteger(s); })) {
-                if(trajectory=="adaptive") rotationCount = rotationCount + 1;
+                if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                 for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048"_),','), [](string s)->uint{ return fromInteger(s); })) {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
@@ -196,7 +196,7 @@ struct Compute {
                         reconstruction->x.read(best);
                         if(k >= maxIterationCount-1) log("Slow convergence stopped after maximum iteration count");
                     } else {
-                        if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after minimum iteration count"); break; }
+                        if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after", k, "iterations"); break; }
                     }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
 
@@ -205,7 +205,7 @@ struct Compute {
                 writeFile(toASCII(configuration), str(result, '\n'), results);
                 writeFile(toASCII(configuration)+".best"_, cast<byte>(best.data), results);
                 log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
-                window->widget = 0;
+                if(window) window->widget = 0;
             }
             completed++;
             assert_(CLMem::handleCount == 0, "Holding OpenCL MemObjects after completion", CLMem::handleCount); // Asserts all MemObjects have been released, as this single process runs all cases (to reuse projection data and monitor window).
