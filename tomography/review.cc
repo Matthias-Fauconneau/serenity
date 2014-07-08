@@ -21,6 +21,7 @@ struct ArrayView : Widget {
         for(string name: results.list()) {
             if(name.contains('.')) continue;
             Dict configuration = parseDict(name);
+            if(configuration["trajectory"_]=="adaptive"_ && int(configuration.at("rotationCount"_))%2==0) continue; // Skips 1,2,4 adaptive rotations (only 2,3,5 is relevant)
             if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = int(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
             for(auto& dimension: configuration.keys) { // Converts dimension identifiers to labels
                 if(dimensionLabels.contains(dimension)) dimension = copy(dimensionLabels.at(dimension));
@@ -118,9 +119,15 @@ struct ArrayView : Widget {
             int2 origin = int2(dimensions[!axis].size+1+offset+cellCount, level);
             int2 size = int2(childCellCount, 1);
             if(axis) origin=origin.yx(), size=size.yx();
+            origin *= cellSize;
+            if(level<dimensions[axis].size-1) {
+                int width = dimensions[axis].size-1-level;
+                if(!axis) fill(target, Rect(origin+int2(-width/2,0),int2(origin.x+(width+1)/2, target.size().y)));
+                if(axis) fill(target, Rect(origin+int2(0,-width/2),int2(target.size().x,origin.y+(width+1)/2)));
+            }
             String label = copy(coordinate);
             if(label[0] < 16) label.removeAt(0); // Removes sort key
-            Text(label, textSize, black).render(clip(target, (origin*cellSize)+Rect(size*cellSize)));
+            Text(label, textSize, black).render(clip(target, origin+Rect(size*cellSize)));
             cellCount += childCellCount;
         }
         filter.remove(dimension);
@@ -211,14 +218,14 @@ struct Application {
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
     Application() {
-        /*for(string valueName: view.valueNames) {
+        for(string valueName: {"Central"_,"Extreme"_,"Total"_,"Time"_}) {
             ArrayView view (valueName, 32);
             Image image ( view.sizeHint() );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
             fill(image, Rect(image.size()), white);
             view.Widget::render( image );
             writeFile(valueName, encodePNG(image));
-        }*/
+        }
         window.setSize(-1);
         window.show();
     }
