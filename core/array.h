@@ -127,6 +127,9 @@ generic array<T> replace(array<T>&& a, const T& before, const T& after) {
 /// Copies elements not matching predicate in a new array
 template<Type T, Type F> array<T> filter(const ref<T>& a, F f) { array<T> r (a.size); for(const T& e: a) if(!f(e)) r << copy(e); return r; }
 
+/// Copies indices not matching predicate in a new array
+template<Type T, Type F> array<T> filterIndex(const ref<T>& a, F f) { array<T> r (a.size); for(const size_t i: range(a.size)) if(!f(i)) r << copy(a[i]); return r; }
+
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function, Type... Args> auto apply(range a, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
     buffer<decltype(function(0, args...))> r(a.stop-a.start); for(uint i: range(a.stop-a.start)) new (&r[i]) decltype(function(0, args...))(function(a.start+i, args...)); return r;

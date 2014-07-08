@@ -21,7 +21,8 @@ struct ArrayView : Widget {
         for(string name: results.list()) {
             if(name.contains('.')) continue;
             Dict configuration = parseDict(name);
-            if(configuration["trajectory"_]=="adaptive"_ && int(configuration.at("rotationCount"_))%2==0) continue; // Skips 1,2,4 adaptive rotations (only 2,3,5 is relevant)
+            //if(configuration["method"_]=="SART"_ ) continue;
+            if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
             if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = int(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
             for(auto& dimension: configuration.keys) { // Converts dimension identifiers to labels
                 if(dimensionLabels.contains(dimension)) dimension = copy(dimensionLabels.at(dimension));
@@ -62,8 +63,16 @@ struct ArrayView : Widget {
                     value = move(values.at(valueName));
                 }
             }
-            min = ::min(min, (float)value), max = ::max(max, (float)value);
             points.insert(move(configuration), move(value));
+        }
+        min = ::min(points.values);
+        if(0) {
+            array<Variant> values = copy(points.values);
+            for(uint _unused i: range(2)) values.remove(::max(values)); // Removes 2 maximum values before computing maximum bound (discards outliers)
+            max = ::max(values);
+        } else { // Ignores SART values for maximum bound
+            array<Variant> values = filterIndex(points.values, [this](size_t i){ return points.keys[i].at("Method"_)=="SART"_ || (this->valueName=="Time"_ && points.keys[i].at("Method"_)=="MLTR"_ && points.keys[i].at("per subset"_)==points.keys[i].at("Projections"_) ); });
+            max = ::max(values);
         }
     }
     array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Rotations,Projections,per subset"_,',')};
@@ -84,12 +93,6 @@ struct ArrayView : Widget {
             if(!allCoordinates[copy(coordinate.key)].contains(coordinate.value)) allCoordinates.at(coordinate.key).insertSorted(copy(coordinate.value));
         return allCoordinates;
     }
-    /*/// Returns points matching \a filter
-    map<Dict, Variant> subset(const Dict& filter) const {
-        map<Dict, Variant> subset;
-        for(const Dict& coordinates: points.keys) if(coordinates.includes(filter)) subset.insert(copy(coordinates), copy(points.at(coordinates)));
-        return subset;
-    }*/
     /// Returns number of cells for the given \a axis, \a level and \a coordinates
     int cellCount(uint axis, uint level, Dict& filter) const {
         if(level == dimensions[axis].size) return 1;
@@ -146,7 +149,7 @@ struct ArrayView : Widget {
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
                     String text = (value==0?format(Bold):""_)+(point.isInteger?dec(realValue):ftoa(realValue));
-                    Text(text, round(textSize*(1+(1-v))),black).render(cell);
+                    Text(text, ::max(16,(int)round(textSize*(1+(1-v)))),black).render(cell);
                     break;
                 }
             }
