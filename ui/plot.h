@@ -19,7 +19,7 @@ struct Plot : virtual Widget {
     int2 sizeHint() override;
     void render() override;
 
-    String title, xlabel, ylabel;
+    String title, xLabel, yLabel;
     bool log[2] = {false, false};
     array<DataSet> dataSets;
     bool plotPoints, plotLines;

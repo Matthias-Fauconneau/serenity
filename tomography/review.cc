@@ -223,7 +223,7 @@ struct Application {
     Application() {
         for(string valueName: {"Central"_,"Extreme"_,"Total"_,"Time"_}) {
             ArrayView view (valueName, 32);
-            Image image ( view.sizeHint() );
+            Image image ( abs(view.sizeHint()) );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
             fill(image, Rect(image.size()), white);
             view.Widget::render( image );

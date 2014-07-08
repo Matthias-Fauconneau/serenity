@@ -32,7 +32,7 @@ void Plot::render() {
         for(uint i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
     }
     if(min.x == max.x) return;
-    min.y = 0;
+    if(!log[1]) min.y = 0;
     if(min.y == max.y) return;
     assert(min.x < max.x && min.y < max.y, min, max);
 
@@ -84,7 +84,7 @@ void Plot::render() {
 
     // Evaluates margins
     int left=tickLabelSize.x*3./2, top=tickLabelSize.y, bottom=tickLabelSize.y;
-    int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xlabel).sizeHint().x);
+    int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(format(Bold)+xLabel).sizeHint().x);
     const int tickLength = 4;
 
     // Evaluates colors
@@ -105,7 +105,7 @@ void Plot::render() {
         pen.y += top;
     }
     for(uint i: range(dataSets.size)) { // Legend
-        Text text(dataSets[i].label, 16, colors[i]); text.render(target, pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)); pen.y+=text.sizeHint().y;
+        Text text(dataSets[i].label, clip(8, (int)round((float)size.y/dataSets.size), 16), colors[i]); text.render(target, pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)); pen.y+=text.sizeHint().y;
     }
 
     // Transforms data positions to render positions
@@ -117,7 +117,9 @@ void Plot::render() {
             if(log[axis]) p[axis] = log2(p[axis]);
             p[axis] = (p[axis]-lmin)/(lmax-lmin);
         }
-        return vec2(left+p.x*(size.x-left-right),2*top+(1-p.y)*(size.y-2*top-bottom));
+        vec2 P(left+p.x*(size.x-left-right),2*top+(1-p.y)*(size.y-2*top-bottom));
+        assert_(!isNaN(p), p, P);
+        return P;
     };
 
     // Draws axis and ticks
@@ -129,7 +131,7 @@ void Plot::render() {
             line(target, p, p+int2(0,-tickLength));
             tick.render(target, p + int2(-tick.textSize.x/2, -min.y > max.y ? -tick.textSize.y : 0) );
         }
-        {Text text(format(Bold)+xlabel,16); text.render(target, int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
+        {Text text(format(Bold)+xLabel,16); text.render(target, int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2));}
     }
     {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
         line(target, int2(round(point(O))), int2(round(point(end))));
@@ -139,7 +141,7 @@ void Plot::render() {
             Text& tick = ticks[1][i];
             tick.render(target, p + int2(-tick.textSize.x-left/6, -tick.textSize.y/2) );
         }
-        {Text text(format(Bold)+ylabel,16);
+        {Text text(format(Bold)+yLabel,16);
             text.render(target, int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y/2));}
     }
 
