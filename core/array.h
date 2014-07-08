@@ -85,7 +85,7 @@ generic struct array : buffer<T> {
 
     /// Removes one matching element and returns an index to its successor
     template<Type K> int tryRemove(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
-    /// Removes one matching element and returns an index to its successor, aborts if not sed
+    /// Removes one matching element and returns an index to its successor, aborts if not found
     template<Type K> int remove(const K& key) { int i=indexOf(key); assert(i>=0); removeAt(i); return i; }
     /// Removes all matching elements
     //template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }

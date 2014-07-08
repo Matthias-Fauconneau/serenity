@@ -28,6 +28,12 @@ template<Type K, Type V> struct map {
 
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
 
+    /// Returns whether this object has the same values for all keys in subsets.
+    bool includes(const map<K, V>& subset) const {
+        for(auto argument: subset) if(at(argument.key) != argument.value) return false;
+        return true;
+    }
+
     template<Type KK> const V& at(const KK& key) const {
         size_t i = keys.indexOf(key);
         if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);

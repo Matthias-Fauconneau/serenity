@@ -30,8 +30,8 @@ struct Variant : String {
     bool isInteger = false; // for proper display of integers (without decimal points)
     Variant(){}
     default_move(Variant);
-    //Variant(string s) : String(copy(String(s))) {}
     Variant(String&& s, bool isInteger=false) : String(move(s)), isInteger(isInteger) {}
+    Variant(string s) : String(copy(String(s))) {}
     Variant(int integer) : String(dec(integer)), isInteger(true) {}
     Variant(uint integer) : String(dec(integer)), isInteger(true) {}
     Variant(double decimal) : String(ftoa(decimal)){}

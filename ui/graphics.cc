@@ -52,9 +52,9 @@ void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha)
     target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]], 0xFF);
 }
 
-static void fill(uint* target, uint stride, uint w, uint h, uint value) {
-    for(uint y=0; y<h; y++) {
-        for(uint x=0; x<w; x++) target[x] = value;
+static void fill(uint* target, uint stride, int w, int h, uint value) {
+    for(int y=0; y<h; y++) {
+        for(int x=0; x<w; x++) target[x] = value;
         target += stride;
     }
 }
