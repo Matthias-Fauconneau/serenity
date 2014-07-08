@@ -17,8 +17,8 @@ kernel void project(struct mat4 imageToWorld, float2 plusMinusHalfHeightMinusOri
     const float2 sideT = (-b + (float2)(sqrtDelta,-sqrtDelta)) / (2*a); // t±
     const float2 sideZ = fabs(origin.z + sideT * ray.z); // |z±|
     float tmin=INFINITY, tmax=-INFINITY;
-    if(capR2.s0 < radiusSq) tmin=min(tmin, capT.s0), tmax=max(tmax, capT.s0); // top
-    if(capR2.s1 < radiusSq) tmin=min(tmin, capT.s1), tmax=max(tmax, capT.s1); // bottom
+    if(capR2.s0 <= radiusSq) tmin=min(tmin, capT.s0), tmax=max(tmax, capT.s0); // top
+    if(capR2.s1 <= radiusSq) tmin=min(tmin, capT.s1), tmax=max(tmax, capT.s1); // bottom
     if(sideZ.s0 <= halfHeight) tmin=min(tmin, sideT.s0), tmax=max(tmax, sideT.s0); // side+
     if(sideZ.s1 <= halfHeight) tmin=min(tmin, sideT.s1), tmax=max(tmax, sideT.s1); // side-
     float3 position = dataOrigin + tmin * ray; // [-(size-1)/2, (size-1)/2] -> [0, size-1]
