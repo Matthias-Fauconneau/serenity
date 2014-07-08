@@ -65,11 +65,10 @@ struct Compute {
             }
         }
 
+        // Filters configuration requiring an update
         Folder results = "Results"_;
-
-        // Counts missing results
-        uint missing = sum(apply(configurations,[&](const Dict& configuration){ return !existsFile(toASCII(configuration), results); }));
-        uint total = configurations.size;
+        const int64 updateTime = realTime() - 24*60*60*1000000000ull; // Updates any results older than 24h
+        array<Dict> update = filter(configurations,[&](const Dict& configuration){ return existsFile(toASCII(configuration), results) && File(toASCII(configuration), results).modifiedTime() >= updateTime; });
 
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
         uint completed = 0;
@@ -79,9 +78,8 @@ struct Compute {
         String intensity0Key; VolumeF intensity0;
         String intensityKey; VolumeF intensity;/*MLTR*/ VolumeF attenuation;/*UI, SART, CG*/
         uint maxProjectionCount=0; for(const Dict& configuration: configurations) maxProjectionCount=max<uint>(maxProjectionCount,configuration["projectionCount"_]);
-        for(uint index: range(configurations.size)) {
-            const Dict& configuration = configurations[index];
-            if(existsFile(toASCII(configuration), results)) continue;
+        for(const Dict& configuration: update) {
+            uint index = configurations.indexOf(configuration); // Original index for total progress report
             log(index, configuration);
 
             // Configuration parameters
@@ -149,7 +147,7 @@ struct Compute {
                 if(window) {
                     window->widget = &layout;
                     window->setSize(min(int2(-1), -window->size));
-                    window->setTitle(str(completed)+"/"_+str(missing)+" "_+str(index)+"/"_+str(total)+" "_+str(configuration));
+                    window->setTitle(str(completed)+"/"_+str(update.size)+" "_+str(index)+"/"_+str(configurations.size)+" "_+str(configuration));
                     window->show();
                 }
 
@@ -212,7 +210,7 @@ struct Compute {
             extern bool terminate;
             if(terminate) { log("Terminated"_); break; }
         }
-        log("Total", totalTime, "Projection", projectionTime, "Poisson", poissonTime, "Reconstruction", reconstructionTime, "Completed", completed, "from", missing, "on total", total, "in average", totalTime/missing);
+        log("Total", totalTime, "Projection", projectionTime, "Poisson", poissonTime, "Reconstruction", reconstructionTime, "Completed", completed, "from", update.size, "on total", configurations.size, "in average", totalTime.toFloat()/update.size, "s/configuration");
         exit();
     }
 } app; // Static object constructors executes before main. In this application, events are processed explicitly by calling window->event() in the innermost loop instead of using the event loop in main() as it makes parameter sweeps easier to write.

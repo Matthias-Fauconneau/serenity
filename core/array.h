@@ -87,8 +87,6 @@ generic struct array : buffer<T> {
     template<Type K> int tryRemove(const K& key) { int i=indexOf(key); if(i>=0) removeAt(i); return i; }
     /// Removes one matching element and returns an index to its successor, aborts if not found
     template<Type K> int remove(const K& key) { int i=indexOf(key); assert(i>=0); removeAt(i); return i; }
-    /// Removes all matching elements
-    //template<Type K> void removeAll(const K& key) { for(size_t i=0; i<size;) if(at(i)==key) removeAt(i); else i++; }
     /// Filters elements matching predicate
     template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
@@ -125,6 +123,9 @@ generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
 generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=after; return move(a);
 }
+
+/// Copies elements not matching predicate in a new array
+template<Type T, Type F> array<T> filter(const ref<T>& a, F f) { array<T> r (a.size); for(const T& e: a) if(!f(e)) r << copy(e); return r; }
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function, Type... Args> auto apply(range a, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
