@@ -68,7 +68,11 @@ struct Compute {
         // Filters configuration requiring an update
         Folder results = "Results"_;
         const int64 updateTime = realTime() - 24*60*60*1000000000ull; // Updates any results older than 24h
-        array<Dict> update = filter(configurations,[&](const Dict& configuration){ return existsFile(toASCII(configuration), results) && File(toASCII(configuration), results).modifiedTime() >= updateTime; });
+        map<int64, Dict> update;
+        for(const Dict& configuration: configurations) {
+            int64 mtime = existsFile(toASCII(configuration), results) ? File(toASCII(configuration), results).modifiedTime() : 0;
+            if(mtime < updateTime) update.insertSorted(mtime, copy(configuration)); // Updates oldest evaluation first
+        }
 
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
         uint completed = 0;
@@ -78,7 +82,8 @@ struct Compute {
         String intensity0Key; VolumeF intensity0;
         String intensityKey; VolumeF intensity;/*MLTR*/ VolumeF attenuation;/*UI, SART, CG*/
         uint maxProjectionCount=0; for(const Dict& configuration: configurations) maxProjectionCount=max<uint>(maxProjectionCount,configuration["projectionCount"_]);
-        for(const Dict& configuration: update) {
+        log("Missing", update.size(), "on total", configurations.size);
+        for(const Dict& configuration: update.values) {
             uint index = configurations.indexOf(configuration); // Original index for total progress report
             log(index, configuration);
 
@@ -147,7 +152,7 @@ struct Compute {
                 if(window) {
                     window->widget = &layout;
                     window->setSize(min(int2(-1), -window->size));
-                    window->setTitle(str(completed)+"/"_+str(update.size)+" "_+str(index)+"/"_+str(configurations.size)+" "_+str(configuration));
+                    window->setTitle(str(completed)+"/"_+str(update.size())+" "_+str(index)+"/"_+str(configurations.size)+" "_+str(configuration));
                     window->show();
                 }
 
@@ -193,9 +198,9 @@ struct Compute {
                         bestK=k;
                         reconstruction->x.read(best);
                         if(k >= maxIterationCount-1) log("Slow convergence stopped after maximum iteration count");
-                    } else {
-                        if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after", k, "iterations"); break; }
                     }
+                    else if(centerSSE < bestCenterSSE || extremeSSE < bestExtremeSSE) {} // Keep running if any region is still converging
+                    else if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after", k, "iterations"); break; }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
 
                 }
@@ -210,7 +215,7 @@ struct Compute {
             extern bool terminate;
             if(terminate) { log("Terminated"_); break; }
         }
-        log("Total", totalTime, "Projection", projectionTime, "Poisson", poissonTime, "Reconstruction", reconstructionTime, "Completed", completed, "from", update.size, "on total", configurations.size, "in average", totalTime.toFloat()/update.size, "s/configuration");
+        log("Total", totalTime, "Projection", projectionTime, "Poisson", poissonTime, "Reconstruction", reconstructionTime, "Completed", completed, "from", update.size(), "on total", configurations.size, "in average", totalTime.toFloat()/update.size(), "s/configuration");
         exit();
     }
 } app; // Static object constructors executes before main. In this application, events are processed explicitly by calling window->event() in the innermost loop instead of using the event loop in main() as it makes parameter sweeps easier to write.
