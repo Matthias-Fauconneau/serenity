@@ -10,7 +10,7 @@ struct Compare {
         PorousRock rock (size);
         VolumeF reference = rock.volume();
         Folder results = "Results"_;
-        buffer<uint> sliceIndices = apply(range(8),[&](uint z){return size.z*z/8; });
+        //buffer<uint> sliceIndices = apply(range(8),[&](uint z){return size.z*z/8; });
         Folder folder ("Difference"_, currentWorkingDirectory(), true);
         ImageF error ( reference.size.xy() );
         Image target ( reference.size.xy() );
@@ -18,7 +18,8 @@ struct Compare {
             if(!endsWith(name,".best"_)) continue;
             Map map (name, results);
             VolumeF reconstruction (size, buffer<float>(map), "x"_);
-            for(uint z: sliceIndices) {
+            //for(uint z: sliceIndices) {
+            for(uint z: {256/2,256/8}) {
                 const float* x0 = slice(reference,z).data;
                 const float* x1 = slice(reconstruction,z).data;
                 float* e = error.data;
