@@ -42,10 +42,13 @@ struct Compute {
         // Explicits configurations
         array<Dict> configurations;
         for(string trajectory: split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
-            for(uint rotationCount: apply(split(parameters.value("rotationCount"_,"4,2,1"_),','), [](string s)->uint{ return fromInteger(s); })) {
-                if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
-                for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048"_),','), [](string s)->uint{ return fromInteger(s); })) {
+            for(string rotationCountParameter: split(parameters.value("rotationCount"_,"4,2,1,optimal"_),',')) {
+                for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048,0"_),','), [](string s)->uint{ return fromInteger(s); })) {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
+                        float rotationCount;
+                        if(rotationCountParameter=="optimal"_) rotationCount = (sqrt(16*PI*projectionCount) - 1) / (4*PI);
+                        else rotationCount = fromDecimal(rotationCountParameter);
+                        if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
                             for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), nearestDivisorToSqrt(projectionCount)*2, projectionCount})) {
                                 Dict configuration;
@@ -85,13 +88,13 @@ struct Compute {
         log("Missing", update.size(), "on total", configurations.size);
         for(const Dict& configuration: update.values) {
             uint index = configurations.indexOf(configuration); // Original index for total progress report
-            log(index, configuration);
+            log(str(completed)+"/"_+str(update.size()), index, configuration);
 
             // Configuration parameters
             int3 volumeSize = configuration["volumeSize"_];
             int2 projectionSize = configuration["projectionSize"_];
             Trajectory trajectory = Trajectory(ref<string>({"single"_,"double"_,"adaptive"_}).indexOf(configuration["trajectory"_]));
-            uint rotationCount = configuration["rotationCount"_];
+            float rotationCount = configuration["rotationCount"_];
             uint photonCount = configuration["photonCount"_];
             uint projectionCount = configuration["projectionCount"_];
             string method = configuration["method"_];
@@ -113,7 +116,8 @@ struct Compute {
                     intensity0 = VolumeF(attenuation0.size, "intensity0"_);
                     log_("Poisson noise ["_+str(maxProjectionCount)+"]... "_);
                     Time time; poissonTime.start();
-                    for(uint i: range(intensity0.data.size)) intensity0.data[i] = (poisson(photonCount) * exp(-attenuation0.data[i])) / float(photonCount);
+                    if(photonCount) for(uint i: range(intensity0.data.size)) intensity0.data[i] = (poisson(photonCount) * exp(-attenuation0.data[i])) / float(photonCount);
+                    else for(uint i: range(intensity0.data.size)) intensity0.data[i] = exp(-attenuation0.data[i]);
                     poissonTime.stop(); log(time);
                     intensity0Key = move(key);
                 }}
