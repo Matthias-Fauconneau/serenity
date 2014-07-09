@@ -6,9 +6,9 @@
 #include "png.h"
 
 struct ArrayView : Widget {
-    Dict dimensionLabels = parseDict("rotationCount:Rotations,photonCount:Photons,projectionCount:Projections,subsetSize:per subset"_);
+    Dict dimensionLabels = parseDict("rotationCount:Revolutions,photonCount:Photons,projectionCount:Projections,subsetSize:per subset"_);
     Dict coordinateLabels = parseDict("single:\0Single,double:\1Double,adaptive:\2Adaptive"_); // Sorts
-    Dict valueLabels = parseDict("Iterations count:Iterations,Center NMSE %:Central,Central NMSE %:Central,Extreme NMSE %:Extreme,Total NMSE %:Total,Global NMSE %:Total,Time (s):Time"_);
+    Dict valueLabels = parseDict("Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T"_); // FIXME: Center, Global kept for backward comptability
     string valueName;
     string bestName = (valueName=="Iterations"_ || valueName == "Time"_) ? "Total"_ : valueName;
     array<String> valueNames;
@@ -16,7 +16,7 @@ struct ArrayView : Widget {
     float min = inf, max = -inf;
     uint textSize;
 
-    ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
+    ArrayView(string valueName, const map<string, Variant>& parameters, uint textSize=16) : valueName(valueName), textSize(textSize) {
         Folder results = "Results"_;
         for(string name: results.list()) {
             if(name.contains('.')) continue;
@@ -24,6 +24,9 @@ struct ArrayView : Widget {
             //if(configuration["method"_]=="SART"_ ) continue;
             if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
             if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = int(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
+            bool skip = false;
+            for(const auto& coordinate: configuration) if(parameters.contains(coordinate.key) && !split(parameters.at(coordinate.key),',').contains(coordinate.value)) skip=true;/*continue 2;*/ // Skips missing values for explicitly specified dimensions
+            if(skip) continue;
             for(auto& dimension: configuration.keys) { // Converts dimension identifiers to labels
                 if(dimensionLabels.contains(dimension)) dimension = copy(dimensionLabels.at(dimension));
                 else { // Converts CamelCase identifier to user-facing labels
@@ -49,9 +52,9 @@ struct ArrayView : Widget {
                     TextData s (line);
                     const int subsetSize = configuration.at("per subset"_);
                     values["Iterations"_] = subsetSize*(s.integer()+1); s.skip(" "_);
-                    values["Central"_] = s.decimal(); s.skip(" "_);
-                    values["Extreme"_] = s.decimal(); s.skip(" "_);
-                    values["Total"_] = s.decimal(); s.skip(" "_);
+                    values["Central NMSE %"_] = s.decimal(); s.skip(" "_);
+                    values["Extreme NMSE %"_] = s.decimal(); s.skip(" "_);
+                    values["Total NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["SNR"_] = -s.decimal(); s.skip(" "_); /*Negates as best is maximum*/
                     values["Time (s)"_] = s.decimal();
                     assert_(!s, s.untilEnd(), "|", line);
@@ -75,7 +78,7 @@ struct ArrayView : Widget {
             max = ::max(values);
         }
     }
-    array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Rotations,Projections,per subset"_,',')};
+    array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Revolutions,Projections,per subset"_,',')};
 
     /// Returns coordinates along \a dimension occuring in points matching \a filter
     array<Variant> coordinates(string dimension, const Dict& filter) const {
@@ -148,8 +151,8 @@ struct ArrayView : Widget {
                     float v = (value-min)/(max-min);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
-                    String text = (value==0?format(Bold):""_)+(point.isInteger?dec(realValue):ftoa(realValue));
-                    Text(text, ::max(16,(int)round(textSize*(1+(1-v)))),black).render(cell);
+                    String text = (value==min?format(Bold):""_)+(point.isInteger?dec(realValue):ftoa(realValue));
+                    Text(text, textSize, black).render(cell);
                     break;
                 }
             }
@@ -217,17 +220,18 @@ struct FileWatcher : File, Poll {
 };
 
 struct Application {
-    ArrayView view { arguments()?arguments()[0]:"Total"_ };
+    map<string, Variant> parameters = parseParameters(arguments()?arguments().slice(1):array<string>(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
+    ArrayView view { arguments()?arguments()[0]:"MSE_T"_, parameters};
     Window window {&view, "Results"_};
-    FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName);/*Reloads*/ window.render(); } };
+    FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
     Application() {
-        for(string valueName: {"Central"_,"Extreme"_,"Total"_,"Time"_}) {
-            ArrayView view (valueName, 32);
+        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR"_}) {
+            ArrayView view (valueName, parameters, 32);
             Image image ( abs(view.sizeHint()) );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
             fill(image, Rect(image.size()), white);
             view.Widget::render( image );
-            writeFile(valueName, encodePNG(image));
+            writeFile("Array "_+valueName, encodePNG(image));
         }
         window.setSize(-1);
         window.show();

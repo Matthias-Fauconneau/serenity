@@ -47,8 +47,8 @@ generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(
 // Comparison functions
 template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
-//template<Type A, Type B> bool operator <=(const A& a, const B& b) { return !(b<a); }
-//template<Type A, Type B> bool operator >=(const A& a, const B& b) { return !(a<b); }
+template<Type A, Type B> bool operator <=(const A& a, const B& b) { return !(b<a); }
+template<Type A, Type B> bool operator >=(const A& a, const B& b) { return !(a<b); }
 
 generic bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
 generic T min(T a, T b) { return a<b ? a : b; }
