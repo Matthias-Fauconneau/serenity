@@ -19,7 +19,8 @@ struct ArrayView : Widget {
     ArrayView(string valueName, const map<string, Variant>& parameters, uint textSize=16) : valueName(valueName), textSize(textSize) {
         Folder results = "Results"_;
         for(string name: results.list()) {
-            if(name.contains('.')) continue;
+            if(valueName=="SNR"_ || valueName=="SNR (dB)"_) { if(!endsWith(name, ".snr"_)) continue; name=section(name,'.',0,-2); }
+            else if(name.contains('.')) continue;
             Dict configuration = parseDict(name);
             //if(configuration["method"_]=="SART"_ ) continue;
             if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
@@ -49,16 +50,18 @@ struct ArrayView : Widget {
                 Dict values;
                 if(startsWith(line, "{"_)) values = parseDict(line);
                 else {// Backward compatibility (REMOVEME)
+                    //log("Old file", name);
                     TextData s (line);
                     const int subsetSize = configuration.at("per subset"_);
                     values["Iterations"_] = subsetSize*(s.integer()+1); s.skip(" "_);
                     values["Central NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["Extreme NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["Total NMSE %"_] = s.decimal(); s.skip(" "_);
-                    values["SNR"_] = -s.decimal(); s.skip(" "_); /*Negates as best is maximum*/
+                    values["SNR"_] = s.decimal(); s.skip(" "_);
                     values["Time (s)"_] = s.decimal();
                     assert_(!s, s.untilEnd(), "|", line);
                 }
+                if(values.contains("SNR"_)) values.insert(String("SNR (dB)"_), -10*log10(values.at("SNR"_))); //Converts to decibels, Negates as best is maximum
                 for(auto& valueName: values.keys) if(valueLabels.contains(valueName)) valueName = copy(valueLabels.at(valueName));
                 for(const String& valueName: values.keys) valueNames += copy(valueName);
                 if(float(values.at(bestName)) < best) {
@@ -68,6 +71,7 @@ struct ArrayView : Widget {
             }
             points.insert(move(configuration), move(value));
         }
+        assert_(points);
         min = ::min(points.values);
         if(0) {
             array<Variant> values = copy(points.values);

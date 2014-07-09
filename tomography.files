@@ -79,3 +79,4 @@ tomography/review.cc
 tomography/compare.cc
 tomography/graph.cc
 tomography/slice.cc
+tomography/SNR.cc

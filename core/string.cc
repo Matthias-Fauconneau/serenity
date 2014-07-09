@@ -116,7 +116,7 @@ double fromDecimal(const string& number) {
     for(bool gotDot=false, gotE=false;i!=number.end();) {
         if(!gotDot && *i == '.') { ++i; gotDot=true; continue; }
         if(!gotE && (*i == 'e' || *i=='E')) { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
-        if(*i<'0' || *i>'9') { error("fromDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
+        if(*i<'0' || *i>'9') { if(*i!=' ') error("fromDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
         int n = *i-'0';
         if(gotE) {
             exponent *= 10;

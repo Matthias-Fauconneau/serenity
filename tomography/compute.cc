@@ -162,24 +162,13 @@ struct Compute {
 
                 // Evaluation
                 uint bestK = 0;
-                float bestCenterSSE = inf, bestExtremeSSE = inf, bestSNR = 0;
+                float bestCenterSSE = inf, bestExtremeSSE = inf;
                 VolumeF best (volumeSize, "best"_);
                 Time time; reconstructionTime.start();
                 const uint minIterationCount = 16, maxIterationCount = 512;
                 array<map<string, Variant>> result;
                 uint k=0; for(;k < maxIterationCount; k++) {
                     reconstruction->step();
-
-                    vec3 center = rock.largestGrain.xyz(); float r = rock.largestGrain.w;
-                    int3 size = ceil(r); int3 origin = int3(round(center))-size;
-                    VolumeF grain = reconstruction->x.read(VolumeF(2*size,"grain"_), origin);
-                    center -= vec3(origin);
-                    float sum=0; float count=0;
-                    for(int z: range(grain.size.z)) for(int y: range(grain.size.y)) for(int x: range(grain.size.x))  if(sq(vec3(x,y,z)-center)<=sq(r-1./2)) sum += grain(x,y,z), count++;
-                    float mean = sum / count; float deviation = 0;
-                    for(int z: range(grain.size.z)) for(int y: range(grain.size.y)) for(int x: range(grain.size.x))  if(sq(vec3(x,y,z)-center)<=sq(r-1./2)) deviation += abs(grain(x,y,z)-mean);
-                    deviation /= count;
-                    float SNR = mean/deviation;
 
                     float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                     float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
@@ -190,7 +179,6 @@ struct Compute {
                         values["Central NMSE %"_] = 100*centerSSE/centerSSQ;
                         values["Extreme NMSE %"_] = 100*extremeSSE/extremeSSQ;
                         values["Total NMSE %"_] = 100*totalNMSE;
-                        values["SNR"_] = SNR;
                         values["Time (s)"_] = time.toFloat();
                         result << move(values);}
                     plot[str(configuration)].insert(k, -10*log10(totalNMSE));
@@ -205,13 +193,15 @@ struct Compute {
                     }
                     else if(centerSSE < bestCenterSSE || extremeSSE < bestExtremeSSE) {} // Keep running if any region is still converging
                     else if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after", k, "iterations"); break; }
-                    bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE), bestSNR = max(bestSNR, SNR);
+                    bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
 
                 }
                 reconstructionTime.stop();
+                assert_(str(result, '\n'));
                 writeFile(toASCII(configuration), str(result, '\n'), results);
+                assert_(cast<byte>(best.data));
                 writeFile(toASCII(configuration)+".best"_, cast<byte>(best.data), results);
-                log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), bestSNR, time);
+                log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), time);
                 if(window) window->widget = 0;
             }
             completed++;
