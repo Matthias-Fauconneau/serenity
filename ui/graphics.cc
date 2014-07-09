@@ -11,13 +11,13 @@ void __attribute((constructor(1001))) generate_sRGB_forward() {
 }
 
 float sRGB_reverse[0x100];
-void __attribute((constructor(1001))) generate_sRGB_reverse() {
+void __attribute((constructor(1002))) generate_sRGB_reverse() {
     for(uint index: range(0x100)) {
         real sRGB = (real) index / 0xFF;
         real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
         assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))<exp2(-50));
         sRGB_reverse[index] = linear;
-        assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
+        //assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
     }
 }
 
