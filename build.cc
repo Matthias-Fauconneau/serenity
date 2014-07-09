@@ -189,7 +189,6 @@ struct Build {
         if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<String((string)binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
-            //args << apply(modules, [this](const unique<Node>& module){ return tmp+"/"_+join(flags,"-"_)+"/"_+module->name+".o"_; });
             args << apply(files, [](const string& file){return String(file);});
             args << apply(libraries, [this](const String& library)->String{ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
