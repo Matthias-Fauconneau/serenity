@@ -183,7 +183,7 @@ struct Rock : PersistentProcess, Poll {
              unique<View> view  = viewer.value->constructNewInstance();
              if( view->view(metadata, name, data) ) { viewers[viewer.key] << move(view); return true; }
          }
-         log("Unknown format",metadata, name);
+         log("Unknown format",metadata, name, Interface<View>::factories.keys);
          return false;
      }
 
