@@ -84,8 +84,8 @@ template<Type K, Type V> struct map {
         if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
         return values.insertAt(keys.insertSorted(forward<KK>(key)),forward<VV>(value));
     }
-    template<Type KK> V& insertSortedMulti(const KK& key, const V& value) {
-        return values.insertAt(keys.insertSorted(key),value);
+    template<Type KK, Type VV> V& insertSortedMulti(KK&& key, VV&& value) {
+        return values.insertAt(keys.insertSorted(forward<KK>(key)),forward<VV>(value));
     }
 
     template<Type KK> V& operator [](KK key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insert(key); }
