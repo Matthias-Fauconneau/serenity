@@ -71,7 +71,7 @@ struct Compute {
         map<int64, Dict> update;
         for(const Dict& configuration: configurations) {
             int64 mtime = existsFile(toASCII(configuration), results) ? File(toASCII(configuration), results).modifiedTime() : 0;
-            if(mtime < updateTime) update.insertSorted(mtime, copy(configuration)); // Updates oldest evaluation first
+            if(mtime < updateTime) update.insertSortedMulti(mtime, copy(configuration)); // Updates oldest evaluation first
         }
 
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
