@@ -16,7 +16,7 @@ struct Projection {
     float cameraLength = 1;
     float specimenDistance = 1./16;
     Trajectory trajectory;
-    uint rotationCount;
+    const float rotationCount;
 
     // Projection setup (coordinates in view space)
     const float volumeAspectRatio = float(volumeSize.z-1) / float(volumeSize.x-1);
@@ -28,7 +28,7 @@ struct Projection {
     const float distance = specimenDistance/volumeRadius; // Distance in world space
     const float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
 
-    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const uint rotationCount) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount) {}
+    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const float rotationCount) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount) {}
 
     // Rotation angle (in radians) around vertical axis
     float angle(uint index) const {
@@ -41,7 +41,7 @@ struct Projection {
     float dz(uint index) const {
         if(trajectory==Single) return float(index)/float(count-1);
         if(trajectory==Double) return float(index%(count/2))/float((count-1)/2);
-        if(trajectory==Adaptive) return clip(0.f, float(int(index)-int(count/(2*rotationCount)))/float(count-count/rotationCount), 1.f);
+        if(trajectory==Adaptive) { assert_(rotationCount==int(rotationCount)); return clip(0.f, float(int(index)-int(count/(2*rotationCount)))/float(count-count/rotationCount), 1.f); }
         error(int(trajectory));
     }
 
