@@ -38,8 +38,8 @@ int Date::days() const {
     for(int month=0;month<this->month;month++) days+=daysInMonth(month,year);
     return days+day;
 }
-Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day),weekDay(weekDay) {
-    if(weekDay<0 && day>=0) this->weekDay=(Thursday+days())%7;
+Date::Date(int day, int month, int year, int hours, int minutes, int seconds) :year(year),month(month),day(day),hours(hours),minutes(minutes),seconds(seconds) {
+    if(day>=0) this->weekDay=(Thursday+days())%7;
     invariant();
 }
 bool Date::summerTime() const { //FIXME: always European Summer Time

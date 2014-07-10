@@ -38,8 +38,10 @@ struct Date {
     void invariant() const;
     /// Default constructs an undetermined date
     Date(){}
+    /// Constructs a calendar date (specified hour)
+    Date(int monthDay, int month, int year, int hours, int minutes, int seconds);
     /// Constructs a calendar date (unspecified hour)
-    Date(int monthDay, int month, int year, int weekDay=-1);
+    Date(int monthDay, int month, int year/*, int weekDay=-1*/) : Date(monthDay, month, year, -1, -1, -1) {}
     /// Converts UNIX \a timestamp (in seconds) to a local time calendar date
     Date(int64 time);
     /// Returns days from Thursday, 1st January 1970

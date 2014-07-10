@@ -5,6 +5,7 @@
 #include "graphics.h"
 #include "png.h"
 #include "synthetic.h"
+#include "deflate.h"
 
 PorousRock rock (256);
 VolumeF reference = rock.volume();
@@ -17,9 +18,9 @@ struct SliceArrayView : Widget {
     uint textSize;
     int2 textCellSize = int2(80*textSize/16, textSize); //TODO: merge ArrayView and SliceArrayView (and backport textCellSize)
 
-    SliceArrayView(uint sliceIndex, uint textSize=16) : sliceIndex(sliceIndex), textSize(textSize) {
+    SliceArrayView(string valueName, uint sliceIndex, uint textSize=16) : sliceIndex(sliceIndex), textSize(textSize) {
         ImageF reference = slice(::reference, sliceIndex);
-        ImageF error ( reference.size );
+        ImageF image ( reference.size );
         Folder results = "Results"_;
         for(string name: results.list()) {
             if(!endsWith(name, ".best"_)) continue;
@@ -43,13 +44,22 @@ struct SliceArrayView : Widget {
             for(auto& coordinate: configuration.values) if(coordinateLabels.contains(coordinate)) coordinate=copy(coordinateLabels.at(coordinate)); // Converts coordinate identifiers to labels
 
             Map map (name, results);
-            VolumeF reconstruction (::reference.size, buffer<float>(map), "x"_);
-            const float* x0 = reference.data;
-            const float* x1 = slice(reconstruction, sliceIndex).data;
-            float* e = error.data;
-            for(uint i: range(reference.size.y*reference.size.x)) e[i] = sq(x1[i] - x0[i]);
-            Image target ( error.size );
-            convert(target, error); // Normalizes each slice by its maximum value
+            buffer<float> data (map);
+            int3 size = ::reference.size;
+            if(data.size != (size_t)size.x*size.y*size.z) { log_("Inflate..."_); Time time; data = cast<float>(inflate(map)); log(time); assert_(data.size == (size_t)size.x*size.y*size.z, data.size, name); }
+            VolumeF reconstruction (size, move(data), "x"_);
+            if(valueName=="x"_) {
+                image =  slice(reconstruction, sliceIndex);
+            } else if(valueName=="error"_) {
+                const float* x0 = reference.data;
+                const float* x1 = slice(reconstruction, sliceIndex).data;
+                float* e = image.data;
+                for(uint i: range(size.y*size.x)) e[i] = sq(x1[i] - x0[i]);
+            } else error(valueName);
+            Image target ( image.size );
+            convert(target, image); // Normalizes each slice by its maximum value
+            Folder slice("Slices"_, currentWorkingDirectory(), true);
+            writeFile(str(name,valueName,sliceIndex), encodePNG(target), slice);
             points.insert(move(configuration), move(target));
         }
     }
@@ -191,24 +201,34 @@ struct FileWatcher : File, Poll {
     function<void(string)> fileDeleted;
 };
 
+#if 0
 struct Application {
-    /*SliceArrayView view {256/2};
-    unique<Window> window = arguments().contains("ui"_) ? unique<Window>(&view, "Results"_) : nullptr;
-    FileWatcher watcher{"Results"_, [this](string){ view=SliceArrayView(view.sliceIndex); if(window) window->render(); } };*/
+    SliceArrayView view {"x"_,256/2};
+    unique<Window> window = /*arguments().contains("ui"_)*/true ? unique<Window>(&view, "Results"_) : nullptr;
+    FileWatcher watcher{"Results"_, [this](string){ view=SliceArrayView("x"_,view.sliceIndex); if(window) window->render(); } };
     Application() {
-        for(uint z: {256/2,256/8}) {
-            log(z);
-            SliceArrayView view (z, 32);
-            Image image ( abs(view.sizeHint()) );
-            assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
-            fill(image, Rect(image.size()), white);
-            view.Widget::render( image );
-            writeFile(str(z), encodePNG(image));
-        }
-        log("Done");
-        /*if(window) {
+        if(window) {
             window->setSize(-1);
             window->show();
-        }*/
+        }
     }
 } app;
+#else
+struct Application {
+    Application() {
+        Folder slice("Slices"_, currentWorkingDirectory(), true);
+        for(string valueName: {"x"_,"error"_}) {
+            for(uint z: {256/2,256/8}) {
+                log(z);
+                SliceArrayView view (valueName, z, 32);
+                Image image ( abs(view.sizeHint()) );
+                assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
+                fill(image, Rect(image.size()), white);
+                view.Widget::render( image );
+                writeFile(str(valueName, z), encodePNG(image),slice);
+            }
+        }
+        log("Done");
+    }
+} app;
+#endif

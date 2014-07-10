@@ -17,7 +17,7 @@ inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
     Plot plot; /// NMSE versus iterations plot
-    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
+    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"update"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
     unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
@@ -62,7 +62,7 @@ struct Compute {
                         else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
-                            for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), nearestDivisorToSqrt(projectionCount)*2/*, projectionCount*/})) {
+                            for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), /*nearestDivisorToSqrt(projectionCount)*2*//*, projectionCount*/})) {
                                 Dict configuration;
                                 configuration["volumeSize"_] = volumeSize;
                                 configuration["projectionSize"_] = projectionSize;
@@ -83,7 +83,9 @@ struct Compute {
 
         // Filters configuration requiring an update
         Folder results = "Results"_;
-        const int64 updateTime = realTime() - 7*24*60*60*1000000000ull; // Updates any old results
+        int64 updateTime = realTime() - 7*24*60*60*1000000000ull; // Updates any old results (default)
+        if(parameters.value("update"_,""_)=="missing"_) updateTime = 0; // Updates missing results
+        if(parameters.value("update"_,""_)=="all"_) updateTime = realTime();  // Updates all results
         map<int64, Dict> update;
         for(const Dict& configuration: configurations) {
             int64 mtime = existsFile(toASCII(configuration), results) ? File(toASCII(configuration), results).modifiedTime() : 0;
@@ -186,12 +188,12 @@ struct Compute {
                 Time time; reconstructionTime.start();
                 const uint minIterationCount = 16, maxIterationCount = 512;
                 array<map<string, Variant>> result;
-                uint k=0; for(;k < maxIterationCount; k++) {
-                    reconstruction->step();
-
+                uint k=0; for(;k < maxIterationCount;k++) {
+                    // Evaluates before stepping as initial volume might be the best if the method does not converge at all
                     float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                     float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                     float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
+                    log(100*totalNMSE);
                     {map<string, Variant> values;
                         values["Iterations"_] = k;
                         values["Iterations·Projection/Subsets"_] = k * subsetSize;
@@ -214,14 +216,22 @@ struct Compute {
                     else if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after", k, "iterations"); break; }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
 
+                    reconstruction->step();
                 }
                 reconstructionTime.stop();
+                // Stores statistics for all iterations
                 assert_(str(result, '\n'));
                 writeFile(toASCII(configuration), str(result, '\n'), results);
+                // Stores best reconstruction
                 {buffer<byte> data = deflate(cast<byte>(best.data)); //FIXME: Inefficient on raw float data (only useful mostly to skips zeroes (⅔ compression))
                     assert_(data);
                     if(available(results) < (int64)data.size) log("Not enough available disk space for reconstruction");
                     else writeFile(toASCII(configuration)+".best"_, data, results);
+                }
+                { // Stores 2 slices of the best reconstruction
+                    Image target ( best.size.xy() );
+                    {int z=volumeSize.z/2; convert(target,slice(best,z)); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(target), results); }
+                    {int z=volumeSize.z/8; convert(target,slice(best,z)); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(target), results); }
                 }
                 log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), time);
                 if(window) window->widget = 0;

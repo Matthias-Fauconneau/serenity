@@ -61,13 +61,18 @@ struct ArrayView : Widget {
                     //log("Old file", name);
                     TextData s (line);
                     const int subsetSize = configuration.at("per subset"_);
-                    values["Iterations"_] = subsetSize*(s.integer()+1); s.skip(" "_);
+                    values["Iterations"_] = s.integer()+1; s.skip(" "_);
+                    values["Iterations·Projection/Subsets"_] = subsetSize*(s.integer()+1); s.skip(" "_);
                     values["Central NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["Extreme NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["Total NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["SNR"_] = s.decimal(); s.skip(" "_);
                     values["Time (s)"_] = s.decimal();
                     assert_(!s, s.untilEnd(), "|", line);
+                }
+                if(File(name).modifiedTime() < (int64)Date(9,7,2014,16,00,00)*1000000000ll) { //FIXME: "Iterations" of evaluation ran before 07/09 16:00 is actually index, needs +1
+                    values["Iterations"_] = int(values["Iterations"_]) +1;
+                    values.remove("Iterations·Projection/Subsets"_);
                 }
                 if(values.contains("SNR"_)) values.insert(String("SNR (dB)"_), -10*log10(values.at("SNR"_))); //Converts to decibels, Negates as best is maximum
                 for(auto& valueName: values.keys) if(valueLabels.contains(valueName)) valueName = copy(valueLabels.at(valueName));
