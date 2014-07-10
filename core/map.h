@@ -124,6 +124,9 @@ template<Type K, Type V> struct map {
     iterator begin() { return iterator(keys.begin(),values.begin()); }
     iterator end() { return iterator(keys.end(),values.end()); }
 
+    /// Filters elements matching predicate
+    template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i])) { keys.removeAt(i), values.removeAt(i); } else i++; return *this; }
+
     array<K> keys;
     array<V> values;
 };
@@ -145,7 +148,7 @@ template<Type K, Type V> String toASCII(const map<K,V>& m) {
     String s;
     for(uint i: range(m.size())) {
         assert(m.keys[i]); s<<str(m.keys[i]);
-        if(m.values[i]) s<<':'<<str(m.values[i]);
+        if(m.values[i].size) s<<':'<<str(m.values[i]);
         if(i<m.size()-1) s<<'|';
     }
     return replace(move(s),'/','\\');

@@ -218,7 +218,7 @@ struct Compute {
                 reconstructionTime.stop();
                 assert_(str(result, '\n'));
                 writeFile(toASCII(configuration), str(result, '\n'), results);
-                {buffer<byte> data = deflate(cast<byte>(best.data)); //FIXME: Inefficient on raw float data (only useful mostly to skips zeroes) //TODO: Update application reading the reconstructions to inflate
+                {buffer<byte> data = deflate(cast<byte>(best.data)); //FIXME: Inefficient on raw float data (only useful mostly to skips zeroes (⅔ compression))
                     assert_(data);
                     if(available(results) < (int64)data.size) log("Not enough available disk space for reconstruction");
                     else writeFile(toASCII(configuration)+".best"_, data, results);

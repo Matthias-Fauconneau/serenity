@@ -5,24 +5,32 @@
 #include "graphics.h"
 #include "png.h"
 
+static const bool smallestSubsets = true; // Filters subsetSize to only keep configurations with the smallest subsets (fastest convergence)
+static const bool limitAcquisitionTime = true; // Filters configurations with Projections·Photons over acquisition time limit
+
+//TODO: merge ArrayView and SliceArrayView
 struct ArrayView : Widget {
     Dict dimensionLabels = parseDict("rotationCount:Revolutions,photonCount:Photons,projectionCount:Projections,subsetSize:per subset"_);
     Dict coordinateLabels = parseDict("single:\0Single,double:\1Double,adaptive:\2Adaptive"_); // Sorts
     Dict valueLabels = parseDict("Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T"_); // FIXME: Center, Global kept for backward comptability
     string valueName;
-    string bestName = (valueName=="Iterations"_ || valueName == "Time"_) ? "Total"_ : valueName;
+    string bestName = (valueName=="Iterations"_ || valueName == "Time (s)"_) ? "MSE_T"_ : valueName;
     array<String> valueNames;
     map<Dict, Variant> points; // Data points
     float min = inf, max = -inf;
     uint textSize;
+    int2 headerCellSize = int2(80*textSize/16, textSize);
+    int2 contentCellSize = int2(48*textSize/16, textSize);
 
     ArrayView(string valueName, const map<string, Variant>& parameters, uint textSize=16) : valueName(valueName), textSize(textSize) {
         Folder results = "Results"_;
         for(string name: results.list()) {
+            String result = readFile(name, results);
+            if(!result) { log("Empty result file", name); continue; }
             if(valueName=="SNR"_ || valueName=="SNR (dB)"_) { if(!endsWith(name, ".snr"_)) continue; name=section(name,'.',0,-2); }
             else if(name.contains('.')) continue;
             Dict configuration = parseDict(name);
-            //if(configuration["method"_]=="SART"_ ) continue;
+            if(!configuration["photonCount"_]) configuration["photonCount"_] = 0;
             if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
             if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = int(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
             bool skip = false;
@@ -43,9 +51,9 @@ struct ArrayView : Widget {
                 }
             }
             for(auto& coordinate: configuration.values) if(coordinateLabels.contains(coordinate)) coordinate=copy(coordinateLabels.at(coordinate)); // Converts coordinate identifiers to labels
+            for(auto& coordinate: configuration.values) assert_(coordinate.size, configuration);
 
             float best = inf; Variant value;
-            String result = readFile(name, results);
             for(string line: split(result, '\n')) {
                 Dict values;
                 if(startsWith(line, "{"_)) values = parseDict(line);
@@ -64,13 +72,23 @@ struct ArrayView : Widget {
                 if(values.contains("SNR"_)) values.insert(String("SNR (dB)"_), -10*log10(values.at("SNR"_))); //Converts to decibels, Negates as best is maximum
                 for(auto& valueName: values.keys) if(valueLabels.contains(valueName)) valueName = copy(valueLabels.at(valueName));
                 for(const String& valueName: values.keys) valueNames += copy(valueName);
+                assert_(values.contains(bestName) && values.contains(valueName), bestName, valueName, values, name);
+                if(values.contains("Iterations"_)) values.at("Iterations"_).isInteger = true;
                 if(float(values.at(bestName)) < best) {
                     best = values[bestName];
                     value = move(values.at(valueName));
                 }
             }
+            assert_(value.size, result);
             points.insert(move(configuration), move(value));
         }
+        if(smallestSubsets) points.filter([this](const Dict& configuration) {
+            Dict config = copy(configuration);
+            config.remove("per subset"_);
+            uint min=-1; for(const Dict& c: points.keys) if(c.includes(config)) min = ::min(min, (uint)c.at("per subset"_));
+            return (uint)configuration.at("per subset"_) > min; // Filters every configuration with larger subsets than minimum
+        });
+        if(limitAcquisitionTime) points.filter([this](const Dict& configuration) { return !configuration.at("Photons"_) || (uint)configuration.at("Projections"_) * (uint)configuration.at("Photons"_) > 256*4096; }); // Filters every configuration over acquisition time limit
         assert_(points);
         min = ::min(points.values);
         if(0) {
@@ -116,20 +134,24 @@ struct ArrayView : Widget {
     int cellCount(uint axis, uint level=0) const { Dict filter; return cellCount(axis, level, filter); }
     int2 cellCount() { return int2(cellCount(0),cellCount(1)); }
     int2 levelCount() { return int2(dimensions[0].size,dimensions[1].size); }
-    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(64*textSize/16,16*textSize/16); }
+    int2 sizeHint() { return (levelCount().yx()+int2(1))*headerCellSize + cellCount() * contentCellSize; }
 
-    uint renderHeader(int2 cellSize, uint axis, uint level, Dict& filter, uint offset=0) {
+    uint renderHeader(int2 contentCellSize, uint axis, uint level, Dict& filter, uint offset=0) {
         if(level==dimensions[axis].size) return 1;
         string dimension = dimensions[axis][level];
         assert_(!filter.contains(dimension));
         uint cellCount = 0;
-        for(const Variant& coordinate: coordinates(dimension, filter)) {
+        auto coordinates = this->coordinates(dimension, filter);
+        for(const Variant& coordinate: coordinates) {
+            assert_(coordinate.size, dimension, filter, coordinates.size, coordinates);
             filter[String(dimension)] = copy(coordinate);
-            uint childCellCount = renderHeader(cellSize, axis, level+1, filter, offset+cellCount);
-            int2 origin = int2(dimensions[!axis].size+1+offset+cellCount, level);
+            uint childCellCount = renderHeader(contentCellSize, axis, level+1, filter, offset+cellCount);
+            int2 headerOrigin (dimensions[!axis].size+1, level);
+            int2 origin = int2(offset+cellCount, 0);
             int2 size = int2(childCellCount, 1);
-            if(axis) origin=origin.yx(), size=size.yx();
-            origin *= cellSize;
+            if(axis) headerOrigin=headerOrigin.yx(), origin=origin.yx(), size=size.yx();
+            int2 cellSize = axis ? int2(headerCellSize.x, contentCellSize.y) : int2(contentCellSize.x, headerCellSize.y);
+            origin = headerOrigin*headerCellSize + origin*cellSize;
             if(level<dimensions[axis].size-1) {
                 int width = dimensions[axis].size-1-level;
                 if(!axis) fill(target, Rect(origin+int2(-width/2,0),int2(origin.x+(width+1)/2, target.size().y)));
@@ -149,8 +171,9 @@ struct ArrayView : Widget {
             if(axis==0) { renderCell(cellSize, 1, 0, filterX, filterY, origin); } // Descends dimensions tree on other array axis
             else { // Renders cell
                 for(const Dict& coordinates: points.keys) if(coordinates.includes(filterX) && coordinates.includes(filterY)) {
-                    Image cell = clip(target, ((levelCount().yx()+int2(1)+origin) * cellSize)+Rect(cellSize));
+                    Image cell = clip(target, (levelCount().yx()+int2(1))*headerCellSize+origin*cellSize+Rect(cellSize));
                     const Variant& point = points.at(coordinates);
+                    assert_(isDecimal(point), point);
                     float value = point;
                     float v = (value-min)/(max-min);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
@@ -177,20 +200,19 @@ struct ArrayView : Widget {
 
     void render() override {
         assert_(cellCount(), cellCount());
-        int2 cellSize = target.size() / (levelCount().yx()+int2(1)+cellCount());
+        int2 cellSize = (target.size() - (levelCount().yx()+int2(1))*headerCellSize ) / cellCount();
         // Fixed coordinates in unused top-left corner
         String fixed;
         for(const auto& coordinate: coordinates(points)) if(coordinate.value.size==1) fixed << coordinate.key+": "_+str(coordinate.value)+"\n"_;
-        Text(fixed, textSize).render(clip(target, Rect(int2(dimensions[1].size,dimensions[0].size)*cellSize)));
+        Text(fixed, textSize).render(clip(target, Rect(int2(dimensions[1].size,dimensions[0].size)*headerCellSize)));
         // Value name in unused top-left cell
-        Text(format(TextFormat::Bold)+valueName, textSize).render(clip(target, int2(dimensions[1].size,dimensions[0].size)*cellSize+Rect(cellSize)));
+        Text(format(TextFormat::Bold)+valueName, textSize).render(clip(target, int2(dimensions[1].size,dimensions[0].size)*headerCellSize+Rect(headerCellSize)));
         // Dimensions
         for(uint axis: range(2)) for(uint level: range(dimensions[axis].size)) {
             int2 origin = int2(dimensions[!axis].size-1+1, level);
             if(axis) origin=origin.yx();
-
             string dimension = dimensions[axis][level];
-            Text(dimension,textSize,black).render(clip(target, (origin*cellSize)+Rect(cellSize)));
+            Text(dimension,textSize,black).render(clip(target, (origin*headerCellSize)+Rect(headerCellSize)));
         }
 
         // Content
@@ -229,7 +251,7 @@ struct Application {
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
     Application() {
-        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR"_}) {
+        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR (dB)"_,"Iterations"_}) {
             ArrayView view (valueName, parameters, 64);
             Image image ( abs(view.sizeHint()) );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());

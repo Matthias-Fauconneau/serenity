@@ -157,9 +157,8 @@ struct SliceArrayView : Widget {
         for(uint axis: range(2)) for(uint level: range(dimensions[axis].size)) {
             int2 origin = int2(dimensions[!axis].size-1+1, level);
             if(axis) origin=origin.yx();
-            origin *= textCellSize; //axis ? int2(textCellSize.x, cellSize.y) : int2(cellSize.x, textCellSize.y);
             string dimension = dimensions[axis][level];
-            Text(dimension,textSize,black).render(clip(target, origin+Rect(textCellSize)));
+            Text(dimension,textSize,black).render(clip(target, origin*textCellSize+Rect(textCellSize)));
         }
 
         // Content
