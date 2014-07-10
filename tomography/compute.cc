@@ -41,8 +41,8 @@ struct Compute {
 
         // Explicits configurations
         array<Dict> configurations;
-        for(string trajectory: split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
-            for(string rotationCountParameter: split(parameters.value("rotationCount"_,"4,2,1,optimal"_),',')) {
+        for(string rotationCountParameter: split(parameters.value("rotationCount"_,"optimal,4,2,1"_),',')) {
+            for(string trajectory: rotationCountParameter=="optimal"_?ref<string>({"single"_}):split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
                 for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048,0"_),','), [](string s)->uint{ return fromInteger(s); })) {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
                         float rotationCount;
@@ -55,7 +55,8 @@ struct Compute {
                                 configuration["volumeSize"_] = volumeSize;
                                 configuration["projectionSize"_] = projectionSize;
                                 configuration["trajectory"_] = trajectory;
-                                configuration["rotationCount"_] = rotationCount;
+                                if(round(rotationCount)==rotationCount) configuration["rotationCount"_] = int(rotationCount); // Backward compatibility: Avoids updating results computed as rotationCount was integer
+                                else configuration["rotationCount"_] = rotationCount;
                                 configuration["photonCount"_] = photonCount;
                                 configuration["projectionCount"_] = projectionCount;
                                 configuration["method"_] = method;
@@ -70,11 +71,11 @@ struct Compute {
 
         // Filters configuration requiring an update
         Folder results = "Results"_;
-        const int64 updateTime = realTime() - 24*60*60*1000000000ull; // Updates any results older than 24h
+        const int64 updateTime = realTime() - 7*24*60*60*1000000000ull; // Updates any old results
         map<int64, Dict> update;
         for(const Dict& configuration: configurations) {
             int64 mtime = existsFile(toASCII(configuration), results) ? File(toASCII(configuration), results).modifiedTime() : 0;
-            if(mtime < updateTime) update.insertSortedMulti(mtime, copy(configuration)); // Updates oldest evaluation first
+            if(mtime <= updateTime) update.insertSortedMulti(mtime, copy(configuration)); // Updates oldest evaluation first
         }
 
         Time totalTime, reconstructionTime, projectionTime, poissonTime;

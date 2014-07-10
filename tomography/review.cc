@@ -116,7 +116,7 @@ struct ArrayView : Widget {
     int cellCount(uint axis, uint level=0) const { Dict filter; return cellCount(axis, level, filter); }
     int2 cellCount() { return int2(cellCount(0),cellCount(1)); }
     int2 levelCount() { return int2(dimensions[0].size,dimensions[1].size); }
-    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(80*textSize/16,32*textSize/16); }
+    int2 sizeHint() { return (levelCount().yx()+int2(1)+cellCount()) * int2(64*textSize/16,16*textSize/16); }
 
     uint renderHeader(int2 cellSize, uint axis, uint level, Dict& filter, uint offset=0) {
         if(level==dimensions[axis].size) return 1;
@@ -230,7 +230,7 @@ struct Application {
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
     Application() {
         for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR"_}) {
-            ArrayView view (valueName, parameters, 32);
+            ArrayView view (valueName, parameters, 64);
             Image image ( abs(view.sizeHint()) );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
             fill(image, Rect(image.size()), white);
