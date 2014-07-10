@@ -9,6 +9,7 @@
 #include "layout.h"
 #include "window.h"
 #include "png.h"
+#include "deflate.h"
 
 /// Returns the first divisor of \a n below √\a n
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
@@ -27,12 +28,22 @@ struct Compute {
         PorousRock rock (volumeSize);
         const VolumeF referenceVolume = rock.volume();
         if(parameters.value("reference"_, false)) {
-            Folder folder ("Reference"_, currentWorkingDirectory(), true);
-            Image target ( referenceVolume.size.xy() );
-            for(uint z: range(referenceVolume.size.z)) {
-                convert(target,slice(referenceVolume,z)); // Normalizes each slice by its maximum value
-                writeFile(dec(z), encodePNG(target),  folder);
-            }
+            {Folder folder ("Reference"_, currentWorkingDirectory(), true);
+                Image target ( referenceVolume.size.xy() );
+                for(uint z: range(referenceVolume.size.z)) {
+                    convert(target,slice(referenceVolume,z)); // Normalizes each slice by its maximum value
+                    writeFile(dec(z), encodePNG(target),  folder);
+                }}
+            {Folder folder ("Projection"_, currentWorkingDirectory(), true);
+                const Projection A (volumeSize, int3(projectionSize, volumeSize.z), Single, 1);
+                ImageF targetf ( A.projectionSize.xy() );
+                Image target ( A.projectionSize.xy() );
+                for(uint index: range(A.projectionSize.z)) {
+                    log(index);
+                    rock.project(targetf, A, index);
+                    convert(target,targetf); // Normalizes each slice by its maximum value
+                    writeFile(dec(index), encodePNG(target), folder);
+                }}
             exit();
             return;
         }
@@ -42,7 +53,8 @@ struct Compute {
         // Explicits configurations
         array<Dict> configurations;
         for(string rotationCountParameter: split(parameters.value("rotationCount"_,"optimal,4,2,1"_),',')) {
-            for(string trajectory: rotationCountParameter=="optimal"_?ref<string>({"single"_}):split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
+            for(string trajectory: split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
+                if(rotationCountParameter=="optimal"_ && trajectory!="single"_) continue;
                 for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048,0"_),','), [](string s)->uint{ return fromInteger(s); })) {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
                         float rotationCount;
@@ -50,7 +62,7 @@ struct Compute {
                         else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
-                            for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), nearestDivisorToSqrt(projectionCount)*2, projectionCount})) {
+                            for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), nearestDivisorToSqrt(projectionCount)*2/*, projectionCount*/})) {
                                 Dict configuration;
                                 configuration["volumeSize"_] = volumeSize;
                                 configuration["projectionSize"_] = projectionSize;
@@ -87,9 +99,15 @@ struct Compute {
         String intensityKey; VolumeF intensity;/*MLTR*/ VolumeF attenuation;/*UI, SART, CG*/
         uint maxProjectionCount=0; for(const Dict& configuration: configurations) maxProjectionCount=max<uint>(maxProjectionCount,configuration["projectionCount"_]);
         log("Missing", update.size(), "on total", configurations.size);
+
+        // Checks available disk space
+        int64 volumeByteSize = volumeSize.x*volumeSize.y*volumeSize.z*sizeof(float);
+        if(available(results) < update.size()*volumeByteSize) log("Warning: Currently available space will only fit",available(results)/volumeByteSize,"/",update.size(), "reconstructions");
+
         for(const Dict& configuration: update.values) {
             uint index = configurations.indexOf(configuration); // Original index for total progress report
             log(str(completed)+"/"_+str(update.size()), index, configuration);
+            if(available(results) < volumeByteSize) log("Warning: Currently available space will not fit reconstruction");
 
             // Configuration parameters
             int3 volumeSize = configuration["volumeSize"_];
@@ -200,8 +218,11 @@ struct Compute {
                 reconstructionTime.stop();
                 assert_(str(result, '\n'));
                 writeFile(toASCII(configuration), str(result, '\n'), results);
-                assert_(cast<byte>(best.data));
-                writeFile(toASCII(configuration)+".best"_, cast<byte>(best.data), results);
+                {buffer<byte> data = deflate(cast<byte>(best.data)); //FIXME: Inefficient on raw float data (only useful mostly to skips zeroes) //TODO: Update application reading the reconstructions to inflate
+                    assert_(data);
+                    if(available(results) < (int64)data.size) log("Not enough available disk space for reconstruction");
+                    else writeFile(toASCII(configuration)+".best"_, data, results);
+                }
                 log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), time);
                 if(window) window->widget = 0;
             }
