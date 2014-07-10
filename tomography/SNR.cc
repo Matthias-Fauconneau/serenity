@@ -1,19 +1,25 @@
 #include "thread.h"
 #include "variant.h"
 #include "synthetic.h"
-#include "png.h"
+#include "deflate.h"
 
 struct SNR {
     SNR() {
         const int3 size = int3(256);
         PorousRock rock (size);
         Folder results = "Results"_;
-        array<String> names = filter(results.list(), [&](const string name){ return !endsWith(name,".best"_) || existsFile(section(name,'.',0,-2)+".snr"_, results); });
-        for(uint index: range(names.size)) {
+        array<String> names = filter(results.list(), [&](const string name){ return !endsWith(name,".best"_) || (existsFile(section(name,'.',0,-2)+".snr"_, results) && File(section(name,'.',0,-2)+".snr"_, results).size()>0); }); for(uint index: range(names.size)) {
             string name = names[index];
             Map map (name, results);
-            assert_(map.size == size.x*size.y*size.z*sizeof(float), name, map.size, size.x*size.y*size.z*sizeof(float));
-            VolumeF volume (size, buffer<float>(map), "x"_);
+            buffer<float> data (map);
+            if(data.size != (size_t)size.x*size.y*size.z) {
+                data = cast<float>(inflate(map));
+                if(data.size != (size_t)size.x*size.y*size.z) {
+                    log("Expected", size.x*size.y*size.z, "voxels, got", data.size, "for", name);
+                    continue;
+                }
+            }
+            VolumeF volume (size, move(data), "x"_);
             float* volumeData = volume.data;
             const int XY = size.x*size.x;
             const int X = size.x;
@@ -65,7 +71,7 @@ struct SNR {
             }
             float SNR = SNRsum / SNRcount;
             writeFile(section(name,'.',0,-2)+".snr"_, "{SNR:"_+str(SNR)+"}"_, results);
-            log(index,"/", names.size, name, SNR);
+            log(index+1,"/", names.size, name, SNR);
         }
     }
 } app;
