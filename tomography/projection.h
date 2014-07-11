@@ -7,28 +7,29 @@ inline string str(const Trajectory& t) { return ref<string>({"single"_,"double"_
 /// Projection configuration
 /// \note Defines all \a count projections using an index parameter
 struct Projection {
-    // Resolution
-    int3 volumeSize;
-    int3 projectionSize;
-    uint count = projectionSize.z;
-    // Parameters
-    float detectorHalfWidth = 1; // 2048*0.194 ~ 397 / 2
-    float cameraLength = 1; // 328.811
-    float specimenDistance = 1./16; // 2.78845
-    Trajectory trajectory;
+    // Setup parameters
+    const float detectorHalfWidth = 1;
+    const float cameraLength;
+    const float specimenDistance;
+    // Reconstruction resolution
+    const int3 volumeSize;
+    const int3 projectionSize;
+    const uint count = projectionSize.z;
+    // Acquisition parameters
+    const Trajectory trajectory;
     const float rotationCount;
 
     // Projection setup (coordinates in view space)
     const float volumeAspectRatio = float(volumeSize.z-1) / float(volumeSize.x-1);
     const float projectionAspectRatio = float(projectionSize.y-1) / float(projectionSize.x-1);
-    const float detectorHalfHeight = projectionAspectRatio * detectorHalfWidth; //image_height * pixel_size; // [mm] ~ 397 mm
+    const float detectorHalfHeight = projectionAspectRatio * detectorHalfWidth;
     const float volumeRadius = detectorHalfWidth / sqrt(sq(detectorHalfWidth)+sq(cameraLength)) * specimenDistance;
     const float zExtent = (specimenDistance - volumeRadius) / cameraLength * detectorHalfHeight; // Fits cap tangent intersection to detector top edge
     const float deltaZ = volumeAspectRatio - zExtent/volumeRadius; // Scales normalized Z to Z view origin in world space so that the cylinder caps exactly fits the view at the trajectory extremes
     const float distance = specimenDistance/volumeRadius; // Distance in world space
     const float extent = 2/sqrt(1-1/sq(distance)); // Projection of the tangent intersection point on the origin plane (i.e projection of the detector extent on the origin plane)
 
-    Projection(int3 volumeSize, int3 projectionSize, const Trajectory trajectory, const float rotationCount) : volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount) {}
+    Projection(float cameraLength, float specimenDistance, int3 volumeSize, int3 projectionSize, Trajectory trajectory, float rotationCount) : cameraLength(cameraLength), specimenDistance(specimenDistance), volumeSize(volumeSize), projectionSize(projectionSize), trajectory(trajectory), rotationCount(rotationCount) {}
 
     // Rotation angle (in radians) around vertical axis
     float angle(uint index) const {

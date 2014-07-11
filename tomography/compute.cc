@@ -21,6 +21,10 @@ struct Compute {
     unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; // User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
+        const float detectorHalfWidth = 2048*0.194;
+        const float cameraLength = 328.811/detectorHalfWidth;
+        const float specimenDistance= 2.78845/detectorHalfWidth;
+
         const int3 volumeSize = parameters.value("volumeSize"_, int3(256)); // Reconstruction sample count along each dimensions
         int2 projectionSize = parameters.value("projectionSize"_, int2(volumeSize.z, volumeSize.z*3/4)); // Detector sample count along each dimensions. Defaults to a 4:3 detector with a resolution comparable to the reconstruction.
 
@@ -35,7 +39,7 @@ struct Compute {
                     writeFile(dec(z), encodePNG(target),  folder);
                 }}
             {Folder folder ("Projection"_, currentWorkingDirectory(), true);
-                const Projection A (volumeSize, int3(projectionSize, volumeSize.z), Single, 1);
+                const Projection A (cameraLength, specimenDistance, volumeSize, int3(projectionSize, volumeSize.z), Single, 1);
                 ImageF targetf ( A.projectionSize.xy() );
                 Image target ( A.projectionSize.xy() );
                 for(uint index: range(A.projectionSize.z)) {
@@ -59,7 +63,7 @@ struct Compute {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
                         float rotationCount;
                         if(rotationCountParameter=="optimal"_) {
-                            const float r = 1./2, H=Projection(volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
+                            const float r = 1./2, H=Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
                             rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
                         } else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
@@ -69,6 +73,8 @@ struct Compute {
                             else if(method=="SART"_) subsetSize = nearestDivisorToSqrt(projectionCount) * 2;
                             else /*method=="MLTR"_*/ subsetSize = nearestDivisorToSqrt(projectionCount);
                             Dict configuration;
+                            configuration["cameraLength"_] = cameraLength;
+                            configuration["specimenDistance"_] = specimenDistance;
                             configuration["volumeSize"_] = volumeSize;
                             configuration["projectionSize"_] = projectionSize;
                             configuration["trajectory"_] = trajectory;
@@ -131,7 +137,7 @@ struct Compute {
                 if(attenuation0Key != key) { // Cache miss
                     log_("Analytic projection ["_+str(maxProjectionCount)+"]... "_);
                     Time time; projectionTime.start();
-                    attenuation0 = project(rock, Projection(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount));
+                    attenuation0 = project(rock, Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount));
                     projectionTime.stop(); log(time);
                     attenuation0Key = move(key);
                 }}
@@ -160,7 +166,7 @@ struct Compute {
                 }}
 
             {// Reconstruction
-                const Projection A (volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount);
+                const Projection A (cameraLength, specimenDistance, volumeSize, int3(projectionSize, projectionCount), trajectory, rotationCount);
                 unique<Reconstruction> reconstruction = nullptr;
                 if(method=="SART"_) reconstruction = unique<SART>(A, attenuation, subsetSize);
                 if(method=="MLTR"_) reconstruction = unique<MLTR>(A, intensity, subsetSize);
