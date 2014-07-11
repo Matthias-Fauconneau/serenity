@@ -41,15 +41,18 @@ void rootIndex(Volume16& target, const ref<Family>& families) {
         }
     }
 }
+
 /// Writes root index of each voxel
 struct RootIndex : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint index) override {
-        int3 size = parse3(inputs[1]->data); assert_(size);
+        int3 size = nextPowerOfTwo(parse3(inputs[1]->data)); assert_(size);
         return (uint64)size.x*size.y*size.z*outputSampleSize(index);
     }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>&, const ref<const Result*>& inputs) override {
-        outputs[0].sampleCount = parse3(inputs[1]->data);
+        int3 size = parse3(inputs[1]->data);
+        outputs[0].sampleCount = nextPowerOfTwo(size);
+        outputs[0].margin = (outputs[0].sampleCount-size)/2;
         rootIndex(outputs[0],parseFamilies(inputs[0]->data));
     }
 };
@@ -105,7 +108,7 @@ array<mat4> bound(const ref<Family>& families) {
     return bounds;
 }
 
-/// Bounds each familiy with an axis-aligned bounding box
+/// Bounds each family with an axis-aligned bounding box
 struct Bound : Operation {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         outputs[0]->metadata = String("boxes"_);

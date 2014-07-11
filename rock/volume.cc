@@ -16,8 +16,13 @@ static uint pack(uint64 bits, uint offset, uint stride=3) { uint packedBits=0; b
 /// Uninterleaves 3 coordinates
 int3 zOrder(uint64 index) { return int3(pack(index,0),pack(index,1),pack(index,2)); }
 
+static bool isPowerOfTwo(uint v) { return (v & (v - 1)) == 0; }
+
 void interleavedLookup(Volume& target) {
     if(target.tiled()) return;
+    assert_(isPowerOfTwo(target.sampleCount.x));
+    assert_(isPowerOfTwo(target.sampleCount.y));
+    assert_(isPowerOfTwo(target.sampleCount.z));
     target.offsetX = interleavedLookup(target.sampleCount.x,0);
     target.offsetY = interleavedLookup(target.sampleCount.y,1);
     target.offsetZ = interleavedLookup(target.sampleCount.z,2);

@@ -6,6 +6,7 @@
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Computes the next highest power of 2
 inline uint nextPowerOfTwo(uint v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; }
+inline int3 nextPowerOfTwo(int3 v) { return int3(nextPowerOfTwo(v.x), nextPowerOfTwo(v.y), nextPowerOfTwo(v.z)); }
 
 // Converts an abstract operation Result to a volume
 inline Volume toVolume(const string& metadata, const buffer<byte>& data) {
