@@ -3,7 +3,6 @@
 #include "operators.h"
 #include "SART.h"
 #include "MLTR.h"
-#include "PMLTR.h"
 #include "CG.h"
 #include "view.h"
 #include "plot.h"

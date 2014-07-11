@@ -2,7 +2,6 @@
 #include "operators.h"
 #include "time.h"
 
-// Simultaneous iterative algebraic reconstruction technique
 SART::SART(const Projection& A, ImageArray&& attenuation, const uint subsetSize) : SubsetReconstruction(A, attenuation, subsetSize, "SART"_), AAti(subsets.size), Ax(subsets[0].b.size,"Ax"_), Atr(x.size,"Atr"_) {
     ImageArray i (Ax.size, "i"_, 1.f);
     log_("SART::AAti ["_+str(subsets.size)+"]... "_); Time time;

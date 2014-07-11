@@ -20,7 +20,7 @@ void Plot::render() {
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
     else {  // Computes axis scales
         for(const DataSet& dataSet: dataSets) {
-            for(auto point: dataSet.data) {
+            for(auto point: dataSet.points) {
                 vec2 p(point.key,point.value);
                 assert(isNumber(p.x) && isNumber(p.y), p);
                 if(log[0]) assert_(p.x>0);
@@ -148,15 +148,15 @@ void Plot::render() {
     // Plots data points
     for(uint i: range(dataSets.size)) {
         vec3 color = colors[i];
-        const auto& data = dataSets[i].data;
+        const auto& data = dataSets[i].points;
         buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
-        if(plotPoints) for(uint i: range(data.size())) {
+        if(plotPoints) for(uint i: range(points.size)) {
             int2 p = int2(round(points[i]));
             const int pointRadius = 16;
             line(target, p-int2(pointRadius, 0), p+int2(pointRadius, 0), color);
             line(target, p-int2(0, pointRadius), p+int2(0, pointRadius), color);
         }
-        if(plotLines) for(uint i: range(data.size()-1)) line(target, points[i], points[i+1], color);
+        if(plotLines) for(uint i: range(points.size-1)) line(target, points[i], points[i+1], color);
     }
     putImage(target);
 }

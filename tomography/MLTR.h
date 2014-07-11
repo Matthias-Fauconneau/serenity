@@ -1,6 +1,7 @@
 #pragma once
 #include "reconstruction.h"
 
+/// Maximum likelihood expectation maximization for transmission tomography
 struct MLTR : SubsetReconstruction {
     array<ImageArray> Ai; // A i
     ImageArray Ax; // A x

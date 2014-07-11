@@ -3,14 +3,12 @@
 #include "time.h"
 
 CG::CG(const Projection& projection, ImageArray&& attenuation) : Reconstruction(projection, "CG"_), At(apply(attenuation.size.z, [&](uint index){ return projection.worldToDevice(index); }), "At"_), r(x.size, "r"_), p(x.size,"p"_), Ap(attenuation.size,"Ap"_), AtAp(x.size,"AtAp"_) {
-     /// Computes residual r=p=Atb
     backproject(r, At, attenuation); // r = At b (x=0)
     residualEnergy = dot(r, r); // |r|²
     assert_(residualEnergy);
     copy(r, p); // r -> p
 }
 
-/// Minimizes |Ax-b|² using conjugated gradient (on the normal equations): x[k+1] = x[k] + α p[k]
 void CG::step() {
     time += project(Ap, A, p); // Ap = A p
     time += backproject(AtAp, At, Ap); // At Ap

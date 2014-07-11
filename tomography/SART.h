@@ -1,6 +1,7 @@
 #pragma once
 #include "reconstruction.h"
 
+/// Simultaneous iterative algebraic reconstruction technique
 struct SART : SubsetReconstruction {
     array<ImageArray> AAti; // A At i
     ImageArray Ax; // At x

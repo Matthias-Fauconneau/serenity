@@ -31,6 +31,7 @@ struct SubsetReconstruction : Reconstruction {
     uint subsetIndex = 0; /// Next subset to be iterated
     buffer<uint> shuffle = shuffleSequence(subsetCount); /// Random
 
+    /// Initializes reconstruction for projection configuration \a A, interleaves projection data \b into subsets
     SubsetReconstruction(const Projection& A, const ImageArray& b, const uint subsetSize, string name, float value=0) : Reconstruction(A, name, value), subsetSize(subsetSize), subsetCount(A.count/subsetSize) {
         assert_(subsetCount*subsetSize == A.count);
         subsets.reserve(subsetCount);

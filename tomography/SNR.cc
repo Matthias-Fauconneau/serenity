@@ -3,6 +3,11 @@
 #include "synthetic.h"
 #include "deflate.h"
 
+inline float sum(const ref<float>& A) { double sum=0; for(float a: A) sum+=a; return sum; }
+inline float sum(const VolumeF& volume) { return sum(volume.data); }
+inline float mean(const ref<float>& A) { return sum(A) / A.size; }
+inline float mean(const VolumeF& volume) { return mean(volume.data); }
+
 struct SNR {
     SNR() {
         const int3 volumeSize = int3(256);
