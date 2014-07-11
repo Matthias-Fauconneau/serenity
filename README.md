@@ -1,38 +1,45 @@
  Tomography is written using [C++11][http://en.wikipedia.org/wiki/C++11]
 
-### Configuring local development environment without a package manager
-Install the scripts
- cp scripts/* $PREFIX/bin
- ln -s $PREFIX/lib $PREFIX/lib64
+### Tomographic reconstruction configurations evaluation
 
-Fetch the package index
- index
+\ref tomography/compute.cc "compute" generates a synthetic sample of porous rock and evaluates reconstruction methods over a range of configurations.
+For each configuration, 4 files are saved in a "Results" under the current working directory:
+- The normalized mean square error over the central and extreme parts of the volumes are stored for each iterations
+- The best reconstruction volume
+- Two slices of the best reconstruction
 
-Build and install gcc dependencies
- build gmp-5.1.2
- build mpfr-3.1.2
- build mpc-1.0.1
-
-Build and install gcc
- build gcc-4.8.1 --disable-multilib --enable-languages="c,c++" --with-mpc=$PREFIX
-
-Add $PREFIX/{bin,lib,include} to your system paths
- export PATH=$PREFIX/bin:$PATH
- export LD_LIBRARY_PATH=$PREFIX/lib:$LD_LIBRARY_PATH
- export CPPFLAGS=-I$PREFIX/include
- export LDFLAGS=-L$PREFIX/lib
-
-Build and install an application
- sh build.sh fast test $PREFIX/bin
-
-Optionnal: Build and install gdb (debugger)
- build gdb-7.6
-
-Optionnal: Build and install Qt and Qt Creator (IDE)
- build-qt
- build qt-creator-2.8.0
- You can now open serenity.creator with Qt Creator
- The code can be browsed using F2 to follow symbols (Alt-Left to go back)
-
-Optionnal: Build and install git
- build git-1.8.3.2
+## Arguments
+- ui [=false]
+ Displays a window with informations to monitor the reconstruction as it runs.
+- reference [=false]
+ Instead of running any reconstructions, exports the reference volumes slices in a "Reference" folder and as many analytic projections to "Projection".
+- update = missing|best|all
+ When set to "missing", only results missing from "Results" are computed
+ When set to "best", any results missing its best reconstruction volume is recomputed
+ When unset (default), any results older than a week (or missing) is recomputed
+ When set to "all", any previous results is ignored and all results are recomputed
+- volumeSize [=256x256x256]
+ Size of the reconstruction volume in voxels
+- projectionSize [=256x192]
+ Size of the projection images in pixels
+- trajectory = single,double,adaptive
+ Single: Projections are distributed on a single helicoidal path around the sample.
+ Double: Projections are distributed between two opposite helicoidal path around the sample.
+ Adaptive: Projections are distributed on a single helicoidal path with half rotations at both ends.
+- rotationCount [=optimal,4,2,1]
+ Total number of revolutions
+ "optimal" computes the rotation count so that projections are equally spaced along both height and angle.
+ "trajectory=adaptive" adds one revolution to account for the ends.
+- photonCount [=8192,4096,2048,0]
+ Number of photons per pixel.
+ \note 0 means no poisson noise is simulated.
+- projectionCount [=128,256,512]
+ Total number of projections.
+- method = SART,MLTR,CG
+ SART: Simultaneous iterative algebraic reconstruction technique
+ MLTR: Maximum likelihood expectation maximization for transmission tomography
+ CG: Minimizes |Ax-b|² using conjugated gradient (on the normal equations)
+- subsetSize
+ Number of projections per subsets
+ CG does not supports subsets.
+ Defaults to √projectionCount for MLTR, 2√projectionCount for SART

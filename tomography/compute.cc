@@ -84,7 +84,7 @@ struct Compute {
         }
 
         // Filters configuration requiring an update
-        Folder results = "Results"_;
+        Folder results = Folder("Results"_, currentWorkingDirectory(), true);
         int64 updateTime = realTime() - 7*24*60*60*1000000000ull; // Updates any old results (default)
         if(parameters.value("update"_,""_)=="missing"_) updateTime = 0; // Updates missing results
         if(parameters.value("update"_,""_)=="all"_) updateTime = realTime();  // Updates all results
