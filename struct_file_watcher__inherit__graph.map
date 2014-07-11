@@ -1,0 +1,6 @@
+<map id="FileWatcher" name="FileWatcher">
+<area shape="rect" id="node2" href="$struct_file.html" title="Handle to a file. " alt="" coords="16,155,59,181"/>
+<area shape="rect" id="node3" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="5,80,69,107"/>
+<area shape="rect" id="node4" href="$struct_handle.html" title="Unix file descriptor. " alt="" coords="6,5,68,32"/>
+<area shape="rect" id="node5" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops. " alt="" coords="83,155,127,181"/>
+</map>

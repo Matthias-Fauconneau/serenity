@@ -1,0 +1,49 @@
+<map id="Application" name="Application">
+<area shape="rect" id="node2" href="$struct_plot_view.html" title="PlotView" alt="" coords="1359,257,1433,284"/>
+<area shape="rect" id="node3" href="$struct_plot.html" title="Plots graphs of 2D point data sets. " alt="" coords="1069,103,1115,129"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="729,521,791,548"/>
+<area shape="rect" id="node33" href="$struct_array_view.html" title="ArrayView" alt="" coords="1355,521,1437,548"/>
+<area shape="rect" id="node38" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="1057,1272,1127,1299"/>
+<area shape="rect" id="node5" href="$struct_image.html" title="2D array of byte4 " alt="" coords="447,521,505,548"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="161,521,261,548"/>
+<area shape="rect" id="node7" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="155,276,266,303"/>
+<area shape="rect" id="node9" href="$structarray.html" title="array\&lt; DataSet \&gt;" alt="" coords="699,99,821,125"/>
+<area shape="rect" id="node10" href="$structbuffer.html" title="buffer\&lt; DataSet \&gt;" alt="" coords="413,99,539,125"/>
+<area shape="rect" id="node11" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="710,443,810,469"/>
+<area shape="rect" id="node12" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="424,443,528,469"/>
+<area shape="rect" id="node13" href="$structarray.html" title="array\&lt; array \&gt;" alt="" coords="1040,244,1144,271"/>
+<area shape="rect" id="node14" href="$structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="706,149,814,176"/>
+<area shape="rect" id="node15" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="1049,167,1135,193"/>
+<area shape="rect" id="node16" href="$structmap.html" title="map\&lt; String, Variant \&gt;" alt="" coords="1015,295,1169,321"/>
+<area shape="rect" id="node17" href="$structarray.html" title="array\&lt; Variant \&gt;" alt="" coords="702,331,818,357"/>
+<area shape="rect" id="node21" href="$structmap.html" title="map\&lt; ref, Variant \&gt;" alt="" coords="1329,687,1463,713"/>
+<area shape="rect" id="node36" href="$structmap.html" title="map\&lt; map\&lt; String, Variant\l \&gt;, Variant \&gt;" alt="" coords="1003,346,1181,387"/>
+<area shape="rect" id="node18" href="$structbuffer.html" title="buffer\&lt; Variant \&gt;" alt="" coords="416,331,536,357"/>
+<area shape="rect" id="node19" href="$structarray.html" title="array\&lt; String \&gt;" alt="" coords="705,200,815,227"/>
+<area shape="rect" id="node20" href="$structbuffer.html" title="buffer\&lt; String \&gt;" alt="" coords="419,200,533,227"/>
+<area shape="rect" id="node22" href="$structarray.html" title="array\&lt; ref \&gt;" alt="" coords="1047,657,1137,684"/>
+<area shape="rect" id="node23" href="$structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="713,572,807,599"/>
+<area shape="rect" id="node24" href="$struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="1046,880,1138,907"/>
+<area shape="rect" id="node25" href="$struct_file.html" title="Handle to a file. " alt="" coords="739,921,781,948"/>
+<area shape="rect" id="node26" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="444,1231,508,1257"/>
+<area shape="rect" id="node39" href="$struct_socket.html" title="Handle to a socket. " alt="" coords="729,1232,791,1259"/>
+<area shape="rect" id="node27" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops. " alt="" coords="738,840,782,867"/>
+<area shape="rect" id="node29" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="1061,737,1123,764"/>
+<area shape="rect" id="node30" href="$struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="451,1349,501,1376"/>
+<area shape="rect" id="node41" href="$struct_semaphore.html" title="A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter. " alt="" coords="716,1461,804,1488"/>
+<area shape="rect" id="node31" href="$structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="120,1349,301,1376"/>
+<area shape="rect" id="node32" href="$structfunction.html" title="function\&lt; void(ref)\&gt;" alt="" coords="693,995,827,1021"/>
+<area shape="rect" id="node34" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="701,1180,819,1207"/>
+<area shape="rect" id="node35" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="439,1180,513,1207"/>
+<area shape="rect" id="node37" href="$structarray.html" title="array\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="691,265,829,306"/>
+<area shape="rect" id="node40" href="$structfunction.html" title="function\&lt; void()\&gt;" alt="" coords="700,1411,820,1437"/>
+<area shape="rect" id="node42" href="$struct_condition.html" title="Condition" alt="" coords="437,1447,515,1473"/>
+<area shape="rect" id="node43" href="$structmap.html" title="map\&lt; uint, unique\&lt;\l Timer \&gt; \&gt;" alt="" coords="693,1591,827,1633"/>
+<area shape="rect" id="node44" href="$structarray.html" title="array\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="391,1649,561,1676"/>
+<area shape="rect" id="node45" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="428,1599,524,1625"/>
+<area shape="rect" id="node46" href="$structarray.html" title="array\&lt; Window::QEvent \&gt;" alt="" coords="673,1283,847,1309"/>
+<area shape="rect" id="node47" href="$structbuffer.html" title="buffer\&lt; Window::QEvent \&gt;" alt="" coords="387,1283,565,1309"/>
+<area shape="rect" id="node48" href="$structmap.html" title="map\&lt; Key, function\l\&lt; void()\&gt; \&gt;" alt="" coords="692,1513,828,1554"/>
+<area shape="rect" id="node49" href="$structarray.html" title="array\&lt; Key \&gt;" alt="" coords="427,1497,525,1524"/>
+<area shape="rect" id="node50" href="$structarray.html" title="array\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="389,1548,563,1575"/>
+</map>

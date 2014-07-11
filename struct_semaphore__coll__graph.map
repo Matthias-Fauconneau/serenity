@@ -1,0 +1,4 @@
+<map id="Semaphore" name="Semaphore">
+<area shape="rect" id="node2" href="$struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="71,83,121,109"/>
+<area shape="rect" id="node3" href="$structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="5,5,187,32"/>
+</map>

@@ -1,0 +1,25 @@
+var struct_projection =
+[
+    [ "Projection", "struct_projection.html#a921530bc7e569320d8e3867b1c0b6ac7", null ],
+    [ "angle", "struct_projection.html#a60802358a9390827fcf478cd9d3c73ad", null ],
+    [ "dz", "struct_projection.html#ae1fce44c40c875f4314706dcecbf0c48", null ],
+    [ "worldToView", "struct_projection.html#a60965000ac654b0949b2360bb038ee25", null ],
+    [ "worldToScaledView", "struct_projection.html#af2c28e325a352f22e1cdf5acd924864e", null ],
+    [ "worldToDevice", "struct_projection.html#ae19626dba1bdbe613bfe185439d3ded6", null ],
+    [ "volumeSize", "struct_projection.html#a16ffdae1018247bbdd13c6922d5b5d41", null ],
+    [ "projectionSize", "struct_projection.html#a26d0a990951eccf369d3570bdebc3f55", null ],
+    [ "count", "struct_projection.html#a5fd9a22d01df5a395239277bd008224b", null ],
+    [ "detectorHalfWidth", "struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4", null ],
+    [ "cameraLength", "struct_projection.html#ab70e76dda53caddf76e96b5af1ef2842", null ],
+    [ "specimenDistance", "struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808", null ],
+    [ "trajectory", "struct_projection.html#a5846ba0ccc734108fe3eff06cb392813", null ],
+    [ "rotationCount", "struct_projection.html#aa35ad833d06433eb3e764ea3c5b1b1b2", null ],
+    [ "volumeAspectRatio", "struct_projection.html#a5d4d2a8f528df5e8469c6f3596e3e1f1", null ],
+    [ "projectionAspectRatio", "struct_projection.html#a9c8fca8012bb3f82ebb0bc6b1e714df4", null ],
+    [ "detectorHalfHeight", "struct_projection.html#a6f9bfdb1a11ea09ad131266e90cfaf6a", null ],
+    [ "volumeRadius", "struct_projection.html#a41b5bac3e05f2d20911911581465cd31", null ],
+    [ "zExtent", "struct_projection.html#ae62389bf0a2caf6109644b917171247b", null ],
+    [ "deltaZ", "struct_projection.html#ab2e93cb94a09cb43ffdcf21ad3e3b516", null ],
+    [ "distance", "struct_projection.html#a279843b00f57c92a2c79d1d89b30914b", null ],
+    [ "extent", "struct_projection.html#a6534239964d23c7f9df9f3325766e116", null ]
+];

@@ -1,0 +1,23 @@
+var searchData=
+[
+  ['tdefl_5fput_5fbits',['TDEFL_PUT_BITS',['../deflate_8cc.html#afa82f58d261e57808ff2b08cf9482b1d',1,'deflate.cc']]],
+  ['tdefl_5fput_5fbits_5ffast',['TDEFL_PUT_BITS_FAST',['../deflate_8cc.html#a756aba09562f417fbde5240b6326fccb',1,'deflate.cc']]],
+  ['tdefl_5fread_5funaligned_5fword',['TDEFL_READ_UNALIGNED_WORD',['../deflate_8cc.html#a2f5384184bb4008dc4bc114e9e66a886',1,'deflate.cc']]],
+  ['tdefl_5frle_5fprev_5fcode_5fsize',['TDEFL_RLE_PREV_CODE_SIZE',['../deflate_8cc.html#af22ccc4520994a5f54caa5a43a75d012',1,'deflate.cc']]],
+  ['tdefl_5frle_5fzero_5fcode_5fsize',['TDEFL_RLE_ZERO_CODE_SIZE',['../deflate_8cc.html#a30333e6e68452b9e96ee7c5141f2b506',1,'deflate.cc']]],
+  ['tinfl_5fcr_5fbegin',['TINFL_CR_BEGIN',['../deflate_8cc.html#a1bf00dad2822034f9b1369579a9c98d1',1,'deflate.cc']]],
+  ['tinfl_5fcr_5ffinish',['TINFL_CR_FINISH',['../deflate_8cc.html#a99786d0af99c4433d7961581d708da51',1,'deflate.cc']]],
+  ['tinfl_5fcr_5freturn',['TINFL_CR_RETURN',['../deflate_8cc.html#a9b76ea2ad5e09a1bd4a7d663745ac29e',1,'deflate.cc']]],
+  ['tinfl_5fcr_5freturn_5fforever',['TINFL_CR_RETURN_FOREVER',['../deflate_8cc.html#a9b93b1cd46aaf29a27dfb526bd110d63',1,'deflate.cc']]],
+  ['tinfl_5fdecompress_5fmem_5fto_5fmem_5ffailed',['TINFL_DECOMPRESS_MEM_TO_MEM_FAILED',['../deflate_8cc.html#abc05bb1717f26edc88a010e903de04e8',1,'deflate.cc']]],
+  ['tinfl_5fget_5fadler32',['tinfl_get_adler32',['../deflate_8cc.html#a5542a5383b30c24dc30bc2af3857a291',1,'deflate.cc']]],
+  ['tinfl_5fget_5fbits',['TINFL_GET_BITS',['../deflate_8cc.html#a4cccb4d20cb7fe52ed89300dcd665815',1,'deflate.cc']]],
+  ['tinfl_5fget_5fbyte',['TINFL_GET_BYTE',['../deflate_8cc.html#a26b0de30f3238271922e55776feacb0f',1,'deflate.cc']]],
+  ['tinfl_5fhuff_5fbitbuf_5ffill',['TINFL_HUFF_BITBUF_FILL',['../deflate_8cc.html#a134552e117c26b55d84ee80247828998',1,'deflate.cc']]],
+  ['tinfl_5fhuff_5fdecode',['TINFL_HUFF_DECODE',['../deflate_8cc.html#a5b7562ec245b9e07daefeae07602d7ae',1,'deflate.cc']]],
+  ['tinfl_5finit',['tinfl_init',['../deflate_8cc.html#a38425ff8609fe5fe5a9a48612e6f3e46',1,'deflate.cc']]],
+  ['tinfl_5flz_5fdict_5fsize',['TINFL_LZ_DICT_SIZE',['../deflate_8cc.html#a39dc152de3351183ff8af716f0c556cb',1,'deflate.cc']]],
+  ['tinfl_5fneed_5fbits',['TINFL_NEED_BITS',['../deflate_8cc.html#a1f5388f745eea1a9297c8fb70277042d',1,'deflate.cc']]],
+  ['tinfl_5fskip_5fbits',['TINFL_SKIP_BITS',['../deflate_8cc.html#aed4ea8f4cdcf4ad4416419dab601e7f0',1,'deflate.cc']]],
+  ['type',['Type',['../core_8h.html#ae1f0ac82c78444bf9b69e7dbdd1d1983',1,'core.h']]]
+];

@@ -1,0 +1,7 @@
+<map id="WidgetGrid" name="WidgetGrid">
+<area shape="rect" id="node2" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="160,155,245,181"/>
+<area shape="rect" id="node3" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="165,80,227,107"/>
+<area shape="rect" id="node5" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="5,155,135,181"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="165,5,227,32"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="6,80,135,107"/>
+</map>

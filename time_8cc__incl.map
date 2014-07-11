@@ -1,0 +1,12 @@
+<map id="time.cc" name="time.cc">
+<area shape="rect" id="node2" href="$time_8h.html" title="Time and date operations. " alt="" coords="159,80,216,107"/>
+<area shape="rect" id="node3" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="5,155,63,181"/>
+<area shape="rect" id="node12" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="89,155,153,181"/>
+<area shape="rect" id="node6" href="$thread_8h.html" title="Threaded event loops, synchronization, execute, process environment and arguments ..." alt="" coords="249,155,319,181"/>
+<area shape="rect" id="node9" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="123,229,201,256"/>
+<area shape="rect" id="node13" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="403,304,465,331"/>
+<area shape="rect" id="node4" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="161,379,240,405"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="249,453,307,480"/>
+<area shape="rect" id="node7" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="170,304,232,331"/>
+<area shape="rect" id="node8" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="456,229,507,256"/>
+</map>

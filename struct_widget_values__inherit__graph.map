@@ -1,0 +1,7 @@
+<map id="WidgetValues&lt; T &gt;" name="WidgetValues&lt; T &gt;">
+<area shape="rect" id="node5" href="$struct_h_list.html" title="Horizontal layout of homogenous items. " alt="" coords="5,229,91,256"/>
+<area shape="rect" id="node6" href="$struct_v_list.html" title="Vertical layout of homogenous items. " alt="" coords="115,229,199,256"/>
+<area shape="rect" id="node2" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="23,80,84,107"/>
+<area shape="rect" id="node3" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="22,5,84,32"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="109,80,195,107"/>
+</map>

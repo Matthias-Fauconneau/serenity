@@ -1,0 +1,22 @@
+var searchData=
+[
+  ['range',['RANGE',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a36ccd76c516f51bf87c02b44305284ca',1,'file.h']]],
+  ['read',['Read',['../struct_map.html#a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5',1,'Map']]],
+  ['readonly',['ReadOnly',['../file_8h.html#aa705cf7e79a21c2352b00ffe20cd295faf1a03d8a79e3c6ef4a82a0ba3fec6e7a',1,'file.h']]],
+  ['readwrite',['ReadWrite',['../file_8h.html#aa705cf7e79a21c2352b00ffe20cd295fa3c4d2d19c91b345c33a83ca9f551f4e1',1,'file.h']]],
+  ['recursive',['Recursive',['../file_8h.html#adf764cbdea00d65edcd07bb9953ad2b7ad5d10c8fb234f82d1779bd7b3ac7b6f7',1,'file.h']]],
+  ['regular',['Regular',['../text_8h.html#ab6ea0063f7246ac0beecb0cf3cb2b126a66dfad2fc66aab9e6bb47cfad78b4b6b',1,'text.h']]],
+  ['release',['Release',['../struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa10f0440c09f2ab804b4e23e7a94c5a34',1,'Widget']]],
+  ['remchg',['REMCHG',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5ac00b8999e03e68667b7733262cfd1842',1,'file.h']]],
+  ['remote',['REMOTE',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a4ba7a18dad4c2b80d41444425fc4b818',1,'file.h']]],
+  ['remoteio',['REMOTEIO',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a7493c718b60a48b787b2d1292acfe03e',1,'file.h']]],
+  ['reparentnotify',['ReparentNotify',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea1c0303f1db0aabdf6285da84ab507091',1,'x.h']]],
+  ['resizerequest',['ResizeRequest',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9eaec9ff8a30e25b045c72b0e91c9fc1775',1,'x.h']]],
+  ['restart',['RESTART',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a262553c759e1d1a9398bc406b1fadcb7',1,'file.h']]],
+  ['return',['Return',['../widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73a9fa8a5a1e10fdeafbb823a1c31fbd491',1,'widget.h']]],
+  ['rfkill',['RFKILL',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a2795afce1849bfffabbd8256b195706d',1,'file.h']]],
+  ['right',['Right',['../struct_linear.html#ada56dc91aadf5dba53b6ab10d6028a0fab0f6f73d88b3f8322c101acef4a37453',1,'Linear::Right()'],['../struct_window.html#ab7cfdc5390347b7185d4014802342576a015164304ddd43a48aa7a3cc97a664fe',1,'Window::Right()']]],
+  ['rightarrow',['RightArrow',['../widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73ab947d01f1561b3d5c053c7a564edc29b',1,'widget.h']]],
+  ['rightbutton',['RightButton',['../struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a36ec6c806a3861f148bf1903ab8c6169',1,'Widget']]],
+  ['rofs',['ROFS',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5ac8b129579e72efc7cf4a6d0d7c3ef479',1,'file.h']]]
+];

@@ -1,0 +1,10 @@
+<map id="graphics.cc" name="graphics.cc">
+<area shape="rect" id="node2" href="$graphics_8h.html" title="2D graphics primitives (fill, blit, line) " alt="" coords="43,80,124,107"/>
+<area shape="rect" id="node3" href="$image_8h.html" title="Image container and operations. " alt="" coords="50,155,117,181"/>
+<area shape="rect" id="node4" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="49,229,119,256"/>
+<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="13,304,77,331"/>
+<area shape="rect" id="node9" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="97,379,159,405"/>
+<area shape="rect" id="node6" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="10,379,72,405"/>
+<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="5,453,84,480"/>
+<area shape="rect" id="node8" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="56,528,113,555"/>
+</map>

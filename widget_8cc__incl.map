@@ -1,0 +1,10 @@
+<map id="widget.cc" name="widget.cc">
+<area shape="rect" id="node2" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="45,80,115,107"/>
+<area shape="rect" id="node3" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="45,229,115,256"/>
+<area shape="rect" id="node9" href="$image_8h.html" title="Image container and operations. " alt="" coords="82,155,149,181"/>
+<area shape="rect" id="node4" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="13,304,77,331"/>
+<area shape="rect" id="node8" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="97,379,159,405"/>
+<area shape="rect" id="node5" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="10,379,72,405"/>
+<area shape="rect" id="node6" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="5,453,84,480"/>
+<area shape="rect" id="node7" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="56,528,113,555"/>
+</map>

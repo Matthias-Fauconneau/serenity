@@ -1,0 +1,7 @@
+<map id="data.cc" name="data.cc">
+<area shape="rect" id="node2" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="5,155,63,181"/>
+<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="83,80,148,107"/>
+<area shape="rect" id="node3" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="37,229,116,256"/>
+<area shape="rect" id="node4" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="48,304,105,331"/>
+<area shape="rect" id="node6" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="89,155,151,181"/>
+</map>

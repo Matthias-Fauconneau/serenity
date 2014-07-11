@@ -1,0 +1,5 @@
+<map id="Widget" name="Widget">
+<area shape="rect" id="node2" href="$struct_image.html" title="2D array of byte4 " alt="" coords="89,96,147,123"/>
+<area shape="rect" id="node3" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="5,5,104,32"/>
+<area shape="rect" id="node4" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="129,5,239,32"/>
+</map>

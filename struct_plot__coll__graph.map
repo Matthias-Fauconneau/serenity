@@ -1,0 +1,10 @@
+<map id="Plot" name="Plot">
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="83,200,145,227"/>
+<area shape="rect" id="node3" href="$struct_image.html" title="2D array of byte4 " alt="" coords="85,96,143,123"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="5,5,104,32"/>
+<area shape="rect" id="node5" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="129,5,239,32"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; DataSet \&gt;" alt="" coords="223,200,345,227"/>
+<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; DataSet \&gt;" alt="" coords="222,96,348,123"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="373,200,472,227"/>
+<area shape="rect" id="node9" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="373,96,477,123"/>
+</map>

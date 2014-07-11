@@ -1,0 +1,12 @@
+<map id="layout.cc" name="layout.cc">
+<area shape="rect" id="node2" href="$layout_8h.html" title="Widget layouts (Linear, Grid) " alt="" coords="114,80,181,107"/>
+<area shape="rect" id="node3" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="75,155,145,181"/>
+<area shape="rect" id="node11" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="149,229,227,256"/>
+<area shape="rect" id="node4" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="44,304,113,331"/>
+<area shape="rect" id="node10" href="$image_8h.html" title="Image container and operations. " alt="" coords="5,229,72,256"/>
+<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="85,379,149,405"/>
+<area shape="rect" id="node9" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="15,453,77,480"/>
+<area shape="rect" id="node6" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="102,453,164,480"/>
+<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="91,528,169,555"/>
+<area shape="rect" id="node8" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="61,603,119,629"/>
+</map>

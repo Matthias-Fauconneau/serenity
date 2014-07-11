@@ -1,0 +1,11 @@
+<map id="plot.h" name="plot.h">
+<area shape="rect" id="node2" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="63,80,133,107"/>
+<area shape="rect" id="node10" href="$map_8h.html" title="Associative array (using linear search) " alt="" coords="143,229,200,256"/>
+<area shape="rect" id="node3" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="27,229,96,256"/>
+<area shape="rect" id="node9" href="$image_8h.html" title="Image container and operations. " alt="" coords="5,155,72,181"/>
+<area shape="rect" id="node4" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="85,304,149,331"/>
+<area shape="rect" id="node8" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="15,379,77,405"/>
+<area shape="rect" id="node5" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="102,379,164,405"/>
+<area shape="rect" id="node6" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="91,453,169,480"/>
+<area shape="rect" id="node7" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="61,528,119,555"/>
+</map>

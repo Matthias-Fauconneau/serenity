@@ -1,0 +1,7 @@
+<map id="CLKernel" name="CLKernel">
+<area shape="rect" id="node2" href="$structhandle.html" title="handle\&lt; cl_kernel \&gt;" alt="" coords="5,83,140,109"/>
+<area shape="rect" id="node3" href="$struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="165,83,216,109"/>
+<area shape="rect" id="node4" href="$structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="83,5,264,32"/>
+<area shape="rect" id="node5" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="274,83,373,109"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="288,5,392,32"/>
+</map>

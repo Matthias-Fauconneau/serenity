@@ -1,0 +1,18 @@
+<map id="project.h" name="project.h">
+<area shape="rect" id="node2" href="$matrix_8h.html" title="matrix.h" alt="" coords="15,155,84,181"/>
+<area shape="rect" id="node9" href="$projection_8h.html" title="projection.h" alt="" coords="5,80,93,107"/>
+<area shape="rect" id="node10" href="$opencl_8h.html" title="opencl.h" alt="" coords="207,80,277,107"/>
+<area shape="rect" id="node3" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="83,304,152,331"/>
+<area shape="rect" id="node4" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="151,379,216,405"/>
+<area shape="rect" id="node8" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="146,453,208,480"/>
+<area shape="rect" id="node5" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="266,453,328,480"/>
+<area shape="rect" id="node6" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="257,528,336,555"/>
+<area shape="rect" id="node7" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="219,603,276,629"/>
+<area shape="rect" id="node11" href="$thread_8h.html" title="Threaded event loops, synchronization, execute, process environment and arguments ..." alt="" coords="364,304,433,331"/>
+<area shape="rect" id="node16" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="571,229,628,256"/>
+<area shape="rect" id="node17" href="$image_8h.html" title="Image container and operations. " alt="" coords="87,229,155,256"/>
+<area shape="rect" id="node18" href="$volume_8h.html" title="volume.h" alt="" coords="243,155,316,181"/>
+<area shape="rect" id="node19" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="179,229,241,256"/>
+<area shape="rect" id="node12" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="241,379,292,405"/>
+<area shape="rect" id="node13" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="367,379,445,405"/>
+</map>

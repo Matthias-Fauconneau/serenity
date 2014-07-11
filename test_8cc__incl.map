@@ -1,0 +1,23 @@
+<map id="test.cc" name="test.cc">
+<area shape="rect" id="node2" href="$project_8h.html" title="project.h" alt="" coords="668,80,740,107"/>
+<area shape="rect" id="node21" href="$window_8h.html" title="X11 window display and input. " alt="" coords="379,155,455,181"/>
+<area shape="rect" id="node3" href="$matrix_8h.html" title="matrix.h" alt="" coords="903,229,972,256"/>
+<area shape="rect" id="node10" href="$projection_8h.html" title="projection.h" alt="" coords="727,155,816,181"/>
+<area shape="rect" id="node11" href="$opencl_8h.html" title="opencl.h" alt="" coords="601,155,671,181"/>
+<area shape="rect" id="node4" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="759,379,828,405"/>
+<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="475,453,540,480"/>
+<area shape="rect" id="node9" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="710,453,772,480"/>
+<area shape="rect" id="node6" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="365,528,427,555"/>
+<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="624,603,703,629"/>
+<area shape="rect" id="node8" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="673,677,731,704"/>
+<area shape="rect" id="node12" href="$thread_8h.html" title="Threaded event loops, synchronization, execute, process environment and arguments ..." alt="" coords="252,304,321,331"/>
+<area shape="rect" id="node17" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="647,304,704,331"/>
+<area shape="rect" id="node18" href="$image_8h.html" title="Image container and operations. " alt="" coords="831,304,899,331"/>
+<area shape="rect" id="node19" href="$volume_8h.html" title="volume.h" alt="" coords="657,229,731,256"/>
+<area shape="rect" id="node20" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="509,304,571,331"/>
+<area shape="rect" id="node13" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="420,379,471,405"/>
+<area shape="rect" id="node14" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="317,379,395,405"/>
+<area shape="rect" id="node22" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="757,229,827,256"/>
+<area shape="rect" id="node23" href="$map_8h.html" title="Associative array (using linear search) " alt="" coords="5,379,63,405"/>
+<area shape="rect" id="node24" href="$time_8h.html" title="Time and date operations. " alt="" coords="447,229,504,256"/>
+</map>

@@ -1,0 +1,7 @@
+<map id="file.cc" name="file.cc">
+<area shape="rect" id="node2" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="5,80,56,107"/>
+<area shape="rect" id="node6" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="81,80,145,107"/>
+<area shape="rect" id="node3" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="41,155,103,181"/>
+<area shape="rect" id="node4" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="32,229,111,256"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="43,304,100,331"/>
+</map>

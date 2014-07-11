@@ -1,0 +1,25 @@
+var structref =
+[
+    [ "ref", "structref.html#a3e91188df796bf36fc60a35f5ed65239", null ],
+    [ "ref", "structref.html#a6039a7ede7cf519942da19fca7a7c01b", null ],
+    [ "ref", "structref.html#aef03d9917f63c537fc0ef975da5c20d6", null ],
+    [ "ref", "structref.html#a5349e837c2d2cb4f8d6a3bcda3b484ac", null ],
+    [ "ref", "structref.html#a4f03595f8ef340b80daa1b987e1d458e", null ],
+    [ "operator bool", "structref.html#a751e4541993f81160a9dc1f8e288c3b0", null ],
+    [ "operator const T *", "structref.html#aac076e0c0f8cff0c52a32439b687c11f", null ],
+    [ "begin", "structref.html#a418e0e3cdade4e1805971d2bcd0f0111", null ],
+    [ "end", "structref.html#acf37e92c0f20f93d5de7fb158018398d", null ],
+    [ "at", "structref.html#acd96da9c392515b04ec8fab3371b6594", null ],
+    [ "value", "structref.html#a0c88782aa58c3b9442b7b0e513bb4f2a", null ],
+    [ "operator[]", "structref.html#ab9e9ecd5b115c6d9d5e72a769bd23936", null ],
+    [ "first", "structref.html#a1876cb5dc99f8908cd79debfbadeba49", null ],
+    [ "last", "structref.html#a109e32d44b233bb348deea179b85356a", null ],
+    [ "slice", "structref.html#aa9226848bf833511e700dda5495f34c9", null ],
+    [ "slice", "structref.html#a856c1ae9bcd7d42291645e054d21e7ad", null ],
+    [ "operator()", "structref.html#a4dfa68e43b8618b66d04b125fca8c850", null ],
+    [ "operator==", "structref.html#a03bd1b05108bd2191d5ee9296b967fbc", null ],
+    [ "indexOf", "structref.html#aa406743ec8f3235f7f8309a0d86a710b", null ],
+    [ "contains", "structref.html#ac5a5baee0562df26ae8ea460f1eb4a3d", null ],
+    [ "data", "structref.html#ab739ac64671ce69db5c173cae7855f4b", null ],
+    [ "size", "structref.html#ac004f420cc07ae30c70297ca1ac8e6d0", null ]
+];

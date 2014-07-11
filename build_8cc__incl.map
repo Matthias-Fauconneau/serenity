@@ -1,0 +1,10 @@
+<map id="build.cc" name="build.cc">
+<area shape="rect" id="node2" href="$thread_8h.html" title="Threaded event loops, synchronization, execute, process environment and arguments ..." alt="" coords="228,80,297,107"/>
+<area shape="rect" id="node10" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="432,229,489,256"/>
+<area shape="rect" id="node11" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="373,80,437,107"/>
+<area shape="rect" id="node3" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="331,229,393,256"/>
+<area shape="rect" id="node6" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="337,155,388,181"/>
+<area shape="rect" id="node7" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="5,155,83,181"/>
+<area shape="rect" id="node4" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="372,304,451,331"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="383,379,440,405"/>
+</map>

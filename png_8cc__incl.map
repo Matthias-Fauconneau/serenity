@@ -1,0 +1,12 @@
+<map id="png.cc" name="png.cc">
+<area shape="rect" id="node2" href="$png_8h.html" title="PNG codec. " alt="" coords="73,80,127,107"/>
+<area shape="rect" id="node10" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="220,155,277,181"/>
+<area shape="rect" id="node11" href="$deflate_8h.html" title="DEFLATE codec (wraps public domain miniz v1.14 by Rich Geldreich) " alt="" coords="144,229,216,256"/>
+<area shape="rect" id="node3" href="$image_8h.html" title="Image container and operations. " alt="" coords="58,155,125,181"/>
+<area shape="rect" id="node4" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="51,229,120,256"/>
+<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="85,304,149,331"/>
+<area shape="rect" id="node9" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="5,379,67,405"/>
+<area shape="rect" id="node6" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="91,379,153,405"/>
+<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="117,453,196,480"/>
+<area shape="rect" id="node8" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="87,528,144,555"/>
+</map>

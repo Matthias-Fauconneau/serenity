@@ -1,0 +1,8 @@
+<map id="WidgetReferences" name="WidgetReferences">
+<area shape="rect" id="node5" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets. " alt="" coords="5,229,59,256"/>
+<area shape="rect" id="node6" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets. " alt="" coords="83,229,137,256"/>
+<area shape="rect" id="node7" href="$struct_widget_grid.html" title="Grid of heterogenous widgets. " alt="" coords="162,229,248,256"/>
+<area shape="rect" id="node2" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="20,80,81,107"/>
+<area shape="rect" id="node3" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="19,5,81,32"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="106,80,235,107"/>
+</map>

@@ -1,0 +1,10 @@
+<map id="variant.h" name="variant.h">
+<area shape="rect" id="node2" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="139,155,204,181"/>
+<area shape="rect" id="node6" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="207,80,276,107"/>
+<area shape="rect" id="node8" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="5,155,63,181"/>
+<area shape="rect" id="node9" href="$map_8h.html" title="Associative array (using linear search) " alt="" coords="73,80,131,107"/>
+<area shape="rect" id="node3" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="111,229,173,256"/>
+<area shape="rect" id="node4" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="103,304,181,331"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="156,379,213,405"/>
+<area shape="rect" id="node7" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="205,229,267,256"/>
+</map>

@@ -1,0 +1,15 @@
+<map id="PMLTR" name="PMLTR">
+<area shape="rect" id="node2" href="$struct_subset_reconstruction.html" title="Derived class for subset reconstruction. " alt="" coords="326,533,476,560"/>
+<area shape="rect" id="node3" href="$struct_reconstruction.html" title="Base class for reconstruction. " alt="" coords="258,392,368,419"/>
+<area shape="rect" id="node4" href="$struct_c_l_volume.html" title="Single channel floating&#45;point OpenCL 3D image. " alt="" coords="179,285,260,312"/>
+<area shape="rect" id="node5" href="$struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="170,173,237,200"/>
+<area shape="rect" id="node6" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="5,83,135,109"/>
+<area shape="rect" id="node7" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="159,83,259,109"/>
+<area shape="rect" id="node8" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="157,5,261,32"/>
+<area shape="rect" id="node9" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="263,173,388,200"/>
+<area shape="rect" id="node11" href="$struct_projection.html" title="Projection" alt="" coords="285,285,364,312"/>
+<area shape="rect" id="node10" href="$structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="285,83,365,109"/>
+<area shape="rect" id="node12" href="$structarray.html" title="array\&lt; SubsetReconstruction\l::Subset \&gt;" alt="" coords="393,385,585,426"/>
+<area shape="rect" id="node13" href="$structbuffer.html" title="buffer\&lt; SubsetReconstruction\l::Subset \&gt;" alt="" coords="391,278,587,319"/>
+<area shape="rect" id="node14" href="$structbuffer.html" title="buffer\&lt; uint \&gt;" alt="" coords="610,392,709,419"/>
+</map>

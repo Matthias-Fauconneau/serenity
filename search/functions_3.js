@@ -1,0 +1,17 @@
+var searchData=
+[
+  ['capacity',['capacity',['../file_8h.html#aba1bf7a21e3098ce75eb4d6f3f7824db',1,'capacity(const Handle &amp;file):&#160;file.cc'],['../file_8h.html#a04bce28e5d25d5c61e912906f7737f34',1,'capacity(const string &amp;path, const Folder &amp;at=root()):&#160;file.cc']]],
+  ['cast',['cast',['../data_8h.html#a8f8572856aa67a871991865958c9ea3a',1,'cast(const ref&lt; O &gt; &amp;o):&#160;data.h'],['../data_8h.html#a2061dfcaf310e5b17a5e46b4b80b5282',1,'cast(buffer&lt; O &gt; &amp;&amp;o):&#160;data.h']]],
+  ['character',['character',['../struct_text_data.html#ac74dd771908638a1f283abeade2ca154',1,'TextData']]],
+  ['chunk_5fparallel',['chunk_parallel',['../thread_8h.html#aaf073af26ae2c25fc05f5c3bddbf409d',1,'thread.h']]],
+  ['clear',['clear',['../structarray.html#a1ff3c2ce7f237a31a0cfc42a23badc6e',1,'array::clear()'],['../structmref.html#a45ea6ce5ac28bbc7c8881d5b6193c249',1,'mref::clear()'],['../structsignal.html#ae04d5aca9a9303231c06fdbc47c2450e',1,'signal::clear()']]],
+  ['clip',['clip',['../image_8h.html#a89146bb1b01b095bf4291811b1a90fd5',1,'image.cc']]],
+  ['clkernel',['CLKernel',['../struct_c_l_kernel.html#a21016ffaff80d150861adbe9a06d1ddb',1,'CLKernel']]],
+  ['connect',['connect',['../structsignal.html#afc655070cc0858a871e541ff9b820ef0',1,'signal::connect(F f)'],['../structsignal.html#afd7883a6aebbfe5dbaa8dae99f75b26b',1,'signal::connect(void(*pf)(Args...))'],['../structsignal.html#a74e5080149c8b87262d0fe0055282363',1,'signal::connect(C *object, void(B::*pmf)(Args...))'],['../structsignal.html#a39c8753435febbd2a14d81cf652928de',1,'signal::connect(const C *object, void(B::*pmf)(Args...) const)']]],
+  ['contains',['contains',['../structarray.html#a60075e43327159dc21ac9be304c08a80',1,'array::contains()'],['../structref.html#ac5a5baee0562df26ae8ea460f1eb4a3d',1,'ref::contains()']]],
+  ['convert',['convert',['../image_8h.html#a14881bbb13a92fe994f4b66ff2deb5a5',1,'image.cc']]],
+  ['copy',['copy',['../array_8h.html#a85e80f75a8e14e2250549c29cf403768',1,'copy(const array&lt; T &gt; &amp;o):&#160;array.h'],['../core_8h.html#af6584d8755c0c96b2680e0bf50d61c64',1,'copy(const T &amp;o):&#160;core.h'],['../core_8h.html#aea069e583f238fa458711aab1cade071',1,'copy(const mref&lt; T &gt; &amp;dst, const ref&lt; T &gt; src):&#160;core.h'],['../file_8h.html#a6923314881ddb5af91ac5712e7786b68',1,'copy(const Folder &amp;oldAt, const string &amp;oldName, const Folder &amp;newAt, const string &amp;newName):&#160;file.cc'],['../image_8h.html#a08ec2a79ff921495be6b961fd4215c00',1,'copy(const Image &amp;target, const Image &amp;source):&#160;image.h'],['../image_8h.html#abcc122e62b94ab7726df72497d778f30',1,'copy(const Image &amp;source):&#160;image.h'],['../memory_8h.html#ad587eaaf800b104859f3f2f83803827a',1,'copy(const buffer&lt; T &gt; &amp;o):&#160;memory.h']]],
+  ['count',['count',['../struct_layout.html#a9e93651a16acf88b68ad55afcfeb1b38',1,'Layout::count()'],['../struct_widget_references.html#a27d25cc585c018773b8f06a8f39515ae',1,'WidgetReferences::count()'],['../struct_widget_values.html#ab9634251383b67eb675ee33ecd9cc39e',1,'WidgetValues::count()'],['../string_8h.html#a5d0cc75dcba1a175b578256efe88573f',1,'count():&#160;string.cc']]],
+  ['currenttime',['currentTime',['../time_8h.html#a8b88a5fb6639c74960f90324d06edfe9',1,'time.cc']]],
+  ['currentworkingdirectory',['currentWorkingDirectory',['../file_8h.html#aaa65fa352abf15fd4b17431d4e0e00b9',1,'file.cc']]]
+];

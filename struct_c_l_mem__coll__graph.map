@@ -1,0 +1,5 @@
+<map id="CLMem" name="CLMem">
+<area shape="rect" id="node2" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="4,83,133,109"/>
+<area shape="rect" id="node3" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="158,83,257,109"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="156,5,260,32"/>
+</map>

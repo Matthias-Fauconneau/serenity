@@ -1,0 +1,27 @@
+var struct_array_view =
+[
+    [ "ArrayView", "struct_array_view.html#a601b6aa2aea657e6e4732b1b14a010d8", null ],
+    [ "coordinates", "struct_array_view.html#afb09a6efa039dc936d3c82e5f1a2d1d0", null ],
+    [ "coordinates", "struct_array_view.html#a4676949877a80fbeb3a6b2f4025959c0", null ],
+    [ "cellCount", "struct_array_view.html#a8fab527b0dec4302864a95d311deab33", null ],
+    [ "cellCount", "struct_array_view.html#a21efd2436c4fb0c0ba85c2543bb8ed28", null ],
+    [ "cellCount", "struct_array_view.html#a791c7cd56942b01be09f3cc7812c0f8a", null ],
+    [ "levelCount", "struct_array_view.html#a3d2062f87eda50840c67b64e5e2921e8", null ],
+    [ "sizeHint", "struct_array_view.html#aa6e3a72752991fee683d5e1dc258044d", null ],
+    [ "renderHeader", "struct_array_view.html#a93c3299f4203d8556c90a68f92640019", null ],
+    [ "renderCell", "struct_array_view.html#aa597b9def2ec3888ab51167851885be4", null ],
+    [ "render", "struct_array_view.html#a47051ceccc50eb108bff8825574fbd95", null ],
+    [ "dimensionLabels", "struct_array_view.html#a78aaac85dd0f0bd36910fd46a3e1b6c1", null ],
+    [ "coordinateLabels", "struct_array_view.html#a7fdcf9992418a5c7de2feebf7ab55fa9", null ],
+    [ "valueLabels", "struct_array_view.html#a157a6b14cb69778f5a23bb558128d503", null ],
+    [ "valueName", "struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950", null ],
+    [ "bestName", "struct_array_view.html#a30ebcda2eb7aaf51ca01b6fb2be86bd1", null ],
+    [ "valueNames", "struct_array_view.html#a7b38ce4fbb2410c1845cb3ce44fb4dc1", null ],
+    [ "points", "struct_array_view.html#a6e77247323bfd70314ed3d0f7ce4d364", null ],
+    [ "min", "struct_array_view.html#a625f9e1e28a686f436aab9e6d49d7b0a", null ],
+    [ "max", "struct_array_view.html#aedf074788eac17e6628622262a761c0b", null ],
+    [ "textSize", "struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db", null ],
+    [ "headerCellSize", "struct_array_view.html#a1c424b50e04c02f9012dd52e18f47640", null ],
+    [ "contentCellSize", "struct_array_view.html#ac51e665c6dcb5806ec289a1bb24fb586", null ],
+    [ "dimensions", "struct_array_view.html#ab1a02d12a123544a20ab87fa5c7c16f5", null ]
+];

@@ -1,0 +1,5 @@
+<map id="GridLayout" name="GridLayout">
+<area shape="rect" id="node4" href="$struct_widget_grid.html" title="Grid of heterogenous widgets. " alt="" coords="5,229,91,256"/>
+<area shape="rect" id="node2" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="17,80,79,107"/>
+<area shape="rect" id="node3" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="17,5,79,32"/>
+</map>

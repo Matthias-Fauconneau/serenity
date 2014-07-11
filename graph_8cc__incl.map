@@ -1,0 +1,23 @@
+<map id="graph.cc" name="graph.cc">
+<area shape="rect" id="node2" href="$thread_8h.html" title="Threaded event loops, synchronization, execute, process environment and arguments ..." alt="" coords="731,304,800,331"/>
+<area shape="rect" id="node10" href="$variant_8h.html" title="variant.h" alt="" coords="363,229,435,256"/>
+<area shape="rect" id="node16" href="$text_8h.html" title="Rich text label/paragraph widget. " alt="" coords="278,80,332,107"/>
+<area shape="rect" id="node20" href="$window_8h.html" title="X11 window display and input. " alt="" coords="573,80,649,107"/>
+<area shape="rect" id="node22" href="$graphics_8h.html" title="2D graphics primitives (fill, blit, line) " alt="" coords="84,155,165,181"/>
+<area shape="rect" id="node23" href="$plot_8h.html" title="plot.h" alt="" coords="490,80,544,107"/>
+<area shape="rect" id="node24" href="$png_8h.html" title="PNG codec. " alt="" coords="5,155,59,181"/>
+<area shape="rect" id="node3" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="495,453,557,480"/>
+<area shape="rect" id="node6" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="879,379,929,405"/>
+<area shape="rect" id="node7" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="546,379,624,405"/>
+<area shape="rect" id="node4" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="417,528,496,555"/>
+<area shape="rect" id="node5" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="388,603,445,629"/>
+<area shape="rect" id="node11" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="354,379,419,405"/>
+<area shape="rect" id="node12" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="168,304,237,331"/>
+<area shape="rect" id="node14" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData) " alt="" coords="496,304,553,331"/>
+<area shape="rect" id="node15" href="$map_8h.html" title="Associative array (using linear search) " alt="" coords="363,304,420,331"/>
+<area shape="rect" id="node13" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="267,379,329,405"/>
+<area shape="rect" id="node17" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="343,155,413,181"/>
+<area shape="rect" id="node18" href="$image_8h.html" title="Image container and operations. " alt="" coords="90,229,157,256"/>
+<area shape="rect" id="node19" href="$utf8_8h.html" title="UTF&#45;8 iterator and encoder. " alt="" coords="182,229,236,256"/>
+<area shape="rect" id="node21" href="$time_8h.html" title="Time and date operations. " alt="" coords="591,229,648,256"/>
+</map>
