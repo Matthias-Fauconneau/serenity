@@ -4,14 +4,14 @@
 #include "matrix.h"
 #include "projection.h"
 
-/// Ray-cylinder intersection
+/// Computes distance along \a ray of intersection points with a cylinder
 /// \note Handles intersection with both the cylinder side and caps
 /// \param halfHeight Half height of the cylinder centered on zero.
 /// \param radius Radius of the cylinder
 /// \param origin Origin of the ray
 /// \param ray Direction of the ray
 /// \param tmin First intersection with the cylinder
-/// \param tmin Last intersection with the cylinder
+/// \param tmax Last intersection with the cylinder
 inline void intersects(const float halfHeight, const float radius, const float3 origin, const float3 ray, float& tmin, float& tmax) {
     float2 plusMinusHalfHeightMinusOriginZ = float2(1,-1) * (halfHeight/*-1.f/2*//*fix out of bounds*/) - origin.z;
     float radiusSq = sq(radius);
@@ -34,12 +34,12 @@ inline void intersects(const float halfHeight, const float radius, const float3 
     if(sideZ[1] <= halfHeight) tmin=min(tmin, sideT[1]), tmax=max(tmax, sideT[1]); // side-
 }
 
-/// Ray-sphere intersection
-/// \a param radius Radius of the sphere centered on zero.
+/// Computes distance along \a ray of intersection points with a sphere
+/// \param radius Radius of the sphere centered on zero.
 /// \param origin Origin of the ray
 /// \param ray Direction of the ray
 /// \param tmin First intersection with the sphere
-/// \param tmin Last intersection with the sphere
+/// \param tmax Last intersection with the sphere
 inline bool intersects(const float radius, const float3 origin, const float3 ray, float& tmin, float& tmax) {
     float a = sq(ray);
     float b = 2 * dot(ray, origin);

@@ -24,6 +24,8 @@ inline uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume&
 
 // -- Backprojection --
 
-/// Backprojects (At) \a b to \a Atb
+/// Backprojects \a b to \a Atb
+/// \param Atb Target volume to store the backprojection
 /// \param At Array of matrix for each index projecting voxel coordinates to image coordinates
+/// \param b Source volume containing the projections images corresponding to \a At
 uint64 backproject(const CLVolume& Atb, const CLBuffer<mat4>& At, const ImageArray& b);

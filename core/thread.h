@@ -1,5 +1,5 @@
 #pragma once
-/// \file process.h \link Thread Threaded event loops\endlink, \link Lock synchronization\endlink, execute, process environment and arguments
+/// \file thread.h \link Thread Threaded event loops\endlink, \link Lock synchronization\endlink, execute, process environment and arguments
 #include "array.h"
 #include "file.h"
 #include "function.h"

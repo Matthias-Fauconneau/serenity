@@ -37,7 +37,7 @@ inline ImageF slice(const VolumeF& volume, size_t index /* Z slice or projection
     return ImageF(buffer<float>(volume.data.slice(index*size.y*size.x,size.y*size.x)), size.xy());
 }
 
-/// Returns the maximum value of \x
+/// Returns the maximum value of \a x
 inline float max(const VolumeF& x) { return max(x.data); }
 inline float dot(const ref<float>& a, const ref<float>& b) { assert_(a.size==b.size); double dot=0; for(uint i: range(a.size)) dot+=a[i]*b[i]; return dot; }
 /// Returns the sum of products of \a a and \a b

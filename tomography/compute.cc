@@ -209,13 +209,10 @@ struct Compute {
                         window->needRender = true;
                         window->event();
                     }
-                    if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) {
-                        bestK=k;
-                        reconstruction->x.read(best);
-                        if(k >= maxIterationCount-1) log("Slow convergence stopped after maximum iteration count");
-                    }
+                    if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) { bestK=k; reconstruction->x.read(best); }
                     else if(centerSSE < bestCenterSSE || extremeSSE < bestExtremeSSE) {} // Keep running if any region is still converging
                     else if(k >= minIterationCount-1 /*&& k>2*bestK*/) { log("Divergence stopped after", k, "iterations"); break; }
+                    if(k >= maxIterationCount-1) { log("Slow convergence stopped after maximum iteration count"); break; }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
 
                     reconstruction->step();

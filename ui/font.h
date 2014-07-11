@@ -19,7 +19,7 @@ struct Font {
     /// Loads font /a data scaled to /a size pixels high
     Font(const ref<byte>& data, int size);
     /// Loads font /a data scaled to /a size pixels high
-    Font(buffer<byte>&& buffer, int size=0);
+    Font(::buffer<byte>&& buffer, int size=0);
     /// Loads font /a data scaled to /a size pixels high
     Font(Map&& map, int size);
 
