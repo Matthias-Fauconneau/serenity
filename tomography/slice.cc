@@ -18,7 +18,7 @@ struct SliceArrayView : Widget {
     uint textSize;
     int2 textCellSize = int2(80*textSize/16, textSize); //TODO: merge ArrayView and SliceArrayView (and backport textCellSize)
 
-    SliceArrayView(string valueName, uint sliceIndex, uint textSize=16) : sliceIndex(sliceIndex), textSize(textSize) {
+    SliceArrayView(string valueName, uint sliceIndex, const map<string, Variant>& parameters, uint textSize=16) : sliceIndex(sliceIndex), textSize(textSize) {
         ImageF reference = slice(::reference, sliceIndex);
         ImageF image ( reference.size );
         Folder results = "Results"_;
@@ -27,6 +27,9 @@ struct SliceArrayView : Widget {
             Dict configuration = parseDict(section(name,'.',0,-2));
             if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
             if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = int(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
+            bool skip = false;
+            for(const auto& coordinate: configuration) if(parameters.contains(coordinate.key) && !split(parameters.at(coordinate.key),',').contains(coordinate.value)) skip=true;/*continue 2;*/ // Skips missing values for explicitly specified dimensions
+            if(skip) continue;
             for(auto& dimension: configuration.keys) { // Converts dimension identifiers to labels
                 if(dimensionLabels.contains(dimension)) dimension = copy(dimensionLabels.at(dimension));
                 else { // Converts CamelCase identifier to user-facing labels
@@ -46,22 +49,28 @@ struct SliceArrayView : Widget {
             Map map (name, results);
             buffer<float> data (map);
             int3 size = ::reference.size;
-            if(data.size != (size_t)size.x*size.y*size.z) { log_("Inflate..."_); Time time; data = cast<float>(inflate(map)); log(time); assert_(data.size == (size_t)size.x*size.y*size.z, data.size, name); }
+            if(data.size != (size_t)size.x*size.y*size.z) {
+                static ::map<String, buffer<float>> cache;
+                if(!cache.contains(name)) { log_(str("Inflate",name,"..."_)); Time time; cache.insert(copy(String(name)), cast<float>(inflate(map))); log(time); }
+                data = buffer<float>(ref<float>(cache.at(name)));
+            }
             VolumeF reconstruction (size, move(data), "x"_);
+            Image target ( image.size );
             if(valueName=="x"_) {
                 image =  slice(reconstruction, sliceIndex);
+                convert(target, image, rock.containerAttenuation);
             } else if(valueName=="error"_) {
                 const float* x0 = reference.data;
                 const float* x1 = slice(reconstruction, sliceIndex).data;
                 float* e = image.data;
-                for(uint i: range(size.y*size.x)) e[i] = sq(x1[i] - x0[i]);
+                for(uint i: range(size.y*size.x)) e[i] = abs(x1[i] - x0[i]);
+                convert(target, image, rock.containerAttenuation);
             } else error(valueName);
-            Image target ( image.size );
-            convert(target, image); // Normalizes each slice by its maximum value
             Folder slice("Slices"_, currentWorkingDirectory(), true);
             writeFile(str(name,valueName,sliceIndex), encodePNG(target), slice);
             points.insert(move(configuration), move(target));
         }
+        assert_(points);
     }
     array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Rotations,Projections,per subset"_,',')};
 
@@ -215,12 +224,13 @@ struct Application {
 } app;
 #else
 struct Application {
+    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
     Application() {
         Folder slice("Slices"_, currentWorkingDirectory(), true);
         for(string valueName: {"x"_,"error"_}) {
             for(uint z: {256/2,256/8}) {
                 log(z);
-                SliceArrayView view (valueName, z, 32);
+                SliceArrayView view (valueName, z, parameters, 32);
                 Image image ( abs(view.sizeHint()) );
                 assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
                 fill(image, Rect(image.size()), white);

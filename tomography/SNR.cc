@@ -5,13 +5,20 @@
 
 struct SNR {
     SNR() {
-        const int3 size = int3(256);
-        PorousRock rock (size);
+        const int3 volumeSize = int3(256);
+        PorousRock rock (volumeSize);
+        const VolumeF referenceVolume = rock.volume();
+        const float referenceMean = mean(referenceVolume);
+        const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
+        const float extremeSSQ = sq(sub(referenceVolume, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4))) + sq(sub(referenceVolume, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4)));
+
         Folder results = "Results"_;
-        array<String> names = filter(results.list(), [&](const string name){ return !endsWith(name,".best"_) || (existsFile(section(name,'.',0,-2)+".snr"_, results) && File(section(name,'.',0,-2)+".snr"_, results).size()>0); }); for(uint index: range(names.size)) {
+        string ext = ".nmse"_; //".snr"_;
+        array<String> names = filter(results.list(), [&](const string name){ return !endsWith(name,".best"_) || (existsFile(section(name,'.',0,-2)+ext, results) && File(section(name,'.',0,-2)+ext, results).size()>0); }); for(uint index: range(names.size)) {
             string name = names[index];
             Map map (name, results);
             buffer<float> data (map);
+            int3 size = volumeSize;
             if(data.size != (size_t)size.x*size.y*size.z) {
                 data = cast<float>(inflate(map));
                 if(data.size != (size_t)size.x*size.y*size.z) {
@@ -20,6 +27,17 @@ struct SNR {
                 }
             }
             VolumeF volume (size, move(data), "x"_);
+#if 1 // MSE of normalized volume
+            const float scale = referenceMean / mean(volume);
+            const ref<float>& a = referenceVolume.data;
+            const ref<float>& b = volume.data;
+            double SSE = 0;
+            for(uint i: range(a.size)) SSE += sq(a[i] - scale*b[i]);
+            double NMSE = SSE / (centerSSQ+extremeSSQ);
+            String result = "{Normalized NMSE %:"_+str(100*NMSE)+"}"_;
+            writeFile(section(name,'.',0,-2)+".nmse"_, result, results);
+            log(index+1,"/", names.size, name, result);
+#else // SNR
             float* volumeData = volume.data;
             const int XY = size.x*size.x;
             const int X = size.x;
@@ -72,6 +90,7 @@ struct SNR {
             float SNR = SNRsum / SNRcount;
             writeFile(section(name,'.',0,-2)+".snr"_, "{SNR:"_+str(SNR)+"}"_, results);
             log(index+1,"/", names.size, name, SNR);
+#endif
         }
     }
 } app;

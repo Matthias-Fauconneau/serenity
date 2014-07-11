@@ -55,7 +55,8 @@ typedef map<String,Variant> Dict; /// Associative array of variants
 
 inline Dict parseDict(TextData& s) {
     Dict dict;
-    if(s.match('{')) if(s.match('}')) return dict;
+    bool curly = s.match('{');
+    if(curly && s.match('}')) return dict;
     for(;;) {
         s.whileAny(" "_);
         string key = s.whileNo(":=|},"_);
@@ -63,8 +64,9 @@ inline Dict parseDict(TextData& s) {
         if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,"_,'{','}'); }
         dict.insertSorted(copy(String(key)), replace(copy(String(value)),'\\','/'));
         if(s.matchAny("|,"_)) continue;
-        else if(!s || s.match('}')) break;
-        else error(s.untilEnd());
+        else if(curly && s.match('}')) break;
+        else if(!curly && !s) break;
+        else error("Invalid Dict", s.buffer);
     }
     return dict;
 }

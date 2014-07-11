@@ -3,6 +3,7 @@
 #include "operators.h"
 #include "SART.h"
 #include "MLTR.h"
+#include "PMLTR.h"
 #include "CG.h"
 #include "view.h"
 #include "plot.h"
@@ -62,19 +63,21 @@ struct Compute {
                         else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
-                            for(const uint subsetSize: method=="CG"_?ref<uint>({projectionCount}):ref<uint>({nearestDivisorToSqrt(projectionCount), /*nearestDivisorToSqrt(projectionCount)*2*//*, projectionCount*/})) {
-                                Dict configuration;
-                                configuration["volumeSize"_] = volumeSize;
-                                configuration["projectionSize"_] = projectionSize;
-                                configuration["trajectory"_] = trajectory;
-                                if(round(rotationCount)==rotationCount) configuration["rotationCount"_] = int(rotationCount); // Backward compatibility: Avoids updating results computed as rotationCount was integer
-                                else configuration["rotationCount"_] = rotationCount;
-                                configuration["photonCount"_] = photonCount;
-                                configuration["projectionCount"_] = projectionCount;
-                                configuration["method"_] = method;
-                                configuration["subsetSize"_] = subsetSize;
-                                configurations << move(configuration);
-                            }
+                            uint subsetSize;
+                            /**/  if(method=="CG"_) subsetSize = projectionCount;
+                            else if(method=="SART"_) subsetSize = nearestDivisorToSqrt(projectionCount) * 2;
+                            else /*method=="MLTR"_*/ subsetSize = nearestDivisorToSqrt(projectionCount);
+                            Dict configuration;
+                            configuration["volumeSize"_] = volumeSize;
+                            configuration["projectionSize"_] = projectionSize;
+                            configuration["trajectory"_] = trajectory;
+                            if(round(rotationCount)==rotationCount) configuration["rotationCount"_] = int(rotationCount); // Backward compatibility: Avoids updating results computed as rotationCount was integer
+                            else configuration["rotationCount"_] = rotationCount;
+                            configuration["photonCount"_] = photonCount;
+                            configuration["projectionCount"_] = projectionCount;
+                            configuration["method"_] = method;
+                            configuration["subsetSize"_] = subsetSize;
+                            configurations << move(configuration);
                         }
                     }
                 }
@@ -89,7 +92,8 @@ struct Compute {
         map<int64, Dict> update;
         for(const Dict& configuration: configurations) {
             int64 mtime = existsFile(toASCII(configuration), results) ? File(toASCII(configuration), results).modifiedTime() : 0;
-            if(mtime <= updateTime) update.insertSortedMulti(mtime, copy(configuration)); // Updates oldest evaluation first
+            bool best = existsFile(toASCII(configuration)+".best"_, results);
+            if(mtime <= updateTime || (!best && parameters.value("update"_,""_)=="best"_)) update.insertSortedMulti(mtime, copy(configuration)); // Updates oldest evaluation first
         }
 
         Time totalTime, reconstructionTime, projectionTime, poissonTime;
@@ -99,7 +103,7 @@ struct Compute {
         String attenuation0Key; VolumeF attenuation0;
         String intensity0Key; VolumeF intensity0;
         String intensityKey; VolumeF intensity;/*MLTR*/ VolumeF attenuation;/*UI, SART, CG*/
-        uint maxProjectionCount=0; for(const Dict& configuration: configurations) maxProjectionCount=max<uint>(maxProjectionCount,configuration["projectionCount"_]);
+        uint maxProjectionCount=0; for(const Dict& configuration: update.values) maxProjectionCount=max<uint>(maxProjectionCount,configuration.at("projectionCount"_));
         log("Missing", update.size(), "on total", configurations.size);
 
         // Checks available disk space
@@ -186,14 +190,13 @@ struct Compute {
                 float bestCenterSSE = inf, bestExtremeSSE = inf;
                 VolumeF best (volumeSize, "best"_);
                 Time time; reconstructionTime.start();
-                const uint minIterationCount = 16, maxIterationCount = 512;
+                const uint minIterationCount = 32, maxIterationCount = 512;
                 array<map<string, Variant>> result;
                 uint k=0; for(;k < maxIterationCount;k++) {
                     // Evaluates before stepping as initial volume might be the best if the method does not converge at all
                     float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                     float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                     float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
-                    log(100*totalNMSE);
                     {map<string, Variant> values;
                         values["Iterations"_] = k;
                         values["Iterations·Projection/Subsets"_] = k * subsetSize;
@@ -213,7 +216,7 @@ struct Compute {
                         if(k >= maxIterationCount-1) log("Slow convergence stopped after maximum iteration count");
                     }
                     else if(centerSSE < bestCenterSSE || extremeSSE < bestExtremeSSE) {} // Keep running if any region is still converging
-                    else if(k >= minIterationCount-1 && k>2*bestK) { log("Divergence stopped after", k, "iterations"); break; }
+                    else if(k >= minIterationCount-1 /*&& k>2*bestK*/) { log("Divergence stopped after", k, "iterations"); break; }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
 
                     reconstruction->step();

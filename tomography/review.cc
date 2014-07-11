@@ -6,13 +6,13 @@
 #include "png.h"
 
 static const bool smallestSubsets = true; // Filters subsetSize to only keep configurations with the smallest subsets (fastest convergence)
-static const bool limitAcquisitionTime = true; // Filters configurations with Projections·Photons over acquisition time limit
+static const bool limitAcquisitionTime = false; // Filters configurations with Projections·Photons over acquisition time limit
 
 //TODO: merge ArrayView and SliceArrayView
 struct ArrayView : Widget {
     Dict dimensionLabels = parseDict("rotationCount:Revolutions,photonCount:Photons,projectionCount:Projections,subsetSize:per subset"_);
     Dict coordinateLabels = parseDict("single:\0Single,double:\1Double,adaptive:\2Adaptive"_); // Sorts
-    Dict valueLabels = parseDict("Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T"_); // FIXME: Center, Global kept for backward comptability
+    Dict valueLabels = parseDict("Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T,Normalized NMSE %:Normalized NMSE"_); // FIXME: Center, Global kept for backward comptability
     string valueName;
     string bestName = (valueName=="Iterations"_ || valueName == "Time (s)"_) ? "MSE_T"_ : valueName;
     array<String> valueNames;
@@ -24,15 +24,18 @@ struct ArrayView : Widget {
 
     ArrayView(string valueName, const map<string, Variant>& parameters, uint textSize=16) : valueName(valueName), textSize(textSize) {
         Folder results = "Results"_;
-        for(string name: results.list()) {
-            String result = readFile(name, results);
+        for(string fileName: results.list()) {
+            string name = fileName;
+            /**/  if(valueName=="SNR"_ || valueName=="SNR (dB)"_) { if(!endsWith(name, ".snr"_)) continue; name=section(name,'.',0,-2); }
+            else if(valueName=="Normalized NMSE"_) { if(!endsWith(name, ".nmse"_)) continue; name=section(name,'.',0,-2); }
+            else if(endsWith(name,".best"_) || endsWith(name,".snr"_) || endsWith(name,".nmse"_) || endsWith(name,".32"_) || endsWith(name,".128"_)) continue;
+            String result = readFile(fileName, results);
             if(!result) { log("Empty result file", name); continue; }
-            if(valueName=="SNR"_ || valueName=="SNR (dB)"_) { if(!endsWith(name, ".snr"_)) continue; name=section(name,'.',0,-2); }
-            else if(name.contains('.')) continue;
             Dict configuration = parseDict(name);
-            if(!configuration["photonCount"_]) configuration["photonCount"_] = 0;
+            if(!configuration["photonCount"_]) continue;// configuration["photonCount"_] = 0;
             if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
-            if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = int(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
+            if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = float(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
+            if((float)configuration.at("rotationCount"_)==round((float)configuration.at("rotationCount"_))) configuration.at("rotationCount"_) = int(configuration.at("rotationCount"_));
             bool skip = false;
             for(const auto& coordinate: configuration) if(parameters.contains(coordinate.key) && !split(parameters.at(coordinate.key),',').contains(coordinate.value)) skip=true;/*continue 2;*/ // Skips missing values for explicitly specified dimensions
             if(skip) continue;
@@ -53,16 +56,19 @@ struct ArrayView : Widget {
             for(auto& coordinate: configuration.values) if(coordinateLabels.contains(coordinate)) coordinate=copy(coordinateLabels.at(coordinate)); // Converts coordinate identifiers to labels
             for(auto& coordinate: configuration.values) assert_(coordinate.size, configuration);
 
-            float best = inf; Variant value;
+            float best = inf; Variant value; //bool oldStyleFile = false;
             for(string line: split(result, '\n')) {
                 Dict values;
-                if(startsWith(line, "{"_)) values = parseDict(line);
-                else {// Backward compatibility (REMOVEME)
-                    //log("Old file", name);
+                if(startsWith(line, "{"_)) {
+                    if(!endsWith(line,"}"_)) continue; // Truncated file (I/O error)
+                    assert_(endsWith(line,"}"_), line);
+                    values = parseDict(line);
+                } else {// Backward compatibility (REMOVEME)
+                    //if(!oldStyleFile) { log("Old file", name, line); oldStyleFile=true; }
                     TextData s (line);
                     const int subsetSize = configuration.at("per subset"_);
                     values["Iterations"_] = s.integer()+1; s.skip(" "_);
-                    values["Iterations·Projection/Subsets"_] = subsetSize*(s.integer()+1); s.skip(" "_);
+                    values["Iterations·Projection/Subsets"_] = subsetSize*(int)values["Iterations"_];
                     values["Central NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["Extreme NMSE %"_] = s.decimal(); s.skip(" "_);
                     values["Total NMSE %"_] = s.decimal(); s.skip(" "_);
@@ -70,21 +76,24 @@ struct ArrayView : Widget {
                     values["Time (s)"_] = s.decimal();
                     assert_(!s, s.untilEnd(), "|", line);
                 }
-                if(File(name).modifiedTime() < (int64)Date(9,7,2014,16,00,00)*1000000000ll) { //FIXME: "Iterations" of evaluation ran before 07/09 16:00 is actually index, needs +1
-                    values["Iterations"_] = int(values["Iterations"_]) +1;
-                    values.remove("Iterations·Projection/Subsets"_);
-                }
                 if(values.contains("SNR"_)) values.insert(String("SNR (dB)"_), -10*log10(values.at("SNR"_))); //Converts to decibels, Negates as best is maximum
                 for(auto& valueName: values.keys) if(valueLabels.contains(valueName)) valueName = copy(valueLabels.at(valueName));
                 for(const String& valueName: values.keys) valueNames += copy(valueName);
                 assert_(values.contains(bestName) && values.contains(valueName), bestName, valueName, values, name);
-                if(values.contains("Iterations"_)) values.at("Iterations"_).isInteger = true;
+                if(values.contains("Iterations"_)) {
+                    values.at("Iterations"_).isInteger = true;
+                    if(File(fileName, results).modifiedTime() < (int64)Date(9,7,2014,16,00,00)*1000000000ll) { //FIXME: "Iterations" of evaluation ran before 07/09 16:00 is actually index, needs +1
+                        values.at("Iterations"_) = int(values.at("Iterations"_)) +1;
+                        if(values.contains("Iterations·Projection/Subsets"_)) values.remove("Iterations·Projection/Subsets"_);
+                    }
+                }
                 if(float(values.at(bestName)) < best) {
-                    best = values[bestName];
+                    best = values.at(bestName);
                     value = move(values.at(valueName));
                 }
             }
             assert_(value.size, result);
+            assert_(!points.contains(configuration), name, configuration);
             points.insert(move(configuration), move(value));
         }
         if(smallestSubsets) points.filter([this](const Dict& configuration) {
@@ -256,7 +265,7 @@ struct Application {
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
     Application() {
-        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR (dB)"_,"Iterations"_}) {
+        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR (dB)"_,"Iterations"_,"Normalized NMSE"_}) {
             ArrayView view (valueName, parameters, 64);
             Image image ( abs(view.sizeHint()) );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());

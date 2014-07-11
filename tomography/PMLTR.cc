@@ -2,7 +2,7 @@
 #include "operators.h"
 #include "time.h"
 
-PMLTR::PMLTR(const Projection& projection, const ImageArray& b, const uint subsetSize) : SubsetReconstruction(projection, b, subsetSize, "P-MLTR"_), Ax(subsets[0].b.size), r(Ax.size), Atr(x.size), Atw(x.size) {}
+PMLTR::PMLTR(const Projection& projection, ImageArray&& intensity, const uint subsetSize) : SubsetReconstruction(projection, intensity, subsetSize, "P-MLTR"_), Ax(subsets[0].b.size,"Ax"_), r(Ax.size,"r"_), Atr(x.size,"Atr"_), Atw(x.size,"Atw"_) {}
 
 void PMLTR::step() {
     time += project(Ax, A, x, subsetIndex, subsetSize, subsetCount); // Ax = A x
@@ -13,5 +13,4 @@ void PMLTR::step() {
     time += backproject(Atw, subsets[subsetIndex].At, w); // Atw = At w
     time += muldiv(x, x, Atr, Atw);
     subsetIndex = (subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
-    k++;
 }

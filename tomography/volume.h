@@ -43,3 +43,8 @@ inline VolumeF cylinder(VolumeF&& target, const float value=1) {
     for(uint z: range(size.z)) for(uint y: range(size.y)) for(uint x: range(size.x)) target(x,y,z) = sq(float2(x,y)-center)<=radiusSq ? value : 0;
     return move(target);
 }
+
+inline float sum(const ref<float>& A) { double sum=0; for(float a: A) sum+=a; return sum; }
+inline float sum(const VolumeF& volume) { return sum(volume.data); }
+inline float mean(const ref<float>& A) { return sum(A) / A.size; }
+inline float mean(const VolumeF& volume) { return mean(volume.data); }
