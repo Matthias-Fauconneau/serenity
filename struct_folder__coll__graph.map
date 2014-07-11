@@ -1,3 +1,4 @@
 <map id="Folder" name="Folder">
-<area shape="rect" id="node2" href="$struct_handle.html" title="Handle is a Unix file descriptor." alt="" coords="5,6,69,34"/>
+<area shape="rect" id="node2" href="$struct_handle.html" title="Unix file descriptor. " alt="" coords="23,96,85,123"/>
+<area shape="rect" id="node3" href="$structhandle.html" title="handle\&lt; int \&gt;" alt="" coords="5,5,104,32"/>
 </map>

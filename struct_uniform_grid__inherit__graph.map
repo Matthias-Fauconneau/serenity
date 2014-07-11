@@ -1,7 +1,7 @@
 <map id="UniformGrid&lt; T &gt;" name="UniformGrid&lt; T &gt;">
-<area shape="rect" id="node2" href="$struct_grid.html" title="UniformGrid layouts items on an uniform width x height grid." alt="" coords="118,161,164,189"/>
-<area shape="rect" id="node4" href="$struct_layout.html" title="Layout is a proxy Widget containing multiple widgets." alt="" coords="111,83,172,111"/>
-<area shape="rect" id="node8" href="$struct_array.html" title="Array\&lt; T \&gt;" alt="" coords="7,161,93,189"/>
-<area shape="rect" id="node6" href="$struct_widget.html" title="Widget is an abstract component to compose user interfaces." alt="" coords="109,6,173,34"/>
-<area shape="rect" id="node11" href="$structarray.html" title="array\&lt; T \&gt;" alt="" coords="4,83,85,111"/>
+<area shape="rect" id="node2" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="164,155,249,181"/>
+<area shape="rect" id="node3" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="157,80,219,107"/>
+<area shape="rect" id="node5" href="$struct_widget_values.html" title="WidgetValues\&lt; T \&gt;" alt="" coords="5,155,139,181"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="157,5,219,32"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="29,80,115,107"/>
 </map>

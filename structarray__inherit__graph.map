@@ -1,9 +1,3 @@
 <map id="array&lt; T &gt;" name="array&lt; T &gt;">
-<area shape="rect" id="node3" href="$struct_array.html" title="Implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="265,83,351,111"/>
-<area shape="rect" id="node5" href="$struct_array_selection.html" title="Array with Selection." alt="" coords="100,161,240,189"/>
-<area shape="rect" id="node13" href="$struct_h_list.html" title="Horizontal layout of homogenous items." alt="" coords="266,161,349,189"/>
-<area shape="rect" id="node15" href="$struct_v_list.html" title="Vertical layout of homogenous items." alt="" coords="375,161,456,189"/>
-<area shape="rect" id="node7" href="$struct_bar.html" title="Horizontal layout of selectable items." alt="" coords="5,238,79,266"/>
-<area shape="rect" id="node9" href="$struct_grid_selection.html" title="GridSelection is a Grid layout of selectable items." alt="" coords="104,238,237,266"/>
-<area shape="rect" id="node11" href="$struct_list.html" title="Vertical layout of selectable items." alt="" coords="261,238,335,266"/>
+<area shape="rect" id="node2" href="$structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="5,5,91,32"/>
 </map>

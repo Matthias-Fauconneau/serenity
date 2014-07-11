@@ -1,9 +1,12 @@
 <map id="text.h" name="text.h">
-<area shape="rect" id="node3" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="5,83,77,111"/>
-<area shape="rect" id="node16" href="$image_8h.html" title="Image container and operations." alt="" coords="103,83,172,111"/>
-<area shape="rect" id="node5" href="$vector_8h.html" title="Vector types and operations." alt="" coords="55,161,124,189"/>
-<area shape="rect" id="node7" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="56,238,123,266"/>
-<area shape="rect" id="node9" href="$array_8h.html" title="Common array container." alt="" coords="58,315,120,343"/>
-<area shape="rect" id="node11" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="60,470,117,498"/>
-<area shape="rect" id="node13" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="89,393,169,421"/>
+<area shape="rect" id="node2" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="5,80,75,107"/>
+<area shape="rect" id="node9" href="$image_8h.html" title="Image container and operations. " alt="" coords="33,155,100,181"/>
+<area shape="rect" id="node10" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="125,155,203,181"/>
+<area shape="rect" id="node11" href="$utf8_8h.html" title="UTF&#45;8 iterator and encoder. " alt="" coords="210,229,264,256"/>
+<area shape="rect" id="node3" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="11,229,80,256"/>
+<area shape="rect" id="node4" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="63,304,128,331"/>
+<area shape="rect" id="node8" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="21,379,83,405"/>
+<area shape="rect" id="node5" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="121,379,183,405"/>
+<area shape="rect" id="node6" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="105,453,184,480"/>
+<area shape="rect" id="node7" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="75,528,132,555"/>
 </map>

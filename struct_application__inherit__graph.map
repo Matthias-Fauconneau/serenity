@@ -1,6 +1,0 @@
-<map id="Application" name="Application">
-<area shape="rect" id="node3" href="$struct_desktop.html" title="Desktop displays a feed reader, an event calendar and an application launcher (activated by taskbar h..." alt="" coords="5,83,75,111"/>
-<area shape="rect" id="node5" href="$struct_music.html" title="SFZ sampler and PDF renderer (tested with Salamander)" alt="" coords="99,83,156,111"/>
-<area shape="rect" id="node7" href="$struct_player.html" title="Music player with a two&#45;column interface (albums/track), gapless playback and persistence of last tra..." alt="" coords="181,83,239,111"/>
-<area shape="rect" id="node9" href="$struct_taskbar.html" title="Taskbar shows active tasks (i.e open windows) in a panel and acts as a minimal X11 window manager..." alt="" coords="264,83,333,111"/>
-</map>

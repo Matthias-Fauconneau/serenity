@@ -1,4 +1,0 @@
-<map id="AudioMedia" name="AudioMedia">
-<area shape="rect" id="node3" href="$struct_f_l_a_c_media.html" title="FLAC audio decoder (using FLAC)" alt="" coords="5,83,96,111"/>
-<area shape="rect" id="node5" href="$struct_m_p3_media.html" title="MP3 audio decoder (using mpg123)" alt="" coords="121,83,207,111"/>
-</map>

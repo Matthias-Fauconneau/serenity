@@ -1,6 +1,0 @@
-<map id="xml.h" name="xml.h">
-<area shape="rect" id="node3" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="8,83,65,111"/>
-<area shape="rect" id="node9" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="65,238,145,266"/>
-<area shape="rect" id="node5" href="$array_8h.html" title="Common array container." alt="" coords="5,161,67,189"/>
-<area shape="rect" id="node7" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="36,315,93,343"/>
-</map>

@@ -1,4 +1,5 @@
 <map id="Symbol" name="Symbol">
-<area shape="rect" id="node2" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="5,6,91,34"/>
-<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="115,6,215,34"/>
+<area shape="rect" id="node2" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="5,83,91,109"/>
+<area shape="rect" id="node3" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="115,83,215,109"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="113,5,217,32"/>
 </map>

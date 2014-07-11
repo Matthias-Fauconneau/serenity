@@ -1,25 +1,10 @@
 <map id="Linear" name="Linear">
-<area shape="rect" id="node7" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="336,161,419,189"/>
-<area shape="rect" id="node25" href="$struct_vertical.html" title="Layouts widgets on the vertical axis." alt="" coords="344,421,411,449"/>
-<area shape="rect" id="node2" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="120,291,181,319"/>
-<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="6,291,71,319"/>
-<area shape="rect" id="node9" href="$struct_bar.html" title="Horizontal layout of selectable items." alt="" coords="493,5,568,33"/>
-<area shape="rect" id="node11" href="$struct_bar.html" title="Bar\&lt; Task \&gt;" alt="" coords="484,57,577,85"/>
-<area shape="rect" id="node13" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets." alt="" coords="503,109,558,137"/>
-<area shape="rect" id="node15" href="$struct_h_list.html" title="Horizontal layout of homogenous items." alt="" coords="489,161,573,189"/>
-<area shape="rect" id="node17" href="$struct_h_list.html" title="HList\&lt; Text \&gt;" alt="" coords="481,213,581,241"/>
-<area shape="rect" id="node19" href="$struct_item.html" title="Icon with text" alt="" coords="507,265,555,293"/>
-<area shape="rect" id="node21" href="$struct_entry.html" title="Item with link to an article." alt="" coords="689,239,743,267"/>
-<area shape="rect" id="node23" href="$struct_trigger_item.html" title="Clickable Item." alt="" coords="671,291,761,319"/>
-<area shape="rect" id="node27" href="$struct_list.html" title="Vertical layout of selectable items." alt="" coords="493,317,568,345"/>
-<area shape="rect" id="node29" href="$struct_list.html" title="List\&lt; Command \&gt;" alt="" coords="467,369,595,397"/>
-<area shape="rect" id="node31" href="$struct_list.html" title="List\&lt; Entry \&gt;" alt="" coords="482,421,579,449"/>
-<area shape="rect" id="node35" href="$struct_list.html" title="List\&lt; Text \&gt;" alt="" coords="485,473,576,501"/>
-<area shape="rect" id="node39" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets." alt="" coords="504,525,557,553"/>
-<area shape="rect" id="node47" href="$struct_v_list.html" title="Vertical layout of homogenous items." alt="" coords="489,577,572,605"/>
-<area shape="rect" id="node33" href="$struct_feeds.html" title="List of entries fetched from RSS/Atom feeds." alt="" coords="687,421,745,449"/>
-<area shape="rect" id="node37" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="643,473,789,501"/>
-<area shape="rect" id="node41" href="$struct_events.html" title="Shows current date, month grid and events." alt="" coords="685,525,747,553"/>
-<area shape="rect" id="node43" href="$struct_h_t_m_l.html" title="Simple HTML layout engine." alt="" coords="687,577,745,605"/>
-<area shape="rect" id="node45" href="$struct_scroll.html" title="Scroll\&lt; HTML \&gt;" alt="" coords="837,577,952,605"/>
+<area shape="rect" id="node4" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="85,229,165,256"/>
+<area shape="rect" id="node7" href="$struct_vertical.html" title="Layouts widgets on the vertical axis. " alt="" coords="191,229,257,256"/>
+<area shape="rect" id="node2" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="144,80,205,107"/>
+<area shape="rect" id="node3" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="143,5,205,32"/>
+<area shape="rect" id="node5" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets. " alt="" coords="5,304,59,331"/>
+<area shape="rect" id="node6" href="$struct_h_list.html" title="Horizontal layout of homogenous items. " alt="" coords="84,304,169,331"/>
+<area shape="rect" id="node8" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets. " alt="" coords="195,304,249,331"/>
+<area shape="rect" id="node9" href="$struct_v_list.html" title="Vertical layout of homogenous items. " alt="" coords="274,304,357,331"/>
 </map>

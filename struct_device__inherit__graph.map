@@ -1,7 +1,5 @@
 <map id="Device" name="Device">
-<area shape="rect" id="node9" href="$struct_audio_output.html" title="Audio output through ALSA PCM interface." alt="" coords="5,315,101,343"/>
-<area shape="rect" id="node11" href="$struct_sequencer.html" title="MIDI input through ALSA rawmidi interface." alt="" coords="126,315,212,343"/>
-<area shape="rect" id="node2" href="$struct_file.html" title="Handle to a file." alt="" coords="89,161,132,189"/>
-<area shape="rect" id="node4" href="$struct_stream.html" title="Handle to an Unix I/O stream." alt="" coords="78,83,143,111"/>
-<area shape="rect" id="node6" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="79,6,143,34"/>
+<area shape="rect" id="node2" href="$struct_file.html" title="Handle to a file. " alt="" coords="16,155,59,181"/>
+<area shape="rect" id="node3" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="5,80,69,107"/>
+<area shape="rect" id="node4" href="$struct_handle.html" title="Unix file descriptor. " alt="" coords="6,5,68,32"/>
 </map>

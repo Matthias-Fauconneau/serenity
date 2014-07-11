@@ -1,8 +1,12 @@
 <map id="HList&lt; T &gt;" name="HList&lt; T &gt;">
-<area shape="rect" id="node2" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="99,238,180,266"/>
-<area shape="rect" id="node4" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="116,161,173,189"/>
-<area shape="rect" id="node6" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="113,83,175,111"/>
-<area shape="rect" id="node10" href="$struct_array.html" title="Implements Layout storage using array&lt;T&gt; (i.e by value)" alt="" coords="5,161,91,189"/>
-<area shape="rect" id="node8" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="111,6,176,34"/>
-<area shape="rect" id="node13" href="$structarray.html" title="Polyvalent memory reference (const or mutable, owned or reference, inline or on heap)." alt="" coords="7,83,88,111"/>
+<area shape="rect" id="node2" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="170,432,251,459"/>
+<area shape="rect" id="node3" href="$struct_linear.html" title="Linear" alt="" coords="198,355,255,381"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="116,264,177,291"/>
+<area shape="rect" id="node10" href="$struct_widget_values.html" title="WidgetValues\&lt; T \&gt;" alt="" coords="39,355,173,381"/>
+<area shape="rect" id="node5" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="115,187,177,213"/>
+<area shape="rect" id="node6" href="$struct_image.html" title="2D array of byte4 " alt="" coords="117,96,175,123"/>
+<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="33,5,132,32"/>
+<area shape="rect" id="node8" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="157,5,267,32"/>
+<area shape="rect" id="node9" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="202,264,288,291"/>
+<area shape="rect" id="node11" href="$structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="5,264,91,291"/>
 </map>

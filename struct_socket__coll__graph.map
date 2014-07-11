@@ -1,4 +1,5 @@
 <map id="Socket" name="Socket">
-<area shape="rect" id="node2" href="$struct_stream.html" title="Handle to an Unix I/O stream." alt="" coords="5,83,69,111"/>
-<area shape="rect" id="node4" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="5,6,69,34"/>
+<area shape="rect" id="node2" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="23,173,87,200"/>
+<area shape="rect" id="node3" href="$struct_handle.html" title="Unix file descriptor. " alt="" coords="23,96,85,123"/>
+<area shape="rect" id="node4" href="$structhandle.html" title="handle\&lt; int \&gt;" alt="" coords="5,5,104,32"/>
 </map>

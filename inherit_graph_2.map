@@ -1,3 +1,4 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$structarray.html" title="array\&lt; byte4 \&gt;" alt="" coords="5,5,112,33"/>
+<area shape="rect" id="node1" href="$structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="6,5,114,32"/>
+<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; array \&gt;" alt="" coords="163,5,267,32"/>
 </map>

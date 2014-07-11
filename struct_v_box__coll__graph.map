@@ -1,8 +1,12 @@
 <map id="VBox" name="VBox">
-<area shape="rect" id="node2" href="$struct_vertical.html" title="Layouts widgets on the vertical axis." alt="" coords="147,238,213,266"/>
-<area shape="rect" id="node4" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="156,161,213,189"/>
-<area shape="rect" id="node6" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="155,83,216,111"/>
-<area shape="rect" id="node10" href="$struct_widgets.html" title="Implements Layout storage using array&lt;Widget*&gt; (i.e by reference)" alt="" coords="60,161,132,189"/>
-<area shape="rect" id="node8" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="153,6,217,34"/>
-<area shape="rect" id="node13" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="5,83,131,111"/>
+<area shape="rect" id="node2" href="$struct_vertical.html" title="Layouts widgets on the vertical axis. " alt="" coords="215,432,281,459"/>
+<area shape="rect" id="node3" href="$struct_linear.html" title="Linear" alt="" coords="238,355,295,381"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="159,264,220,291"/>
+<area shape="rect" id="node10" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="83,355,212,381"/>
+<area shape="rect" id="node5" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="158,187,220,213"/>
+<area shape="rect" id="node6" href="$struct_image.html" title="2D array of byte4 " alt="" coords="160,96,217,123"/>
+<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="75,5,175,32"/>
+<area shape="rect" id="node8" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="199,5,309,32"/>
+<area shape="rect" id="node9" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="245,264,331,291"/>
+<area shape="rect" id="node11" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="5,264,133,291"/>
 </map>

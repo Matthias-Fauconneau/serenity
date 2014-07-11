@@ -1,7 +1,0 @@
-<map id="Sequencer" name="Sequencer">
-<area shape="rect" id="node2" href="$struct_device.html" title="Handle to a device." alt="" coords="6,238,68,266"/>
-<area shape="rect" id="node4" href="$struct_file.html" title="Handle to a file." alt="" coords="16,161,59,189"/>
-<area shape="rect" id="node6" href="$struct_stream.html" title="Handle to an Unix I/O stream." alt="" coords="5,83,69,111"/>
-<area shape="rect" id="node8" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="5,6,69,34"/>
-<area shape="rect" id="node10" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops." alt="" coords="93,238,136,266"/>
-</map>

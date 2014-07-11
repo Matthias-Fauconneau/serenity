@@ -1,7 +1,8 @@
 <map id="image.h" name="image.h">
-<area shape="rect" id="node3" href="$vector_8h.html" title="Vector types and operations." alt="" coords="5,83,75,111"/>
-<area shape="rect" id="node5" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="7,161,73,189"/>
-<area shape="rect" id="node7" href="$array_8h.html" title="Common array container." alt="" coords="9,238,71,266"/>
-<area shape="rect" id="node9" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="11,393,68,421"/>
-<area shape="rect" id="node11" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="39,315,120,343"/>
+<area shape="rect" id="node2" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="49,80,119,107"/>
+<area shape="rect" id="node3" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="13,155,77,181"/>
+<area shape="rect" id="node7" href="$math_8h.html" title="Floating&#45;point builtins. " alt="" coords="97,229,159,256"/>
+<area shape="rect" id="node4" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="10,229,72,256"/>
+<area shape="rect" id="node5" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="5,304,84,331"/>
+<area shape="rect" id="node6" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="56,379,113,405"/>
 </map>

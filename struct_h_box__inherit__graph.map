@@ -1,8 +1,8 @@
 <map id="HBox" name="HBox">
-<area shape="rect" id="node2" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis." alt="" coords="141,238,223,266"/>
-<area shape="rect" id="node4" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="156,161,213,189"/>
-<area shape="rect" id="node6" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="155,83,216,111"/>
-<area shape="rect" id="node10" href="$struct_widgets.html" title="Implements Layout storage using array&lt;Widget*&gt; (i.e by reference)" alt="" coords="60,161,132,189"/>
-<area shape="rect" id="node8" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="153,6,217,34"/>
-<area shape="rect" id="node13" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="5,83,131,111"/>
+<area shape="rect" id="node2" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="138,229,219,256"/>
+<area shape="rect" id="node3" href="$struct_linear.html" title="Linear" alt="" coords="161,155,217,181"/>
+<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="159,80,220,107"/>
+<area shape="rect" id="node6" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="5,155,135,181"/>
+<area shape="rect" id="node5" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="158,5,220,32"/>
+<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="5,80,133,107"/>
 </map>

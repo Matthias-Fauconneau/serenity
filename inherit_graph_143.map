@@ -1,4 +1,8 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$classjpeg__decoder__stream.html" title="jpeg_decoder_stream" alt="" coords="5,5,157,33"/>
-<area shape="rect" id="node3" href="$classjpeg__decoder__mem__stream.html" title="jpeg_decoder_mem_stream" alt="" coords="205,5,395,33"/>
+<area shape="rect" id="node1" href="$struct_reconstruction.html" title="Base class for reconstruction. " alt="" coords="6,31,117,57"/>
+<area shape="rect" id="node2" href="$struct_c_g.html" title="Minimizes |Ax&#45;b|² using conjugated gradient (on the normal equations) " alt="" coords="220,5,263,32"/>
+<area shape="rect" id="node3" href="$struct_subset_reconstruction.html" title="Derived class for subset reconstruction. " alt="" coords="166,56,317,83"/>
+<area shape="rect" id="node4" href="$struct_m_l_t_r.html" title="Maximum likelihood expectation maximization for transmission tomography. " alt="" coords="369,5,428,32"/>
+<area shape="rect" id="node5" href="$struct_p_m_l_t_r.html" title="PMLTR" alt="" coords="365,56,432,83"/>
+<area shape="rect" id="node6" href="$struct_s_a_r_t.html" title="Simultaneous iterative algebraic reconstruction technique. " alt="" coords="369,107,428,133"/>
 </map>

@@ -1,5 +1,5 @@
 <map id="EventFD" name="EventFD">
-<area shape="rect" id="node7" href="$struct_thread.html" title="Thread" alt="" coords="9,238,73,266"/>
-<area shape="rect" id="node2" href="$struct_stream.html" title="Stream is an handle to an Unix I/O stream." alt="" coords="9,83,73,111"/>
-<area shape="rect" id="node4" href="$struct_handle.html" title="Handle is a Unix file descriptor." alt="" coords="9,6,73,34"/>
+<area shape="rect" id="node4" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="10,229,72,256"/>
+<area shape="rect" id="node2" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="9,80,73,107"/>
+<area shape="rect" id="node3" href="$struct_handle.html" title="Unix file descriptor. " alt="" coords="10,5,72,32"/>
 </map>

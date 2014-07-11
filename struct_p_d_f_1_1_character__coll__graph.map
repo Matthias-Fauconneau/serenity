@@ -1,7 +1,0 @@
-<map id="PDF::Character" name="PDF::Character">
-<area shape="rect" id="node2" href="$struct_p_d_f_1_1_font.html" title="PDF::Font" alt="" coords="101,99,183,127"/>
-<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; float \&gt;" alt="" coords="5,6,104,34"/>
-<area shape="rect" id="node7" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="129,6,228,34"/>
-<area shape="rect" id="node9" href="$structvector.html" title="vector\&lt; xy, float, 2 \&gt;" alt="" coords="261,99,403,127"/>
-<area shape="rect" id="node11" href="$structxy.html" title="xy\&lt; float \&gt;" alt="" coords="289,6,375,34"/>
-</map>

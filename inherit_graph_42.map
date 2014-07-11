@@ -1,3 +1,6 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$structcat_3_01_a_00_01ref_3_01byte_01_4_01_4.html" title="Specialization to append a string." alt="" coords="6,5,149,33"/>
+<area shape="rect" id="node1" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="5,31,136,57"/>
+<area shape="rect" id="node2" href="$struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="185,31,253,57"/>
+<area shape="rect" id="node3" href="$struct_c_l_image.html" title="Single channel floating&#45;point OpenCL 2D image. " alt="" coords="305,5,380,32"/>
+<area shape="rect" id="node4" href="$struct_c_l_volume.html" title="Single channel floating&#45;point OpenCL 3D image. " alt="" coords="301,56,384,83"/>
 </map>

@@ -1,8 +1,0 @@
-<map id="TCPSocket" name="TCPSocket">
-<area shape="rect" id="node9" href="$struct_s_s_l_socket.html" title="SSL network socket (openssl)" alt="" coords="52,315,140,343"/>
-<area shape="rect" id="node2" href="$struct_socket.html" title="Handle to a socket." alt="" coords="65,161,127,189"/>
-<area shape="rect" id="node4" href="$struct_stream.html" title="Handle to an Unix I/O stream." alt="" coords="63,83,128,111"/>
-<area shape="rect" id="node6" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="64,6,128,34"/>
-<area shape="rect" id="node11" href="$struct_data_stream.html" title="DataStream\&lt; SSLSocket \&gt;" alt="" coords="5,393,187,421"/>
-<area shape="rect" id="node13" href="$struct_h_t_t_p.html" title="Asynchronously fetches a file over HTTP." alt="" coords="67,470,124,498"/>
-</map>

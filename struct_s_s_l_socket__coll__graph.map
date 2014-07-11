@@ -1,6 +1,0 @@
-<map id="SSLSocket" name="SSLSocket">
-<area shape="rect" id="node2" href="$struct_t_c_p_socket.html" title="TCP network socket (POSIX)" alt="" coords="5,238,93,266"/>
-<area shape="rect" id="node4" href="$struct_socket.html" title="Handle to a socket." alt="" coords="18,161,80,189"/>
-<area shape="rect" id="node6" href="$struct_stream.html" title="Handle to an Unix I/O stream." alt="" coords="17,83,81,111"/>
-<area shape="rect" id="node8" href="$struct_handle.html" title="Unix file descriptor." alt="" coords="17,6,81,34"/>
-</map>

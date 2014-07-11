@@ -1,3 +1,5 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$structarray.html" title="array\&lt; Word \&gt;" alt="" coords="5,5,112,33"/>
+<area shape="rect" id="node1" href="$struct_data.html" title="Data" alt="" coords="5,31,56,57"/>
+<area shape="rect" id="node2" href="$struct_binary_data.html" title="Provides a convenient interface to parse binary inputs. " alt="" coords="105,5,191,32"/>
+<area shape="rect" id="node3" href="$struct_text_data.html" title="Provides a convenient interface to parse text streams. " alt="" coords="110,56,186,83"/>
 </map>

@@ -1,4 +1,0 @@
-<map id="TriggerButton" name="TriggerButton">
-<area shape="rect" id="node2" href="$struct_image_view.html" title="Displays a static image." alt="" coords="32,83,80,111"/>
-<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="23,6,88,34"/>
-</map>

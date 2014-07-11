@@ -1,37 +1,51 @@
 <map id="array.h" name="array.h">
-<area shape="rect" id="node3" href="$process_8h.html" title="threaded event loops, synchronization, execute, process environment and arguments" alt="" coords="955,315,1033,343"/>
-<area shape="rect" id="node47" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="1117,238,1168,266"/>
-<area shape="rect" id="node61" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="804,83,871,111"/>
-<area shape="rect" id="node78" href="$score_8h.html" title="Sheet music notation recognition from PDF files (with MIDI synchronization)" alt="" coords="125,393,192,421"/>
-<area shape="rect" id="node87" href="$png_8h.html" title="PNG decoder and uncompressed encoder." alt="" coords="5,315,60,343"/>
-<area shape="rect" id="node108" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="1367,238,1424,266"/>
-<area shape="rect" id="node120" href="$inflate_8h.html" title="DEFLATE standard decoder (wrap Rich Geldreich&#39;s tinflate.cc)" alt="" coords="1090,83,1157,111"/>
-<area shape="rect" id="node123" href="$utf8_8h.html" title="UTF&#45;8 iterator and encoder." alt="" coords="1183,83,1237,111"/>
-<area shape="rect" id="node5" href="$asound_8h.html" title="ALSA PCM output interface." alt="" coords="621,393,697,421"/>
-<area shape="rect" id="node7" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="832,470,905,498"/>
-<area shape="rect" id="node9" href="$player_8cc.html" title="Music player." alt="" coords="496,470,569,498"/>
-<area shape="rect" id="node11" href="$time_8h.html" title="Time and date operations." alt="" coords="1359,393,1416,421"/>
-<area shape="rect" id="node15" href="$desktop_8cc.html" title="Background shell application." alt="" coords="1125,625,1211,653"/>
-<area shape="rect" id="node17" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="952,547,1033,575"/>
-<area shape="rect" id="node25" href="$window_8h.html" title="X11 window display and input." alt="" coords="238,393,316,421"/>
-<area shape="rect" id="node31" href="$http_8h.html" title="DNS queries, asynchronous HTTP requests, persistent disk cache." alt="" coords="1493,393,1548,421"/>
-<area shape="rect" id="node39" href="$sequencer_8h.html" title="ALSA MIDI input interface." alt="" coords="831,393,925,421"/>
-<area shape="rect" id="node42" href="$sampler_8h.html" title="High performance, low latency SFZ sound font sampler." alt="" coords="1103,393,1181,421"/>
-<area shape="rect" id="node13" href="$calendar_8h.html" title="Calendar, Events, Clock." alt="" coords="1081,470,1163,498"/>
-<area shape="rect" id="node19" href="$disasm_8h.html" title="x86 (including SSE2) disassembler" alt="" coords="1341,470,1416,498"/>
-<area shape="rect" id="node21" href="$profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions)" alt="" coords="1611,470,1687,498"/>
-<area shape="rect" id="node33" href="$html_8h.html" title="Asynchronous image loader and HTML layout engine." alt="" coords="1492,470,1549,498"/>
-<area shape="rect" id="node35" href="$feeds_8h.html" title="RSS/Atom feeds reader (Entry, Favicon, Feeds)" alt="" coords="1330,547,1395,575"/>
-<area shape="rect" id="node52" href="$font_8h.html" title="Freetype font renderer wrapper (Font)" alt="" coords="813,315,868,343"/>
-<area shape="rect" id="node54" href="$pdf_8h.html" title="Portable Document Format renderer." alt="" coords="443,393,495,421"/>
-<area shape="rect" id="node63" href="$vector_8h.html" title="Vector types and operations." alt="" coords="496,161,565,189"/>
-<area shape="rect" id="node105" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations" alt="" coords="1437,161,1499,189"/>
-<area shape="rect" id="node65" href="$image_8h.html" title="Image container and operations." alt="" coords="365,238,435,266"/>
-<area shape="rect" id="node75" href="$display_8h.html" title="Graphics primitives (fill, blit, substract)" alt="" coords="187,315,260,343"/>
-<area shape="rect" id="node91" href="$widget_8h.html" title="Widget interface to compose user interfaces." alt="" coords="494,238,567,266"/>
-<area shape="rect" id="node67" href="$interface_8h.html" title="Widgets (ScrollArea, ImageView, TriggerButton, ToggleButton, Progress, Slider, Item, TabBar)" alt="" coords="723,393,807,421"/>
-<area shape="rect" id="node81" href="$text_8h.html" title="Rich text label/paragraph widget." alt="" coords="438,315,492,343"/>
-<area shape="rect" id="node94" href="$layout_8h.html" title="Widget layouts (Linear, Grid)" alt="" coords="569,315,636,343"/>
-<area shape="rect" id="node112" href="$xml_8h.html" title="XML parser." alt="" coords="1593,315,1648,343"/>
-<area shape="rect" id="node116" href="$midi_8h.html" title="Standard MIDI file player." alt="" coords="1309,315,1365,343"/>
+<area shape="rect" id="node2" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="959,80,1024,107"/>
+<area shape="rect" id="node33" href="$map_8h.html" title="Associative array (using linear search) " alt="" coords="1235,229,1292,256"/>
+<area shape="rect" id="node46" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map) " alt="" coords="1813,155,1864,181"/>
+<area shape="rect" id="node47" href="$thread_8h.html" title="Threaded event loops, synchronization, execute, process environment and arguments ..." alt="" coords="487,229,556,256"/>
+<area shape="rect" id="node48" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="614,155,692,181"/>
+<area shape="rect" id="node49" href="$utf8_8h.html" title="UTF&#45;8 iterator and encoder. " alt="" coords="2079,304,2133,331"/>
+<area shape="rect" id="node3" href="$build_8cc.html" title="Builds C++ projects with automatic module dependency resolution. " alt="" coords="409,304,476,331"/>
+<area shape="rect" id="node4" href="$data_8cc_source.html" title="data.cc" alt="" coords="959,155,1024,181"/>
+<area shape="rect" id="node5" href="$file_8cc_source.html" title="file.cc" alt="" coords="1693,229,1749,256"/>
+<area shape="rect" id="node6" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="1356,155,1425,181"/>
+<area shape="rect" id="node32" href="$variant_8h_source.html" title="variant.h" alt="" coords="23,379,95,405"/>
+<area shape="rect" id="node34" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="975,229,1037,256"/>
+<area shape="rect" id="node36" href="$thread_8cc_source.html" title="thread.cc" alt="" coords="855,304,931,331"/>
+<area shape="rect" id="node38" href="$string_8cc_source.html" title="string.cc" alt="" coords="1049,155,1121,181"/>
+<area shape="rect" id="node39" href="$time_8h.html" title="Time and date operations. " alt="" coords="327,304,384,331"/>
+<area shape="rect" id="node40" href="$time_8cc_source.html" title="time.cc" alt="" coords="615,379,680,405"/>
+<area shape="rect" id="node45" href="$deflate_8cc_source.html" title="deflate.cc" alt="" coords="1146,155,1224,181"/>
+<area shape="rect" id="node7" href="$image_8h.html" title="Image container and operations. " alt="" coords="1498,229,1565,256"/>
+<area shape="rect" id="node8" href="$image_8cc_source.html" title="image.cc" alt="" coords="1353,304,1427,331"/>
+<area shape="rect" id="node18" href="$font_8h.html" title="Freetype font renderer wrapper (Font) " alt="" coords="1847,304,1901,331"/>
+<area shape="rect" id="node21" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="1157,304,1227,331"/>
+<area shape="rect" id="node31" href="$matrix_8h_source.html" title="matrix.h" alt="" coords="1796,379,1865,405"/>
+<area shape="rect" id="node9" href="$opencl_8h_source.html" title="opencl.h" alt="" coords="1498,379,1568,405"/>
+<area shape="rect" id="node10" href="$volume_8h_source.html" title="volume.h" alt="" coords="1647,304,1720,331"/>
+<area shape="rect" id="node27" href="$text_8h.html" title="Rich text label/paragraph widget. " alt="" coords="1165,379,1219,405"/>
+<area shape="rect" id="node30" href="$window_8cc_source.html" title="window.cc" alt="" coords="1093,453,1176,480"/>
+<area shape="rect" id="node11" href="$synthetic_8h_source.html" title="synthetic.h" alt="" coords="705,379,791,405"/>
+<area shape="rect" id="node16" href="$view_8h_source.html" title="view.h" alt="" coords="1389,453,1448,480"/>
+<area shape="rect" id="node12" href="$compute_8cc_source.html" title="compute.cc" alt="" coords="837,528,928,555"/>
+<area shape="rect" id="node13" href="$slice_8cc_source.html" title="slice.cc" alt="" coords="705,453,772,480"/>
+<area shape="rect" id="node14" href="$_s_n_r_8cc_source.html" title="SNR.cc" alt="" coords="24,453,93,480"/>
+<area shape="rect" id="node15" href="$synthetic_8cc_source.html" title="synthetic.cc" alt="" coords="1768,453,1861,480"/>
+<area shape="rect" id="node17" href="$view_8cc_source.html" title="view.cc" alt="" coords="1283,528,1349,555"/>
+<area shape="rect" id="node19" href="$font_8cc_source.html" title="font.cc" alt="" coords="1941,379,2003,405"/>
+<area shape="rect" id="node20" href="$text_8cc_source.html" title="text.cc" alt="" coords="1886,453,1948,480"/>
+<area shape="rect" id="node22" href="$layout_8h.html" title="Widget layouts (Linear, Grid) " alt="" coords="1019,379,1087,405"/>
+<area shape="rect" id="node24" href="$plot_8h_source.html" title="plot.h" alt="" coords="1243,379,1297,405"/>
+<area shape="rect" id="node29" href="$window_8h.html" title="X11 window display and input. " alt="" coords="816,379,892,405"/>
+<area shape="rect" id="node23" href="$layout_8cc_source.html" title="layout.cc" alt="" coords="993,453,1067,480"/>
+<area shape="rect" id="node25" href="$graph_8cc_source.html" title="graph.cc" alt="" coords="847,453,919,480"/>
+<area shape="rect" id="node26" href="$plot_8cc_source.html" title="plot.cc" alt="" coords="1252,453,1313,480"/>
+<area shape="rect" id="node28" href="$review_8cc_source.html" title="review.cc" alt="" coords="458,453,536,480"/>
+<area shape="rect" id="node35" href="$profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions) ..." alt="" coords="1007,304,1080,331"/>
+<area shape="rect" id="node37" href="$trace_8cc_source.html" title="trace.cc" alt="" coords="1452,304,1521,331"/>
+<area shape="rect" id="node41" href="$_c_g_8cc_source.html" title="CG.cc" alt="" coords="321,379,380,405"/>
+<area shape="rect" id="node42" href="$_m_l_t_r_8cc_source.html" title="MLTR.cc" alt="" coords="405,379,480,405"/>
+<area shape="rect" id="node43" href="$_p_m_l_t_r_8cc_source.html" title="PMLTR.cc" alt="" coords="505,379,591,405"/>
+<area shape="rect" id="node44" href="$_s_a_r_t_8cc_source.html" title="SART.cc" alt="" coords="221,379,296,405"/>
+<area shape="rect" id="node50" href="$utf8_8cc_source.html" title="utf8.cc" alt="" coords="2130,379,2192,405"/>
 </map>

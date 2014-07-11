@@ -1,6 +1,8 @@
 <map id="window.h" name="window.h">
-<area shape="rect" id="node3" href="$desktop_8cc.html" title="Background shell application." alt="" coords="5,83,91,111"/>
-<area shape="rect" id="node5" href="$music_8cc.html" title="Keyboard (piano) practice application." alt="" coords="116,83,189,111"/>
-<area shape="rect" id="node7" href="$player_8cc.html" title="Music player." alt="" coords="215,83,288,111"/>
-<area shape="rect" id="node9" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="313,83,395,111"/>
+<area shape="rect" id="node2" href="$test_8cc_source.html" title="test.cc" alt="" coords="5,80,67,107"/>
+<area shape="rect" id="node3" href="$compute_8cc_source.html" title="compute.cc" alt="" coords="92,80,183,107"/>
+<area shape="rect" id="node4" href="$graph_8cc_source.html" title="graph.cc" alt="" coords="207,80,279,107"/>
+<area shape="rect" id="node5" href="$review_8cc_source.html" title="review.cc" alt="" coords="303,80,381,107"/>
+<area shape="rect" id="node6" href="$slice_8cc_source.html" title="slice.cc" alt="" coords="407,80,473,107"/>
+<area shape="rect" id="node7" href="$window_8cc_source.html" title="window.cc" alt="" coords="498,80,581,107"/>
 </map>

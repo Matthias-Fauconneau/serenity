@@ -1,3 +1,6 @@
 <map id="Layout" name="Layout">
-<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="5,6,69,34"/>
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="87,187,149,213"/>
+<area shape="rect" id="node3" href="$struct_image.html" title="2D array of byte4 " alt="" coords="89,96,147,123"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="5,5,104,32"/>
+<area shape="rect" id="node5" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="129,5,239,32"/>
 </map>

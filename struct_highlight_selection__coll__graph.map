@@ -1,7 +1,0 @@
-<map id="HighlightSelection" name="HighlightSelection">
-<area shape="rect" id="node2" href="$struct_selection.html" title="Implements selection of active widget/item for a Layout." alt="" coords="72,225,148,253"/>
-<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="13,115,75,143"/>
-<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="5,14,69,42"/>
-<area shape="rect" id="node8" href="$structsignal.html" title="signal\&lt; uint \&gt;" alt="" coords="111,115,212,143"/>
-<area shape="rect" id="node10" href="$structarray.html" title="array\&lt; function\&lt; void\l(Args...)\&gt; \&gt;" alt="" coords="95,6,241,50"/>
-</map>

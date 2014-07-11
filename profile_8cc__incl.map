@@ -1,11 +1,7 @@
 <map id="profile.cc" name="profile.cc">
-<area shape="rect" id="node3" href="$time_8h.html" title="Time and date operations." alt="" coords="93,83,151,111"/>
-<area shape="rect" id="node20" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations" alt="" coords="182,83,244,111"/>
-<area shape="rect" id="node5" href="$data_8h.html" title="Structured data parsers (Data, BinaryData, TextData)" alt="" coords="5,238,63,266"/>
-<area shape="rect" id="node14" href="$process_8h.html" title="threaded event loops, synchronization, execute, process environment and arguments" alt="" coords="83,161,161,189"/>
-<area shape="rect" id="node7" href="$array_8h.html" title="Common array container." alt="" coords="101,315,163,343"/>
-<area shape="rect" id="node9" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="103,470,160,498"/>
-<area shape="rect" id="node11" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="131,393,212,421"/>
-<area shape="rect" id="node17" href="$file_8h.html" title="Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)" alt="" coords="139,238,189,266"/>
-<area shape="rect" id="node22" href="$string_8h.html" title="String manipulations (using lightweight ref&lt;byte&gt; when possible)" alt="" coords="191,161,257,189"/>
+<area shape="rect" id="node2" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="13,80,75,107"/>
+<area shape="rect" id="node3" href="$string_8h.html" title="String manipulations (using lightweight string when possible) " alt="" coords="11,155,76,181"/>
+<area shape="rect" id="node4" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="13,229,75,256"/>
+<area shape="rect" id="node5" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="4,304,83,331"/>
+<area shape="rect" id="node6" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="15,379,72,405"/>
 </map>

@@ -1,5 +1,5 @@
 <map id="utf8.h" name="utf8.h">
-<area shape="rect" id="node3" href="$array_8h.html" title="Common array container." alt="" coords="5,83,67,111"/>
-<area shape="rect" id="node5" href="$core_8h.html" title="move/forward operators, predicate, integer types, IDE workarounds, variadic log, numeric range..." alt="" coords="7,238,64,266"/>
-<area shape="rect" id="node7" href="$memory_8h.html" title="Memory operations (clear, copy, heap allocate, unique heap reference)" alt="" coords="35,161,116,189"/>
+<area shape="rect" id="node2" href="$array_8h.html" title="Contiguous collection of elements. " alt="" coords="13,80,75,107"/>
+<area shape="rect" id="node3" href="$memory_8h.html" title="Memory operations and management (mref, buffer, unique, shared) " alt="" coords="4,155,83,181"/>
+<area shape="rect" id="node4" href="$core_8h.html" title="keywords, basic types, debugging, ranges, ref " alt="" coords="15,229,72,256"/>
 </map>

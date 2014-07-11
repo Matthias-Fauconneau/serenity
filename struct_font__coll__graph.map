@@ -1,7 +1,13 @@
 <map id="Font" name="Font">
-<area shape="rect" id="node2" href="$struct_map.html" title="Managed memory mapping." alt="" coords="5,123,53,151"/>
-<area shape="rect" id="node4" href="$structmap.html" title="map\&lt; uint, map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="77,115,241,159"/>
-<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="39,14,136,42"/>
-<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="161,6,300,50"/>
-<area shape="rect" id="node10" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="266,123,365,151"/>
+<area shape="rect" id="node2" href="$struct_map.html" title="Managed memory mapping. " alt="" coords="537,7,583,33"/>
+<area shape="rect" id="node3" href="$structhandle.html" title="handle\&lt; byte * \&gt;" alt="" coords="231,7,350,33"/>
+<area shape="rect" id="node4" href="$struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="535,57,585,84"/>
+<area shape="rect" id="node5" href="$structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="200,57,381,84"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="508,108,612,135"/>
+<area shape="rect" id="node7" href="$structhandle.html" title="handle\&lt; FT_FaceRec_ * \&gt;" alt="" coords="472,159,648,185"/>
+<area shape="rect" id="node8" href="$structmap.html" title="map\&lt; uint, map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="478,210,642,251"/>
+<area shape="rect" id="node9" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="243,189,339,216"/>
+<area shape="rect" id="node10" href="$structbuffer.html" title="buffer\&lt; uint \&gt;" alt="" coords="27,189,127,216"/>
+<area shape="rect" id="node11" href="$structarray.html" title="array\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="221,241,360,282"/>
+<area shape="rect" id="node12" href="$structbuffer.html" title="buffer\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="6,241,149,282"/>
 </map>

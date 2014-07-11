@@ -1,3 +1,5 @@
 <map id="Text::Link" name="Text::Link">
-<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="5,6,104,34"/>
+<area shape="rect" id="node2" href="$struct_text_1_1_cursor.html" title="Text::Cursor" alt="" coords="5,83,99,109"/>
+<area shape="rect" id="node3" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="123,83,223,109"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="121,5,225,32"/>
 </map>

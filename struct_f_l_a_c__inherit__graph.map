@@ -1,4 +1,0 @@
-<map id="FLAC" name="FLAC">
-<area shape="rect" id="node5" href="$struct_note.html" title="Note" alt="" coords="20,161,71,189"/>
-<area shape="rect" id="node2" href="$struct_bit_reader.html" title="Decodes packed bitstreams." alt="" coords="5,6,85,34"/>
-</map>

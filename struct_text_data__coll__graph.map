@@ -1,4 +1,4 @@
 <map id="TextData" name="TextData">
-<area shape="rect" id="node2" href="$struct_data.html" title="Interface to read structured data." alt="" coords="29,99,80,127"/>
-<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="5,6,104,34"/>
+<area shape="rect" id="node2" href="$struct_data.html" title="Data" alt="" coords="32,96,83,123"/>
+<area shape="rect" id="node3" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="5,5,109,32"/>
 </map>

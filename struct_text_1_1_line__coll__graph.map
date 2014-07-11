@@ -1,4 +1,4 @@
 <map id="Text::Line" name="Text::Line">
-<area shape="rect" id="node2" href="$structvector.html" title="vector\&lt; xy, int, 2 \&gt;" alt="" coords="5,86,136,114"/>
-<area shape="rect" id="node4" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="33,6,107,34"/>
+<area shape="rect" id="node2" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="5,83,123,109"/>
+<area shape="rect" id="node3" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="27,5,100,32"/>
 </map>

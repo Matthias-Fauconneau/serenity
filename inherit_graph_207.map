@@ -1,3 +1,28 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$struct_render_1_1_pict_form_info.html" title="Render::PictFormInfo" alt="" coords="6,5,154,33"/>
+<area shape="rect" id="node1" href="$structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="299,19,386,45"/>
+<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; T \&gt;" alt="" coords="483,5,565,32"/>
+<area shape="rect" id="node3" href="$struct_widget_values.html" title="WidgetValues\&lt; T \&gt;" alt="" coords="457,56,591,83"/>
+<area shape="rect" id="node4" href="$struct_h_list.html" title="Horizontal layout of homogenous items. " alt="" coords="660,107,745,133"/>
+<area shape="rect" id="node5" href="$struct_uniform_grid.html" title="UniformGrid\&lt; T \&gt;" alt="" coords="641,157,765,184"/>
+<area shape="rect" id="node6" href="$struct_v_list.html" title="Vertical layout of homogenous items. " alt="" coords="661,56,745,83"/>
+<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="278,259,407,285"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="461,259,587,285"/>
+<area shape="rect" id="node9" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="459,309,589,336"/>
+<area shape="rect" id="node10" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets. " alt="" coords="675,259,730,285"/>
+<area shape="rect" id="node11" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets. " alt="" coords="675,208,730,235"/>
+<area shape="rect" id="node12" href="$struct_widget_grid.html" title="Grid of heterogenous widgets. " alt="" coords="659,309,746,336"/>
+<area shape="rect" id="node13" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="6,411,69,437"/>
+<area shape="rect" id="node14" href="$struct_array_view.html" title="ArrayView" alt="" coords="132,284,215,311"/>
+<area shape="rect" id="node15" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="143,208,204,235"/>
+<area shape="rect" id="node20" href="$struct_plot.html" title="Plots graphs of 2D point data sets. " alt="" coords="151,335,196,361"/>
+<area shape="rect" id="node22" href="$struct_slice_array_view.html" title="SliceArrayView" alt="" coords="118,385,229,412"/>
+<area shape="rect" id="node23" href="$struct_slice_view.html" title="Displays a slice from a volume (stored either in host (VolumeF) or device (CLVolume) memory)..." alt="" coords="133,436,213,463"/>
+<area shape="rect" id="node24" href="$struct_tam_danielson.html" title="TamDanielson" alt="" coords="120,487,227,513"/>
+<area shape="rect" id="node25" href="$struct_text.html" title="Text is a Widget displaying text (can be multiple lines) " alt="" coords="149,537,197,564"/>
+<area shape="rect" id="node26" href="$struct_volume_view.html" title="Displays a projection from a volume (stored either in device memory). " alt="" coords="126,588,221,615"/>
+<area shape="rect" id="node16" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="481,208,567,235"/>
+<area shape="rect" id="node17" href="$struct_linear.html" title="Linear" alt="" coords="314,157,371,184"/>
+<area shape="rect" id="node18" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="483,157,565,184"/>
+<area shape="rect" id="node19" href="$struct_vertical.html" title="Layouts widgets on the vertical axis. " alt="" coords="491,107,557,133"/>
+<area shape="rect" id="node21" href="$struct_plot_view.html" title="PlotView" alt="" coords="305,360,380,387"/>
 </map>

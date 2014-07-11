@@ -1,7 +1,0 @@
-<map id="ScrollArea" name="ScrollArea">
-<area shape="rect" id="node5" href="$struct_scroll.html" title="Makes a widget scrollable by proxying it through ScrollArea." alt="" coords="5,161,91,189"/>
-<area shape="rect" id="node7" href="$struct_scroll.html" title="Scroll\&lt; HTML \&gt;" alt="" coords="116,161,231,189"/>
-<area shape="rect" id="node9" href="$struct_scroll.html" title="Scroll\&lt; List\&lt; Text \&gt; \&gt;" alt="" coords="255,161,401,189"/>
-<area shape="rect" id="node11" href="$struct_scroll.html" title="Scroll\&lt; PDF \&gt;" alt="" coords="426,161,531,189"/>
-<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="218,6,283,34"/>
-</map>

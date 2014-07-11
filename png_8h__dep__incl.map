@@ -1,3 +1,8 @@
 <map id="png.h" name="png.h">
-<area shape="rect" id="node3" href="$taskbar_8cc.html" title="Persistent panel application and X11 window manager." alt="" coords="4,83,85,111"/>
+<area shape="rect" id="node2" href="$png_8cc_source.html" title="png.cc" alt="" coords="5,80,67,107"/>
+<area shape="rect" id="node3" href="$compute_8cc_source.html" title="compute.cc" alt="" coords="91,80,181,107"/>
+<area shape="rect" id="node4" href="$graph_8cc_source.html" title="graph.cc" alt="" coords="205,80,277,107"/>
+<area shape="rect" id="node5" href="$review_8cc_source.html" title="review.cc" alt="" coords="302,80,380,107"/>
+<area shape="rect" id="node6" href="$slice_8cc_source.html" title="slice.cc" alt="" coords="405,80,472,107"/>
+<area shape="rect" id="node7" href="$window_8cc_source.html" title="window.cc" alt="" coords="497,80,580,107"/>
 </map>

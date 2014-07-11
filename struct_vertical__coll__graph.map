@@ -1,5 +1,9 @@
 <map id="Vertical" name="Vertical">
-<area shape="rect" id="node2" href="$struct_linear.html" title="Layouts widgets on an axis." alt="" coords="9,161,67,189"/>
-<area shape="rect" id="node4" href="$struct_layout.html" title="Proxy Widget containing multiple widgets." alt="" coords="8,83,69,111"/>
-<area shape="rect" id="node6" href="$struct_widget.html" title="Abstract component to compose user interfaces." alt="" coords="6,6,71,34"/>
+<area shape="rect" id="node2" href="$struct_linear.html" title="Linear" alt="" coords="163,355,220,381"/>
+<area shape="rect" id="node3" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="88,264,149,291"/>
+<area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="87,187,149,213"/>
+<area shape="rect" id="node5" href="$struct_image.html" title="2D array of byte4 " alt="" coords="89,96,147,123"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="5,5,104,32"/>
+<area shape="rect" id="node7" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="129,5,239,32"/>
+<area shape="rect" id="node8" href="$structref.html" title="ref\&lt; byte \&gt;" alt="" coords="174,264,260,291"/>
 </map>

@@ -1,4 +1,3 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$struct_semaphore.html" title="A simple semaphore using futex." alt="" coords="5,5,96,33"/>
-<area shape="rect" id="node3" href="$struct_lock.html" title="Lock is an initially released binary semaphore." alt="" coords="144,5,195,33"/>
+<area shape="rect" id="node1" href="$struct_rect.html" title="Axis&#45;aligned rectangle with 2D integer coordinates. " alt="" coords="5,5,56,32"/>
 </map>

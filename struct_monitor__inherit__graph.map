@@ -1,6 +1,0 @@
-<map id="Monitor" name="Monitor">
-<area shape="rect" id="node2" href="$struct_application.html" title="Application provides a quit slot to cleanly terminate the default thread." alt="" coords="5,161,93,189"/>
-<area shape="rect" id="node4" href="$struct_timer.html" title="Timer" alt="" coords="117,161,172,189"/>
-<area shape="rect" id="node6" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops." alt="" coords="123,83,167,111"/>
-<area shape="rect" id="node8" href="$structpollfd.html" title="pollfd" alt="" coords="119,6,172,34"/>
-</map>
