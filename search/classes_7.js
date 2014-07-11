@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['handle',['Handle',['../struct_handle.html',1,'Handle'],['../structhandle.html',1,'handle&lt; T &gt;']]],
+  ['handle',['handle',['../structhandle.html',1,'handle&lt; T &gt;'],['../struct_handle.html',1,'Handle']]],
   ['handle_3c_20byte_20_2a_20_3e',['handle&lt; byte * &gt;',['../structhandle.html',1,'']]],
   ['handle_3c_20cl_5fkernel_20_3e',['handle&lt; cl_kernel &gt;',['../structhandle.html',1,'']]],
   ['handle_3c_20cl_5fmem_20_3e',['handle&lt; cl_mem &gt;',['../structhandle.html',1,'']]],

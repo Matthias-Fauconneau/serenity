@@ -2,10 +2,12 @@ var thread_8h =
 [
     [ "Lock", "struct_lock.html", "struct_lock" ],
     [ "Locker", "struct_locker.html", "struct_locker" ],
+    [ "Condition", "struct_condition.html", "struct_condition" ],
     [ "Semaphore", "struct_semaphore.html", "struct_semaphore" ],
     [ "Poll", "struct_poll.html", "struct_poll" ],
     [ "EventFD", "struct_event_f_d.html", "struct_event_f_d" ],
     [ "Thread", "struct_thread.html", "struct_thread" ],
+    [ "thread", "structthread.html", "structthread" ],
     [ "Invalid", "thread_8h.html#adc29c2ff13d900c2f185ee95427fb06cae962ea8b0b3a376575ad0e616eeac474", null ],
     [ "Denormal", "thread_8h.html#adc29c2ff13d900c2f185ee95427fb06cad0eaa27df3a37d698190c951d5ceda67", null ],
     [ "DivisionByZero", "thread_8h.html#adc29c2ff13d900c2f185ee95427fb06cad26ab71240ed8c1511e513e098fae76f", null ],

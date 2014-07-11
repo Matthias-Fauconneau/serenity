@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('structmap.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -104,6 +104,7 @@ $(document).ready(function(){initNavTree('structmap.html','');});
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="structmap-members.html">List of all members</a>  </div>
@@ -124,131 +125,106 @@ Collaboration diagram for map&lt; K, V &gt;:</div>
 <area shape="rect" id="node2" href="structarray.html" title="array\&lt; V \&gt;" alt="" coords="9,83,92,109"/><area shape="rect" id="node3" href="structbuffer.html" title="buffer\&lt; V \&gt;" alt="" coords="5,5,93,32"/><area shape="rect" id="node4" href="structarray.html" title="array\&lt; K \&gt;" alt="" coords="118,83,201,109"/><area shape="rect" id="node5" href="structbuffer.html" title="buffer\&lt; K \&gt;" alt="" coords="117,5,205,32"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap_1_1const__iterator.html">const_iterator</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap_1_1iterator.html">iterator</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a3270507b2329d1ed462cf84395001cd4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3270507b2329d1ed462cf84395001cd4"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>map</b> (const <a class="el" href="structref.html">ref</a>&lt; key_value&lt; K, V &gt;&gt; &amp;pairs)</td></tr>
+<tr class="memitem:a580b1dfaaf03c987d635c2aede009e83"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a580b1dfaaf03c987d635c2aede009e83">map</a> ()</td></tr>
+<tr class="separator:a580b1dfaaf03c987d635c2aede009e83"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3270507b2329d1ed462cf84395001cd4"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a3270507b2329d1ed462cf84395001cd4">map</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="structkey__value.html">key_value</a>&lt; K, V &gt;&gt; &amp;pairs)</td></tr>
 <tr class="separator:a3270507b2329d1ed462cf84395001cd4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7ffbdc910a4aaa5fe273f137283216b5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7ffbdc910a4aaa5fe273f137283216b5"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>map</b> (const <a class="el" href="structref.html">ref</a>&lt; K &gt; &amp;keys, const <a class="el" href="structref.html">ref</a>&lt; V &gt; &amp;values)</td></tr>
+<tr class="memitem:a7ffbdc910a4aaa5fe273f137283216b5"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a7ffbdc910a4aaa5fe273f137283216b5">map</a> (const <a class="el" href="structref.html">ref</a>&lt; K &gt; &amp;<a class="el" href="structmap.html#afe0347adf295919002b163992e353fa2">keys</a>, const <a class="el" href="structref.html">ref</a>&lt; V &gt; &amp;<a class="el" href="structmap.html#a77c9ebef060d59f48886ae57665c0a20">values</a>)</td></tr>
 <tr class="separator:a7ffbdc910a4aaa5fe273f137283216b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6ac15c08282bb0d2d5a2a6253b0d5029"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6ac15c08282bb0d2d5a2a6253b0d5029"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>size</b> () const </td></tr>
+<tr class="memitem:a6ac15c08282bb0d2d5a2a6253b0d5029"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a6ac15c08282bb0d2d5a2a6253b0d5029">size</a> () const </td></tr>
 <tr class="separator:a6ac15c08282bb0d2d5a2a6253b0d5029"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a05629058e22266fbc3367576ec81695a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a05629058e22266fbc3367576ec81695a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>reserve</b> (int size)</td></tr>
+<tr class="memitem:a05629058e22266fbc3367576ec81695a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a05629058e22266fbc3367576ec81695a">reserve</a> (int <a class="el" href="structmap.html#a6ac15c08282bb0d2d5a2a6253b0d5029">size</a>)</td></tr>
 <tr class="separator:a05629058e22266fbc3367576ec81695a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5d1a8dc2e13afc404082badea9a99f8b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5d1a8dc2e13afc404082badea9a99f8b"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>clear</b> ()</td></tr>
+<tr class="memitem:a5d1a8dc2e13afc404082badea9a99f8b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a5d1a8dc2e13afc404082badea9a99f8b">clear</a> ()</td></tr>
 <tr class="separator:a5d1a8dc2e13afc404082badea9a99f8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5449a5ceef70ccc6f96b1c02587d3e2d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5449a5ceef70ccc6f96b1c02587d3e2d"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator bool</b> () const </td></tr>
+<tr class="memitem:a5449a5ceef70ccc6f96b1c02587d3e2d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a5449a5ceef70ccc6f96b1c02587d3e2d">operator bool</a> () const </td></tr>
 <tr class="separator:a5449a5ceef70ccc6f96b1c02587d3e2d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae2878250fb98e45ce5b4079a83eecdf2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae2878250fb98e45ce5b4079a83eecdf2"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator==</b> (const <a class="el" href="structmap.html">map</a>&lt; K, V &gt; &amp;o) const </td></tr>
+<tr class="memitem:ae2878250fb98e45ce5b4079a83eecdf2"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#ae2878250fb98e45ce5b4079a83eecdf2">operator==</a> (const <a class="el" href="structmap.html">map</a>&lt; K, V &gt; &amp;o) const </td></tr>
 <tr class="separator:ae2878250fb98e45ce5b4079a83eecdf2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aae72a2c1acb7ea06ee82e64edd995fbb"><td class="memTemplParams" colspan="2"><a class="anchor" id="aae72a2c1acb7ea06ee82e64edd995fbb"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:aae72a2c1acb7ea06ee82e64edd995fbb"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><b>contains</b> (const KK &amp;key) const </td></tr>
+<tr class="memitem:aae72a2c1acb7ea06ee82e64edd995fbb"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:aae72a2c1acb7ea06ee82e64edd995fbb"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#aae72a2c1acb7ea06ee82e64edd995fbb">contains</a> (const KK &amp;key) const </td></tr>
 <tr class="separator:aae72a2c1acb7ea06ee82e64edd995fbb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3e7098bd79ebe6663f9a5f4477831d2b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3e7098bd79ebe6663f9a5f4477831d2b"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a3e7098bd79ebe6663f9a5f4477831d2b">includes</a> (const <a class="el" href="structmap.html">map</a>&lt; K, V &gt; &amp;subset) const </td></tr>
-<tr class="memdesc:a3e7098bd79ebe6663f9a5f4477831d2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether this object has the same values for all keys in subsets. <br/></td></tr>
+<tr class="memitem:a3e7098bd79ebe6663f9a5f4477831d2b"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a3e7098bd79ebe6663f9a5f4477831d2b">includes</a> (const <a class="el" href="structmap.html">map</a>&lt; K, V &gt; &amp;subset) const </td></tr>
+<tr class="memdesc:a3e7098bd79ebe6663f9a5f4477831d2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether this object has the same values for all keys in subsets.  <a href="#a3e7098bd79ebe6663f9a5f4477831d2b">More...</a><br/></td></tr>
 <tr class="separator:a3e7098bd79ebe6663f9a5f4477831d2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5eab19d951c80ee7e6f1dc6881910792"><td class="memTemplParams" colspan="2"><a class="anchor" id="a5eab19d951c80ee7e6f1dc6881910792"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a5eab19d951c80ee7e6f1dc6881910792"><td class="memTemplItemLeft" align="right" valign="top">const V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>at</b> (const KK &amp;key) const </td></tr>
+<tr class="memitem:a5eab19d951c80ee7e6f1dc6881910792"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a5eab19d951c80ee7e6f1dc6881910792"><td class="memTemplItemLeft" align="right" valign="top">const V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a5eab19d951c80ee7e6f1dc6881910792">at</a> (const KK &amp;key) const </td></tr>
 <tr class="separator:a5eab19d951c80ee7e6f1dc6881910792"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2b5a5b18bc0feb8e11622b874d59a26d"><td class="memTemplParams" colspan="2"><a class="anchor" id="a2b5a5b18bc0feb8e11622b874d59a26d"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a2b5a5b18bc0feb8e11622b874d59a26d"><td class="memTemplItemLeft" align="right" valign="top">const V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>operator[]</b> (const KK &amp;key) const </td></tr>
+<tr class="memitem:a2b5a5b18bc0feb8e11622b874d59a26d"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a2b5a5b18bc0feb8e11622b874d59a26d"><td class="memTemplItemLeft" align="right" valign="top">const V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a2b5a5b18bc0feb8e11622b874d59a26d">operator[]</a> (const KK &amp;key) const </td></tr>
 <tr class="separator:a2b5a5b18bc0feb8e11622b874d59a26d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a60098f9210b2f8c9e3a6760fcc18a97a"><td class="memTemplParams" colspan="2"><a class="anchor" id="a60098f9210b2f8c9e3a6760fcc18a97a"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a60098f9210b2f8c9e3a6760fcc18a97a"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>at</b> (const KK &amp;key)</td></tr>
+<tr class="memitem:a60098f9210b2f8c9e3a6760fcc18a97a"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a60098f9210b2f8c9e3a6760fcc18a97a"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a60098f9210b2f8c9e3a6760fcc18a97a">at</a> (const KK &amp;key)</td></tr>
 <tr class="separator:a60098f9210b2f8c9e3a6760fcc18a97a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a364c06bd2c61c8e2f320b1045b2cd46d"><td class="memTemplParams" colspan="2"><a class="anchor" id="a364c06bd2c61c8e2f320b1045b2cd46d"></a>
-template&lt;typename KK , typename VV &gt; </td></tr>
-<tr class="memitem:a364c06bd2c61c8e2f320b1045b2cd46d"><td class="memTemplItemLeft" align="right" valign="top">VV&#160;</td><td class="memTemplItemRight" valign="bottom"><b>value</b> (const KK &amp;key, VV value) const </td></tr>
+<tr class="memitem:a364c06bd2c61c8e2f320b1045b2cd46d"><td class="memTemplParams" colspan="2">template&lt;typename KK , typename VV &gt; </td></tr>
+<tr class="memitem:a364c06bd2c61c8e2f320b1045b2cd46d"><td class="memTemplItemLeft" align="right" valign="top">VV&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a> (const KK &amp;key, VV value) const </td></tr>
 <tr class="separator:a364c06bd2c61c8e2f320b1045b2cd46d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a231e02b3279c9667aa19c7fe65850541"><td class="memTemplParams" colspan="2"><a class="anchor" id="a231e02b3279c9667aa19c7fe65850541"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a231e02b3279c9667aa19c7fe65850541"><td class="memTemplItemLeft" align="right" valign="top">const V *&#160;</td><td class="memTemplItemRight" valign="bottom"><b>find</b> (const KK &amp;key) const </td></tr>
+<tr class="memitem:a231e02b3279c9667aa19c7fe65850541"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a231e02b3279c9667aa19c7fe65850541"><td class="memTemplItemLeft" align="right" valign="top">const V *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a231e02b3279c9667aa19c7fe65850541">find</a> (const KK &amp;key) const </td></tr>
 <tr class="separator:a231e02b3279c9667aa19c7fe65850541"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0f16a3d3f2355590cbb95df0f7d4578b"><td class="memTemplParams" colspan="2"><a class="anchor" id="a0f16a3d3f2355590cbb95df0f7d4578b"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a0f16a3d3f2355590cbb95df0f7d4578b"><td class="memTemplItemLeft" align="right" valign="top">V *&#160;</td><td class="memTemplItemRight" valign="bottom"><b>find</b> (const KK &amp;key)</td></tr>
+<tr class="memitem:a0f16a3d3f2355590cbb95df0f7d4578b"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a0f16a3d3f2355590cbb95df0f7d4578b"><td class="memTemplItemLeft" align="right" valign="top">V *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a0f16a3d3f2355590cbb95df0f7d4578b">find</a> (const KK &amp;key)</td></tr>
 <tr class="separator:a0f16a3d3f2355590cbb95df0f7d4578b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab0de61b39fd53ec11592019ff69ca967"><td class="memTemplParams" colspan="2"><a class="anchor" id="ab0de61b39fd53ec11592019ff69ca967"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:ab0de61b39fd53ec11592019ff69ca967"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>insert</b> (KK &amp;&amp;key)</td></tr>
+<tr class="memitem:ab0de61b39fd53ec11592019ff69ca967"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:ab0de61b39fd53ec11592019ff69ca967"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#ab0de61b39fd53ec11592019ff69ca967">insert</a> (KK &amp;&amp;key)</td></tr>
 <tr class="separator:ab0de61b39fd53ec11592019ff69ca967"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0ff9d11e2cfad7cc8d4a53e5814a9661"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0ff9d11e2cfad7cc8d4a53e5814a9661"></a>
-V &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>insert</b> (K &amp;&amp;key, V &amp;&amp;value)</td></tr>
+<tr class="memitem:a0ff9d11e2cfad7cc8d4a53e5814a9661"><td class="memItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a0ff9d11e2cfad7cc8d4a53e5814a9661">insert</a> (K &amp;&amp;key, V &amp;&amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:a0ff9d11e2cfad7cc8d4a53e5814a9661"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0ea6577a2cd5c10cbc3f432f14d8fd2d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0ea6577a2cd5c10cbc3f432f14d8fd2d"></a>
-V &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>insert</b> (K &amp;&amp;key, const V &amp;value)</td></tr>
+<tr class="memitem:a0ea6577a2cd5c10cbc3f432f14d8fd2d"><td class="memItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a0ea6577a2cd5c10cbc3f432f14d8fd2d">insert</a> (K &amp;&amp;key, const V &amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:a0ea6577a2cd5c10cbc3f432f14d8fd2d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a07e7b53393b307bc34fa0610d1a4d54c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a07e7b53393b307bc34fa0610d1a4d54c"></a>
-V &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>insert</b> (const K &amp;key, V &amp;&amp;value)</td></tr>
+<tr class="memitem:a07e7b53393b307bc34fa0610d1a4d54c"><td class="memItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a07e7b53393b307bc34fa0610d1a4d54c">insert</a> (const K &amp;key, V &amp;&amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:a07e7b53393b307bc34fa0610d1a4d54c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a95b87165bc7928aea0347f749e85bc50"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a95b87165bc7928aea0347f749e85bc50"></a>
-V &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>insert</b> (const K &amp;key, const V &amp;value)</td></tr>
+<tr class="memitem:a95b87165bc7928aea0347f749e85bc50"><td class="memItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a95b87165bc7928aea0347f749e85bc50">insert</a> (const K &amp;key, const V &amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:a95b87165bc7928aea0347f749e85bc50"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abf92e65f1cac96bb98ef83e1fe875298"><td class="memTemplParams" colspan="2"><a class="anchor" id="abf92e65f1cac96bb98ef83e1fe875298"></a>
-template&lt;typename KK , typename VV &gt; </td></tr>
-<tr class="memitem:abf92e65f1cac96bb98ef83e1fe875298"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>insertMulti</b> (KK &amp;&amp;key, VV &amp;&amp;value)</td></tr>
+<tr class="memitem:abf92e65f1cac96bb98ef83e1fe875298"><td class="memTemplParams" colspan="2">template&lt;typename KK , typename VV &gt; </td></tr>
+<tr class="memitem:abf92e65f1cac96bb98ef83e1fe875298"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#abf92e65f1cac96bb98ef83e1fe875298">insertMulti</a> (KK &amp;&amp;key, VV &amp;&amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:abf92e65f1cac96bb98ef83e1fe875298"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae9c855f83a07925e123f1009bec5d8da"><td class="memTemplParams" colspan="2"><a class="anchor" id="ae9c855f83a07925e123f1009bec5d8da"></a>
-template&lt;typename KK , typename VV &gt; </td></tr>
-<tr class="memitem:ae9c855f83a07925e123f1009bec5d8da"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>insertSorted</b> (KK &amp;&amp;key, VV &amp;&amp;value)</td></tr>
+<tr class="memitem:ae9c855f83a07925e123f1009bec5d8da"><td class="memTemplParams" colspan="2">template&lt;typename KK , typename VV &gt; </td></tr>
+<tr class="memitem:ae9c855f83a07925e123f1009bec5d8da"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#ae9c855f83a07925e123f1009bec5d8da">insertSorted</a> (KK &amp;&amp;key, VV &amp;&amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:ae9c855f83a07925e123f1009bec5d8da"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9b7ea2a71a87166ac11b83667721c40b"><td class="memTemplParams" colspan="2"><a class="anchor" id="a9b7ea2a71a87166ac11b83667721c40b"></a>
-template&lt;typename KK , typename VV &gt; </td></tr>
-<tr class="memitem:a9b7ea2a71a87166ac11b83667721c40b"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>insertSortedMulti</b> (KK &amp;&amp;key, VV &amp;&amp;value)</td></tr>
+<tr class="memitem:a9b7ea2a71a87166ac11b83667721c40b"><td class="memTemplParams" colspan="2">template&lt;typename KK , typename VV &gt; </td></tr>
+<tr class="memitem:a9b7ea2a71a87166ac11b83667721c40b"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a9b7ea2a71a87166ac11b83667721c40b">insertSortedMulti</a> (KK &amp;&amp;key, VV &amp;&amp;<a class="el" href="structmap.html#a364c06bd2c61c8e2f320b1045b2cd46d">value</a>)</td></tr>
 <tr class="separator:a9b7ea2a71a87166ac11b83667721c40b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9fe6e6c8b842c882311a3a13808cbcb9"><td class="memTemplParams" colspan="2"><a class="anchor" id="a9fe6e6c8b842c882311a3a13808cbcb9"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a9fe6e6c8b842c882311a3a13808cbcb9"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><b>operator[]</b> (KK key)</td></tr>
+<tr class="memitem:a9fe6e6c8b842c882311a3a13808cbcb9"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a9fe6e6c8b842c882311a3a13808cbcb9"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a9fe6e6c8b842c882311a3a13808cbcb9">operator[]</a> (KK key)</td></tr>
 <tr class="separator:a9fe6e6c8b842c882311a3a13808cbcb9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab407fd9923699a794dd5e0d8e85efa5c"><td class="memTemplParams" colspan="2"><a class="anchor" id="ab407fd9923699a794dd5e0d8e85efa5c"></a>
-template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:ab407fd9923699a794dd5e0d8e85efa5c"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
 <tr class="memitem:ab407fd9923699a794dd5e0d8e85efa5c"><td class="memTemplItemLeft" align="right" valign="top">V &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#ab407fd9923699a794dd5e0d8e85efa5c">sorted</a> (const KK &amp;key)</td></tr>
-<tr class="memdesc:ab407fd9923699a794dd5e0d8e85efa5c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns value for <em>key</em>, inserts a new sorted key with a default value if not existing. <br/></td></tr>
+<tr class="memdesc:ab407fd9923699a794dd5e0d8e85efa5c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns value for <em>key</em>, inserts a new sorted key with a default value if not existing.  <a href="#ab407fd9923699a794dd5e0d8e85efa5c">More...</a><br/></td></tr>
 <tr class="separator:ab407fd9923699a794dd5e0d8e85efa5c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a73c853c29d89e11e5a393f230e8cb8b0"><td class="memTemplParams" colspan="2"><a class="anchor" id="a73c853c29d89e11e5a393f230e8cb8b0"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a73c853c29d89e11e5a393f230e8cb8b0"><td class="memTemplItemLeft" align="right" valign="top">V&#160;</td><td class="memTemplItemRight" valign="bottom"><b>take</b> (const KK &amp;key)</td></tr>
+<tr class="memitem:a73c853c29d89e11e5a393f230e8cb8b0"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a73c853c29d89e11e5a393f230e8cb8b0"><td class="memTemplItemLeft" align="right" valign="top">V&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a73c853c29d89e11e5a393f230e8cb8b0">take</a> (const KK &amp;key)</td></tr>
 <tr class="separator:a73c853c29d89e11e5a393f230e8cb8b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8b77a7ae23605872d1bd1df2c7475de1"><td class="memTemplParams" colspan="2"><a class="anchor" id="a8b77a7ae23605872d1bd1df2c7475de1"></a>
-template&lt;typename KK &gt; </td></tr>
-<tr class="memitem:a8b77a7ae23605872d1bd1df2c7475de1"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>remove</b> (const KK &amp;key)</td></tr>
+<tr class="memitem:a8b77a7ae23605872d1bd1df2c7475de1"><td class="memTemplParams" colspan="2">template&lt;typename KK &gt; </td></tr>
+<tr class="memitem:a8b77a7ae23605872d1bd1df2c7475de1"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#a8b77a7ae23605872d1bd1df2c7475de1">remove</a> (const KK &amp;key)</td></tr>
 <tr class="separator:a8b77a7ae23605872d1bd1df2c7475de1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a713deb38b969aa22338a690ab50f6e0d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a713deb38b969aa22338a690ab50f6e0d"></a>
-const_iterator&#160;</td><td class="memItemRight" valign="bottom"><b>begin</b> () const </td></tr>
+<tr class="memitem:a713deb38b969aa22338a690ab50f6e0d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap_1_1const__iterator.html">const_iterator</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a713deb38b969aa22338a690ab50f6e0d">begin</a> () const </td></tr>
 <tr class="separator:a713deb38b969aa22338a690ab50f6e0d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9e6ff407963d76bbe00e2f3ec539888c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9e6ff407963d76bbe00e2f3ec539888c"></a>
-const_iterator&#160;</td><td class="memItemRight" valign="bottom"><b>end</b> () const </td></tr>
+<tr class="memitem:a9e6ff407963d76bbe00e2f3ec539888c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap_1_1const__iterator.html">const_iterator</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a9e6ff407963d76bbe00e2f3ec539888c">end</a> () const </td></tr>
 <tr class="separator:a9e6ff407963d76bbe00e2f3ec539888c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac1949c1675b01c7e2a65c97c22bf2663"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac1949c1675b01c7e2a65c97c22bf2663"></a>
-iterator&#160;</td><td class="memItemRight" valign="bottom"><b>begin</b> ()</td></tr>
+<tr class="memitem:ac1949c1675b01c7e2a65c97c22bf2663"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap_1_1iterator.html">iterator</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#ac1949c1675b01c7e2a65c97c22bf2663">begin</a> ()</td></tr>
 <tr class="separator:ac1949c1675b01c7e2a65c97c22bf2663"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6414707c4ee345368e391edfc9c04c79"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6414707c4ee345368e391edfc9c04c79"></a>
-iterator&#160;</td><td class="memItemRight" valign="bottom"><b>end</b> ()</td></tr>
+<tr class="memitem:a6414707c4ee345368e391edfc9c04c79"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap_1_1iterator.html">iterator</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a6414707c4ee345368e391edfc9c04c79">end</a> ()</td></tr>
 <tr class="separator:a6414707c4ee345368e391edfc9c04c79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad9cdfc9cbdeb82ac6660689958586316"><td class="memTemplParams" colspan="2"><a class="anchor" id="ad9cdfc9cbdeb82ac6660689958586316"></a>
-template&lt;typename F &gt; </td></tr>
+<tr class="memitem:ad9cdfc9cbdeb82ac6660689958586316"><td class="memTemplParams" colspan="2">template&lt;typename F &gt; </td></tr>
 <tr class="memitem:ad9cdfc9cbdeb82ac6660689958586316"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="structmap.html">map</a> &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="structmap.html#ad9cdfc9cbdeb82ac6660689958586316">filter</a> (F f)</td></tr>
-<tr class="memdesc:ad9cdfc9cbdeb82ac6660689958586316"><td class="mdescLeft">&#160;</td><td class="mdescRight">Filters elements matching predicate. <br/></td></tr>
+<tr class="memdesc:ad9cdfc9cbdeb82ac6660689958586316"><td class="mdescLeft">&#160;</td><td class="mdescRight">Filters elements matching predicate.  <a href="#ad9cdfc9cbdeb82ac6660689958586316">More...</a><br/></td></tr>
 <tr class="separator:ad9cdfc9cbdeb82ac6660689958586316"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:afe0347adf295919002b163992e353fa2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afe0347adf295919002b163992e353fa2"></a>
-<a class="el" href="structarray.html">array</a>&lt; K &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>keys</b></td></tr>
+<tr class="memitem:afe0347adf295919002b163992e353fa2"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; K &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#afe0347adf295919002b163992e353fa2">keys</a></td></tr>
 <tr class="separator:afe0347adf295919002b163992e353fa2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a77c9ebef060d59f48886ae57665c0a20"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a77c9ebef060d59f48886ae57665c0a20"></a>
-<a class="el" href="structarray.html">array</a>&lt; V &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>values</b></td></tr>
+<tr class="memitem:a77c9ebef060d59f48886ae57665c0a20"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; V &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmap.html#a77c9ebef060d59f48886ae57665c0a20">values</a></td></tr>
 <tr class="separator:a77c9ebef060d59f48886ae57665c0a20"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
@@ -258,7 +234,830 @@ struct map&lt; K, V &gt;</h3>
 <p>Associates keys with values. </p>
 
 <p>Definition at line <a class="el" href="map_8h_source.html#l00010">10</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a580b1dfaaf03c987d635c2aede009e83"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt; K, V &gt;::<a class="el" href="structmap.html">map</a> </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00011">11</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3270507b2329d1ed462cf84395001cd4"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt; K, V &gt;::<a class="el" href="structmap.html">map</a> </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="structkey__value.html">key_value</a>&lt; K, V &gt;&gt; &amp;&#160;</td>
+          <td class="paramname"><em>pairs</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00013">13</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7ffbdc910a4aaa5fe273f137283216b5"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt; K, V &gt;::<a class="el" href="structmap.html">map</a> </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; K &gt; &amp;&#160;</td>
+          <td class="paramname"><em>keys</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; V &gt; &amp;&#160;</td>
+          <td class="paramname"><em>values</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00016">16</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a6ac15c08282bb0d2d5a2a6253b0d5029"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::size </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00018">18</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a05629058e22266fbc3367576ec81695a"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::reserve </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>size</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00019">19</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5d1a8dc2e13afc404082badea9a99f8b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::clear </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00020">20</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5449a5ceef70ccc6f96b1c02587d3e2d"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt; K, V &gt;::operator bool </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00022">22</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae2878250fb98e45ce5b4079a83eecdf2"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">bool <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::operator== </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structmap.html">map</a>&lt; K, V &gt; &amp;&#160;</td>
+          <td class="paramname"><em>o</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00023">23</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aae72a2c1acb7ea06ee82e64edd995fbb"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">bool <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::contains </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00029">29</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3e7098bd79ebe6663f9a5f4477831d2b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">bool <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::includes </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structmap.html">map</a>&lt; K, V &gt; &amp;&#160;</td>
+          <td class="paramname"><em>subset</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns whether this object has the same values for all keys in subsets. </p>
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00032">32</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5eab19d951c80ee7e6f1dc6881910792"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">const V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::at </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00037">37</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a2b5a5b18bc0feb8e11622b874d59a26d"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">const V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::operator[] </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00042">42</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a60098f9210b2f8c9e3a6760fcc18a97a"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::at </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00043">43</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a364c06bd2c61c8e2f320b1045b2cd46d"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK , typename VV &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">VV <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::value </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">VV&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00049">49</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a231e02b3279c9667aa19c7fe65850541"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">const V* <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::find </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00055">55</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0f16a3d3f2355590cbb95df0f7d4578b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V* <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::find </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00056">56</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab0de61b39fd53ec11592019ff69ca967"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insert </td>
+          <td>(</td>
+          <td class="paramtype">KK &amp;&amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00057">57</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0ff9d11e2cfad7cc8d4a53e5814a9661"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insert </td>
+          <td>(</td>
+          <td class="paramtype">K &amp;&amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">V &amp;&amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00063">63</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0ea6577a2cd5c10cbc3f432f14d8fd2d"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insert </td>
+          <td>(</td>
+          <td class="paramtype">K &amp;&amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const V &amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00067">67</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a07e7b53393b307bc34fa0610d1a4d54c"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insert </td>
+          <td>(</td>
+          <td class="paramtype">const K &amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">V &amp;&amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00071">71</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a95b87165bc7928aea0347f749e85bc50"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insert </td>
+          <td>(</td>
+          <td class="paramtype">const K &amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const V &amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00075">75</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="abf92e65f1cac96bb98ef83e1fe875298"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK , typename VV &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insertMulti </td>
+          <td>(</td>
+          <td class="paramtype">KK &amp;&amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">VV &amp;&amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00079">79</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae9c855f83a07925e123f1009bec5d8da"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK , typename VV &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insertSorted </td>
+          <td>(</td>
+          <td class="paramtype">KK &amp;&amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">VV &amp;&amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00083">83</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9b7ea2a71a87166ac11b83667721c40b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK , typename VV &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::insertSortedMulti </td>
+          <td>(</td>
+          <td class="paramtype">KK &amp;&amp;&#160;</td>
+          <td class="paramname"><em>key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">VV &amp;&amp;&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00087">87</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9fe6e6c8b842c882311a3a13808cbcb9"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::operator[] </td>
+          <td>(</td>
+          <td class="paramtype">KK&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00091">91</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab407fd9923699a794dd5e0d8e85efa5c"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::sorted </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns value for <em>key</em>, inserts a new sorted key with a default value if not existing. </p>
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00093">93</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a73c853c29d89e11e5a393f230e8cb8b0"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">V <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::take </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00098">98</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8b77a7ae23605872d1bd1df2c7475de1"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename KK &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::remove </td>
+          <td>(</td>
+          <td class="paramtype">const KK &amp;&#160;</td>
+          <td class="paramname"><em>key</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00102">102</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a713deb38b969aa22338a690ab50f6e0d"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap_1_1const__iterator.html">const_iterator</a> <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::begin </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00114">114</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9e6ff407963d76bbe00e2f3ec539888c"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap_1_1const__iterator.html">const_iterator</a> <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::end </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00115">115</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac1949c1675b01c7e2a65c97c22bf2663"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap_1_1iterator.html">iterator</a> <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::begin </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00124">124</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6414707c4ee345368e391edfc9c04c79"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap_1_1iterator.html">iterator</a> <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::end </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00125">125</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad9cdfc9cbdeb82ac6660689958586316"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+<div class="memtemplate">
+template&lt;typename F &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&amp; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::filter </td>
+          <td>(</td>
+          <td class="paramtype">F&#160;</td>
+          <td class="paramname"><em>f</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Filters elements matching predicate. </p>
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00128">128</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="afe0347adf295919002b163992e353fa2"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;K&gt; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::keys</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00130">130</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a77c9ebef060d59f48886ae57665c0a20"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename K, typename V&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;V&gt; <a class="el" href="structmap.html">map</a>&lt; K, V &gt;::values</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="map_8h_source.html#l00131">131</a> of file <a class="el" href="map_8h_source.html">map.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

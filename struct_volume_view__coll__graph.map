@@ -1,13 +1,17 @@
 <map id="VolumeView" name="VolumeView">
-<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="179,277,241,304"/>
-<area shape="rect" id="node3" href="$struct_image.html" title="2D array of byte4 " alt="" coords="155,173,212,200"/>
-<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="5,83,104,109"/>
-<area shape="rect" id="node5" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="129,83,239,109"/>
-<area shape="rect" id="node6" href="$struct_c_l_volume.html" title="Single channel floating&#45;point OpenCL 3D image. " alt="" coords="291,277,372,304"/>
-<area shape="rect" id="node7" href="$struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="295,173,363,200"/>
-<area shape="rect" id="node8" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="264,83,393,109"/>
-<area shape="rect" id="node9" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="418,83,517,109"/>
-<area shape="rect" id="node10" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="416,5,520,32"/>
-<area shape="rect" id="node11" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="388,173,513,200"/>
-<area shape="rect" id="node12" href="$struct_projection.html" title="Projection" alt="" coords="405,277,484,304"/>
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="647,81,710,108"/>
+<area shape="rect" id="node3" href="$struct_image.html" title="2D array of byte4 " alt="" coords="409,56,468,83"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="175,5,275,32"/>
+<area shape="rect" id="node5" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="170,56,281,83"/>
+<area shape="rect" id="node6" href="$struct_c_l_volume.html" title="Single channel floating&#45;point OpenCL 3D image. " alt="" coords="637,149,720,176"/>
+<area shape="rect" id="node7" href="$struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="405,115,473,141"/>
+<area shape="rect" id="node8" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="160,107,291,133"/>
+<area shape="rect" id="node9" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="175,157,275,184"/>
+<area shape="rect" id="node10" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="5,157,109,184"/>
+<area shape="rect" id="node11" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="376,208,501,235"/>
+<area shape="rect" id="node13" href="$struct_projection.html" title="Projection" alt="" coords="639,201,719,228"/>
+<area shape="rect" id="node12" href="$structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="185,208,266,235"/>
+<area shape="rect" id="node14" href="$struct_value.html" title="Value" alt="" coords="651,255,706,281"/>
+<area shape="rect" id="node15" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="376,259,501,285"/>
+<area shape="rect" id="node16" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="161,259,290,285"/>
 </map>

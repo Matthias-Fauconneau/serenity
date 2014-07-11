@@ -1,5 +1,6 @@
 <map id="Poll" name="Poll">
 <area shape="rect" id="node2" href="$struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="5,80,96,107"/>
 <area shape="rect" id="node3" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="121,80,183,107"/>
-<area shape="rect" id="node4" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="208,80,277,107"/>
+<area shape="rect" id="node4" href="$struct_timer.html" title="Timer" alt="" coords="207,80,261,107"/>
+<area shape="rect" id="node5" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="287,80,356,107"/>
 </map>

@@ -1,13 +1,20 @@
 var NAVTREE =
 [
   [ "Tomography", "index.html", [
+    [ "Namespace Members", "namespacemembers.html", [
+      [ "All", "namespacemembers.html", null ],
+      [ "Variables", "namespacemembers_vars.html", null ],
+      [ "Enumerations", "namespacemembers_enum.html", null ],
+      [ "Enumerator", "namespacemembers_eval.html", null ]
+    ] ],
     [ "Classes", null, [
       [ "Class List", "annotated.html", "annotated" ],
       [ "Class Hierarchy", "hierarchy.html", "hierarchy" ],
       [ "Class Members", "functions.html", [
         [ "All", "functions.html", "functions_dup" ],
         [ "Functions", "functions_func.html", "functions_func" ],
-        [ "Variables", "functions_vars.html", null ],
+        [ "Variables", "functions_vars.html", "functions_vars" ],
+        [ "Typedefs", "functions_type.html", null ],
         [ "Enumerations", "functions_enum.html", null ],
         [ "Enumerator", "functions_eval.html", null ]
       ] ]
@@ -15,11 +22,12 @@ var NAVTREE =
     [ "Files", null, [
       [ "File List", "files.html", "files" ],
       [ "File Members", "globals.html", [
-        [ "All", "globals.html", null ],
-        [ "Functions", "globals_func.html", null ],
+        [ "All", "globals.html", "globals_dup" ],
+        [ "Functions", "globals_func.html", "globals_func" ],
         [ "Variables", "globals_vars.html", null ],
         [ "Typedefs", "globals_type.html", null ],
         [ "Enumerations", "globals_enum.html", null ],
+        [ "Enumerator", "globals_eval.html", "globals_eval" ],
         [ "Macros", "globals_defs.html", null ]
       ] ]
     ] ]
@@ -28,14 +36,21 @@ var NAVTREE =
 
 var NAVTREEINDEX =
 [
-"_c_g_8cc_source.html",
-"file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5ae2a1c111c6d4f7599b2d1cc2e5bf8fcd",
-"string_8h.html#a00de5d1f16358d3862293833d1a1f96b",
-"struct_handle.html#a1b5043aecd926b15dd22b014997886c8",
-"struct_slice_view.html#ae049079e8e6094ba66fe770ff7203fc1",
-"struct_window.html#a97e96ce9f330de05a3fb33b924bcfb70",
-"structrange.html",
-"widget_8h.html#a19d5f1b2584de00a414f6b4951d36b11"
+"_c_g_8cc.html",
+"deflate_8cc_source.html",
+"functions_func_m.html",
+"math_8h.html#aab66a478db2f0e5033ceed9be5b3d9b6",
+"string_8h.html#a8577bceddecab67ca282f686996de15c",
+"struct_connection_setup_reply2.html#ae0120c747708abba59bb1ce11f8fdc95",
+"struct_get_property_reply.html#ac611cb7e49693d1cd4810d11e7a51655",
+"struct_poll.html",
+"struct_shdr.html#a1d643a21808188d88ca996fd4fcd97d0",
+"struct_text_layout_1_1_character.html#a926362593b3b37d4ec4eebeb3d696aff",
+"struct_window.html#af4f94eece4001a343cd5e60b724c09ccac411261cbfda8c58209153e651cdcae2",
+"structmap.html#a8b77a7ae23605872d1bd1df2c7475de1",
+"structtdefl__compressor.html#ac4233d89f25c3f5f9c9eda73bcf3e6c4",
+"union_x_event.html#a1bf41808cd12b0d0662fb67db30dade0",
+"x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea7ac40b53d17b5082776d1da4497e8818"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

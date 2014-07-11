@@ -1,5 +1,7 @@
 <map id="CLMem" name="CLMem">
 <area shape="rect" id="node3" href="$struct_c_l_image.html" title="Single channel floating&#45;point OpenCL 2D image. " alt="" coords="5,155,79,181"/>
-<area shape="rect" id="node4" href="$struct_c_l_volume.html" title="Single channel floating&#45;point OpenCL 3D image. " alt="" coords="104,155,185,181"/>
-<area shape="rect" id="node2" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="28,5,157,32"/>
+<area shape="rect" id="node4" href="$struct_c_l_raw_buffer.html" title="CLRawBuffer" alt="" coords="104,155,205,181"/>
+<area shape="rect" id="node6" href="$struct_c_l_volume.html" title="Single channel floating&#45;point OpenCL 3D image. " alt="" coords="229,155,311,181"/>
+<area shape="rect" id="node2" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="89,5,219,32"/>
+<area shape="rect" id="node5" href="$struct_c_l_buffer.html" title="Generic typed OpenCL Buffer. " alt="" coords="117,229,191,256"/>
 </map>

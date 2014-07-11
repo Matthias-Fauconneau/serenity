@@ -6,46 +6,46 @@
 <area shape="rect" id="node48" href="$function_8h.html" title="Equivalent to std::function. " alt="" coords="614,155,692,181"/>
 <area shape="rect" id="node49" href="$utf8_8h.html" title="UTF&#45;8 iterator and encoder. " alt="" coords="2079,304,2133,331"/>
 <area shape="rect" id="node3" href="$build_8cc.html" title="Builds C++ projects with automatic module dependency resolution. " alt="" coords="409,304,476,331"/>
-<area shape="rect" id="node4" href="$data_8cc_source.html" title="data.cc" alt="" coords="959,155,1024,181"/>
-<area shape="rect" id="node5" href="$file_8cc_source.html" title="file.cc" alt="" coords="1693,229,1749,256"/>
+<area shape="rect" id="node4" href="$data_8cc.html" title="data.cc" alt="" coords="959,155,1024,181"/>
+<area shape="rect" id="node5" href="$file_8cc.html" title="file.cc" alt="" coords="1693,229,1749,256"/>
 <area shape="rect" id="node6" href="$vector_8h.html" title="Vector definitions and operations. " alt="" coords="1356,155,1425,181"/>
-<area shape="rect" id="node32" href="$variant_8h_source.html" title="variant.h" alt="" coords="23,379,95,405"/>
+<area shape="rect" id="node32" href="$variant_8h.html" title="variant.h" alt="" coords="23,379,95,405"/>
 <area shape="rect" id="node34" href="$trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="975,229,1037,256"/>
-<area shape="rect" id="node36" href="$thread_8cc_source.html" title="thread.cc" alt="" coords="855,304,931,331"/>
-<area shape="rect" id="node38" href="$string_8cc_source.html" title="string.cc" alt="" coords="1049,155,1121,181"/>
+<area shape="rect" id="node36" href="$thread_8cc.html" title="thread.cc" alt="" coords="855,304,931,331"/>
+<area shape="rect" id="node38" href="$string_8cc.html" title="string.cc" alt="" coords="1049,155,1121,181"/>
 <area shape="rect" id="node39" href="$time_8h.html" title="Time and date operations. " alt="" coords="327,304,384,331"/>
-<area shape="rect" id="node40" href="$time_8cc_source.html" title="time.cc" alt="" coords="615,379,680,405"/>
-<area shape="rect" id="node45" href="$deflate_8cc_source.html" title="deflate.cc" alt="" coords="1146,155,1224,181"/>
+<area shape="rect" id="node40" href="$time_8cc.html" title="time.cc" alt="" coords="615,379,680,405"/>
+<area shape="rect" id="node45" href="$deflate_8cc.html" title="deflate.cc" alt="" coords="1146,155,1224,181"/>
 <area shape="rect" id="node7" href="$image_8h.html" title="Image container and operations. " alt="" coords="1498,229,1565,256"/>
-<area shape="rect" id="node8" href="$image_8cc_source.html" title="image.cc" alt="" coords="1353,304,1427,331"/>
+<area shape="rect" id="node8" href="$image_8cc.html" title="image.cc" alt="" coords="1353,304,1427,331"/>
 <area shape="rect" id="node18" href="$font_8h.html" title="Freetype font renderer wrapper (Font) " alt="" coords="1847,304,1901,331"/>
 <area shape="rect" id="node21" href="$widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="1157,304,1227,331"/>
-<area shape="rect" id="node31" href="$matrix_8h_source.html" title="matrix.h" alt="" coords="1796,379,1865,405"/>
-<area shape="rect" id="node9" href="$opencl_8h_source.html" title="opencl.h" alt="" coords="1498,379,1568,405"/>
-<area shape="rect" id="node10" href="$volume_8h_source.html" title="volume.h" alt="" coords="1647,304,1720,331"/>
+<area shape="rect" id="node31" href="$matrix_8h.html" title="matrix.h" alt="" coords="1796,379,1865,405"/>
+<area shape="rect" id="node9" href="$opencl_8h.html" title="opencl.h" alt="" coords="1498,379,1568,405"/>
+<area shape="rect" id="node10" href="$volume_8h.html" title="volume.h" alt="" coords="1647,304,1720,331"/>
 <area shape="rect" id="node27" href="$text_8h.html" title="Rich text label/paragraph widget. " alt="" coords="1165,379,1219,405"/>
-<area shape="rect" id="node30" href="$window_8cc_source.html" title="window.cc" alt="" coords="1093,453,1176,480"/>
-<area shape="rect" id="node11" href="$synthetic_8h_source.html" title="synthetic.h" alt="" coords="705,379,791,405"/>
-<area shape="rect" id="node16" href="$view_8h_source.html" title="view.h" alt="" coords="1389,453,1448,480"/>
-<area shape="rect" id="node12" href="$compute_8cc_source.html" title="compute.cc" alt="" coords="837,528,928,555"/>
-<area shape="rect" id="node13" href="$slice_8cc_source.html" title="slice.cc" alt="" coords="705,453,772,480"/>
-<area shape="rect" id="node14" href="$_s_n_r_8cc_source.html" title="SNR.cc" alt="" coords="24,453,93,480"/>
-<area shape="rect" id="node15" href="$synthetic_8cc_source.html" title="synthetic.cc" alt="" coords="1768,453,1861,480"/>
-<area shape="rect" id="node17" href="$view_8cc_source.html" title="view.cc" alt="" coords="1283,528,1349,555"/>
-<area shape="rect" id="node19" href="$font_8cc_source.html" title="font.cc" alt="" coords="1941,379,2003,405"/>
-<area shape="rect" id="node20" href="$text_8cc_source.html" title="text.cc" alt="" coords="1886,453,1948,480"/>
+<area shape="rect" id="node30" href="$window_8cc.html" title="window.cc" alt="" coords="1093,453,1176,480"/>
+<area shape="rect" id="node11" href="$synthetic_8h.html" title="synthetic.h" alt="" coords="705,379,791,405"/>
+<area shape="rect" id="node16" href="$view_8h.html" title="view.h" alt="" coords="1389,453,1448,480"/>
+<area shape="rect" id="node12" href="$compute_8cc.html" title="compute.cc" alt="" coords="837,528,928,555"/>
+<area shape="rect" id="node13" href="$slice_8cc.html" title="slice.cc" alt="" coords="705,453,772,480"/>
+<area shape="rect" id="node14" href="$_s_n_r_8cc.html" title="SNR.cc" alt="" coords="24,453,93,480"/>
+<area shape="rect" id="node15" href="$synthetic_8cc.html" title="synthetic.cc" alt="" coords="1768,453,1861,480"/>
+<area shape="rect" id="node17" href="$view_8cc.html" title="view.cc" alt="" coords="1283,528,1349,555"/>
+<area shape="rect" id="node19" href="$font_8cc.html" title="font.cc" alt="" coords="1941,379,2003,405"/>
+<area shape="rect" id="node20" href="$text_8cc.html" title="text.cc" alt="" coords="1886,453,1948,480"/>
 <area shape="rect" id="node22" href="$layout_8h.html" title="Widget layouts (Linear, Grid) " alt="" coords="1019,379,1087,405"/>
-<area shape="rect" id="node24" href="$plot_8h_source.html" title="plot.h" alt="" coords="1243,379,1297,405"/>
+<area shape="rect" id="node24" href="$plot_8h.html" title="plot.h" alt="" coords="1243,379,1297,405"/>
 <area shape="rect" id="node29" href="$window_8h.html" title="X11 window display and input. " alt="" coords="816,379,892,405"/>
-<area shape="rect" id="node23" href="$layout_8cc_source.html" title="layout.cc" alt="" coords="993,453,1067,480"/>
-<area shape="rect" id="node25" href="$graph_8cc_source.html" title="graph.cc" alt="" coords="847,453,919,480"/>
-<area shape="rect" id="node26" href="$plot_8cc_source.html" title="plot.cc" alt="" coords="1252,453,1313,480"/>
-<area shape="rect" id="node28" href="$review_8cc_source.html" title="review.cc" alt="" coords="458,453,536,480"/>
+<area shape="rect" id="node23" href="$layout_8cc.html" title="layout.cc" alt="" coords="993,453,1067,480"/>
+<area shape="rect" id="node25" href="$graph_8cc.html" title="graph.cc" alt="" coords="847,453,919,480"/>
+<area shape="rect" id="node26" href="$plot_8cc.html" title="plot.cc" alt="" coords="1252,453,1313,480"/>
+<area shape="rect" id="node28" href="$review_8cc.html" title="review.cc" alt="" coords="458,453,536,480"/>
 <area shape="rect" id="node35" href="$profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions) ..." alt="" coords="1007,304,1080,331"/>
-<area shape="rect" id="node37" href="$trace_8cc_source.html" title="trace.cc" alt="" coords="1452,304,1521,331"/>
-<area shape="rect" id="node41" href="$_c_g_8cc_source.html" title="CG.cc" alt="" coords="321,379,380,405"/>
-<area shape="rect" id="node42" href="$_m_l_t_r_8cc_source.html" title="MLTR.cc" alt="" coords="405,379,480,405"/>
-<area shape="rect" id="node43" href="$_p_m_l_t_r_8cc_source.html" title="PMLTR.cc" alt="" coords="505,379,591,405"/>
-<area shape="rect" id="node44" href="$_s_a_r_t_8cc_source.html" title="SART.cc" alt="" coords="221,379,296,405"/>
-<area shape="rect" id="node50" href="$utf8_8cc_source.html" title="utf8.cc" alt="" coords="2130,379,2192,405"/>
+<area shape="rect" id="node37" href="$trace_8cc.html" title="trace.cc" alt="" coords="1452,304,1521,331"/>
+<area shape="rect" id="node41" href="$_c_g_8cc.html" title="CG.cc" alt="" coords="321,379,380,405"/>
+<area shape="rect" id="node42" href="$_m_l_t_r_8cc.html" title="MLTR.cc" alt="" coords="405,379,480,405"/>
+<area shape="rect" id="node43" href="$_p_m_l_t_r_8cc.html" title="PMLTR.cc" alt="" coords="505,379,591,405"/>
+<area shape="rect" id="node44" href="$_s_a_r_t_8cc.html" title="SART.cc" alt="" coords="221,379,296,405"/>
+<area shape="rect" id="node50" href="$utf8_8cc.html" title="utf8.cc" alt="" coords="2130,379,2192,405"/>
 </map>

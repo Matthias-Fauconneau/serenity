@@ -1,3 +1,4 @@
 <map id="Projection" name="Projection">
-<area shape="rect" id="node2" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,5,131,32"/>
+<area shape="rect" id="node2" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,83,131,109"/>
+<area shape="rect" id="node3" href="$structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="27,5,108,32"/>
 </map>

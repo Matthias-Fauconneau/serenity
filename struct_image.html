@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_image.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -126,57 +126,374 @@ Collaboration diagram for Image:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a8ae5f82929b1a9a88db3b414de5a6a46"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8ae5f82929b1a9a88db3b414de5a6a46"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Image</b> (::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &gt; &amp;&amp;<a class="el" href="structbuffer.html">buffer</a>, <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> *data, uint width, uint height, uint stride, bool alpha=false, bool sRGB=false)</td></tr>
+<tr class="memitem:a58edd1c45b4faeb5f789b0d036d02313"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a58edd1c45b4faeb5f789b0d036d02313">Image</a> ()</td></tr>
+<tr class="separator:a58edd1c45b4faeb5f789b0d036d02313"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8ae5f82929b1a9a88db3b414de5a6a46"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a8ae5f82929b1a9a88db3b414de5a6a46">Image</a> (::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &gt; &amp;&amp;<a class="el" href="structbuffer.html">buffer</a>, <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> *<a class="el" href="struct_image.html#a17f03e4e3e5ae1c357187b08517c655c">data</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_image.html#a48473e02e1ffda2c6024bb1f26aa740b">width</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_image.html#adffcc33d12d84d83e95e3bae37f81b83">height</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_image.html#a86f75af1aed4bcc1071d3c2b3620123a">stride</a>, bool <a class="el" href="struct_image.html#a0d775236e302633a9ab58f2ab3cd85d7">alpha</a>=false, bool <a class="el" href="struct_image.html#a631c0870c3924e6b867a59bfc811ce6e">sRGB</a>=false)</td></tr>
 <tr class="separator:a8ae5f82929b1a9a88db3b414de5a6a46"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a85adfc65490baa630d9e06914307a7b0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a85adfc65490baa630d9e06914307a7b0"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Image</b> (uint width, uint height, bool alpha=false, bool sRGB=true)</td></tr>
+<tr class="memitem:a85adfc65490baa630d9e06914307a7b0"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a85adfc65490baa630d9e06914307a7b0">Image</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_image.html#a48473e02e1ffda2c6024bb1f26aa740b">width</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_image.html#adffcc33d12d84d83e95e3bae37f81b83">height</a>, bool <a class="el" href="struct_image.html#a0d775236e302633a9ab58f2ab3cd85d7">alpha</a>=false, bool <a class="el" href="struct_image.html#a631c0870c3924e6b867a59bfc811ce6e">sRGB</a>=true)</td></tr>
 <tr class="separator:a85adfc65490baa630d9e06914307a7b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a767cf4f7f84c497fdd8c1eacf6cfd752"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a767cf4f7f84c497fdd8c1eacf6cfd752"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Image</b> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> size)</td></tr>
+<tr class="memitem:a767cf4f7f84c497fdd8c1eacf6cfd752"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a767cf4f7f84c497fdd8c1eacf6cfd752">Image</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> <a class="el" href="struct_image.html#aeda70fcba7ea4228e082bfbeea5db0b3">size</a>)</td></tr>
 <tr class="separator:a767cf4f7f84c497fdd8c1eacf6cfd752"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a265f35ac9a54a1162f0b1bbf4a4a6d5d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a265f35ac9a54a1162f0b1bbf4a4a6d5d"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator bool</b> () const </td></tr>
+<tr class="memitem:a265f35ac9a54a1162f0b1bbf4a4a6d5d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a265f35ac9a54a1162f0b1bbf4a4a6d5d">operator bool</a> () const </td></tr>
 <tr class="separator:a265f35ac9a54a1162f0b1bbf4a4a6d5d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a939e1ef27c74d1d491a1eef1f7778d3a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a939e1ef27c74d1d491a1eef1f7778d3a"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator ref&lt; byte &gt;</b> () const </td></tr>
+<tr class="memitem:a939e1ef27c74d1d491a1eef1f7778d3a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a939e1ef27c74d1d491a1eef1f7778d3a">operator ref&lt; byte &gt;</a> () const </td></tr>
 <tr class="separator:a939e1ef27c74d1d491a1eef1f7778d3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeda70fcba7ea4228e082bfbeea5db0b3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aeda70fcba7ea4228e082bfbeea5db0b3"></a>
-<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>size</b> () const </td></tr>
+<tr class="memitem:aeda70fcba7ea4228e082bfbeea5db0b3"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#aeda70fcba7ea4228e082bfbeea5db0b3">size</a> () const </td></tr>
 <tr class="separator:aeda70fcba7ea4228e082bfbeea5db0b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7bcf548631b8a30b6155bb4f61a5b85b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7bcf548631b8a30b6155bb4f61a5b85b"></a>
-<a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator()</b> (uint x, uint y) const </td></tr>
+<tr class="memitem:a7bcf548631b8a30b6155bb4f61a5b85b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a7bcf548631b8a30b6155bb4f61a5b85b">operator()</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">x</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="opencl_8cc.html#a689da9dbd55f86098520b934ecb8a96e">y</a>) const </td></tr>
 <tr class="separator:a7bcf548631b8a30b6155bb4f61a5b85b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a46c09852b1afb814b129887ad0516bab"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a46c09852b1afb814b129887ad0516bab"></a>
-::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>buffer</b></td></tr>
+<tr class="memitem:a46c09852b1afb814b129887ad0516bab"><td class="memItemLeft" align="right" valign="top">::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a46c09852b1afb814b129887ad0516bab">buffer</a></td></tr>
 <tr class="separator:a46c09852b1afb814b129887ad0516bab"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a17f03e4e3e5ae1c357187b08517c655c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a17f03e4e3e5ae1c357187b08517c655c"></a>
-<a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>data</b> =0</td></tr>
+<tr class="memitem:a17f03e4e3e5ae1c357187b08517c655c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a17f03e4e3e5ae1c357187b08517c655c">data</a> =0</td></tr>
 <tr class="separator:a17f03e4e3e5ae1c357187b08517c655c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a48473e02e1ffda2c6024bb1f26aa740b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a48473e02e1ffda2c6024bb1f26aa740b"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>width</b> =0</td></tr>
+<tr class="memitem:a48473e02e1ffda2c6024bb1f26aa740b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a48473e02e1ffda2c6024bb1f26aa740b">width</a> =0</td></tr>
 <tr class="separator:a48473e02e1ffda2c6024bb1f26aa740b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adffcc33d12d84d83e95e3bae37f81b83"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="adffcc33d12d84d83e95e3bae37f81b83"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>height</b> =0</td></tr>
+<tr class="memitem:adffcc33d12d84d83e95e3bae37f81b83"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#adffcc33d12d84d83e95e3bae37f81b83">height</a> =0</td></tr>
 <tr class="separator:adffcc33d12d84d83e95e3bae37f81b83"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a86f75af1aed4bcc1071d3c2b3620123a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a86f75af1aed4bcc1071d3c2b3620123a"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>stride</b> =0</td></tr>
+<tr class="memitem:a86f75af1aed4bcc1071d3c2b3620123a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a86f75af1aed4bcc1071d3c2b3620123a">stride</a> =0</td></tr>
 <tr class="separator:a86f75af1aed4bcc1071d3c2b3620123a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0d775236e302633a9ab58f2ab3cd85d7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0d775236e302633a9ab58f2ab3cd85d7"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>alpha</b> =false</td></tr>
+<tr class="memitem:a0d775236e302633a9ab58f2ab3cd85d7"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a0d775236e302633a9ab58f2ab3cd85d7">alpha</a> =false</td></tr>
 <tr class="separator:a0d775236e302633a9ab58f2ab3cd85d7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a631c0870c3924e6b867a59bfc811ce6e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a631c0870c3924e6b867a59bfc811ce6e"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>sRGB</b> =true</td></tr>
+<tr class="memitem:a631c0870c3924e6b867a59bfc811ce6e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_image.html#a631c0870c3924e6b867a59bfc811ce6e">sRGB</a> =true</td></tr>
 <tr class="separator:a631c0870c3924e6b867a59bfc811ce6e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>2D array of <em>byte4</em> </p>
 
 <p>Definition at line <a class="el" href="image_8h_source.html#l00027">27</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a58edd1c45b4faeb5f789b0d036d02313"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Image::Image </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00028">28</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8ae5f82929b1a9a88db3b414de5a6a46"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Image::Image </td>
+          <td>(</td>
+          <td class="paramtype">::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> &gt; &amp;&amp;&#160;</td>
+          <td class="paramname"><em>buffer</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a> *&#160;</td>
+          <td class="paramname"><em>data</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>width</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>height</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>stride</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>alpha</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>sRGB</em> = <code>false</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00029">29</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a85adfc65490baa630d9e06914307a7b0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Image::Image </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>width</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>height</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>alpha</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>sRGB</em> = <code>true</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00031">31</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a767cf4f7f84c497fdd8c1eacf6cfd752"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Image::Image </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td>
+          <td class="paramname"><em>size</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00035">35</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a265f35ac9a54a1162f0b1bbf4a4a6d5d"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Image::operator bool </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00037">37</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a939e1ef27c74d1d491a1eef1f7778d3a"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Image::operator <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00038">38</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aeda70fcba7ea4228e082bfbeea5db0b3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> Image::size </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00039">39</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7bcf548631b8a30b6155bb4f61a5b85b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a>&amp; Image::operator() </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>y</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00040">40</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a46c09852b1afb814b129887ad0516bab"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">::<a class="el" href="structbuffer.html">buffer</a>&lt;<a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a>&gt; Image::buffer</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00042">42</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a17f03e4e3e5ae1c357187b08517c655c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a914d5191de64e7c66a2a471f339a67a6">byte4</a>* Image::data =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00043">43</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a48473e02e1ffda2c6024bb1f26aa740b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> Image::width =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00044">44</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="adffcc33d12d84d83e95e3bae37f81b83"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> Image::height =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00044">44</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a86f75af1aed4bcc1071d3c2b3620123a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> Image::stride =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00044">44</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0d775236e302633a9ab58f2ab3cd85d7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Image::alpha =false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00045">45</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a631c0870c3924e6b867a59bfc811ce6e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Image::sRGB =true</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="image_8h_source.html#l00045">45</a> of file <a class="el" href="image_8h_source.html">image.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

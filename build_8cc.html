@@ -92,7 +92,7 @@ $(document).ready(function(){initNavTree('build_8cc.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -103,6 +103,7 @@ $(document).ready(function(){initNavTree('build_8cc.html','');});
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#func-members">Functions</a> &#124;
 <a href="#var-members">Variables</a>  </div>
   <div class="headertitle">
@@ -125,29 +126,120 @@ Include dependency graph for build.cc:</div>
 </div>
 <p><a href="build_8cc_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_node.html">Node</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html">Build</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a319b4b50110d730d74080dedcd20d273"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a319b4b50110d730d74080dedcd20d273"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator==</b> (const Node &amp;a, const Node &amp;b)</td></tr>
+<tr class="memitem:a319b4b50110d730d74080dedcd20d273"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="build_8cc.html#a319b4b50110d730d74080dedcd20d273">operator==</a> (const <a class="el" href="struct_node.html">Node</a> &amp;a, const <a class="el" href="struct_node.html">Node</a> &amp;b)</td></tr>
 <tr class="separator:a319b4b50110d730d74080dedcd20d273"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a204e42774e3845fab7407631e1498be2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a204e42774e3845fab7407631e1498be2"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator==</b> (const Node &amp;a, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;b)</td></tr>
+<tr class="memitem:a204e42774e3845fab7407631e1498be2"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="build_8cc.html#a204e42774e3845fab7407631e1498be2">operator==</a> (const <a class="el" href="struct_node.html">Node</a> &amp;a, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;b)</td></tr>
 <tr class="separator:a204e42774e3845fab7407631e1498be2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0c650865947ec4064b6b4915e7abb429"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0c650865947ec4064b6b4915e7abb429"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>which</b> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> name)</td></tr>
+<tr class="memitem:a0c650865947ec4064b6b4915e7abb429"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="build_8cc.html#a0c650865947ec4064b6b4915e7abb429">which</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a">name</a>)</td></tr>
 <tr class="separator:a0c650865947ec4064b6b4915e7abb429"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="var-members"></a>
 Variables</h2></td></tr>
-<tr class="memitem:a3821f9122d2c8e2aaedc2e28d98b8147"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3821f9122d2c8e2aaedc2e28d98b8147"></a>
-struct Build&#160;</td><td class="memItemRight" valign="bottom"><b>build</b></td></tr>
+<tr class="memitem:a3821f9122d2c8e2aaedc2e28d98b8147"><td class="memItemLeft" align="right" valign="top">struct <a class="el" href="struct_build.html">Build</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="build_8cc.html#a3821f9122d2c8e2aaedc2e28d98b8147">build</a></td></tr>
 <tr class="separator:a3821f9122d2c8e2aaedc2e28d98b8147"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Builds C++ projects with automatic module dependency resolution. </p>
 
 <p>Definition in file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="a319b4b50110d730d74080dedcd20d273"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool operator== </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_node.html">Node</a> &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_node.html">Node</a> &amp;&#160;</td>
+          <td class="paramname"><em>b</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00011">11</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a204e42774e3845fab7407631e1498be2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool operator== </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_node.html">Node</a> &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>b</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00012">12</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0c650865947ec4064b6b4915e7abb429"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> which </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00015">15</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Variable Documentation</h2>
+<a class="anchor" id="a3821f9122d2c8e2aaedc2e28d98b8147"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct <a class="el" href="struct_build.html">Build</a>  build</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

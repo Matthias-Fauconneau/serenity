@@ -1,7 +1,5 @@
 var searchData=
 [
-  ['_7earray',['~array',['../structarray.html#a9b08050d554bbdf83747443ce4b8b819',1,'array']]],
-  ['_7ebuffer',['~buffer',['../structbuffer.html#a2676a1a64b89fd492537129a618b88cf',1,'buffer']]],
-  ['_7eclmem',['~CLMem',['../struct_c_l_mem.html#a6c31618629d5ed4e19dab93eb37d67a3',1,'CLMem']]],
-  ['_7ewindow',['~Window',['../struct_window.html#a245d821e6016fa1f6970ccbbedd635f6',1,'Window']]]
+  ['yw',['yw',['../structxyzw.html#a15e3396d3e8f6684e2b2d724583b27aa',1,'xyzw']]],
+  ['yx',['yx',['../structxy.html#af0c56259aef9314e2107e3fcd5c865e7',1,'xy']]]
 ];

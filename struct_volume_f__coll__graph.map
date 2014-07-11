@@ -1,6 +1,7 @@
 <map id="VolumeF" name="VolumeF">
 <area shape="rect" id="node2" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,83,131,109"/>
-<area shape="rect" id="node3" href="$structbuffer.html" title="buffer\&lt; float \&gt;" alt="" coords="155,83,259,109"/>
-<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="283,83,383,109"/>
-<area shape="rect" id="node5" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="281,5,385,32"/>
+<area shape="rect" id="node3" href="$structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="27,5,108,32"/>
+<area shape="rect" id="node4" href="$structbuffer.html" title="buffer\&lt; float \&gt;" alt="" coords="155,83,259,109"/>
+<area shape="rect" id="node5" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="283,83,383,109"/>
+<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="281,5,385,32"/>
 </map>

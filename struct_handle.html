@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_handle.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -121,7 +121,7 @@ Inheritance diagram for Handle:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_handle__inherit__graph.png" border="0" usemap="#_handle_inherit__map" alt="Inheritance graph"/></div>
 <map name="_handle_inherit__map" id="_handle_inherit__map">
-<area shape="rect" id="node2" href="struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="192,80,256,107"/><area shape="rect" id="node3" href="struct_event_f_d.html" title="Pollable semaphore. " alt="" coords="52,155,125,181"/><area shape="rect" id="node5" href="struct_file.html" title="Handle to a file. " alt="" coords="203,155,245,181"/><area shape="rect" id="node8" href="struct_socket.html" title="Handle to a socket. " alt="" coords="283,155,345,181"/><area shape="rect" id="node4" href="struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="5,229,67,256"/><area shape="rect" id="node6" href="struct_device.html" title="Handle to a device. " alt="" coords="91,229,153,256"/><area shape="rect" id="node7" href="struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="178,229,269,256"/><area shape="rect" id="node9" href="struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="295,229,364,256"/></map>
+<area shape="rect" id="node2" href="struct_folder.html" title="Folder" alt="" coords="109,80,167,107"/><area shape="rect" id="node3" href="struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="192,80,256,107"/><area shape="rect" id="node4" href="struct_event_f_d.html" title="Pollable semaphore. " alt="" coords="51,155,124,181"/><area shape="rect" id="node6" href="struct_file.html" title="Handle to a file. " alt="" coords="203,155,245,181"/><area shape="rect" id="node9" href="struct_socket.html" title="Handle to a socket. " alt="" coords="283,155,345,181"/><area shape="rect" id="node5" href="struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="5,229,67,256"/><area shape="rect" id="node7" href="struct_device.html" title="Handle to a device. " alt="" coords="91,229,153,256"/><area shape="rect" id="node8" href="struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="178,229,269,256"/><area shape="rect" id="node10" href="struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="295,229,364,256"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <div class="dynheader">
 Collaboration diagram for Handle:</div>
@@ -133,34 +133,193 @@ Collaboration diagram for Handle:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a447b79aecaa861589adfad34da09d9fd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a447b79aecaa861589adfad34da09d9fd"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Handle</b> (int fd)</td></tr>
+<tr class="memitem:a4e3b97f227b72125e595164e0a6629a7"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a4e3b97f227b72125e595164e0a6629a7">Handle</a> ()</td></tr>
+<tr class="separator:a4e3b97f227b72125e595164e0a6629a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a447b79aecaa861589adfad34da09d9fd"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a447b79aecaa861589adfad34da09d9fd">Handle</a> (int <a class="el" href="struct_handle.html#a65397389c31c21d23b6eae705d56da37">fd</a>)</td></tr>
 <tr class="separator:a447b79aecaa861589adfad34da09d9fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a36d563f2346a408f65526bea077cdfe0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a36d563f2346a408f65526bea077cdfe0"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Handle</b> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a36d563f2346a408f65526bea077cdfe0"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a36d563f2346a408f65526bea077cdfe0">Handle</a> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a36d563f2346a408f65526bea077cdfe0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b5043aecd926b15dd22b014997886c8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1b5043aecd926b15dd22b014997886c8"></a>
-<a class="el" href="struct_handle.html">Handle</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a1b5043aecd926b15dd22b014997886c8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_handle.html">Handle</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a1b5043aecd926b15dd22b014997886c8">operator=</a> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a1b5043aecd926b15dd22b014997886c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a58b1dc3169dffb55690e54b82d756804"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a58b1dc3169dffb55690e54b82d756804"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator bool</b> () const </td></tr>
+<tr class="memitem:ad63422289041b1a0fbebae079786ae22"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#ad63422289041b1a0fbebae079786ae22">~Handle</a> ()</td></tr>
+<tr class="separator:ad63422289041b1a0fbebae079786ae22"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a58b1dc3169dffb55690e54b82d756804"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a58b1dc3169dffb55690e54b82d756804">operator bool</a> () const </td></tr>
 <tr class="separator:a58b1dc3169dffb55690e54b82d756804"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adbc8ca925326ef2429a2f3b15a1ed430"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="adbc8ca925326ef2429a2f3b15a1ed430"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#adbc8ca925326ef2429a2f3b15a1ed430">name</a> () const </td></tr>
-<tr class="memdesc:adbc8ca925326ef2429a2f3b15a1ed430"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file descriptor name. <br/></td></tr>
+<tr class="memitem:adbc8ca925326ef2429a2f3b15a1ed430"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#adbc8ca925326ef2429a2f3b15a1ed430">name</a> () const </td></tr>
+<tr class="memdesc:adbc8ca925326ef2429a2f3b15a1ed430"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file descriptor name.  <a href="#adbc8ca925326ef2429a2f3b15a1ed430">More...</a><br/></td></tr>
 <tr class="separator:adbc8ca925326ef2429a2f3b15a1ed430"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a65397389c31c21d23b6eae705d56da37"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a65397389c31c21d23b6eae705d56da37"></a>
-<a class="el" href="structhandle.html">handle</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>fd</b></td></tr>
+<tr class="memitem:a65397389c31c21d23b6eae705d56da37"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structhandle.html">handle</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a65397389c31c21d23b6eae705d56da37">fd</a></td></tr>
 <tr class="separator:a65397389c31c21d23b6eae705d56da37"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Unix file descriptor. </p>
 
 <p>Definition at line <a class="el" href="file_8h_source.html#l00018">18</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a4e3b97f227b72125e595164e0a6629a7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Handle::Handle </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00020">20</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a447b79aecaa861589adfad34da09d9fd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Handle::Handle </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>fd</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00021">21</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a36d563f2346a408f65526bea077cdfe0"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Handle::Handle </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_handle.html">Handle</a> &amp;&amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="ad63422289041b1a0fbebae079786ae22"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Handle::~Handle </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00020">20</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a1b5043aecd926b15dd22b014997886c8"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_handle.html">Handle</a>&amp; Handle::operator= </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_handle.html">Handle</a> &amp;&amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a58b1dc3169dffb55690e54b82d756804"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Handle::operator bool </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00024">24</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="adbc8ca925326ef2429a2f3b15a1ed430"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> Handle::name </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns file descriptor name. </p>
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00021">21</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a65397389c31c21d23b6eae705d56da37"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structhandle.html">handle</a>&lt;int&gt; Handle::fd</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00019">19</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

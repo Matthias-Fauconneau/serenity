@@ -1,5 +1,6 @@
 var struct_window =
 [
+    [ "QEvent", "struct_window_1_1_q_event.html", "struct_window_1_1_q_event" ],
     [ "Background", "struct_window.html#af4f94eece4001a343cd5e60b724c09cc", [
       [ "NoBackground", "struct_window.html#af4f94eece4001a343cd5e60b724c09ccac411261cbfda8c58209153e651cdcae2", null ],
       [ "Black", "struct_window.html#af4f94eece4001a343cd5e60b724c09ccae82db92d9dfb8d68e46fa8c4f47c4efe", null ],

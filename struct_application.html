@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_application.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -104,6 +104,7 @@ $(document).ready(function(){initNavTree('struct_application.html','');});
 
 <div class="header">
   <div class="summary">
+<a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
 <a href="struct_application-members.html">List of all members</a>  </div>
   <div class="headertitle">
@@ -115,31 +116,158 @@ Collaboration diagram for Application:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_application__coll__graph.png" border="0" usemap="#_application_coll__map" alt="Collaboration graph"/></div>
 <map name="_application_coll__map" id="_application_coll__map">
-<area shape="rect" id="node2" href="struct_plot_view.html" title="PlotView" alt="" coords="1359,257,1433,284"/><area shape="rect" id="node3" href="struct_plot.html" title="Plots graphs of 2D point data sets. " alt="" coords="1069,103,1115,129"/><area shape="rect" id="node4" href="struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="729,521,791,548"/><area shape="rect" id="node33" href="struct_array_view.html" title="ArrayView" alt="" coords="1355,521,1437,548"/><area shape="rect" id="node38" href="struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="1057,1272,1127,1299"/><area shape="rect" id="node5" href="struct_image.html" title="2D array of byte4 " alt="" coords="447,521,505,548"/><area shape="rect" id="node6" href="structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="161,521,261,548"/><area shape="rect" id="node7" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="155,276,266,303"/><area shape="rect" id="node9" href="structarray.html" title="array\&lt; DataSet \&gt;" alt="" coords="699,99,821,125"/><area shape="rect" id="node10" href="structbuffer.html" title="buffer\&lt; DataSet \&gt;" alt="" coords="413,99,539,125"/><area shape="rect" id="node11" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="710,443,810,469"/><area shape="rect" id="node12" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="424,443,528,469"/><area shape="rect" id="node13" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="1040,244,1144,271"/><area shape="rect" id="node14" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="706,149,814,176"/><area shape="rect" id="node15" href="structref.html" title="ref\&lt; byte \&gt;" alt="" coords="1049,167,1135,193"/><area shape="rect" id="node16" href="structmap.html" title="map\&lt; String, Variant \&gt;" alt="" coords="1015,295,1169,321"/><area shape="rect" id="node17" href="structarray.html" title="array\&lt; Variant \&gt;" alt="" coords="702,331,818,357"/><area shape="rect" id="node21" href="structmap.html" title="map\&lt; ref, Variant \&gt;" alt="" coords="1329,687,1463,713"/><area shape="rect" id="node36" href="structmap.html" title="map\&lt; map\&lt; String, Variant\l \&gt;, Variant \&gt;" alt="" coords="1003,346,1181,387"/><area shape="rect" id="node18" href="structbuffer.html" title="buffer\&lt; Variant \&gt;" alt="" coords="416,331,536,357"/><area shape="rect" id="node19" href="structarray.html" title="array\&lt; String \&gt;" alt="" coords="705,200,815,227"/><area shape="rect" id="node20" href="structbuffer.html" title="buffer\&lt; String \&gt;" alt="" coords="419,200,533,227"/><area shape="rect" id="node22" href="structarray.html" title="array\&lt; ref \&gt;" alt="" coords="1047,657,1137,684"/><area shape="rect" id="node23" href="structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="713,572,807,599"/><area shape="rect" id="node24" href="struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="1046,880,1138,907"/><area shape="rect" id="node25" href="struct_file.html" title="Handle to a file. " alt="" coords="739,921,781,948"/><area shape="rect" id="node26" href="struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="444,1231,508,1257"/><area shape="rect" id="node39" href="struct_socket.html" title="Handle to a socket. " alt="" coords="729,1232,791,1259"/><area shape="rect" id="node27" href="struct_poll.html" title="Poll is a convenient interface to participate in the event loops. " alt="" coords="738,840,782,867"/><area shape="rect" id="node29" href="struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="1061,737,1123,764"/><area shape="rect" id="node30" href="struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="451,1349,501,1376"/><area shape="rect" id="node41" href="struct_semaphore.html" title="A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter. " alt="" coords="716,1461,804,1488"/><area shape="rect" id="node31" href="structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="120,1349,301,1376"/><area shape="rect" id="node32" href="structfunction.html" title="function\&lt; void(ref)\&gt;" alt="" coords="693,995,827,1021"/><area shape="rect" id="node34" href="structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="701,1180,819,1207"/><area shape="rect" id="node35" href="structxy.html" title="xy\&lt; int \&gt;" alt="" coords="439,1180,513,1207"/><area shape="rect" id="node37" href="structarray.html" title="array\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="691,265,829,306"/><area shape="rect" id="node40" href="structfunction.html" title="function\&lt; void()\&gt;" alt="" coords="700,1411,820,1437"/><area shape="rect" id="node42" href="struct_condition.html" title="Condition" alt="" coords="437,1447,515,1473"/><area shape="rect" id="node43" href="structmap.html" title="map\&lt; uint, unique\&lt;\l Timer \&gt; \&gt;" alt="" coords="693,1591,827,1633"/><area shape="rect" id="node44" href="structarray.html" title="array\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="391,1649,561,1676"/><area shape="rect" id="node45" href="structarray.html" title="array\&lt; uint \&gt;" alt="" coords="428,1599,524,1625"/><area shape="rect" id="node46" href="structarray.html" title="array\&lt; Window::QEvent \&gt;" alt="" coords="673,1283,847,1309"/><area shape="rect" id="node47" href="structbuffer.html" title="buffer\&lt; Window::QEvent \&gt;" alt="" coords="387,1283,565,1309"/><area shape="rect" id="node48" href="structmap.html" title="map\&lt; Key, function\l\&lt; void()\&gt; \&gt;" alt="" coords="692,1513,828,1554"/><area shape="rect" id="node49" href="structarray.html" title="array\&lt; Key \&gt;" alt="" coords="427,1497,525,1524"/><area shape="rect" id="node50" href="structarray.html" title="array\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="389,1548,563,1575"/></map>
+<area shape="rect" id="node2" href="struct_plot_view.html" title="PlotView" alt="" coords="1244,184,1319,211"/><area shape="rect" id="node3" href="struct_plot.html" title="Plots graphs of 2D point data sets. " alt="" coords="955,191,1000,217"/><area shape="rect" id="node4" href="struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="614,456,677,483"/><area shape="rect" id="node33" href="struct_array_view.html" title="ArrayView" alt="" coords="1240,436,1323,463"/><area shape="rect" id="node38" href="struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="943,1120,1012,1147"/><area shape="rect" id="node5" href="struct_image.html" title="2D array of byte4 " alt="" coords="332,548,391,575"/><area shape="rect" id="node6" href="structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="46,548,146,575"/><area shape="rect" id="node7" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="41,319,151,345"/><area shape="rect" id="node8" href="structarray.html" title="array\&lt; DataSet \&gt;" alt="" coords="584,184,707,211"/><area shape="rect" id="node9" href="structbuffer.html" title="buffer\&lt; DataSet \&gt;" alt="" coords="298,184,425,211"/><area shape="rect" id="node10" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="595,392,695,419"/><area shape="rect" id="node11" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="309,392,413,419"/><area shape="rect" id="node12" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="925,20,1029,47"/><area shape="rect" id="node13" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="591,5,699,32"/><area shape="rect" id="node14" href="structref.html" title="ref\&lt; byte \&gt;" alt="" coords="934,247,1021,273"/><area shape="rect" id="node15" href="structmap.html" title="map\&lt; String, Variant \&gt;" alt="" coords="900,140,1055,167"/><area shape="rect" id="node16" href="structarray.html" title="array\&lt; Variant \&gt;" alt="" coords="587,235,703,261"/><area shape="rect" id="node20" href="structmap.html" title="map\&lt; ref, Variant \&gt;" alt="" coords="1214,557,1349,584"/><area shape="rect" id="node36" href="structmap.html" title="map\&lt; map\&lt; String, Variant\l \&gt;, Variant \&gt;" alt="" coords="888,303,1067,345"/><area shape="rect" id="node17" href="structbuffer.html" title="buffer\&lt; Variant \&gt;" alt="" coords="301,235,421,261"/><area shape="rect" id="node18" href="structarray.html" title="array\&lt; String \&gt;" alt="" coords="591,56,700,83"/><area shape="rect" id="node19" href="structbuffer.html" title="buffer\&lt; String \&gt;" alt="" coords="305,56,418,83"/><area shape="rect" id="node21" href="structarray.html" title="array\&lt; ref \&gt;" alt="" coords="932,508,1023,535"/><area shape="rect" id="node22" href="structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="598,507,693,533"/><area shape="rect" id="node23" href="struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="931,692,1023,719"/><area shape="rect" id="node24" href="struct_file.html" title="Handle to a file. " alt="" coords="624,692,667,719"/><area shape="rect" id="node25" href="struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="329,1095,393,1121"/><area shape="rect" id="node39" href="struct_socket.html" title="Handle to a socket. " alt="" coords="614,1120,677,1147"/><area shape="rect" id="node26" href="struct_handle.html" title="Unix file descriptor. " alt="" coords="65,1095,127,1121"/><area shape="rect" id="node27" href="struct_poll.html" title="Poll is a convenient interface to participate in the event loops. " alt="" coords="623,881,667,908"/><area shape="rect" id="node28" href="struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="946,1559,1009,1585"/><area shape="rect" id="node29" href="structarray.html" title="array\&lt; Poll * \&gt;" alt="" coords="592,1631,699,1657"/><area shape="rect" id="node30" href="struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="336,1496,387,1523"/><area shape="rect" id="node41" href="struct_semaphore.html" title="A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter. " alt="" coords="601,1312,689,1339"/><area shape="rect" id="node31" href="structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="5,1496,187,1523"/><area shape="rect" id="node32" href="structfunction.html" title="function\&lt; void(ref)\&gt;" alt="" coords="578,624,713,651"/><area shape="rect" id="node34" href="structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="586,573,705,600"/><area shape="rect" id="node35" href="structxy.html" title="xy\&lt; int \&gt;" alt="" coords="324,497,399,524"/><area shape="rect" id="node37" href="structarray.html" title="array\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="576,303,715,345"/><area shape="rect" id="node40" href="structfunction.html" title="function\&lt; void()\&gt;" alt="" coords="585,1429,705,1456"/><area shape="rect" id="node42" href="struct_condition.html" title="Condition" alt="" coords="323,1308,400,1335"/><area shape="rect" id="node43" href="structmap.html" title="map\&lt; uint, unique\&lt;\l Timer \&gt; \&gt;" alt="" coords="578,1171,713,1213"/><area shape="rect" id="node44" href="structarray.html" title="array\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="276,1153,447,1180"/><area shape="rect" id="node45" href="structarray.html" title="array\&lt; uint \&gt;" alt="" coords="313,1204,409,1231"/><area shape="rect" id="node46" href="structarray.html" title="array\&lt; Window::QEvent \&gt;" alt="" coords="558,1245,733,1272"/><area shape="rect" id="node47" href="structbuffer.html" title="buffer\&lt; Window::QEvent \&gt;" alt="" coords="272,1255,451,1281"/><area shape="rect" id="node48" href="structmap.html" title="map\&lt; Key, function\l\&lt; void()\&gt; \&gt;" alt="" coords="577,1363,713,1405"/><area shape="rect" id="node49" href="structarray.html" title="array\&lt; Key \&gt;" alt="" coords="312,1359,411,1385"/><area shape="rect" id="node50" href="structarray.html" title="array\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="275,1409,448,1436"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
+Public Member Functions</h2></td></tr>
+<tr class="memitem:afa8cc05ce6b6092be5ecdfdae44e05f8"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#afa8cc05ce6b6092be5ecdfdae44e05f8">Application</a> ()</td></tr>
+<tr class="separator:afa8cc05ce6b6092be5ecdfdae44e05f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afa8cc05ce6b6092be5ecdfdae44e05f8"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#afa8cc05ce6b6092be5ecdfdae44e05f8">Application</a> ()</td></tr>
+<tr class="separator:afa8cc05ce6b6092be5ecdfdae44e05f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afa8cc05ce6b6092be5ecdfdae44e05f8"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#afa8cc05ce6b6092be5ecdfdae44e05f8">Application</a> ()</td></tr>
+<tr class="separator:afa8cc05ce6b6092be5ecdfdae44e05f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a9c9a776b4a986a898c167ab4a51c8e93"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9c9a776b4a986a898c167ab4a51c8e93"></a>
-<a class="el" href="struct_plot_view.html">PlotView</a>&#160;</td><td class="memItemRight" valign="bottom"><b>view</b> { &quot;Time (s)&quot;_, <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0]:&quot;Total NMSE %&quot;_}</td></tr>
+<tr class="memitem:a9c9a776b4a986a898c167ab4a51c8e93"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_plot_view.html">PlotView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#a9c9a776b4a986a898c167ab4a51c8e93">view</a> { &quot;Time (s)&quot;_, <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0]:&quot;Total NMSE %&quot;_}</td></tr>
 <tr class="separator:a9c9a776b4a986a898c167ab4a51c8e93"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a93552f96f3ffd60a6f676e17145c5e28"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a93552f96f3ffd60a6f676e17145c5e28"></a>
-<a class="el" href="struct_window.html">Window</a>&#160;</td><td class="memItemRight" valign="bottom"><b>window</b> {&amp;view, &quot;Results&quot;_}</td></tr>
+<tr class="memitem:a93552f96f3ffd60a6f676e17145c5e28"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_window.html">Window</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#a93552f96f3ffd60a6f676e17145c5e28">window</a> {&amp;<a class="el" href="struct_application.html#a9c9a776b4a986a898c167ab4a51c8e93">view</a>, &quot;Results&quot;_}</td></tr>
 <tr class="separator:a93552f96f3ffd60a6f676e17145c5e28"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7c4c0c458d4f4aa119f53df12826ec3b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7c4c0c458d4f4aa119f53df12826ec3b"></a>
-<a class="el" href="struct_file_watcher.html">FileWatcher</a>&#160;</td><td class="memItemRight" valign="bottom"><b>watcher</b> {&quot;Results&quot;_, [this](<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>){ view=<a class="el" href="struct_plot_view.html">PlotView</a>(view.xName, view.yName); window.render(); } }</td></tr>
+<tr class="memitem:a7c4c0c458d4f4aa119f53df12826ec3b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_file_watcher.html">FileWatcher</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#a7c4c0c458d4f4aa119f53df12826ec3b">watcher</a> {&quot;Results&quot;_, [this](<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>){ <a class="el" href="struct_application.html#a9c9a776b4a986a898c167ab4a51c8e93">view</a>=<a class="el" href="struct_plot_view.html">PlotView</a>(view.xName, view.yName); window.render(); } }</td></tr>
 <tr class="separator:a7c4c0c458d4f4aa119f53df12826ec3b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a20442c7779f788af4c257d6370a2acdc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a20442c7779f788af4c257d6370a2acdc"></a>
-<a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>, <a class="el" href="struct_variant.html">Variant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>parameters</b> = parseParameters(<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>().slice(1):<a class="el" href="structarray.html">array</a>&lt;<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&gt;(),{&quot;ui&quot;_,&quot;reference&quot;_,&quot;volumeSize&quot;_,&quot;projectionSize&quot;_,&quot;trajectory&quot;_,&quot;rotationCount&quot;_,&quot;photonCount&quot;_,&quot;projectionCount&quot;_,&quot;method&quot;_,&quot;subsetSize&quot;_})</td></tr>
+<tr class="memitem:a20442c7779f788af4c257d6370a2acdc"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>, <a class="el" href="struct_variant.html">Variant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#a20442c7779f788af4c257d6370a2acdc">parameters</a> = <a class="el" href="variant_8h.html#ab9f10166eab2f10884399f45e890e9ea">parseParameters</a>(<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>().<a class="el" href="volume_8h.html#a4eabedaf8148e75e6703bf2bc85ca89c">slice</a>(1):<a class="el" href="structarray.html">array</a>&lt;<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&gt;(),{&quot;ui&quot;_,&quot;reference&quot;_,&quot;volumeSize&quot;_,&quot;projectionSize&quot;_,&quot;trajectory&quot;_,&quot;rotationCount&quot;_,&quot;photonCount&quot;_,&quot;projectionCount&quot;_,&quot;method&quot;_,&quot;subsetSize&quot;_})</td></tr>
 <tr class="separator:a20442c7779f788af4c257d6370a2acdc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad4a6551c974a2b46bb8e4f2f0ee1be13"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad4a6551c974a2b46bb8e4f2f0ee1be13"></a>
-<a class="el" href="struct_array_view.html">ArrayView</a>&#160;</td><td class="memItemRight" valign="bottom"><b>view</b> { <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0]:&quot;MSE_T&quot;_, parameters}</td></tr>
+<tr class="memitem:ad4a6551c974a2b46bb8e4f2f0ee1be13"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_array_view.html">ArrayView</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_application.html#ad4a6551c974a2b46bb8e4f2f0ee1be13">view</a> { <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0]:&quot;MSE_T&quot;_, <a class="el" href="struct_application.html#a20442c7779f788af4c257d6370a2acdc">parameters</a>}</td></tr>
 <tr class="separator:ad4a6551c974a2b46bb8e4f2f0ee1be13"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="graph_8cc_source.html#l00095">95</a> of file <a class="el" href="graph_8cc_source.html">graph.cc</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="afa8cc05ce6b6092be5ecdfdae44e05f8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Application::Application </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="graph_8cc_source.html#l00099">99</a> of file <a class="el" href="graph_8cc_source.html">graph.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="afa8cc05ce6b6092be5ecdfdae44e05f8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Application::Application </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00267">267</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="afa8cc05ce6b6092be5ecdfdae44e05f8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Application::Application </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="slice_8cc_source.html#l00228">228</a> of file <a class="el" href="slice_8cc_source.html">slice.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a9c9a776b4a986a898c167ab4a51c8e93"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_plot_view.html">PlotView</a> Application::view { &quot;Time (s)&quot;_, <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0]:&quot;Total NMSE %&quot;_}</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="graph_8cc_source.html#l00096">96</a> of file <a class="el" href="graph_8cc_source.html">graph.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a93552f96f3ffd60a6f676e17145c5e28"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_window.html">Window</a> Application::window {&amp;<a class="el" href="struct_application.html#a9c9a776b4a986a898c167ab4a51c8e93">view</a>, &quot;Results&quot;_}</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="graph_8cc_source.html#l00097">97</a> of file <a class="el" href="graph_8cc_source.html">graph.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7c4c0c458d4f4aa119f53df12826ec3b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_file_watcher.html">FileWatcher</a> Application::watcher {&quot;Results&quot;_, [this](<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>){ <a class="el" href="struct_application.html#a9c9a776b4a986a898c167ab4a51c8e93">view</a>=<a class="el" href="struct_plot_view.html">PlotView</a>(view.xName, view.yName); window.render(); } }</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="graph_8cc_source.html#l00098">98</a> of file <a class="el" href="graph_8cc_source.html">graph.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a20442c7779f788af4c257d6370a2acdc"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; Application::parameters = <a class="el" href="variant_8h.html#ab9f10166eab2f10884399f45e890e9ea">parseParameters</a>(<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>().<a class="el" href="volume_8h.html#a4eabedaf8148e75e6703bf2bc85ca89c">slice</a>(1):<a class="el" href="structarray.html">array</a>&lt;<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&gt;(),{&quot;ui&quot;_,&quot;reference&quot;_,&quot;volumeSize&quot;_,&quot;projectionSize&quot;_,&quot;trajectory&quot;_,&quot;rotationCount&quot;_,&quot;photonCount&quot;_,&quot;projectionCount&quot;_,&quot;method&quot;_,&quot;subsetSize&quot;_})</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00263">263</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad4a6551c974a2b46bb8e4f2f0ee1be13"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_array_view.html">ArrayView</a> Application::view { <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()?<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0]:&quot;MSE_T&quot;_, <a class="el" href="struct_application.html#a20442c7779f788af4c257d6370a2acdc">parameters</a>}</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00264">264</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

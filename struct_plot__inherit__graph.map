@@ -1,3 +1,4 @@
 <map id="Plot" name="Plot">
-<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="5,5,67,32"/>
+<area shape="rect" id="node3" href="$struct_plot_view.html" title="PlotView" alt="" coords="4,155,77,181"/>
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="10,5,72,32"/>
 </map>

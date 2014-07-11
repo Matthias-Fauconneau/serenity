@@ -1,11 +1,12 @@
 <map id="WidgetGrid" name="WidgetGrid">
-<area shape="rect" id="node2" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="239,355,324,381"/>
+<area shape="rect" id="node2" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="191,355,276,381"/>
 <area shape="rect" id="node3" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="159,264,220,291"/>
-<area shape="rect" id="node9" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="84,355,213,381"/>
+<area shape="rect" id="node10" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="36,355,165,381"/>
 <area shape="rect" id="node4" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="158,187,220,213"/>
 <area shape="rect" id="node5" href="$struct_image.html" title="2D array of byte4 " alt="" coords="160,96,217,123"/>
 <area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="75,5,175,32"/>
 <area shape="rect" id="node7" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="199,5,309,32"/>
 <area shape="rect" id="node8" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="245,264,363,291"/>
-<area shape="rect" id="node10" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="5,264,133,291"/>
+<area shape="rect" id="node9" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="267,187,340,213"/>
+<area shape="rect" id="node11" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="5,264,133,291"/>
 </map>

@@ -78,13 +78,15 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li class="current"><a href="functions.html"><span>All</span></a></li>
       <li><a href="functions_func.html"><span>Functions</span></a></li>
       <li><a href="functions_vars.html"><span>Variables</span></a></li>
+      <li><a href="functions_type.html"><span>Typedefs</span></a></li>
       <li><a href="functions_enum.html"><span>Enumerations</span></a></li>
       <li><a href="functions_eval.html"><span>Enumerator</span></a></li>
     </ul>
   </div>
   <div id="navrow4" class="tabs3">
     <ul class="tablist">
-      <li><a href="functions.html#index_a"><span>a</span></a></li>
+      <li><a href="functions.html#index__"><span>_</span></a></li>
+      <li><a href="functions_a.html#index_a"><span>a</span></a></li>
       <li><a href="functions_b.html#index_b"><span>b</span></a></li>
       <li><a href="functions_c.html#index_c"><span>c</span></a></li>
       <li><a href="functions_d.html#index_d"><span>d</span></a></li>
@@ -107,6 +109,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions_v.html#index_v"><span>v</span></a></li>
       <li><a href="functions_w.html#index_w"><span>w</span></a></li>
       <li><a href="functions_x.html#index_x"><span>x</span></a></li>
+      <li><a href="functions_y.html#index_y"><span>y</span></a></li>
+      <li><a href="functions_z.html#index_z"><span>z</span></a></li>
       <li><a href="functions_~.html#index_~"><span>~</span></a></li>
     </ul>
   </div>
@@ -130,7 +134,7 @@ $(document).ready(function(){initNavTree('functions_n.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -140,19 +144,78 @@ $(document).ready(function(){initNavTree('functions_n.html','');});
 </div>
 
 <div class="contents">
-<div class="textblock">Here is a list of all documented class members with links to the class documentation for each member:</div>
+<div class="textblock">Here is a list of all class members with links to the classes they belong to:</div>
 
 <h3><a class="anchor" id="index_n"></a>- n -</h3><ul>
-<li>name()
-: <a class="el" href="struct_handle.html#adbc8ca925326ef2429a2f3b15a1ed430">Handle</a>
+<li>name
+: <a class="el" href="struct_c_l_kernel.html#a71ed5c0cf09201f7e764aa877d5690ee">CLKernel</a>
+, <a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">CLMem</a>
+, <a class="el" href="structdirent.html#af93a3f0f0e7a0d33070a6ac590ebf124">dirent</a>
+, <a class="el" href="struct_handle.html#adbc8ca925326ef2429a2f3b15a1ed430">Handle</a>
 , <a class="el" href="struct_linear.html#a3a26e671d8a5da374e60516ea775cce7">Linear</a>
+, <a class="el" href="struct_node.html#a3a72bc59de2189bb03c3c169f9d9b7a8">Node</a>
+, <a class="el" href="struct_shdr.html#a2f59ccb27b88b163c25df9811553d057">Shdr</a>
+, <a class="el" href="struct_sym.html#a41cd45b4368842f7e04f780efaddfecb">Sym</a>
 , <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">VolumeF</a>
+</li>
+<li>nameSize
+: <a class="el" href="struct_connection_setup.html#ac2dee66e9c23eba88033a7655d98802f">ConnectionSetup</a>
+</li>
+<li>needLink
+: <a class="el" href="struct_build.html#a056cd6dd49a6d2b2a6994a34f03c958a">Build</a>
 </li>
 <li>needRender
 : <a class="el" href="struct_window.html#ae296facf4aba47238e946e966ea14f1f">Window</a>
 </li>
 <li>next()
 : <a class="el" href="struct_data.html#ad96ac1fa9673cdf174fe933a39dd238c">Data</a>
+, <a class="el" href="struct_random.html#a5169652747111124c4b47036f683c78b">Random</a>
+</li>
+<li>nextLine()
+: <a class="el" href="struct_text_layout.html#ac139b4006f12dc86b32ee26c773eb03a">TextLayout</a>
+</li>
+<li>NoBackground
+: <a class="el" href="struct_window.html#af4f94eece4001a343cd5e60b724c09ccac411261cbfda8c58209153e651cdcae2">Window</a>
+</li>
+<li>Node()
+: <a class="el" href="struct_node.html#a9766d07fad4fef5f8313fddbc6fc5c6e">Node</a>
+</li>
+<li>None
+: <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a89e48d1d45cfa0907a6aee0dbaf3768d">Widget</a>
+</li>
+<li>nopropagate
+: <a class="el" href="struct_get_window_attributes_reply.html#ae9a291df5df1357dfa380a481bb4910b">GetWindowAttributesReply</a>
+</li>
+<li>normalMatrix()
+: <a class="el" href="structmat4.html#a4b8eb6643f8a9a9b1b5d48a4811074af">mat4</a>
+</li>
+<li>numDepths
+: <a class="el" href="struct_screen.html#a1c718920cfcd8c336f25b1a7407f4d8e">Screen</a>
+, <a class="el" href="struct_x_render_1_1_pict_screen.html#a83ce8117de2cc2d2dd1c2d9e77b96f35">XRender::PictScreen</a>
+, <a class="el" href="struct_x_render_1_1_query_pict_formats_reply.html#a70cd3848d573606ebe0c97f0b5e042d0">XRender::QueryPictFormatsReply</a>
+</li>
+<li>numFormats
+: <a class="el" href="struct_connection_setup_reply2.html#a87d21863b04ba91eb996446c7de9c9b6">ConnectionSetupReply2</a>
+, <a class="el" href="struct_x_render_1_1_query_pict_formats_reply.html#a2e7153bcdd13627ec96fb026a74b8406">XRender::QueryPictFormatsReply</a>
+</li>
+<li>numKeySymsPerKeyCode
+: <a class="el" href="struct_get_keyboard_mapping_reply.html#a6e9ba9979f43c2bb173567e0e7e12669">GetKeyboardMappingReply</a>
+</li>
+<li>numPictVisuals
+: <a class="el" href="struct_x_render_1_1_pict_depth.html#a5377da58194f32145bcee6e41f9be35c">XRender::PictDepth</a>
+</li>
+<li>numScreens
+: <a class="el" href="struct_connection_setup_reply2.html#a7e81ca095908a40029a7bb66aefa7ad5">ConnectionSetupReply2</a>
+, <a class="el" href="struct_x_render_1_1_query_pict_formats_reply.html#a4973fe9f3dc669c857d93412ef084e12">XRender::QueryPictFormatsReply</a>
+</li>
+<li>numSubpixels
+: <a class="el" href="struct_x_render_1_1_query_pict_formats_reply.html#a17a000713e07529d5fa1c5fdb11f75fa">XRender::QueryPictFormatsReply</a>
+</li>
+<li>numVisuals
+: <a class="el" href="struct_x_render_1_1_query_pict_formats_reply.html#a557e6d87954014076dea4e720cc5c1f7">XRender::QueryPictFormatsReply</a>
+</li>
+<li>numVisualTypes
+: <a class="el" href="struct_x_depth.html#af6f2f5bac29760f66b5afa28d57683b0">XDepth</a>
 </li>
 </ul>
 </div><!-- contents -->

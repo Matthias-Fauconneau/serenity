@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['byte3',['byte3',['../vector_8h.html#a3efb4ae786e9f0978d02ca3d3ab1234a',1,'vector.h']]],
-  ['byte4',['byte4',['../vector_8h.html#a914d5191de64e7c66a2a471f339a67a6',1,'vector.h']]]
+  ['args',['Args',['../struct_i_o_w.html#a78c8fa4d255955fc2173296ed6f12b0f',1,'IOW::Args()'],['../struct_i_o_r.html#a388dbd1bc96fa4fc2c8274eb34de9e1b',1,'IOR::Args()'],['../struct_i_o_w_r.html#a4b73f3f095ed8225744d0ee34f39ebbc',1,'IOWR::Args()']]]
 ];

@@ -1,10 +1,11 @@
 <map id="Handle" name="Handle">
-<area shape="rect" id="node2" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="192,80,256,107"/>
-<area shape="rect" id="node3" href="$struct_event_f_d.html" title="Pollable semaphore. " alt="" coords="52,155,125,181"/>
-<area shape="rect" id="node5" href="$struct_file.html" title="Handle to a file. " alt="" coords="203,155,245,181"/>
-<area shape="rect" id="node8" href="$struct_socket.html" title="Handle to a socket. " alt="" coords="283,155,345,181"/>
-<area shape="rect" id="node4" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="5,229,67,256"/>
-<area shape="rect" id="node6" href="$struct_device.html" title="Handle to a device. " alt="" coords="91,229,153,256"/>
-<area shape="rect" id="node7" href="$struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="178,229,269,256"/>
-<area shape="rect" id="node9" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="295,229,364,256"/>
+<area shape="rect" id="node2" href="$struct_folder.html" title="Folder" alt="" coords="109,80,167,107"/>
+<area shape="rect" id="node3" href="$struct_stream.html" title="Handle to an Unix I/O stream. " alt="" coords="192,80,256,107"/>
+<area shape="rect" id="node4" href="$struct_event_f_d.html" title="Pollable semaphore. " alt="" coords="51,155,124,181"/>
+<area shape="rect" id="node6" href="$struct_file.html" title="Handle to a file. " alt="" coords="203,155,245,181"/>
+<area shape="rect" id="node9" href="$struct_socket.html" title="Handle to a socket. " alt="" coords="283,155,345,181"/>
+<area shape="rect" id="node5" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="5,229,67,256"/>
+<area shape="rect" id="node7" href="$struct_device.html" title="Handle to a device. " alt="" coords="91,229,153,256"/>
+<area shape="rect" id="node8" href="$struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="178,229,269,256"/>
+<area shape="rect" id="node10" href="$struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="295,229,364,256"/>
 </map>

@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_poll.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -122,7 +122,7 @@ Inheritance diagram for Poll:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_poll__inherit__graph.png" border="0" usemap="#_poll_inherit__map" alt="Inheritance graph"/></div>
 <map name="_poll_inherit__map" id="_poll_inherit__map">
-<area shape="rect" id="node2" href="struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="5,80,96,107"/><area shape="rect" id="node3" href="struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="121,80,183,107"/><area shape="rect" id="node4" href="struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="208,80,277,107"/></map>
+<area shape="rect" id="node2" href="struct_file_watcher.html" title="Watches a folder for new files. " alt="" coords="5,80,96,107"/><area shape="rect" id="node3" href="struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="121,80,183,107"/><area shape="rect" id="node4" href="struct_timer.html" title="Timer" alt="" coords="207,80,261,107"/><area shape="rect" id="node5" href="struct_window.html" title="Interfaces widget as a window on an X11 display server. " alt="" coords="287,80,356,107"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <div class="dynheader">
 Collaboration diagram for Poll:</div>
@@ -134,48 +134,86 @@ Collaboration diagram for Poll:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:a8dce2bb3c5e86b29de39ba2cd24fba37"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <b>IDLE</b> =64
+<tr class="memitem:a8dce2bb3c5e86b29de39ba2cd24fba37"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <a class="el" href="struct_poll.html#a8dce2bb3c5e86b29de39ba2cd24fba37a073a5a9ea79d97c7b2cd2b0fd744cdbf">IDLE</a> =64
  }</td></tr>
 <tr class="separator:a8dce2bb3c5e86b29de39ba2cd24fba37"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a992b55ed468ad21f451770bf64841b9e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a992b55ed468ad21f451770bf64841b9e"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Poll</b> (const <a class="el" href="struct_poll.html">Poll</a> &amp;)=delete</td></tr>
+<tr class="memitem:a992b55ed468ad21f451770bf64841b9e"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a992b55ed468ad21f451770bf64841b9e">Poll</a> (const <a class="el" href="struct_poll.html">Poll</a> &amp;)=delete</td></tr>
 <tr class="separator:a992b55ed468ad21f451770bf64841b9e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac4643ee87c9c8fcba97feed1916a53f7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac4643ee87c9c8fcba97feed1916a53f7"></a>
-<a class="el" href="struct_poll.html">Poll</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (const <a class="el" href="struct_poll.html">Poll</a> &amp;)=delete</td></tr>
+<tr class="memitem:ac4643ee87c9c8fcba97feed1916a53f7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_poll.html">Poll</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#ac4643ee87c9c8fcba97feed1916a53f7">operator=</a> (const <a class="el" href="struct_poll.html">Poll</a> &amp;)=delete</td></tr>
 <tr class="separator:ac4643ee87c9c8fcba97feed1916a53f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac87cd5f23219605b941ce7a8781aed53"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#ac87cd5f23219605b941ce7a8781aed53">Poll</a> (int fd=0, int events=POLLIN, <a class="el" href="struct_thread.html">Thread</a> &amp;thread=<a class="el" href="thread_8h.html#a4ee5a6197d42179339bf812acb38763b">mainThread</a>)</td></tr>
+<tr class="memitem:ac87cd5f23219605b941ce7a8781aed53"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#ac87cd5f23219605b941ce7a8781aed53">Poll</a> (int fd=0, int <a class="el" href="x_8h.html#a2a66dde8e006ec7e1a5e294426671d10">events</a>=POLLIN, <a class="el" href="struct_thread.html">Thread</a> &amp;<a class="el" href="structthread.html">thread</a>=<a class="el" href="thread_8h.html#a4ee5a6197d42179339bf812acb38763b">mainThread</a>)</td></tr>
 <tr class="separator:ac87cd5f23219605b941ce7a8781aed53"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a37417051b1f51b14cc55e8e094a66810"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a37417051b1f51b14cc55e8e094a66810"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a37417051b1f51b14cc55e8e094a66810">registerPoll</a> ()</td></tr>
-<tr class="memdesc:a37417051b1f51b14cc55e8e094a66810"><td class="mdescLeft">&#160;</td><td class="mdescRight">Registers <em>fd</em> to the event loop. <br/></td></tr>
+<tr class="memitem:ab99bf5ecc1992b6023e19fbb6b321f7a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#ab99bf5ecc1992b6023e19fbb6b321f7a">~Poll</a> ()</td></tr>
+<tr class="separator:ab99bf5ecc1992b6023e19fbb6b321f7a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a37417051b1f51b14cc55e8e094a66810"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a37417051b1f51b14cc55e8e094a66810">registerPoll</a> ()</td></tr>
+<tr class="memdesc:a37417051b1f51b14cc55e8e094a66810"><td class="mdescLeft">&#160;</td><td class="mdescRight">Registers <em>fd</em> to the event loop.  <a href="#a37417051b1f51b14cc55e8e094a66810">More...</a><br/></td></tr>
 <tr class="separator:a37417051b1f51b14cc55e8e094a66810"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a418d8b5d090f554ed791d018b3a91971"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a418d8b5d090f554ed791d018b3a91971"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a418d8b5d090f554ed791d018b3a91971">unregisterPoll</a> ()</td></tr>
-<tr class="memdesc:a418d8b5d090f554ed791d018b3a91971"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters <em>fd</em> from the event loop. <br/></td></tr>
+<tr class="memitem:a418d8b5d090f554ed791d018b3a91971"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a418d8b5d090f554ed791d018b3a91971">unregisterPoll</a> ()</td></tr>
+<tr class="memdesc:a418d8b5d090f554ed791d018b3a91971"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unregisters <em>fd</em> from the event loop.  <a href="#a418d8b5d090f554ed791d018b3a91971">More...</a><br/></td></tr>
 <tr class="separator:a418d8b5d090f554ed791d018b3a91971"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0d3944c40c5bf892b0d8f44411456d79"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0d3944c40c5bf892b0d8f44411456d79"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a0d3944c40c5bf892b0d8f44411456d79">queue</a> ()</td></tr>
-<tr class="memdesc:a0d3944c40c5bf892b0d8f44411456d79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Schedules an <em>event</em> call from <em>thread's</em> next poll iteration. <br/></td></tr>
+<tr class="memitem:a0d3944c40c5bf892b0d8f44411456d79"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#a0d3944c40c5bf892b0d8f44411456d79">queue</a> ()</td></tr>
+<tr class="memdesc:a0d3944c40c5bf892b0d8f44411456d79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Schedules an <em>event</em> call from <em>thread's</em> next poll iteration.  <a href="#a0d3944c40c5bf892b0d8f44411456d79">More...</a><br/></td></tr>
 <tr class="separator:a0d3944c40c5bf892b0d8f44411456d79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af956142652efc6781e6a2086b7be4f2e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af956142652efc6781e6a2086b7be4f2e"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#af956142652efc6781e6a2086b7be4f2e">event</a> ()=0</td></tr>
-<tr class="memdesc:af956142652efc6781e6a2086b7be4f2e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback on new poll events (or when thread is idle when triggered by <em>wait</em>) <br/></td></tr>
+<tr class="memitem:af956142652efc6781e6a2086b7be4f2e"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#af956142652efc6781e6a2086b7be4f2e">event</a> ()=0</td></tr>
+<tr class="memdesc:af956142652efc6781e6a2086b7be4f2e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Callback on new poll events (or when thread is idle when triggered by <em>wait</em>)  <a href="#af956142652efc6781e6a2086b7be4f2e">More...</a><br/></td></tr>
 <tr class="separator:af956142652efc6781e6a2086b7be4f2e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:acf6b8eec728102b6f0b34a2bb1c241fc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acf6b8eec728102b6f0b34a2bb1c241fc"></a>
-<a class="el" href="struct_thread.html">Thread</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>thread</b></td></tr>
+<tr class="memitem:acf6b8eec728102b6f0b34a2bb1c241fc"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_thread.html">Thread</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_poll.html#acf6b8eec728102b6f0b34a2bb1c241fc">thread</a></td></tr>
 <tr class="separator:acf6b8eec728102b6f0b34a2bb1c241fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p><a class="el" href="struct_poll.html" title="Poll is a convenient interface to participate in the event loops. ">Poll</a> is a convenient interface to participate in the event loops. </p>
 
 <p>Definition at line <a class="el" href="thread_8h_source.html#l00076">76</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
-</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+</div><h2 class="groupheader">Member Enumeration Documentation</h2>
+<a class="anchor" id="a8dce2bb3c5e86b29de39ba2cd24fba37"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">anonymous enum</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><em><a class="anchor" id="a8dce2bb3c5e86b29de39ba2cd24fba37a073a5a9ea79d97c7b2cd2b0fd744cdbf"></a>IDLE</em>&#160;</td><td class="fielddoc">
+</td></tr>
+</table>
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00091">91</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a992b55ed468ad21f451770bf64841b9e"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Poll::Poll </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_poll.html">Poll</a> &amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">delete</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a class="anchor" id="ac87cd5f23219605b941ce7a8781aed53"></a>
 <div class="memitem">
 <div class="memproto">
@@ -209,6 +247,147 @@ Public Attributes</h2></td></tr>
 <dl class="section note"><dt>Note</dt><dd>May be used without a file descriptor to queue jobs using <em>wait</em>, <em>event</em> will be called after all system events have been handled </dd></dl>
 
 <p>Definition at line <a class="el" href="thread_8h_source.html#l00081">81</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab99bf5ecc1992b6023e19fbb6b321f7a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Poll::~Poll </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00082">82</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="ac4643ee87c9c8fcba97feed1916a53f7"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_poll.html">Poll</a>&amp; Poll::operator= </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_poll.html">Poll</a> &amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">delete</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a37417051b1f51b14cc55e8e094a66810"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Poll::registerPoll </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Registers <em>fd</em> to the event loop. </p>
+
+<p>Definition at line <a class="el" href="thread_8cc_source.html#l00026">26</a> of file <a class="el" href="thread_8cc_source.html">thread.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a418d8b5d090f554ed791d018b3a91971"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Poll::unregisterPoll </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Unregisters <em>fd</em> from the event loop. </p>
+
+<p>Definition at line <a class="el" href="thread_8cc_source.html#l00036">36</a> of file <a class="el" href="thread_8cc_source.html">thread.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0d3944c40c5bf892b0d8f44411456d79"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Poll::queue </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Schedules an <em>event</em> call from <em>thread's</em> next poll iteration. </p>
+
+<p>Definition at line <a class="el" href="thread_8cc_source.html#l00037">37</a> of file <a class="el" href="thread_8cc_source.html">thread.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af956142652efc6781e6a2086b7be4f2e"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">virtual void Poll::event </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Callback on new poll events (or when thread is idle when triggered by <em>wait</em>) </p>
+
+<p>Implemented in <a class="el" href="struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30">FileWatcher</a>, <a class="el" href="struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30">FileWatcher</a>, <a class="el" href="struct_thread.html#a48452c8ac27d2a97bb25dcdfdd2a0955">Thread</a>, <a class="el" href="struct_window.html#a9f324a3c5a82585e937f3cbfe91611e0">Window</a>, <a class="el" href="struct_timer.html#aed77c14fdf90adb6a3e8a4f55f2ab5c4">Timer</a>, and <a class="el" href="struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30">FileWatcher</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="acf6b8eec728102b6f0b34a2bb1c241fc"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_thread.html">Thread</a>&amp; Poll::thread</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00078">78</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
 
 </div>
 </div>

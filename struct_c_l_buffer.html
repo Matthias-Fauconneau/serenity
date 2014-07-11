@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_c_l_buffer.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -116,38 +116,231 @@ $(document).ready(function(){initNavTree('struct_c_l_buffer.html','');});
  <a href="struct_c_l_buffer.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="opencl_8h_source.html">opencl.h</a>&gt;</code></p>
-
-<p>Inherits CLRawBuffer.</p>
+<div class="dynheader">
+Inheritance diagram for CLBuffer:</div>
+<div class="dyncontent">
+<div class="center"><img src="struct_c_l_buffer__inherit__graph.png" border="0" usemap="#_c_l_buffer_inherit__map" alt="Inheritance graph"/></div>
+<map name="_c_l_buffer_inherit__map" id="_c_l_buffer_inherit__map">
+<area shape="rect" id="node2" href="struct_c_l_raw_buffer.html" title="CLRawBuffer" alt="" coords="19,155,120,181"/><area shape="rect" id="node3" href="struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="35,80,103,107"/><area shape="rect" id="node4" href="structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="4,5,133,32"/></map>
+<center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
+<div class="dynheader">
+Collaboration diagram for CLBuffer:</div>
+<div class="dyncontent">
+<div class="center"><img src="struct_c_l_buffer__coll__graph.png" border="0" usemap="#_c_l_buffer_coll__map" alt="Collaboration graph"/></div>
+<map name="_c_l_buffer_coll__map" id="_c_l_buffer_coll__map">
+<area shape="rect" id="node2" href="struct_c_l_raw_buffer.html" title="CLRawBuffer" alt="" coords="64,251,165,277"/><area shape="rect" id="node3" href="struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="81,173,148,200"/><area shape="rect" id="node4" href="structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="4,83,133,109"/><area shape="rect" id="node5" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="158,83,257,109"/><area shape="rect" id="node6" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="156,5,260,32"/></map>
+<center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a3c2398770b03ddd391434fe787c69f73"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3c2398770b03ddd391434fe787c69f73"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>CLBuffer</b> (size_t size, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> name)</td></tr>
+<tr class="memitem:a3c2398770b03ddd391434fe787c69f73"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_buffer.html#a3c2398770b03ddd391434fe787c69f73">CLBuffer</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="struct_c_l_buffer.html#a424f9fcc65081da9d2574d9a3046bd7c">size</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">name</a>)</td></tr>
 <tr class="separator:a3c2398770b03ddd391434fe787c69f73"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9066a3a34c096bbe909d9cfc8ede5c87"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9066a3a34c096bbe909d9cfc8ede5c87"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>CLBuffer</b> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;data, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> name)</td></tr>
+<tr class="memitem:a9066a3a34c096bbe909d9cfc8ede5c87"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_buffer.html#a9066a3a34c096bbe909d9cfc8ede5c87">CLBuffer</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;<a class="el" href="opencl_8cc.html#ab598ab784cd31f1683da18d1e2122129">data</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">name</a>)</td></tr>
 <tr class="separator:a9066a3a34c096bbe909d9cfc8ede5c87"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae254b323f7606c0d9d81c424450af553"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae254b323f7606c0d9d81c424450af553"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>CLBuffer</b> (<a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:ae254b323f7606c0d9d81c424450af553"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_buffer.html#ae254b323f7606c0d9d81c424450af553">CLBuffer</a> (<a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:ae254b323f7606c0d9d81c424450af553"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6b88f623691fb0b2cd7e7d6aa9cd4122"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6b88f623691fb0b2cd7e7d6aa9cd4122"></a>
-<a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (<a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a6b88f623691fb0b2cd7e7d6aa9cd4122"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_buffer.html#a6b88f623691fb0b2cd7e7d6aa9cd4122">operator=</a> (<a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a6b88f623691fb0b2cd7e7d6aa9cd4122"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a314e2a2f1282f97c66cbd7299ac6bcff"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a314e2a2f1282f97c66cbd7299ac6bcff"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (const <a class="el" href="structmref.html">mref</a>&lt; T &gt; &amp;target)</td></tr>
+<tr class="memitem:a314e2a2f1282f97c66cbd7299ac6bcff"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_buffer.html#a314e2a2f1282f97c66cbd7299ac6bcff">read</a> (const <a class="el" href="structmref.html">mref</a>&lt; T &gt; &amp;target)</td></tr>
 <tr class="separator:a314e2a2f1282f97c66cbd7299ac6bcff"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_struct_c_l_raw_buffer"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_c_l_raw_buffer')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_c_l_raw_buffer.html">CLRawBuffer</a></td></tr>
+<tr class="memitem:a7425dbec5ec5627a074347021975bddd inherit pub_methods_struct_c_l_raw_buffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_raw_buffer.html#a7425dbec5ec5627a074347021975bddd">CLRawBuffer</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">name</a>)</td></tr>
+<tr class="separator:a7425dbec5ec5627a074347021975bddd inherit pub_methods_struct_c_l_raw_buffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1f5ba06c1542a8b9b8d25bf5e46ff342 inherit pub_methods_struct_c_l_raw_buffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_raw_buffer.html#a1f5ba06c1542a8b9b8d25bf5e46ff342">CLRawBuffer</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; <a class="el" href="opencl_8cc.html#ab598ab784cd31f1683da18d1e2122129">data</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">name</a>)</td></tr>
+<tr class="separator:a1f5ba06c1542a8b9b8d25bf5e46ff342 inherit pub_methods_struct_c_l_raw_buffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2159e58f97aba0ec3ab678dd72d0febb inherit pub_methods_struct_c_l_raw_buffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_raw_buffer.html#a2159e58f97aba0ec3ab678dd72d0febb">CLRawBuffer</a> (<a class="el" href="struct_c_l_raw_buffer.html">CLRawBuffer</a> &amp;&amp;)=default</td></tr>
+<tr class="separator:a2159e58f97aba0ec3ab678dd72d0febb inherit pub_methods_struct_c_l_raw_buffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab6b2b50e54158312aed7e194cc4e09ce inherit pub_methods_struct_c_l_raw_buffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_c_l_raw_buffer.html">CLRawBuffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_raw_buffer.html#ab6b2b50e54158312aed7e194cc4e09ce">operator=</a> (<a class="el" href="struct_c_l_raw_buffer.html">CLRawBuffer</a> &amp;&amp;)=default</td></tr>
+<tr class="separator:ab6b2b50e54158312aed7e194cc4e09ce inherit pub_methods_struct_c_l_raw_buffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a39aa1b285ae7ea7bd0006acfc826bdc4 inherit pub_methods_struct_c_l_raw_buffer"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_raw_buffer.html#a39aa1b285ae7ea7bd0006acfc826bdc4">read</a> (const <a class="el" href="structmref.html">mref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;target)</td></tr>
+<tr class="separator:a39aa1b285ae7ea7bd0006acfc826bdc4 inherit pub_methods_struct_c_l_raw_buffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_struct_c_l_mem"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_c_l_mem')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_c_l_mem.html">CLMem</a></td></tr>
+<tr class="memitem:adcf1f52c36091ed097ce031e9a9241c5 inherit pub_methods_struct_c_l_mem"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_mem.html#adcf1f52c36091ed097ce031e9a9241c5">CLMem</a> (<a class="el" href="opencl_8h.html#af2141916ad9655073b9810d7bc71494d">cl_mem</a> mem, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">name</a>)</td></tr>
+<tr class="separator:adcf1f52c36091ed097ce031e9a9241c5 inherit pub_methods_struct_c_l_mem"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a73af90ac2d53b61c921744ed052c6f9b inherit pub_methods_struct_c_l_mem"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_mem.html#a73af90ac2d53b61c921744ed052c6f9b">CLMem</a> (<a class="el" href="struct_c_l_mem.html">CLMem</a> &amp;&amp;)=default</td></tr>
+<tr class="separator:a73af90ac2d53b61c921744ed052c6f9b inherit pub_methods_struct_c_l_mem"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a88a221971df87baeb72c2477f5463307 inherit pub_methods_struct_c_l_mem"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_c_l_mem.html">CLMem</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_mem.html#a88a221971df87baeb72c2477f5463307">operator=</a> (<a class="el" href="struct_c_l_mem.html">CLMem</a> &amp;&amp;)=default</td></tr>
+<tr class="separator:a88a221971df87baeb72c2477f5463307 inherit pub_methods_struct_c_l_mem"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6c31618629d5ed4e19dab93eb37d67a3 inherit pub_methods_struct_c_l_mem"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_mem.html#a6c31618629d5ed4e19dab93eb37d67a3">~CLMem</a> ()</td></tr>
+<tr class="memdesc:a6c31618629d5ed4e19dab93eb37d67a3 inherit pub_methods_struct_c_l_mem"><td class="mdescLeft">&#160;</td><td class="mdescRight">Releases the OpenCL MemObject.  <a href="#a6c31618629d5ed4e19dab93eb37d67a3">More...</a><br/></td></tr>
+<tr class="separator:a6c31618629d5ed4e19dab93eb37d67a3 inherit pub_methods_struct_c_l_mem"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_methods_structhandle"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_structhandle')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="structhandle.html">handle&lt; cl_mem &gt;</a></td></tr>
+<tr class="memitem:a6451548a6e61ec6f2e66dd91262ac8e9 inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a6451548a6e61ec6f2e66dd91262ac8e9">handle</a> (cl_mempointer=<a class="el" href="opencl_8h.html#af2141916ad9655073b9810d7bc71494d">cl_mem</a>())</td></tr>
+<tr class="separator:a6451548a6e61ec6f2e66dd91262ac8e9 inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8f9e8b73e96b3bbe004b0d5d66815563 inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a8f9e8b73e96b3bbe004b0d5d66815563">handle</a> (<a class="el" href="structhandle.html">handle</a> &amp;&amp;o)</td></tr>
+<tr class="separator:a8f9e8b73e96b3bbe004b0d5d66815563 inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acf4db33437e99710a975ac63de4045f9 inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structhandle.html">handle</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#acf4db33437e99710a975ac63de4045f9">operator=</a> (<a class="el" href="structhandle.html">handle</a> &amp;&amp;o)</td></tr>
+<tr class="separator:acf4db33437e99710a975ac63de4045f9 inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9c836dec024ddd91bd0e71cc0489ca1e inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a9c836dec024ddd91bd0e71cc0489ca1e">operator cl_mem</a> () const</td></tr>
+<tr class="separator:a9c836dec024ddd91bd0e71cc0489ca1e inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a57d16b6e7d4d479e0c6684c47edb3070 inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a57d16b6e7d4d479e0c6684c47edb3070">operator cl_mem &amp;</a> ()</td></tr>
+<tr class="separator:a57d16b6e7d4d479e0c6684c47edb3070 inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4ef2051d65fb16f61ef61da269e64847 inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="opencl_8h.html#af2141916ad9655073b9810d7bc71494d">cl_mem</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a4ef2051d65fb16f61ef61da269e64847">operator&amp;</a> ()</td></tr>
+<tr class="separator:a4ef2051d65fb16f61ef61da269e64847 inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1c82dc1d9daa25216ab80a577b2efc0b inherit pub_methods_structhandle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="opencl_8h.html#af2141916ad9655073b9810d7bc71494d">cl_mem</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a1c82dc1d9daa25216ab80a577b2efc0b">operator-&gt;</a> ()</td></tr>
+<tr class="separator:a1c82dc1d9daa25216ab80a577b2efc0b inherit pub_methods_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a424f9fcc65081da9d2574d9a3046bd7c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a424f9fcc65081da9d2574d9a3046bd7c"></a>
-size_t&#160;</td><td class="memItemRight" valign="bottom"><b>size</b></td></tr>
+<tr class="memitem:a424f9fcc65081da9d2574d9a3046bd7c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_buffer.html#a424f9fcc65081da9d2574d9a3046bd7c">size</a></td></tr>
 <tr class="separator:a424f9fcc65081da9d2574d9a3046bd7c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_attribs_struct_c_l_mem"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_c_l_mem')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_c_l_mem.html">CLMem</a></td></tr>
+<tr class="memitem:a90e9fae6d11692a78f2d36efd2d8648e inherit pub_attribs_struct_c_l_mem"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e">name</a></td></tr>
+<tr class="separator:a90e9fae6d11692a78f2d36efd2d8648e inherit pub_attribs_struct_c_l_mem"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="inherit_header pub_attribs_structhandle"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_structhandle')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="structhandle.html">handle&lt; cl_mem &gt;</a></td></tr>
+<tr class="memitem:a7183305895529e6d97ea509358d21829 inherit pub_attribs_structhandle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="opencl_8h.html#af2141916ad9655073b9810d7bc71494d">cl_mem</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structhandle.html#a7183305895529e6d97ea509358d21829">pointer</a></td></tr>
+<tr class="separator:a7183305895529e6d97ea509358d21829 inherit pub_attribs_structhandle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="inherited"></a>
+Additional Inherited Members</h2></td></tr>
+<tr class="inherit_header pub_static_attribs_struct_c_l_mem"><td colspan="2" onclick="javascript:toggleInherit('pub_static_attribs_struct_c_l_mem')"><img src="closed.png" alt="-"/>&#160;Static Public Attributes inherited from <a class="el" href="struct_c_l_mem.html">CLMem</a></td></tr>
+<tr class="memitem:a4aa229a120a80f278874b8e67cc5242f inherit pub_static_attribs_struct_c_l_mem"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_mem.html#a4aa229a120a80f278874b8e67cc5242f">handleCount</a> = 0</td></tr>
+<tr class="separator:a4aa229a120a80f278874b8e67cc5242f inherit pub_static_attribs_struct_c_l_mem"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Generic typed OpenCL Buffer. </p>
 
 <p>Definition at line <a class="el" href="opencl_8h_source.html#l00033">33</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a3c2398770b03ddd391434fe787c69f73"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">CLBuffer::CLBuffer </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00034">34</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9066a3a34c096bbe909d9cfc8ede5c87"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">CLBuffer::CLBuffer </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>data</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00035">35</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae254b323f7606c0d9d81c424450af553"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">CLBuffer::CLBuffer </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a6b88f623691fb0b2cd7e7d6aa9cd4122"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_c_l_buffer.html">CLBuffer</a>&amp; CLBuffer::operator= </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_c_l_buffer.html">CLBuffer</a> &amp;&amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a314e2a2f1282f97c66cbd7299ac6bcff"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLBuffer::read </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structmref.html">mref</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>target</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00038">38</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a424f9fcc65081da9d2574d9a3046bd7c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> CLBuffer::size</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00040">40</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

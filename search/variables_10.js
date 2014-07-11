@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['visual',['visual',['../struct_window.html#a89ead7022781abfd6e933f850a08137f',1,'Window']]]
+  ['queue',['queue',['../struct_thread.html#a30bba3f1629f1b945712a7dbfaaee595',1,'Thread']]]
 ];

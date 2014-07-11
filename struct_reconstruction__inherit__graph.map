@@ -1,6 +1,7 @@
 <map id="Reconstruction" name="Reconstruction">
 <area shape="rect" id="node2" href="$struct_c_g.html" title="Minimizes |Ax&#45;b|² using conjugated gradient (on the normal equations) " alt="" coords="5,80,48,107"/>
 <area shape="rect" id="node3" href="$struct_subset_reconstruction.html" title="Derived class for subset reconstruction. " alt="" coords="73,80,223,107"/>
-<area shape="rect" id="node4" href="$struct_m_l_t_r.html" title="Maximum likelihood expectation maximization for transmission tomography. " alt="" coords="77,155,135,181"/>
-<area shape="rect" id="node5" href="$struct_s_a_r_t.html" title="Simultaneous iterative algebraic reconstruction technique. " alt="" coords="160,155,217,181"/>
+<area shape="rect" id="node4" href="$struct_m_l_t_r.html" title="Maximum likelihood expectation maximization for transmission tomography. " alt="" coords="32,155,89,181"/>
+<area shape="rect" id="node5" href="$struct_p_m_l_t_r.html" title="PMLTR" alt="" coords="115,155,181,181"/>
+<area shape="rect" id="node6" href="$struct_s_a_r_t.html" title="Simultaneous iterative algebraic reconstruction technique. " alt="" coords="205,155,263,181"/>
 </map>

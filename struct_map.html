@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_map.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -127,69 +127,455 @@ Collaboration diagram for Map:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:a080388050135ececd8e8b5c7b9d83e21"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><b>Prot</b> { <b>Read</b> =1, 
-<b>Write</b> =2
+<tr class="memitem:a080388050135ececd8e8b5c7b9d83e21"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a> { <a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5">Read</a> =1, 
+<a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21a864607c874524d97c0d3487cc792d03f">Write</a> =2
  }</td></tr>
 <tr class="separator:a080388050135ececd8e8b5c7b9d83e21"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a05ae4a78423e760d4090a39d0d49101a"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><b>Flags</b> { <b>Shared</b> =1, 
-<b>Private</b> =2, 
-<b>Anonymous</b> =0x20, 
-<b>Populate</b> =0x8000
+<tr class="memitem:a05ae4a78423e760d4090a39d0d49101a"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101a">Flags</a> { <a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa332c4acd425ccb5fae1b3e446e6cbffe">Shared</a> =1, 
+<a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa533775c306fbc6d6b5d7f17ddbb8cc09">Private</a> =2, 
+<a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa7f283f04588e2ce9cf82b83d0b05460b">Anonymous</a> =0x20, 
+<a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa5cf35aef7ab3cf1e9bb45a3b0de9d949">Populate</a> =0x8000
  }</td></tr>
 <tr class="separator:a05ae4a78423e760d4090a39d0d49101a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a88c2a47a63bd3cccc2b80da0a7f8d54a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a88c2a47a63bd3cccc2b80da0a7f8d54a"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Map</b> (const <a class="el" href="struct_file.html">File</a> &amp;file, Prot prot=Read, Flags flags=Shared)</td></tr>
+<tr class="memitem:a0f5ad0fd4563497b4214038cbca8b582"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a0f5ad0fd4563497b4214038cbca8b582">Map</a> ()</td></tr>
+<tr class="separator:a0f5ad0fd4563497b4214038cbca8b582"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a88c2a47a63bd3cccc2b80da0a7f8d54a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a88c2a47a63bd3cccc2b80da0a7f8d54a">Map</a> (const <a class="el" href="struct_file.html">File</a> &amp;file, <a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a> prot=<a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5">Read</a>, <a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101a">Flags</a> flags=<a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa332c4acd425ccb5fae1b3e446e6cbffe">Shared</a>)</td></tr>
 <tr class="separator:a88c2a47a63bd3cccc2b80da0a7f8d54a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a206f730eb102662da17c905371b80979"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a206f730eb102662da17c905371b80979"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Map</b> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;path, const Folder &amp;at=<a class="el" href="file_8h.html#aaa65fa352abf15fd4b17431d4e0e00b9">currentWorkingDirectory</a>(), Prot prot=Read)</td></tr>
+<tr class="memitem:a206f730eb102662da17c905371b80979"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a206f730eb102662da17c905371b80979">Map</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;path, const <a class="el" href="struct_folder.html">Folder</a> &amp;at=<a class="el" href="file_8h.html#aaa65fa352abf15fd4b17431d4e0e00b9">currentWorkingDirectory</a>(), <a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a> prot=<a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5">Read</a>)</td></tr>
 <tr class="separator:a206f730eb102662da17c905371b80979"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a23c7d54cb7ae9fb3a1681db168c941f6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a23c7d54cb7ae9fb3a1681db168c941f6"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Map</b> (uint fd, uint offset, uint size, Prot prot, Flags flags=Shared)</td></tr>
+<tr class="memitem:a23c7d54cb7ae9fb3a1681db168c941f6"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a23c7d54cb7ae9fb3a1681db168c941f6">Map</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> fd, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> offset, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_map.html#afe3d67545ce9342a0fbff091dd387f69">size</a>, <a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a> prot, <a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101a">Flags</a> flags=<a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa332c4acd425ccb5fae1b3e446e6cbffe">Shared</a>)</td></tr>
 <tr class="separator:a23c7d54cb7ae9fb3a1681db168c941f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a72349bdc15e148cbb68e95878a989d70"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a72349bdc15e148cbb68e95878a989d70"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Map</b> (<a class="el" href="struct_map.html">Map</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a72349bdc15e148cbb68e95878a989d70"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a72349bdc15e148cbb68e95878a989d70">Map</a> (<a class="el" href="struct_map.html">Map</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a72349bdc15e148cbb68e95878a989d70"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a923adb3d3711e79864fda244adde320d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a923adb3d3711e79864fda244adde320d"></a>
-<a class="el" href="struct_map.html">Map</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (<a class="el" href="struct_map.html">Map</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a923adb3d3711e79864fda244adde320d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_map.html">Map</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a923adb3d3711e79864fda244adde320d">operator=</a> (<a class="el" href="struct_map.html">Map</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a923adb3d3711e79864fda244adde320d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aab3f8fab9e282fc51a9b8f8ae7e1784d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aab3f8fab9e282fc51a9b8f8ae7e1784d"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator bool</b> () const </td></tr>
+<tr class="memitem:aa403fbe09394ccf39747588f5168e3b2"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#aa403fbe09394ccf39747588f5168e3b2">~Map</a> ()</td></tr>
+<tr class="separator:aa403fbe09394ccf39747588f5168e3b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aab3f8fab9e282fc51a9b8f8ae7e1784d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#aab3f8fab9e282fc51a9b8f8ae7e1784d">operator bool</a> () const </td></tr>
 <tr class="separator:aab3f8fab9e282fc51a9b8f8ae7e1784d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afb4a8dff06d4ba1e2cf0dae80440087a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afb4a8dff06d4ba1e2cf0dae80440087a"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator ref&lt; byte &gt;</b> () const </td></tr>
+<tr class="memitem:afb4a8dff06d4ba1e2cf0dae80440087a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#afb4a8dff06d4ba1e2cf0dae80440087a">operator ref&lt; byte &gt;</a> () const </td></tr>
 <tr class="separator:afb4a8dff06d4ba1e2cf0dae80440087a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6d9778577314a7ab3b09169410c199bc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6d9778577314a7ab3b09169410c199bc"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator mref&lt; byte &gt;</b> ()</td></tr>
+<tr class="memitem:a6d9778577314a7ab3b09169410c199bc"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a6d9778577314a7ab3b09169410c199bc">operator mref&lt; byte &gt;</a> ()</td></tr>
 <tr class="separator:a6d9778577314a7ab3b09169410c199bc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a83d25b535c59dd6fa61f6cdca6c7cb9b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a83d25b535c59dd6fa61f6cdca6c7cb9b"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator ref&lt; float &gt;</b> () const </td></tr>
+<tr class="memitem:a83d25b535c59dd6fa61f6cdca6c7cb9b"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a83d25b535c59dd6fa61f6cdca6c7cb9b">operator ref&lt; float &gt;</a> () const </td></tr>
 <tr class="separator:a83d25b535c59dd6fa61f6cdca6c7cb9b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac776b34025d25aed4b2f729c74f23f5a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac776b34025d25aed4b2f729c74f23f5a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#ac776b34025d25aed4b2f729c74f23f5a">lock</a> (uint size=-1) const </td></tr>
-<tr class="memdesc:ac776b34025d25aed4b2f729c74f23f5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Locks memory map in RAM. <br/></td></tr>
+<tr class="memitem:ac776b34025d25aed4b2f729c74f23f5a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#ac776b34025d25aed4b2f729c74f23f5a">lock</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_map.html#afe3d67545ce9342a0fbff091dd387f69">size</a>=-1) const </td></tr>
+<tr class="memdesc:ac776b34025d25aed4b2f729c74f23f5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Locks memory map in RAM.  <a href="#ac776b34025d25aed4b2f729c74f23f5a">More...</a><br/></td></tr>
 <tr class="separator:ac776b34025d25aed4b2f729c74f23f5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab835df651fd5b4c10e858d8c56690d4d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab835df651fd5b4c10e858d8c56690d4d"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#ab835df651fd5b4c10e858d8c56690d4d">unmap</a> ()</td></tr>
-<tr class="memdesc:ab835df651fd5b4c10e858d8c56690d4d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unmaps memory map. <br/></td></tr>
+<tr class="memitem:ab835df651fd5b4c10e858d8c56690d4d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#ab835df651fd5b4c10e858d8c56690d4d">unmap</a> ()</td></tr>
+<tr class="memdesc:ab835df651fd5b4c10e858d8c56690d4d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unmaps memory map.  <a href="#ab835df651fd5b4c10e858d8c56690d4d">More...</a><br/></td></tr>
 <tr class="separator:ab835df651fd5b4c10e858d8c56690d4d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a15bab18a2939c8d9d45395cc6bc0d26d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a15bab18a2939c8d9d45395cc6bc0d26d"></a>
-<a class="el" href="structhandle.html">handle</a>&lt; byte * &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>data</b></td></tr>
+<tr class="memitem:a15bab18a2939c8d9d45395cc6bc0d26d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structhandle.html">handle</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> * &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#a15bab18a2939c8d9d45395cc6bc0d26d">data</a></td></tr>
 <tr class="separator:a15bab18a2939c8d9d45395cc6bc0d26d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afe3d67545ce9342a0fbff091dd387f69"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afe3d67545ce9342a0fbff091dd387f69"></a>
-size_t&#160;</td><td class="memItemRight" valign="bottom"><b>size</b> =0</td></tr>
+<tr class="memitem:afe3d67545ce9342a0fbff091dd387f69"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_map.html#afe3d67545ce9342a0fbff091dd387f69">size</a> =0</td></tr>
 <tr class="separator:afe3d67545ce9342a0fbff091dd387f69"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Managed memory mapping. </p>
 
 <p>Definition at line <a class="el" href="file_8h_source.html#l00144">144</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Member Enumeration Documentation</h2>
+<a class="anchor" id="a080388050135ececd8e8b5c7b9d83e21"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Map::Prot</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><em><a class="anchor" id="a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5"></a>Read</em>&#160;</td><td class="fielddoc">
+</td></tr>
+<tr><td class="fieldname"><em><a class="anchor" id="a080388050135ececd8e8b5c7b9d83e21a864607c874524d97c0d3487cc792d03f"></a>Write</em>&#160;</td><td class="fielddoc">
+</td></tr>
+</table>
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00145">145</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a05ae4a78423e760d4090a39d0d49101a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101a">Map::Flags</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><em><a class="anchor" id="a05ae4a78423e760d4090a39d0d49101aa332c4acd425ccb5fae1b3e446e6cbffe"></a>Shared</em>&#160;</td><td class="fielddoc">
+</td></tr>
+<tr><td class="fieldname"><em><a class="anchor" id="a05ae4a78423e760d4090a39d0d49101aa533775c306fbc6d6b5d7f17ddbb8cc09"></a>Private</em>&#160;</td><td class="fielddoc">
+</td></tr>
+<tr><td class="fieldname"><em><a class="anchor" id="a05ae4a78423e760d4090a39d0d49101aa7f283f04588e2ce9cf82b83d0b05460b"></a>Anonymous</em>&#160;</td><td class="fielddoc">
+</td></tr>
+<tr><td class="fieldname"><em><a class="anchor" id="a05ae4a78423e760d4090a39d0d49101aa5cf35aef7ab3cf1e9bb45a3b0de9d949"></a>Populate</em>&#160;</td><td class="fielddoc">
+</td></tr>
+</table>
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00146">146</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a0f5ad0fd4563497b4214038cbca8b582"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::Map </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00148">148</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a88c2a47a63bd3cccc2b80da0a7f8d54a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::Map </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_file.html">File</a> &amp;&#160;</td>
+          <td class="paramname"><em>file</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a>&#160;</td>
+          <td class="paramname"><em>prot</em> = <code><a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5">Read</a></code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101a">Flags</a>&#160;</td>
+          <td class="paramname"><em>flags</em> = <code><a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa332c4acd425ccb5fae1b3e446e6cbffe">Shared</a></code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00104">104</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a206f730eb102662da17c905371b80979"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::Map </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_folder.html">Folder</a> &amp;&#160;</td>
+          <td class="paramname"><em>at</em> = <code><a class="el" href="file_8h.html#aaa65fa352abf15fd4b17431d4e0e00b9">currentWorkingDirectory</a>()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a>&#160;</td>
+          <td class="paramname"><em>prot</em> = <code><a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21ad1d1cb6a0825135de4c3257cbbc6beb5">Read</a></code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00150">150</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a23c7d54cb7ae9fb3a1681db168c941f6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::Map </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>fd</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>offset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_map.html#a080388050135ececd8e8b5c7b9d83e21">Prot</a>&#160;</td>
+          <td class="paramname"><em>prot</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101a">Flags</a>&#160;</td>
+          <td class="paramname"><em>flags</em> = <code><a class="el" href="struct_map.html#a05ae4a78423e760d4090a39d0d49101aa332c4acd425ccb5fae1b3e446e6cbffe">Shared</a></code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00105">105</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a72349bdc15e148cbb68e95878a989d70"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::Map </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_map.html">Map</a> &amp;&amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="aa403fbe09394ccf39747588f5168e3b2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::~Map </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00106">106</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a923adb3d3711e79864fda244adde320d"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_map.html">Map</a>&amp; Map::operator= </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_map.html">Map</a> &amp;&amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="aab3f8fab9e282fc51a9b8f8ae7e1784d"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::operator bool </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00155">155</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="afb4a8dff06d4ba1e2cf0dae80440087a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::operator <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00156">156</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6d9778577314a7ab3b09169410c199bc"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::operator <a class="el" href="structmref.html">mref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00157">157</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a83d25b535c59dd6fa61f6cdca6c7cb9b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Map::operator <a class="el" href="structref.html">ref</a>&lt; float &gt; </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00158">158</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac776b34025d25aed4b2f729c74f23f5a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Map::lock </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>size</em> = <code>-1</code></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Locks memory map in RAM. </p>
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00107">107</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab835df651fd5b4c10e858d8c56690d4d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Map::unmap </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Unmaps memory map. </p>
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00108">108</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a15bab18a2939c8d9d45395cc6bc0d26d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structhandle.html">handle</a>&lt;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>*&gt; Map::data</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00165">165</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="afe3d67545ce9342a0fbff091dd387f69"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> Map::size =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00166">166</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

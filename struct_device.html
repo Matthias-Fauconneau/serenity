@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_device.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -132,139 +132,288 @@ Collaboration diagram for Device:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ae3ad44b0ab0f5dba3accc12b41f3a0b8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae3ad44b0ab0f5dba3accc12b41f3a0b8"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Device</b> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;path, const Folder &amp;at=<a class="el" href="file_8h.html#a58a3a30b85a63ddc4b74c15de58fa682">root</a>(), Flags flags=ReadWrite)</td></tr>
+<tr class="memitem:a64ba12dcc5f4267486c5d545d04dcf68"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_device.html#a64ba12dcc5f4267486c5d545d04dcf68">Device</a> ()</td></tr>
+<tr class="separator:a64ba12dcc5f4267486c5d545d04dcf68"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae3ad44b0ab0f5dba3accc12b41f3a0b8"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_device.html#ae3ad44b0ab0f5dba3accc12b41f3a0b8">Device</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;path, const <a class="el" href="struct_folder.html">Folder</a> &amp;at=<a class="el" href="file_8h.html#a58a3a30b85a63ddc4b74c15de58fa682">root</a>(), <a class="el" href="file_8h.html#aa705cf7e79a21c2352b00ffe20cd295f">Flags</a> flags=<a class="el" href="file_8h.html#aa705cf7e79a21c2352b00ffe20cd295fa3c4d2d19c91b345c33a83ca9f551f4e1">ReadWrite</a>)</td></tr>
 <tr class="separator:ae3ad44b0ab0f5dba3accc12b41f3a0b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae84ce649fb0be82853f4b205c83e6316"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae84ce649fb0be82853f4b205c83e6316"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_device.html#ae84ce649fb0be82853f4b205c83e6316">ioctl</a> (uint request, void *<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>)</td></tr>
-<tr class="memdesc:ae84ce649fb0be82853f4b205c83e6316"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl <em>request</em> with untyped <em>arguments</em>. <br/></td></tr>
+<tr class="memitem:ae84ce649fb0be82853f4b205c83e6316"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_device.html#ae84ce649fb0be82853f4b205c83e6316">ioctl</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> request, void *<a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>)</td></tr>
+<tr class="memdesc:ae84ce649fb0be82853f4b205c83e6316"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl <em>request</em> with untyped <em>arguments</em>.  <a href="#ae84ce649fb0be82853f4b205c83e6316">More...</a><br/></td></tr>
 <tr class="separator:ae84ce649fb0be82853f4b205c83e6316"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6acbc7ec297c3a880697c863b48cf62f"><td class="memTemplParams" colspan="2"><a class="anchor" id="a6acbc7ec297c3a880697c863b48cf62f"></a>
-template&lt;typename IO &gt; </td></tr>
+<tr class="memitem:a6acbc7ec297c3a880697c863b48cf62f"><td class="memTemplParams" colspan="2">template&lt;typename IO &gt; </td></tr>
 <tr class="memitem:a6acbc7ec297c3a880697c863b48cf62f"><td class="memTemplItemLeft" align="right" valign="top">int&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#a6acbc7ec297c3a880697c863b48cf62f">io</a> ()</td></tr>
-<tr class="memdesc:a6acbc7ec297c3a880697c863b48cf62f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with neither input/outputs arguments. <br/></td></tr>
+<tr class="memdesc:a6acbc7ec297c3a880697c863b48cf62f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with neither input/outputs arguments.  <a href="#a6acbc7ec297c3a880697c863b48cf62f">More...</a><br/></td></tr>
 <tr class="separator:a6acbc7ec297c3a880697c863b48cf62f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:add954fbcf3ddc5349a8c57f20f512821"><td class="memTemplParams" colspan="2"><a class="anchor" id="add954fbcf3ddc5349a8c57f20f512821"></a>
-template&lt;typename IOW &gt; </td></tr>
-<tr class="memitem:add954fbcf3ddc5349a8c57f20f512821"><td class="memTemplItemLeft" align="right" valign="top">int&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#add954fbcf3ddc5349a8c57f20f512821">iow</a> (const typename IOW::Args &amp;input)</td></tr>
-<tr class="memdesc:add954fbcf3ddc5349a8c57f20f512821"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with <em>input</em> arguments. <br/></td></tr>
+<tr class="memitem:add954fbcf3ddc5349a8c57f20f512821"><td class="memTemplParams" colspan="2">template&lt;typename IOW &gt; </td></tr>
+<tr class="memitem:add954fbcf3ddc5349a8c57f20f512821"><td class="memTemplItemLeft" align="right" valign="top">int&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#add954fbcf3ddc5349a8c57f20f512821">iow</a> (const typename <a class="el" href="struct_i_o_w.html#a78c8fa4d255955fc2173296ed6f12b0f">IOW::Args</a> &amp;input)</td></tr>
+<tr class="memdesc:add954fbcf3ddc5349a8c57f20f512821"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with <em>input</em> arguments.  <a href="#add954fbcf3ddc5349a8c57f20f512821">More...</a><br/></td></tr>
 <tr class="separator:add954fbcf3ddc5349a8c57f20f512821"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a05dac4a93aabeb3eba681b5c4cc14191"><td class="memTemplParams" colspan="2"><a class="anchor" id="a05dac4a93aabeb3eba681b5c4cc14191"></a>
-template&lt;typename IOR &gt; </td></tr>
-<tr class="memitem:a05dac4a93aabeb3eba681b5c4cc14191"><td class="memTemplItemLeft" align="right" valign="top">IOR::Args&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#a05dac4a93aabeb3eba681b5c4cc14191">ior</a> ()</td></tr>
-<tr class="memdesc:a05dac4a93aabeb3eba681b5c4cc14191"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with output arguments. <br/></td></tr>
+<tr class="memitem:a05dac4a93aabeb3eba681b5c4cc14191"><td class="memTemplParams" colspan="2">template&lt;typename IOR &gt; </td></tr>
+<tr class="memitem:a05dac4a93aabeb3eba681b5c4cc14191"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="struct_i_o_r.html#a388dbd1bc96fa4fc2c8274eb34de9e1b">IOR::Args</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#a05dac4a93aabeb3eba681b5c4cc14191">ior</a> ()</td></tr>
+<tr class="memdesc:a05dac4a93aabeb3eba681b5c4cc14191"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with output arguments.  <a href="#a05dac4a93aabeb3eba681b5c4cc14191">More...</a><br/></td></tr>
 <tr class="separator:a05dac4a93aabeb3eba681b5c4cc14191"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a604fc59437aecb4e20ca712b90d9fd75"><td class="memTemplParams" colspan="2"><a class="anchor" id="a604fc59437aecb4e20ca712b90d9fd75"></a>
-template&lt;typename IOWR &gt; </td></tr>
-<tr class="memitem:a604fc59437aecb4e20ca712b90d9fd75"><td class="memTemplItemLeft" align="right" valign="top">int&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#a604fc59437aecb4e20ca712b90d9fd75">iowr</a> (typename IOWR::Args &amp;reference)</td></tr>
-<tr class="memdesc:a604fc59437aecb4e20ca712b90d9fd75"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with <em>reference</em> argument. <br/></td></tr>
+<tr class="memitem:a604fc59437aecb4e20ca712b90d9fd75"><td class="memTemplParams" colspan="2">template&lt;typename IOWR &gt; </td></tr>
+<tr class="memitem:a604fc59437aecb4e20ca712b90d9fd75"><td class="memTemplItemLeft" align="right" valign="top">int&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_device.html#a604fc59437aecb4e20ca712b90d9fd75">iowr</a> (typename <a class="el" href="struct_i_o_w_r.html#a4b73f3f095ed8225744d0ee34f39ebbc">IOWR::Args</a> &amp;<a class="el" href="slice_8cc.html#ab44ea3eaa789020ac30b9f11f64efbdc">reference</a>)</td></tr>
+<tr class="memdesc:a604fc59437aecb4e20ca712b90d9fd75"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends ioctl request with <em>reference</em> argument.  <a href="#a604fc59437aecb4e20ca712b90d9fd75">More...</a><br/></td></tr>
 <tr class="separator:a604fc59437aecb4e20ca712b90d9fd75"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_file"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_file')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_file.html">File</a></td></tr>
-<tr class="memitem:ac4d3d35af221569a551948fffa1aaf05 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac4d3d35af221569a551948fffa1aaf05"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>File</b> (int fd)</td></tr>
+<tr class="memitem:ae039af5807fc385f41b60644725d15d0 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#ae039af5807fc385f41b60644725d15d0">File</a> ()</td></tr>
+<tr class="separator:ae039af5807fc385f41b60644725d15d0 inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac4d3d35af221569a551948fffa1aaf05 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#ac4d3d35af221569a551948fffa1aaf05">File</a> (int <a class="el" href="struct_handle.html#a65397389c31c21d23b6eae705d56da37">fd</a>)</td></tr>
 <tr class="separator:ac4d3d35af221569a551948fffa1aaf05 inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3fdc56bb9602c4dcb03f1b88d62afb62 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a3fdc56bb9602c4dcb03f1b88d62afb62">File</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;path, const Folder &amp;at=<a class="el" href="file_8h.html#aaa65fa352abf15fd4b17431d4e0e00b9">currentWorkingDirectory</a>(), Flags flags=ReadOnly)</td></tr>
+<tr class="memitem:a3fdc56bb9602c4dcb03f1b88d62afb62 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a3fdc56bb9602c4dcb03f1b88d62afb62">File</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;path, const <a class="el" href="struct_folder.html">Folder</a> &amp;at=<a class="el" href="file_8h.html#aaa65fa352abf15fd4b17431d4e0e00b9">currentWorkingDirectory</a>(), <a class="el" href="file_8h.html#aa705cf7e79a21c2352b00ffe20cd295f">Flags</a> flags=<a class="el" href="file_8h.html#aa705cf7e79a21c2352b00ffe20cd295faf1a03d8a79e3c6ef4a82a0ba3fec6e7a">ReadOnly</a>)</td></tr>
 <tr class="separator:a3fdc56bb9602c4dcb03f1b88d62afb62 inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a31ee0fb4c730cee79d3453c468d93ace inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a31ee0fb4c730cee79d3453c468d93ace"></a>
-struct stat&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a31ee0fb4c730cee79d3453c468d93ace">stat</a> () const  { assert(path.size&lt;0x100)</td></tr>
-<tr class="memdesc:a31ee0fb4c730cee79d3453c468d93ace inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file properties. <br/></td></tr>
+<tr class="memitem:a31ee0fb4c730cee79d3453c468d93ace inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top">struct stat&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a31ee0fb4c730cee79d3453c468d93ace">stat</a> () const  { <a class="el" href="core_8h.html#a784dd097cb273f2069311854ed1a7ce8">assert</a>(<a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">path.size</a>&lt;0x100)</td></tr>
+<tr class="memdesc:a31ee0fb4c730cee79d3453c468d93ace inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file properties.  <a href="#a31ee0fb4c730cee79d3453c468d93ace">More...</a><br/></td></tr>
 <tr class="separator:a31ee0fb4c730cee79d3453c468d93ace inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae600eac451b9c1298401e1f63c89383a inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae600eac451b9c1298401e1f63c89383a"></a>
-FileType&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#ae600eac451b9c1298401e1f63c89383a">type</a> () const </td></tr>
-<tr class="memdesc:ae600eac451b9c1298401e1f63c89383a inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file type. <br/></td></tr>
+<tr class="memitem:ae600eac451b9c1298401e1f63c89383a inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="el" href="file_8h.html#a2c794c5c13ab4dd7e65bad031dbe41c3">FileType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#ae600eac451b9c1298401e1f63c89383a">type</a> () const </td></tr>
+<tr class="memdesc:ae600eac451b9c1298401e1f63c89383a inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file type.  <a href="#ae600eac451b9c1298401e1f63c89383a">More...</a><br/></td></tr>
 <tr class="separator:ae600eac451b9c1298401e1f63c89383a inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0d278cdf55b664a63b512307f4a4c8f4 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0d278cdf55b664a63b512307f4a4c8f4"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a0d278cdf55b664a63b512307f4a4c8f4">size</a> () const </td></tr>
-<tr class="memdesc:a0d278cdf55b664a63b512307f4a4c8f4 inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file size. <br/></td></tr>
+<tr class="memitem:a0d278cdf55b664a63b512307f4a4c8f4 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a0d278cdf55b664a63b512307f4a4c8f4">size</a> () const </td></tr>
+<tr class="memdesc:a0d278cdf55b664a63b512307f4a4c8f4 inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file size.  <a href="#a0d278cdf55b664a63b512307f4a4c8f4">More...</a><br/></td></tr>
 <tr class="separator:a0d278cdf55b664a63b512307f4a4c8f4 inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aed155e73eb0a3622a5c4a6d233bc7b78 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aed155e73eb0a3622a5c4a6d233bc7b78"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#aed155e73eb0a3622a5c4a6d233bc7b78">accessTime</a> () const </td></tr>
-<tr class="memdesc:aed155e73eb0a3622a5c4a6d233bc7b78 inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the last access Unix timestamp (in nanoseconds) <br/></td></tr>
+<tr class="memitem:aed155e73eb0a3622a5c4a6d233bc7b78 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#aed155e73eb0a3622a5c4a6d233bc7b78">accessTime</a> () const </td></tr>
+<tr class="memdesc:aed155e73eb0a3622a5c4a6d233bc7b78 inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the last access Unix timestamp (in nanoseconds)  <a href="#aed155e73eb0a3622a5c4a6d233bc7b78">More...</a><br/></td></tr>
 <tr class="separator:aed155e73eb0a3622a5c4a6d233bc7b78 inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad45cfc7dd46457384adca8dbfbfefcfa inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad45cfc7dd46457384adca8dbfbfefcfa"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#ad45cfc7dd46457384adca8dbfbfefcfa">modifiedTime</a> () const </td></tr>
-<tr class="memdesc:ad45cfc7dd46457384adca8dbfbfefcfa inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the last modified Unix timestamp (in nanoseconds) <br/></td></tr>
+<tr class="memitem:ad45cfc7dd46457384adca8dbfbfefcfa inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#ad45cfc7dd46457384adca8dbfbfefcfa">modifiedTime</a> () const </td></tr>
+<tr class="memdesc:ad45cfc7dd46457384adca8dbfbfefcfa inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the last modified Unix timestamp (in nanoseconds)  <a href="#ad45cfc7dd46457384adca8dbfbfefcfa">More...</a><br/></td></tr>
 <tr class="separator:ad45cfc7dd46457384adca8dbfbfefcfa inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a61d2f510106f5ddeec7250e0b17a1da7 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a61d2f510106f5ddeec7250e0b17a1da7"></a>
-<a class="el" href="struct_file.html">File</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a61d2f510106f5ddeec7250e0b17a1da7">resize</a> (int64 <a class="el" href="struct_file.html#a0d278cdf55b664a63b512307f4a4c8f4">size</a>)</td></tr>
-<tr class="memdesc:a61d2f510106f5ddeec7250e0b17a1da7 inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Resizes file. <br/></td></tr>
+<tr class="memitem:a61d2f510106f5ddeec7250e0b17a1da7 inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_file.html">File</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a61d2f510106f5ddeec7250e0b17a1da7">resize</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> <a class="el" href="struct_file.html#a0d278cdf55b664a63b512307f4a4c8f4">size</a>)</td></tr>
+<tr class="memdesc:a61d2f510106f5ddeec7250e0b17a1da7 inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Resizes file.  <a href="#a61d2f510106f5ddeec7250e0b17a1da7">More...</a><br/></td></tr>
 <tr class="separator:a61d2f510106f5ddeec7250e0b17a1da7 inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8af77f715f9a45c029c547b43486dd9d inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8af77f715f9a45c029c547b43486dd9d"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a8af77f715f9a45c029c547b43486dd9d">seek</a> (int index)</td></tr>
-<tr class="memdesc:a8af77f715f9a45c029c547b43486dd9d inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Seeks to <em>index</em>. <br/></td></tr>
+<tr class="memitem:a8af77f715f9a45c029c547b43486dd9d inherit pub_methods_struct_file"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_file.html#a8af77f715f9a45c029c547b43486dd9d">seek</a> (int index)</td></tr>
+<tr class="memdesc:a8af77f715f9a45c029c547b43486dd9d inherit pub_methods_struct_file"><td class="mdescLeft">&#160;</td><td class="mdescRight">Seeks to <em>index</em>.  <a href="#a8af77f715f9a45c029c547b43486dd9d">More...</a><br/></td></tr>
 <tr class="separator:a8af77f715f9a45c029c547b43486dd9d inherit pub_methods_struct_file"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_stream"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_stream')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_stream.html">Stream</a></td></tr>
-<tr class="memitem:ac9a846a21907e24e31e1a62bfd8f3ae6 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac9a846a21907e24e31e1a62bfd8f3ae6"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Stream</b> (int fd)</td></tr>
+<tr class="memitem:a8c3f05bd00361ec92627fa41f330a39b inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a8c3f05bd00361ec92627fa41f330a39b">Stream</a> ()</td></tr>
+<tr class="separator:a8c3f05bd00361ec92627fa41f330a39b inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac9a846a21907e24e31e1a62bfd8f3ae6 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#ac9a846a21907e24e31e1a62bfd8f3ae6">Stream</a> (int <a class="el" href="struct_handle.html#a65397389c31c21d23b6eae705d56da37">fd</a>)</td></tr>
 <tr class="separator:ac9a846a21907e24e31e1a62bfd8f3ae6 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1c640af4452bd5a7b7784938126fbd34 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1c640af4452bd5a7b7784938126fbd34"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a1c640af4452bd5a7b7784938126fbd34">read</a> (byte *<a class="el" href="structbuffer.html">buffer</a>, size_t size)</td></tr>
-<tr class="memdesc:a1c640af4452bd5a7b7784938126fbd34 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads exactly <em>size</em> bytes into <em>buffer</em>. <br/></td></tr>
+<tr class="memitem:a1c640af4452bd5a7b7784938126fbd34 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a1c640af4452bd5a7b7784938126fbd34">read</a> (<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> *<a class="el" href="structbuffer.html">buffer</a>, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:a1c640af4452bd5a7b7784938126fbd34 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads exactly <em>size</em> bytes into <em>buffer</em>.  <a href="#a1c640af4452bd5a7b7784938126fbd34">More...</a><br/></td></tr>
 <tr class="separator:a1c640af4452bd5a7b7784938126fbd34 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac449d616b8770cd698e8ecde1c00cc98 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac449d616b8770cd698e8ecde1c00cc98"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#ac449d616b8770cd698e8ecde1c00cc98">readUpTo</a> (byte *<a class="el" href="structbuffer.html">buffer</a>, size_t size)</td></tr>
-<tr class="memdesc:ac449d616b8770cd698e8ecde1c00cc98 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads up to <em>size</em> bytes into <em>buffer</em>. <br/></td></tr>
+<tr class="memitem:ac449d616b8770cd698e8ecde1c00cc98 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#ac449d616b8770cd698e8ecde1c00cc98">readUpTo</a> (<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> *<a class="el" href="structbuffer.html">buffer</a>, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:ac449d616b8770cd698e8ecde1c00cc98 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads up to <em>size</em> bytes into <em>buffer</em>.  <a href="#ac449d616b8770cd698e8ecde1c00cc98">More...</a><br/></td></tr>
 <tr class="separator:ac449d616b8770cd698e8ecde1c00cc98 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a26069bdc4db3ae9793b54a3ae5e93659 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a26069bdc4db3ae9793b54a3ae5e93659"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a26069bdc4db3ae9793b54a3ae5e93659">read</a> (size_t size)</td></tr>
-<tr class="memdesc:a26069bdc4db3ae9793b54a3ae5e93659 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads exactly <em>size</em> bytes. <br/></td></tr>
+<tr class="memitem:a26069bdc4db3ae9793b54a3ae5e93659 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a26069bdc4db3ae9793b54a3ae5e93659">read</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:a26069bdc4db3ae9793b54a3ae5e93659 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads exactly <em>size</em> bytes.  <a href="#a26069bdc4db3ae9793b54a3ae5e93659">More...</a><br/></td></tr>
 <tr class="separator:a26069bdc4db3ae9793b54a3ae5e93659 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a70ffff3612b8736892a503bf4b6ddc69 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a70ffff3612b8736892a503bf4b6ddc69"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a70ffff3612b8736892a503bf4b6ddc69">readUpTo</a> (size_t size)</td></tr>
-<tr class="memdesc:a70ffff3612b8736892a503bf4b6ddc69 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads up to <em>size</em> bytes. <br/></td></tr>
+<tr class="memitem:a70ffff3612b8736892a503bf4b6ddc69 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a70ffff3612b8736892a503bf4b6ddc69">readUpTo</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:a70ffff3612b8736892a503bf4b6ddc69 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads up to <em>size</em> bytes.  <a href="#a70ffff3612b8736892a503bf4b6ddc69">More...</a><br/></td></tr>
 <tr class="separator:a70ffff3612b8736892a503bf4b6ddc69 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7b5f7c1782995c957e69bf8d212dface inherit pub_methods_struct_stream"><td class="memTemplParams" colspan="2"><a class="anchor" id="a7b5f7c1782995c957e69bf8d212dface"></a>
-template&lt;typename T &gt; </td></tr>
+<tr class="memitem:a7b5f7c1782995c957e69bf8d212dface inherit pub_methods_struct_stream"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
 <tr class="memitem:a7b5f7c1782995c957e69bf8d212dface inherit pub_methods_struct_stream"><td class="memTemplItemLeft" align="right" valign="top">T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_stream.html#a7b5f7c1782995c957e69bf8d212dface">read</a> ()</td></tr>
-<tr class="memdesc:a7b5f7c1782995c957e69bf8d212dface inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads a raw value. <br/></td></tr>
+<tr class="memdesc:a7b5f7c1782995c957e69bf8d212dface inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads a raw value.  <a href="#a7b5f7c1782995c957e69bf8d212dface">More...</a><br/></td></tr>
 <tr class="separator:a7b5f7c1782995c957e69bf8d212dface inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="memTemplParams" colspan="2"><a class="anchor" id="aea6d6b50dde3d5feb1199f835a303269"></a>
-template&lt;typename T &gt; </td></tr>
-<tr class="memitem:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_stream.html#aea6d6b50dde3d5feb1199f835a303269">read</a> (size_t size)</td></tr>
-<tr class="memdesc:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads <em>size</em> raw values. <br/></td></tr>
+<tr class="memitem:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_stream.html#aea6d6b50dde3d5feb1199f835a303269">read</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reads <em>size</em> raw values.  <a href="#aea6d6b50dde3d5feb1199f835a303269">More...</a><br/></td></tr>
 <tr class="separator:aea6d6b50dde3d5feb1199f835a303269 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6cda41b17cf9fb7243a71a4d26b13377 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6cda41b17cf9fb7243a71a4d26b13377"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a6cda41b17cf9fb7243a71a4d26b13377">poll</a> (int timeout=0)</td></tr>
-<tr class="memdesc:a6cda41b17cf9fb7243a71a4d26b13377 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Polls whether reading would block. <br/></td></tr>
+<tr class="memitem:a6cda41b17cf9fb7243a71a4d26b13377 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a6cda41b17cf9fb7243a71a4d26b13377">poll</a> (int timeout=0)</td></tr>
+<tr class="memdesc:a6cda41b17cf9fb7243a71a4d26b13377 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Polls whether reading would block.  <a href="#a6cda41b17cf9fb7243a71a4d26b13377">More...</a><br/></td></tr>
 <tr class="separator:a6cda41b17cf9fb7243a71a4d26b13377 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af3019ae0b9b7f16e8d4fef36311633d5 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af3019ae0b9b7f16e8d4fef36311633d5"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#af3019ae0b9b7f16e8d4fef36311633d5">write</a> (const byte *data, size_t size)</td></tr>
-<tr class="memdesc:af3019ae0b9b7f16e8d4fef36311633d5 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes <em>buffer</em> of <em>size</em> bytes. <br/></td></tr>
+<tr class="memitem:af3019ae0b9b7f16e8d4fef36311633d5 inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#af3019ae0b9b7f16e8d4fef36311633d5">write</a> (const <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> *<a class="el" href="opencl_8cc.html#ab598ab784cd31f1683da18d1e2122129">data</a>, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:af3019ae0b9b7f16e8d4fef36311633d5 inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes <em>buffer</em> of <em>size</em> bytes.  <a href="#af3019ae0b9b7f16e8d4fef36311633d5">More...</a><br/></td></tr>
 <tr class="separator:af3019ae0b9b7f16e8d4fef36311633d5 inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8669856b2b3b8673a1cee1fe03d2ac5a inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8669856b2b3b8673a1cee1fe03d2ac5a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a8669856b2b3b8673a1cee1fe03d2ac5a">write</a> (const <a class="el" href="structref.html">ref</a>&lt; byte &gt; &amp;<a class="el" href="structbuffer.html">buffer</a>)</td></tr>
-<tr class="memdesc:a8669856b2b3b8673a1cee1fe03d2ac5a inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes <em>buffer</em>. <br/></td></tr>
+<tr class="memitem:a8669856b2b3b8673a1cee1fe03d2ac5a inherit pub_methods_struct_stream"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_stream.html#a8669856b2b3b8673a1cee1fe03d2ac5a">write</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;<a class="el" href="structbuffer.html">buffer</a>)</td></tr>
+<tr class="memdesc:a8669856b2b3b8673a1cee1fe03d2ac5a inherit pub_methods_struct_stream"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes <em>buffer</em>.  <a href="#a8669856b2b3b8673a1cee1fe03d2ac5a">More...</a><br/></td></tr>
 <tr class="separator:a8669856b2b3b8673a1cee1fe03d2ac5a inherit pub_methods_struct_stream"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_handle"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_handle')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_handle.html">Handle</a></td></tr>
-<tr class="memitem:a447b79aecaa861589adfad34da09d9fd inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a447b79aecaa861589adfad34da09d9fd"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Handle</b> (int fd)</td></tr>
+<tr class="memitem:a4e3b97f227b72125e595164e0a6629a7 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a4e3b97f227b72125e595164e0a6629a7">Handle</a> ()</td></tr>
+<tr class="separator:a4e3b97f227b72125e595164e0a6629a7 inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a447b79aecaa861589adfad34da09d9fd inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a447b79aecaa861589adfad34da09d9fd">Handle</a> (int <a class="el" href="struct_handle.html#a65397389c31c21d23b6eae705d56da37">fd</a>)</td></tr>
 <tr class="separator:a447b79aecaa861589adfad34da09d9fd inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a36d563f2346a408f65526bea077cdfe0 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a36d563f2346a408f65526bea077cdfe0"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Handle</b> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a36d563f2346a408f65526bea077cdfe0 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a36d563f2346a408f65526bea077cdfe0">Handle</a> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a36d563f2346a408f65526bea077cdfe0 inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b5043aecd926b15dd22b014997886c8 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1b5043aecd926b15dd22b014997886c8"></a>
-<a class="el" href="struct_handle.html">Handle</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
+<tr class="memitem:a1b5043aecd926b15dd22b014997886c8 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_handle.html">Handle</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a1b5043aecd926b15dd22b014997886c8">operator=</a> (<a class="el" href="struct_handle.html">Handle</a> &amp;&amp;)=default</td></tr>
 <tr class="separator:a1b5043aecd926b15dd22b014997886c8 inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a58b1dc3169dffb55690e54b82d756804 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a58b1dc3169dffb55690e54b82d756804"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>operator bool</b> () const </td></tr>
+<tr class="memitem:ad63422289041b1a0fbebae079786ae22 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#ad63422289041b1a0fbebae079786ae22">~Handle</a> ()</td></tr>
+<tr class="separator:ad63422289041b1a0fbebae079786ae22 inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a58b1dc3169dffb55690e54b82d756804 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a58b1dc3169dffb55690e54b82d756804">operator bool</a> () const </td></tr>
 <tr class="separator:a58b1dc3169dffb55690e54b82d756804 inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adbc8ca925326ef2429a2f3b15a1ed430 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="adbc8ca925326ef2429a2f3b15a1ed430"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#adbc8ca925326ef2429a2f3b15a1ed430">name</a> () const </td></tr>
-<tr class="memdesc:adbc8ca925326ef2429a2f3b15a1ed430 inherit pub_methods_struct_handle"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file descriptor name. <br/></td></tr>
+<tr class="memitem:adbc8ca925326ef2429a2f3b15a1ed430 inherit pub_methods_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#adbc8ca925326ef2429a2f3b15a1ed430">name</a> () const </td></tr>
+<tr class="memdesc:adbc8ca925326ef2429a2f3b15a1ed430 inherit pub_methods_struct_handle"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns file descriptor name.  <a href="#adbc8ca925326ef2429a2f3b15a1ed430">More...</a><br/></td></tr>
 <tr class="separator:adbc8ca925326ef2429a2f3b15a1ed430 inherit pub_methods_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
 <tr class="inherit_header pub_attribs_struct_handle"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_handle')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_handle.html">Handle</a></td></tr>
-<tr class="memitem:a65397389c31c21d23b6eae705d56da37 inherit pub_attribs_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a65397389c31c21d23b6eae705d56da37"></a>
-<a class="el" href="structhandle.html">handle</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>fd</b></td></tr>
+<tr class="memitem:a65397389c31c21d23b6eae705d56da37 inherit pub_attribs_struct_handle"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structhandle.html">handle</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_handle.html#a65397389c31c21d23b6eae705d56da37">fd</a></td></tr>
 <tr class="separator:a65397389c31c21d23b6eae705d56da37 inherit pub_attribs_struct_handle"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p><a class="el" href="struct_handle.html" title="Unix file descriptor. ">Handle</a> to a device. </p>
 
 <p>Definition at line <a class="el" href="file_8h_source.html#l00128">128</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a64ba12dcc5f4267486c5d545d04dcf68"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Device::Device </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00129">129</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae3ad44b0ab0f5dba3accc12b41f3a0b8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Device::Device </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_folder.html">Folder</a> &amp;&#160;</td>
+          <td class="paramname"><em>at</em> = <code><a class="el" href="file_8h.html#a58a3a30b85a63ddc4b74c15de58fa682">root</a>()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="file_8h.html#aa705cf7e79a21c2352b00ffe20cd295f">Flags</a>&#160;</td>
+          <td class="paramname"><em>flags</em> = <code><a class="el" href="file_8h.html#aa705cf7e79a21c2352b00ffe20cd295fa3c4d2d19c91b345c33a83ca9f551f4e1">ReadWrite</a></code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00130">130</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="ae84ce649fb0be82853f4b205c83e6316"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Device::ioctl </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>request</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>arguments</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sends ioctl <em>request</em> with untyped <em>arguments</em>. </p>
+
+<p>Definition at line <a class="el" href="file_8cc_source.html#l00101">101</a> of file <a class="el" href="file_8cc_source.html">file.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6acbc7ec297c3a880697c863b48cf62f"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename IO &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">int Device::io </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sends ioctl request with neither input/outputs arguments. </p>
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00134">134</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="add954fbcf3ddc5349a8c57f20f512821"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename IOW &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">int Device::iow </td>
+          <td>(</td>
+          <td class="paramtype">const typename <a class="el" href="struct_i_o_w.html#a78c8fa4d255955fc2173296ed6f12b0f">IOW::Args</a> &amp;&#160;</td>
+          <td class="paramname"><em>input</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sends ioctl request with <em>input</em> arguments. </p>
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00136">136</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a05dac4a93aabeb3eba681b5c4cc14191"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename IOR &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_i_o_r.html#a388dbd1bc96fa4fc2c8274eb34de9e1b">IOR::Args</a> Device::ior </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sends ioctl request with output arguments. </p>
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00138">138</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a604fc59437aecb4e20ca712b90d9fd75"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename IOWR &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">int Device::iowr </td>
+          <td>(</td>
+          <td class="paramtype">typename <a class="el" href="struct_i_o_w_r.html#a4b73f3f095ed8225744d0ee34f39ebbc">IOWR::Args</a> &amp;&#160;</td>
+          <td class="paramname"><em>reference</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sends ioctl request with <em>reference</em> argument. </p>
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00140">140</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

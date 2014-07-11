@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_i_o_r.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -111,17 +111,17 @@ $(document).ready(function(){initNavTree('struct_i_o_r.html','');});
 <div class="title">IOR&lt; major, minor, T &gt; Struct Template Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p><code>#include &lt;<a class="el" href="file_8h_source.html">file.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:a388dbd1bc96fa4fc2c8274eb34de9e1b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a388dbd1bc96fa4fc2c8274eb34de9e1b"></a>
-typedef T&#160;</td><td class="memItemRight" valign="bottom"><b>Args</b></td></tr>
+<tr class="memitem:a388dbd1bc96fa4fc2c8274eb34de9e1b"><td class="memItemLeft" align="right" valign="top">typedef T&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_i_o_r.html#a388dbd1bc96fa4fc2c8274eb34de9e1b">Args</a></td></tr>
 <tr class="separator:a388dbd1bc96fa4fc2c8274eb34de9e1b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-attribs"></a>
 Static Public Attributes</h2></td></tr>
-<tr class="memitem:a15fe8ec116ee5954f632c5a96e660525"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a15fe8ec116ee5954f632c5a96e660525"></a>
-static constexpr uint&#160;</td><td class="memItemRight" valign="bottom"><b>ior</b> = 2&lt;&lt;30 | sizeof(T)&lt;&lt;16 | major&lt;&lt;8 | minor</td></tr>
+<tr class="memitem:a15fe8ec116ee5954f632c5a96e660525"><td class="memItemLeft" align="right" valign="top">static constexpr <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_i_o_r.html#a15fe8ec116ee5954f632c5a96e660525">ior</a> = 2&lt;&lt;30 | sizeof(T)&lt;&lt;16 | major&lt;&lt;8 | minor</td></tr>
 <tr class="separator:a15fe8ec116ee5954f632c5a96e660525"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
@@ -130,7 +130,49 @@ struct IOR&lt; major, minor, T &gt;</h3>
 
 
 <p>Definition at line <a class="el" href="file_8h_source.html#l00125">125</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Member Typedef Documentation</h2>
+<a class="anchor" id="a388dbd1bc96fa4fc2c8274eb34de9e1b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;uint major, uint minor, typename T &gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef T <a class="el" href="struct_i_o_r.html">IOR</a>&lt; major, minor, T &gt;::<a class="el" href="struct_i_o_r.html#a388dbd1bc96fa4fc2c8274eb34de9e1b">Args</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00125">125</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a15fe8ec116ee5954f632c5a96e660525"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;uint major, uint minor, typename T &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">constexpr <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_i_o_r.html">IOR</a>&lt; major, minor, T &gt;::ior = 2&lt;&lt;30 | sizeof(T)&lt;&lt;16 | major&lt;&lt;8 | minor</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="file_8h_source.html#l00125">125</a> of file <a class="el" href="file_8h_source.html">file.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

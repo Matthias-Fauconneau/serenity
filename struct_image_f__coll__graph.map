@@ -1,4 +1,5 @@
 <map id="ImageF" name="ImageF">
-<area shape="rect" id="node2" href="$structbuffer.html" title="buffer\&lt; float \&gt;" alt="" coords="5,5,109,32"/>
-<area shape="rect" id="node3" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="134,5,252,32"/>
+<area shape="rect" id="node2" href="$structbuffer.html" title="buffer\&lt; float \&gt;" alt="" coords="5,83,109,109"/>
+<area shape="rect" id="node3" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="134,83,252,109"/>
+<area shape="rect" id="node4" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="156,5,229,32"/>
 </map>

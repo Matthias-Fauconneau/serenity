@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_text_1_1_cursor.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -111,32 +111,143 @@ $(document).ready(function(){initNavTree('struct_text_1_1_cursor.html','');});
 <div class="title">Text::Cursor Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p><code>#include &lt;<a class="el" href="text_8h_source.html">text.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:af8a994eb4538347824a9e71e6a79f90a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af8a994eb4538347824a9e71e6a79f90a"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Cursor</b> (uint line, uint column)</td></tr>
+<tr class="memitem:a10501089809b5e6e58febda9781924ec"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_1_1_cursor.html#a10501089809b5e6e58febda9781924ec">Cursor</a> ()</td></tr>
+<tr class="separator:a10501089809b5e6e58febda9781924ec"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af8a994eb4538347824a9e71e6a79f90a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_1_1_cursor.html#af8a994eb4538347824a9e71e6a79f90a">Cursor</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_text_1_1_cursor.html#acf1122b0f3f89f800e0144d1f673e775">line</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_text_1_1_cursor.html#a3433579a255a41122afca64b797851ee">column</a>)</td></tr>
 <tr class="separator:af8a994eb4538347824a9e71e6a79f90a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a04f40b181175990684a2dc6cc53796f5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a04f40b181175990684a2dc6cc53796f5"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator==</b> (const <a class="el" href="struct_text_1_1_cursor.html">Cursor</a> &amp;o) const </td></tr>
+<tr class="memitem:a04f40b181175990684a2dc6cc53796f5"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_1_1_cursor.html#a04f40b181175990684a2dc6cc53796f5">operator==</a> (const <a class="el" href="struct_text_1_1_cursor.html">Cursor</a> &amp;o) const </td></tr>
 <tr class="separator:a04f40b181175990684a2dc6cc53796f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a80b86aa8ff920ffd42221039f3c60e29"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a80b86aa8ff920ffd42221039f3c60e29"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator&lt;</b> (const <a class="el" href="struct_text_1_1_cursor.html">Cursor</a> &amp;o) const </td></tr>
+<tr class="memitem:a80b86aa8ff920ffd42221039f3c60e29"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_1_1_cursor.html#a80b86aa8ff920ffd42221039f3c60e29">operator&lt;</a> (const <a class="el" href="struct_text_1_1_cursor.html">Cursor</a> &amp;o) const </td></tr>
 <tr class="separator:a80b86aa8ff920ffd42221039f3c60e29"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:acf1122b0f3f89f800e0144d1f673e775"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acf1122b0f3f89f800e0144d1f673e775"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>line</b> =0</td></tr>
+<tr class="memitem:acf1122b0f3f89f800e0144d1f673e775"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_1_1_cursor.html#acf1122b0f3f89f800e0144d1f673e775">line</a> =0</td></tr>
 <tr class="separator:acf1122b0f3f89f800e0144d1f673e775"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3433579a255a41122afca64b797851ee"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3433579a255a41122afca64b797851ee"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>column</b> =0</td></tr>
+<tr class="memitem:a3433579a255a41122afca64b797851ee"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_1_1_cursor.html#a3433579a255a41122afca64b797851ee">column</a> =0</td></tr>
 <tr class="separator:a3433579a255a41122afca64b797851ee"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="text_8h_source.html#l00058">58</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a10501089809b5e6e58febda9781924ec"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Text::Cursor::Cursor </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8h_source.html#l00060">60</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af8a994eb4538347824a9e71e6a79f90a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Text::Cursor::Cursor </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>line</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>column</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8h_source.html#l00061">61</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a04f40b181175990684a2dc6cc53796f5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Text::Cursor::operator== </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_text_1_1_cursor.html">Cursor</a> &amp;&#160;</td>
+          <td class="paramname"><em>o</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8h_source.html#l00062">62</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a80b86aa8ff920ffd42221039f3c60e29"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Text::Cursor::operator&lt; </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_text_1_1_cursor.html">Cursor</a> &amp;&#160;</td>
+          <td class="paramname"><em>o</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8h_source.html#l00063">63</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="acf1122b0f3f89f800e0144d1f673e775"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> Text::Cursor::line =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8h_source.html#l00059">59</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3433579a255a41122afca64b797851ee"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> Text::Cursor::column =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8h_source.html#l00059">59</a> of file <a class="el" href="text_8h_source.html">text.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

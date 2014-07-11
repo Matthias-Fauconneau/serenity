@@ -1,9 +1,14 @@
 var file_8h =
 [
     [ "Handle", "struct_handle.html", "struct_handle" ],
+    [ "Folder", "struct_folder.html", "struct_folder" ],
     [ "Stream", "struct_stream.html", "struct_stream" ],
     [ "Socket", "struct_socket.html", "struct_socket" ],
     [ "File", "struct_file.html", "struct_file" ],
+    [ "IO", "struct_i_o.html", null ],
+    [ "IOW", "struct_i_o_w.html", "struct_i_o_w" ],
+    [ "IOR", "struct_i_o_r.html", "struct_i_o_r" ],
+    [ "IOWR", "struct_i_o_w_r.html", "struct_i_o_w_r" ],
     [ "Device", "struct_device.html", "struct_device" ],
     [ "Map", "struct_map.html", "struct_map" ],
     [ "check", "file_8h.html#ad550f6b197466e8ae37371ca8bee8e4d", null ],

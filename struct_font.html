@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_font.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -127,95 +127,368 @@ Collaboration diagram for Font:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aaa7987706de2f987a921b84335f5000d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aaa7987706de2f987a921b84335f5000d"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#aaa7987706de2f987a921b84335f5000d">Font</a> (const <a class="el" href="structref.html">ref</a>&lt; byte &gt; &amp;data, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>)</td></tr>
-<tr class="memdesc:aaa7987706de2f987a921b84335f5000d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Loads font /a data scaled to /a size pixels high. <br/></td></tr>
+<tr class="memitem:aaa7987706de2f987a921b84335f5000d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#aaa7987706de2f987a921b84335f5000d">Font</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;<a class="el" href="opencl_8cc.html#ab598ab784cd31f1683da18d1e2122129">data</a>, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>)</td></tr>
+<tr class="memdesc:aaa7987706de2f987a921b84335f5000d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Loads font /a data scaled to /a size pixels high.  <a href="#aaa7987706de2f987a921b84335f5000d">More...</a><br/></td></tr>
 <tr class="separator:aaa7987706de2f987a921b84335f5000d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abdaf41cac0a7bd0d447bd8a574e967d2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abdaf41cac0a7bd0d447bd8a574e967d2"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#abdaf41cac0a7bd0d447bd8a574e967d2">Font</a> (::<a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt; &amp;&amp;<a class="el" href="structbuffer.html">buffer</a>, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>=0)</td></tr>
-<tr class="memdesc:abdaf41cac0a7bd0d447bd8a574e967d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Loads font /a data scaled to /a size pixels high. <br/></td></tr>
+<tr class="memitem:abdaf41cac0a7bd0d447bd8a574e967d2"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#abdaf41cac0a7bd0d447bd8a574e967d2">Font</a> (::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;&amp;<a class="el" href="structbuffer.html">buffer</a>, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>=0)</td></tr>
+<tr class="memdesc:abdaf41cac0a7bd0d447bd8a574e967d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Loads font /a data scaled to /a size pixels high.  <a href="#abdaf41cac0a7bd0d447bd8a574e967d2">More...</a><br/></td></tr>
 <tr class="separator:abdaf41cac0a7bd0d447bd8a574e967d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acff530b72a3002561eee739593a5e839"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acff530b72a3002561eee739593a5e839"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#acff530b72a3002561eee739593a5e839">Font</a> (<a class="el" href="struct_map.html">Map</a> &amp;&amp;<a class="el" href="structmap.html">map</a>, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>)</td></tr>
-<tr class="memdesc:acff530b72a3002561eee739593a5e839"><td class="mdescLeft">&#160;</td><td class="mdescRight">Loads font /a data scaled to /a size pixels high. <br/></td></tr>
+<tr class="memitem:acff530b72a3002561eee739593a5e839"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#acff530b72a3002561eee739593a5e839">Font</a> (<a class="el" href="struct_map.html">Map</a> &amp;&amp;<a class="el" href="structmap.html">map</a>, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>)</td></tr>
+<tr class="memdesc:acff530b72a3002561eee739593a5e839"><td class="mdescLeft">&#160;</td><td class="mdescRight">Loads font /a data scaled to /a size pixels high.  <a href="#acff530b72a3002561eee739593a5e839">More...</a><br/></td></tr>
 <tr class="separator:acff530b72a3002561eee739593a5e839"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac37cee3279b1832c248f86661b91ffba"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac37cee3279b1832c248f86661b91ffba"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>default_move</b> (<a class="el" href="struct_font.html">Font</a>)</td></tr>
+<tr class="memitem:ac37cee3279b1832c248f86661b91ffba"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#ac37cee3279b1832c248f86661b91ffba">default_move</a> (<a class="el" href="struct_font.html">Font</a>)</td></tr>
 <tr class="separator:ac37cee3279b1832c248f86661b91ffba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a635184f6e3f6ab9f18c455fd8cbae13c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a635184f6e3f6ab9f18c455fd8cbae13c"></a>
-uint16&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;name)</td></tr>
-<tr class="memdesc:a635184f6e3f6ab9f18c455fd8cbae13c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns font glyph index for glyph <em>name</em>. <br/></td></tr>
+<tr class="memitem:a134aaa2f78af0c12d3ce504957169768"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a134aaa2f78af0c12d3ce504957169768">~Font</a> ()</td></tr>
+<tr class="separator:a134aaa2f78af0c12d3ce504957169768"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a635184f6e3f6ab9f18c455fd8cbae13c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a">name</a>)</td></tr>
+<tr class="memdesc:a635184f6e3f6ab9f18c455fd8cbae13c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns font glyph index for glyph <em>name</em>.  <a href="#a635184f6e3f6ab9f18c455fd8cbae13c">More...</a><br/></td></tr>
 <tr class="separator:a635184f6e3f6ab9f18c455fd8cbae13c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a382bd45392fcf8e752f0fd4ec5edfefb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a382bd45392fcf8e752f0fd4ec5edfefb"></a>
-uint16&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a382bd45392fcf8e752f0fd4ec5edfefb">index</a> (uint16 code)</td></tr>
-<tr class="memdesc:a382bd45392fcf8e752f0fd4ec5edfefb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns font glyph index for Unicode codepoint <em>code</em>. <br/></td></tr>
+<tr class="memitem:a382bd45392fcf8e752f0fd4ec5edfefb"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a382bd45392fcf8e752f0fd4ec5edfefb">index</a> (<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> code)</td></tr>
+<tr class="memdesc:a382bd45392fcf8e752f0fd4ec5edfefb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns font glyph index for Unicode codepoint <em>code</em>.  <a href="#a382bd45392fcf8e752f0fd4ec5edfefb">More...</a><br/></td></tr>
 <tr class="separator:a382bd45392fcf8e752f0fd4ec5edfefb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a81dbe1e5f146fde200d2db8508712022"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a81dbe1e5f146fde200d2db8508712022"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a81dbe1e5f146fde200d2db8508712022">advance</a> (uint16 <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>)</td></tr>
-<tr class="memdesc:a81dbe1e5f146fde200d2db8508712022"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns hinted advance for <em>index</em>. <br/></td></tr>
+<tr class="memitem:a81dbe1e5f146fde200d2db8508712022"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a81dbe1e5f146fde200d2db8508712022">advance</a> (<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>)</td></tr>
+<tr class="memdesc:a81dbe1e5f146fde200d2db8508712022"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns hinted advance for <em>index</em>.  <a href="#a81dbe1e5f146fde200d2db8508712022">More...</a><br/></td></tr>
 <tr class="separator:a81dbe1e5f146fde200d2db8508712022"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6f06530958edee084a6cf6331a59776d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6f06530958edee084a6cf6331a59776d"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a6f06530958edee084a6cf6331a59776d">linearAdvance</a> (uint16 <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>)</td></tr>
-<tr class="memdesc:a6f06530958edee084a6cf6331a59776d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns unhinted advance for <em>index</em>. <br/></td></tr>
+<tr class="memitem:a6f06530958edee084a6cf6331a59776d"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a6f06530958edee084a6cf6331a59776d">linearAdvance</a> (<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>)</td></tr>
+<tr class="memdesc:a6f06530958edee084a6cf6331a59776d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns unhinted advance for <em>index</em>.  <a href="#a6f06530958edee084a6cf6331a59776d">More...</a><br/></td></tr>
 <tr class="separator:a6f06530958edee084a6cf6331a59776d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5c0139c648b6d3d7625d91bd22e2a968"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5c0139c648b6d3d7625d91bd22e2a968"></a>
-<a class="el" href="structvec.html">vec2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a> (uint16 <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>)</td></tr>
-<tr class="memdesc:a5c0139c648b6d3d7625d91bd22e2a968"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns size for <em>index</em>. <br/></td></tr>
+<tr class="memitem:a5c0139c648b6d3d7625d91bd22e2a968"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#af762e0ef96d42b37a15600b22a002a6a">vec2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a> (<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>)</td></tr>
+<tr class="memdesc:a5c0139c648b6d3d7625d91bd22e2a968"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns size for <em>index</em>.  <a href="#a5c0139c648b6d3d7625d91bd22e2a968">More...</a><br/></td></tr>
 <tr class="separator:a5c0139c648b6d3d7625d91bd22e2a968"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a754709e95192319cd00bb44ca595a5a9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a754709e95192319cd00bb44ca595a5a9"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a754709e95192319cd00bb44ca595a5a9">kerning</a> (uint16 leftIndex, uint16 rightIndex)</td></tr>
-<tr class="memdesc:a754709e95192319cd00bb44ca595a5a9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns scaled kerning adjustment between <em>leftIndex</em> and <em>rightIndex</em>. <br/></td></tr>
+<tr class="memitem:a754709e95192319cd00bb44ca595a5a9"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a754709e95192319cd00bb44ca595a5a9">kerning</a> (<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> leftIndex, <a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> rightIndex)</td></tr>
+<tr class="memdesc:a754709e95192319cd00bb44ca595a5a9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns scaled kerning adjustment between <em>leftIndex</em> and <em>rightIndex</em>.  <a href="#a754709e95192319cd00bb44ca595a5a9">More...</a><br/></td></tr>
 <tr class="separator:a754709e95192319cd00bb44ca595a5a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aef8f0779a74b2071af1d871c16947d65"><td class="memItemLeft" align="right" valign="top">const Glyph &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#aef8f0779a74b2071af1d871c16947d65">glyph</a> (uint16 <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>, int x=0)</td></tr>
+<tr class="memitem:aef8f0779a74b2071af1d871c16947d65"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="struct_glyph.html">Glyph</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#aef8f0779a74b2071af1d871c16947d65">glyph</a> (<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>, int <a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">x</a>=0)</td></tr>
 <tr class="separator:aef8f0779a74b2071af1d871c16947d65"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4a807b761239089ef28a7752ac8098ef"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4a807b761239089ef28a7752ac8098ef"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a4a807b761239089ef28a7752ac8098ef">render</a> (struct Bitmap &amp;raster, int <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>, int &amp;xMin, int &amp;xMax, int &amp;yMin, int &amp;yMax, int xx, int xy, int yx, int yy, int dx, int dy)</td></tr>
-<tr class="memdesc:a4a807b761239089ef28a7752ac8098ef"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders glyph <em>index</em> with transformation matrix <em>xx</em>, xy, yx, yy, dx, dy into <em>raster</em>. <br/></td></tr>
+<tr class="memitem:a4a807b761239089ef28a7752ac8098ef"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a4a807b761239089ef28a7752ac8098ef">render</a> (struct Bitmap &amp;raster, int <a class="el" href="struct_font.html#a635184f6e3f6ab9f18c455fd8cbae13c">index</a>, int &amp;xMin, int &amp;xMax, int &amp;yMin, int &amp;yMax, int xx, int <a class="el" href="structxy.html">xy</a>, int yx, int yy, int dx, int dy)</td></tr>
+<tr class="memdesc:a4a807b761239089ef28a7752ac8098ef"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders glyph <em>index</em> with transformation matrix <em>xx</em>, xy, yx, yy, dx, dy into <em>raster</em>.  <a href="#a4a807b761239089ef28a7752ac8098ef">More...</a><br/></td></tr>
 <tr class="separator:a4a807b761239089ef28a7752ac8098ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
-<tr class="memitem:a68e33f8f15ed3a21ba1985d0669dbfad"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a68e33f8f15ed3a21ba1985d0669dbfad"></a>
-static <a class="el" href="struct_font.html">Font</a>&#160;</td><td class="memItemRight" valign="bottom"><b>byName</b> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> name, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>)</td></tr>
+<tr class="memitem:a68e33f8f15ed3a21ba1985d0669dbfad"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="struct_font.html">Font</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a68e33f8f15ed3a21ba1985d0669dbfad">byName</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a">name</a>, int <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">size</a>)</td></tr>
 <tr class="separator:a68e33f8f15ed3a21ba1985d0669dbfad"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a85e1c751eb83c2ed1d81f6c974c256f8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a85e1c751eb83c2ed1d81f6c974c256f8"></a>
-<a class="el" href="structhandle.html">handle</a>&lt; FT_FaceRec_ * &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>face</b></td></tr>
+<tr class="memitem:a85e1c751eb83c2ed1d81f6c974c256f8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structhandle.html">handle</a>&lt; FT_FaceRec_ * &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a85e1c751eb83c2ed1d81f6c974c256f8">face</a></td></tr>
 <tr class="separator:a85e1c751eb83c2ed1d81f6c974c256f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a05386ef6c0908902bfd468c8cd03bf3a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a05386ef6c0908902bfd468c8cd03bf3a"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>fontSize</b> =0</td></tr>
+<tr class="memitem:a05386ef6c0908902bfd468c8cd03bf3a"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a05386ef6c0908902bfd468c8cd03bf3a">fontSize</a> =0</td></tr>
 <tr class="separator:a05386ef6c0908902bfd468c8cd03bf3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab8e29b0db18c36c6ede1ff2b3919c2f9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab8e29b0db18c36c6ede1ff2b3919c2f9"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>ascender</b> =0</td></tr>
+<tr class="memitem:ab8e29b0db18c36c6ede1ff2b3919c2f9"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#ab8e29b0db18c36c6ede1ff2b3919c2f9">ascender</a> =0</td></tr>
 <tr class="separator:ab8e29b0db18c36c6ede1ff2b3919c2f9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1309911f89028ba4d0e4c209744b7c1c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1309911f89028ba4d0e4c209744b7c1c"></a>
-<a class="el" href="structmap.html">map</a>&lt; uint, <a class="el" href="structmap.html">map</a>&lt; uint16, Glyph &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>cache</b></td></tr>
+<tr class="memitem:a1309911f89028ba4d0e4c209744b7c1c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>, <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>, <a class="el" href="struct_glyph.html">Glyph</a> &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a1309911f89028ba4d0e4c209744b7c1c">cache</a></td></tr>
 <tr class="separator:a1309911f89028ba4d0e4c209744b7c1c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8dbdc6b6b29a721e5d06fe0ecac72da6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8dbdc6b6b29a721e5d06fe0ecac72da6"></a>
-<a class="el" href="struct_lock.html">Lock</a>&#160;</td><td class="memItemRight" valign="bottom"><b>lock</b></td></tr>
+<tr class="memitem:a8dbdc6b6b29a721e5d06fe0ecac72da6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_lock.html">Lock</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a8dbdc6b6b29a721e5d06fe0ecac72da6">lock</a></td></tr>
 <tr class="separator:a8dbdc6b6b29a721e5d06fe0ecac72da6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af2cfc28399999061b7d360188815c782"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af2cfc28399999061b7d360188815c782"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>buffer</b></td></tr>
+<tr class="memitem:af2cfc28399999061b7d360188815c782"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#af2cfc28399999061b7d360188815c782">buffer</a></td></tr>
 <tr class="separator:af2cfc28399999061b7d360188815c782"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0e159109457bd56f83357c3dc8ee82e4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0e159109457bd56f83357c3dc8ee82e4"></a>
-<a class="el" href="struct_map.html">Map</a>&#160;</td><td class="memItemRight" valign="bottom"><b>map</b></td></tr>
+<tr class="memitem:a0e159109457bd56f83357c3dc8ee82e4"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_map.html">Map</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_font.html#a0e159109457bd56f83357c3dc8ee82e4">map</a></td></tr>
 <tr class="separator:a0e159109457bd56f83357c3dc8ee82e4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Freetype wrapper. </p>
 
 <p>Definition at line <a class="el" href="font_8h_source.html#l00018">18</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
-</div><h2 class="groupheader">Member Function Documentation</h2>
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="aaa7987706de2f987a921b84335f5000d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Font::Font </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>data</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>size</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Loads font /a data scaled to /a size pixels high. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00009">9</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="abdaf41cac0a7bd0d447bd8a574e967d2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Font::Font </td>
+          <td>(</td>
+          <td class="paramtype">::<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;&amp;&#160;</td>
+          <td class="paramname"><em>buffer</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>size</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Loads font /a data scaled to /a size pixels high. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00019">19</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="acff530b72a3002561eee739593a5e839"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Font::Font </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_map.html">Map</a> &amp;&amp;&#160;</td>
+          <td class="paramname"><em>map</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>size</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Loads font /a data scaled to /a size pixels high. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00020">20</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a134aaa2f78af0c12d3ce504957169768"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Font::~Font </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00023">23</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a68e33f8f15ed3a21ba1985d0669dbfad"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_font.html">Font</a> Font::byName </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>size</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00021">21</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac37cee3279b1832c248f86661b91ffba"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Font::default_move </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_font.html">Font</a>&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a635184f6e3f6ab9f18c455fd8cbae13c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> Font::index </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>name</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns font glyph index for glyph <em>name</em>. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00031">31</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a382bd45392fcf8e752f0fd4ec5edfefb"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> Font::index </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
+          <td class="paramname"><em>code</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns font glyph index for Unicode codepoint <em>code</em>. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00036">36</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a81dbe1e5f146fde200d2db8508712022"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Font::advance </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns hinted advance for <em>index</em>. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00048">48</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6f06530958edee084a6cf6331a59776d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Font::linearAdvance </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns unhinted advance for <em>index</em>. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00049">49</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5c0139c648b6d3d7625d91bd22e2a968"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#af762e0ef96d42b37a15600b22a002a6a">vec2</a> Font::size </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns size for <em>index</em>. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00050">50</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a754709e95192319cd00bb44ca595a5a9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Font::kerning </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
+          <td class="paramname"><em>leftIndex</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
+          <td class="paramname"><em>rightIndex</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns scaled kerning adjustment between <em>leftIndex</em> and <em>rightIndex</em>. </p>
+
+<p>Definition at line <a class="el" href="font_8cc_source.html#l00045">45</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="aef8f0779a74b2071af1d871c16947d65"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">const Glyph &amp; Font::glyph </td>
+          <td class="memname">const <a class="el" href="struct_glyph.html">Glyph</a> &amp; Font::glyph </td>
           <td>(</td>
-          <td class="paramtype">uint16&#160;</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;</td>
           <td class="paramname"><em>index</em>, </td>
         </tr>
         <tr>
@@ -234,6 +507,193 @@ float&#160;</td><td class="memItemRight" valign="bottom"><b>ascender</b> =0</td>
 <p>Caches and returns glyph for <em>index</em> at position <em>x</em> <em>x</em> fractional part is used to return subpixel positionned images </p>
 
 <p>Definition at line <a class="el" href="font_8cc_source.html#l00052">52</a> of file <a class="el" href="font_8cc_source.html">font.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4a807b761239089ef28a7752ac8098ef"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Font::render </td>
+          <td>(</td>
+          <td class="paramtype">struct Bitmap &amp;&#160;</td>
+          <td class="paramname"><em>raster</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int &amp;&#160;</td>
+          <td class="paramname"><em>xMin</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int &amp;&#160;</td>
+          <td class="paramname"><em>xMax</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int &amp;&#160;</td>
+          <td class="paramname"><em>yMin</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int &amp;&#160;</td>
+          <td class="paramname"><em>yMax</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>xx</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>xy</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>yx</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>yy</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dx</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>dy</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Renders glyph <em>index</em> with transformation matrix <em>xx</em>, xy, yx, yy, dx, dy into <em>raster</em>. </p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a85e1c751eb83c2ed1d81f6c974c256f8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structhandle.html">handle</a>&lt;FT_FaceRec_*&gt; Font::face</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00049">49</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a05386ef6c0908902bfd468c8cd03bf3a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Font::fontSize =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00050">50</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab8e29b0db18c36c6ede1ff2b3919c2f9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Font::ascender =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00050">50</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1309911f89028ba4d0e4c209744b7c1c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>, <a class="el" href="structmap.html">map</a>&lt;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>, <a class="el" href="struct_glyph.html">Glyph</a>&gt; &gt; Font::cache</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00051">51</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8dbdc6b6b29a721e5d06fe0ecac72da6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_lock.html">Lock</a> Font::lock</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00052">52</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af2cfc28399999061b7d360188815c782"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffer.html">buffer</a>&lt;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&gt; Font::buffer</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00054">54</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0e159109457bd56f83357c3dc8ee82e4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_map.html">Map</a> Font::map</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="font_8h_source.html#l00055">55</a> of file <a class="el" href="font_8h_source.html">font.h</a>.</p>
 
 </div>
 </div>

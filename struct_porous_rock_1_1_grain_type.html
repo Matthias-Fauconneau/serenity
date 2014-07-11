@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_porous_rock_1_1_grain_type.html
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -110,6 +110,8 @@ $(document).ready(function(){initNavTree('struct_porous_rock_1_1_grain_type.html
 <div class="title">PorousRock::GrainType Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p><code>#include &lt;<a class="el" href="synthetic_8h_source.html">synthetic.h</a>&gt;</code></p>
 <div class="dynheader">
 Collaboration diagram for PorousRock::GrainType:</div>
 <div class="dyncontent">
@@ -120,20 +122,60 @@ Collaboration diagram for PorousRock::GrainType:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a008321321168a8ec8eb3ed0b87c6c0e9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a008321321168a8ec8eb3ed0b87c6c0e9"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>relativeGrainCount</b></td></tr>
+<tr class="memitem:a008321321168a8ec8eb3ed0b87c6c0e9"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_porous_rock_1_1_grain_type.html#a008321321168a8ec8eb3ed0b87c6c0e9">relativeGrainCount</a></td></tr>
 <tr class="separator:a008321321168a8ec8eb3ed0b87c6c0e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a92263fdb697eecaf7f92e61ac2dbe76d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a92263fdb697eecaf7f92e61ac2dbe76d"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>attenuation</b></td></tr>
+<tr class="memitem:a92263fdb697eecaf7f92e61ac2dbe76d"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_porous_rock_1_1_grain_type.html#a92263fdb697eecaf7f92e61ac2dbe76d">attenuation</a></td></tr>
 <tr class="separator:a92263fdb697eecaf7f92e61ac2dbe76d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1d839e1f74c53760ecf912881842bc7e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1d839e1f74c53760ecf912881842bc7e"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="structvec.html">vec4</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>grains</b></td></tr>
+<tr class="memitem:a1d839e1f74c53760ecf912881842bc7e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="vector_8h.html#acc883becb15b98fd25e2d89dcfa020e8">vec4</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_porous_rock_1_1_grain_type.html#a1d839e1f74c53760ecf912881842bc7e">grains</a></td></tr>
 <tr class="separator:a1d839e1f74c53760ecf912881842bc7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="synthetic_8h_source.html#l00037">37</a> of file <a class="el" href="synthetic_8h_source.html">synthetic.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a008321321168a8ec8eb3ed0b87c6c0e9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float PorousRock::GrainType::relativeGrainCount</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="synthetic_8h_source.html#l00037">37</a> of file <a class="el" href="synthetic_8h_source.html">synthetic.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a92263fdb697eecaf7f92e61ac2dbe76d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float PorousRock::GrainType::attenuation</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="synthetic_8h_source.html#l00037">37</a> of file <a class="el" href="synthetic_8h_source.html">synthetic.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1d839e1f74c53760ecf912881842bc7e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffer.html">buffer</a>&lt;<a class="el" href="vector_8h.html#acc883becb15b98fd25e2d89dcfa020e8">vec4</a>&gt; PorousRock::GrainType::grains</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="synthetic_8h_source.html#l00037">37</a> of file <a class="el" href="synthetic_8h_source.html">synthetic.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

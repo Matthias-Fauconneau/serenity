@@ -1,4 +1,20 @@
 var searchData=
 [
+  ['getgeometry',['GetGeometry',['../struct_get_geometry.html',1,'']]],
+  ['getgeometryreply',['GetGeometryReply',['../struct_get_geometry_reply.html',1,'']]],
+  ['getimage',['GetImage',['../struct_shm_1_1_get_image.html',1,'Shm']]],
+  ['getimagereply',['GetImageReply',['../struct_shm_1_1_get_image_reply.html',1,'Shm']]],
+  ['getkeyboardmapping',['GetKeyboardMapping',['../struct_get_keyboard_mapping.html',1,'']]],
+  ['getkeyboardmappingreply',['GetKeyboardMappingReply',['../struct_get_keyboard_mapping_reply.html',1,'']]],
+  ['getproperty',['GetProperty',['../struct_get_property.html',1,'']]],
+  ['getpropertyreply',['GetPropertyReply',['../struct_get_property_reply.html',1,'']]],
+  ['getselectionowner',['GetSelectionOwner',['../struct_get_selection_owner.html',1,'']]],
+  ['getselectionownerreply',['GetSelectionOwnerReply',['../struct_get_selection_owner_reply.html',1,'']]],
+  ['getwindowattributes',['GetWindowAttributes',['../struct_get_window_attributes.html',1,'']]],
+  ['getwindowattributesreply',['GetWindowAttributesReply',['../struct_get_window_attributes_reply.html',1,'']]],
+  ['glyph',['Glyph',['../struct_glyph.html',1,'']]],
+  ['grabbutton',['GrabButton',['../struct_grab_button.html',1,'']]],
+  ['grabkey',['GrabKey',['../struct_grab_key.html',1,'']]],
+  ['graintype',['GrainType',['../struct_porous_rock_1_1_grain_type.html',1,'PorousRock']]],
   ['gridlayout',['GridLayout',['../struct_grid_layout.html',1,'']]]
 ];

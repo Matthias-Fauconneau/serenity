@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_array_view.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -123,140 +123,296 @@ Collaboration diagram for ArrayView:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_array_view__coll__graph.png" border="0" usemap="#_array_view_coll__map" alt="Collaboration graph"/></div>
 <map name="_array_view_coll__map" id="_array_view_coll__map">
-<area shape="rect" id="node2" href="struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="637,31,699,57"/><area shape="rect" id="node3" href="struct_image.html" title="2D array of byte4 " alt="" coords="389,31,448,57"/><area shape="rect" id="node4" href="structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="142,5,242,32"/><area shape="rect" id="node5" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="137,56,247,83"/><area shape="rect" id="node7" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="616,81,720,108"/><area shape="rect" id="node8" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="365,81,473,108"/><area shape="rect" id="node9" href="structarray.html" title="array\&lt; ref \&gt;" alt="" coords="623,132,713,159"/><area shape="rect" id="node10" href="structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="371,132,466,159"/><area shape="rect" id="node11" href="structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="609,185,727,212"/><area shape="rect" id="node12" href="structxy.html" title="xy\&lt; int \&gt;" alt="" coords="381,184,456,211"/><area shape="rect" id="node13" href="structmap.html" title="map\&lt; map\&lt; String, Variant\l \&gt;, Variant \&gt;" alt="" coords="579,309,757,350"/><area shape="rect" id="node14" href="structarray.html" title="array\&lt; Variant \&gt;" alt="" coords="361,293,477,320"/><area shape="rect" id="node19" href="structmap.html" title="map\&lt; String, Variant \&gt;" alt="" coords="591,257,745,284"/><area shape="rect" id="node15" href="structbuffer.html" title="buffer\&lt; Variant \&gt;" alt="" coords="132,293,252,320"/><area shape="rect" id="node16" href="structarray.html" title="array\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="349,354,488,395"/><area shape="rect" id="node17" href="structbuffer.html" title="buffer\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="121,354,263,395"/><area shape="rect" id="node18" href="structref.html" title="ref\&lt; byte \&gt;" alt="" coords="625,375,711,401"/><area shape="rect" id="node20" href="structarray.html" title="array\&lt; String \&gt;" alt="" coords="364,235,473,261"/><area shape="rect" id="node21" href="structbuffer.html" title="buffer\&lt; String \&gt;" alt="" coords="135,235,249,261"/></map>
+<area shape="rect" id="node2" href="struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="522,31,585,57"/><area shape="rect" id="node3" href="struct_image.html" title="2D array of byte4 " alt="" coords="275,31,333,57"/><area shape="rect" id="node4" href="structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="27,5,127,32"/><area shape="rect" id="node5" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="22,56,133,83"/><area shape="rect" id="node6" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="501,81,605,108"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="250,81,358,108"/><area shape="rect" id="node8" href="structarray.html" title="array\&lt; ref \&gt;" alt="" coords="508,132,599,159"/><area shape="rect" id="node9" href="structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="257,132,351,159"/><area shape="rect" id="node10" href="structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="494,185,613,212"/><area shape="rect" id="node11" href="structxy.html" title="xy\&lt; int \&gt;" alt="" coords="267,184,341,211"/><area shape="rect" id="node12" href="structmap.html" title="map\&lt; map\&lt; String, Variant\l \&gt;, Variant \&gt;" alt="" coords="464,309,643,350"/><area shape="rect" id="node13" href="structarray.html" title="array\&lt; Variant \&gt;" alt="" coords="246,295,362,321"/><area shape="rect" id="node18" href="structmap.html" title="map\&lt; String, Variant \&gt;" alt="" coords="476,257,631,284"/><area shape="rect" id="node14" href="structbuffer.html" title="buffer\&lt; Variant \&gt;" alt="" coords="17,295,137,321"/><area shape="rect" id="node15" href="structarray.html" title="array\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="235,354,373,395"/><area shape="rect" id="node16" href="structbuffer.html" title="buffer\&lt; map\&lt; String,\l Variant \&gt; \&gt;" alt="" coords="6,354,149,395"/><area shape="rect" id="node17" href="structref.html" title="ref\&lt; byte \&gt;" alt="" coords="510,375,597,401"/><area shape="rect" id="node19" href="structarray.html" title="array\&lt; String \&gt;" alt="" coords="249,235,359,261"/><area shape="rect" id="node20" href="structbuffer.html" title="buffer\&lt; String \&gt;" alt="" coords="21,235,134,261"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a601b6aa2aea657e6e4732b1b14a010d8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a601b6aa2aea657e6e4732b1b14a010d8"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>ArrayView</b> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> valueName, const <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; &amp;parameters, uint textSize=16)</td></tr>
+<tr class="memitem:a601b6aa2aea657e6e4732b1b14a010d8"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a601b6aa2aea657e6e4732b1b14a010d8">ArrayView</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a>, const <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; &amp;parameters, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>=16)</td></tr>
 <tr class="separator:a601b6aa2aea657e6e4732b1b14a010d8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afb09a6efa039dc936d3c82e5f1a2d1d0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afb09a6efa039dc936d3c82e5f1a2d1d0"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_variant.html">Variant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#afb09a6efa039dc936d3c82e5f1a2d1d0">coordinates</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> dimension, const <a class="el" href="structmap.html">Dict</a> &amp;<a class="el" href="array_8h.html#a3bb4d1886afc91ca0382e0fcc81dbe7b">filter</a>) const </td></tr>
-<tr class="memdesc:afb09a6efa039dc936d3c82e5f1a2d1d0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns coordinates along <em>dimension</em> occuring in points matching <em>filter</em>. <br/></td></tr>
+<tr class="memitem:afb09a6efa039dc936d3c82e5f1a2d1d0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_variant.html">Variant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#afb09a6efa039dc936d3c82e5f1a2d1d0">coordinates</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> dimension, const <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;<a class="el" href="png_8cc.html#a1fde91dd34bb17267ee57d4431fc5a6f">filter</a>) const </td></tr>
+<tr class="memdesc:afb09a6efa039dc936d3c82e5f1a2d1d0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns coordinates along <em>dimension</em> occuring in points matching <em>filter</em>.  <a href="#afb09a6efa039dc936d3c82e5f1a2d1d0">More...</a><br/></td></tr>
 <tr class="separator:afb09a6efa039dc936d3c82e5f1a2d1d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4676949877a80fbeb3a6b2f4025959c0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4676949877a80fbeb3a6b2f4025959c0"></a>
-<a class="el" href="structmap.html">map</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>, <a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_variant.html">Variant</a> &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a4676949877a80fbeb3a6b2f4025959c0">coordinates</a> (const <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="structmap.html">Dict</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; &amp;points) const </td></tr>
-<tr class="memdesc:a4676949877a80fbeb3a6b2f4025959c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns coordinates occuring in <em>points</em>. <br/></td></tr>
+<tr class="memitem:a4676949877a80fbeb3a6b2f4025959c0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap.html">map</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>, <a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_variant.html">Variant</a> &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a4676949877a80fbeb3a6b2f4025959c0">coordinates</a> (const <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; &amp;<a class="el" href="struct_array_view.html#a6e77247323bfd70314ed3d0f7ce4d364">points</a>) const </td></tr>
+<tr class="memdesc:a4676949877a80fbeb3a6b2f4025959c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns coordinates occuring in <em>points</em>.  <a href="#a4676949877a80fbeb3a6b2f4025959c0">More...</a><br/></td></tr>
 <tr class="separator:a4676949877a80fbeb3a6b2f4025959c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8fab527b0dec4302864a95d311deab33"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8fab527b0dec4302864a95d311deab33"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a8fab527b0dec4302864a95d311deab33">cellCount</a> (uint axis, uint level, <a class="el" href="structmap.html">Dict</a> &amp;<a class="el" href="array_8h.html#a3bb4d1886afc91ca0382e0fcc81dbe7b">filter</a>) const </td></tr>
-<tr class="memdesc:a8fab527b0dec4302864a95d311deab33"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns number of cells for the given <em>axis</em>, <em>level</em> and <em>coordinates</em>. <br/></td></tr>
+<tr class="memitem:a8fab527b0dec4302864a95d311deab33"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a8fab527b0dec4302864a95d311deab33">cellCount</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> axis, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> level, <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;<a class="el" href="png_8cc.html#a1fde91dd34bb17267ee57d4431fc5a6f">filter</a>) const </td></tr>
+<tr class="memdesc:a8fab527b0dec4302864a95d311deab33"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns number of cells for the given <em>axis</em>, <em>level</em> and <em>coordinates</em>.  <a href="#a8fab527b0dec4302864a95d311deab33">More...</a><br/></td></tr>
 <tr class="separator:a8fab527b0dec4302864a95d311deab33"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a21efd2436c4fb0c0ba85c2543bb8ed28"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a21efd2436c4fb0c0ba85c2543bb8ed28"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>cellCount</b> (uint axis, uint level=0) const </td></tr>
+<tr class="memitem:a21efd2436c4fb0c0ba85c2543bb8ed28"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a21efd2436c4fb0c0ba85c2543bb8ed28">cellCount</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> axis, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> level=0) const </td></tr>
 <tr class="separator:a21efd2436c4fb0c0ba85c2543bb8ed28"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a791c7cd56942b01be09f3cc7812c0f8a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a791c7cd56942b01be09f3cc7812c0f8a"></a>
-<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>cellCount</b> ()</td></tr>
+<tr class="memitem:a791c7cd56942b01be09f3cc7812c0f8a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a791c7cd56942b01be09f3cc7812c0f8a">cellCount</a> ()</td></tr>
 <tr class="separator:a791c7cd56942b01be09f3cc7812c0f8a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3d2062f87eda50840c67b64e5e2921e8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3d2062f87eda50840c67b64e5e2921e8"></a>
-<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>levelCount</b> ()</td></tr>
+<tr class="memitem:a3d2062f87eda50840c67b64e5e2921e8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a3d2062f87eda50840c67b64e5e2921e8">levelCount</a> ()</td></tr>
 <tr class="separator:a3d2062f87eda50840c67b64e5e2921e8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa6e3a72752991fee683d5e1dc258044d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#aa6e3a72752991fee683d5e1dc258044d">sizeHint</a> ()</td></tr>
 <tr class="separator:aa6e3a72752991fee683d5e1dc258044d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a93c3299f4203d8556c90a68f92640019"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a93c3299f4203d8556c90a68f92640019"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>renderHeader</b> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> contentCellSize, uint axis, uint level, <a class="el" href="structmap.html">Dict</a> &amp;<a class="el" href="array_8h.html#a3bb4d1886afc91ca0382e0fcc81dbe7b">filter</a>, uint offset=0)</td></tr>
+<tr class="memitem:a93c3299f4203d8556c90a68f92640019"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a93c3299f4203d8556c90a68f92640019">renderHeader</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> <a class="el" href="struct_array_view.html#ac51e665c6dcb5806ec289a1bb24fb586">contentCellSize</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> axis, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> level, <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;<a class="el" href="png_8cc.html#a1fde91dd34bb17267ee57d4431fc5a6f">filter</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> offset=0)</td></tr>
 <tr class="separator:a93c3299f4203d8556c90a68f92640019"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa597b9def2ec3888ab51167851885be4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa597b9def2ec3888ab51167851885be4"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>renderCell</b> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cellSize, uint axis, uint level, <a class="el" href="structmap.html">Dict</a> &amp;filterX, <a class="el" href="structmap.html">Dict</a> &amp;filterY, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> origin=0)</td></tr>
+<tr class="memitem:aa597b9def2ec3888ab51167851885be4"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#aa597b9def2ec3888ab51167851885be4">renderCell</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cellSize, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> axis, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> level, <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;filterX, <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;filterY, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> origin=0)</td></tr>
 <tr class="separator:aa597b9def2ec3888ab51167851885be4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a47051ceccc50eb108bff8825574fbd95"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a47051ceccc50eb108bff8825574fbd95"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>render</b> () override</td></tr>
+<tr class="memitem:a47051ceccc50eb108bff8825574fbd95"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a47051ceccc50eb108bff8825574fbd95">render</a> () override</td></tr>
 <tr class="separator:a47051ceccc50eb108bff8825574fbd95"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_widget"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_widget')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_widget.html">Widget</a></td></tr>
-<tr class="memitem:a960adfe48af4e7ae159a96e258627252 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a960adfe48af4e7ae159a96e258627252"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>render</b> (const <a class="el" href="struct_image.html">Image</a> &amp;<a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a>)</td></tr>
+<tr class="memitem:a960adfe48af4e7ae159a96e258627252 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a960adfe48af4e7ae159a96e258627252">render</a> (const <a class="el" href="struct_image.html">Image</a> &amp;<a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a>)</td></tr>
 <tr class="separator:a960adfe48af4e7ae159a96e258627252 inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b8de06108cb07a1981372a6a865ed97 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a4b8de06108cb07a1981372a6a865ed97">mouseEvent</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> size, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button)</td></tr>
+<tr class="memitem:a4b8de06108cb07a1981372a6a865ed97 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a4b8de06108cb07a1981372a6a865ed97">mouseEvent</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button)</td></tr>
 <tr class="separator:a4b8de06108cb07a1981372a6a865ed97 inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa3b1e3fe0a10ab2184c9da6b7121f9c6"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#aa3b1e3fe0a10ab2184c9da6b7121f9c6">mouseEvent</a> (<a class="el" href="struct_rect.html">Rect</a> rect, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button)</td></tr>
-<tr class="memdesc:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convenience overload for layout implementation. <br/></td></tr>
+<tr class="memitem:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#aa3b1e3fe0a10ab2184c9da6b7121f9c6">mouseEvent</a> (<a class="el" href="struct_rect.html">Rect</a> rect, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button)</td></tr>
+<tr class="memdesc:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convenience overload for layout implementation.  <a href="#aa3b1e3fe0a10ab2184c9da6b7121f9c6">More...</a><br/></td></tr>
 <tr class="separator:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6c724859c52bf62948ef9b6ce0a1105c inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a6c724859c52bf62948ef9b6ce0a1105c">keyPress</a> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, Modifiers modifiers)</td></tr>
+<tr class="memitem:a6c724859c52bf62948ef9b6ce0a1105c inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a6c724859c52bf62948ef9b6ce0a1105c">keyPress</a> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, <a class="el" href="widget_8h.html#a153f7e4dd506d333b40d9b3c27719e0d">Modifiers</a> modifiers)</td></tr>
 <tr class="separator:a6c724859c52bf62948ef9b6ce0a1105c inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8b2e152fad3de4eb05cb97939977d0bb inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8b2e152fad3de4eb05cb97939977d0bb"></a>
-virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>keyRelease</b> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, Modifiers modifiers)</td></tr>
+<tr class="memitem:a8b2e152fad3de4eb05cb97939977d0bb inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a8b2e152fad3de4eb05cb97939977d0bb">keyRelease</a> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, <a class="el" href="widget_8h.html#a153f7e4dd506d333b40d9b3c27719e0d">Modifiers</a> modifiers)</td></tr>
 <tr class="separator:a8b2e152fad3de4eb05cb97939977d0bb inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a78aaac85dd0f0bd36910fd46a3e1b6c1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a78aaac85dd0f0bd36910fd46a3e1b6c1"></a>
-<a class="el" href="structmap.html">Dict</a>&#160;</td><td class="memItemRight" valign="bottom"><b>dimensionLabels</b> = parseDict(&quot;rotationCount:Revolutions,photonCount:Photons,projectionCount:Projections,subsetSize:per subset&quot;_)</td></tr>
+<tr class="memitem:a78aaac85dd0f0bd36910fd46a3e1b6c1"><td class="memItemLeft" align="right" valign="top"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a78aaac85dd0f0bd36910fd46a3e1b6c1">dimensionLabels</a> = <a class="el" href="variant_8h.html#a8670bb0cdfa11f78664269489d3876a3">parseDict</a>(&quot;rotationCount:Revolutions,photonCount:Photons,projectionCount:Projections,subsetSize:per subset&quot;_)</td></tr>
 <tr class="separator:a78aaac85dd0f0bd36910fd46a3e1b6c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7fdcf9992418a5c7de2feebf7ab55fa9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7fdcf9992418a5c7de2feebf7ab55fa9"></a>
-<a class="el" href="structmap.html">Dict</a>&#160;</td><td class="memItemRight" valign="bottom"><b>coordinateLabels</b> = parseDict(&quot;single:\0Single,double:\1Double,adaptive:\2Adaptive&quot;_)</td></tr>
+<tr class="memitem:a7fdcf9992418a5c7de2feebf7ab55fa9"><td class="memItemLeft" align="right" valign="top"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a7fdcf9992418a5c7de2feebf7ab55fa9">coordinateLabels</a> = <a class="el" href="variant_8h.html#a8670bb0cdfa11f78664269489d3876a3">parseDict</a>(&quot;single:\0Single,double:\1Double,adaptive:\2Adaptive&quot;_)</td></tr>
 <tr class="separator:a7fdcf9992418a5c7de2feebf7ab55fa9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a157a6b14cb69778f5a23bb558128d503"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a157a6b14cb69778f5a23bb558128d503"></a>
-<a class="el" href="structmap.html">Dict</a>&#160;</td><td class="memItemRight" valign="bottom"><b>valueLabels</b> = parseDict(&quot;Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T,Normalized NMSE %:Normalized NMSE&quot;_)</td></tr>
+<tr class="memitem:a157a6b14cb69778f5a23bb558128d503"><td class="memItemLeft" align="right" valign="top"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a157a6b14cb69778f5a23bb558128d503">valueLabels</a> = <a class="el" href="variant_8h.html#a8670bb0cdfa11f78664269489d3876a3">parseDict</a>(&quot;Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T,Normalized NMSE %:Normalized NMSE&quot;_)</td></tr>
 <tr class="separator:a157a6b14cb69778f5a23bb558128d503"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a527c6594575d1a2cc0f53eb0a8934950"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a527c6594575d1a2cc0f53eb0a8934950"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><b>valueName</b></td></tr>
+<tr class="memitem:a527c6594575d1a2cc0f53eb0a8934950"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a></td></tr>
 <tr class="separator:a527c6594575d1a2cc0f53eb0a8934950"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a30ebcda2eb7aaf51ca01b6fb2be86bd1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a30ebcda2eb7aaf51ca01b6fb2be86bd1"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><b>bestName</b> = (valueName==&quot;Iterations&quot;_ || valueName == &quot;Time (s)&quot;_) ? &quot;MSE_T&quot;_ : valueName</td></tr>
+<tr class="memitem:a30ebcda2eb7aaf51ca01b6fb2be86bd1"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a30ebcda2eb7aaf51ca01b6fb2be86bd1">bestName</a> = (<a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a>==&quot;Iterations&quot;_ || <a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a> == &quot;Time (s)&quot;_) ? &quot;MSE_T&quot;_ : <a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a></td></tr>
 <tr class="separator:a30ebcda2eb7aaf51ca01b6fb2be86bd1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7b38ce4fbb2410c1845cb3ce44fb4dc1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7b38ce4fbb2410c1845cb3ce44fb4dc1"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>valueNames</b></td></tr>
+<tr class="memitem:a7b38ce4fbb2410c1845cb3ce44fb4dc1"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a7b38ce4fbb2410c1845cb3ce44fb4dc1">valueNames</a></td></tr>
 <tr class="separator:a7b38ce4fbb2410c1845cb3ce44fb4dc1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6e77247323bfd70314ed3d0f7ce4d364"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6e77247323bfd70314ed3d0f7ce4d364"></a>
-<a class="el" href="structmap.html">map</a>&lt; <a class="el" href="structmap.html">Dict</a>, <a class="el" href="struct_variant.html">Variant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>points</b></td></tr>
+<tr class="memitem:a6e77247323bfd70314ed3d0f7ce4d364"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmap.html">map</a>&lt; <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>, <a class="el" href="struct_variant.html">Variant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a6e77247323bfd70314ed3d0f7ce4d364">points</a></td></tr>
 <tr class="separator:a6e77247323bfd70314ed3d0f7ce4d364"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a625f9e1e28a686f436aab9e6d49d7b0a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a625f9e1e28a686f436aab9e6d49d7b0a"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>min</b> = inf</td></tr>
+<tr class="memitem:a625f9e1e28a686f436aab9e6d49d7b0a"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a625f9e1e28a686f436aab9e6d49d7b0a">min</a> = <a class="el" href="math_8h.html#a84e82898bc7b9a6ad766c182722203c9">inf</a></td></tr>
 <tr class="separator:a625f9e1e28a686f436aab9e6d49d7b0a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aedf074788eac17e6628622262a761c0b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aedf074788eac17e6628622262a761c0b"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>max</b> = -inf</td></tr>
+<tr class="memitem:aedf074788eac17e6628622262a761c0b"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#aedf074788eac17e6628622262a761c0b">max</a> = -<a class="el" href="math_8h.html#a84e82898bc7b9a6ad766c182722203c9">inf</a></td></tr>
 <tr class="separator:aedf074788eac17e6628622262a761c0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0cfa2da841a28e721510cab7941dc1db"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0cfa2da841a28e721510cab7941dc1db"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>textSize</b></td></tr>
+<tr class="memitem:a0cfa2da841a28e721510cab7941dc1db"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a></td></tr>
 <tr class="separator:a0cfa2da841a28e721510cab7941dc1db"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1c424b50e04c02f9012dd52e18f47640"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1c424b50e04c02f9012dd52e18f47640"></a>
-<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>headerCellSize</b> = <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>(80*textSize/16, textSize)</td></tr>
+<tr class="memitem:a1c424b50e04c02f9012dd52e18f47640"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#a1c424b50e04c02f9012dd52e18f47640">headerCellSize</a> = <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>(80*<a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>/16, <a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>)</td></tr>
 <tr class="separator:a1c424b50e04c02f9012dd52e18f47640"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac51e665c6dcb5806ec289a1bb24fb586"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac51e665c6dcb5806ec289a1bb24fb586"></a>
-<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>contentCellSize</b> = <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>(48*textSize/16, textSize)</td></tr>
+<tr class="memitem:ac51e665c6dcb5806ec289a1bb24fb586"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#ac51e665c6dcb5806ec289a1bb24fb586">contentCellSize</a> = <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>(48*<a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>/16, <a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>)</td></tr>
 <tr class="separator:ac51e665c6dcb5806ec289a1bb24fb586"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab1a02d12a123544a20ab87fa5c7c16f5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab1a02d12a123544a20ab87fa5c7c16f5"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>dimensions</b> [2] = {<a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a>(&quot;Trajectory,Photons,Method&quot;_,','),<a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a>(&quot;Revolutions,Projections,per subset&quot;_,',')}</td></tr>
+<tr class="memitem:ab1a02d12a123544a20ab87fa5c7c16f5"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_array_view.html#ab1a02d12a123544a20ab87fa5c7c16f5">dimensions</a> [2] = {<a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a>(&quot;Trajectory,Photons,Method&quot;_,','),<a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a>(&quot;Revolutions,Projections,per subset&quot;_,',')}</td></tr>
 <tr class="separator:ab1a02d12a123544a20ab87fa5c7c16f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_struct_widget"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_widget')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_widget.html">Widget</a></td></tr>
-<tr class="memitem:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae2a033162016b0382f019dca5b434e19"></a>
-<a class="el" href="struct_image.html">Image</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a></td></tr>
-<tr class="memdesc:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders this widget. <br/></td></tr>
+<tr class="memitem:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_image.html">Image</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a></td></tr>
+<tr class="memdesc:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders this widget.  <a href="#ae2a033162016b0382f019dca5b434e19">More...</a><br/></td></tr>
 <tr class="separator:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
 <tr class="inherit_header pub_types_struct_widget"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_widget')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_widget.html">Widget</a></td></tr>
 <tr class="memitem:a95fa7b0a7eeceeae942b6687c687ce5a inherit pub_types_struct_widget"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> { <br/>
-&#160;&#160;<b>Press</b>, 
-<b>Release</b>, 
-<b>Motion</b>, 
-<b>Enter</b>, 
+&#160;&#160;<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa13c3bc709025d20052e643828d3f8863">Press</a>, 
+<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa10f0440c09f2ab804b4e23e7a94c5a34">Release</a>, 
+<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aafd8d70b8938cada14b8527dbda205ccb">Motion</a>, 
+<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa487c909293da2d270b62e8265ecb8b50">Enter</a>, 
 <br/>
-&#160;&#160;<b>Leave</b>
+&#160;&#160;<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa8bc8f4e388824604fb38252c24c29be1">Leave</a>
 <br/>
  }</td></tr>
-<tr class="memdesc:a95fa7b0a7eeceeae942b6687c687ce5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse event type. <br/></td></tr>
+<tr class="memdesc:a95fa7b0a7eeceeae942b6687c687ce5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse event type.  <a href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">More...</a><br/></td></tr>
 <tr class="separator:a95fa7b0a7eeceeae942b6687c687ce5a inherit pub_types_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae852395c66e10fbb55d0a35cab7ffb83 inherit pub_types_struct_widget"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> { <br/>
-&#160;&#160;<b>None</b>, 
-<b>LeftButton</b>, 
-<b>MiddleButton</b>, 
-<b>RightButton</b>, 
+&#160;&#160;<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a89e48d1d45cfa0907a6aee0dbaf3768d">None</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a6d1d6891ebbe03cfddf8c568e04793b2">LeftButton</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a02c7030168c26b1d1cd299487a7ccab0">MiddleButton</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a36ec6c806a3861f148bf1903ab8c6169">RightButton</a>, 
 <br/>
-&#160;&#160;<b>WheelUp</b>, 
-<b>WheelDown</b>
+&#160;&#160;<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83aee5721624455aa52d9b3855f307c462d">WheelUp</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a44b23427115d6506d6eb99a0acd35dfb">WheelDown</a>
 <br/>
  }</td></tr>
-<tr class="memdesc:ae852395c66e10fbb55d0a35cab7ffb83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse buttons. <br/></td></tr>
+<tr class="memdesc:ae852395c66e10fbb55d0a35cab7ffb83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse buttons.  <a href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">More...</a><br/></td></tr>
 <tr class="separator:ae852395c66e10fbb55d0a35cab7ffb83 inherit pub_types_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="review_8cc_source.html#l00012">12</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
-</div><h2 class="groupheader">Member Function Documentation</h2>
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a601b6aa2aea657e6e4732b1b14a010d8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">ArrayView::ArrayView </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>valueName</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>parameters</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>textSize</em> = <code>16</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00025">25</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="afb09a6efa039dc936d3c82e5f1a2d1d0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_variant.html">Variant</a>&gt; ArrayView::coordinates </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>dimension</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;&#160;</td>
+          <td class="paramname"><em>filter</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns coordinates along <em>dimension</em> occuring in points matching <em>filter</em>. </p>
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00120">120</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4676949877a80fbeb3a6b2f4025959c0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt;<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>, <a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_variant.html">Variant</a>&gt; &gt; ArrayView::coordinates </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structmap.html">map</a>&lt; <a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>, <a class="el" href="struct_variant.html">Variant</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>points</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns coordinates occuring in <em>points</em>. </p>
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00129">129</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8fab527b0dec4302864a95d311deab33"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ArrayView::cellCount </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>axis</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;&#160;</td>
+          <td class="paramname"><em>filter</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns number of cells for the given <em>axis</em>, <em>level</em> and <em>coordinates</em>. </p>
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00136">136</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a21efd2436c4fb0c0ba85c2543bb8ed28"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ArrayView::cellCount </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>axis</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>level</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00148">148</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a791c7cd56942b01be09f3cc7812c0f8a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> ArrayView::cellCount </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00149">149</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3d2062f87eda50840c67b64e5e2921e8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> ArrayView::levelCount </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00150">150</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="aa6e3a72752991fee683d5e1dc258044d"></a>
 <div class="memitem">
 <div class="memproto">
@@ -283,6 +439,314 @@ Additional Inherited Members</h2></td></tr>
 <p>Reimplemented from <a class="el" href="struct_widget.html#a67acadfee077131b97ff8a9d09661084">Widget</a>.</p>
 
 <p>Definition at line <a class="el" href="review_8cc_source.html#l00151">151</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a93c3299f4203d8556c90a68f92640019"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> ArrayView::renderHeader </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td>
+          <td class="paramname"><em>contentCellSize</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>axis</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;&#160;</td>
+          <td class="paramname"><em>filter</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>offset</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00153">153</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa597b9def2ec3888ab51167851885be4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int ArrayView::renderCell </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td>
+          <td class="paramname"><em>cellSize</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>axis</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;&#160;</td>
+          <td class="paramname"><em>filterX</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> &amp;&#160;</td>
+          <td class="paramname"><em>filterY</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td>
+          <td class="paramname"><em>origin</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00183">183</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a47051ceccc50eb108bff8825574fbd95"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ArrayView::render </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Implements <a class="el" href="struct_widget.html#a1b15d37c35f72502627a465542a77cfa">Widget</a>.</p>
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00215">215</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a78aaac85dd0f0bd36910fd46a3e1b6c1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> ArrayView::dimensionLabels = <a class="el" href="variant_8h.html#a8670bb0cdfa11f78664269489d3876a3">parseDict</a>(&quot;rotationCount:Revolutions,photonCount:Photons,projectionCount:Projections,subsetSize:per subset&quot;_)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00013">13</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7fdcf9992418a5c7de2feebf7ab55fa9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> ArrayView::coordinateLabels = <a class="el" href="variant_8h.html#a8670bb0cdfa11f78664269489d3876a3">parseDict</a>(&quot;single:\0Single,double:\1Double,adaptive:\2Adaptive&quot;_)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00014">14</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a157a6b14cb69778f5a23bb558128d503"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a> ArrayView::valueLabels = <a class="el" href="variant_8h.html#a8670bb0cdfa11f78664269489d3876a3">parseDict</a>(&quot;Iterations count:Iterations,Central NMSE %:MSE_C,Extreme NMSE %:MSE_E,Total NMSE %:MSE_T,Center NMSE %:MSE_C,Global NMSE %:MSE_T,Normalized NMSE %:Normalized NMSE&quot;_)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00015">15</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a527c6594575d1a2cc0f53eb0a8934950"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> ArrayView::valueName</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00016">16</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a30ebcda2eb7aaf51ca01b6fb2be86bd1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> ArrayView::bestName = (<a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a>==&quot;Iterations&quot;_ || <a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a> == &quot;Time (s)&quot;_) ? &quot;MSE_T&quot;_ : <a class="el" href="struct_array_view.html#a527c6594575d1a2cc0f53eb0a8934950">valueName</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00017">17</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7b38ce4fbb2410c1845cb3ce44fb4dc1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&gt; ArrayView::valueNames</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00018">18</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6e77247323bfd70314ed3d0f7ce4d364"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmap.html">map</a>&lt;<a class="el" href="variant_8h.html#a95e4de53c121e89a7803989b027c1557">Dict</a>, <a class="el" href="struct_variant.html">Variant</a>&gt; ArrayView::points</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00019">19</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a625f9e1e28a686f436aab9e6d49d7b0a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float ArrayView::min = <a class="el" href="math_8h.html#a84e82898bc7b9a6ad766c182722203c9">inf</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00020">20</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aedf074788eac17e6628622262a761c0b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float ArrayView::max = -<a class="el" href="math_8h.html#a84e82898bc7b9a6ad766c182722203c9">inf</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00020">20</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0cfa2da841a28e721510cab7941dc1db"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> ArrayView::textSize</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00021">21</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1c424b50e04c02f9012dd52e18f47640"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> ArrayView::headerCellSize = <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>(80*<a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>/16, <a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00022">22</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac51e665c6dcb5806ec289a1bb24fb586"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> ArrayView::contentCellSize = <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>(48*<a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>/16, <a class="el" href="struct_array_view.html#a0cfa2da841a28e721510cab7941dc1db">textSize</a>)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00023">23</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab1a02d12a123544a20ab87fa5c7c16f5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&gt; ArrayView::dimensions[2] = {<a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a>(&quot;Trajectory,Photons,Method&quot;_,','),<a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a>(&quot;Revolutions,Projections,per subset&quot;_,',')}</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="review_8cc_source.html#l00117">117</a> of file <a class="el" href="review_8cc_source.html">review.cc</a>.</p>
 
 </div>
 </div>

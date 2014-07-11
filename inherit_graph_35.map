@@ -1,3 +1,4 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$struct_compute.html" title="Computes reconstruction of a synthetic sample on a series of cases with varying parameters. " alt="" coords="5,5,80,32"/>
+<area shape="rect" id="node1" href="$structbuffer.html" title="buffer\&lt; V \&gt;" alt="" coords="5,5,93,32"/>
+<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; V \&gt;" alt="" coords="142,5,226,32"/>
 </map>

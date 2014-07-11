@@ -1,6 +1,10 @@
 var text_8h =
 [
     [ "Text", "struct_text.html", "struct_text" ],
+    [ "Character", "struct_text_1_1_character.html", "struct_text_1_1_character" ],
+    [ "Line", "struct_text_1_1_line.html", "struct_text_1_1_line" ],
+    [ "Cursor", "struct_text_1_1_cursor.html", "struct_text_1_1_cursor" ],
+    [ "Link", "struct_text_1_1_link.html", "struct_text_1_1_link" ],
     [ "TextFormat", "text_8h.html#ab6ea0063f7246ac0beecb0cf3cb2b126", [
       [ "Regular", "text_8h.html#ab6ea0063f7246ac0beecb0cf3cb2b126a66dfad2fc66aab9e6bb47cfad78b4b6b", null ],
       [ "Bold", "text_8h.html#ab6ea0063f7246ac0beecb0cf3cb2b126aa529a7a50505042b4f78439ecc3fb0d6", null ],

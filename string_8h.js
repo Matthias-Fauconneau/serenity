@@ -1,5 +1,6 @@
 var string_8h =
 [
+    [ "stringz", "structstringz.html", "structstringz" ],
     [ "str", "string_8h.html#aeb53e2c75fbf96eb0b4b8ac6be4afb24", null ],
     [ "operator<", "string_8h.html#a0afafe70324e90fcb977bc4d2207ca8e", null ],
     [ "count", "string_8h.html#a5d0cc75dcba1a175b578256efe88573f", null ],

@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_date.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -111,73 +111,383 @@ $(document).ready(function(){initNavTree('struct_date.html','');});
 <div class="title">Date Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p><code>#include &lt;<a class="el" href="time_8h_source.html">time.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a03bb0669186a65051884b10402213974"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a03bb0669186a65051884b10402213974"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>invariant</b> () const </td></tr>
+<tr class="memitem:a03bb0669186a65051884b10402213974"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a03bb0669186a65051884b10402213974">invariant</a> () const </td></tr>
 <tr class="separator:a03bb0669186a65051884b10402213974"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4e59ed4ba66eec61c27460c5d09fa1bd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4e59ed4ba66eec61c27460c5d09fa1bd"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a4e59ed4ba66eec61c27460c5d09fa1bd">Date</a> ()</td></tr>
-<tr class="memdesc:a4e59ed4ba66eec61c27460c5d09fa1bd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default constructs an undetermined date. <br/></td></tr>
+<tr class="memitem:a4e59ed4ba66eec61c27460c5d09fa1bd"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a4e59ed4ba66eec61c27460c5d09fa1bd">Date</a> ()</td></tr>
+<tr class="memdesc:a4e59ed4ba66eec61c27460c5d09fa1bd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default constructs an undetermined date.  <a href="#a4e59ed4ba66eec61c27460c5d09fa1bd">More...</a><br/></td></tr>
 <tr class="separator:a4e59ed4ba66eec61c27460c5d09fa1bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a982022a09950d92a9d2189884fe398d2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a982022a09950d92a9d2189884fe398d2"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a982022a09950d92a9d2189884fe398d2">Date</a> (int monthDay, int month, int year, int hours, int minutes, int seconds)</td></tr>
-<tr class="memdesc:a982022a09950d92a9d2189884fe398d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a calendar date (specified hour) <br/></td></tr>
+<tr class="memitem:a982022a09950d92a9d2189884fe398d2"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a982022a09950d92a9d2189884fe398d2">Date</a> (int monthDay, int <a class="el" href="struct_date.html#a533843e07c6ac8d19fee9b16f5336ba2">month</a>, int <a class="el" href="struct_date.html#a3eeced2ed56bc95d56782b9e738db8ea">year</a>, int <a class="el" href="struct_date.html#a3616a71ecbc84f7daf1bf033a11c6a84">hours</a>, int <a class="el" href="struct_date.html#a3bd2b03da68ad8995b56a393a0c4f4a0">minutes</a>, int <a class="el" href="struct_date.html#a5237356d466f12c0a24f29e36126d40c">seconds</a>)</td></tr>
+<tr class="memdesc:a982022a09950d92a9d2189884fe398d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a calendar date (specified hour)  <a href="#a982022a09950d92a9d2189884fe398d2">More...</a><br/></td></tr>
 <tr class="separator:a982022a09950d92a9d2189884fe398d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8ddbae747ad4bf0ed43bab635e51bd29"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8ddbae747ad4bf0ed43bab635e51bd29"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a8ddbae747ad4bf0ed43bab635e51bd29">Date</a> (int monthDay, int month, int year)</td></tr>
-<tr class="memdesc:a8ddbae747ad4bf0ed43bab635e51bd29"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a calendar date (unspecified hour) <br/></td></tr>
+<tr class="memitem:a8ddbae747ad4bf0ed43bab635e51bd29"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a8ddbae747ad4bf0ed43bab635e51bd29">Date</a> (int monthDay, int <a class="el" href="struct_date.html#a533843e07c6ac8d19fee9b16f5336ba2">month</a>, int <a class="el" href="struct_date.html#a3eeced2ed56bc95d56782b9e738db8ea">year</a>)</td></tr>
+<tr class="memdesc:a8ddbae747ad4bf0ed43bab635e51bd29"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a calendar date (unspecified hour)  <a href="#a8ddbae747ad4bf0ed43bab635e51bd29">More...</a><br/></td></tr>
 <tr class="separator:a8ddbae747ad4bf0ed43bab635e51bd29"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1ba7d16d366d302704f3be1c53b83b3b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1ba7d16d366d302704f3be1c53b83b3b"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a1ba7d16d366d302704f3be1c53b83b3b">Date</a> (int64 time)</td></tr>
-<tr class="memdesc:a1ba7d16d366d302704f3be1c53b83b3b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts UNIX <em>timestamp</em> (in seconds) to a local time calendar date. <br/></td></tr>
+<tr class="memitem:a1ba7d16d366d302704f3be1c53b83b3b"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a1ba7d16d366d302704f3be1c53b83b3b">Date</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> time)</td></tr>
+<tr class="memdesc:a1ba7d16d366d302704f3be1c53b83b3b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts UNIX <em>timestamp</em> (in seconds) to a local time calendar date.  <a href="#a1ba7d16d366d302704f3be1c53b83b3b">More...</a><br/></td></tr>
 <tr class="separator:a1ba7d16d366d302704f3be1c53b83b3b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6a5b89d877449b9f28e18331ee200fc3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6a5b89d877449b9f28e18331ee200fc3"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a6a5b89d877449b9f28e18331ee200fc3">days</a> () const </td></tr>
-<tr class="memdesc:a6a5b89d877449b9f28e18331ee200fc3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns days from Thursday, 1st January 1970. <br/></td></tr>
+<tr class="memitem:a6a5b89d877449b9f28e18331ee200fc3"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a6a5b89d877449b9f28e18331ee200fc3">days</a> () const </td></tr>
+<tr class="memdesc:a6a5b89d877449b9f28e18331ee200fc3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns days from Thursday, 1st January 1970.  <a href="#a6a5b89d877449b9f28e18331ee200fc3">More...</a><br/></td></tr>
 <tr class="separator:a6a5b89d877449b9f28e18331ee200fc3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6d56fa2c996479733d8dd77adbf21c25"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6d56fa2c996479733d8dd77adbf21c25"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a6d56fa2c996479733d8dd77adbf21c25">summerTime</a> () const </td></tr>
-<tr class="memdesc:a6d56fa2c996479733d8dd77adbf21c25"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether this date is in daylight saving time. <br/></td></tr>
+<tr class="memitem:a6d56fa2c996479733d8dd77adbf21c25"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a6d56fa2c996479733d8dd77adbf21c25">summerTime</a> () const </td></tr>
+<tr class="memdesc:a6d56fa2c996479733d8dd77adbf21c25"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether this date is in daylight saving time.  <a href="#a6d56fa2c996479733d8dd77adbf21c25">More...</a><br/></td></tr>
 <tr class="separator:a6d56fa2c996479733d8dd77adbf21c25"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a17c3456c4ded175421068cce66359d90"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a17c3456c4ded175421068cce66359d90"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a17c3456c4ded175421068cce66359d90">localTimeOffset</a> (int64 utc) const </td></tr>
-<tr class="memdesc:a17c3456c4ded175421068cce66359d90"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the local time offset from UTC in seconds (time zone + DST) <br/></td></tr>
+<tr class="memitem:a17c3456c4ded175421068cce66359d90"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a17c3456c4ded175421068cce66359d90">localTimeOffset</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> utc) const </td></tr>
+<tr class="memdesc:a17c3456c4ded175421068cce66359d90"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the local time offset from UTC in seconds (time zone + DST)  <a href="#a17c3456c4ded175421068cce66359d90">More...</a><br/></td></tr>
 <tr class="separator:a17c3456c4ded175421068cce66359d90"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab25ace72ddcea8373eb4e7c489fcbc1f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab25ace72ddcea8373eb4e7c489fcbc1f"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#ab25ace72ddcea8373eb4e7c489fcbc1f">operator int64</a> () const </td></tr>
-<tr class="memdesc:ab25ace72ddcea8373eb4e7c489fcbc1f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts the date to Unix time (in seconds) <br/></td></tr>
+<tr class="memitem:ab25ace72ddcea8373eb4e7c489fcbc1f"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#ab25ace72ddcea8373eb4e7c489fcbc1f">operator int64</a> () const </td></tr>
+<tr class="memdesc:ab25ace72ddcea8373eb4e7c489fcbc1f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts the date to Unix time (in seconds)  <a href="#ab25ace72ddcea8373eb4e7c489fcbc1f">More...</a><br/></td></tr>
 <tr class="separator:ab25ace72ddcea8373eb4e7c489fcbc1f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a3eeced2ed56bc95d56782b9e738db8ea"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3eeced2ed56bc95d56782b9e738db8ea"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>year</b> =-1</td></tr>
+<tr class="memitem:a3eeced2ed56bc95d56782b9e738db8ea"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a3eeced2ed56bc95d56782b9e738db8ea">year</a> =-1</td></tr>
 <tr class="separator:a3eeced2ed56bc95d56782b9e738db8ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a533843e07c6ac8d19fee9b16f5336ba2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a533843e07c6ac8d19fee9b16f5336ba2"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>month</b> =-1</td></tr>
+<tr class="memitem:a533843e07c6ac8d19fee9b16f5336ba2"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a533843e07c6ac8d19fee9b16f5336ba2">month</a> =-1</td></tr>
 <tr class="separator:a533843e07c6ac8d19fee9b16f5336ba2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5b192adcabf2b2871e3f0b76c1ec1601"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5b192adcabf2b2871e3f0b76c1ec1601"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>day</b> =-1</td></tr>
+<tr class="memitem:a5b192adcabf2b2871e3f0b76c1ec1601"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a5b192adcabf2b2871e3f0b76c1ec1601">day</a> =-1</td></tr>
 <tr class="separator:a5b192adcabf2b2871e3f0b76c1ec1601"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3616a71ecbc84f7daf1bf033a11c6a84"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3616a71ecbc84f7daf1bf033a11c6a84"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>hours</b> =-1</td></tr>
+<tr class="memitem:a3616a71ecbc84f7daf1bf033a11c6a84"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a3616a71ecbc84f7daf1bf033a11c6a84">hours</a> =-1</td></tr>
 <tr class="separator:a3616a71ecbc84f7daf1bf033a11c6a84"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3bd2b03da68ad8995b56a393a0c4f4a0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3bd2b03da68ad8995b56a393a0c4f4a0"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>minutes</b> =-1</td></tr>
+<tr class="memitem:a3bd2b03da68ad8995b56a393a0c4f4a0"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a3bd2b03da68ad8995b56a393a0c4f4a0">minutes</a> =-1</td></tr>
 <tr class="separator:a3bd2b03da68ad8995b56a393a0c4f4a0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5237356d466f12c0a24f29e36126d40c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5237356d466f12c0a24f29e36126d40c"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>seconds</b> =-1</td></tr>
+<tr class="memitem:a5237356d466f12c0a24f29e36126d40c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#a5237356d466f12c0a24f29e36126d40c">seconds</a> =-1</td></tr>
 <tr class="separator:a5237356d466f12c0a24f29e36126d40c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abc9d37a992598e0176df74f520cb202c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abc9d37a992598e0176df74f520cb202c"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><b>weekDay</b> =-1</td></tr>
+<tr class="memitem:abc9d37a992598e0176df74f520cb202c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_date.html#abc9d37a992598e0176df74f520cb202c">weekDay</a> =-1</td></tr>
 <tr class="separator:abc9d37a992598e0176df74f520cb202c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="time_8h_source.html#l00035">35</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a4e59ed4ba66eec61c27460c5d09fa1bd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Date::Date </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Default constructs an undetermined date. </p>
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00040">40</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a982022a09950d92a9d2189884fe398d2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Date::Date </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>monthDay</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>month</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>year</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>hours</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>minutes</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>seconds</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Constructs a calendar date (specified hour) </p>
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00041">41</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8ddbae747ad4bf0ed43bab635e51bd29"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Date::Date </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>monthDay</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>month</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>year</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Constructs a calendar date (unspecified hour) </p>
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00044">44</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1ba7d16d366d302704f3be1c53b83b3b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Date::Date </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>time</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts UNIX <em>timestamp</em> (in seconds) to a local time calendar date. </p>
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00067">67</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a03bb0669186a65051884b10402213974"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Date::invariant </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00018">18</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6a5b89d877449b9f28e18331ee200fc3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::days </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns days from Thursday, 1st January 1970. </p>
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00034">34</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6d56fa2c996479733d8dd77adbf21c25"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Date::summerTime </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns whether this date is in daylight saving time. </p>
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00045">45</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a17c3456c4ded175421068cce66359d90"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::localTimeOffset </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>utc</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns the local time offset from UTC in seconds (time zone + DST) </p>
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00052">52</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab25ace72ddcea8373eb4e7c489fcbc1f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Date::operator <a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts the date to Unix time (in seconds) </p>
+
+<p>Definition at line <a class="el" href="time_8cc_source.html#l00083">83</a> of file <a class="el" href="time_8cc_source.html">time.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a3eeced2ed56bc95d56782b9e738db8ea"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::year =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00036">36</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a533843e07c6ac8d19fee9b16f5336ba2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::month =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00036">36</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5b192adcabf2b2871e3f0b76c1ec1601"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::day =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00036">36</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3616a71ecbc84f7daf1bf033a11c6a84"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::hours =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00036">36</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3bd2b03da68ad8995b56a393a0c4f4a0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::minutes =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00036">36</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5237356d466f12c0a24f29e36126d40c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::seconds =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00036">36</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="abc9d37a992598e0176df74f520cb202c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int Date::weekDay =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="time_8h_source.html#l00037">37</a> of file <a class="el" href="time_8h_source.html">time.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

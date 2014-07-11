@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_locker.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -126,21 +126,72 @@ Collaboration diagram for Locker:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:afe2fce5e4d5d248eec1fbf109aae60bd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afe2fce5e4d5d248eec1fbf109aae60bd"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Locker</b> (<a class="el" href="struct_lock.html">Lock</a> &amp;lock)</td></tr>
+<tr class="memitem:afe2fce5e4d5d248eec1fbf109aae60bd"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_locker.html#afe2fce5e4d5d248eec1fbf109aae60bd">Locker</a> (<a class="el" href="struct_lock.html">Lock</a> &amp;<a class="el" href="struct_locker.html#a231a17cc37f81bfc47ad35457affe523">lock</a>)</td></tr>
 <tr class="separator:afe2fce5e4d5d248eec1fbf109aae60bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6332fec7611d1507cb7323987ec86845"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_locker.html#a6332fec7611d1507cb7323987ec86845">~Locker</a> ()</td></tr>
+<tr class="separator:a6332fec7611d1507cb7323987ec86845"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a231a17cc37f81bfc47ad35457affe523"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a231a17cc37f81bfc47ad35457affe523"></a>
-<a class="el" href="struct_lock.html">Lock</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>lock</b></td></tr>
+<tr class="memitem:a231a17cc37f81bfc47ad35457affe523"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_lock.html">Lock</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_locker.html#a231a17cc37f81bfc47ad35457affe523">lock</a></td></tr>
 <tr class="separator:a231a17cc37f81bfc47ad35457affe523"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Convenience class to automatically unlock a mutex. </p>
 
 <p>Definition at line <a class="el" href="thread_8h_source.html#l00032">32</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="afe2fce5e4d5d248eec1fbf109aae60bd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Locker::Locker </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_lock.html">Lock</a> &amp;&#160;</td>
+          <td class="paramname"><em>lock</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00034">34</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6332fec7611d1507cb7323987ec86845"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Locker::~Locker </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00035">35</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a231a17cc37f81bfc47ad35457affe523"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_lock.html">Lock</a>&amp; Locker::lock</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00033">33</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

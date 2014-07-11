@@ -92,7 +92,7 @@ $(document).ready(function(){initNavTree('png_8h.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -124,23 +124,43 @@ This graph shows which files directly or indirectly include this file:</div>
 <div class="dyncontent">
 <div class="center"><img src="png_8h__dep__incl.png" border="0" usemap="#png_8hdep" alt=""/></div>
 <map name="png_8hdep" id="png_8hdep">
-<area shape="rect" id="node2" href="png_8cc_source.html" title="png.cc" alt="" coords="5,80,67,107"/><area shape="rect" id="node3" href="compute_8cc_source.html" title="compute.cc" alt="" coords="91,80,181,107"/><area shape="rect" id="node4" href="graph_8cc_source.html" title="graph.cc" alt="" coords="205,80,277,107"/><area shape="rect" id="node5" href="review_8cc_source.html" title="review.cc" alt="" coords="302,80,380,107"/><area shape="rect" id="node6" href="slice_8cc_source.html" title="slice.cc" alt="" coords="405,80,472,107"/><area shape="rect" id="node7" href="window_8cc_source.html" title="window.cc" alt="" coords="497,80,580,107"/></map>
+<area shape="rect" id="node2" href="png_8cc.html" title="png.cc" alt="" coords="5,80,67,107"/><area shape="rect" id="node3" href="compute_8cc.html" title="compute.cc" alt="" coords="91,80,181,107"/><area shape="rect" id="node4" href="graph_8cc.html" title="graph.cc" alt="" coords="205,80,277,107"/><area shape="rect" id="node5" href="review_8cc.html" title="review.cc" alt="" coords="302,80,380,107"/><area shape="rect" id="node6" href="slice_8cc.html" title="slice.cc" alt="" coords="405,80,472,107"/><area shape="rect" id="node7" href="window_8cc.html" title="window.cc" alt="" coords="497,80,580,107"/></map>
 </div>
 </div>
 <p><a href="png_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a4ee755075a1ea4ce09f8285ecc27f6a0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4ee755075a1ea4ce09f8285ecc27f6a0"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="png_8h.html#a4ee755075a1ea4ce09f8285ecc27f6a0">encodePNG</a> (const <a class="el" href="struct_image.html">Image</a> &amp;image)</td></tr>
-<tr class="memdesc:a4ee755075a1ea4ce09f8285ecc27f6a0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Encodes image using the Portable Network Graphics standard. <br/></td></tr>
+<tr class="memitem:a4ee755075a1ea4ce09f8285ecc27f6a0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="png_8h.html#a4ee755075a1ea4ce09f8285ecc27f6a0">encodePNG</a> (const <a class="el" href="struct_image.html">Image</a> &amp;image)</td></tr>
+<tr class="memdesc:a4ee755075a1ea4ce09f8285ecc27f6a0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Encodes image using the Portable Network Graphics standard.  <a href="#a4ee755075a1ea4ce09f8285ecc27f6a0">More...</a><br/></td></tr>
 <tr class="separator:a4ee755075a1ea4ce09f8285ecc27f6a0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>PNG codec. </p>
 
 <p>Definition in file <a class="el" href="png_8h_source.html">png.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="a4ee755075a1ea4ce09f8285ecc27f6a0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffer.html">buffer</a>&lt;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&gt; encodePNG </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_image.html">Image</a> &amp;&#160;</td>
+          <td class="paramname"><em>image</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Encodes image using the Portable Network Graphics standard. </p>
+
+<p>Definition at line <a class="el" href="png_8cc_source.html#l00161">161</a> of file <a class="el" href="png_8cc_source.html">png.cc</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

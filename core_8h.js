@@ -1,8 +1,15 @@
 var core_8h =
 [
+    [ "remove_reference", "structremove__reference.html", "structremove__reference" ],
+    [ "remove_reference< T & >", "structremove__reference_3_01_t_01_6_01_4.html", "structremove__reference_3_01_t_01_6_01_4" ],
+    [ "remove_reference< T && >", "structremove__reference_3_01_t_01_6_6_01_4.html", "structremove__reference_3_01_t_01_6_6_01_4" ],
     [ "handle", "structhandle.html", "structhandle" ],
+    [ "is_lvalue_reference", "structis__lvalue__reference.html", null ],
+    [ "is_lvalue_reference< T & >", "structis__lvalue__reference_3_01_t_01_6_01_4.html", null ],
+    [ "initializer_list", "structstd_1_1initializer__list.html", "structstd_1_1initializer__list" ],
     [ "ref", "structref.html", "structref" ],
     [ "range", "structrange.html", "structrange" ],
+    [ "iterator", "structrange_1_1iterator.html", "structrange_1_1iterator" ],
     [ "ref", "structref.html", "structref" ],
     [ "mref", "structmref.html", "structmref" ],
     [ "_unused", "core_8h.html#ab795c7ed25edebadeccc5ecf535c2563", null ],

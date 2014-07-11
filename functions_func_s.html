@@ -78,6 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions.html"><span>All</span></a></li>
       <li class="current"><a href="functions_func.html"><span>Functions</span></a></li>
       <li><a href="functions_vars.html"><span>Variables</span></a></li>
+      <li><a href="functions_type.html"><span>Typedefs</span></a></li>
       <li><a href="functions_enum.html"><span>Enumerations</span></a></li>
       <li><a href="functions_eval.html"><span>Enumerator</span></a></li>
     </ul>
@@ -107,6 +108,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions_func_v.html#index_v"><span>v</span></a></li>
       <li><a href="functions_func_w.html#index_w"><span>w</span></a></li>
       <li><a href="functions_func_x.html#index_x"><span>x</span></a></li>
+      <li><a href="functions_func_y.html#index_y"><span>y</span></a></li>
       <li><a href="functions_func_~.html#index_~"><span>~</span></a></li>
     </ul>
   </div>
@@ -130,7 +132,7 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -143,6 +145,13 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
 &#160;
 
 <h3><a class="anchor" id="index_s"></a>- s -</h3><ul>
+<li>SART()
+: <a class="el" href="struct_s_a_r_t.html#acc5642cc7d32d3f010e43377b3d77e28">SART</a>
+</li>
+<li>scale()
+: <a class="el" href="structmat3.html#af737caf3b2eb17ed7298a1d967014d8c">mat3</a>
+, <a class="el" href="structmat4.html#aaaec9c35ff0a3aabda3304a6df2d2b77">mat4</a>
+</li>
 <li>seek()
 : <a class="el" href="struct_binary_data.html#a3571ec61b684c1ccf6aa11f80f9ed049">BinaryData</a>
 , <a class="el" href="struct_file.html#a8af77f715f9a45c029c547b43486dd9d">File</a>
@@ -152,6 +161,12 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
 </li>
 <li>Semaphore()
 : <a class="el" href="struct_semaphore.html#ad4c6667b9fa2e4b87c4d3ef7b380525a">Semaphore</a>
+</li>
+<li>send()
+: <a class="el" href="struct_window.html#a1de01ac7a5fe3aa6904194e7a36b4871">Window</a>
+</li>
+<li>setAbsolute()
+: <a class="el" href="struct_timer.html#a86b703563f324199e648e82c0ca7f4db">Timer</a>
 </li>
 <li>setCursor()
 : <a class="el" href="struct_window.html#a5bd9450a50bc2dc26adbef5f55391a1b">Window</a>
@@ -165,17 +180,36 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
 <li>setIcon()
 : <a class="el" href="struct_window.html#a0dc953c39eeb074f48bd5fb85c16eac2">Window</a>
 </li>
+<li>setKernelArg()
+: <a class="el" href="struct_c_l_kernel.html#aeb8874044092db38871ab0944036c4c7">CLKernel</a>
+</li>
+<li>setKernelArgs()
+: <a class="el" href="struct_c_l_kernel.html#aafbac7ccd4cc4053732f46a018d75ae6">CLKernel</a>
+</li>
 <li>setPosition()
 : <a class="el" href="struct_window.html#a3bfbdcc73406b828e05c4c814d73d8bc">Window</a>
 </li>
+<li>setPriority()
+: <a class="el" href="struct_thread.html#a3f31cc93f4bebd06345d40cc66f08ecf">Thread</a>
+</li>
+<li>setRelative()
+: <a class="el" href="struct_timer.html#a08df91b05b405f062d1705f599a5c3f1">Timer</a>
+</li>
 <li>setSize()
-: <a class="el" href="struct_window.html#ae332f4ec006bb674bcbd4bf261818122">Window</a>
+: <a class="el" href="struct_text.html#a48660690923185971c8424eb83ff6e31">Text</a>
+, <a class="el" href="struct_window.html#ae332f4ec006bb674bcbd4bf261818122">Window</a>
+</li>
+<li>setText()
+: <a class="el" href="struct_text.html#af0fcddcb8354f753947c371d634fabf9">Text</a>
 </li>
 <li>setTitle()
 : <a class="el" href="struct_window.html#a467c751b44cf160248540ee5c8d83684">Window</a>
 </li>
 <li>setType()
 : <a class="el" href="struct_window.html#a35ea9e866d78669be38a4e4a1145ba34">Window</a>
+</li>
+<li>shared()
+: <a class="el" href="structshared.html#ac16fab8a16e5ead88c1460fc07b6644a">shared</a>
 </li>
 <li>show()
 : <a class="el" href="struct_window.html#a8f986e19a11c4c97ed8e6ad3d0e648b7">Window</a>
@@ -186,11 +220,18 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
 <li>size()
 : <a class="el" href="struct_file.html#a0d278cdf55b664a63b512307f4a4c8f4">File</a>
 , <a class="el" href="struct_font.html#a5c0139c648b6d3d7625d91bd22e2a968">Font</a>
+, <a class="el" href="struct_image.html#aeda70fcba7ea4228e082bfbeea5db0b3">Image</a>
+, <a class="el" href="structmap.html#a6ac15c08282bb0d2d5a2a6253b0d5029">map&lt; K, V &gt;</a>
+, <a class="el" href="struct_rect.html#a609c1706a90a0adbcef987144da5e695">Rect</a>
+, <a class="el" href="structstd_1_1initializer__list.html#a40629edbc4ad49fcf6e0d0e4d6cfe4bb">std::initializer_list&lt; T &gt;</a>
 </li>
 <li>sizeHint()
-: <a class="el" href="struct_grid_layout.html#ab19ea2b9a4fd88ef8c86fb7fbfddcd41">GridLayout</a>
+: <a class="el" href="struct_array_view.html#aa6e3a72752991fee683d5e1dc258044d">ArrayView</a>
+, <a class="el" href="struct_grid_layout.html#ab19ea2b9a4fd88ef8c86fb7fbfddcd41">GridLayout</a>
 , <a class="el" href="struct_linear.html#a4aef5f925f6d1fb57235dea9eba9f099">Linear</a>
 , <a class="el" href="struct_plot.html#a1cd58af1a8914e6416abeccdba421c33">Plot</a>
+, <a class="el" href="struct_plot_view.html#ad98aec3860ed1fc0177ca938a44f1235">PlotView</a>
+, <a class="el" href="struct_slice_array_view.html#a5e291a36e06c237ec3609d8843a2b0a7">SliceArrayView</a>
 , <a class="el" href="struct_slice_view.html#ac1222329f8d0da337ad5833b407ad16d">SliceView</a>
 , <a class="el" href="struct_text.html#ad5dd14ce01753e0b88c6e95c9a415222">Text</a>
 , <a class="el" href="struct_volume_view.html#a510cda7336154827145a04b073dc18f2">VolumeView</a>
@@ -200,10 +241,22 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
 : <a class="el" href="struct_text_data.html#abc65430125686d0f13f271cf56ab5b7e">TextData</a>
 </li>
 <li>slice()
-: <a class="el" href="struct_binary_data.html#a6af2c48f18412e88c7aa4ad1cbdc1bfc">BinaryData</a>
+: <a class="el" href="struct_binary_data.html#a15591f1ffbe952f86ec1ac03dd96e063">BinaryData</a>
 , <a class="el" href="struct_data.html#a6cd66b3fa4b3a7b1768bdfb03496f0b3">Data</a>
-, <a class="el" href="structmref.html#a8d13d429bafcc488c4e446a5bb842d76">mref&lt; T &gt;</a>
+, <a class="el" href="structmref.html#aa6f313ebfb11560517531734400d9b66">mref&lt; T &gt;</a>
 , <a class="el" href="structref.html#a856c1ae9bcd7d42291645e054d21e7ad">ref&lt; T &gt;</a>
+</li>
+<li>SliceArrayView()
+: <a class="el" href="struct_slice_array_view.html#af93b1762be8b314369256146dccc670d">SliceArrayView</a>
+</li>
+<li>SliceView()
+: <a class="el" href="struct_slice_view.html#a57defc67dad3e25883a276f3f1800a20">SliceView</a>
+</li>
+<li>SNR()
+: <a class="el" href="struct_s_n_r.html#ad6937b95bd9edb7e18c21700c59e0c27">SNR</a>
+</li>
+<li>Socket()
+: <a class="el" href="struct_socket.html#aa86cf7c7794fc3025c8df36227131584">Socket</a>
 </li>
 <li>sorted()
 : <a class="el" href="structmap.html#ab407fd9923699a794dd5e0d8e85efa5c">map&lt; K, V &gt;</a>
@@ -211,17 +264,31 @@ $(document).ready(function(){initNavTree('functions_func_s.html','');});
 <li>spawn()
 : <a class="el" href="struct_thread.html#a810ba91d7f7399ff6409c7e3bdc107e4">Thread</a>
 </li>
+<li>start()
+: <a class="el" href="struct_time.html#a67839514bc4a3bc2b2702015c540b8db">Time</a>
+</li>
 <li>stat()
 : <a class="el" href="struct_file.html#a31ee0fb4c730cee79d3453c468d93ace">File</a>
+, <a class="el" href="struct_folder.html#a0df970b758c537a279557781a1cdc79c">Folder</a>
 </li>
 <li>step()
 : <a class="el" href="struct_c_g.html#ad65144dc227ad61f820dc268308d93b6">CG</a>
 , <a class="el" href="struct_m_l_t_r.html#acef1da68003f6d2385f5b5de618b8792">MLTR</a>
+, <a class="el" href="struct_p_m_l_t_r.html#a3bb9bd827b9da64e396ec694c278758d">PMLTR</a>
 , <a class="el" href="struct_reconstruction.html#abf08335d184510cba4b51c83cb638f7a">Reconstruction</a>
 , <a class="el" href="struct_s_a_r_t.html#ad7aa1c52b81cba276b1c430c55046908">SART</a>
 </li>
+<li>stop()
+: <a class="el" href="struct_time.html#a30e76d0422039eb5cfc4d22a94c89980">Time</a>
+</li>
+<li>Stream()
+: <a class="el" href="struct_stream.html#ac9a846a21907e24e31e1a62bfd8f3ae6">Stream</a>
+</li>
 <li>SubsetReconstruction()
 : <a class="el" href="struct_subset_reconstruction.html#a59e3b9013ad8244cd35285a22b709789">SubsetReconstruction</a>
+</li>
+<li>summerTime()
+: <a class="el" href="struct_date.html#a6d56fa2c996479733d8dd77adbf21c25">Date</a>
 </li>
 </ul>
 </div><!-- contents -->

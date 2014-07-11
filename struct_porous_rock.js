@@ -1,5 +1,6 @@
 var struct_porous_rock =
 [
+    [ "GrainType", "struct_porous_rock_1_1_grain_type.html", "struct_porous_rock_1_1_grain_type" ],
     [ "PorousRock", "struct_porous_rock.html#a1ef7511f896dc511dc07064b6652eec9", null ],
     [ "volume", "struct_porous_rock.html#a2c83231e7b28c86d23d0b4e2ebd0a455", null ],
     [ "project", "struct_porous_rock.html#a350de8749e2abc0f2c85c3ff22737419", null ],

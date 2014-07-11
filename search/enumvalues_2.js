@@ -1,5 +1,26 @@
 var searchData=
 [
-  ['even',['Even',['../struct_linear.html#ada56dc91aadf5dba53b6ab10d6028a0fa097fbad5914425ecc0782603dcf23baa',1,'Linear']]],
-  ['expand',['Expand',['../struct_linear.html#ada56dc91aadf5dba53b6ab10d6028a0faff5eef7c664930c67d22492a599202f6',1,'Linear']]]
+  ['canceled',['CANCELED',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5acf7f43e67077d0d24cf2ca297960e719',1,'file.h']]],
+  ['center',['Center',['../struct_linear.html#ada56dc91aadf5dba53b6ab10d6028a0fab66547f673daa009b2a0499ff2772dc2',1,'Linear::Center()'],['../struct_window.html#ab7cfdc5390347b7185d4014802342576a117860124d2abd6aef729f7bbc61e9d1',1,'Window::Center()']]],
+  ['child',['CHILD',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a1fbfc6416a0d78a967e48395e021d7c7',1,'file.h']]],
+  ['chrng',['CHRNG',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5affe8e7aab0754397a00d1ca51f814612',1,'file.h']]],
+  ['circulatenotify',['CirculateNotify',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea835f2cec686f65ffe38e0617fc4d0486',1,'x.h']]],
+  ['circulaterequest',['CirculateRequest',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea0ddb2b2fb776d78174ff1a9621860cfb',1,'x.h']]],
+  ['clear',['Clear',['../namespace_x_render.html#a68bd43040c493563d53a7a00533d84a7a2095c2d849bb8c8292b090533cc64c88',1,'XRender']]],
+  ['clientmessage',['ClientMessage',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea0c9fa2a45831c4f34ab3789a7a45779f',1,'x.h']]],
+  ['colormap',['Colormap',['../struct_window.html#ae657e5ad3372132e992414cda32d1d33ac4a3d65f57fb81c68a4170579bfecf0c',1,'Window::Colormap()'],['../x_8h.html#a45440ba12e82e1d77a17f9e9ec4b162ea3c505a3221ed4ff1321504cf9c626c5f',1,'ColorMap():&#160;x.h']]],
+  ['colormapnotify',['ColormapNotify',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9eafecee28f645bb6a938aeaa40c807a960',1,'x.h']]],
+  ['comm',['COMM',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a6f451ba8ea6ae9cd569eb91e2126376b',1,'file.h']]],
+  ['completion',['Completion',['../namespace_shm.html#a7c59943a943687e56bb10173392d344eadfe9b801163db3649159b3a92557a759',1,'Shm']]],
+  ['configurenotify',['ConfigureNotify',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea776c3f5f715e728b0d39b1bd5c9b70d8',1,'x.h']]],
+  ['configurerequest',['ConfigureRequest',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9eac1e7537b4e4842ef722c4e90368f5251',1,'x.h']]],
+  ['connaborted',['CONNABORTED',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5aa7cb355073c223a1be891d907b1b4632',1,'file.h']]],
+  ['connrefused',['CONNREFUSED',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a97890bdcbb2a92d614c7ff0339ec4364',1,'file.h']]],
+  ['connreset',['CONNRESET',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5ae0d5ba4c7ef6f269330d097885a702f3',1,'file.h']]],
+  ['control',['Control',['../widget_8h.html#a153f7e4dd506d333b40d9b3c27719e0da472675dc9774d12a861cde09d5f590e2',1,'widget.h']]],
+  ['controlkey',['ControlKey',['../widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73a5c7f21172adbc3323889359e36dd2b53',1,'widget.h']]],
+  ['controlmask',['ControlMask',['../x_8h.html#aff6bd296614968da9fb694d363f62c45af3a9889abd3e509d7642796eee0e1b12',1,'x.h']]],
+  ['create',['Create',['../file_8h.html#aa705cf7e79a21c2352b00ffe20cd295fa93479401ae71e13bd81626eb0b6c2d37',1,'file.h']]],
+  ['createnotify',['CreateNotify',['../x_8h.html#a05589fbab0657f08285ebdfe93f5ec9ea0b51447299e2ff8853bc254d8ee32161',1,'x.h']]],
+  ['cursormask',['CursorMask',['../x_8h.html#a45440ba12e82e1d77a17f9e9ec4b162ea79ce19e1412de4068fc1a25a7bbdc2af',1,'x.h']]]
 ];

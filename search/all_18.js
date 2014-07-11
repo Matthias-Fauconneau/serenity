@@ -1,5 +1,28 @@
 var searchData=
 [
+  ['x',['x',['../structxy.html#ad91a15b238775336a38c94526ba276a8',1,'xy::x()'],['../structxyz.html#a44891338527452a98a7beb2c72696fcc',1,'xyz::x()'],['../structxyzw.html#aad79d3d8bc39900e613b955ed93c9f0b',1,'xyzw::x()'],['../struct_reconstruction.html#a2f3dbd4d7f10229c33794024a3225a48',1,'Reconstruction::x()'],['../struct_volume_view.html#aaf604c99d63f890d3604c95305454bd9',1,'VolumeView::x()'],['../union_x_event.html#a0acdd8628989d655ec35eb3841b34e29',1,'XEvent::x()'],['../union_x_event.html#af0249cd98890f28049fe2707e6df1fab',1,'XEvent::x()'],['../struct_create_window.html#a561de46916bc68ba79f331086f2cbc18',1,'CreateWindow::x()'],['../struct_configure_window.html#a3cf0098cbeb13c6a5b0d181829e9b75c',1,'ConfigureWindow::x()'],['../struct_set_position.html#ae949f531c7b63104441543b6167be890',1,'SetPosition::x()'],['../struct_set_geometry.html#a4ee5859571795963db52e040658ed10a',1,'SetGeometry::x()'],['../struct_get_geometry_reply.html#a6987e2fa565770b8a47853eda5fcafad',1,'GetGeometryReply::x()'],['../struct_put_image.html#a953912149f10adec89150a10155a1971',1,'PutImage::x()'],['../struct_shm_1_1_get_image.html#a5255a391cf8bf8f672e9c289a9e751c0',1,'Shm::GetImage::x()'],['../struct_x_render_1_1_create_cursor.html#af402920b69d32fc384e7c23a6f06b5ce',1,'XRender::CreateCursor::x()'],['../opencl_8cc.html#a011601a145292cfa51692a00986fba79',1,'x():&#160;opencl.cc'],['../x_8h.html#aca81df1b06d6eb3ecf3340be398d16faa58833a3110c570fb05130d40c365d1e4',1,'X():&#160;x.h']]],
   ['x_2eh',['x.h',['../x_8h.html',1,'']]],
-  ['xy',['xy',['../struct_linear.html#ad6aa5094ac83929868aea85dcb4d086f',1,'Linear::xy()'],['../struct_horizontal.html#ad4c7d5e86c5899a4ef2cd614f22c8d03',1,'Horizontal::xy()'],['../struct_vertical.html#af936ed2c47a691b8ca2c2c3e10b43525',1,'Vertical::xy()']]]
+  ['x11',['X11',['../widget_8h.html#a47322ec94c24726c1f04d8638b975016',1,'widget.h']]],
+  ['xcursor',['XCursor',['../struct_window.html#ae657e5ad3372132e992414cda32d1d33a78995798eacae42bc26ced7e90d0e3c2',1,'Window']]],
+  ['xdepth',['XDepth',['../struct_x_depth.html',1,'']]],
+  ['xdev',['XDEV',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a076d26f0b87742ec7fb57adf6590f600',1,'file.h']]],
+  ['xerror',['XError',['../struct_x_error.html',1,'']]],
+  ['xerrors',['xErrors',['../x_8h.html#aebe374a250e5cfa265091b9ecf1e4238',1,'xErrors():&#160;x.h'],['../namespace_shm.html#a83abe10047bdd7a7dc0e48c0e57b3058',1,'Shm::xErrors()'],['../namespace_x_render.html#a855410f97eb8256b3587ea335bffccd4',1,'XRender::xErrors()']]],
+  ['xevent',['XEvent',['../union_x_event.html',1,'']]],
+  ['xformat',['XFormat',['../struct_x_format.html',1,'']]],
+  ['xfull',['XFULL',['../file_8h.html#a2c3e4bb40f36b262a5214e2da2bca9c5a359f25fe0d49cde6a11733f67b208e82',1,'file.h']]],
+  ['xlabel',['xLabel',['../struct_plot.html#aca35ab1a1ce8fad389c5a48e30a97aa9',1,'Plot']]],
+  ['xname',['xName',['../struct_plot_view.html#ab9e764d22b8caf8e05f7893fca2c3fe0',1,'PlotView']]],
+  ['xrender',['XRender',['../namespace_x_render.html',1,'']]],
+  ['xwindow',['XWindow',['../struct_window.html#ae657e5ad3372132e992414cda32d1d33a128e1830fe903a6c99bbf3133d18ef7d',1,'Window']]],
+  ['xxyy',['xxyy',['../structxy.html#aac7386c51e0f8995d9f25fac9bc49094',1,'xy::xxyy()'],['../structxyz.html#aafa90c772aaa13fea6ebb532ad16e093',1,'xyz::xxyy()']]],
+  ['xy',['xy',['../structxy.html',1,'xy&lt; T &gt;'],['../structxyz.html#af981fa57ebe4ca968928e36963f21f27',1,'xyz::xy()'],['../structxyzw.html#ae529154cb26cefb3ed376850ba9560bc',1,'xyzw::xy()'],['../struct_linear.html#ad6aa5094ac83929868aea85dcb4d086f',1,'Linear::xy()'],['../struct_horizontal.html#ad4c7d5e86c5899a4ef2cd614f22c8d03',1,'Horizontal::xy()'],['../struct_vertical.html#af936ed2c47a691b8ca2c2c3e10b43525',1,'Vertical::xy()']]],
+  ['xy_3c_20int_20_3e',['xy&lt; int &gt;',['../structxy.html',1,'']]],
+  ['xyw',['xyw',['../structxyzw.html#a123ab6fdb17d62ba60858d74872da20d',1,'xyzw']]],
+  ['xyxy',['xyxy',['../structxyz.html#a0620670045b40e60d0ef4b064ef03be2',1,'xyz::xyxy()'],['../structxyzw.html#ab19898ae139ba9a2ac1ac3d98176c221',1,'xyzw::xyxy()']]],
+  ['xyz',['xyz',['../structxyz.html',1,'xyz&lt; T &gt;'],['../structxyzw.html#ada87235f1d70944048fe718114b2cdc0',1,'xyzw::xyz()']]],
+  ['xyz_3c_20int_20_3e',['xyz&lt; int &gt;',['../structxyz.html',1,'']]],
+  ['xyztobgr',['XYZtoBGR',['../graphics_8cc.html#aaa742ceae1af084703fc48b0afff0bf2',1,'XYZtoBGR(float X, float Y, float Z):&#160;graphics.cc'],['../graphics_8cc.html#a0ee4c53b15de9cb7c7efda05e8b25e4f',1,'XYZtoBGR(vec3 XYZ):&#160;graphics.cc']]],
+  ['xyzw',['xyzw',['../structxyzw.html',1,'']]],
+  ['xz',['xz',['../structxyzw.html#a2710eba7107eae3a4b2b332c7fe7169c',1,'xyzw']]]
 ];

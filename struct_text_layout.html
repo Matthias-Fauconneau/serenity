@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_text_layout.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -104,6 +104,7 @@ $(document).ready(function(){initNavTree('struct_text_layout.html','');});
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
@@ -120,71 +121,323 @@ Collaboration diagram for TextLayout:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_text_layout__coll__graph.png" border="0" usemap="#_text_layout_coll__map" alt="Collaboration graph"/></div>
 <map name="_text_layout_coll__map" id="_text_layout_coll__map">
-<area shape="rect" id="node2" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="8,83,112,109"/><area shape="rect" id="node3" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="5,5,112,32"/><area shape="rect" id="node4" href="structarray.html" title="array\&lt; Text::Link \&gt;" alt="" coords="139,83,272,109"/><area shape="rect" id="node5" href="structbuffer.html" title="buffer\&lt; Text::Link \&gt;" alt="" coords="137,5,273,32"/><area shape="rect" id="node6" href="structarray.html" title="array\&lt; Line \&gt;" alt="" coords="296,83,395,109"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; Line \&gt;" alt="" coords="298,5,400,32"/><area shape="rect" id="node8" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="419,83,529,109"/></map>
+<area shape="rect" id="node2" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="8,107,112,133"/><area shape="rect" id="node3" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="5,13,112,40"/><area shape="rect" id="node4" href="structarray.html" title="array\&lt; Text::Link \&gt;" alt="" coords="139,107,272,133"/><area shape="rect" id="node5" href="structbuffer.html" title="buffer\&lt; Text::Link \&gt;" alt="" coords="137,13,273,40"/><area shape="rect" id="node6" href="structarray.html" title="array\&lt; TextLayout::\lLine \&gt;" alt="" coords="296,99,431,141"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; TextLayout\l::Line \&gt;" alt="" coords="298,6,429,47"/><area shape="rect" id="node8" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="457,107,567,133"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html">Character</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_line.html">Line</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:a0024f43c95d6196820ed12c1256abad9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0024f43c95d6196820ed12c1256abad9"></a>
-typedef <a class="el" href="structarray.html">array</a>&lt; Character &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Word</b></td></tr>
+<tr class="memitem:a0024f43c95d6196820ed12c1256abad9"><td class="memItemLeft" align="right" valign="top">typedef <a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_text_layout_1_1_character.html">Character</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a0024f43c95d6196820ed12c1256abad9">Word</a></td></tr>
 <tr class="separator:a0024f43c95d6196820ed12c1256abad9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a30df2717a65c773ebb7e3744b9aa2b5e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a30df2717a65c773ebb7e3744b9aa2b5e"></a>
-typedef <a class="el" href="structarray.html">array</a>&lt; Character &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>TextLine</b></td></tr>
+<tr class="memitem:a30df2717a65c773ebb7e3744b9aa2b5e"><td class="memItemLeft" align="right" valign="top">typedef <a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_text_layout_1_1_character.html">Character</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a30df2717a65c773ebb7e3744b9aa2b5e">TextLine</a></td></tr>
 <tr class="separator:a30df2717a65c773ebb7e3744b9aa2b5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a9cb3cf1f3f6ef27522a0b58427982c49"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9cb3cf1f3f6ef27522a0b58427982c49"></a>
-<a class="el" href="widget_8h.html#ac9c915d433bdce7b6b47c0956c850f43">Text::Cursor</a>&#160;</td><td class="memItemRight" valign="bottom"><b>current</b> ()</td></tr>
+<tr class="memitem:a9cb3cf1f3f6ef27522a0b58427982c49"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_text_1_1_cursor.html">Text::Cursor</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a9cb3cf1f3f6ef27522a0b58427982c49">current</a> ()</td></tr>
 <tr class="separator:a9cb3cf1f3f6ef27522a0b58427982c49"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac139b4006f12dc86b32ee26c773eb03a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac139b4006f12dc86b32ee26c773eb03a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>nextLine</b> (bool justify)</td></tr>
+<tr class="memitem:ac139b4006f12dc86b32ee26c773eb03a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#ac139b4006f12dc86b32ee26c773eb03a">nextLine</a> (bool justify)</td></tr>
 <tr class="separator:ac139b4006f12dc86b32ee26c773eb03a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa2c2db00b6392582af5b805661ad9be4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa2c2db00b6392582af5b805661ad9be4"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>TextLayout</b> (const <a class="el" href="structref.html">ref</a>&lt; uint &gt; &amp;text, int size, int wrap, <a class="el" href="struct_font.html">Font</a> *font=0)</td></tr>
+<tr class="memitem:aa2c2db00b6392582af5b805661ad9be4"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#aa2c2db00b6392582af5b805661ad9be4">TextLayout</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> &gt; &amp;<a class="el" href="struct_text_layout.html#a3a2f91d97a4da9ff4aad688ae3d5ef09">text</a>, int <a class="el" href="struct_text_layout.html#ae3611ed2c283249b517cd52983bc97dc">size</a>, int <a class="el" href="struct_text_layout.html#a283987f05511f0746f5c73e51bde6a1f">wrap</a>, <a class="el" href="struct_font.html">Font</a> *font=0)</td></tr>
 <tr class="separator:aa2c2db00b6392582af5b805661ad9be4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:ae3611ed2c283249b517cd52983bc97dc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae3611ed2c283249b517cd52983bc97dc"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>size</b></td></tr>
+<tr class="memitem:ae3611ed2c283249b517cd52983bc97dc"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#ae3611ed2c283249b517cd52983bc97dc">size</a></td></tr>
 <tr class="separator:ae3611ed2c283249b517cd52983bc97dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a283987f05511f0746f5c73e51bde6a1f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a283987f05511f0746f5c73e51bde6a1f"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>wrap</b></td></tr>
+<tr class="memitem:a283987f05511f0746f5c73e51bde6a1f"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a283987f05511f0746f5c73e51bde6a1f">wrap</a></td></tr>
 <tr class="separator:a283987f05511f0746f5c73e51bde6a1f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aecfdd9cf53f94403014af195a5d80e79"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aecfdd9cf53f94403014af195a5d80e79"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>spaceAdvance</b></td></tr>
+<tr class="memitem:aecfdd9cf53f94403014af195a5d80e79"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#aecfdd9cf53f94403014af195a5d80e79">spaceAdvance</a></td></tr>
 <tr class="separator:aecfdd9cf53f94403014af195a5d80e79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a850f3b176211dd430434a308eea474ed"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a850f3b176211dd430434a308eea474ed"></a>
-<a class="el" href="structvec.html">vec2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>pen</b> =0</td></tr>
+<tr class="memitem:a850f3b176211dd430434a308eea474ed"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#af762e0ef96d42b37a15600b22a002a6a">vec2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a850f3b176211dd430434a308eea474ed">pen</a> =0</td></tr>
 <tr class="separator:a850f3b176211dd430434a308eea474ed"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a313a004eff641cdd18f61eb89198ca3e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a313a004eff641cdd18f61eb89198ca3e"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="structarray.html">Word</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>line</b></td></tr>
+<tr class="memitem:a313a004eff641cdd18f61eb89198ca3e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_text_layout.html#a0024f43c95d6196820ed12c1256abad9">Word</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a313a004eff641cdd18f61eb89198ca3e">line</a></td></tr>
 <tr class="separator:a313a004eff641cdd18f61eb89198ca3e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3a2f91d97a4da9ff4aad688ae3d5ef09"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3a2f91d97a4da9ff4aad688ae3d5ef09"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="structarray.html">TextLine</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>text</b></td></tr>
+<tr class="memitem:a3a2f91d97a4da9ff4aad688ae3d5ef09"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_text_layout.html#a30df2717a65c773ebb7e3744b9aa2b5e">TextLine</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a3a2f91d97a4da9ff4aad688ae3d5ef09">text</a></td></tr>
 <tr class="separator:a3a2f91d97a4da9ff4aad688ae3d5ef09"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeb7fd783bd522bab14b0120ea7ffa2bf"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aeb7fd783bd522bab14b0120ea7ffa2bf"></a>
-<a class="el" href="structarray.html">array</a>&lt; Line &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>lines</b></td></tr>
+<tr class="memitem:aeb7fd783bd522bab14b0120ea7ffa2bf"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_text_layout_1_1_line.html">Line</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#aeb7fd783bd522bab14b0120ea7ffa2bf">lines</a></td></tr>
 <tr class="separator:aeb7fd783bd522bab14b0120ea7ffa2bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a41f5e674dc33b3b0d94f5bba0a508ca9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a41f5e674dc33b3b0d94f5bba0a508ca9"></a>
-<a class="el" href="structarray.html">array</a>&lt; Text::Link &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>links</b></td></tr>
+<tr class="memitem:a41f5e674dc33b3b0d94f5bba0a508ca9"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="struct_text_1_1_link.html">Text::Link</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a41f5e674dc33b3b0d94f5bba0a508ca9">links</a></td></tr>
 <tr class="separator:a41f5e674dc33b3b0d94f5bba0a508ca9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad0501191d4c617da0680e8c4a94eb6d0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad0501191d4c617da0680e8c4a94eb6d0"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>lineNumber</b> =0</td></tr>
+<tr class="memitem:ad0501191d4c617da0680e8c4a94eb6d0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#ad0501191d4c617da0680e8c4a94eb6d0">lineNumber</a> =0</td></tr>
 <tr class="separator:ad0501191d4c617da0680e8c4a94eb6d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6ddcf758105e42401f551399b0b6f82d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6ddcf758105e42401f551399b0b6f82d"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>column</b> =0</td></tr>
+<tr class="memitem:a6ddcf758105e42401f551399b0b6f82d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a6ddcf758105e42401f551399b0b6f82d">column</a> =0</td></tr>
 <tr class="separator:a6ddcf758105e42401f551399b0b6f82d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a128ee4bdaf51d8eb00b3980ead926543"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a128ee4bdaf51d8eb00b3980ead926543"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>lastIndex</b> =-1</td></tr>
+<tr class="memitem:a128ee4bdaf51d8eb00b3980ead926543"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout.html#a128ee4bdaf51d8eb00b3980ead926543">lastIndex</a> =-1</td></tr>
 <tr class="separator:a128ee4bdaf51d8eb00b3980ead926543"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Layouts formatted text with wrapping, justification and links. </p>
 
 <p>Definition at line <a class="el" href="text_8cc_source.html#l00012">12</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Member Typedef Documentation</h2>
+<a class="anchor" id="a0024f43c95d6196820ed12c1256abad9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef <a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_text_layout_1_1_character.html">Character</a>&gt; <a class="el" href="struct_text_layout.html#a0024f43c95d6196820ed12c1256abad9">TextLayout::Word</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00018">18</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a30df2717a65c773ebb7e3744b9aa2b5e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef <a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_text_layout_1_1_character.html">Character</a>&gt; <a class="el" href="struct_text_layout.html#a30df2717a65c773ebb7e3744b9aa2b5e">TextLayout::TextLine</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00020">20</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="aa2c2db00b6392582af5b805661ad9be4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">TextLayout::TextLayout </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>text</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>wrap</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_font.html">Font</a> *&#160;</td>
+          <td class="paramname"><em>font</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00053">53</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a9cb3cf1f3f6ef27522a0b58427982c49"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_text_1_1_cursor.html">Text::Cursor</a> TextLayout::current </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00027">27</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac139b4006f12dc86b32ee26c773eb03a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void TextLayout::nextLine </td>
+          <td>(</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>justify</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00030">30</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="ae3611ed2c283249b517cd52983bc97dc"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float TextLayout::size</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00013">13</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a283987f05511f0746f5c73e51bde6a1f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float TextLayout::wrap</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00014">14</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aecfdd9cf53f94403014af195a5d80e79"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float TextLayout::spaceAdvance</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00015">15</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a850f3b176211dd430434a308eea474ed"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#af762e0ef96d42b37a15600b22a002a6a">vec2</a> TextLayout::pen =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00016">16</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a313a004eff641cdd18f61eb89198ca3e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_text_layout.html#a0024f43c95d6196820ed12c1256abad9">Word</a>&gt; TextLayout::line</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00019">19</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3a2f91d97a4da9ff4aad688ae3d5ef09"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_text_layout.html#a30df2717a65c773ebb7e3744b9aa2b5e">TextLine</a>&gt; TextLayout::text</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00021">21</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aeb7fd783bd522bab14b0120ea7ffa2bf"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_text_layout_1_1_line.html">Line</a>&gt; TextLayout::lines</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00023">23</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a41f5e674dc33b3b0d94f5bba0a508ca9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="struct_text_1_1_link.html">Text::Link</a>&gt; TextLayout::links</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00024">24</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad0501191d4c617da0680e8c4a94eb6d0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> TextLayout::lineNumber =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00026">26</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6ddcf758105e42401f551399b0b6f82d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> TextLayout::column =0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00026">26</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a128ee4bdaf51d8eb00b3980ead926543"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> TextLayout::lastIndex =-1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00029">29</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

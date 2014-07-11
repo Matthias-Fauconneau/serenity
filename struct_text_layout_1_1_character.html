@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_text_layout_1_1_character.html'
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -115,34 +115,113 @@ Collaboration diagram for TextLayout::Character:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_text_layout_1_1_character__coll__graph.png" border="0" usemap="#_text_layout_1_1_character_coll__map" alt="Collaboration graph"/></div>
 <map name="_text_layout_1_1_character_coll__map" id="_text_layout_1_1_character_coll__map">
-<area shape="rect" id="node2" href="struct_font.html" title="Freetype wrapper. " alt="" coords="768,133,816,160"/><area shape="rect" id="node3" href="struct_map.html" title="Managed memory mapping. " alt="" coords="537,7,583,33"/><area shape="rect" id="node4" href="structhandle.html" title="handle\&lt; byte * \&gt;" alt="" coords="231,7,350,33"/><area shape="rect" id="node5" href="struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="535,57,585,84"/><area shape="rect" id="node6" href="structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="200,57,381,84"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="508,108,612,135"/><area shape="rect" id="node8" href="structhandle.html" title="handle\&lt; FT_FaceRec_ * \&gt;" alt="" coords="472,159,648,185"/><area shape="rect" id="node9" href="structmap.html" title="map\&lt; uint, map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="478,210,642,251"/><area shape="rect" id="node10" href="structarray.html" title="array\&lt; uint \&gt;" alt="" coords="243,191,339,217"/><area shape="rect" id="node11" href="structbuffer.html" title="buffer\&lt; uint \&gt;" alt="" coords="27,191,127,217"/><area shape="rect" id="node12" href="structarray.html" title="array\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="221,242,360,283"/><area shape="rect" id="node13" href="structbuffer.html" title="buffer\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="6,242,149,283"/><area shape="rect" id="node14" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="737,217,847,244"/></map>
+<area shape="rect" id="node2" href="struct_font.html" title="Freetype wrapper. " alt="" coords="768,108,816,135"/><area shape="rect" id="node3" href="struct_map.html" title="Managed memory mapping. " alt="" coords="537,7,583,33"/><area shape="rect" id="node4" href="structhandle.html" title="handle\&lt; byte * \&gt;" alt="" coords="231,7,350,33"/><area shape="rect" id="node5" href="struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="535,57,585,84"/><area shape="rect" id="node6" href="structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="200,57,381,84"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="508,108,612,135"/><area shape="rect" id="node8" href="structhandle.html" title="handle\&lt; FT_FaceRec_ * \&gt;" alt="" coords="472,159,648,185"/><area shape="rect" id="node9" href="structmap.html" title="map\&lt; uint, map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="478,210,642,251"/><area shape="rect" id="node10" href="structarray.html" title="array\&lt; uint \&gt;" alt="" coords="243,191,339,217"/><area shape="rect" id="node11" href="structbuffer.html" title="buffer\&lt; uint \&gt;" alt="" coords="27,191,127,217"/><area shape="rect" id="node12" href="structarray.html" title="array\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="221,242,360,283"/><area shape="rect" id="node13" href="structbuffer.html" title="buffer\&lt; map\&lt; uint16,\l Glyph \&gt; \&gt;" alt="" coords="6,242,149,283"/><area shape="rect" id="node14" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="737,159,847,185"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a143439fb64a9e8bf39172b8e49eca2b7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a143439fb64a9e8bf39172b8e49eca2b7"></a>
-<a class="el" href="struct_font.html">Font</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>font</b></td></tr>
+<tr class="memitem:a143439fb64a9e8bf39172b8e49eca2b7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_font.html">Font</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html#a143439fb64a9e8bf39172b8e49eca2b7">font</a></td></tr>
 <tr class="separator:a143439fb64a9e8bf39172b8e49eca2b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab3517dfd9039d6a8972c1e564d444401"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab3517dfd9039d6a8972c1e564d444401"></a>
-<a class="el" href="structvec.html">vec2</a>&#160;</td><td class="memItemRight" valign="bottom"><b>pos</b></td></tr>
+<tr class="memitem:ab3517dfd9039d6a8972c1e564d444401"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#af762e0ef96d42b37a15600b22a002a6a">vec2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html#ab3517dfd9039d6a8972c1e564d444401">pos</a></td></tr>
 <tr class="separator:ab3517dfd9039d6a8972c1e564d444401"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a926362593b3b37d4ec4eebeb3d696aff"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a926362593b3b37d4ec4eebeb3d696aff"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>index</b></td></tr>
+<tr class="memitem:a926362593b3b37d4ec4eebeb3d696aff"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html#a926362593b3b37d4ec4eebeb3d696aff">index</a></td></tr>
 <tr class="separator:a926362593b3b37d4ec4eebeb3d696aff"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ada26dd89f86871c53070fb9ec23ecb37"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ada26dd89f86871c53070fb9ec23ecb37"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>width</b></td></tr>
+<tr class="memitem:ada26dd89f86871c53070fb9ec23ecb37"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html#ada26dd89f86871c53070fb9ec23ecb37">width</a></td></tr>
 <tr class="separator:ada26dd89f86871c53070fb9ec23ecb37"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af9418688626093bbc53d62338b447207"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af9418688626093bbc53d62338b447207"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>advance</b></td></tr>
+<tr class="memitem:af9418688626093bbc53d62338b447207"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html#af9418688626093bbc53d62338b447207">advance</a></td></tr>
 <tr class="separator:af9418688626093bbc53d62338b447207"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a71113ad0d81b46d06a4d542287c8e2a3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a71113ad0d81b46d06a4d542287c8e2a3"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>editIndex</b></td></tr>
+<tr class="memitem:a71113ad0d81b46d06a4d542287c8e2a3"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_text_layout_1_1_character.html#a71113ad0d81b46d06a4d542287c8e2a3">editIndex</a></td></tr>
 <tr class="separator:a71113ad0d81b46d06a4d542287c8e2a3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a143439fb64a9e8bf39172b8e49eca2b7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_font.html">Font</a>* TextLayout::Character::font</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab3517dfd9039d6a8972c1e564d444401"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#af762e0ef96d42b37a15600b22a002a6a">vec2</a> TextLayout::Character::pos</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a926362593b3b37d4ec4eebeb3d696aff"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> TextLayout::Character::index</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ada26dd89f86871c53070fb9ec23ecb37"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> TextLayout::Character::width</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af9418688626093bbc53d62338b447207"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float TextLayout::Character::advance</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a71113ad0d81b46d06a4d542287c8e2a3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> TextLayout::Character::editIndex</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="text_8cc_source.html#l00017">17</a> of file <a class="el" href="text_8cc_source.html">text.cc</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

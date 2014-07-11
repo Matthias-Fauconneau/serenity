@@ -1,7 +1,8 @@
 <map id="CLVolume" name="CLVolume">
-<area shape="rect" id="node2" href="$struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="58,173,125,200"/>
+<area shape="rect" id="node2" href="$struct_c_l_mem.html" title="Generic OpenCL MemObject. " alt="" coords="170,173,237,200"/>
 <area shape="rect" id="node3" href="$structhandle.html" title="handle\&lt; cl_mem \&gt;" alt="" coords="5,83,135,109"/>
 <area shape="rect" id="node4" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="159,83,259,109"/>
 <area shape="rect" id="node5" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="157,5,261,32"/>
-<area shape="rect" id="node6" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="151,173,276,200"/>
+<area shape="rect" id="node6" href="$structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="263,173,388,200"/>
+<area shape="rect" id="node7" href="$structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="285,83,365,109"/>
 </map>

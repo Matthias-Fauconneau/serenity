@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('union_x_event.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -110,326 +110,933 @@ $(document).ready(function(){initNavTree('union_x_event.html','');});
 <div class="title">XEvent Union Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p><code>#include &lt;<a class="el" href="x_8h_source.html">x.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a831ae0ef157480b5ec3c8271b864bd5a"><td class="memItemLeft" ><a class="anchor" id="a831ae0ef157480b5ec3c8271b864bd5a"></a>
-struct {</td></tr>
-<tr class="memitem:a218bb0e3415ba5c0d1b15da4926c10df"><td class="memItemLeft" ><a class="anchor" id="a637b1769b02413127de8be4e2ffcd766"></a>
-&#160;&#160;&#160;uint8&#160;&#160;&#160;<b>key</b></td></tr>
+<tr class="memitem:a831ae0ef157480b5ec3c8271b864bd5a"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a218bb0e3415ba5c0d1b15da4926c10df"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a637b1769b02413127de8be4e2ffcd766">key</a></td></tr>
 <tr class="separator:a218bb0e3415ba5c0d1b15da4926c10df"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2daf3e847953119a2d56a009e86219b2"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a2daf3e847953119a2d56a009e86219b2"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a2daf3e847953119a2d56a009e86219b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a42322436559689d66a89a10ae7e6497a"><td class="memItemLeft" ><a class="anchor" id="a88c49cefaf275692deecaea0c85936ab"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>time</b></td></tr>
+<tr class="memitem:a42322436559689d66a89a10ae7e6497a"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a88c49cefaf275692deecaea0c85936ab">time</a></td></tr>
 <tr class="separator:a42322436559689d66a89a10ae7e6497a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a99f42c1bdc24388639fe485c2ddb17a3"><td class="memItemLeft" ><a class="anchor" id="a1af2cbcb04a9fc7cc192d08ea3699dd3"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>root</b></td></tr>
+<tr class="memitem:a99f42c1bdc24388639fe485c2ddb17a3"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a1af2cbcb04a9fc7cc192d08ea3699dd3">root</a></td></tr>
 <tr class="separator:a99f42c1bdc24388639fe485c2ddb17a3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a83f85dcb3069ffb25095a47c6a0694c8"><td class="memItemLeft" ><a class="anchor" id="a9225b5d5a6a4b284c51ea93de6cab172"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>event</b></td></tr>
+<tr class="memitem:a83f85dcb3069ffb25095a47c6a0694c8"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a9225b5d5a6a4b284c51ea93de6cab172">event</a></td></tr>
 <tr class="separator:a83f85dcb3069ffb25095a47c6a0694c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4aa8e14b05187ac4cfe528275a049175"><td class="memItemLeft" ><a class="anchor" id="aa0de86f68b8f3df7ff294be871e0c37b"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>child</b></td></tr>
+<tr class="memitem:a4aa8e14b05187ac4cfe528275a049175"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa0de86f68b8f3df7ff294be871e0c37b">child</a></td></tr>
 <tr class="separator:a4aa8e14b05187ac4cfe528275a049175"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aedccf441e16258e1715bb13f1d1b9d22"><td class="memItemLeft" ><a class="anchor" id="a584f76d1b150f64e89bce4bc1fe67d88"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>rootX</b></td></tr>
+<tr class="memitem:aedccf441e16258e1715bb13f1d1b9d22"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a584f76d1b150f64e89bce4bc1fe67d88">rootX</a></td></tr>
 <tr class="separator:aedccf441e16258e1715bb13f1d1b9d22"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7ce79229a8eadde3c25b97a4c23f1ae8"><td class="memItemLeft" ><a class="anchor" id="a0a53977b4cc01bd58ed3f045263d2623"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>rootY</b></td></tr>
+<tr class="memitem:a7ce79229a8eadde3c25b97a4c23f1ae8"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a0a53977b4cc01bd58ed3f045263d2623">rootY</a></td></tr>
 <tr class="separator:a7ce79229a8eadde3c25b97a4c23f1ae8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1a04f4e2627b1bf6806ae224cc671bdc"><td class="memItemLeft" ><a class="anchor" id="a0acdd8628989d655ec35eb3841b34e29"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>x</b></td></tr>
+<tr class="memitem:a1a04f4e2627b1bf6806ae224cc671bdc"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a0acdd8628989d655ec35eb3841b34e29">x</a></td></tr>
 <tr class="separator:a1a04f4e2627b1bf6806ae224cc671bdc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a68da09cbb4d63eaec59198ee124d91f8"><td class="memItemLeft" ><a class="anchor" id="a51b1b6d7c6fd939c463a6339a51839a6"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>y</b></td></tr>
+<tr class="memitem:a68da09cbb4d63eaec59198ee124d91f8"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a51b1b6d7c6fd939c463a6339a51839a6">y</a></td></tr>
 <tr class="separator:a68da09cbb4d63eaec59198ee124d91f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab524901e8e50cc2827c36c517c883832"><td class="memItemLeft" ><a class="anchor" id="a21a8444871a3774313bea4d069b33135"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>state</b></td></tr>
+<tr class="memitem:ab524901e8e50cc2827c36c517c883832"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a21a8444871a3774313bea4d069b33135">state</a></td></tr>
 <tr class="separator:ab524901e8e50cc2827c36c517c883832"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a07ad71cda1e1892bc8bb1bfda4714f27"><td class="memItemLeft" ><a class="anchor" id="ac846bfb3b79e9adc6b3e525198cdf10b"></a>
-&#160;&#160;&#160;int8&#160;&#160;&#160;<b>sameScreen</b></td></tr>
+<tr class="memitem:a07ad71cda1e1892bc8bb1bfda4714f27"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ac846bfb3b79e9adc6b3e525198cdf10b">sameScreen</a></td></tr>
 <tr class="separator:a07ad71cda1e1892bc8bb1bfda4714f27"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a831ae0ef157480b5ec3c8271b864bd5a"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>_packed</b></td></tr>
+<tr class="memitem:a831ae0ef157480b5ec3c8271b864bd5a"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a831ae0ef157480b5ec3c8271b864bd5a">_packed</a></td></tr>
 <tr class="separator:a831ae0ef157480b5ec3c8271b864bd5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a54d62390bb05411fc94d5dc0bf2aac2f"><td class="memItemLeft" ><a class="anchor" id="a54d62390bb05411fc94d5dc0bf2aac2f"></a>
-struct {</td></tr>
-<tr class="memitem:a08b5f4e8035f7b406e2b81d8c8b916ce"><td class="memItemLeft" ><a class="anchor" id="a8df9a11533608e484b803f04bafddfc1"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>detail</b></td></tr>
+<tr class="memitem:a54d62390bb05411fc94d5dc0bf2aac2f"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a08b5f4e8035f7b406e2b81d8c8b916ce"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a8df9a11533608e484b803f04bafddfc1">detail</a></td></tr>
 <tr class="separator:a08b5f4e8035f7b406e2b81d8c8b916ce"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a417f3e1e7b2eef3feca859956b7e6cf7"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a417f3e1e7b2eef3feca859956b7e6cf7"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a417f3e1e7b2eef3feca859956b7e6cf7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7283a2affe480216e50b2dbbd790c431"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:a7283a2affe480216e50b2dbbd790c431"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:a7283a2affe480216e50b2dbbd790c431"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad7c3c9ab781ba9edf888e1cf8b991b0c"><td class="memItemLeft" ><a class="anchor" id="a08a3a6a9f9e6523147b5e0b7c6eb590f"></a>
-&#160;&#160;&#160;uint8&#160;&#160;&#160;<b>mode</b></td></tr>
+<tr class="memitem:ad7c3c9ab781ba9edf888e1cf8b991b0c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a08a3a6a9f9e6523147b5e0b7c6eb590f">mode</a></td></tr>
 <tr class="separator:ad7c3c9ab781ba9edf888e1cf8b991b0c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a54d62390bb05411fc94d5dc0bf2aac2f"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>focus</b></td></tr>
+<tr class="memitem:a54d62390bb05411fc94d5dc0bf2aac2f"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a54d62390bb05411fc94d5dc0bf2aac2f">focus</a></td></tr>
 <tr class="separator:a54d62390bb05411fc94d5dc0bf2aac2f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40b07aed8ee95dfeec4f722710328a64"><td class="memItemLeft" ><a class="anchor" id="a40b07aed8ee95dfeec4f722710328a64"></a>
-struct {</td></tr>
-<tr class="memitem:a7726b99402e616c003a12792c31cb5c6"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:a40b07aed8ee95dfeec4f722710328a64"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a7726b99402e616c003a12792c31cb5c6"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:a7726b99402e616c003a12792c31cb5c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3c814900d15c80c333558d4e1f588047"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a3c814900d15c80c333558d4e1f588047"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a3c814900d15c80c333558d4e1f588047"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abc12f0fca38a88a9991512e7dd5b821e"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:abc12f0fca38a88a9991512e7dd5b821e"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:abc12f0fca38a88a9991512e7dd5b821e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac7d55214a094e08750cf4c12786a75db"><td class="memItemLeft" ><a class="anchor" id="af0249cd98890f28049fe2707e6df1fab"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>x</b></td></tr>
+<tr class="memitem:ac7d55214a094e08750cf4c12786a75db"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#af0249cd98890f28049fe2707e6df1fab">x</a></td></tr>
 <tr class="separator:ac7d55214a094e08750cf4c12786a75db"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5b380e5bd707ba3dd3101175f9f76273"><td class="memItemLeft" ><a class="anchor" id="a1eb6113c5ede99e93e012d7fbeb5ca74"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>y</b></td></tr>
+<tr class="memitem:a5b380e5bd707ba3dd3101175f9f76273"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a1eb6113c5ede99e93e012d7fbeb5ca74">y</a></td></tr>
 <tr class="separator:a5b380e5bd707ba3dd3101175f9f76273"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aea7d678c275968ff525f122d4b3641af"><td class="memItemLeft" ><a class="anchor" id="aa5b63be5f09e0cc5fa2324f114baaa70"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>w</b></td></tr>
+<tr class="memitem:aea7d678c275968ff525f122d4b3641af"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa5b63be5f09e0cc5fa2324f114baaa70">w</a></td></tr>
 <tr class="separator:aea7d678c275968ff525f122d4b3641af"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1a5f0019bb10370e2ac5b09210f40f87"><td class="memItemLeft" ><a class="anchor" id="a318822814ee4e51c300c276f0b07ef6e"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>h</b></td></tr>
+<tr class="memitem:a1a5f0019bb10370e2ac5b09210f40f87"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a318822814ee4e51c300c276f0b07ef6e">h</a></td></tr>
 <tr class="separator:a1a5f0019bb10370e2ac5b09210f40f87"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9d951587e3db480a37ab5c25fdba243c"><td class="memItemLeft" ><a class="anchor" id="ac2a96c86b28c6a83f7bfe055e186367b"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>count</b></td></tr>
+<tr class="memitem:a9d951587e3db480a37ab5c25fdba243c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ac2a96c86b28c6a83f7bfe055e186367b">count</a></td></tr>
 <tr class="separator:a9d951587e3db480a37ab5c25fdba243c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40b07aed8ee95dfeec4f722710328a64"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>expose</b></td></tr>
+<tr class="memitem:a40b07aed8ee95dfeec4f722710328a64"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a40b07aed8ee95dfeec4f722710328a64">expose</a></td></tr>
 <tr class="separator:a40b07aed8ee95dfeec4f722710328a64"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aed3615d073ad80709bdf19b3463cfd83"><td class="memItemLeft" ><a class="anchor" id="aed3615d073ad80709bdf19b3463cfd83"></a>
-struct {</td></tr>
-<tr class="memitem:a4cf03422c0ce1ccea20934e272afd833"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:aed3615d073ad80709bdf19b3463cfd83"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a4cf03422c0ce1ccea20934e272afd833"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:a4cf03422c0ce1ccea20934e272afd833"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a90d103449dad1a099aef1d7feea63278"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a90d103449dad1a099aef1d7feea63278"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a90d103449dad1a099aef1d7feea63278"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aec35386cca3816f84e01713761146e8b"><td class="memItemLeft" ><a class="anchor" id="a016192f1bd77e7d47c9e6807727dfee5"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>parent</b></td></tr>
+<tr class="memitem:aec35386cca3816f84e01713761146e8b"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a016192f1bd77e7d47c9e6807727dfee5">parent</a></td></tr>
 <tr class="separator:aec35386cca3816f84e01713761146e8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a398491e0fe473e2f8611a17a38fb95ec"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:a398491e0fe473e2f8611a17a38fb95ec"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:a398491e0fe473e2f8611a17a38fb95ec"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a355a8f139755650bc66de08a7f43729a"><td class="memItemLeft" ><a class="anchor" id="a0acdd8628989d655ec35eb3841b34e29"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>x</b></td></tr>
+<tr class="memitem:a355a8f139755650bc66de08a7f43729a"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a0acdd8628989d655ec35eb3841b34e29">x</a></td></tr>
 <tr class="separator:a355a8f139755650bc66de08a7f43729a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a91a706aaf54e76f431d3e38312e03965"><td class="memItemLeft" ><a class="anchor" id="a51b1b6d7c6fd939c463a6339a51839a6"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>y</b></td></tr>
+<tr class="memitem:a91a706aaf54e76f431d3e38312e03965"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a51b1b6d7c6fd939c463a6339a51839a6">y</a></td></tr>
 <tr class="separator:a91a706aaf54e76f431d3e38312e03965"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acc506a2bc76cc6555b61983e518d6095"><td class="memItemLeft" ><a class="anchor" id="ac465d8e15897ae39fa8cd54de228541e"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>w</b></td></tr>
+<tr class="memitem:acc506a2bc76cc6555b61983e518d6095"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ac465d8e15897ae39fa8cd54de228541e">w</a></td></tr>
 <tr class="separator:acc506a2bc76cc6555b61983e518d6095"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6197c4ef121091b8a441ea2ad112b1f2"><td class="memItemLeft" ><a class="anchor" id="a1bf41808cd12b0d0662fb67db30dade0"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>h</b></td></tr>
+<tr class="memitem:a6197c4ef121091b8a441ea2ad112b1f2"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a1bf41808cd12b0d0662fb67db30dade0">h</a></td></tr>
 <tr class="separator:a6197c4ef121091b8a441ea2ad112b1f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae4e62ec1f4fecfed6aa394a00d39c8fc"><td class="memItemLeft" ><a class="anchor" id="a7cd1a15c9e3fc985d2ece7df8ff3abcb"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>border</b></td></tr>
+<tr class="memitem:ae4e62ec1f4fecfed6aa394a00d39c8fc"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a7cd1a15c9e3fc985d2ece7df8ff3abcb">border</a></td></tr>
 <tr class="separator:ae4e62ec1f4fecfed6aa394a00d39c8fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad07aa8aca7308ad63860cffcb0007837"><td class="memItemLeft" ><a class="anchor" id="afc5ae84f64e0b02896b8a6bcee5ad07c"></a>
-&#160;&#160;&#160;int8&#160;&#160;&#160;<b>override_redirect</b></td></tr>
+<tr class="memitem:ad07aa8aca7308ad63860cffcb0007837"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#afc5ae84f64e0b02896b8a6bcee5ad07c">override_redirect</a></td></tr>
 <tr class="separator:ad07aa8aca7308ad63860cffcb0007837"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aed3615d073ad80709bdf19b3463cfd83"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>create</b></td></tr>
+<tr class="memitem:aed3615d073ad80709bdf19b3463cfd83"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#aed3615d073ad80709bdf19b3463cfd83">create</a></td></tr>
 <tr class="separator:aed3615d073ad80709bdf19b3463cfd83"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0be842cfeac7425c3a8870503ac574e0"><td class="memItemLeft" ><a class="anchor" id="a0be842cfeac7425c3a8870503ac574e0"></a>
-struct {</td></tr>
-<tr class="memitem:a26148377a5190c5269be7cbaa5a43b34"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:a0be842cfeac7425c3a8870503ac574e0"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a26148377a5190c5269be7cbaa5a43b34"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:a26148377a5190c5269be7cbaa5a43b34"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af1d8be02712d1344b7bf2fb483030261"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:af1d8be02712d1344b7bf2fb483030261"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:af1d8be02712d1344b7bf2fb483030261"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad8c98e0b879ea9fdf2753ce1062cbaa9"><td class="memItemLeft" ><a class="anchor" id="a9225b5d5a6a4b284c51ea93de6cab172"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>event</b></td></tr>
+<tr class="memitem:ad8c98e0b879ea9fdf2753ce1062cbaa9"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a9225b5d5a6a4b284c51ea93de6cab172">event</a></td></tr>
 <tr class="separator:ad8c98e0b879ea9fdf2753ce1062cbaa9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5d40af451a5bc1db53991468a034bc28"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:a5d40af451a5bc1db53991468a034bc28"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:a5d40af451a5bc1db53991468a034bc28"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac5d74768ca18b7f8a71d318b7f2378bd"><td class="memItemLeft" ><a class="anchor" id="afc5ae84f64e0b02896b8a6bcee5ad07c"></a>
-&#160;&#160;&#160;int8&#160;&#160;&#160;<b>override_redirect</b></td></tr>
+<tr class="memitem:ac5d74768ca18b7f8a71d318b7f2378bd"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#afc5ae84f64e0b02896b8a6bcee5ad07c">override_redirect</a></td></tr>
 <tr class="separator:ac5d74768ca18b7f8a71d318b7f2378bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0be842cfeac7425c3a8870503ac574e0"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>map</b></td></tr>
+<tr class="memitem:a0be842cfeac7425c3a8870503ac574e0"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a0be842cfeac7425c3a8870503ac574e0">map</a></td></tr>
 <tr class="separator:a0be842cfeac7425c3a8870503ac574e0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a20d5c24384bcaea477798cb887bd64c9"><td class="memItemLeft" ><a class="anchor" id="a20d5c24384bcaea477798cb887bd64c9"></a>
-struct {</td></tr>
-<tr class="memitem:a67def277237ef292e984e4e8fc9697fa"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:a20d5c24384bcaea477798cb887bd64c9"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a67def277237ef292e984e4e8fc9697fa"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:a67def277237ef292e984e4e8fc9697fa"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afd0162c7b63a63abe5423b186ae4dae2"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:afd0162c7b63a63abe5423b186ae4dae2"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:afd0162c7b63a63abe5423b186ae4dae2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1e898d7d306ddf720d54161f22b8276b"><td class="memItemLeft" ><a class="anchor" id="a9225b5d5a6a4b284c51ea93de6cab172"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>event</b></td></tr>
+<tr class="memitem:a1e898d7d306ddf720d54161f22b8276b"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a9225b5d5a6a4b284c51ea93de6cab172">event</a></td></tr>
 <tr class="separator:a1e898d7d306ddf720d54161f22b8276b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aacd2e4c186bd715414ee73f2465c0e78"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:aacd2e4c186bd715414ee73f2465c0e78"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:aacd2e4c186bd715414ee73f2465c0e78"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4d6d89c385ae21070ebe24c51cc2b422"><td class="memItemLeft" ><a class="anchor" id="afdb21a0ebb72c5898a61a09445102460"></a>
-&#160;&#160;&#160;int8&#160;&#160;&#160;<b>from_configure</b></td></tr>
+<tr class="memitem:a4d6d89c385ae21070ebe24c51cc2b422"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#afdb21a0ebb72c5898a61a09445102460">from_configure</a></td></tr>
 <tr class="separator:a4d6d89c385ae21070ebe24c51cc2b422"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a20d5c24384bcaea477798cb887bd64c9"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>unmap</b></td></tr>
+<tr class="memitem:a20d5c24384bcaea477798cb887bd64c9"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a20d5c24384bcaea477798cb887bd64c9">unmap</a></td></tr>
 <tr class="separator:a20d5c24384bcaea477798cb887bd64c9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ada3443acd822c9cc78d04a3cdc9d1ef1"><td class="memItemLeft" ><a class="anchor" id="ada3443acd822c9cc78d04a3cdc9d1ef1"></a>
-struct {</td></tr>
-<tr class="memitem:ad572af874e9c10f3be38f9f57834eb5e"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:ada3443acd822c9cc78d04a3cdc9d1ef1"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:ad572af874e9c10f3be38f9f57834eb5e"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:ad572af874e9c10f3be38f9f57834eb5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae5edf7ee3c1eb0e814df4d923268c04c"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:ae5edf7ee3c1eb0e814df4d923268c04c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:ae5edf7ee3c1eb0e814df4d923268c04c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2e93eb83acda807ae21ebb4401578491"><td class="memItemLeft" ><a class="anchor" id="a016192f1bd77e7d47c9e6807727dfee5"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>parent</b></td></tr>
+<tr class="memitem:a2e93eb83acda807ae21ebb4401578491"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a016192f1bd77e7d47c9e6807727dfee5">parent</a></td></tr>
 <tr class="separator:a2e93eb83acda807ae21ebb4401578491"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0039eb258e891d19f4a6ac2c55d48c71"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:a0039eb258e891d19f4a6ac2c55d48c71"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:a0039eb258e891d19f4a6ac2c55d48c71"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ada3443acd822c9cc78d04a3cdc9d1ef1"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>map_request</b></td></tr>
+<tr class="memitem:ada3443acd822c9cc78d04a3cdc9d1ef1"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#ada3443acd822c9cc78d04a3cdc9d1ef1">map_request</a></td></tr>
 <tr class="separator:ada3443acd822c9cc78d04a3cdc9d1ef1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac3721c0d8e70053a2af38d0501ff4428"><td class="memItemLeft" ><a class="anchor" id="ac3721c0d8e70053a2af38d0501ff4428"></a>
-struct {</td></tr>
-<tr class="memitem:a6fb49cd0fa84bba1840a4b181c08f9eb"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:ac3721c0d8e70053a2af38d0501ff4428"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a6fb49cd0fa84bba1840a4b181c08f9eb"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:a6fb49cd0fa84bba1840a4b181c08f9eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8f125c08970a55ffe357c80deaab40b7"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a8f125c08970a55ffe357c80deaab40b7"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a8f125c08970a55ffe357c80deaab40b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8680687b6a0f4ed64d7e033d3debd93c"><td class="memItemLeft" ><a class="anchor" id="a9225b5d5a6a4b284c51ea93de6cab172"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>event</b></td></tr>
+<tr class="memitem:a8680687b6a0f4ed64d7e033d3debd93c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a9225b5d5a6a4b284c51ea93de6cab172">event</a></td></tr>
 <tr class="separator:a8680687b6a0f4ed64d7e033d3debd93c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aab631bcc731f3a2824bf9a9039737365"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:aab631bcc731f3a2824bf9a9039737365"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:aab631bcc731f3a2824bf9a9039737365"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a98c9018cb1512a62771589c7ca24deea"><td class="memItemLeft" ><a class="anchor" id="a750f60027ef6a23c82a140d3f705a22a"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>above</b></td></tr>
+<tr class="memitem:a98c9018cb1512a62771589c7ca24deea"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a750f60027ef6a23c82a140d3f705a22a">above</a></td></tr>
 <tr class="separator:a98c9018cb1512a62771589c7ca24deea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2010317f0cb90955f345e9e39ae0290c"><td class="memItemLeft" ><a class="anchor" id="a0acdd8628989d655ec35eb3841b34e29"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>x</b></td></tr>
+<tr class="memitem:a2010317f0cb90955f345e9e39ae0290c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a0acdd8628989d655ec35eb3841b34e29">x</a></td></tr>
 <tr class="separator:a2010317f0cb90955f345e9e39ae0290c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac0d89f037ed4a6b978333964542bf5d2"><td class="memItemLeft" ><a class="anchor" id="a51b1b6d7c6fd939c463a6339a51839a6"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>y</b></td></tr>
+<tr class="memitem:ac0d89f037ed4a6b978333964542bf5d2"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a51b1b6d7c6fd939c463a6339a51839a6">y</a></td></tr>
 <tr class="separator:ac0d89f037ed4a6b978333964542bf5d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a874039692b7b3fef0e3508831d4e001c"><td class="memItemLeft" ><a class="anchor" id="ac465d8e15897ae39fa8cd54de228541e"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>w</b></td></tr>
+<tr class="memitem:a874039692b7b3fef0e3508831d4e001c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ac465d8e15897ae39fa8cd54de228541e">w</a></td></tr>
 <tr class="separator:a874039692b7b3fef0e3508831d4e001c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0adf670f5d00d19d88d722064170b5ff"><td class="memItemLeft" ><a class="anchor" id="a1bf41808cd12b0d0662fb67db30dade0"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>h</b></td></tr>
+<tr class="memitem:a0adf670f5d00d19d88d722064170b5ff"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a1bf41808cd12b0d0662fb67db30dade0">h</a></td></tr>
 <tr class="separator:a0adf670f5d00d19d88d722064170b5ff"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad48e63377e97b907a9efa7c8d2c5b120"><td class="memItemLeft" ><a class="anchor" id="a7cd1a15c9e3fc985d2ece7df8ff3abcb"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>border</b></td></tr>
+<tr class="memitem:ad48e63377e97b907a9efa7c8d2c5b120"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a7cd1a15c9e3fc985d2ece7df8ff3abcb">border</a></td></tr>
 <tr class="separator:ad48e63377e97b907a9efa7c8d2c5b120"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af06c5cf8196861d31b6377c3c2dd5319"><td class="memItemLeft" ><a class="anchor" id="afc5ae84f64e0b02896b8a6bcee5ad07c"></a>
-&#160;&#160;&#160;int8&#160;&#160;&#160;<b>override_redirect</b></td></tr>
+<tr class="memitem:af06c5cf8196861d31b6377c3c2dd5319"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#afc5ae84f64e0b02896b8a6bcee5ad07c">override_redirect</a></td></tr>
 <tr class="separator:af06c5cf8196861d31b6377c3c2dd5319"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac3721c0d8e70053a2af38d0501ff4428"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>configure</b></td></tr>
+<tr class="memitem:ac3721c0d8e70053a2af38d0501ff4428"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#ac3721c0d8e70053a2af38d0501ff4428">configure</a></td></tr>
 <tr class="separator:ac3721c0d8e70053a2af38d0501ff4428"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac32225c903ef0f5a3884f977afad3ece"><td class="memItemLeft" ><a class="anchor" id="ac32225c903ef0f5a3884f977afad3ece"></a>
-struct {</td></tr>
-<tr class="memitem:a8924135f62704f3a3f6e4adf16d15cd7"><td class="memItemLeft" ><a class="anchor" id="a64068cc70b881c398902c6c03705adb2"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>stackMode</b></td></tr>
+<tr class="memitem:ac32225c903ef0f5a3884f977afad3ece"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a8924135f62704f3a3f6e4adf16d15cd7"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a64068cc70b881c398902c6c03705adb2">stackMode</a></td></tr>
 <tr class="separator:a8924135f62704f3a3f6e4adf16d15cd7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6b3d5d1edf09a44ea45a8ffa685a14ef"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a6b3d5d1edf09a44ea45a8ffa685a14ef"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a6b3d5d1edf09a44ea45a8ffa685a14ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40996d4fd3e986e9df392529c3377737"><td class="memItemLeft" ><a class="anchor" id="a016192f1bd77e7d47c9e6807727dfee5"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>parent</b></td></tr>
+<tr class="memitem:a40996d4fd3e986e9df392529c3377737"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a016192f1bd77e7d47c9e6807727dfee5">parent</a></td></tr>
 <tr class="separator:a40996d4fd3e986e9df392529c3377737"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a333558adfafb0f859f3fdc3ba2ccfeac"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:a333558adfafb0f859f3fdc3ba2ccfeac"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:a333558adfafb0f859f3fdc3ba2ccfeac"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a26f4111f0c11b3f3493d4d80fa8462df"><td class="memItemLeft" ><a class="anchor" id="a223203b8b872706d1aab3fc3a1eb23d5"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>sibling</b></td></tr>
+<tr class="memitem:a26f4111f0c11b3f3493d4d80fa8462df"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a223203b8b872706d1aab3fc3a1eb23d5">sibling</a></td></tr>
 <tr class="separator:a26f4111f0c11b3f3493d4d80fa8462df"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a87d56e45413cb7bbf60b8745f4d74fe8"><td class="memItemLeft" ><a class="anchor" id="a0acdd8628989d655ec35eb3841b34e29"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>x</b></td></tr>
+<tr class="memitem:a87d56e45413cb7bbf60b8745f4d74fe8"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a0acdd8628989d655ec35eb3841b34e29">x</a></td></tr>
 <tr class="separator:a87d56e45413cb7bbf60b8745f4d74fe8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40e5a54c8aab01d5fb65b7bc5088724a"><td class="memItemLeft" ><a class="anchor" id="a51b1b6d7c6fd939c463a6339a51839a6"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>y</b></td></tr>
+<tr class="memitem:a40e5a54c8aab01d5fb65b7bc5088724a"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a51b1b6d7c6fd939c463a6339a51839a6">y</a></td></tr>
 <tr class="separator:a40e5a54c8aab01d5fb65b7bc5088724a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab0bf41ce2742e893acc04a9499fe74d1"><td class="memItemLeft" ><a class="anchor" id="ac465d8e15897ae39fa8cd54de228541e"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>w</b></td></tr>
+<tr class="memitem:ab0bf41ce2742e893acc04a9499fe74d1"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ac465d8e15897ae39fa8cd54de228541e">w</a></td></tr>
 <tr class="separator:ab0bf41ce2742e893acc04a9499fe74d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acdd0e6579fdd21ed11a0f660630b8d74"><td class="memItemLeft" ><a class="anchor" id="a1bf41808cd12b0d0662fb67db30dade0"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>h</b></td></tr>
+<tr class="memitem:acdd0e6579fdd21ed11a0f660630b8d74"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a1bf41808cd12b0d0662fb67db30dade0">h</a></td></tr>
 <tr class="separator:acdd0e6579fdd21ed11a0f660630b8d74"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a061ed3e32c010667decfeb6219547ff4"><td class="memItemLeft" ><a class="anchor" id="a7cd1a15c9e3fc985d2ece7df8ff3abcb"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>border</b></td></tr>
+<tr class="memitem:a061ed3e32c010667decfeb6219547ff4"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a7cd1a15c9e3fc985d2ece7df8ff3abcb">border</a></td></tr>
 <tr class="separator:a061ed3e32c010667decfeb6219547ff4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a249f2e67936bd698be479d71bfba1144"><td class="memItemLeft" ><a class="anchor" id="a1d3945b8144e3c83d303415fbaf18630"></a>
-&#160;&#160;&#160;int16&#160;&#160;&#160;<b>valueMask</b></td></tr>
+<tr class="memitem:a249f2e67936bd698be479d71bfba1144"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a1d3945b8144e3c83d303415fbaf18630">valueMask</a></td></tr>
 <tr class="separator:a249f2e67936bd698be479d71bfba1144"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac32225c903ef0f5a3884f977afad3ece"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>configure_request</b></td></tr>
+<tr class="memitem:ac32225c903ef0f5a3884f977afad3ece"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#ac32225c903ef0f5a3884f977afad3ece">configure_request</a></td></tr>
 <tr class="separator:ac32225c903ef0f5a3884f977afad3ece"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a11e8582ab5b1357f078826707376fd84"><td class="memItemLeft" ><a class="anchor" id="a11e8582ab5b1357f078826707376fd84"></a>
-struct {</td></tr>
-<tr class="memitem:a74304085d4f3192d2e345a0864b4309d"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:a11e8582ab5b1357f078826707376fd84"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a74304085d4f3192d2e345a0864b4309d"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:a74304085d4f3192d2e345a0864b4309d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acc3d4735994e31bb1b9c7ac28c02f5a9"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:acc3d4735994e31bb1b9c7ac28c02f5a9"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:acc3d4735994e31bb1b9c7ac28c02f5a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a14de9233b481f316c05c389523b9fcf8"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:a14de9233b481f316c05c389523b9fcf8"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:a14de9233b481f316c05c389523b9fcf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a75c9f77561e02eb82010583fb8aba79f"><td class="memItemLeft" ><a class="anchor" id="a72da0753b8f02d6b1e4cf875d53b1587"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>atom</b></td></tr>
+<tr class="memitem:a75c9f77561e02eb82010583fb8aba79f"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a72da0753b8f02d6b1e4cf875d53b1587">atom</a></td></tr>
 <tr class="separator:a75c9f77561e02eb82010583fb8aba79f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a64c9782fb661881c2709483cd6e30970"><td class="memItemLeft" ><a class="anchor" id="a88c49cefaf275692deecaea0c85936ab"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>time</b></td></tr>
+<tr class="memitem:a64c9782fb661881c2709483cd6e30970"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a88c49cefaf275692deecaea0c85936ab">time</a></td></tr>
 <tr class="separator:a64c9782fb661881c2709483cd6e30970"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aac2df93dcb241033ccc7278458f72a8c"><td class="memItemLeft" ><a class="anchor" id="a3fa0bb8bed51080d020a4c0dcf5deb7e"></a>
-&#160;&#160;&#160;uint8&#160;&#160;&#160;<b>state</b></td></tr>
+<tr class="memitem:aac2df93dcb241033ccc7278458f72a8c"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a3fa0bb8bed51080d020a4c0dcf5deb7e">state</a></td></tr>
 <tr class="separator:aac2df93dcb241033ccc7278458f72a8c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a11e8582ab5b1357f078826707376fd84"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>property</b></td></tr>
+<tr class="memitem:a11e8582ab5b1357f078826707376fd84"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a11e8582ab5b1357f078826707376fd84">property</a></td></tr>
 <tr class="separator:a11e8582ab5b1357f078826707376fd84"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6332b4126dbb6712c472b708539f447d"><td class="memItemLeft" ><a class="anchor" id="a6332b4126dbb6712c472b708539f447d"></a>
-struct {</td></tr>
-<tr class="memitem:adf63415132bbcef05e2a714f62664443"><td class="memItemLeft" ><a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>pad</b></td></tr>
+<tr class="memitem:a6332b4126dbb6712c472b708539f447d"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:adf63415132bbcef05e2a714f62664443"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ad7fc6565a25e216724cdf2f86abe2610">pad</a></td></tr>
 <tr class="separator:adf63415132bbcef05e2a714f62664443"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a64cf0d42ee610ebc02f26240906ae014"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:a64cf0d42ee610ebc02f26240906ae014"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:a64cf0d42ee610ebc02f26240906ae014"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a267b9f357ebbc7a2fe2caa3acda59bc1"><td class="memItemLeft" ><a class="anchor" id="a88c49cefaf275692deecaea0c85936ab"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>time</b></td></tr>
+<tr class="memitem:a267b9f357ebbc7a2fe2caa3acda59bc1"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a88c49cefaf275692deecaea0c85936ab">time</a></td></tr>
 <tr class="separator:a267b9f357ebbc7a2fe2caa3acda59bc1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acd6d7bd7ffc62a6fa42f23ce80ad08c9"><td class="memItemLeft" ><a class="anchor" id="ab7e565a1527c6247e87b510c74def210"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>requestor</b></td></tr>
+<tr class="memitem:acd6d7bd7ffc62a6fa42f23ce80ad08c9"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#ab7e565a1527c6247e87b510c74def210">requestor</a></td></tr>
 <tr class="separator:acd6d7bd7ffc62a6fa42f23ce80ad08c9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a03713b151abd3879bac49fa9a6dd7922"><td class="memItemLeft" ><a class="anchor" id="a84e1d1d77c521feedeac84b7d97660c0"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>selection</b></td></tr>
+<tr class="memitem:a03713b151abd3879bac49fa9a6dd7922"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a84e1d1d77c521feedeac84b7d97660c0">selection</a></td></tr>
 <tr class="separator:a03713b151abd3879bac49fa9a6dd7922"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acb6e2588732715230781bd8bdd44518d"><td class="memItemLeft" ><a class="anchor" id="a7d830e9ffdd3d3acf205587dce26026a"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>target</b></td></tr>
+<tr class="memitem:acb6e2588732715230781bd8bdd44518d"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a7d830e9ffdd3d3acf205587dce26026a">target</a></td></tr>
 <tr class="separator:acb6e2588732715230781bd8bdd44518d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a190db94d76f5206795d0aa201c7c3f43"><td class="memItemLeft" ><a class="anchor" id="a5cc971bc56750bd4dca5f5bd3189d72d"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>property</b></td></tr>
+<tr class="memitem:a190db94d76f5206795d0aa201c7c3f43"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a5cc971bc56750bd4dca5f5bd3189d72d">property</a></td></tr>
 <tr class="separator:a190db94d76f5206795d0aa201c7c3f43"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6332b4126dbb6712c472b708539f447d"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>selection</b></td></tr>
+<tr class="memitem:a6332b4126dbb6712c472b708539f447d"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#a6332b4126dbb6712c472b708539f447d">selection</a></td></tr>
 <tr class="separator:a6332b4126dbb6712c472b708539f447d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa24e6c05c1c443bc6373d8345b46e308"><td class="memItemLeft" ><a class="anchor" id="aa24e6c05c1c443bc6373d8345b46e308"></a>
-struct {</td></tr>
-<tr class="memitem:a2a71c1ff2f19afc0a3e24b948de623fd"><td class="memItemLeft" ><a class="anchor" id="afb6a99f6be00b7f4f9512fb6044ba6a3"></a>
-&#160;&#160;&#160;byte&#160;&#160;&#160;<b>format</b></td></tr>
+<tr class="memitem:aa24e6c05c1c443bc6373d8345b46e308"><td class="memItemLeft" >struct {</td></tr>
+<tr class="memitem:a2a71c1ff2f19afc0a3e24b948de623fd"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#afb6a99f6be00b7f4f9512fb6044ba6a3">format</a></td></tr>
 <tr class="separator:a2a71c1ff2f19afc0a3e24b948de623fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab27cde7c030ee21c82997bf66fe27576"><td class="memItemLeft" ><a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
-&#160;&#160;&#160;uint16&#160;&#160;&#160;<b>seq</b></td></tr>
+<tr class="memitem:ab27cde7c030ee21c82997bf66fe27576"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a04f8bd9c02e41529f5feca25cc80f1d4">seq</a></td></tr>
 <tr class="separator:ab27cde7c030ee21c82997bf66fe27576"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac41edc724042b7fac6fd2531b0fe91c3"><td class="memItemLeft" ><a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>window</b></td></tr>
+<tr class="memitem:ac41edc724042b7fac6fd2531b0fe91c3"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#aa61cea1302f339d85d0f584d8e23563e">window</a></td></tr>
 <tr class="separator:ac41edc724042b7fac6fd2531b0fe91c3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a45bae7f424c9fda0a4e52f7c01e1daa3"><td class="memItemLeft" ><a class="anchor" id="a28762d8eeab2170746bf480491f29545"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>type</b></td></tr>
+<tr class="memitem:a45bae7f424c9fda0a4e52f7c01e1daa3"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a28762d8eeab2170746bf480491f29545">type</a></td></tr>
 <tr class="separator:a45bae7f424c9fda0a4e52f7c01e1daa3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a010b330da7d6ba59e30fe12cf87e6d38"><td class="memItemLeft" ><a class="anchor" id="a9bf76a076bd7f46ddae10a2470a62e55"></a>
-&#160;&#160;&#160;uint&#160;&#160;&#160;<b>data</b> [5]</td></tr>
+<tr class="memitem:a010b330da7d6ba59e30fe12cf87e6d38"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;&#160;&#160;<a class="el" href="union_x_event.html#a9bf76a076bd7f46ddae10a2470a62e55">data</a> [5]</td></tr>
 <tr class="separator:a010b330da7d6ba59e30fe12cf87e6d38"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa24e6c05c1c443bc6373d8345b46e308"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>client</b></td></tr>
+<tr class="memitem:aa24e6c05c1c443bc6373d8345b46e308"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="union_x_event.html#aa24e6c05c1c443bc6373d8345b46e308">client</a></td></tr>
 <tr class="separator:aa24e6c05c1c443bc6373d8345b46e308"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="x_8h_source.html#l00007">7</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a637b1769b02413127de8be4e2ffcd766"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a> XEvent::key</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a04f8bd9c02e41529f5feca25cc80f1d4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> XEvent::seq</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a88c49cefaf275692deecaea0c85936ab"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::time</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1af2cbcb04a9fc7cc192d08ea3699dd3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::root</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9225b5d5a6a4b284c51ea93de6cab172"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::event</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa0de86f68b8f3df7ff294be871e0c37b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::child</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a584f76d1b150f64e89bce4bc1fe67d88"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::rootX</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0a53977b4cc01bd58ed3f045263d2623"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::rootY</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a0acdd8628989d655ec35eb3841b34e29"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::x</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a51b1b6d7c6fd939c463a6339a51839a6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::y</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a21a8444871a3774313bea4d069b33135"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::state</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac846bfb3b79e9adc6b3e525198cdf10b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a> XEvent::sameScreen</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00008">8</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a831ae0ef157480b5ec3c8271b864bd5a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }   XEvent::_packed</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a8df9a11533608e484b803f04bafddfc1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> XEvent::detail</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00009">9</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa61cea1302f339d85d0f584d8e23563e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::window</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00009">9</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a08a3a6a9f9e6523147b5e0b7c6eb590f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a> XEvent::mode</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00009">9</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a54d62390bb05411fc94d5dc0bf2aac2f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::focus</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="ad7fc6565a25e216724cdf2f86abe2610"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> XEvent::pad</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00010">10</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af0249cd98890f28049fe2707e6df1fab"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> XEvent::x</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00010">10</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1eb6113c5ede99e93e012d7fbeb5ca74"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> XEvent::y</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00010">10</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa5b63be5f09e0cc5fa2324f114baaa70"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> XEvent::w</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00010">10</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a318822814ee4e51c300c276f0b07ef6e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> XEvent::h</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00010">10</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac2a96c86b28c6a83f7bfe055e186367b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> XEvent::count</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00010">10</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a40b07aed8ee95dfeec4f722710328a64"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::expose</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a016192f1bd77e7d47c9e6807727dfee5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::parent</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00011">11</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac465d8e15897ae39fa8cd54de228541e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::w</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00011">11</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1bf41808cd12b0d0662fb67db30dade0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::h</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00011">11</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7cd1a15c9e3fc985d2ece7df8ff3abcb"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::border</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00011">11</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="afc5ae84f64e0b02896b8a6bcee5ad07c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a> XEvent::override_redirect</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00011">11</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aed3615d073ad80709bdf19b3463cfd83"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::create</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a0be842cfeac7425c3a8870503ac574e0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::map</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="afdb21a0ebb72c5898a61a09445102460"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a> XEvent::from_configure</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00013">13</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a20d5c24384bcaea477798cb887bd64c9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::unmap</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="ada3443acd822c9cc78d04a3cdc9d1ef1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::map_request</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a750f60027ef6a23c82a140d3f705a22a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::above</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00015">15</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac3721c0d8e70053a2af38d0501ff4428"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::configure</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a64068cc70b881c398902c6c03705adb2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> XEvent::stackMode</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00016">16</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a223203b8b872706d1aab3fc3a1eb23d5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::sibling</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00016">16</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1d3945b8144e3c83d303415fbaf18630"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> XEvent::valueMask</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00016">16</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac32225c903ef0f5a3884f977afad3ece"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::configure_request</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a72da0753b8f02d6b1e4cf875d53b1587"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::atom</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00017">17</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3fa0bb8bed51080d020a4c0dcf5deb7e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a> XEvent::state</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00017">17</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a11e8582ab5b1357f078826707376fd84"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::property</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="ab7e565a1527c6247e87b510c74def210"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::requestor</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00018">18</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a84e1d1d77c521feedeac84b7d97660c0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::selection</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00018">18</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7d830e9ffdd3d3acf205587dce26026a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::target</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00018">18</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5cc971bc56750bd4dca5f5bd3189d72d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::property</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00018">18</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6332b4126dbb6712c472b708539f447d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::selection</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="afb6a99f6be00b7f4f9512fb6044ba6a3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> XEvent::format</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00019">19</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a28762d8eeab2170746bf480491f29545"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::type</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00019">19</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9bf76a076bd7f46ddae10a2470a62e55"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> XEvent::data[5]</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="x_8h_source.html#l00019">19</a> of file <a class="el" href="x_8h_source.html">x.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa24e6c05c1c443bc6373d8345b46e308"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">struct { ... }  XEvent::client</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

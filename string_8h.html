@@ -92,7 +92,7 @@ $(document).ready(function(){initNavTree('string_8h.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -103,6 +103,7 @@ $(document).ready(function(){initNavTree('string_8h.html','');});
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
 <div class="title">string.h File Reference</div>  </div>
@@ -124,242 +125,187 @@ This graph shows which files directly or indirectly include this file:</div>
 <div class="dyncontent">
 <div class="center"><img src="string_8h__dep__incl.png" border="0" usemap="#string_8hdep" alt=""/></div>
 <map name="string_8hdep" id="string_8hdep">
-<area shape="rect" id="node2" href="build_8cc.html" title="Builds C++ projects with automatic module dependency resolution. " alt="" coords="615,80,682,107"/><area shape="rect" id="node3" href="data_8cc_source.html" title="data.cc" alt="" coords="706,80,771,107"/><area shape="rect" id="node4" href="file_8cc_source.html" title="file.cc" alt="" coords="796,80,852,107"/><area shape="rect" id="node5" href="vector_8h.html" title="Vector definitions and operations. " alt="" coords="878,80,947,107"/><area shape="rect" id="node41" href="variant_8h_source.html" title="variant.h" alt="" coords="907,304,979,331"/><area shape="rect" id="node42" href="map_8h.html" title="Associative array (using linear search) " alt="" coords="808,229,866,256"/><area shape="rect" id="node43" href="trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="1289,80,1351,107"/><area shape="rect" id="node45" href="thread_8cc_source.html" title="thread.cc" alt="" coords="1558,155,1634,181"/><area shape="rect" id="node47" href="string_8cc_source.html" title="string.cc" alt="" coords="1504,80,1576,107"/><area shape="rect" id="node48" href="time_8h.html" title="Time and date operations. " alt="" coords="1791,229,1848,256"/><area shape="rect" id="node49" href="time_8cc_source.html" title="time.cc" alt="" coords="2022,304,2087,331"/><area shape="rect" id="node50" href="deflate_8cc_source.html" title="deflate.cc" alt="" coords="1925,80,2003,107"/><area shape="rect" id="node6" href="image_8h.html" title="Image container and operations. " alt="" coords="673,155,740,181"/><area shape="rect" id="node7" href="image_8cc_source.html" title="image.cc" alt="" coords="219,379,292,405"/><area shape="rect" id="node28" href="font_8h.html" title="Freetype font renderer wrapper (Font) " alt="" coords="330,304,384,331"/><area shape="rect" id="node33" href="widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="396,229,466,256"/><area shape="rect" id="node39" href="matrix_8h_source.html" title="matrix.h" alt="" coords="1152,155,1222,181"/><area shape="rect" id="node8" href="opencl_8h_source.html" title="opencl.h" alt="" coords="1246,304,1316,331"/><area shape="rect" id="node19" href="png_8h.html" title="PNG codec. " alt="" coords="726,304,780,331"/><area shape="rect" id="node23" href="window_8cc_source.html" title="window.cc" alt="" coords="1036,379,1119,405"/><area shape="rect" id="node24" href="volume_8h_source.html" title="volume.h" alt="" coords="1195,229,1268,256"/><area shape="rect" id="node31" href="graphics_8h.html" title="2D graphics primitives (fill, blit, line) " alt="" coords="619,304,700,331"/><area shape="rect" id="node36" href="text_8h.html" title="Rich text label/paragraph widget. " alt="" coords="540,304,594,331"/><area shape="rect" id="node9" href="opencl_8cc_source.html" title="opencl.cc" alt="" coords="1246,379,1324,405"/><area shape="rect" id="node10" href="project_8h_source.html" title="project.h" alt="" coords="1443,379,1515,405"/><area shape="rect" id="node14" href="operators_8h_source.html" title="operators.h" alt="" coords="1590,379,1676,405"/><area shape="rect" id="node11" href="test_8cc_source.html" title="test.cc" alt="" coords="1284,453,1346,480"/><area shape="rect" id="node12" href="view_8h_source.html" title="view.h" alt="" coords="1081,453,1140,480"/><area shape="rect" id="node13" href="compute_8cc_source.html" title="compute.cc" alt="" coords="902,528,992,555"/><area shape="rect" id="node15" href="_c_g_8cc_source.html" title="CG.cc" alt="" coords="1861,453,1920,480"/><area shape="rect" id="node16" href="_m_l_t_r_8cc_source.html" title="MLTR.cc" alt="" coords="1945,453,2020,480"/><area shape="rect" id="node17" href="_p_m_l_t_r_8cc_source.html" title="PMLTR.cc" alt="" coords="1648,453,1734,480"/><area shape="rect" id="node18" href="_s_a_r_t_8cc_source.html" title="SART.cc" alt="" coords="1760,453,1835,480"/><area shape="rect" id="node20" href="graph_8cc_source.html" title="graph.cc" alt="" coords="542,379,614,405"/><area shape="rect" id="node21" href="review_8cc_source.html" title="review.cc" alt="" coords="638,379,716,405"/><area shape="rect" id="node22" href="slice_8cc_source.html" title="slice.cc" alt="" coords="792,379,859,405"/><area shape="rect" id="node25" href="synthetic_8h_source.html" title="synthetic.h" alt="" coords="1393,304,1479,331"/><area shape="rect" id="node26" href="_s_n_r_8cc_source.html" title="SNR.cc" alt="" coords="1350,379,1419,405"/><area shape="rect" id="node27" href="synthetic_8cc_source.html" title="synthetic.cc" alt="" coords="1702,379,1795,405"/><area shape="rect" id="node29" href="font_8cc_source.html" title="font.cc" alt="" coords="132,379,194,405"/><area shape="rect" id="node30" href="text_8cc_source.html" title="text.cc" alt="" coords="369,379,431,405"/><area shape="rect" id="node32" href="plot_8cc_source.html" title="plot.cc" alt="" coords="456,379,518,405"/><area shape="rect" id="node34" href="layout_8h.html" title="Widget layouts (Linear, Grid) " alt="" coords="40,379,107,405"/><area shape="rect" id="node35" href="plot_8h_source.html" title="plot.h" alt="" coords="461,304,515,331"/><area shape="rect" id="node37" href="widget_8cc_source.html" title="widget.cc" alt="" coords="176,304,254,331"/><area shape="rect" id="node38" href="window_8h.html" title="X11 window display and input. " alt="" coords="806,304,882,331"/><area shape="rect" id="node40" href="projection_8h_source.html" title="projection.h" alt="" coords="1460,229,1548,256"/><area shape="rect" id="node44" href="profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions) ..." alt="" coords="1246,155,1319,181"/><area shape="rect" id="node46" href="trace_8cc_source.html" title="trace.cc" alt="" coords="1395,155,1464,181"/></map>
+<area shape="rect" id="node2" href="build_8cc.html" title="Builds C++ projects with automatic module dependency resolution. " alt="" coords="615,80,682,107"/><area shape="rect" id="node3" href="data_8cc.html" title="data.cc" alt="" coords="706,80,771,107"/><area shape="rect" id="node4" href="file_8cc.html" title="file.cc" alt="" coords="796,80,852,107"/><area shape="rect" id="node5" href="vector_8h.html" title="Vector definitions and operations. " alt="" coords="878,80,947,107"/><area shape="rect" id="node41" href="variant_8h.html" title="variant.h" alt="" coords="907,304,979,331"/><area shape="rect" id="node42" href="map_8h.html" title="Associative array (using linear search) " alt="" coords="808,229,866,256"/><area shape="rect" id="node43" href="trace_8h.html" title="stack trace using ELF/DWARF debug informations " alt="" coords="1289,80,1351,107"/><area shape="rect" id="node45" href="thread_8cc.html" title="thread.cc" alt="" coords="1558,155,1634,181"/><area shape="rect" id="node47" href="string_8cc.html" title="string.cc" alt="" coords="1504,80,1576,107"/><area shape="rect" id="node48" href="time_8h.html" title="Time and date operations. " alt="" coords="1791,229,1848,256"/><area shape="rect" id="node49" href="time_8cc.html" title="time.cc" alt="" coords="2022,304,2087,331"/><area shape="rect" id="node50" href="deflate_8cc.html" title="deflate.cc" alt="" coords="1925,80,2003,107"/><area shape="rect" id="node6" href="image_8h.html" title="Image container and operations. " alt="" coords="673,155,740,181"/><area shape="rect" id="node7" href="image_8cc.html" title="image.cc" alt="" coords="219,379,292,405"/><area shape="rect" id="node28" href="font_8h.html" title="Freetype font renderer wrapper (Font) " alt="" coords="330,304,384,331"/><area shape="rect" id="node33" href="widget_8h.html" title="Widget interface to compose user interfaces. " alt="" coords="396,229,466,256"/><area shape="rect" id="node39" href="matrix_8h.html" title="matrix.h" alt="" coords="1152,155,1222,181"/><area shape="rect" id="node8" href="opencl_8h.html" title="opencl.h" alt="" coords="1246,304,1316,331"/><area shape="rect" id="node19" href="png_8h.html" title="PNG codec. " alt="" coords="726,304,780,331"/><area shape="rect" id="node23" href="window_8cc.html" title="window.cc" alt="" coords="1036,379,1119,405"/><area shape="rect" id="node24" href="volume_8h.html" title="volume.h" alt="" coords="1195,229,1268,256"/><area shape="rect" id="node31" href="graphics_8h.html" title="2D graphics primitives (fill, blit, line) " alt="" coords="619,304,700,331"/><area shape="rect" id="node36" href="text_8h.html" title="Rich text label/paragraph widget. " alt="" coords="540,304,594,331"/><area shape="rect" id="node9" href="opencl_8cc.html" title="opencl.cc" alt="" coords="1246,379,1324,405"/><area shape="rect" id="node10" href="project_8h.html" title="project.h" alt="" coords="1443,379,1515,405"/><area shape="rect" id="node14" href="operators_8h.html" title="operators.h" alt="" coords="1590,379,1676,405"/><area shape="rect" id="node11" href="test_8cc.html" title="test.cc" alt="" coords="1284,453,1346,480"/><area shape="rect" id="node12" href="view_8h.html" title="view.h" alt="" coords="1081,453,1140,480"/><area shape="rect" id="node13" href="compute_8cc.html" title="compute.cc" alt="" coords="902,528,992,555"/><area shape="rect" id="node15" href="_c_g_8cc.html" title="CG.cc" alt="" coords="1861,453,1920,480"/><area shape="rect" id="node16" href="_m_l_t_r_8cc.html" title="MLTR.cc" alt="" coords="1945,453,2020,480"/><area shape="rect" id="node17" href="_p_m_l_t_r_8cc.html" title="PMLTR.cc" alt="" coords="1648,453,1734,480"/><area shape="rect" id="node18" href="_s_a_r_t_8cc.html" title="SART.cc" alt="" coords="1760,453,1835,480"/><area shape="rect" id="node20" href="graph_8cc.html" title="graph.cc" alt="" coords="542,379,614,405"/><area shape="rect" id="node21" href="review_8cc.html" title="review.cc" alt="" coords="638,379,716,405"/><area shape="rect" id="node22" href="slice_8cc.html" title="slice.cc" alt="" coords="792,379,859,405"/><area shape="rect" id="node25" href="synthetic_8h.html" title="synthetic.h" alt="" coords="1393,304,1479,331"/><area shape="rect" id="node26" href="_s_n_r_8cc.html" title="SNR.cc" alt="" coords="1350,379,1419,405"/><area shape="rect" id="node27" href="synthetic_8cc.html" title="synthetic.cc" alt="" coords="1702,379,1795,405"/><area shape="rect" id="node29" href="font_8cc.html" title="font.cc" alt="" coords="132,379,194,405"/><area shape="rect" id="node30" href="text_8cc.html" title="text.cc" alt="" coords="369,379,431,405"/><area shape="rect" id="node32" href="plot_8cc.html" title="plot.cc" alt="" coords="456,379,518,405"/><area shape="rect" id="node34" href="layout_8h.html" title="Widget layouts (Linear, Grid) " alt="" coords="40,379,107,405"/><area shape="rect" id="node35" href="plot_8h.html" title="plot.h" alt="" coords="461,304,515,331"/><area shape="rect" id="node37" href="widget_8cc.html" title="widget.cc" alt="" coords="176,304,254,331"/><area shape="rect" id="node38" href="window_8h.html" title="X11 window display and input. " alt="" coords="806,304,882,331"/><area shape="rect" id="node40" href="projection_8h.html" title="projection.h" alt="" coords="1460,229,1548,256"/><area shape="rect" id="node44" href="profile_8cc.html" title="Profiles executable when linked (need all sources to be compiled with &#45;finstrument&#45;functions) ..." alt="" coords="1246,155,1319,181"/><area shape="rect" id="node46" href="trace_8cc.html" title="trace.cc" alt="" coords="1395,155,1464,181"/></map>
 </div>
 </div>
 <p><a href="string_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structstringz.html">stringz</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:aeb53e2c75fbf96eb0b4b8ac6be4afb24"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aeb53e2c75fbf96eb0b4b8ac6be4afb24"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const T &amp;)</td></tr>
+<tr class="memitem:aeb53e2c75fbf96eb0b4b8ac6be4afb24"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aeb53e2c75fbf96eb0b4b8ac6be4afb24">str</a> (const T &amp;)</td></tr>
 <tr class="separator:aeb53e2c75fbf96eb0b4b8ac6be4afb24"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0afafe70324e90fcb977bc4d2207ca8e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a0afafe70324e90fcb977bc4d2207ca8e">operator&lt;</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;a, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;b)</td></tr>
 <tr class="memdesc:a0afafe70324e90fcb977bc4d2207ca8e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Lexically compare strings.  <a href="#a0afafe70324e90fcb977bc4d2207ca8e">More...</a><br/></td></tr>
 <tr class="separator:a0afafe70324e90fcb977bc4d2207ca8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5d0cc75dcba1a175b578256efe88573f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5d0cc75dcba1a175b578256efe88573f"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;a, byte c)</td></tr>
-<tr class="memdesc:a5d0cc75dcba1a175b578256efe88573f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Counts number of occurence of a character in a String. <br/></td></tr>
+<tr class="memitem:a5d0cc75dcba1a175b578256efe88573f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;a, <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> c)</td></tr>
+<tr class="memdesc:a5d0cc75dcba1a175b578256efe88573f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Counts number of occurence of a character in a String.  <a href="#a5d0cc75dcba1a175b578256efe88573f">More...</a><br/></td></tr>
 <tr class="separator:a5d0cc75dcba1a175b578256efe88573f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3dd07628b413a2e63b2952a71d366a15"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a3dd07628b413a2e63b2952a71d366a15">section</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>, byte separator, int begin=0, int end=1)</td></tr>
+<tr class="memitem:a3dd07628b413a2e63b2952a71d366a15"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a3dd07628b413a2e63b2952a71d366a15">section</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>, <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> separator, int begin=0, int end=1)</td></tr>
 <tr class="separator:a3dd07628b413a2e63b2952a71d366a15"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a38d84583a6beb999acc99de1c64e4184"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a38d84583a6beb999acc99de1c64e4184"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a38d84583a6beb999acc99de1c64e4184">trim</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a38d84583a6beb999acc99de1c64e4184"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a reference with heading and trailing whitespace removed. <br/></td></tr>
+<tr class="memitem:a38d84583a6beb999acc99de1c64e4184"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a38d84583a6beb999acc99de1c64e4184">trim</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a38d84583a6beb999acc99de1c64e4184"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a reference with heading and trailing whitespace removed.  <a href="#a38d84583a6beb999acc99de1c64e4184">More...</a><br/></td></tr>
 <tr class="separator:a38d84583a6beb999acc99de1c64e4184"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7522548f18f0f67b0580b218a0e902de"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7522548f18f0f67b0580b218a0e902de"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a7522548f18f0f67b0580b218a0e902de">startsWith</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;sub)</td></tr>
-<tr class="memdesc:a7522548f18f0f67b0580b218a0e902de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <em>str</em> starts with <em>sub</em>. <br/></td></tr>
+<tr class="memitem:a7522548f18f0f67b0580b218a0e902de"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a7522548f18f0f67b0580b218a0e902de">startsWith</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="volume_8h.html#a61d2268762e6a9e445bab98ee842251f">sub</a>)</td></tr>
+<tr class="memdesc:a7522548f18f0f67b0580b218a0e902de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <em>str</em> starts with <em>sub</em>.  <a href="#a7522548f18f0f67b0580b218a0e902de">More...</a><br/></td></tr>
 <tr class="separator:a7522548f18f0f67b0580b218a0e902de"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab1862f5bf6841bc73114ba6a48fa9674"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab1862f5bf6841bc73114ba6a48fa9674"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ab1862f5bf6841bc73114ba6a48fa9674">endsWith</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;sub)</td></tr>
-<tr class="memdesc:ab1862f5bf6841bc73114ba6a48fa9674"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <em>str</em> ends with <em>sub</em>. <br/></td></tr>
+<tr class="memitem:ab1862f5bf6841bc73114ba6a48fa9674"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ab1862f5bf6841bc73114ba6a48fa9674">endsWith</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="volume_8h.html#a61d2268762e6a9e445bab98ee842251f">sub</a>)</td></tr>
+<tr class="memdesc:ab1862f5bf6841bc73114ba6a48fa9674"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <em>str</em> ends with <em>sub</em>.  <a href="#ab1862f5bf6841bc73114ba6a48fa9674">More...</a><br/></td></tr>
 <tr class="separator:ab1862f5bf6841bc73114ba6a48fa9674"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2381273ba7be300cff4122bf29c4d9d2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2381273ba7be300cff4122bf29c4d9d2"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a2381273ba7be300cff4122bf29c4d9d2">find</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;substring)</td></tr>
-<tr class="memdesc:a2381273ba7be300cff4122bf29c4d9d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <em>str</em> contains the <em>substring</em>. <br/></td></tr>
+<tr class="memitem:a2381273ba7be300cff4122bf29c4d9d2"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a2381273ba7be300cff4122bf29c4d9d2">find</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;substring)</td></tr>
+<tr class="memdesc:a2381273ba7be300cff4122bf29c4d9d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <em>str</em> contains the <em>substring</em>.  <a href="#a2381273ba7be300cff4122bf29c4d9d2">More...</a><br/></td></tr>
 <tr class="separator:a2381273ba7be300cff4122bf29c4d9d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad7def6a0a56391758d16180a831192c3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad7def6a0a56391758d16180a831192c3"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ad7def6a0a56391758d16180a831192c3">isASCII</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:ad7def6a0a56391758d16180a831192c3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if a string is a displayable unextended ASCII string. <br/></td></tr>
+<tr class="memitem:ad7def6a0a56391758d16180a831192c3"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ad7def6a0a56391758d16180a831192c3">isASCII</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:ad7def6a0a56391758d16180a831192c3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if a string is a displayable unextended ASCII string.  <a href="#ad7def6a0a56391758d16180a831192c3">More...</a><br/></td></tr>
 <tr class="separator:ad7def6a0a56391758d16180a831192c3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a214c47c7fcaef623e40d235f50a6fe2b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a214c47c7fcaef623e40d235f50a6fe2b"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a214c47c7fcaef623e40d235f50a6fe2b">isUTF8</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a214c47c7fcaef623e40d235f50a6fe2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if a string is a valid UTF8 string. <br/></td></tr>
+<tr class="memitem:a214c47c7fcaef623e40d235f50a6fe2b"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a214c47c7fcaef623e40d235f50a6fe2b">isUTF8</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a214c47c7fcaef623e40d235f50a6fe2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if a string is a valid UTF8 string.  <a href="#a214c47c7fcaef623e40d235f50a6fe2b">More...</a><br/></td></tr>
 <tr class="separator:a214c47c7fcaef623e40d235f50a6fe2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a42a8022c459256f365a6c675a0b842dc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a42a8022c459256f365a6c675a0b842dc"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a42a8022c459256f365a6c675a0b842dc">isInteger</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a42a8022c459256f365a6c675a0b842dc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if s contains only [0-9]. <br/></td></tr>
+<tr class="memitem:a42a8022c459256f365a6c675a0b842dc"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a42a8022c459256f365a6c675a0b842dc">isInteger</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a42a8022c459256f365a6c675a0b842dc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if s contains only [0-9].  <a href="#a42a8022c459256f365a6c675a0b842dc">More...</a><br/></td></tr>
 <tr class="separator:a42a8022c459256f365a6c675a0b842dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3aaa1ede719c485014e4823ffa0b0f0a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3aaa1ede719c485014e4823ffa0b0f0a"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a3aaa1ede719c485014e4823ffa0b0f0a">fromInteger</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>, int base=10)</td></tr>
-<tr class="memdesc:a3aaa1ede719c485014e4823ffa0b0f0a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parses an integer value. <br/></td></tr>
+<tr class="memitem:a3aaa1ede719c485014e4823ffa0b0f0a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a3aaa1ede719c485014e4823ffa0b0f0a">fromInteger</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>, int base=10)</td></tr>
+<tr class="memdesc:a3aaa1ede719c485014e4823ffa0b0f0a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parses an integer value.  <a href="#a3aaa1ede719c485014e4823ffa0b0f0a">More...</a><br/></td></tr>
 <tr class="separator:a3aaa1ede719c485014e4823ffa0b0f0a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a990070f6b14dd3327db91508ea16cef4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a990070f6b14dd3327db91508ea16cef4"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a990070f6b14dd3327db91508ea16cef4">isDecimal</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a990070f6b14dd3327db91508ea16cef4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if s matches [0-9]*.?[0-9]*. <br/></td></tr>
+<tr class="memitem:a990070f6b14dd3327db91508ea16cef4"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a990070f6b14dd3327db91508ea16cef4">isDecimal</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a990070f6b14dd3327db91508ea16cef4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if s matches [0-9]*.?[0-9]*.  <a href="#a990070f6b14dd3327db91508ea16cef4">More...</a><br/></td></tr>
 <tr class="separator:a990070f6b14dd3327db91508ea16cef4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a663cb89c682986418179e17bf7bb48b8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a663cb89c682986418179e17bf7bb48b8"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a663cb89c682986418179e17bf7bb48b8">fromDecimal</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>)</td></tr>
-<tr class="memdesc:a663cb89c682986418179e17bf7bb48b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parses a decimal value. <br/></td></tr>
+<tr class="memitem:a663cb89c682986418179e17bf7bb48b8"><td class="memItemLeft" align="right" valign="top">double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a663cb89c682986418179e17bf7bb48b8">fromDecimal</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>)</td></tr>
+<tr class="memdesc:a663cb89c682986418179e17bf7bb48b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parses a decimal value.  <a href="#a663cb89c682986418179e17bf7bb48b8">More...</a><br/></td></tr>
 <tr class="separator:a663cb89c682986418179e17bf7bb48b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa53b153ebf84ff09dc73429d1259f41a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa53b153ebf84ff09dc73429d1259f41a"></a>
-const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aa53b153ebf84ff09dc73429d1259f41a">str</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:aa53b153ebf84ff09dc73429d1259f41a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards string. <br/></td></tr>
+<tr class="memitem:aa53b153ebf84ff09dc73429d1259f41a"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aa53b153ebf84ff09dc73429d1259f41a">str</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:aa53b153ebf84ff09dc73429d1259f41a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards string.  <a href="#aa53b153ebf84ff09dc73429d1259f41a">More...</a><br/></td></tr>
 <tr class="separator:aa53b153ebf84ff09dc73429d1259f41a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a575984169e9634e7e3f09b1fbf6bca13"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a575984169e9634e7e3f09b1fbf6bca13"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a575984169e9634e7e3f09b1fbf6bca13">str</a> (const char *s)</td></tr>
-<tr class="memdesc:a575984169e9634e7e3f09b1fbf6bca13"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a bounded reference to the null-terminated String pointer. <br/></td></tr>
+<tr class="memitem:a575984169e9634e7e3f09b1fbf6bca13"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a575984169e9634e7e3f09b1fbf6bca13">str</a> (const char *s)</td></tr>
+<tr class="memdesc:a575984169e9634e7e3f09b1fbf6bca13"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a bounded reference to the null-terminated String pointer.  <a href="#a575984169e9634e7e3f09b1fbf6bca13">More...</a><br/></td></tr>
 <tr class="separator:a575984169e9634e7e3f09b1fbf6bca13"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af7cf799c4bebe1d98e670146a86a23e2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af7cf799c4bebe1d98e670146a86a23e2"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#af7cf799c4bebe1d98e670146a86a23e2">str</a> (const bool &amp;b)</td></tr>
-<tr class="memdesc:af7cf799c4bebe1d98e670146a86a23e2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns boolean as "true"/"false". <br/></td></tr>
+<tr class="memitem:af7cf799c4bebe1d98e670146a86a23e2"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#af7cf799c4bebe1d98e670146a86a23e2">str</a> (const bool &amp;b)</td></tr>
+<tr class="memdesc:af7cf799c4bebe1d98e670146a86a23e2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns boolean as "true"/"false".  <a href="#af7cf799c4bebe1d98e670146a86a23e2">More...</a><br/></td></tr>
 <tr class="separator:af7cf799c4bebe1d98e670146a86a23e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeebdd147fd3c80de45ca8d11b213ef85"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aeebdd147fd3c80de45ca8d11b213ef85"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aeebdd147fd3c80de45ca8d11b213ef85">str</a> (const char &amp;c)</td></tr>
-<tr class="memdesc:aeebdd147fd3c80de45ca8d11b213ef85"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a reference to the character. <br/></td></tr>
+<tr class="memitem:aeebdd147fd3c80de45ca8d11b213ef85"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aeebdd147fd3c80de45ca8d11b213ef85">str</a> (const char &amp;c)</td></tr>
+<tr class="memdesc:aeebdd147fd3c80de45ca8d11b213ef85"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a reference to the character.  <a href="#aeebdd147fd3c80de45ca8d11b213ef85">More...</a><br/></td></tr>
 <tr class="separator:aeebdd147fd3c80de45ca8d11b213ef85"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aee1703b23290292e9b8b75a016fe33b3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aee1703b23290292e9b8b75a016fe33b3"></a>
-const <a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aee1703b23290292e9b8b75a016fe33b3">str</a> (const <a class="el" href="structbuffer.html">buffer</a>&lt; byte &gt; &amp;s)</td></tr>
-<tr class="memdesc:aee1703b23290292e9b8b75a016fe33b3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards <a class="el" href="structbuffer.html">buffer&lt;byte&gt;</a> <br/></td></tr>
+<tr class="memitem:aee1703b23290292e9b8b75a016fe33b3"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aee1703b23290292e9b8b75a016fe33b3">str</a> (const <a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;s)</td></tr>
+<tr class="memdesc:aee1703b23290292e9b8b75a016fe33b3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards <a class="el" href="structbuffer.html">buffer&lt;byte&gt;</a>  <a href="#aee1703b23290292e9b8b75a016fe33b3">More...</a><br/></td></tr>
 <tr class="separator:aee1703b23290292e9b8b75a016fe33b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a774edb2aead066c4cf8b4aec19aeb664"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a774edb2aead066c4cf8b4aec19aeb664">join</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt; &amp;list, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;separator)</td></tr>
 <tr class="memdesc:a774edb2aead066c4cf8b4aec19aeb664"><td class="mdescLeft">&#160;</td><td class="mdescRight">Joins <em>list</em> into a single String with each element separated by <em>separator</em>.  <a href="#a774edb2aead066c4cf8b4aec19aeb664">More...</a><br/></td></tr>
 <tr class="separator:a774edb2aead066c4cf8b4aec19aeb664"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9d0e8b0b9903e0bd1b5f176f29e82a5e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9d0e8b0b9903e0bd1b5f176f29e82a5e"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>join</b> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt; &amp;list, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;separator)</td></tr>
+<tr class="memitem:a9d0e8b0b9903e0bd1b5f176f29e82a5e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a9d0e8b0b9903e0bd1b5f176f29e82a5e">join</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt; &amp;list, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;separator)</td></tr>
 <tr class="separator:a9d0e8b0b9903e0bd1b5f176f29e82a5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8bfcb43aa3a887bb9a1a87597353a784"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8bfcb43aa3a887bb9a1a87597353a784"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a8bfcb43aa3a887bb9a1a87597353a784">replace</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;before, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;after)</td></tr>
-<tr class="memdesc:a8bfcb43aa3a887bb9a1a87597353a784"><td class="mdescLeft">&#160;</td><td class="mdescRight">Replaces every occurrence of the String <em>before</em> with the String <em>after</em>. <br/></td></tr>
+<tr class="memitem:a8bfcb43aa3a887bb9a1a87597353a784"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a8bfcb43aa3a887bb9a1a87597353a784">replace</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;before, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;after)</td></tr>
+<tr class="memdesc:a8bfcb43aa3a887bb9a1a87597353a784"><td class="mdescLeft">&#160;</td><td class="mdescRight">Replaces every occurrence of the String <em>before</em> with the String <em>after</em>.  <a href="#a8bfcb43aa3a887bb9a1a87597353a784">More...</a><br/></td></tr>
 <tr class="separator:a8bfcb43aa3a887bb9a1a87597353a784"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a36fe5825d0c9f2a0bb9a8c992f670c1b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a36fe5825d0c9f2a0bb9a8c992f670c1b"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a36fe5825d0c9f2a0bb9a8c992f670c1b">isUpper</a> (char c)</td></tr>
-<tr class="memdesc:a36fe5825d0c9f2a0bb9a8c992f670c1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether <em>c</em> is uppercase. <br/></td></tr>
+<tr class="memitem:a36fe5825d0c9f2a0bb9a8c992f670c1b"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a36fe5825d0c9f2a0bb9a8c992f670c1b">isUpper</a> (char c)</td></tr>
+<tr class="memdesc:a36fe5825d0c9f2a0bb9a8c992f670c1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether <em>c</em> is uppercase.  <a href="#a36fe5825d0c9f2a0bb9a8c992f670c1b">More...</a><br/></td></tr>
 <tr class="separator:a36fe5825d0c9f2a0bb9a8c992f670c1b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7094a1f3323d55f2167de94164b09bd6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7094a1f3323d55f2167de94164b09bd6"></a>
-char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a7094a1f3323d55f2167de94164b09bd6">toLower</a> (char c)</td></tr>
-<tr class="memdesc:a7094a1f3323d55f2167de94164b09bd6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Lowers case. <br/></td></tr>
+<tr class="memitem:a7094a1f3323d55f2167de94164b09bd6"><td class="memItemLeft" align="right" valign="top">char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a7094a1f3323d55f2167de94164b09bd6">toLower</a> (char c)</td></tr>
+<tr class="memdesc:a7094a1f3323d55f2167de94164b09bd6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Lowers case.  <a href="#a7094a1f3323d55f2167de94164b09bd6">More...</a><br/></td></tr>
 <tr class="separator:a7094a1f3323d55f2167de94164b09bd6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7753c861923e504ac04fa8c756797c1c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7753c861923e504ac04fa8c756797c1c"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a7753c861923e504ac04fa8c756797c1c">toLower</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a7753c861923e504ac04fa8c756797c1c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Lowers case. <br/></td></tr>
+<tr class="memitem:a7753c861923e504ac04fa8c756797c1c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a7753c861923e504ac04fa8c756797c1c">toLower</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a7753c861923e504ac04fa8c756797c1c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Lowers case.  <a href="#a7753c861923e504ac04fa8c756797c1c">More...</a><br/></td></tr>
 <tr class="separator:a7753c861923e504ac04fa8c756797c1c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a05c45753518b35cbcdb7330bebb9d430"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a05c45753518b35cbcdb7330bebb9d430"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a05c45753518b35cbcdb7330bebb9d430">isLower</a> (char c)</td></tr>
-<tr class="memdesc:a05c45753518b35cbcdb7330bebb9d430"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether <em>c</em> is lowercase. <br/></td></tr>
+<tr class="memitem:a05c45753518b35cbcdb7330bebb9d430"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a05c45753518b35cbcdb7330bebb9d430">isLower</a> (char c)</td></tr>
+<tr class="memdesc:a05c45753518b35cbcdb7330bebb9d430"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns whether <em>c</em> is lowercase.  <a href="#a05c45753518b35cbcdb7330bebb9d430">More...</a><br/></td></tr>
 <tr class="separator:a05c45753518b35cbcdb7330bebb9d430"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a849d8b50098ed5f01547384012eefabe"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a849d8b50098ed5f01547384012eefabe"></a>
-char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a849d8b50098ed5f01547384012eefabe">toUpper</a> (char c)</td></tr>
-<tr class="memdesc:a849d8b50098ed5f01547384012eefabe"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uppers case. <br/></td></tr>
+<tr class="memitem:a849d8b50098ed5f01547384012eefabe"><td class="memItemLeft" align="right" valign="top">char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a849d8b50098ed5f01547384012eefabe">toUpper</a> (char c)</td></tr>
+<tr class="memdesc:a849d8b50098ed5f01547384012eefabe"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uppers case.  <a href="#a849d8b50098ed5f01547384012eefabe">More...</a><br/></td></tr>
 <tr class="separator:a849d8b50098ed5f01547384012eefabe"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a62fe906b6d3b6c842f3dfed1a68db7be"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a62fe906b6d3b6c842f3dfed1a68db7be"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a62fe906b6d3b6c842f3dfed1a68db7be">toUpper</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a62fe906b6d3b6c842f3dfed1a68db7be"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uppers case. <br/></td></tr>
+<tr class="memitem:a62fe906b6d3b6c842f3dfed1a68db7be"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a62fe906b6d3b6c842f3dfed1a68db7be">toUpper</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a62fe906b6d3b6c842f3dfed1a68db7be"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uppers case.  <a href="#a62fe906b6d3b6c842f3dfed1a68db7be">More...</a><br/></td></tr>
 <tr class="separator:a62fe906b6d3b6c842f3dfed1a68db7be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad1152387adecb078c581c881a63e97f5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad1152387adecb078c581c881a63e97f5"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ad1152387adecb078c581c881a63e97f5">simplify</a> (<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;&amp;s)</td></tr>
-<tr class="memdesc:ad1152387adecb078c581c881a63e97f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Removes duplicate whitespace. <br/></td></tr>
+<tr class="memitem:ad1152387adecb078c581c881a63e97f5"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ad1152387adecb078c581c881a63e97f5">simplify</a> (<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;&amp;s)</td></tr>
+<tr class="memdesc:ad1152387adecb078c581c881a63e97f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Removes duplicate whitespace.  <a href="#ad1152387adecb078c581c881a63e97f5">More...</a><br/></td></tr>
 <tr class="separator:ad1152387adecb078c581c881a63e97f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4ce58c0701cc7ec59d2c502e29553905"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4ce58c0701cc7ec59d2c502e29553905"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a4ce58c0701cc7ec59d2c502e29553905">repeat</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, uint times)</td></tr>
-<tr class="memdesc:a4ce58c0701cc7ec59d2c502e29553905"><td class="mdescLeft">&#160;</td><td class="mdescRight">Repeats a string. <br/></td></tr>
+<tr class="memitem:a4ce58c0701cc7ec59d2c502e29553905"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a4ce58c0701cc7ec59d2c502e29553905">repeat</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> times)</td></tr>
+<tr class="memdesc:a4ce58c0701cc7ec59d2c502e29553905"><td class="mdescLeft">&#160;</td><td class="mdescRight">Repeats a string.  <a href="#a4ce58c0701cc7ec59d2c502e29553905">More...</a><br/></td></tr>
 <tr class="separator:a4ce58c0701cc7ec59d2c502e29553905"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1976f658419b40f3427a65dcf354864e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1976f658419b40f3427a65dcf354864e"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a1976f658419b40f3427a65dcf354864e">pad</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, uint length, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;pad=&quot; &quot;)</td></tr>
-<tr class="memdesc:a1976f658419b40f3427a65dcf354864e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pads a string. <br/></td></tr>
+<tr class="memitem:a1976f658419b40f3427a65dcf354864e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a1976f658419b40f3427a65dcf354864e">pad</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> length, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;pad=&quot; &quot;)</td></tr>
+<tr class="memdesc:a1976f658419b40f3427a65dcf354864e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pads a string.  <a href="#a1976f658419b40f3427a65dcf354864e">More...</a><br/></td></tr>
 <tr class="separator:a1976f658419b40f3427a65dcf354864e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5796895732aeab59f170f0df2957812a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5796895732aeab59f170f0df2957812a"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a5796895732aeab59f170f0df2957812a">left</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, uint length, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=&quot; &quot;)</td></tr>
-<tr class="memdesc:a5796895732aeab59f170f0df2957812a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pads a string to the left. <br/></td></tr>
+<tr class="memitem:a5796895732aeab59f170f0df2957812a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a5796895732aeab59f170f0df2957812a">left</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> length, const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=&quot; &quot;)</td></tr>
+<tr class="memdesc:a5796895732aeab59f170f0df2957812a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pads a string to the left.  <a href="#a5796895732aeab59f170f0df2957812a">More...</a><br/></td></tr>
 <tr class="separator:a5796895732aeab59f170f0df2957812a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac7b7c3d2b85752c656fd338827e95380"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac7b7c3d2b85752c656fd338827e95380"></a>
-const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ac7b7c3d2b85752c656fd338827e95380">str</a> (const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;s)</td></tr>
-<tr class="memdesc:ac7b7c3d2b85752c656fd338827e95380"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards string. <br/></td></tr>
+<tr class="memitem:ac7b7c3d2b85752c656fd338827e95380"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ac7b7c3d2b85752c656fd338827e95380">str</a> (const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;s)</td></tr>
+<tr class="memdesc:ac7b7c3d2b85752c656fd338827e95380"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards string.  <a href="#ac7b7c3d2b85752c656fd338827e95380">More...</a><br/></td></tr>
 <tr class="separator:ac7b7c3d2b85752c656fd338827e95380"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a00de5d1f16358d3862293833d1a1f96b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a00de5d1f16358d3862293833d1a1f96b"></a>
-stringz&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a00de5d1f16358d3862293833d1a1f96b">strz</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
-<tr class="memdesc:a00de5d1f16358d3862293833d1a1f96b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Copies the reference and appends a null byte. <br/></td></tr>
+<tr class="memitem:a00de5d1f16358d3862293833d1a1f96b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structstringz.html">stringz</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a00de5d1f16358d3862293833d1a1f96b">strz</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;s)</td></tr>
+<tr class="memdesc:a00de5d1f16358d3862293833d1a1f96b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Copies the reference and appends a null byte.  <a href="#a00de5d1f16358d3862293833d1a1f96b">More...</a><br/></td></tr>
 <tr class="separator:a00de5d1f16358d3862293833d1a1f96b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a060a7511b8b1bc89865c932556871f6d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="time_8h.html#ad3133d5bc2358ff89e7527f2ecde6181">str</a>, byte separator=' ')</td></tr>
+<tr class="memitem:a060a7511b8b1bc89865c932556871f6d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a060a7511b8b1bc89865c932556871f6d">split</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="widget_8h.html#ab759664c121f942a832cd989ab5bef85">str</a>, <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> separator=' ')</td></tr>
 <tr class="memdesc:a060a7511b8b1bc89865c932556871f6d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns an array of references splitting <em>str</em> wherever <em>separator</em> occurs.  <a href="#a060a7511b8b1bc89865c932556871f6d">More...</a><br/></td></tr>
 <tr class="separator:a060a7511b8b1bc89865c932556871f6d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acc6b3cf5215b9041c8213bd4184275f9"><td class="memTemplParams" colspan="2">template&lt;uint base = 10&gt; </td></tr>
-<tr class="memitem:acc6b3cf5215b9041c8213bd4184275f9"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#acc6b3cf5215b9041c8213bd4184275f9">utoa</a> (uint64 number, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, char padChar='0')</td></tr>
+<tr class="memitem:acc6b3cf5215b9041c8213bd4184275f9"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#acc6b3cf5215b9041c8213bd4184275f9">utoa</a> (<a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> number, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, char padChar='0')</td></tr>
 <tr class="memdesc:acc6b3cf5215b9041c8213bd4184275f9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts integers.  <a href="#acc6b3cf5215b9041c8213bd4184275f9">More...</a><br/></td></tr>
 <tr class="separator:acc6b3cf5215b9041c8213bd4184275f9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af419342be24fc5c064c15c40e3fa9140"><td class="memTemplParams" colspan="2"><a class="anchor" id="af419342be24fc5c064c15c40e3fa9140"></a>
-template&lt;uint base = 10&gt; </td></tr>
-<tr class="memitem:af419342be24fc5c064c15c40e3fa9140"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><b>itoa</b> (int64 number, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, char padChar=' ')</td></tr>
+<tr class="memitem:af419342be24fc5c064c15c40e3fa9140"><td class="memTemplParams" colspan="2">template&lt;uint base = 10&gt; </td></tr>
+<tr class="memitem:af419342be24fc5c064c15c40e3fa9140"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#af419342be24fc5c064c15c40e3fa9140">itoa</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> number, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, char padChar=' ')</td></tr>
 <tr class="separator:af419342be24fc5c064c15c40e3fa9140"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad315c97eedb2dc2d9c72f2f5adbd1b68"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad315c97eedb2dc2d9c72f2f5adbd1b68"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>dec</b> (int64 n, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, char padChar=' ')</td></tr>
+<tr class="memitem:ad315c97eedb2dc2d9c72f2f5adbd1b68"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ad315c97eedb2dc2d9c72f2f5adbd1b68">dec</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> n, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, char padChar=' ')</td></tr>
 <tr class="separator:ad315c97eedb2dc2d9c72f2f5adbd1b68"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaf9cc6b732d9f9df504a8c826882f554"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aaf9cc6b732d9f9df504a8c826882f554"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const uint8 &amp;n)</td></tr>
+<tr class="memitem:aaf9cc6b732d9f9df504a8c826882f554"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aaf9cc6b732d9f9df504a8c826882f554">str</a> (const <a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a> &amp;n)</td></tr>
 <tr class="separator:aaf9cc6b732d9f9df504a8c826882f554"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a09851c644f6fc67a8fa891263a38ece8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a09851c644f6fc67a8fa891263a38ece8"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const int8 &amp;n)</td></tr>
+<tr class="memitem:a09851c644f6fc67a8fa891263a38ece8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a09851c644f6fc67a8fa891263a38ece8">str</a> (const <a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a> &amp;n)</td></tr>
 <tr class="separator:a09851c644f6fc67a8fa891263a38ece8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab074a577d4447cc98621755e98a5758e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab074a577d4447cc98621755e98a5758e"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const uint16 &amp;n)</td></tr>
+<tr class="memitem:ab074a577d4447cc98621755e98a5758e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ab074a577d4447cc98621755e98a5758e">str</a> (const <a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> &amp;n)</td></tr>
 <tr class="separator:ab074a577d4447cc98621755e98a5758e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a547b74c307278fcdcc36cf72b5d47ca2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a547b74c307278fcdcc36cf72b5d47ca2"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const int16 &amp;n)</td></tr>
+<tr class="memitem:a547b74c307278fcdcc36cf72b5d47ca2"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a547b74c307278fcdcc36cf72b5d47ca2">str</a> (const <a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> &amp;n)</td></tr>
 <tr class="separator:a547b74c307278fcdcc36cf72b5d47ca2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a88e5e7e79d40cc418527f3fa3adce968"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a88e5e7e79d40cc418527f3fa3adce968"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const uint32 &amp;n)</td></tr>
+<tr class="memitem:a88e5e7e79d40cc418527f3fa3adce968"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a88e5e7e79d40cc418527f3fa3adce968">str</a> (const <a class="el" href="core_8h.html#a1134b580f8da4de94ca6b1de4d37975e">uint32</a> &amp;n)</td></tr>
 <tr class="separator:a88e5e7e79d40cc418527f3fa3adce968"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8577bceddecab67ca282f686996de15c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8577bceddecab67ca282f686996de15c"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const int32 &amp;n)</td></tr>
+<tr class="memitem:a8577bceddecab67ca282f686996de15c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a8577bceddecab67ca282f686996de15c">str</a> (const <a class="el" href="core_8h.html#a43d43196463bde49cb067f5c20ab8481">int32</a> &amp;n)</td></tr>
 <tr class="separator:a8577bceddecab67ca282f686996de15c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4c909ac5eb6ad03d5345d2ada80d9b03"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4c909ac5eb6ad03d5345d2ada80d9b03"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const unsigned long &amp;n)</td></tr>
+<tr class="memitem:a4c909ac5eb6ad03d5345d2ada80d9b03"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a4c909ac5eb6ad03d5345d2ada80d9b03">str</a> (const unsigned long &amp;n)</td></tr>
 <tr class="separator:a4c909ac5eb6ad03d5345d2ada80d9b03"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3c8a5638b96411a74b3db7271dae9acc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3c8a5638b96411a74b3db7271dae9acc"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const long &amp;n)</td></tr>
+<tr class="memitem:a3c8a5638b96411a74b3db7271dae9acc"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a3c8a5638b96411a74b3db7271dae9acc">str</a> (const long &amp;n)</td></tr>
 <tr class="separator:a3c8a5638b96411a74b3db7271dae9acc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa1a8c98381c62ba7ef1fe609998eaeed"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa1a8c98381c62ba7ef1fe609998eaeed"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const uint64 &amp;n)</td></tr>
+<tr class="memitem:aa1a8c98381c62ba7ef1fe609998eaeed"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#aa1a8c98381c62ba7ef1fe609998eaeed">str</a> (const <a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> &amp;n)</td></tr>
 <tr class="separator:aa1a8c98381c62ba7ef1fe609998eaeed"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a935c2f640dd4f9a2db09f460eba84d30"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a935c2f640dd4f9a2db09f460eba84d30"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const int64 &amp;n)</td></tr>
+<tr class="memitem:a935c2f640dd4f9a2db09f460eba84d30"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a935c2f640dd4f9a2db09f460eba84d30">str</a> (const <a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> &amp;n)</td></tr>
 <tr class="separator:a935c2f640dd4f9a2db09f460eba84d30"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5722fad004285aa0aedbee75ed337ead"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5722fad004285aa0aedbee75ed337ead"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>hex</b> (uint64 n, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0)</td></tr>
+<tr class="memitem:a5722fad004285aa0aedbee75ed337ead"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a5722fad004285aa0aedbee75ed337ead">hex</a> (<a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> n, int <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0)</td></tr>
 <tr class="separator:a5722fad004285aa0aedbee75ed337ead"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afc40a6c8513adc2a55948a81bfac56c0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afc40a6c8513adc2a55948a81bfac56c0"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (T *const &amp;p)</td></tr>
+<tr class="memitem:afc40a6c8513adc2a55948a81bfac56c0"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#afc40a6c8513adc2a55948a81bfac56c0">str</a> (T *const &amp;<a class="el" href="_c_g_8cc.html#ac45166f185f8c0df54e54d18ac8ab0c1">p</a>)</td></tr>
 <tr class="separator:afc40a6c8513adc2a55948a81bfac56c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acc6c022e6dc78003a9743abbc9d4cdc6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acc6c022e6dc78003a9743abbc9d4cdc6"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const <a class="el" href="structunique.html">unique</a>&lt; T &gt; &amp;t)</td></tr>
+<tr class="memitem:acc6c022e6dc78003a9743abbc9d4cdc6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#acc6c022e6dc78003a9743abbc9d4cdc6">str</a> (const <a class="el" href="structunique.html">unique</a>&lt; T &gt; &amp;t)</td></tr>
 <tr class="separator:acc6c022e6dc78003a9743abbc9d4cdc6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abf6e826fd0b99221e4ffbe7bc0c9a021"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abf6e826fd0b99221e4ffbe7bc0c9a021"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const <a class="el" href="structshared.html">shared</a>&lt; T &gt; &amp;t)</td></tr>
+<tr class="memitem:abf6e826fd0b99221e4ffbe7bc0c9a021"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#abf6e826fd0b99221e4ffbe7bc0c9a021">str</a> (const <a class="el" href="structshared.html">shared</a>&lt; T &gt; &amp;t)</td></tr>
 <tr class="separator:abf6e826fd0b99221e4ffbe7bc0c9a021"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a631a5d731dcc924a8e59b786bce8b06e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a631a5d731dcc924a8e59b786bce8b06e"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a631a5d731dcc924a8e59b786bce8b06e">ftoa</a> (double number, int precision=2, uint <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, int exponent=0)</td></tr>
-<tr class="memdesc:a631a5d731dcc924a8e59b786bce8b06e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts floating-point numbers. <br/></td></tr>
+<tr class="memitem:a631a5d731dcc924a8e59b786bce8b06e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a631a5d731dcc924a8e59b786bce8b06e">ftoa</a> (double number, int precision=2, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="x_8h.html#a1ee164ea8676f218c22d3fe76a2dacc6">pad</a>=0, int exponent=0)</td></tr>
+<tr class="memdesc:a631a5d731dcc924a8e59b786bce8b06e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts floating-point numbers.  <a href="#a631a5d731dcc924a8e59b786bce8b06e">More...</a><br/></td></tr>
 <tr class="separator:a631a5d731dcc924a8e59b786bce8b06e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a339ce1a15063828bf541d89f6cffd3eb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a339ce1a15063828bf541d89f6cffd3eb"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const float &amp;n)</td></tr>
+<tr class="memitem:a339ce1a15063828bf541d89f6cffd3eb"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a339ce1a15063828bf541d89f6cffd3eb">str</a> (const float &amp;n)</td></tr>
 <tr class="separator:a339ce1a15063828bf541d89f6cffd3eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a01379ee1d3216768a02a22f45edff48e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a01379ee1d3216768a02a22f45edff48e"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const double &amp;n)</td></tr>
+<tr class="memitem:a01379ee1d3216768a02a22f45edff48e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a01379ee1d3216768a02a22f45edff48e">str</a> (const double &amp;n)</td></tr>
 <tr class="separator:a01379ee1d3216768a02a22f45edff48e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8b5997f897d5684d55b90a91994d9884"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8b5997f897d5684d55b90a91994d9884"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>percent</b> (const float f)</td></tr>
+<tr class="memitem:a8b5997f897d5684d55b90a91994d9884"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a8b5997f897d5684d55b90a91994d9884">percent</a> (const float f)</td></tr>
 <tr class="separator:a8b5997f897d5684d55b90a91994d9884"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a45b68e048b15afab54fe03f14653466f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a45b68e048b15afab54fe03f14653466f"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>percent</b> (const uint64 a, const uint64 b)</td></tr>
+<tr class="memitem:a45b68e048b15afab54fe03f14653466f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a45b68e048b15afab54fe03f14653466f">percent</a> (const <a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> a, const <a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> b)</td></tr>
 <tr class="separator:a45b68e048b15afab54fe03f14653466f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af58d37363de0e15135ce28a5ec5d286c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af58d37363de0e15135ce28a5ec5d286c"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#af58d37363de0e15135ce28a5ec5d286c">binaryPrefix</a> (size_t value, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> unit=&quot;B&quot;)</td></tr>
-<tr class="memdesc:af58d37363de0e15135ce28a5ec5d286c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Formats value using best binary prefix. <br/></td></tr>
+<tr class="memitem:af58d37363de0e15135ce28a5ec5d286c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#af58d37363de0e15135ce28a5ec5d286c">binaryPrefix</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> value, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> unit=&quot;B&quot;)</td></tr>
+<tr class="memdesc:af58d37363de0e15135ce28a5ec5d286c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Formats value using best binary prefix.  <a href="#af58d37363de0e15135ce28a5ec5d286c">More...</a><br/></td></tr>
 <tr class="separator:af58d37363de0e15135ce28a5ec5d286c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4e0db12b7334e3e96d71d876b8c5e7cd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4e0db12b7334e3e96d71d876b8c5e7cd"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a4e0db12b7334e3e96d71d876b8c5e7cd">str</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
-<tr class="memdesc:a4e0db12b7334e3e96d71d876b8c5e7cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts arrays. <br/></td></tr>
+<tr class="memitem:a4e0db12b7334e3e96d71d876b8c5e7cd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a4e0db12b7334e3e96d71d876b8c5e7cd">str</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
+<tr class="memdesc:a4e0db12b7334e3e96d71d876b8c5e7cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts arrays.  <a href="#a4e0db12b7334e3e96d71d876b8c5e7cd">More...</a><br/></td></tr>
 <tr class="separator:a4e0db12b7334e3e96d71d876b8c5e7cd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a195b26ea43250904e961fc4a4c2f4915"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a195b26ea43250904e961fc4a4c2f4915"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const <a class="el" href="structmref.html">mref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
+<tr class="memitem:a195b26ea43250904e961fc4a4c2f4915"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a195b26ea43250904e961fc4a4c2f4915">str</a> (const <a class="el" href="structmref.html">mref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
 <tr class="separator:a195b26ea43250904e961fc4a4c2f4915"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6b1f31990e8a0815351f430e9d884e9e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6b1f31990e8a0815351f430e9d884e9e"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const <a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
+<tr class="memitem:a6b1f31990e8a0815351f430e9d884e9e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a6b1f31990e8a0815351f430e9d884e9e">str</a> (const <a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
 <tr class="separator:a6b1f31990e8a0815351f430e9d884e9e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a29f8c896ec198d6b3acb0730170c9394"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a29f8c896ec198d6b3acb0730170c9394"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>str</b> (const <a class="el" href="structarray.html">array</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
+<tr class="memitem:a29f8c896ec198d6b3acb0730170c9394"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a29f8c896ec198d6b3acb0730170c9394">str</a> (const <a class="el" href="structarray.html">array</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
 <tr class="separator:a29f8c896ec198d6b3acb0730170c9394"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a909bcfa1b68cf118047bc5939923e81c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a909bcfa1b68cf118047bc5939923e81c"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>dec</b> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
+<tr class="memitem:a909bcfa1b68cf118047bc5939923e81c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#a909bcfa1b68cf118047bc5939923e81c">dec</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
 <tr class="separator:a909bcfa1b68cf118047bc5939923e81c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab23d88d3a3a18fdc18e43d61c65e165d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab23d88d3a3a18fdc18e43d61c65e165d"></a>
-generic <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>hex</b> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
+<tr class="memitem:ab23d88d3a3a18fdc18e43d61c65e165d"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="string_8h.html#ab23d88d3a3a18fdc18e43d61c65e165d">hex</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a, char separator=' ')</td></tr>
 <tr class="separator:ab23d88d3a3a18fdc18e43d61c65e165d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae05548ddfe0048da7ceabc78bd5c045b"><td class="memTemplParams" colspan="2"><a class="anchor" id="ae05548ddfe0048da7ceabc78bd5c045b"></a>
-template&lt;typename T , size_t N&gt; </td></tr>
+<tr class="memitem:ae05548ddfe0048da7ceabc78bd5c045b"><td class="memTemplParams" colspan="2">template&lt;typename T , size_t N&gt; </td></tr>
 <tr class="memitem:ae05548ddfe0048da7ceabc78bd5c045b"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#ae05548ddfe0048da7ceabc78bd5c045b">str</a> (const T(&amp;a)[N], char separator=' ')</td></tr>
-<tr class="memdesc:ae05548ddfe0048da7ceabc78bd5c045b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts static arrays. <br/></td></tr>
+<tr class="memdesc:ae05548ddfe0048da7ceabc78bd5c045b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts static arrays.  <a href="#ae05548ddfe0048da7ceabc78bd5c045b">More...</a><br/></td></tr>
 <tr class="separator:ae05548ddfe0048da7ceabc78bd5c045b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5fda09edf8b8c0e75aea693f06b2bb04"><td class="memTemplParams" colspan="2">template&lt;typename A , typename... Args&gt; </td></tr>
 <tr class="memitem:a5fda09edf8b8c0e75aea693f06b2bb04"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#a5fda09edf8b8c0e75aea693f06b2bb04">str</a> (const A &amp;a, const Args &amp;...args)</td></tr>
@@ -368,10 +314,9 @@ template&lt;typename T , size_t N&gt; </td></tr>
 <tr class="memitem:a6b44f30da7eefc7f476da6f15e9b6677"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#a6b44f30da7eefc7f476da6f15e9b6677">log</a> (const Args &amp;...args)</td></tr>
 <tr class="memdesc:a6b44f30da7eefc7f476da6f15e9b6677"><td class="mdescLeft">&#160;</td><td class="mdescRight">Logs to standard output using str(...) serialization.  <a href="#a6b44f30da7eefc7f476da6f15e9b6677">More...</a><br/></td></tr>
 <tr class="separator:a6b44f30da7eefc7f476da6f15e9b6677"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7ec821afe680144683689fa632373701"><td class="memTemplParams" colspan="2"><a class="anchor" id="a7ec821afe680144683689fa632373701"></a>
-template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:a7ec821afe680144683689fa632373701"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#a7ec821afe680144683689fa632373701">__attribute</a> ((noreturn)) <a class="el" href="core_8h.html#a582bff114cf268d287f9e7548d9fe6d1">error</a>(const Args &amp;...args)</td></tr>
-<tr class="memdesc:a7ec821afe680144683689fa632373701"><td class="mdescLeft">&#160;</td><td class="mdescRight">Logs to standard output using str(...) serialization and terminate all threads. <br/></td></tr>
+<tr class="memitem:a7ec821afe680144683689fa632373701"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
+<tr class="memitem:a7ec821afe680144683689fa632373701"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="string_8h.html#a7ec821afe680144683689fa632373701">__attribute</a> ((noreturn)) <a class="el" href="core_8h.html#ab54b8e6db168023859d86c60d26173d4">error</a>(const Args &amp;...args)</td></tr>
+<tr class="memdesc:a7ec821afe680144683689fa632373701"><td class="mdescLeft">&#160;</td><td class="mdescRight">Logs to standard output using str(...) serialization and terminate all threads.  <a href="#a7ec821afe680144683689fa632373701">More...</a><br/></td></tr>
 <tr class="separator:a7ec821afe680144683689fa632373701"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
@@ -379,6 +324,24 @@ template&lt;typename... Args&gt; </td></tr>
 
 <p>Definition in file <a class="el" href="string_8h_source.html">string.h</a>.</p>
 </div><h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="aeb53e2c75fbf96eb0b4b8ac6be4afb24"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const T &amp;&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00006">6</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="a0afafe70324e90fcb977bc4d2207ca8e"></a>
 <div class="memitem">
 <div class="memproto">
@@ -410,6 +373,36 @@ template&lt;typename... Args&gt; </td></tr>
 
 </div>
 </div>
+<a class="anchor" id="a5d0cc75dcba1a175b578256efe88573f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> count </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;</td>
+          <td class="paramname"><em>c</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Counts number of occurence of a character in a String. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00014">14</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="a3dd07628b413a2e63b2952a71d366a15"></a>
 <div class="memitem">
 <div class="memproto">
@@ -423,7 +416,7 @@ template&lt;typename... Args&gt; </td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">byte&#160;</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;</td>
           <td class="paramname"><em>separator</em>, </td>
         </tr>
         <tr>
@@ -449,6 +442,346 @@ template&lt;typename... Args&gt; </td></tr>
 <dl class="section note"><dt>Note</dt><dd>You can use a negative <em>begin</em> or <em>end</em> to count from the right (-1=last) </dd></dl>
 
 <p>Definition at line <a class="el" href="string_8cc_source.html#l00038">38</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a38d84583a6beb999acc99de1c64e4184"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> trim </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns a reference with heading and trailing whitespace removed. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00049">49</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7522548f18f0f67b0580b218a0e902de"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool startsWith </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>str</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>sub</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if <em>str</em> starts with <em>sub</em>. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00022">22</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab1862f5bf6841bc73114ba6a48fa9674"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool endsWith </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>str</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>sub</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if <em>str</em> ends with <em>sub</em>. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00034">34</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a2381273ba7be300cff4122bf29c4d9d2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool find </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>str</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>substring</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if <em>str</em> contains the <em>substring</em>. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00026">26</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad7def6a0a56391758d16180a831192c3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool isASCII </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if a string is a displayable unextended ASCII string. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00056">56</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a214c47c7fcaef623e40d235f50a6fe2b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool isUTF8 </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if a string is a valid UTF8 string. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00061">61</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a42a8022c459256f365a6c675a0b842dc"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool isInteger </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if s contains only [0-9]. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00072">72</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3aaa1ede719c485014e4823ffa0b0f0a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> fromInteger </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>str</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>base</em> = <code>10</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Parses an integer value. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00076">76</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a990070f6b14dd3327db91508ea16cef4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool isDecimal </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if s matches [0-9]*.?[0-9]*. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00096">96</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a663cb89c682986418179e17bf7bb48b8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">double fromDecimal </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>str</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Parses a decimal value. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00108">108</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa53b153ebf84ff09dc73429d1259f41a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&amp; str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Forwards string. </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00041">41</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a575984169e9634e7e3f09b1fbf6bca13"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns a bounded reference to the null-terminated String pointer. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00018">18</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af7cf799c4bebe1d98e670146a86a23e2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const bool &amp;&#160;</td>
+          <td class="paramname"><em>b</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns boolean as "true"/"false". </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00046">46</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aeebdd147fd3c80de45ca8d11b213ef85"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const char &amp;&#160;</td>
+          <td class="paramname"><em>c</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns a reference to the character. </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00048">48</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aee1703b23290292e9b8b75a016fe33b3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="structbuffer.html">buffer</a>&lt;<a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&gt;&amp; str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Forwards <a class="el" href="structbuffer.html">buffer&lt;byte&gt;</a> </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00051">51</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
 
 </div>
 </div>
@@ -483,6 +816,352 @@ template&lt;typename... Args&gt; </td></tr>
 
 </div>
 </div>
+<a class="anchor" id="a9d0e8b0b9903e0bd1b5f176f29e82a5e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> join </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>list</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>separator</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00141">141</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8bfcb43aa3a887bb9a1a87597353a784"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> replace </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>before</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>after</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Replaces every occurrence of the String <em>before</em> with the String <em>after</em>. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00143">143</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a36fe5825d0c9f2a0bb9a8c992f670c1b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool isUpper </td>
+          <td>(</td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>c</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns whether <em>c</em> is uppercase. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00152">152</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7094a1f3323d55f2167de94164b09bd6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">char toLower </td>
+          <td>(</td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>c</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Lowers case. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00153">153</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7753c861923e504ac04fa8c756797c1c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> toLower </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Lowers case. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00154">154</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a05c45753518b35cbcdb7330bebb9d430"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool isLower </td>
+          <td>(</td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>c</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns whether <em>c</em> is lowercase. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00156">156</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a849d8b50098ed5f01547384012eefabe"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">char toUpper </td>
+          <td>(</td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>c</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Uppers case. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00157">157</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a62fe906b6d3b6c842f3dfed1a68db7be"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> toUpper </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Uppers case. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00158">158</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad1152387adecb078c581c881a63e97f5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> simplify </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;&amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Removes duplicate whitespace. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00160">160</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4ce58c0701cc7ec59d2c502e29553905"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> repeat </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>times</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Repeats a string. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00172">172</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a1976f658419b40f3427a65dcf354864e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> pad </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>length</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>pad</em> = <code>&quot;&#160;&quot;</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Pads a string. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00176">176</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5796895732aeab59f170f0df2957812a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> left </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>length</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>pad</em> = <code>&quot;&#160;&quot;</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Pads a string to the left. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00177">177</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac7b7c3d2b85752c656fd338827e95380"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&amp; str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Forwards string. </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00080">80</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a00de5d1f16358d3862293833d1a1f96b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structstringz.html">stringz</a> strz </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Copies the reference and appends a null byte. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00179">179</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="a060a7511b8b1bc89865c932556871f6d"></a>
 <div class="memitem">
 <div class="memproto">
@@ -496,7 +1175,7 @@ template&lt;typename... Args&gt; </td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">byte&#160;</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>&#160;</td>
           <td class="paramname"><em>separator</em>&#160;</td>
         </tr>
         <tr>
@@ -523,7 +1202,7 @@ template&lt;uint base = 10&gt; </div>
         <tr>
           <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> utoa </td>
           <td>(</td>
-          <td class="paramtype">uint64&#160;</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td>
           <td class="paramname"><em>n</em>, </td>
         </tr>
         <tr>
@@ -550,6 +1229,694 @@ template&lt;uint base = 10&gt; </div>
 <p>Converts integers. </p>
 
 <p>Definition at line <a class="el" href="string_8cc_source.html#l00201">201</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af419342be24fc5c064c15c40e3fa9140"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;uint base = 10&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> itoa </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>number</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>pad</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>padChar</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00215">215</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad315c97eedb2dc2d9c72f2f5adbd1b68"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> dec </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>n</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>pad</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>padChar</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00092">92</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aaf9cc6b732d9f9df504a8c826882f554"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#adde6aaee8457bee49c2a92621fe22b79">uint8</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00093">93</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a09851c644f6fc67a8fa891263a38ece8"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a1b956fe1df85f3c132b21edb4e116458">int8</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00094">94</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab074a577d4447cc98621755e98a5758e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a05f6b0ae8f6a6e135b0e290c25fe0e4e">uint16</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00095">95</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a547b74c307278fcdcc36cf72b5d47ca2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a259fa4834387bd68627ddf37bb3ebdb9">int16</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00096">96</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a88e5e7e79d40cc418527f3fa3adce968"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a1134b580f8da4de94ca6b1de4d37975e">uint32</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00097">97</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8577bceddecab67ca282f686996de15c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a43d43196463bde49cb067f5c20ab8481">int32</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00098">98</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4c909ac5eb6ad03d5345d2ada80d9b03"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const unsigned long &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00099">99</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3c8a5638b96411a74b3db7271dae9acc"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const long &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00100">100</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa1a8c98381c62ba7ef1fe609998eaeed"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00101">101</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a935c2f640dd4f9a2db09f460eba84d30"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00102">102</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5722fad004285aa0aedbee75ed337ead"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> hex </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td>
+          <td class="paramname"><em>n</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>pad</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00103">103</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="afc40a6c8513adc2a55948a81bfac56c0"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">T *const &amp;&#160;</td>
+          <td class="paramname"><em>p</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00104">104</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="acc6c022e6dc78003a9743abbc9d4cdc6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structunique.html">unique</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>t</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00105">105</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="abf6e826fd0b99221e4ffbe7bc0c9a021"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structshared.html">shared</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>t</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00106">106</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a631a5d731dcc924a8e59b786bce8b06e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> ftoa </td>
+          <td>(</td>
+          <td class="paramtype">double&#160;</td>
+          <td class="paramname"><em>number</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>precision</em> = <code>2</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>pad</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>exponent</em> = <code>0</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts floating-point numbers. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00229">229</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a339ce1a15063828bf541d89f6cffd3eb"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const float &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00110">110</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a01379ee1d3216768a02a22f45edff48e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const double &amp;&#160;</td>
+          <td class="paramname"><em>n</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00111">111</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8b5997f897d5684d55b90a91994d9884"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> percent </td>
+          <td>(</td>
+          <td class="paramtype">const float&#160;</td>
+          <td class="paramname"><em>f</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00251">251</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a45b68e048b15afab54fe03f14653466f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> percent </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td>
+          <td class="paramname"><em>b</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00252">252</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af58d37363de0e15135ce28a5ec5d286c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> binaryPrefix </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>unit</em> = <code>&quot;B&quot;</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Formats value using best binary prefix. </p>
+
+<p>Definition at line <a class="el" href="string_8cc_source.html#l00254">254</a> of file <a class="el" href="string_8cc_source.html">string.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4e0db12b7334e3e96d71d876b8c5e7cd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts arrays. </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00120">120</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a195b26ea43250904e961fc4a4c2f4915"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structmref.html">mref</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00121">121</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6b1f31990e8a0815351f430e9d884e9e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00122">122</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a29f8c896ec198d6b3acb0730170c9394"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structarray.html">array</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00123">123</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a909bcfa1b68cf118047bc5939923e81c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> dec </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00124">124</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab23d88d3a3a18fdc18e43d61c65e165d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a94f478faf4448c1faec3a49048a4da40">generic</a> <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> hex </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00125">125</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae05548ddfe0048da7ceabc78bd5c045b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T , size_t N&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> str </td>
+          <td>(</td>
+          <td class="paramtype">const T(&amp;)&#160;</td>
+          <td class="paramname"><em>a</em>[N], </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>separator</em> = <code>'&#160;'</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts static arrays. </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00128">128</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
 
 </div>
 </div>
@@ -605,6 +1972,28 @@ template&lt;typename... Args&gt; </div>
 <p>Logs a message to standard output. </p>
 
 <p>Definition at line <a class="el" href="string_8h_source.html#l00135">135</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7ec821afe680144683689fa632373701"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void __attribute </td>
+          <td>(</td>
+          <td class="paramtype">(noreturn)&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Logs to standard output using str(...) serialization and terminate all threads. </p>
+
+<p>Definition at line <a class="el" href="string_8h_source.html#l00137">137</a> of file <a class="el" href="string_8h_source.html">string.h</a>.</p>
 
 </div>
 </div>

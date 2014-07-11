@@ -78,6 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions.html"><span>All</span></a></li>
       <li class="current"><a href="functions_func.html"><span>Functions</span></a></li>
       <li><a href="functions_vars.html"><span>Variables</span></a></li>
+      <li><a href="functions_type.html"><span>Typedefs</span></a></li>
       <li><a href="functions_enum.html"><span>Enumerations</span></a></li>
       <li><a href="functions_eval.html"><span>Enumerator</span></a></li>
     </ul>
@@ -107,6 +108,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions_func_v.html#index_v"><span>v</span></a></li>
       <li><a href="functions_func_w.html#index_w"><span>w</span></a></li>
       <li><a href="functions_func_x.html#index_x"><span>x</span></a></li>
+      <li><a href="functions_func_y.html#index_y"><span>y</span></a></li>
       <li><a href="functions_func_~.html#index_~"><span>~</span></a></li>
     </ul>
   </div>
@@ -130,7 +132,7 @@ $(document).ready(function(){initNavTree('functions_func_t.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -145,18 +147,57 @@ $(document).ready(function(){initNavTree('functions_func_t.html','');});
 <h3><a class="anchor" id="index_t"></a>- t -</h3><ul>
 <li>take()
 : <a class="el" href="structarray.html#a8d10b69ad58f0384b80683614ece97bf">array&lt; T &gt;</a>
+, <a class="el" href="structmap.html#a73c853c29d89e11e5a393f230e8cb8b0">map&lt; K, V &gt;</a>
+</li>
+<li>TamDanielson()
+: <a class="el" href="struct_tam_danielson.html#a992c2518ab9cae51db177a0f73945b96">TamDanielson</a>
 </li>
 <li>Text()
 : <a class="el" href="struct_text.html#a867b078030439c9b500cc82b75dd9201">Text</a>
 </li>
+<li>TextLayout()
+: <a class="el" href="struct_text_layout.html#aa2c2db00b6392582af5b805661ad9be4">TextLayout</a>
+</li>
+<li>Thread()
+: <a class="el" href="struct_thread.html#aa8e2ce14188f139f0eadf4eb25451ddd">Thread</a>
+</li>
+<li>Time()
+: <a class="el" href="struct_time.html#a4245e409c7347d1d671858962c2ca3b5">Time</a>
+</li>
+<li>Timer()
+: <a class="el" href="struct_timer.html#aed115c9bfcd9440cba65c099bb6443ad">Timer</a>
+</li>
+<li>toFloat()
+: <a class="el" href="struct_time.html#a292170feedf97a3b6e95c4a4942b0d0b">Time</a>
+</li>
 <li>toggleDisplay()
 : <a class="el" href="struct_window.html#a7333225fdab33c248717e7da53ee2f93">Window</a>
+</li>
+<li>translate()
+: <a class="el" href="structmat3.html#ac26c004a43131f95999dae9873b127a4">mat3</a>
+, <a class="el" href="structmat4.html#a97e30ea19f7df7f3e83106dc0fbbcc39">mat4</a>
+</li>
+<li>transpose()
+: <a class="el" href="structmat3.html#a37e0d98b86201148018d5f6ebefed605">mat3</a>
+, <a class="el" href="structmat4.html#aab816366c2233c95eac70b2eab11e8e2">mat4</a>
 </li>
 <li>tryAcquire()
 : <a class="el" href="struct_semaphore.html#a5c1c10f122da5c7f5c1055508e633ada">Semaphore</a>
 </li>
 <li>tryLock()
 : <a class="el" href="struct_lock.html#a8a26bb2f1c9eebadbd795c4af900ef60">Lock</a>
+</li>
+<li>tryParseConditions()
+: <a class="el" href="struct_build.html#a7e5c7eccfaa66c7ed3cf1fb420f16cbe">Build</a>
+</li>
+<li>tryParseDefines()
+: <a class="el" href="struct_build.html#a2c6eda84cfed0ff4238c8f5854317bdf">Build</a>
+</li>
+<li>tryParseFiles()
+: <a class="el" href="struct_build.html#a4c1ede9eae6f81696834050dc1958a93">Build</a>
+</li>
+<li>tryParseIncludes()
+: <a class="el" href="struct_build.html#ade1b0856e49523756952992cc2c04c8f">Build</a>
 </li>
 <li>tryRemove()
 : <a class="el" href="structarray.html#a24b9ee6bcfb9f3e0c0628ca1698c2394">array&lt; T &gt;</a>

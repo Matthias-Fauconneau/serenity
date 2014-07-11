@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['float2',['float2',['../vector_8h.html#a20dbb69a7f4451f070fd3d8c52d4011e',1,'vector.h']]],
-  ['float3',['float3',['../vector_8h.html#a9a70249f3b91142a96dc1d8886568b22',1,'vector.h']]],
-  ['float4',['float4',['../vector_8h.html#af2da58981c5af8452564ebdc8068e257',1,'vector.h']]]
+  ['byte',['byte',['../core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5',1,'core.h']]],
+  ['byte3',['byte3',['../vector_8h.html#a3efb4ae786e9f0978d02ca3d3ab1234a',1,'vector.h']]],
+  ['byte4',['byte4',['../vector_8h.html#a914d5191de64e7c66a2a471f339a67a6',1,'vector.h']]]
 ];

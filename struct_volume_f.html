@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_volume_f.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -121,56 +121,286 @@ Collaboration diagram for VolumeF:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_volume_f__coll__graph.png" border="0" usemap="#_volume_f_coll__map" alt="Collaboration graph"/></div>
 <map name="_volume_f_coll__map" id="_volume_f_coll__map">
-<area shape="rect" id="node2" href="structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,83,131,109"/><area shape="rect" id="node3" href="structbuffer.html" title="buffer\&lt; float \&gt;" alt="" coords="155,83,259,109"/><area shape="rect" id="node4" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="283,83,383,109"/><area shape="rect" id="node5" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="281,5,385,32"/></map>
+<area shape="rect" id="node2" href="structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,83,131,109"/><area shape="rect" id="node3" href="structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="27,5,108,32"/><area shape="rect" id="node4" href="structbuffer.html" title="buffer\&lt; float \&gt;" alt="" coords="155,83,259,109"/><area shape="rect" id="node5" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="283,83,383,109"/><area shape="rect" id="node6" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="281,5,385,32"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a7de0a8d0959b239faf5511c8960bf7d9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7de0a8d0959b239faf5511c8960bf7d9"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a7de0a8d0959b239faf5511c8960bf7d9">VolumeF</a> ()</td></tr>
-<tr class="memdesc:a7de0a8d0959b239faf5511c8960bf7d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default constructs an empty volume. <br/></td></tr>
+<tr class="memitem:a7de0a8d0959b239faf5511c8960bf7d9"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a7de0a8d0959b239faf5511c8960bf7d9">VolumeF</a> ()</td></tr>
+<tr class="memdesc:a7de0a8d0959b239faf5511c8960bf7d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default constructs an empty volume.  <a href="#a7de0a8d0959b239faf5511c8960bf7d9">More...</a><br/></td></tr>
 <tr class="separator:a7de0a8d0959b239faf5511c8960bf7d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a32c642fe24b555e39c4d37cb552be2a7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a32c642fe24b555e39c4d37cb552be2a7"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a32c642fe24b555e39c4d37cb552be2a7">VolumeF</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> size, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a>)</td></tr>
-<tr class="memdesc:a32c642fe24b555e39c4d37cb552be2a7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates an uninitialized volume. <br/></td></tr>
+<tr class="memitem:a32c642fe24b555e39c4d37cb552be2a7"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a32c642fe24b555e39c4d37cb552be2a7">VolumeF</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="struct_volume_f.html#a79757ff5b6d79a9688ba9d28f8fa1dc3">size</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a>)</td></tr>
+<tr class="memdesc:a32c642fe24b555e39c4d37cb552be2a7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates an uninitialized volume.  <a href="#a32c642fe24b555e39c4d37cb552be2a7">More...</a><br/></td></tr>
 <tr class="separator:a32c642fe24b555e39c4d37cb552be2a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a406b8a9489c560204a91a08bbfd1f891"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a406b8a9489c560204a91a08bbfd1f891"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a406b8a9489c560204a91a08bbfd1f891">VolumeF</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> size, float value, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a>)</td></tr>
-<tr class="memdesc:a406b8a9489c560204a91a08bbfd1f891"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates and initializes a volume to <em>value</em>. <br/></td></tr>
+<tr class="memitem:a406b8a9489c560204a91a08bbfd1f891"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a406b8a9489c560204a91a08bbfd1f891">VolumeF</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="struct_volume_f.html#a79757ff5b6d79a9688ba9d28f8fa1dc3">size</a>, float value, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a>)</td></tr>
+<tr class="memdesc:a406b8a9489c560204a91a08bbfd1f891"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates and initializes a volume to <em>value</em>.  <a href="#a406b8a9489c560204a91a08bbfd1f891">More...</a><br/></td></tr>
 <tr class="separator:a406b8a9489c560204a91a08bbfd1f891"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8808489e200eaa9e48fd06153fa08d5e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8808489e200eaa9e48fd06153fa08d5e"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a8808489e200eaa9e48fd06153fa08d5e">VolumeF</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> size, <a class="el" href="structbuffer.html">buffer</a>&lt; float &gt; &amp;&amp;<a class="el" href="struct_volume_f.html#a2c40ea397ab9351d4d157d987be605da">data</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a>)</td></tr>
-<tr class="memdesc:a8808489e200eaa9e48fd06153fa08d5e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts a buffer to a volume (move constructor) <br/></td></tr>
+<tr class="memitem:a8808489e200eaa9e48fd06153fa08d5e"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a8808489e200eaa9e48fd06153fa08d5e">VolumeF</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="struct_volume_f.html#a79757ff5b6d79a9688ba9d28f8fa1dc3">size</a>, <a class="el" href="structbuffer.html">buffer</a>&lt; float &gt; &amp;&amp;<a class="el" href="struct_volume_f.html#a2c40ea397ab9351d4d157d987be605da">data</a>, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a>)</td></tr>
+<tr class="memdesc:a8808489e200eaa9e48fd06153fa08d5e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts a buffer to a volume (move constructor)  <a href="#a8808489e200eaa9e48fd06153fa08d5e">More...</a><br/></td></tr>
 <tr class="separator:a8808489e200eaa9e48fd06153fa08d5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7cace82e19202133539ea75f7874808c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7cace82e19202133539ea75f7874808c"></a>
-float &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator()</b> (uint x, uint y, uint z) const </td></tr>
+<tr class="memitem:a7cace82e19202133539ea75f7874808c"><td class="memItemLeft" align="right" valign="top">float &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a7cace82e19202133539ea75f7874808c">operator()</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">x</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="opencl_8cc.html#a689da9dbd55f86098520b934ecb8a96e">y</a>, <a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> <a class="el" href="opencl_8cc.html#a4154341b19f8c08e19c2e8764454aa78">z</a>) const </td></tr>
 <tr class="separator:a7cace82e19202133539ea75f7874808c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2dd769ebf8de5fa8d458e04f01b012df"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2dd769ebf8de5fa8d458e04f01b012df"></a>
-float &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator()</b> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> p) const </td></tr>
+<tr class="memitem:a2dd769ebf8de5fa8d458e04f01b012df"><td class="memItemLeft" align="right" valign="top">float &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a2dd769ebf8de5fa8d458e04f01b012df">operator()</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="_c_g_8cc.html#ac45166f185f8c0df54e54d18ac8ab0c1">p</a>) const </td></tr>
 <tr class="separator:a2dd769ebf8de5fa8d458e04f01b012df"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3da29424ab3a127b4b59e198d1b7a0be"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3da29424ab3a127b4b59e198d1b7a0be"></a>
-float &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator[]</b> (uint i)</td></tr>
+<tr class="memitem:a3da29424ab3a127b4b59e198d1b7a0be"><td class="memItemLeft" align="right" valign="top">float &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a3da29424ab3a127b4b59e198d1b7a0be">operator[]</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> i)</td></tr>
 <tr class="separator:a3da29424ab3a127b4b59e198d1b7a0be"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a79757ff5b6d79a9688ba9d28f8fa1dc3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a79757ff5b6d79a9688ba9d28f8fa1dc3"></a>
-<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td><td class="memItemRight" valign="bottom"><b>size</b> = 0</td></tr>
+<tr class="memitem:a79757ff5b6d79a9688ba9d28f8fa1dc3"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a79757ff5b6d79a9688ba9d28f8fa1dc3">size</a> = 0</td></tr>
 <tr class="separator:a79757ff5b6d79a9688ba9d28f8fa1dc3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2c40ea397ab9351d4d157d987be605da"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2c40ea397ab9351d4d157d987be605da"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; float &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a2c40ea397ab9351d4d157d987be605da">data</a></td></tr>
-<tr class="memdesc:a2c40ea397ab9351d4d157d987be605da"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sample counts (along each dimensions) <br/></td></tr>
+<tr class="memitem:a2c40ea397ab9351d4d157d987be605da"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; float &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a2c40ea397ab9351d4d157d987be605da">data</a></td></tr>
+<tr class="memdesc:a2c40ea397ab9351d4d157d987be605da"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sample counts (along each dimensions)  <a href="#a2c40ea397ab9351d4d157d987be605da">More...</a><br/></td></tr>
 <tr class="separator:a2c40ea397ab9351d4d157d987be605da"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a002dc24bdf75229f4c19c64c8ed5b313"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a002dc24bdf75229f4c19c64c8ed5b313"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a></td></tr>
-<tr class="memdesc:a002dc24bdf75229f4c19c64c8ed5b313"><td class="mdescLeft">&#160;</td><td class="mdescRight">Samples ordered in Z slices, Y rows, X samples. <br/></td></tr>
+<tr class="memitem:a002dc24bdf75229f4c19c64c8ed5b313"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313">name</a></td></tr>
+<tr class="memdesc:a002dc24bdf75229f4c19c64c8ed5b313"><td class="mdescLeft">&#160;</td><td class="mdescRight">Samples ordered in Z slices, Y rows, X samples.  <a href="#a002dc24bdf75229f4c19c64c8ed5b313">More...</a><br/></td></tr>
 <tr class="separator:a002dc24bdf75229f4c19c64c8ed5b313"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>3D array of floats </p>
 
 <p>Definition at line <a class="el" href="volume_8h_source.html#l00006">6</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a7de0a8d0959b239faf5511c8960bf7d9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">VolumeF::VolumeF </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Default constructs an empty volume. </p>
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00008">8</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a32c642fe24b555e39c4d37cb552be2a7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">VolumeF::VolumeF </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Allocates an uninitialized volume. </p>
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00010">10</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a406b8a9489c560204a91a08bbfd1f891"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">VolumeF::VolumeF </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Allocates and initializes a volume to <em>value</em>. </p>
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00012">12</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8808489e200eaa9e48fd06153fa08d5e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">VolumeF::VolumeF </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structbuffer.html">buffer</a>&lt; float &gt; &amp;&amp;&#160;</td>
+          <td class="paramname"><em>data</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Converts a buffer to a volume (move constructor) </p>
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00014">14</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a7cace82e19202133539ea75f7874808c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float&amp; VolumeF::operator() </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>x</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>y</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>z</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00017">17</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a2dd769ebf8de5fa8d458e04f01b012df"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float&amp; VolumeF::operator() </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
+          <td class="paramname"><em>p</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00018">18</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a3da29424ab3a127b4b59e198d1b7a0be"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float&amp; VolumeF::operator[] </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>i</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00019">19</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a79757ff5b6d79a9688ba9d28f8fa1dc3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> VolumeF::size = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00021">21</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a2c40ea397ab9351d4d157d987be605da"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structbuffer.html">buffer</a>&lt;float&gt; VolumeF::data</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sample counts (along each dimensions) </p>
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00022">22</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a002dc24bdf75229f4c19c64c8ed5b313"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> VolumeF::name</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Samples ordered in Z slices, Y rows, X samples. </p>
+
+<p>Definition at line <a class="el" href="volume_8h_source.html#l00023">23</a> of file <a class="el" href="volume_8h_source.html">volume.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

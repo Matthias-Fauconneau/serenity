@@ -1,5 +1,7 @@
 var profile_8cc =
 [
+    [ "Frame", "struct_frame.html", "struct_frame" ],
+    [ "Entry", "struct_entry.html", "struct_entry" ],
     [ "readCycleCounter", "profile_8cc.html#a5e3894a48ee7dc72356db67d62b8e9f6", null ],
     [ "operator<", "profile_8cc.html#ad0e834b2c274e591b8208835caf392e3", null ],
     [ "__attribute", "profile_8cc.html#a90de5979863fbd998d00060f532d1c80", null ],

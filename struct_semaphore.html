@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_semaphore.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -121,49 +121,193 @@ Collaboration diagram for Semaphore:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_semaphore__coll__graph.png" border="0" usemap="#_semaphore_coll__map" alt="Collaboration graph"/></div>
 <map name="_semaphore_coll__map" id="_semaphore_coll__map">
-<area shape="rect" id="node2" href="struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="71,83,121,109"/><area shape="rect" id="node3" href="structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="5,5,187,32"/></map>
+<area shape="rect" id="node2" href="struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="100,83,151,109"/><area shape="rect" id="node3" href="structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="5,5,187,32"/><area shape="rect" id="node4" href="struct_condition.html" title="Condition" alt="" coords="231,83,307,109"/><area shape="rect" id="node5" href="structhandle.html" title="handle\&lt; pthread_cond_t \&gt;" alt="" coords="211,5,384,32"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ad4c6667b9fa2e4b87c4d3ef7b380525a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad4c6667b9fa2e4b87c4d3ef7b380525a"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#ad4c6667b9fa2e4b87c4d3ef7b380525a">Semaphore</a> (int64 <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>=0)</td></tr>
-<tr class="memdesc:ad4c6667b9fa2e4b87c4d3ef7b380525a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a semaphore with <em>count</em> initial ressources. <br/></td></tr>
+<tr class="memitem:ad4c6667b9fa2e4b87c4d3ef7b380525a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#ad4c6667b9fa2e4b87c4d3ef7b380525a">Semaphore</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>=0)</td></tr>
+<tr class="memdesc:ad4c6667b9fa2e4b87c4d3ef7b380525a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a semaphore with <em>count</em> initial ressources.  <a href="#ad4c6667b9fa2e4b87c4d3ef7b380525a">More...</a><br/></td></tr>
 <tr class="separator:ad4c6667b9fa2e4b87c4d3ef7b380525a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a34e1636f74bfbf98e7b70b9e2439abe3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a34e1636f74bfbf98e7b70b9e2439abe3"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a34e1636f74bfbf98e7b70b9e2439abe3">acquire</a> (int64 <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>)</td></tr>
-<tr class="memdesc:a34e1636f74bfbf98e7b70b9e2439abe3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Acquires <em>count</em> ressources. <br/></td></tr>
+<tr class="memitem:a34e1636f74bfbf98e7b70b9e2439abe3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a34e1636f74bfbf98e7b70b9e2439abe3">acquire</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>)</td></tr>
+<tr class="memdesc:a34e1636f74bfbf98e7b70b9e2439abe3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Acquires <em>count</em> ressources.  <a href="#a34e1636f74bfbf98e7b70b9e2439abe3">More...</a><br/></td></tr>
 <tr class="separator:a34e1636f74bfbf98e7b70b9e2439abe3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5c1c10f122da5c7f5c1055508e633ada"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5c1c10f122da5c7f5c1055508e633ada"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a5c1c10f122da5c7f5c1055508e633ada">tryAcquire</a> (int64 <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>)</td></tr>
-<tr class="memdesc:a5c1c10f122da5c7f5c1055508e633ada"><td class="mdescLeft">&#160;</td><td class="mdescRight">Atomically tries to acquires <em>count</em> ressources only if available. <br/></td></tr>
+<tr class="memitem:a5c1c10f122da5c7f5c1055508e633ada"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a5c1c10f122da5c7f5c1055508e633ada">tryAcquire</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>)</td></tr>
+<tr class="memdesc:a5c1c10f122da5c7f5c1055508e633ada"><td class="mdescLeft">&#160;</td><td class="mdescRight">Atomically tries to acquires <em>count</em> ressources only if available.  <a href="#a5c1c10f122da5c7f5c1055508e633ada">More...</a><br/></td></tr>
 <tr class="separator:a5c1c10f122da5c7f5c1055508e633ada"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7cb3e72b2bcb92749173444abc3a15f5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7cb3e72b2bcb92749173444abc3a15f5"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a7cb3e72b2bcb92749173444abc3a15f5">release</a> (int64 <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>)</td></tr>
-<tr class="memdesc:a7cb3e72b2bcb92749173444abc3a15f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Releases <em>count</em> ressources. <br/></td></tr>
+<tr class="memitem:a7cb3e72b2bcb92749173444abc3a15f5"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a7cb3e72b2bcb92749173444abc3a15f5">release</a> (<a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> <a class="el" href="string_8h.html#a5d0cc75dcba1a175b578256efe88573f">count</a>)</td></tr>
+<tr class="memdesc:a7cb3e72b2bcb92749173444abc3a15f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Releases <em>count</em> ressources.  <a href="#a7cb3e72b2bcb92749173444abc3a15f5">More...</a><br/></td></tr>
 <tr class="separator:a7cb3e72b2bcb92749173444abc3a15f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad388e9f3582b3e5a43087bbc0ac251f4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad388e9f3582b3e5a43087bbc0ac251f4"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#ad388e9f3582b3e5a43087bbc0ac251f4">operator int</a> () const </td></tr>
-<tr class="memdesc:ad388e9f3582b3e5a43087bbc0ac251f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns available ressources <em>count</em>. <br/></td></tr>
+<tr class="memitem:ad388e9f3582b3e5a43087bbc0ac251f4"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#ad388e9f3582b3e5a43087bbc0ac251f4">operator int</a> () const </td></tr>
+<tr class="memdesc:ad388e9f3582b3e5a43087bbc0ac251f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns available ressources <em>count</em>.  <a href="#ad388e9f3582b3e5a43087bbc0ac251f4">More...</a><br/></td></tr>
 <tr class="separator:ad388e9f3582b3e5a43087bbc0ac251f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:afc703a0a361909fc5dd65033b8a0ed97"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afc703a0a361909fc5dd65033b8a0ed97"></a>
-<a class="el" href="struct_lock.html">Lock</a>&#160;</td><td class="memItemRight" valign="bottom"><b>mutex</b></td></tr>
+<tr class="memitem:afc703a0a361909fc5dd65033b8a0ed97"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_lock.html">Lock</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#afc703a0a361909fc5dd65033b8a0ed97">mutex</a></td></tr>
 <tr class="separator:afc703a0a361909fc5dd65033b8a0ed97"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9adb0d3de66bb2c33e6829628f635a3c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9adb0d3de66bb2c33e6829628f635a3c"></a>
-Condition&#160;</td><td class="memItemRight" valign="bottom"><b>condition</b></td></tr>
+<tr class="memitem:a9adb0d3de66bb2c33e6829628f635a3c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_condition.html">Condition</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#a9adb0d3de66bb2c33e6829628f635a3c">condition</a></td></tr>
 <tr class="separator:a9adb0d3de66bb2c33e6829628f635a3c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab86ffb618924ac0811792831e48103f5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab86ffb618924ac0811792831e48103f5"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><b>counter</b></td></tr>
+<tr class="memitem:ab86ffb618924ac0811792831e48103f5"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_semaphore.html#ab86ffb618924ac0811792831e48103f5">counter</a></td></tr>
 <tr class="separator:ab86ffb618924ac0811792831e48103f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter. </p>
 
 <p>Definition at line <a class="el" href="thread_8h_source.html#l00044">44</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="ad4c6667b9fa2e4b87c4d3ef7b380525a"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Semaphore::Semaphore </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>count</em> = <code>0</code></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">explicit</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Creates a semaphore with <em>count</em> initial ressources. </p>
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00049">49</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a34e1636f74bfbf98e7b70b9e2439abe3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Semaphore::acquire </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>count</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Acquires <em>count</em> ressources. </p>
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00051">51</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5c1c10f122da5c7f5c1055508e633ada"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Semaphore::tryAcquire </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>count</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Atomically tries to acquires <em>count</em> ressources only if available. </p>
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00058">58</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7cb3e72b2bcb92749173444abc3a15f5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Semaphore::release </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td>
+          <td class="paramname"><em>count</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Releases <em>count</em> ressources. </p>
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00067">67</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad388e9f3582b3e5a43087bbc0ac251f4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Semaphore::operator int </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns available ressources <em>count</em>. </p>
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00072">72</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="afc703a0a361909fc5dd65033b8a0ed97"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_lock.html">Lock</a> Semaphore::mutex</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00045">45</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9adb0d3de66bb2c33e6829628f635a3c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_condition.html">Condition</a> Semaphore::condition</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00046">46</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab86ffb618924ac0811792831e48103f5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> Semaphore::counter</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="thread_8h_source.html#l00047">47</a> of file <a class="el" href="thread_8h_source.html">thread.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

@@ -1,11 +1,19 @@
 var searchData=
 [
-  ['encodepng',['encodePNG',['../png_8h.html#a4ee755075a1ea4ce09f8285ecc27f6a0',1,'png.cc']]],
-  ['endswith',['endsWith',['../string_8h.html#ab1862f5bf6841bc73114ba6a48fa9674',1,'string.cc']]],
-  ['error',['error',['../core_8h.html#a582bff114cf268d287f9e7548d9fe6d1',1,'core.h']]],
-  ['event',['event',['../struct_poll.html#af956142652efc6781e6a2086b7be4f2e',1,'Poll::event()'],['../struct_thread.html#a48452c8ac27d2a97bb25dcdfdd2a0955',1,'Thread::event()'],['../struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30',1,'FileWatcher::event() override'],['../struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30',1,'FileWatcher::event() override'],['../struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30',1,'FileWatcher::event() override'],['../struct_window.html#a9f324a3c5a82585e937f3cbfe91611e0',1,'Window::event()']]],
-  ['execute',['execute',['../thread_8h.html#a23c3b56fbc82a400ceb884d76ca92fb9',1,'thread.cc']]],
-  ['existsfile',['existsFile',['../file_8h.html#a635ef40ea7469ecaa75dbd5f37a810d9',1,'file.cc']]],
-  ['existsfolder',['existsFolder',['../file_8h.html#a9ecf68308c462183673b414fa3be652c',1,'file.cc']]],
-  ['exit',['exit',['../thread_8h.html#a660644fcee026e3f44448456eb771d0a',1,'thread.cc']]]
+  ['elapsed',['elapsed',['../struct_time.html#a388c6eefb4fb000aa445f4e69c18d7c5',1,'Time']]],
+  ['emulatewriteto3dimage',['emulateWriteTo3DImage',['../opencl_8h.html#aec02ca5f1362550273b7b6a7bb6b4152',1,'opencl.h']]],
+  ['encodepng',['encodePNG',['../png_8cc.html#a4ee755075a1ea4ce09f8285ecc27f6a0',1,'encodePNG(const Image &amp;image):&#160;png.cc'],['../png_8h.html#a4ee755075a1ea4ce09f8285ecc27f6a0',1,'encodePNG(const Image &amp;image):&#160;png.cc']]],
+  ['end',['end',['../structstd_1_1initializer__list.html#a84396591fc3633c17c3f4766b753b8be',1,'std::initializer_list::end()'],['../structrange.html#a8570b4caea858fd75d526ee4e3982ec8',1,'range::end()'],['../structref.html#acf37e92c0f20f93d5de7fb158018398d',1,'ref::end()'],['../structmref.html#afb3acca7d80314b70f7f5f575473e290',1,'mref::end()'],['../structmap.html#a9e6ff407963d76bbe00e2f3ec539888c',1,'map::end() const '],['../structmap.html#a6414707c4ee345368e391edfc9c04c79',1,'map::end()']]],
+  ['endswith',['endsWith',['../string_8cc.html#aeb33a8b8cad5d03cc7626339b7234ccb',1,'endsWith(const string &amp;s, const string &amp;a):&#160;string.cc'],['../string_8h.html#ab1862f5bf6841bc73114ba6a48fa9674',1,'endsWith(const string &amp;str, const string &amp;sub):&#160;string.cc']]],
+  ['enqueuendrangekernel',['enqueueNDRangeKernel',['../struct_c_l_kernel.html#ad441c8249e555339610cd38eb1c27f0f',1,'CLKernel']]],
+  ['error',['error',['../core_8h.html#a582bff114cf268d287f9e7548d9fe6d1',1,'error(const Args &amp;...args) __attribute((noreturn)):&#160;core.h'],['../core_8h.html#ab54b8e6db168023859d86c60d26173d4',1,'error(const string &amp;message) __attribute((noreturn)):&#160;core.h']]],
+  ['event',['event',['../struct_poll.html#af956142652efc6781e6a2086b7be4f2e',1,'Poll::event()'],['../struct_thread.html#a48452c8ac27d2a97bb25dcdfdd2a0955',1,'Thread::event()'],['../struct_timer.html#aed77c14fdf90adb6a3e8a4f55f2ab5c4',1,'Timer::event()'],['../struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30',1,'FileWatcher::event() override'],['../struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30',1,'FileWatcher::event() override'],['../struct_file_watcher.html#ac1ab78c8cac49dc33b886d9dd4ee6d30',1,'FileWatcher::event() override'],['../struct_window.html#a9f324a3c5a82585e937f3cbfe91611e0',1,'Window::event()']]],
+  ['eventfd',['EventFD',['../struct_event_f_d.html#a33e80ce59704a9494bff29700e7044d6',1,'EventFD']]],
+  ['execute',['execute',['../struct_c_l_kernel.html#a8074a3d9ce903ae1642fa0d9adcaf194',1,'CLKernel::execute()'],['../thread_8cc.html#a77f041ab9057829f3adcd33fd85eb963',1,'execute(const string &amp;path, const ref&lt; string &gt; &amp;args, bool wait, const Folder &amp;workingDirectory):&#160;thread.cc'],['../thread_8h.html#a23c3b56fbc82a400ceb884d76ca92fb9',1,'execute(const string &amp;path, const ref&lt; string &gt; &amp;args={}, bool wait=true, const Folder &amp;workingDirectory=currentWorkingDirectory()):&#160;thread.cc']]],
+  ['existsfile',['existsFile',['../file_8cc.html#a6a34388499759b276001c193f3664e64',1,'existsFile(const string &amp;path, const Folder &amp;at):&#160;file.cc'],['../file_8h.html#a635ef40ea7469ecaa75dbd5f37a810d9',1,'existsFile(const string &amp;path, const Folder &amp;at=currentWorkingDirectory()):&#160;file.cc']]],
+  ['existsfolder',['existsFolder',['../file_8cc.html#accc2ea58b11d067b1d29a861a9b16f2b',1,'existsFolder(const string &amp;folder, const Folder &amp;at):&#160;file.cc'],['../file_8h.html#a9ecf68308c462183673b414fa3be652c',1,'existsFolder(const string &amp;folder, const Folder &amp;at=currentWorkingDirectory()):&#160;file.cc']]],
+  ['exit',['exit',['../thread_8cc.html#a55e99c539cf7723ec15e856b7e0a8cee',1,'exit(int status):&#160;thread.cc'],['../thread_8h.html#a660644fcee026e3f44448456eb771d0a',1,'exit(int status=0):&#160;thread.cc']]],
+  ['exp',['exp',['../math_8h.html#a9b5b75b78eff58c7f376e3ce51e9fdfd',1,'exp(float x):&#160;math.h'],['../math_8h.html#a603b689149585298102b4f80b918e908',1,'exp(real x):&#160;math.h']]],
+  ['exp10',['exp10',['../math_8h.html#ac48cf315bb461c3ef08eecfc55dc8759',1,'math.h']]],
+  ['exp2',['exp2',['../math_8h.html#a20607203dd859479ed8339d4b9d98a19',1,'math.h']]]
 ];

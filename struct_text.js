@@ -1,5 +1,9 @@
 var struct_text =
 [
+    [ "Character", "struct_text_1_1_character.html", "struct_text_1_1_character" ],
+    [ "Cursor", "struct_text_1_1_cursor.html", "struct_text_1_1_cursor" ],
+    [ "Line", "struct_text_1_1_line.html", "struct_text_1_1_line" ],
+    [ "Link", "struct_text_1_1_link.html", "struct_text_1_1_link" ],
     [ "TextLine", "struct_text.html#af516bcd002fb930a73e2c7e2062d897c", null ],
     [ "Text", "struct_text.html#a867b078030439c9b500cc82b75dd9201", null ],
     [ "setText", "struct_text.html#af0fcddcb8354f753947c371d634fabf9", null ],

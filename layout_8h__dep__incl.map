@@ -1,6 +1,6 @@
 <map id="layout.h" name="layout.h">
-<area shape="rect" id="node2" href="$view_8h_source.html" title="view.h" alt="" coords="89,80,148,107"/>
-<area shape="rect" id="node3" href="$compute_8cc_source.html" title="compute.cc" alt="" coords="5,155,96,181"/>
-<area shape="rect" id="node5" href="$layout_8cc_source.html" title="layout.cc" alt="" coords="173,80,247,107"/>
-<area shape="rect" id="node4" href="$view_8cc_source.html" title="view.cc" alt="" coords="120,155,187,181"/>
+<area shape="rect" id="node2" href="$view_8h.html" title="view.h" alt="" coords="89,80,148,107"/>
+<area shape="rect" id="node3" href="$compute_8cc.html" title="compute.cc" alt="" coords="5,155,96,181"/>
+<area shape="rect" id="node5" href="$layout_8cc.html" title="layout.cc" alt="" coords="173,80,247,107"/>
+<area shape="rect" id="node4" href="$view_8cc.html" title="view.cc" alt="" coords="120,155,187,181"/>
 </map>

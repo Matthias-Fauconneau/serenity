@@ -1,5 +1,6 @@
 var structrange =
 [
+    [ "iterator", "structrange_1_1iterator.html", "structrange_1_1iterator" ],
     [ "range", "structrange.html#ae1dfa064caf5278507265a0cceefef84", null ],
     [ "range", "structrange.html#ae25699356553f28560e46555ef942f4f", null ],
     [ "begin", "structrange.html#a7e9304b4146f33457e73c738e5458e09", null ],

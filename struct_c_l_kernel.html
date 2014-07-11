@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_c_l_kernel.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -126,73 +126,410 @@ Collaboration diagram for CLKernel:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a21016ffaff80d150861adbe9a06d1ddb"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a21016ffaff80d150861adbe9a06d1ddb"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a21016ffaff80d150861adbe9a06d1ddb">CLKernel</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> source, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> name)</td></tr>
-<tr class="memdesc:a21016ffaff80d150861adbe9a06d1ddb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compiles kernel <em>name</em> defined by <em>source</em>. <br/></td></tr>
+<tr class="memitem:a21016ffaff80d150861adbe9a06d1ddb"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a21016ffaff80d150861adbe9a06d1ddb">CLKernel</a> (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> source, <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> <a class="el" href="struct_c_l_kernel.html#a71ed5c0cf09201f7e764aa877d5690ee">name</a>)</td></tr>
+<tr class="memdesc:a21016ffaff80d150861adbe9a06d1ddb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compiles kernel <em>name</em> defined by <em>source</em>.  <a href="#a21016ffaff80d150861adbe9a06d1ddb">More...</a><br/></td></tr>
 <tr class="separator:a21016ffaff80d150861adbe9a06d1ddb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeb8874044092db38871ab0944036c4c7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aeb8874044092db38871ab0944036c4c7"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>setKernelArg</b> (uint index, size_t size, const void *value)</td></tr>
+<tr class="memitem:aeb8874044092db38871ab0944036c4c7"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#aeb8874044092db38871ab0944036c4c7">setKernelArg</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, const void *value)</td></tr>
 <tr class="separator:aeb8874044092db38871ab0944036c4c7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aafbac7ccd4cc4053732f46a018d75ae6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aafbac7ccd4cc4053732f46a018d75ae6"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>setKernelArgs</b> (uint index)</td></tr>
+<tr class="memitem:aafbac7ccd4cc4053732f46a018d75ae6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#aafbac7ccd4cc4053732f46a018d75ae6">setKernelArgs</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index)</td></tr>
 <tr class="separator:aafbac7ccd4cc4053732f46a018d75ae6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab499a8f7e2ff4881e21fa1e9d2fd04f7"><td class="memTemplParams" colspan="2"><a class="anchor" id="ab499a8f7e2ff4881e21fa1e9d2fd04f7"></a>
-template&lt;typename T , typename... Args&gt; </td></tr>
-<tr class="memitem:ab499a8f7e2ff4881e21fa1e9d2fd04f7"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>setKernelArgs</b> (uint index, const T &amp;value, const Args &amp;...args)</td></tr>
+<tr class="memitem:ab499a8f7e2ff4881e21fa1e9d2fd04f7"><td class="memTemplParams" colspan="2">template&lt;typename T , typename... Args&gt; </td></tr>
+<tr class="memitem:ab499a8f7e2ff4881e21fa1e9d2fd04f7"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#ab499a8f7e2ff4881e21fa1e9d2fd04f7">setKernelArgs</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index, const T &amp;value, const Args &amp;...args)</td></tr>
 <tr class="separator:ab499a8f7e2ff4881e21fa1e9d2fd04f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a84abc7ef38d267ffe0a957443551976a"><td class="memTemplParams" colspan="2"><a class="anchor" id="a84abc7ef38d267ffe0a957443551976a"></a>
-template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:a84abc7ef38d267ffe0a957443551976a"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>setKernelArgs</b> (uint index, const CLRawBuffer &amp;value, const Args &amp;...args)</td></tr>
+<tr class="memitem:a84abc7ef38d267ffe0a957443551976a"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
+<tr class="memitem:a84abc7ef38d267ffe0a957443551976a"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a84abc7ef38d267ffe0a957443551976a">setKernelArgs</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index, const <a class="el" href="struct_c_l_raw_buffer.html">CLRawBuffer</a> &amp;value, const Args &amp;...args)</td></tr>
 <tr class="separator:a84abc7ef38d267ffe0a957443551976a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa367c00dcff67761c1ab8d184aa0e0dd"><td class="memTemplParams" colspan="2"><a class="anchor" id="aa367c00dcff67761c1ab8d184aa0e0dd"></a>
-template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:aa367c00dcff67761c1ab8d184aa0e0dd"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>setKernelArgs</b> (uint index, const <a class="el" href="struct_c_l_buffer.html">CLBufferF</a> &amp;value, const Args &amp;...args)</td></tr>
+<tr class="memitem:aa367c00dcff67761c1ab8d184aa0e0dd"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
+<tr class="memitem:aa367c00dcff67761c1ab8d184aa0e0dd"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#aa367c00dcff67761c1ab8d184aa0e0dd">setKernelArgs</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index, const <a class="el" href="opencl_8h.html#acb80ebdcae288dc8be99d73383209784">CLBufferF</a> &amp;value, const Args &amp;...args)</td></tr>
 <tr class="separator:aa367c00dcff67761c1ab8d184aa0e0dd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad28b7cba6e21133a94f643b081ec9afe"><td class="memTemplParams" colspan="2"><a class="anchor" id="ad28b7cba6e21133a94f643b081ec9afe"></a>
-template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:ad28b7cba6e21133a94f643b081ec9afe"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>setKernelArgs</b> (uint index, const <a class="el" href="struct_c_l_image.html">CLImage</a> &amp;value, const Args &amp;...args)</td></tr>
+<tr class="memitem:ad28b7cba6e21133a94f643b081ec9afe"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
+<tr class="memitem:ad28b7cba6e21133a94f643b081ec9afe"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#ad28b7cba6e21133a94f643b081ec9afe">setKernelArgs</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index, const <a class="el" href="struct_c_l_image.html">CLImage</a> &amp;value, const Args &amp;...args)</td></tr>
 <tr class="separator:ad28b7cba6e21133a94f643b081ec9afe"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a82db4df22626699b4ba0eb049e15ec79"><td class="memTemplParams" colspan="2"><a class="anchor" id="a82db4df22626699b4ba0eb049e15ec79"></a>
-template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:a82db4df22626699b4ba0eb049e15ec79"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>setKernelArgs</b> (uint index, const <a class="el" href="struct_c_l_volume.html">CLVolume</a> &amp;value, const Args &amp;...args)</td></tr>
+<tr class="memitem:a82db4df22626699b4ba0eb049e15ec79"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
+<tr class="memitem:a82db4df22626699b4ba0eb049e15ec79"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a82db4df22626699b4ba0eb049e15ec79">setKernelArgs</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index, const <a class="el" href="struct_c_l_volume.html">CLVolume</a> &amp;value, const Args &amp;...args)</td></tr>
 <tr class="separator:a82db4df22626699b4ba0eb049e15ec79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad441c8249e555339610cd38eb1c27f0f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad441c8249e555339610cd38eb1c27f0f"></a>
-uint64&#160;</td><td class="memItemRight" valign="bottom"><b>enqueueNDRangeKernel</b> (uint work_dim, const size_t *global_work_offset, const size_t *global_work_size, const size_t *local_work_size)</td></tr>
+<tr class="memitem:ad441c8249e555339610cd38eb1c27f0f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#ad441c8249e555339610cd38eb1c27f0f">enqueueNDRangeKernel</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> work_dim, const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *global_work_offset, const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *global_work_size, const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *local_work_size)</td></tr>
 <tr class="separator:ad441c8249e555339610cd38eb1c27f0f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8074a3d9ce903ae1642fa0d9adcaf194"><td class="memTemplParams" colspan="2"><a class="anchor" id="a8074a3d9ce903ae1642fa0d9adcaf194"></a>
-template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:a8074a3d9ce903ae1642fa0d9adcaf194"><td class="memTemplItemLeft" align="right" valign="top">uint64&#160;</td><td class="memTemplItemRight" valign="bottom"><b>execute</b> (uint work_dim, const size_t *global_work_offset, const size_t *global_work_size, const size_t *local_work_size, const Args &amp;...args)</td></tr>
+<tr class="memitem:a8074a3d9ce903ae1642fa0d9adcaf194"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
+<tr class="memitem:a8074a3d9ce903ae1642fa0d9adcaf194"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a8074a3d9ce903ae1642fa0d9adcaf194">execute</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> work_dim, const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *global_work_offset, const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *global_work_size, const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *local_work_size, const Args &amp;...args)</td></tr>
 <tr class="separator:a8074a3d9ce903ae1642fa0d9adcaf194"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adefe4ed4402ef83de0504d0e319c92ad"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:adefe4ed4402ef83de0504d0e319c92ad"><td class="memTemplItemLeft" align="right" valign="top">uint64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#adefe4ed4402ef83de0504d0e319c92ad">operator()</a> (size_t threadGroupCount, size_t threadCount, const Args &amp;...args)</td></tr>
+<tr class="memitem:adefe4ed4402ef83de0504d0e319c92ad"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#adefe4ed4402ef83de0504d0e319c92ad">operator()</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> threadGroupCount, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> threadCount, const Args &amp;...args)</td></tr>
 <tr class="separator:adefe4ed4402ef83de0504d0e319c92ad"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acb7f663e686c7c8483baeee9e4b954f1"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:acb7f663e686c7c8483baeee9e4b954f1"><td class="memTemplItemLeft" align="right" valign="top">uint64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#acb7f663e686c7c8483baeee9e4b954f1">operator()</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> size, const Args &amp;...args)</td></tr>
+<tr class="memitem:acb7f663e686c7c8483baeee9e4b954f1"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#acb7f663e686c7c8483baeee9e4b954f1">operator()</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, const Args &amp;...args)</td></tr>
 <tr class="separator:acb7f663e686c7c8483baeee9e4b954f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:add7e925999f09eabbae53deeda7da528"><td class="memTemplParams" colspan="2">template&lt;typename... Args&gt; </td></tr>
-<tr class="memitem:add7e925999f09eabbae53deeda7da528"><td class="memTemplItemLeft" align="right" valign="top">uint64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#add7e925999f09eabbae53deeda7da528">operator()</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> size, const Args &amp;...args)</td></tr>
+<tr class="memitem:add7e925999f09eabbae53deeda7da528"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#add7e925999f09eabbae53deeda7da528">operator()</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, const Args &amp;...args)</td></tr>
 <tr class="separator:add7e925999f09eabbae53deeda7da528"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:acf8d838d4f44e47e4196b2d3c1f5ff6e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acf8d838d4f44e47e4196b2d3c1f5ff6e"></a>
-<a class="el" href="structhandle.html">handle</a>&lt; cl_kernel &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>kernel</b></td></tr>
+<tr class="memitem:acf8d838d4f44e47e4196b2d3c1f5ff6e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structhandle.html">handle</a>&lt; <a class="el" href="opencl_8h.html#ad555869572d7067f86762cd9e032cf2b">cl_kernel</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#acf8d838d4f44e47e4196b2d3c1f5ff6e">kernel</a></td></tr>
 <tr class="separator:acf8d838d4f44e47e4196b2d3c1f5ff6e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a101d670235da2125cbf2b72d1863fee9"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a101d670235da2125cbf2b72d1863fee9"></a>
-<a class="el" href="struct_lock.html">Lock</a>&#160;</td><td class="memItemRight" valign="bottom"><b>lock</b></td></tr>
+<tr class="memitem:a101d670235da2125cbf2b72d1863fee9"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_lock.html">Lock</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a101d670235da2125cbf2b72d1863fee9">lock</a></td></tr>
 <tr class="separator:a101d670235da2125cbf2b72d1863fee9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a22504a0fb4f68b5b8299d13bcd45b7a7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a22504a0fb4f68b5b8299d13bcd45b7a7"></a>
-size_t&#160;</td><td class="memItemRight" valign="bottom"><b>localSpace</b> = 0</td></tr>
+<tr class="memitem:a22504a0fb4f68b5b8299d13bcd45b7a7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a22504a0fb4f68b5b8299d13bcd45b7a7">localSpace</a> = 0</td></tr>
 <tr class="separator:a22504a0fb4f68b5b8299d13bcd45b7a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a71ed5c0cf09201f7e764aa877d5690ee"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a71ed5c0cf09201f7e764aa877d5690ee"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>name</b></td></tr>
+<tr class="memitem:a71ed5c0cf09201f7e764aa877d5690ee"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_c_l_kernel.html#a71ed5c0cf09201f7e764aa877d5690ee">name</a></td></tr>
 <tr class="separator:a71ed5c0cf09201f7e764aa877d5690ee"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>OpenCL kernel. </p>
 
 <p>Definition at line <a class="el" href="opencl_8h_source.html#l00089">89</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
-</div><h2 class="groupheader">Member Function Documentation</h2>
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a21016ffaff80d150861adbe9a06d1ddb"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">CLKernel::CLKernel </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>source</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td>
+          <td class="paramname"><em>name</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Compiles kernel <em>name</em> defined by <em>source</em>. </p>
+
+<p>Definition at line <a class="el" href="opencl_8cc_source.html#l00028">28</a> of file <a class="el" href="opencl_8cc_source.html">opencl.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="aeb8874044092db38871ab0944036c4c7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArg </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>value</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8cc_source.html#l00042">42</a> of file <a class="el" href="opencl_8cc_source.html">opencl.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aafbac7ccd4cc4053732f46a018d75ae6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00099">99</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab499a8f7e2ff4881e21fa1e9d2fd04f7"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T , typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const T &amp;&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const Args &amp;...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00100">100</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a84abc7ef38d267ffe0a957443551976a"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_c_l_raw_buffer.html">CLRawBuffer</a> &amp;&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const Args &amp;...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00102">102</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa367c00dcff67761c1ab8d184aa0e0dd"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="opencl_8h.html#acb80ebdcae288dc8be99d73383209784">CLBufferF</a> &amp;&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const Args &amp;...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00103">103</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad28b7cba6e21133a94f643b081ec9afe"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_c_l_image.html">CLImage</a> &amp;&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const Args &amp;...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00104">104</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a82db4df22626699b4ba0eb049e15ec79"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname">void CLKernel::setKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_c_l_volume.html">CLVolume</a> &amp;&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const Args &amp;...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00105">105</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ad441c8249e555339610cd38eb1c27f0f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> CLKernel::enqueueNDRangeKernel </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>work_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *&#160;</td>
+          <td class="paramname"><em>global_work_offset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *&#160;</td>
+          <td class="paramname"><em>global_work_size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *&#160;</td>
+          <td class="paramname"><em>local_work_size</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8cc_source.html#l00043">43</a> of file <a class="el" href="opencl_8cc_source.html">opencl.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a8074a3d9ce903ae1642fa0d9adcaf194"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename... Args&gt; </div>
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> CLKernel::execute </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>work_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *&#160;</td>
+          <td class="paramname"><em>global_work_offset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *&#160;</td>
+          <td class="paramname"><em>global_work_size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> *&#160;</td>
+          <td class="paramname"><em>local_work_size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const Args &amp;...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00108">108</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="adefe4ed4402ef83de0504d0e319c92ad"></a>
 <div class="memitem">
 <div class="memproto">
@@ -200,15 +537,15 @@ size_t&#160;</td><td class="memItemRight" valign="bottom"><b>localSpace</b> = 0<
 template&lt;typename... Args&gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname">uint64 CLKernel::operator() </td>
+          <td class="memname"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> CLKernel::operator() </td>
           <td>(</td>
-          <td class="paramtype">size_t&#160;</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td>
           <td class="paramname"><em>threadGroupCount</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">size_t&#160;</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td>
           <td class="paramname"><em>threadCount</em>, </td>
         </tr>
         <tr>
@@ -245,7 +582,7 @@ template&lt;typename... Args&gt; </div>
 template&lt;typename... Args&gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname">uint64 CLKernel::operator() </td>
+          <td class="memname"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> CLKernel::operator() </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td>
           <td class="paramname"><em>size</em>, </td>
@@ -283,7 +620,7 @@ template&lt;typename... Args&gt; </div>
 template&lt;typename... Args&gt; </div>
       <table class="memname">
         <tr>
-          <td class="memname">uint64 CLKernel::operator() </td>
+          <td class="memname"><a class="el" href="core_8h.html#a29940ae63ec06c9998bba873e25407ad">uint64</a> CLKernel::operator() </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
           <td class="paramname"><em>size</em>, </td>
@@ -311,6 +648,63 @@ template&lt;typename... Args&gt; </div>
 </dl>
 
 <p>Definition at line <a class="el" href="opencl_8h_source.html#l00126">126</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="acf8d838d4f44e47e4196b2d3c1f5ff6e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structhandle.html">handle</a>&lt;<a class="el" href="opencl_8h.html#ad555869572d7067f86762cd9e032cf2b">cl_kernel</a>&gt; CLKernel::kernel</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00090">90</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a101d670235da2125cbf2b72d1863fee9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_lock.html">Lock</a> CLKernel::lock</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00091">91</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a22504a0fb4f68b5b8299d13bcd45b7a7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> CLKernel::localSpace = 0</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00092">92</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a71ed5c0cf09201f7e764aa877d5690ee"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> CLKernel::name</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="opencl_8h_source.html#l00093">93</a> of file <a class="el" href="opencl_8h_source.html">opencl.h</a>.</p>
 
 </div>
 </div>

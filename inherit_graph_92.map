@@ -1,23 +1,4 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="318,31,405,57"/>
-<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; T \&gt;" alt="" coords="501,5,584,32"/>
-<area shape="rect" id="node3" href="$struct_widget_values.html" title="WidgetValues\&lt; T \&gt;" alt="" coords="475,56,610,83"/>
-<area shape="rect" id="node4" href="$struct_h_list.html" title="Horizontal layout of homogenous items. " alt="" coords="659,145,744,172"/>
-<area shape="rect" id="node5" href="$struct_v_list.html" title="Vertical layout of homogenous items. " alt="" coords="659,69,743,96"/>
-<area shape="rect" id="node6" href="$structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="118,284,247,311"/>
-<area shape="rect" id="node7" href="$structarray.html" title="array\&lt; Widget * \&gt;" alt="" coords="299,309,424,336"/>
-<area shape="rect" id="node8" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="296,259,427,285"/>
-<area shape="rect" id="node9" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets. " alt="" coords="674,279,729,305"/>
-<area shape="rect" id="node10" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets. " alt="" coords="674,228,729,255"/>
-<area shape="rect" id="node11" href="$struct_widget_grid.html" title="Grid of heterogenous widgets. " alt="" coords="499,208,586,235"/>
-<area shape="rect" id="node12" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="6,132,69,159"/>
-<area shape="rect" id="node13" href="$struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="152,183,213,209"/>
-<area shape="rect" id="node18" href="$struct_plot.html" title="Plots graphs of 2D point data sets. " alt="" coords="160,233,205,260"/>
-<area shape="rect" id="node19" href="$struct_slice_view.html" title="Displays a slice from a volume (stored either in host (VolumeF) or device (CLVolume) memory)..." alt="" coords="143,31,223,57"/>
-<area shape="rect" id="node20" href="$struct_text.html" title="Text is a Widget displaying text (can be multiple lines) " alt="" coords="159,81,207,108"/>
-<area shape="rect" id="node21" href="$struct_volume_view.html" title="Displays a projection from a volume (stored either in device memory). " alt="" coords="135,132,230,159"/>
-<area shape="rect" id="node14" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="319,208,404,235"/>
-<area shape="rect" id="node15" href="$struct_linear.html" title="Linear" alt="" coords="333,157,390,184"/>
-<area shape="rect" id="node16" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="502,157,583,184"/>
-<area shape="rect" id="node17" href="$struct_vertical.html" title="Layouts widgets on the vertical axis. " alt="" coords="509,107,576,133"/>
+<area shape="rect" id="node1" href="$structhandle.html" title="handle\&lt; pthread_cond_t \&gt;" alt="" coords="5,5,179,32"/>
+<area shape="rect" id="node2" href="$struct_condition.html" title="Condition" alt="" coords="227,5,304,32"/>
 </map>

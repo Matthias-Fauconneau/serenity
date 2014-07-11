@@ -1,6 +1,12 @@
 var vector_8h =
 [
     [ "vec", "structvec.html", "structvec" ],
+    [ "abcd", "structabcd.html", "structabcd" ],
+    [ "xy", "structxy.html", "structxy" ],
+    [ "xyz", "structxyz.html", "structxyz" ],
+    [ "xyzw", "structxyzw.html", "structxyzw" ],
+    [ "bgr", "structbgr.html", "structbgr" ],
+    [ "bgra", "structbgra.html", "structbgra" ],
     [ "generic", "vector_8h.html#a94f478faf4448c1faec3a49048a4da40", null ],
     [ "vec", "vector_8h.html#a7db67fdc1e9339c40e82544750de892f", null ],
     [ "generic", "vector_8h.html#a94f478faf4448c1faec3a49048a4da40", null ],

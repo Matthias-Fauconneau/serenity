@@ -78,6 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions.html"><span>All</span></a></li>
       <li class="current"><a href="functions_func.html"><span>Functions</span></a></li>
       <li><a href="functions_vars.html"><span>Variables</span></a></li>
+      <li><a href="functions_type.html"><span>Typedefs</span></a></li>
       <li><a href="functions_enum.html"><span>Enumerations</span></a></li>
       <li><a href="functions_eval.html"><span>Enumerator</span></a></li>
     </ul>
@@ -107,6 +108,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions_func_v.html#index_v"><span>v</span></a></li>
       <li><a href="functions_func_w.html#index_w"><span>w</span></a></li>
       <li><a href="functions_func_x.html#index_x"><span>x</span></a></li>
+      <li><a href="functions_func_y.html#index_y"><span>y</span></a></li>
       <li><a href="functions_func_~.html#index_~"><span>~</span></a></li>
     </ul>
   </div>
@@ -130,7 +132,7 @@ $(document).ready(function(){initNavTree('functions_func_o.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -145,13 +147,95 @@ $(document).ready(function(){initNavTree('functions_func_o.html','');});
 <h3><a class="anchor" id="index_o"></a>- o -</h3><ul>
 <li>operator bool()
 : <a class="el" href="struct_data.html#a5c07d21dd3c752d5ded00f90ea8c43a3">Data</a>
+, <a class="el" href="structfunction_3_01_r_07_args_8_8_8_08_4.html#a9ed3b93d5e41fe8df1449772b94c75ee">function&lt; R(Args...)&gt;</a>
+, <a class="el" href="struct_handle.html#a58b1dc3169dffb55690e54b82d756804">Handle</a>
+, <a class="el" href="struct_image.html#a265f35ac9a54a1162f0b1bbf4a4a6d5d">Image</a>
+, <a class="el" href="structmap.html#a5449a5ceef70ccc6f96b1c02587d3e2d">map&lt; K, V &gt;</a>
+, <a class="el" href="struct_map.html#aab3f8fab9e282fc51a9b8f8ae7e1784d">Map</a>
+, <a class="el" href="structmref.html#a558729389e6d45ff15e6dafe5944d1fe">mref&lt; T &gt;</a>
+, <a class="el" href="structrange.html#ae5b5509e87e67e82486502e14e045124">range</a>
+, <a class="el" href="structref.html#a751e4541993f81160a9dc1f8e288c3b0">ref&lt; T &gt;</a>
+, <a class="el" href="structshared.html#ab7351e518f70c9dd3b1786662d79c913">shared</a>
 , <a class="el" href="structsignal.html#a0bbfc4331b001f583ce5dd551e657f92">signal&lt; Args &gt;</a>
+, <a class="el" href="structunique.html#a8d5e1cce24c75a6177161056b8bc215d">unique</a>
+, <a class="el" href="struct_variant.html#a389fbc932dd53118a1ba43d2f98d310b">Variant</a>
+, <a class="el" href="structvec.html#a96ea305fb30f414149ae12427033d59f">vec&lt; V, T, N &gt;</a>
+</li>
+<li>operator byte4()
+: <a class="el" href="structia.html#a054bcf169d4aec0ae4841b0babce2bf7">ia</a>
+, <a class="el" href="structluma.html#a440febbfa514c62e12da7f4a7a5af452">luma</a>
+, <a class="el" href="structrgb.html#aea2447026dcf29f890724721082acd9e">rgb</a>
+, <a class="el" href="structrgba.html#a3902a16cbc96ac55a68b1ec7c173a245">rgba</a>
+</li>
+<li>operator const char *()
+: <a class="el" href="structstringz.html#a181f660d8f72b7042d896dd41bfa7a89">stringz</a>
+</li>
+<li>operator const T &amp;()
+: <a class="el" href="structshared.html#a00149b4445af3820bdb3ba05d26ef66d">shared</a>
+, <a class="el" href="structunique.html#a4dcce0c987f97bdf3ba6206fda981249">unique</a>
+</li>
+<li>operator const T *()
+: <a class="el" href="structref.html#aac076e0c0f8cff0c52a32439b687c11f">ref&lt; T &gt;</a>
+</li>
+<li>operator double()
+: <a class="el" href="struct_variant.html#aa219f2b71675ab5d878455596fab57a1">Variant</a>
+</li>
+<li>operator float()
+: <a class="el" href="struct_variant.html#a33f6a9f572898aababbd60524fc0a3aa">Variant</a>
 </li>
 <li>operator function&lt; void()
 : <a class="el" href="structsignal.html#a1e4a71bbbbf44e086ec985c7800a70d2">signal&lt; Args &gt;</a>
 </li>
 <li>operator int()
 : <a class="el" href="struct_semaphore.html#ad388e9f3582b3e5a43087bbc0ac251f4">Semaphore</a>
+, <a class="el" href="struct_variant.html#ac3e5dd1db899efd0efa907007fb15a59">Variant</a>
+</li>
+<li>operator int16()
+: <a class="el" href="struct_binary_data_1_1_read_operator.html#a6a56cb816816cf15e9a68299d35d2739">BinaryData::ReadOperator</a>
+</li>
+<li>operator int2()
+: <a class="el" href="struct_variant.html#a96d5cccfe79375682bf46f8d4ddeaec0">Variant</a>
+</li>
+<li>operator int3()
+: <a class="el" href="struct_variant.html#a5249f868a4a9e13d14028e994396ee16">Variant</a>
+</li>
+<li>operator int32()
+: <a class="el" href="struct_binary_data_1_1_read_operator.html#a624005bb87bb79cba8621ea9e8807009">BinaryData::ReadOperator</a>
+</li>
+<li>operator int64()
+: <a class="el" href="struct_binary_data_1_1_read_operator.html#adbee8b156f32c752fca5e0a66b360103">BinaryData::ReadOperator</a>
+, <a class="el" href="struct_date.html#ab25ace72ddcea8373eb4e7c489fcbc1f">Date</a>
+</li>
+<li>operator int8()
+: <a class="el" href="struct_binary_data_1_1_read_operator.html#a6bded8f5d4deec8d3a0eb8b9a0d6af97">BinaryData::ReadOperator</a>
+</li>
+<li>operator mat3()
+: <a class="el" href="structmat4.html#ac07fb480ea5f79836ff19a08e5d81924">mat4</a>
+</li>
+<li>operator mref&lt; byte &gt;()
+: <a class="el" href="struct_map.html#a6d9778577314a7ab3b09169410c199bc">Map</a>
+</li>
+<li>operator ref&lt; byte &gt;()
+: <a class="el" href="struct_image.html#a939e1ef27c74d1d491a1eef1f7778d3a">Image</a>
+, <a class="el" href="struct_map.html#afb4a8dff06d4ba1e2cf0dae80440087a">Map</a>
+</li>
+<li>operator ref&lt; float &gt;()
+: <a class="el" href="struct_map.html#a83d25b535c59dd6fa61f6cdca6c7cb9b">Map</a>
+</li>
+<li>operator T()
+: <a class="el" href="structhandle.html#a9c836dec024ddd91bd0e71cc0489ca1e">handle&lt; T &gt;</a>
+</li>
+<li>operator T &amp;()
+: <a class="el" href="structhandle.html#a57d16b6e7d4d479e0c6684c47edb3070">handle&lt; T &gt;</a>
+, <a class="el" href="structshared.html#a22250f54a02aa6105531e9cc87cb29d7">shared</a>
+, <a class="el" href="structunique.html#a9c99398fbdd88f29982a8383ca00726e">unique</a>
+</li>
+<li>operator T *()
+: <a class="el" href="structmref.html#ac8c36988d9c7c0672db3ced90785e51e">mref&lt; T &gt;</a>
+</li>
+<li>operator uint()
+: <a class="el" href="struct_random.html#a5a4707d8323a2c841a1d5b680c7c7ea2">Random</a>
+, <a class="el" href="struct_variant.html#a380c3042f42b07d0e2df6c66577ac047">Variant</a>
 </li>
 <li>operator uint16()
 : <a class="el" href="struct_binary_data_1_1_read_operator.html#a607ca35c9591cec2604a4023fb8446d3">BinaryData::ReadOperator</a>
@@ -161,25 +245,121 @@ $(document).ready(function(){initNavTree('functions_func_o.html','');});
 </li>
 <li>operator uint64()
 : <a class="el" href="struct_binary_data_1_1_read_operator.html#a9badfd4abcfa91e01e49ec994407441d">BinaryData::ReadOperator</a>
+, <a class="el" href="struct_time.html#a6d8e11abe4803c211c1be3011c789805">Time</a>
 </li>
 <li>operator uint8()
 : <a class="el" href="struct_binary_data_1_1_read_operator.html#aeb5459259e77891c41e586389bb6786d">BinaryData::ReadOperator</a>
 </li>
+<li>operator!()
+: <a class="el" href="structshared.html#ad0cf9540866a7501b5f6c13a30fda5b8">shared</a>
+, <a class="el" href="structunique.html#ac3ddaed85fe88d6e19e27fdd29e8db73">unique</a>
+</li>
+<li>operator!=()
+: <a class="el" href="structmap_1_1const__iterator.html#a2aaade468838b24498eb881c8328d48e">map&lt; K, V &gt;::const_iterator</a>
+, <a class="el" href="structmap_1_1iterator.html#a3030ab9c4a797c70c3bb811329317aee">map&lt; K, V &gt;::iterator</a>
+, <a class="el" href="structrange_1_1iterator.html#a1003c118988a955b4ff74de65863b086">range::iterator</a>
+, <a class="el" href="structutf8__iterator.html#ab671ac2cbd265c778c1bba44a0f880ef">utf8_iterator</a>
+</li>
+<li>operator&amp;()
+: <a class="el" href="structhandle.html#a4ef2051d65fb16f61ef61da269e64847">handle&lt; T &gt;</a>
+</li>
 <li>operator()()
-: <a class="el" href="struct_c_l_kernel.html#adefe4ed4402ef83de0504d0e319c92ad">CLKernel</a>
+: <a class="el" href="structanonymous__function_3_01_f_00_01_r_07_args_8_8_8_08_4.html#a720006fe05d77d25b429c3755ef6d57d">anonymous_function&lt; F, R(Args...)&gt;</a>
+, <a class="el" href="struct_c_l_kernel.html#adefe4ed4402ef83de0504d0e319c92ad">CLKernel</a>
+, <a class="el" href="structconst__method_3_01_o_00_01_r_07_args_8_8_8_08_4.html#a1fa69df6a6120a25b3193b6a5a02c052">const_method&lt; O, R(Args...)&gt;</a>
+, <a class="el" href="structfunction_3_01_r_07_args_8_8_8_08_4.html#a949760672700d8fed4b639d44e05e6a1">function&lt; R(Args...)&gt;</a>
+, <a class="el" href="structfunctor_3_01_r_07_args_8_8_8_08_4.html#ade2abf0527d0249919ba6e7d7d3bcb57">functor&lt; R(Args...)&gt;</a>
+, <a class="el" href="struct_image.html#a7bcf548631b8a30b6155bb4f61a5b85b">Image</a>
+, <a class="el" href="struct_image_f.html#a16c0aa46e0d6c2b15bed4bfd153b631e">ImageF</a>
+, <a class="el" href="structmat2.html#aa060e1d8ae2ad073f4388b3653809234">mat2</a>
+, <a class="el" href="structmat3.html#a4c55679e1e013f81c8657660b85621ef">mat3</a>
+, <a class="el" href="structmat3x2.html#a757015a3cb87a9adfd934cc09317fc80">mat3x2</a>
+, <a class="el" href="structmat4.html#a06c44f5feea8f02d566111e87d68ffef">mat4</a>
+, <a class="el" href="structmethod_3_01_o_00_01_r_07_args_8_8_8_08_4.html#a1484b02a408c31aa5ef7ac4042577f22">method&lt; O, R(Args...)&gt;</a>
+, <a class="el" href="struct_random.html#ab15a03287db96c69a09154ef35cc961e">Random</a>
 , <a class="el" href="structref.html#a4dfa68e43b8618b66d04b125fca8c850">ref&lt; T &gt;</a>
 , <a class="el" href="structsignal.html#a1fc03caf8cb0a5fafb0bbf1ef3932e39">signal&lt; Args &gt;</a>
+, <a class="el" href="struct_volume_f.html#a7cace82e19202133539ea75f7874808c">VolumeF</a>
 </li>
 <li>operator*()
-: <a class="el" href="structutf8__iterator.html#a9cf0abc2eacddfa891f2c47b5253d2fd">utf8_iterator</a>
+: <a class="el" href="structmap_1_1const__iterator.html#a1d5db7503c2bf95ccc7b58160b35176f">map&lt; K, V &gt;::const_iterator</a>
+, <a class="el" href="structmap_1_1iterator.html#a6ff591bfe8eaf0a033083db7ab277c0e">map&lt; K, V &gt;::iterator</a>
+, <a class="el" href="structmat2.html#a9efe65c7ebad600f849949081114a699">mat2</a>
+, <a class="el" href="structmat3.html#a9eff39a3a92b5fc887b0b486f771b479">mat3</a>
+, <a class="el" href="structmat3x2.html#ae140b360ded58d3e4596d03217761cce">mat3x2</a>
+, <a class="el" href="structmat4.html#a934be4444843ee7751e2ee2a1d03a838">mat4</a>
+, <a class="el" href="structrange_1_1iterator.html#a87527d91a2c53b92e1cf378ec31de44e">range::iterator</a>
+, <a class="el" href="structutf8__iterator.html#a9cf0abc2eacddfa891f2c47b5253d2fd">utf8_iterator</a>
+</li>
+<li>operator*=()
+: <a class="el" href="structvec.html#abf18c042b1107a89c1b4b2c7fe49aaaa">vec&lt; V, T, N &gt;</a>
+</li>
+<li>operator++()
+: <a class="el" href="structmap_1_1const__iterator.html#af7fb42f07c2c06ca324a7762eb59466c">map&lt; K, V &gt;::const_iterator</a>
+, <a class="el" href="structmap_1_1iterator.html#ab1df3520ce50a9def393f4a84b27baa9">map&lt; K, V &gt;::iterator</a>
+, <a class="el" href="structrange_1_1iterator.html#aff5e34d0b3d1a9a9610572af87afd0f3">range::iterator</a>
+, <a class="el" href="structutf8__iterator.html#ac8d53edb82f8d61d7b6dac44e17bdaa5">utf8_iterator</a>
+</li>
+<li>operator+=()
+: <a class="el" href="structarray.html#af0a49b844e11fd16ae254b176cb3c306">array&lt; T &gt;</a>
+, <a class="el" href="structvec.html#a49f7baa1b840e794faeb59599badc975">vec&lt; V, T, N &gt;</a>
+</li>
+<li>operator-=()
+: <a class="el" href="structvec.html#af8a031c5ba63d2c2f9309d8d34ee231a">vec&lt; V, T, N &gt;</a>
+</li>
+<li>operator-&gt;()
+: <a class="el" href="structhandle.html#a1c82dc1d9daa25216ab80a577b2efc0b">handle&lt; T &gt;</a>
+, <a class="el" href="structshared.html#a26269b4374855c583d5e84be56103ef4">shared</a>
+, <a class="el" href="structunique.html#a523dcb3eab716179fe7be72b4d13b4ba">unique</a>
+</li>
+<li>operator/=()
+: <a class="el" href="structvec.html#aa8f5daae8b5c0f376d6a6e42947e2123">vec&lt; V, T, N &gt;</a>
+</li>
+<li>operator::buffer()
+: <a class="el" href="struct_binary_data_1_1_array_read_operator.html#a5b7715f829f100afd3eb2ba0227bedbc">BinaryData::ArrayReadOperator</a>
+</li>
+<li>operator&lt;()
+: <a class="el" href="struct_text_1_1_cursor.html#a80b86aa8ff920ffd42221039f3c60e29">Text::Cursor</a>
+</li>
+<li>operator&lt;&lt;()
+: <a class="el" href="structarray.html#ae6d7d425a52a3d4176f9da4f37877844">array&lt; T &gt;</a>
+, <a class="el" href="structbuffer.html#ab6857664802feb7920ae08b7ec44542c">buffer</a>
+</li>
+<li>operator=()
+: <a class="el" href="structarray.html#a87d1aba45f5326ed94b1b6823b5dd23a">array&lt; T &gt;</a>
+, <a class="el" href="structbuffer.html#af9696c6a5f3667fc82c2dfbb681bb1d0">buffer</a>
+, <a class="el" href="struct_c_l_buffer.html#a6b88f623691fb0b2cd7e7d6aa9cd4122">CLBuffer</a>
+, <a class="el" href="struct_c_l_image.html#a8a18904c91d8566f931692e07321290f">CLImage</a>
+, <a class="el" href="struct_c_l_mem.html#a88a221971df87baeb72c2477f5463307">CLMem</a>
+, <a class="el" href="struct_c_l_raw_buffer.html#ab6b2b50e54158312aed7e194cc4e09ce">CLRawBuffer</a>
+, <a class="el" href="struct_c_l_volume.html#a021ee49006ae55777a90258af21b9a54">CLVolume</a>
+, <a class="el" href="structhandle.html#acf4db33437e99710a975ac63de4045f9">handle&lt; T &gt;</a>
+, <a class="el" href="struct_handle.html#a1b5043aecd926b15dd22b014997886c8">Handle</a>
+, <a class="el" href="struct_lock.html#afda0bedec91e823c4ce62cb0936dbe21">Lock</a>
+, <a class="el" href="struct_map.html#a923adb3d3711e79864fda244adde320d">Map</a>
+, <a class="el" href="struct_poll.html#ac4643ee87c9c8fcba97feed1916a53f7">Poll</a>
+, <a class="el" href="structshared.html#a064235b978bf9077f07ce24f665b3639">shared</a>
+, <a class="el" href="structunique.html#a768a8840ec71ada02328e9aaba4e1d58">unique</a>
+, <a class="el" href="struct_variant.html#a4b774bc33deb1f2136b94c5bbb7a3694">Variant</a>
 </li>
 <li>operator==()
 : <a class="el" href="structarray.html#a9749ae28786a9960d5cacb1f3f9d72e9">array&lt; T &gt;</a>
+, <a class="el" href="structmap.html#ae2878250fb98e45ce5b4079a83eecdf2">map&lt; K, V &gt;</a>
 , <a class="el" href="structref.html#a03bd1b05108bd2191d5ee9296b967fbc">ref&lt; T &gt;</a>
+, <a class="el" href="structshared.html#ad41edce8e678d5bab4dfa9e6f1a3d01f">shared</a>
+, <a class="el" href="struct_text_1_1_cursor.html#a04f40b181175990684a2dc6cc53796f5">Text::Cursor</a>
+, <a class="el" href="structunique.html#a964656ffa97acc744a9a279b16d00c8e">unique</a>
 </li>
 <li>operator[]()
 : <a class="el" href="struct_data.html#a331c7c78f6d687d2724aca99201d7e0d">Data</a>
-, <a class="el" href="structvec.html#a84e2c9735d1559410ea53df8c913fe4e">vec&lt; V, T, N &gt;</a>
+, <a class="el" href="structmap.html#a9fe6e6c8b842c882311a3a13808cbcb9">map&lt; K, V &gt;</a>
+, <a class="el" href="structmat3.html#aaebf0fedfea106f6bf36e426c52eca99">mat3</a>
+, <a class="el" href="structmat4.html#a733cccd7b7275777a69b4e6104f4e1a6">mat4</a>
+, <a class="el" href="structmref.html#ad3b94d0ecf5830c374a5d6bf5ed44376">mref&lt; T &gt;</a>
+, <a class="el" href="struct_plot.html#a7edf58de78fae8a3f8801870c7664e89">Plot</a>
+, <a class="el" href="structref.html#ab9e9ecd5b115c6d9d5e72a769bd23936">ref&lt; T &gt;</a>
+, <a class="el" href="structvec.html#a62672a568bffb8c4392e95d9e142aa9a">vec&lt; V, T, N &gt;</a>
+, <a class="el" href="struct_volume_f.html#a3da29424ab3a127b4b59e198d1b7a0be">VolumeF</a>
 </li>
 </ul>
 </div><!-- contents -->

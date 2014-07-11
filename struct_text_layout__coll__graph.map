@@ -1,9 +1,9 @@
 <map id="TextLayout" name="TextLayout">
-<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; array \&gt;" alt="" coords="8,83,112,109"/>
-<area shape="rect" id="node3" href="$structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="5,5,112,32"/>
-<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; Text::Link \&gt;" alt="" coords="139,83,272,109"/>
-<area shape="rect" id="node5" href="$structbuffer.html" title="buffer\&lt; Text::Link \&gt;" alt="" coords="137,5,273,32"/>
-<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; Line \&gt;" alt="" coords="296,83,395,109"/>
-<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; Line \&gt;" alt="" coords="298,5,400,32"/>
-<area shape="rect" id="node8" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="419,83,529,109"/>
+<area shape="rect" id="node2" href="$structarray.html" title="array\&lt; array \&gt;" alt="" coords="8,107,112,133"/>
+<area shape="rect" id="node3" href="$structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="5,13,112,40"/>
+<area shape="rect" id="node4" href="$structarray.html" title="array\&lt; Text::Link \&gt;" alt="" coords="139,107,272,133"/>
+<area shape="rect" id="node5" href="$structbuffer.html" title="buffer\&lt; Text::Link \&gt;" alt="" coords="137,13,273,40"/>
+<area shape="rect" id="node6" href="$structarray.html" title="array\&lt; TextLayout::\lLine \&gt;" alt="" coords="296,99,431,141"/>
+<area shape="rect" id="node7" href="$structbuffer.html" title="buffer\&lt; TextLayout\l::Line \&gt;" alt="" coords="298,6,429,47"/>
+<area shape="rect" id="node8" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="457,107,567,133"/>
 </map>

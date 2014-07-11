@@ -1,6 +1,8 @@
 var time_8h =
 [
     [ "Time", "struct_time.html", "struct_time" ],
+    [ "Date", "struct_date.html", "struct_date" ],
+    [ "Timer", "struct_timer.html", "struct_timer" ],
     [ "WeekDay", "time_8h.html#a38e35eaba0dce3be153ec798fb175de5", [
       [ "Monday", "time_8h.html#a38e35eaba0dce3be153ec798fb175de5a455141191c205fb8f46e2e9da6b0dd47", null ],
       [ "Tuesday", "time_8h.html#a38e35eaba0dce3be153ec798fb175de5a596327c453efea63ea26096bf041f630", null ],

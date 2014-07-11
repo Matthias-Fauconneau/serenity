@@ -1,14 +1,15 @@
 <map id="Layout" name="Layout">
-<area shape="rect" id="node3" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="5,155,91,181"/>
-<area shape="rect" id="node5" href="$struct_linear.html" title="Linear" alt="" coords="270,155,327,181"/>
-<area shape="rect" id="node12" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="115,155,244,181"/>
-<area shape="rect" id="node13" href="$struct_widget_values.html" title="WidgetValues\&lt; T \&gt;" alt="" coords="414,229,548,256"/>
-<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="207,5,269,32"/>
-<area shape="rect" id="node4" href="$struct_widget_grid.html" title="Grid of heterogenous widgets. " alt="" coords="5,229,91,256"/>
-<area shape="rect" id="node6" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="309,229,389,256"/>
-<area shape="rect" id="node9" href="$struct_vertical.html" title="Layouts widgets on the vertical axis. " alt="" coords="217,229,284,256"/>
-<area shape="rect" id="node7" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets. " alt="" coords="233,304,287,331"/>
-<area shape="rect" id="node8" href="$struct_h_list.html" title="Horizontal layout of homogenous items. " alt="" coords="433,304,519,331"/>
-<area shape="rect" id="node10" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets. " alt="" coords="137,304,191,331"/>
-<area shape="rect" id="node11" href="$struct_v_list.html" title="Vertical layout of homogenous items. " alt="" coords="321,304,404,331"/>
+<area shape="rect" id="node3" href="$struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="187,229,272,256"/>
+<area shape="rect" id="node6" href="$struct_linear.html" title="Linear" alt="" coords="309,155,365,181"/>
+<area shape="rect" id="node13" href="$struct_widget_references.html" title="WidgetReferences" alt="" coords="493,229,623,256"/>
+<area shape="rect" id="node14" href="$struct_widget_values.html" title="WidgetValues\&lt; T \&gt;" alt="" coords="27,229,161,256"/>
+<area shape="rect" id="node2" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="271,5,333,32"/>
+<area shape="rect" id="node4" href="$struct_uniform_grid.html" title="UniformGrid\&lt; T \&gt;" alt="" coords="5,304,128,331"/>
+<area shape="rect" id="node5" href="$struct_widget_grid.html" title="Grid of heterogenous widgets. " alt="" coords="371,304,457,331"/>
+<area shape="rect" id="node7" href="$struct_horizontal.html" title="Layouts widgets on the horizontal axis. " alt="" coords="297,229,377,256"/>
+<area shape="rect" id="node10" href="$struct_vertical.html" title="Layouts widgets on the vertical axis. " alt="" coords="403,229,469,256"/>
+<area shape="rect" id="node8" href="$struct_h_box.html" title="Horizontal layout of heterogenous widgets. " alt="" coords="482,304,536,331"/>
+<area shape="rect" id="node9" href="$struct_h_list.html" title="Horizontal layout of homogenous items. " alt="" coords="153,304,239,331"/>
+<area shape="rect" id="node11" href="$struct_v_box.html" title="Vertical layout of heterogenous widgets. " alt="" coords="561,304,615,331"/>
+<area shape="rect" id="node12" href="$struct_v_list.html" title="Vertical layout of homogenous items. " alt="" coords="263,304,347,331"/>
 </map>

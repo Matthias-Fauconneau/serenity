@@ -1,6 +1,20 @@
 var searchData=
 [
-  ['remote',['remote',['../struct_window.html#a26f92f63d42f5ca2ab6aa87c1143080d',1,'Window']]],
-  ['renderlock',['renderLock',['../struct_window.html#a984a75320e72593920be4d36bf46112e',1,'Window']]],
-  ['root',['root',['../struct_window.html#a298d320bc89f538a45f7549ca70e9d77',1,'Window']]]
+  ['name',['name',['../struct_node.html#a3a72bc59de2189bb03c3c169f9d9b7a8',1,'Node::name()'],['../structdirent.html#af93a3f0f0e7a0d33070a6ac590ebf124',1,'dirent::name()'],['../struct_c_l_mem.html#a90e9fae6d11692a78f2d36efd2d8648e',1,'CLMem::name()'],['../struct_c_l_kernel.html#a71ed5c0cf09201f7e764aa877d5690ee',1,'CLKernel::name()'],['../struct_shdr.html#a2f59ccb27b88b163c25df9811553d057',1,'Shdr::name()'],['../struct_sym.html#a41cd45b4368842f7e04f780efaddfecb',1,'Sym::name()'],['../struct_volume_f.html#a002dc24bdf75229f4c19c64c8ed5b313',1,'VolumeF::name()'],['../struct_linear.html#a3a26e671d8a5da374e60516ea775cce7',1,'Linear::name()'],['../opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a',1,'name():&#160;opencl.cc']]],
+  ['namesize',['nameSize',['../struct_connection_setup.html#ac2dee66e9c23eba88033a7655d98802f',1,'ConnectionSetup']]],
+  ['nan',['nan',['../math_8h.html#a9e567f43a5b2b798521b46cd6a52eb08',1,'math.h']]],
+  ['nanf',['nanf',['../math_8h.html#a5a231103eb89824a77da36fcc28dc7f7',1,'math.h']]],
+  ['needlink',['needLink',['../struct_build.html#a056cd6dd49a6d2b2a6994a34f03c958a',1,'Build']]],
+  ['needrender',['needRender',['../struct_window.html#ae296facf4aba47238e946e966ea14f1f',1,'Window']]],
+  ['nonelinearsampler',['noneLinearSampler',['../opencl_8cc.html#a3417b2f4f01cce165d7fb0ebf83c37ec',1,'noneLinearSampler():&#160;opencl.cc'],['../opencl_8h.html#a3417b2f4f01cce165d7fb0ebf83c37ec',1,'noneLinearSampler():&#160;opencl.cc']]],
+  ['nonenearestsampler',['noneNearestSampler',['../opencl_8cc.html#ae7897d565903c0a7f3c0766c524d540b',1,'noneNearestSampler():&#160;opencl.cc'],['../opencl_8h.html#ae7897d565903c0a7f3c0766c524d540b',1,'noneNearestSampler():&#160;opencl.cc']]],
+  ['nopropagate',['nopropagate',['../struct_get_window_attributes_reply.html#ae9a291df5df1357dfa380a481bb4910b',1,'GetWindowAttributesReply']]],
+  ['numdepths',['numDepths',['../struct_screen.html#a1c718920cfcd8c336f25b1a7407f4d8e',1,'Screen::numDepths()'],['../struct_x_render_1_1_pict_screen.html#a83ce8117de2cc2d2dd1c2d9e77b96f35',1,'XRender::PictScreen::numDepths()'],['../struct_x_render_1_1_query_pict_formats_reply.html#a70cd3848d573606ebe0c97f0b5e042d0',1,'XRender::QueryPictFormatsReply::numDepths()']]],
+  ['numformats',['numFormats',['../struct_connection_setup_reply2.html#a87d21863b04ba91eb996446c7de9c9b6',1,'ConnectionSetupReply2::numFormats()'],['../struct_x_render_1_1_query_pict_formats_reply.html#a2e7153bcdd13627ec96fb026a74b8406',1,'XRender::QueryPictFormatsReply::numFormats()']]],
+  ['numkeysymsperkeycode',['numKeySymsPerKeyCode',['../struct_get_keyboard_mapping_reply.html#a6e9ba9979f43c2bb173567e0e7e12669',1,'GetKeyboardMappingReply']]],
+  ['numpictvisuals',['numPictVisuals',['../struct_x_render_1_1_pict_depth.html#a5377da58194f32145bcee6e41f9be35c',1,'XRender::PictDepth']]],
+  ['numscreens',['numScreens',['../struct_connection_setup_reply2.html#a7e81ca095908a40029a7bb66aefa7ad5',1,'ConnectionSetupReply2::numScreens()'],['../struct_x_render_1_1_query_pict_formats_reply.html#a4973fe9f3dc669c857d93412ef084e12',1,'XRender::QueryPictFormatsReply::numScreens()']]],
+  ['numsubpixels',['numSubpixels',['../struct_x_render_1_1_query_pict_formats_reply.html#a17a000713e07529d5fa1c5fdb11f75fa',1,'XRender::QueryPictFormatsReply']]],
+  ['numvisuals',['numVisuals',['../struct_x_render_1_1_query_pict_formats_reply.html#a557e6d87954014076dea4e720cc5c1f7',1,'XRender::QueryPictFormatsReply']]],
+  ['numvisualtypes',['numVisualTypes',['../struct_x_depth.html#af6f2f5bac29760f66b5afa28d57683b0',1,'XDepth']]]
 ];

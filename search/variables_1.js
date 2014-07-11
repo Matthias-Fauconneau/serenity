@@ -1,4 +1,29 @@
 var searchData=
 [
-  ['b',['b',['../struct_subset_reconstruction_1_1_subset.html#ae56f0883c5b0fa40faa0fa3589e83aa7',1,'SubsetReconstruction::Subset']]]
+  ['a',['a',['../structabcd.html#aefab7b4e5401957293c63f3405f7b9e7',1,'abcd::a()'],['../structbgra.html#a15ec1769b1f12993896e0370502b78c2',1,'bgra::a()'],['../structrgba.html#a7b155e0df0495c8de4ed8f566267a3bc',1,'rgba::a()'],['../structia.html#aa7f0457dcff9a76c7490ea7cbb4641bb',1,'ia::a()'],['../struct_reconstruction.html#a4955f14a8ea19c730dcc3a2c6c7fd7a1',1,'Reconstruction::A()'],['../struct_volume_view.html#ac410c128d9eefc1c0b2315865817c670',1,'VolumeView::A()']]],
+  ['aati',['AAti',['../struct_s_a_r_t.html#a78389f94c416d88753ac5d1fdccf65f5',1,'SART']]],
+  ['above',['above',['../union_x_event.html#a750f60027ef6a23c82a140d3f705a22a',1,'XEvent']]],
+  ['actions',['actions',['../struct_window.html#a91045daaa903849946bd9530a71493bf',1,'Window']]],
+  ['additionnal',['additionnal',['../struct_connection_setup_reply1.html#a041e09a0866a9761874ed2d14ad1a94e',1,'ConnectionSetupReply1']]],
+  ['addr',['addr',['../struct_shdr.html#a1d643a21808188d88ca996fd4fcd97d0',1,'Shdr']]],
+  ['addralign',['addralign',['../struct_shdr.html#adda43c88f2bf9d0b5b3ff6017d14f1f4',1,'Shdr']]],
+  ['advance',['advance',['../struct_text_layout_1_1_character.html#af9418688626093bbc53d62338b447207',1,'TextLayout::Character::advance()'],['../struct_text_1_1_character.html#af522e57f2321a62df6ebb1afb67b49c1',1,'Text::Character::advance()']]],
+  ['ai',['Ai',['../struct_m_l_t_r.html#aca75cc59b7db0e3032f27c199895494d',1,'MLTR']]],
+  ['airattenuation',['airAttenuation',['../struct_porous_rock.html#a976c3bd39e7ece8a758a3ce29a28b63a',1,'PorousRock']]],
+  ['airdensity',['airDensity',['../struct_porous_rock.html#ab92bccc104c756660e5a8dafa9373df3',1,'PorousRock']]],
+  ['alleventmask',['allEventMask',['../struct_get_window_attributes_reply.html#a658645066a416cf3ce9a633bc2084e8d',1,'GetWindowAttributesReply']]],
+  ['alloc',['alloc',['../struct_create_colormap.html#a846f5d168c502ca5c29c0f9e0bafca6e',1,'CreateColormap']]],
+  ['alpha',['alpha',['../struct_image.html#a0d775236e302633a9ab58f2ab3cd85d7',1,'Image::alpha()'],['../struct_porous_rock.html#a46a899d1399eeac59255f3a92a3a858a',1,'PorousRock::alpha()'],['../struct_text.html#a98ce3e7c86248a08274d04a7371f7fec',1,'Text::alpha()']]],
+  ['anchor',['anchor',['../struct_window.html#a87ea5751f55775de0f411d539f619acc',1,'Window']]],
+  ['any',['any',['../structfunction_3_01_r_07_args_8_8_8_08_4.html#af07a0520c236669db10c029ba512c605',1,'function&lt; R(Args...)&gt;']]],
+  ['ap',['Ap',['../struct_c_g.html#ac9d5944426204c1c6181bb824b1d3f5c',1,'CG']]],
+  ['app',['app',['../test_8cc.html#a4ebb8f0ec67227cd815db3a56d4a8abb',1,'app():&#160;test.cc'],['../compute_8cc.html#a87a9e7fb00b5a1d359ceb615f36f907f',1,'app():&#160;compute.cc'],['../graph_8cc.html#aa2e598664b66609c487d8088dd5198a4',1,'app():&#160;graph.cc'],['../review_8cc.html#aa2e598664b66609c487d8088dd5198a4',1,'app():&#160;review.cc'],['../slice_8cc.html#aa2e598664b66609c487d8088dd5198a4',1,'app():&#160;slice.cc'],['../_s_n_r_8cc.html#aa1af8ceaa274d03d87aae53bad57cb12',1,'app():&#160;SNR.cc']]],
+  ['ascender',['ascender',['../struct_font.html#ab8e29b0db18c36c6ede1ff2b3919c2f9',1,'Font']]],
+  ['at',['At',['../struct_c_g.html#a97b62a1d39fa9f04752cc9be12446d7f',1,'CG::At()'],['../struct_subset_reconstruction_1_1_subset.html#a11b6755ff3a29f9b6dc283ca9abf6685',1,'SubsetReconstruction::Subset::At()']]],
+  ['atap',['AtAp',['../struct_c_g.html#aed770571292105109036fc50f2fc100a',1,'CG']]],
+  ['atom',['atom',['../union_x_event.html#a72da0753b8f02d6b1e4cf875d53b1587',1,'XEvent::atom()'],['../struct_intern_atom_reply.html#a55b6989013765d78cac1977db6c2bd9d',1,'InternAtomReply::atom()']]],
+  ['atr',['Atr',['../struct_m_l_t_r.html#a0ce256cbb8fdf2dce6effb12717566f5',1,'MLTR::Atr()'],['../struct_p_m_l_t_r.html#a21be17b82fdc4e4ddcda9c37d0e2fdef',1,'PMLTR::Atr()'],['../struct_s_a_r_t.html#a73f67146b25affe322e199aeb3e6759a',1,'SART::Atr()']]],
+  ['attenuation',['attenuation',['../struct_porous_rock_1_1_grain_type.html#a92263fdb697eecaf7f92e61ac2dbe76d',1,'PorousRock::GrainType']]],
+  ['atw',['Atw',['../struct_m_l_t_r.html#a3e10f824df03927ac06506d74db33d31',1,'MLTR::Atw()'],['../struct_p_m_l_t_r.html#a932cc82beeab2b9199fa3248dc9251ea',1,'PMLTR::Atw()']]],
+  ['ax',['Ax',['../struct_m_l_t_r.html#ade13fa0849aed1aeaa5e153f98219840',1,'MLTR::Ax()'],['../struct_p_m_l_t_r.html#a18f6c4af0e18d17d50ed1be750872245',1,'PMLTR::Ax()'],['../struct_s_a_r_t.html#a60bd278bf7031e9841f8ed814dc475e2',1,'SART::Ax()']]]
 ];

@@ -1,6 +1,7 @@
 var searchData=
 [
-  ['int2',['int2',['../vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2',1,'vector.h']]],
-  ['int3',['int3',['../vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14',1,'vector.h']]],
-  ['int4',['int4',['../vector_8h.html#a0664f36d80e47fbd53e5e836ed1dc24d',1,'vector.h']]]
+  ['cl_5fkernel',['cl_kernel',['../opencl_8h.html#ad555869572d7067f86762cd9e032cf2b',1,'opencl.h']]],
+  ['cl_5fmem',['cl_mem',['../opencl_8h.html#af2141916ad9655073b9810d7bc71494d',1,'opencl.h']]],
+  ['cl_5fsampler',['cl_sampler',['../opencl_8h.html#a0abe9600e6af78ca5d40d3c47164cc0a',1,'opencl.h']]],
+  ['clbufferf',['CLBufferF',['../opencl_8h.html#acb80ebdcae288dc8be99d73383209784',1,'opencl.h']]]
 ];

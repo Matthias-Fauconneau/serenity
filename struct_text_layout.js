@@ -1,5 +1,7 @@
 var struct_text_layout =
 [
+    [ "Character", "struct_text_layout_1_1_character.html", "struct_text_layout_1_1_character" ],
+    [ "Line", "struct_text_layout_1_1_line.html", "struct_text_layout_1_1_line" ],
     [ "Word", "struct_text_layout.html#a0024f43c95d6196820ed12c1256abad9", null ],
     [ "TextLine", "struct_text_layout.html#a30df2717a65c773ebb7e3744b9aa2b5e", null ],
     [ "TextLayout", "struct_text_layout.html#aa2c2db00b6392582af5b805661ad9be4", null ],

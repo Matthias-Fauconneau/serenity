@@ -78,6 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions.html"><span>All</span></a></li>
       <li class="current"><a href="functions_func.html"><span>Functions</span></a></li>
       <li><a href="functions_vars.html"><span>Variables</span></a></li>
+      <li><a href="functions_type.html"><span>Typedefs</span></a></li>
       <li><a href="functions_enum.html"><span>Enumerations</span></a></li>
       <li><a href="functions_eval.html"><span>Enumerator</span></a></li>
     </ul>
@@ -107,6 +108,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions_func_v.html#index_v"><span>v</span></a></li>
       <li><a href="functions_func_w.html#index_w"><span>w</span></a></li>
       <li><a href="functions_func_x.html#index_x"><span>x</span></a></li>
+      <li><a href="functions_func_y.html#index_y"><span>y</span></a></li>
       <li><a href="functions_func_~.html#index_~"><span>~</span></a></li>
     </ul>
   </div>
@@ -130,7 +132,7 @@ $(document).ready(function(){initNavTree('functions_func_l.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -143,10 +145,19 @@ $(document).ready(function(){initNavTree('functions_func_l.html','');});
 &#160;
 
 <h3><a class="anchor" id="index_l"></a>- l -</h3><ul>
+<li>last()
+: <a class="el" href="structmref.html#a2a305c58374f3ad01789af08ead8625a">mref&lt; T &gt;</a>
+, <a class="el" href="structref.html#a109e32d44b233bb348deea179b85356a">ref&lt; T &gt;</a>
+</li>
 <li>layout()
 : <a class="el" href="struct_grid_layout.html#a7dbb4a3e2482dd89bdbc41ef200fa047">GridLayout</a>
 , <a class="el" href="struct_layout.html#a4aec359e222f0827df71351124dcbfe5">Layout</a>
 , <a class="el" href="struct_linear.html#a7fb78329fe0d808beab760b99155924e">Linear</a>
+, <a class="el" href="struct_text.html#a8d9e7c316c96365bc3ca723e57615bec">Text</a>
+</li>
+<li>levelCount()
+: <a class="el" href="struct_array_view.html#a3d2062f87eda50840c67b64e5e2921e8">ArrayView</a>
+, <a class="el" href="struct_slice_array_view.html#a62969232c01d60917e4f55b7aca68a18">SliceArrayView</a>
 </li>
 <li>line()
 : <a class="el" href="struct_text_data.html#a21a77ce3b3d10b913a4f9908b66ca837">TextData</a>
@@ -160,9 +171,21 @@ $(document).ready(function(){initNavTree('functions_func_l.html','');});
 <li>linearSearch()
 : <a class="el" href="structarray.html#a0c60b9fe98d96b19ac4ada012040ef7c">array&lt; T &gt;</a>
 </li>
+<li>list()
+: <a class="el" href="struct_folder.html#abf5a64bcefc43da1fa73b26ff1247e8a">Folder</a>
+</li>
+<li>localTimeOffset()
+: <a class="el" href="struct_date.html#a17c3456c4ded175421068cce66359d90">Date</a>
+</li>
+<li>Lock()
+: <a class="el" href="struct_lock.html#a00ece8cab2f9ed279790bb09d183f788">Lock</a>
+</li>
 <li>lock()
 : <a class="el" href="struct_lock.html#a9274a7e20cd5884ea268698d6db8eed6">Lock</a>
 , <a class="el" href="struct_map.html#ac776b34025d25aed4b2f729c74f23f5a">Map</a>
+</li>
+<li>Locker()
+: <a class="el" href="struct_locker.html#afe2fce5e4d5d248eec1fbf109aae60bd">Locker</a>
 </li>
 </ul>
 </div><!-- contents -->

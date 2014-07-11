@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_build.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -116,86 +116,207 @@ Collaboration diagram for Build:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_build__coll__graph.png" border="0" usemap="#_build_coll__map" alt="Collaboration graph"/></div>
 <map name="_build_coll__map" id="_build_coll__map">
-<area shape="rect" id="node2" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="451,32,555,59"/><area shape="rect" id="node3" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="201,32,309,59"/><area shape="rect" id="node4" href="structarray.html" title="array\&lt; int \&gt;" alt="" coords="458,83,547,109"/><area shape="rect" id="node5" href="structbuffer.html" title="buffer\&lt; int \&gt;" alt="" coords="208,83,301,109"/><area shape="rect" id="node6" href="structarray.html" title="array\&lt; T \&gt;" alt="" coords="461,133,544,160"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="211,133,298,160"/><area shape="rect" id="node8" href="structarray.html" title="array\&lt; unique\&lt; Node \&gt; \&gt;" alt="" coords="419,184,587,211"/><area shape="rect" id="node9" href="structbuffer.html" title="buffer\&lt; unique\&lt; Node \&gt; \&gt;" alt="" coords="169,184,341,211"/><area shape="rect" id="node10" href="structarray.html" title="array\&lt; ref \&gt;" alt="" coords="457,235,548,261"/><area shape="rect" id="node11" href="structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="207,235,302,261"/><area shape="rect" id="node12" href="struct_folder.html" title="Folder" alt="" coords="473,285,532,312"/><area shape="rect" id="node13" href="struct_handle.html" title="Unix file descriptor. " alt="" coords="223,285,286,312"/><area shape="rect" id="node14" href="structhandle.html" title="handle\&lt; int \&gt;" alt="" coords="5,285,104,312"/><area shape="rect" id="node15" href="structref.html" title="Unmanaged fixed&#45;size const reference to an array of elements. " alt="" coords="468,336,537,363"/><area shape="rect" id="node17" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="453,387,553,413"/><area shape="rect" id="node18" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="203,387,307,413"/></map>
+<area shape="rect" id="node2" href="structarray.html" title="array\&lt; array \&gt;" alt="" coords="424,32,528,59"/><area shape="rect" id="node3" href="structbuffer.html" title="buffer\&lt; array \&gt;" alt="" coords="201,32,309,59"/><area shape="rect" id="node4" href="structarray.html" title="array\&lt; int \&gt;" alt="" coords="431,83,521,109"/><area shape="rect" id="node5" href="structbuffer.html" title="buffer\&lt; int \&gt;" alt="" coords="208,83,301,109"/><area shape="rect" id="node6" href="structarray.html" title="array\&lt; T \&gt;" alt="" coords="435,133,517,160"/><area shape="rect" id="node7" href="structbuffer.html" title="buffer\&lt; T \&gt;" alt="" coords="211,133,298,160"/><area shape="rect" id="node8" href="structarray.html" title="array\&lt; unique\&lt; Node \&gt; \&gt;" alt="" coords="392,184,560,211"/><area shape="rect" id="node9" href="structbuffer.html" title="buffer\&lt; unique\&lt; Node \&gt; \&gt;" alt="" coords="169,184,341,211"/><area shape="rect" id="node10" href="structarray.html" title="array\&lt; ref \&gt;" alt="" coords="431,235,521,261"/><area shape="rect" id="node11" href="structbuffer.html" title="buffer\&lt; ref \&gt;" alt="" coords="207,235,302,261"/><area shape="rect" id="node12" href="struct_folder.html" title="Folder" alt="" coords="447,285,505,312"/><area shape="rect" id="node13" href="struct_handle.html" title="Unix file descriptor. " alt="" coords="223,285,286,312"/><area shape="rect" id="node14" href="structhandle.html" title="handle\&lt; int \&gt;" alt="" coords="5,285,104,312"/><area shape="rect" id="node15" href="structref.html" title="Unmanaged fixed&#45;size const reference to an array of elements. " alt="" coords="441,336,511,363"/><area shape="rect" id="node16" href="structarray.html" title="array\&lt; byte \&gt;" alt="" coords="426,391,526,417"/><area shape="rect" id="node17" href="structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="203,391,307,417"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a7beeeb3bb6c0e10973e2ffa22d573051"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7beeeb3bb6c0e10973e2ffa22d573051"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a7beeeb3bb6c0e10973e2ffa22d573051">find</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;file)</td></tr>
-<tr class="memdesc:a7beeeb3bb6c0e10973e2ffa22d573051"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the first path matching file. <br/></td></tr>
+<tr class="memitem:a7beeeb3bb6c0e10973e2ffa22d573051"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a7beeeb3bb6c0e10973e2ffa22d573051">find</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;file)</td></tr>
+<tr class="memdesc:a7beeeb3bb6c0e10973e2ffa22d573051"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the first path matching file.  <a href="#a7beeeb3bb6c0e10973e2ffa22d573051">More...</a><br/></td></tr>
 <tr class="separator:a7beeeb3bb6c0e10973e2ffa22d573051"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ade1b0856e49523756952992cc2c04c8f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ade1b0856e49523756952992cc2c04c8f"></a>
-<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><b>tryParseIncludes</b> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
+<tr class="memitem:ade1b0856e49523756952992cc2c04c8f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#ade1b0856e49523756952992cc2c04c8f">tryParseIncludes</a> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
 <tr class="separator:ade1b0856e49523756952992cc2c04c8f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2c6eda84cfed0ff4238c8f5854317bdf"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2c6eda84cfed0ff4238c8f5854317bdf"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>tryParseDefines</b> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
+<tr class="memitem:a2c6eda84cfed0ff4238c8f5854317bdf"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a2c6eda84cfed0ff4238c8f5854317bdf">tryParseDefines</a> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
 <tr class="separator:a2c6eda84cfed0ff4238c8f5854317bdf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7e5c7eccfaa66c7ed3cf1fb420f16cbe"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7e5c7eccfaa66c7ed3cf1fb420f16cbe"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>tryParseConditions</b> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
+<tr class="memitem:a7e5c7eccfaa66c7ed3cf1fb420f16cbe"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a7e5c7eccfaa66c7ed3cf1fb420f16cbe">tryParseConditions</a> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
 <tr class="separator:a7e5c7eccfaa66c7ed3cf1fb420f16cbe"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4c1ede9eae6f81696834050dc1958a93"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4c1ede9eae6f81696834050dc1958a93"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>tryParseFiles</b> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
+<tr class="memitem:a4c1ede9eae6f81696834050dc1958a93"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a4c1ede9eae6f81696834050dc1958a93">tryParseFiles</a> (<a class="el" href="struct_text_data.html">TextData</a> &amp;s)</td></tr>
 <tr class="separator:a4c1ede9eae6f81696834050dc1958a93"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaff16336d8124a76847d590b8d827dfa"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aaff16336d8124a76847d590b8d827dfa"></a>
-int64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#aaff16336d8124a76847d590b8d827dfa">parse</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;name, <a class="el" href="struct_node.html">Node</a> &amp;parent)</td></tr>
-<tr class="memdesc:aaff16336d8124a76847d590b8d827dfa"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns timestamp of the last modified interface header recursively parsing includes. <br/></td></tr>
+<tr class="memitem:aaff16336d8124a76847d590b8d827dfa"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#aaff16336d8124a76847d590b8d827dfa">parse</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a">name</a>, <a class="el" href="struct_node.html">Node</a> &amp;parent)</td></tr>
+<tr class="memdesc:aaff16336d8124a76847d590b8d827dfa"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns timestamp of the last modified interface header recursively parsing includes.  <a href="#aaff16336d8124a76847d590b8d827dfa">More...</a><br/></td></tr>
 <tr class="separator:aaff16336d8124a76847d590b8d827dfa"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af22396d23ac4d4398077a89b32accbc0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#af22396d23ac4d4398077a89b32accbc0">compileModule</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;target)</td></tr>
+<tr class="memitem:af22396d23ac4d4398077a89b32accbc0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#af22396d23ac4d4398077a89b32accbc0">compileModule</a> (const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;<a class="el" href="struct_build.html#a967b53007c3ccd2669d6de684ee74a9d">target</a>)</td></tr>
 <tr class="separator:af22396d23ac4d4398077a89b32accbc0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeb4536402bbeafdaa43b606b9e589fb3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aeb4536402bbeafdaa43b606b9e589fb3"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>fail</b> ()</td></tr>
+<tr class="memitem:aeb4536402bbeafdaa43b606b9e589fb3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#aeb4536402bbeafdaa43b606b9e589fb3">fail</a> ()</td></tr>
 <tr class="separator:aeb4536402bbeafdaa43b606b9e589fb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a96ad56fb129cfbc2131fd094c41ae1ec"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a96ad56fb129cfbc2131fd094c41ae1ec">Build</a> ()</td></tr>
+<tr class="separator:a96ad56fb129cfbc2131fd094c41ae1ec"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a7c4487f807b0b0911c083b973238a073"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7c4487f807b0b0911c083b973238a073"></a>
-const <a class="el" href="struct_folder.html">Folder</a>&#160;</td><td class="memItemRight" valign="bottom"><b>folder</b> {&quot;.&quot;_}</td></tr>
+<tr class="memitem:a7c4487f807b0b0911c083b973238a073"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="struct_folder.html">Folder</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a7c4487f807b0b0911c083b973238a073">folder</a> {&quot;.&quot;<a class="el" href="_c_g_8cc.html#af8fafee12fa2b9e32e13d3d7e3712485">_</a>}</td></tr>
 <tr class="separator:a7c4487f807b0b0911c083b973238a073"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acf52ccc71814ad2047ac7ba1c4a46c4c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acf52ccc71814ad2047ac7ba1c4a46c4c"></a>
-const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>base</b> = <a class="el" href="memory_8h.html#ad587eaaf800b104859f3f2f83803827a">copy</a>(<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>(<a class="el" href="string_8h.html#a3dd07628b413a2e63b2952a71d366a15">section</a>(folder.name(),'/',-2,-1)))</td></tr>
+<tr class="memitem:acf52ccc71814ad2047ac7ba1c4a46c4c"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#acf52ccc71814ad2047ac7ba1c4a46c4c">base</a> = <a class="el" href="variant_8h.html#a6f176ddb9a5262c763856b89d4a040d9">copy</a>(<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>(<a class="el" href="string_8h.html#a3dd07628b413a2e63b2952a71d366a15">section</a>(<a class="el" href="opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a">folder.name</a>(),'/',-2,-1)))</td></tr>
 <tr class="separator:acf52ccc71814ad2047ac7ba1c4a46c4c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a967b53007c3ccd2669d6de684ee74a9d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a967b53007c3ccd2669d6de684ee74a9d"></a>
-const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><b>target</b> = <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>().size&gt;=1 ? <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0] : (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>)base</td></tr>
+<tr class="memitem:a967b53007c3ccd2669d6de684ee74a9d"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a967b53007c3ccd2669d6de684ee74a9d">target</a> = <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>().<a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>&gt;=1 ? <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0] : (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>)<a class="el" href="struct_build.html#acf52ccc71814ad2047ac7ba1c4a46c4c">base</a></td></tr>
 <tr class="separator:a967b53007c3ccd2669d6de684ee74a9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a76a93ed50f956070fe5ae5135907dff2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a76a93ed50f956070fe5ae5135907dff2"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>defines</b></td></tr>
+<tr class="memitem:a76a93ed50f956070fe5ae5135907dff2"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a76a93ed50f956070fe5ae5135907dff2">defines</a></td></tr>
 <tr class="separator:a76a93ed50f956070fe5ae5135907dff2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4c49d55546c1db9c8199216f993cecba"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4c49d55546c1db9c8199216f993cecba"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>flags</b></td></tr>
+<tr class="memitem:a4c49d55546c1db9c8199216f993cecba"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a4c49d55546c1db9c8199216f993cecba">flags</a></td></tr>
 <tr class="separator:a4c49d55546c1db9c8199216f993cecba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6b4eafe7849b05e51c31ca609eeb5b75"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6b4eafe7849b05e51c31ca609eeb5b75"></a>
-const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>tmp</b> {&quot;/var/tmp/&quot;_+base}</td></tr>
+<tr class="memitem:a6b4eafe7849b05e51c31ca609eeb5b75"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a6b4eafe7849b05e51c31ca609eeb5b75">tmp</a> {&quot;/var/tmp/&quot;_+<a class="el" href="struct_build.html#acf52ccc71814ad2047ac7ba1c4a46c4c">base</a>}</td></tr>
 <tr class="separator:a6b4eafe7849b05e51c31ca609eeb5b75"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a13a45d07515e5e8f3a24d7fd3f5d008b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a13a45d07515e5e8f3a24d7fd3f5d008b"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>CXX</b></td></tr>
+<tr class="memitem:a13a45d07515e5e8f3a24d7fd3f5d008b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a13a45d07515e5e8f3a24d7fd3f5d008b">CXX</a></td></tr>
 <tr class="separator:a13a45d07515e5e8f3a24d7fd3f5d008b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6019c2d2a942f8fa20bb2a4d94eff88b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6019c2d2a942f8fa20bb2a4d94eff88b"></a>
-<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><b>LD</b> = which(&quot;ld&quot;_)</td></tr>
+<tr class="memitem:a6019c2d2a942f8fa20bb2a4d94eff88b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a6019c2d2a942f8fa20bb2a4d94eff88b">LD</a> = <a class="el" href="build_8cc.html#a0c650865947ec4064b6b4915e7abb429">which</a>(&quot;ld&quot;_)</td></tr>
 <tr class="separator:a6019c2d2a942f8fa20bb2a4d94eff88b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a056cd6dd49a6d2b2a6994a34f03c958a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a056cd6dd49a6d2b2a6994a34f03c958a"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>needLink</b> = false</td></tr>
+<tr class="memitem:a056cd6dd49a6d2b2a6994a34f03c958a"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a056cd6dd49a6d2b2a6994a34f03c958a">needLink</a> = false</td></tr>
 <tr class="separator:a056cd6dd49a6d2b2a6994a34f03c958a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a27551fe0610c7a404faf897ac812b091"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a27551fe0610c7a404faf897ac812b091"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="structunique.html">unique</a>&lt; <a class="el" href="struct_node.html">Node</a> &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>modules</b></td></tr>
+<tr class="memitem:a27551fe0610c7a404faf897ac812b091"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="structunique.html">unique</a>&lt; <a class="el" href="struct_node.html">Node</a> &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a27551fe0610c7a404faf897ac812b091">modules</a></td></tr>
 <tr class="separator:a27551fe0610c7a404faf897ac812b091"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9fc5799f0b88961133fe629df0185806"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9fc5799f0b88961133fe629df0185806"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>libraries</b></td></tr>
+<tr class="memitem:a9fc5799f0b88961133fe629df0185806"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a9fc5799f0b88961133fe629df0185806">libraries</a></td></tr>
 <tr class="separator:a9fc5799f0b88961133fe629df0185806"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a98b1148e8d7f10efee5f272032b49cbd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a98b1148e8d7f10efee5f272032b49cbd"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>files</b></td></tr>
+<tr class="memitem:a98b1148e8d7f10efee5f272032b49cbd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a98b1148e8d7f10efee5f272032b49cbd">files</a></td></tr>
 <tr class="separator:a98b1148e8d7f10efee5f272032b49cbd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af3fe14298ec634265799d2cd45c7f37f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af3fe14298ec634265799d2cd45c7f37f"></a>
-<a class="el" href="structarray.html">array</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>pids</b></td></tr>
+<tr class="memitem:af3fe14298ec634265799d2cd45c7f37f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; int &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#af3fe14298ec634265799d2cd45c7f37f">pids</a></td></tr>
 <tr class="separator:af3fe14298ec634265799d2cd45c7f37f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a123c804ac8478243682c7755c1ffd440"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a123c804ac8478243682c7755c1ffd440"></a>
-<a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>sources</b> = folder.list(Files|Recursive)</td></tr>
+<tr class="memitem:a123c804ac8478243682c7755c1ffd440"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structarray.html">array</a>&lt; <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_build.html#a123c804ac8478243682c7755c1ffd440">sources</a> = folder.list(<a class="el" href="file_8h.html#adf764cbdea00d65edcd07bb9953ad2b7a49ce9e101fea37ab1954e5b3b9975c09">Files</a>|<a class="el" href="file_8h.html#adf764cbdea00d65edcd07bb9953ad2b7ad5d10c8fb234f82d1779bd7b3ac7b6f7">Recursive</a>)</td></tr>
 <tr class="separator:a123c804ac8478243682c7755c1ffd440"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock">
 <p>Definition at line <a class="el" href="build_8cc_source.html#l00022">22</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
-</div><h2 class="groupheader">Member Function Documentation</h2>
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a96ad56fb129cfbc2131fd094c41ae1ec"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Build::Build </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00170">170</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a7beeeb3bb6c0e10973e2ffa22d573051"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> Build::find </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>file</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns the first path matching file. </p>
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00039">39</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ade1b0856e49523756952992cc2c04c8f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> Build::tryParseIncludes </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_text_data.html">TextData</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00041">41</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a2c6eda84cfed0ff4238c8f5854317bdf"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Build::tryParseDefines </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_text_data.html">TextData</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00056">56</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a7e5c7eccfaa66c7ed3cf1fb420f16cbe"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Build::tryParseConditions </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_text_data.html">TextData</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00062">62</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4c1ede9eae6f81696834050dc1958a93"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Build::tryParseFiles </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_text_data.html">TextData</a> &amp;&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00082">82</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aaff16336d8124a76847d590b8d827dfa"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a87dc1c46a17e3ee6037afdb6aef76632">int64</a> Build::parse </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> &amp;&#160;</td>
+          <td class="paramname"><em>name</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_node.html">Node</a> &amp;&#160;</td>
+          <td class="paramname"><em>parent</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns timestamp of the last modified interface header recursively parsing includes. </p>
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00108">108</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
 <a class="anchor" id="af22396d23ac4d4398077a89b32accbc0"></a>
 <div class="memitem">
 <div class="memproto">
@@ -213,6 +334,220 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>needLink</b> = false<
 <dl class="section return"><dt>Returns</dt><dd>Timestamp of the last modified module implementation (deep) </dd></dl>
 
 <p>Definition at line <a class="el" href="build_8cc_source.html#l00130">130</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aeb4536402bbeafdaa43b606b9e589fb3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void Build::fail </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00168">168</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a7c4487f807b0b0911c083b973238a073"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="struct_folder.html">Folder</a> Build::folder {&quot;.&quot;<a class="el" href="_c_g_8cc.html#af8fafee12fa2b9e32e13d3d7e3712485">_</a>}</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00023">23</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="acf52ccc71814ad2047ac7ba1c4a46c4c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> Build::base = <a class="el" href="variant_8h.html#a6f176ddb9a5262c763856b89d4a040d9">copy</a>(<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>(<a class="el" href="string_8h.html#a3dd07628b413a2e63b2952a71d366a15">section</a>(<a class="el" href="opencl_8cc.html#a9dd89a37a782c90ddfb457dd7ce34c0a">folder.name</a>(),'/',-2,-1)))</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00024">24</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a967b53007c3ccd2669d6de684ee74a9d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a> Build::target = <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>().<a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>&gt;=1 ? <a class="el" href="thread_8h.html#a305243a0cbc45678ace756030c37a496">arguments</a>()[0] : (<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>)<a class="el" href="struct_build.html#acf52ccc71814ad2047ac7ba1c4a46c4c">base</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00025">25</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a76a93ed50f956070fe5ae5135907dff2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&gt; Build::defines</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00026">26</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a4c49d55546c1db9c8199216f993cecba"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="core_8h.html#a02c6499349f8bcd0923830b1ee278219">string</a>&gt; Build::flags</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00027">27</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6b4eafe7849b05e51c31ca609eeb5b75"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> Build::tmp {&quot;/var/tmp/&quot;_+<a class="el" href="struct_build.html#acf52ccc71814ad2047ac7ba1c4a46c4c">base</a>}</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00028">28</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a13a45d07515e5e8f3a24d7fd3f5d008b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> Build::CXX</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00029">29</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6019c2d2a942f8fa20bb2a4d94eff88b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a> Build::LD = <a class="el" href="build_8cc.html#a0c650865947ec4064b6b4915e7abb429">which</a>(&quot;ld&quot;_)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00030">30</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a056cd6dd49a6d2b2a6994a34f03c958a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Build::needLink = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00031">31</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a27551fe0610c7a404faf897ac812b091"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="structunique.html">unique</a>&lt;<a class="el" href="struct_node.html">Node</a>&gt; &gt; Build::modules</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00032">32</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9fc5799f0b88961133fe629df0185806"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&gt; Build::libraries</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00033">33</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a98b1148e8d7f10efee5f272032b49cbd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&gt; Build::files</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00034">34</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af3fe14298ec634265799d2cd45c7f37f"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;int&gt; Build::pids</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00035">35</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a123c804ac8478243682c7755c1ffd440"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structarray.html">array</a>&lt;<a class="el" href="array_8h.html#afb917b998002d51b040b0b2205572517">String</a>&gt; Build::sources = folder.list(<a class="el" href="file_8h.html#adf764cbdea00d65edcd07bb9953ad2b7a49ce9e101fea37ab1954e5b3b9975c09">Files</a>|<a class="el" href="file_8h.html#adf764cbdea00d65edcd07bb9953ad2b7ad5d10c8fb234f82d1779bd7b3ac7b6f7">Recursive</a>)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="build_8cc_source.html#l00037">37</a> of file <a class="el" href="build_8cc_source.html">build.cc</a>.</p>
 
 </div>
 </div>

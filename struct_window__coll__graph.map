@@ -4,30 +4,34 @@
 <area shape="rect" id="node10" href="$struct_event_f_d.html" title="Pollable semaphore. " alt="" coords="567,52,641,79"/>
 <area shape="rect" id="node4" href="$struct_handle.html" title="Unix file descriptor. " alt="" coords="169,19,231,45"/>
 <area shape="rect" id="node5" href="$structhandle.html" title="handle\&lt; int \&gt;" alt="" coords="5,19,104,45"/>
-<area shape="rect" id="node6" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops. " alt="" coords="1169,157,1213,184"/>
-<area shape="rect" id="node7" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="869,128,931,155"/>
-<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; Poll * \&gt;" alt="" coords="551,116,657,143"/>
-<area shape="rect" id="node9" href="$structbuffer.html" title="buffer\&lt; Poll * \&gt;" alt="" coords="318,116,429,143"/>
-<area shape="rect" id="node11" href="$struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="579,220,629,247"/>
-<area shape="rect" id="node17" href="$struct_semaphore.html" title="A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter. " alt="" coords="1011,215,1099,241"/>
-<area shape="rect" id="node12" href="$structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="283,220,464,247"/>
-<area shape="rect" id="node13" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="1159,327,1222,353"/>
-<area shape="rect" id="node14" href="$struct_image.html" title="2D array of byte4 " alt="" coords="871,356,929,383"/>
-<area shape="rect" id="node15" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="554,316,654,343"/>
-<area shape="rect" id="node16" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="549,367,659,393"/>
-<area shape="rect" id="node18" href="$structarray.html" title="array\&lt; QEvent \&gt;" alt="" coords="1131,455,1250,481"/>
-<area shape="rect" id="node19" href="$structbuffer.html" title="buffer\&lt; QEvent \&gt;" alt="" coords="839,455,961,481"/>
-<area shape="rect" id="node20" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="1131,548,1250,575"/>
-<area shape="rect" id="node21" href="$structmap.html" title="map\&lt; uint, unique\&lt;\l Timer \&gt; \&gt;" alt="" coords="1123,599,1258,641"/>
-<area shape="rect" id="node22" href="$structarray.html" title="array\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="815,556,985,583"/>
-<area shape="rect" id="node23" href="$structbuffer.html" title="buffer\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="517,556,691,583"/>
-<area shape="rect" id="node24" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="852,607,948,633"/>
-<area shape="rect" id="node25" href="$structbuffer.html" title="buffer\&lt; uint \&gt;" alt="" coords="554,607,654,633"/>
-<area shape="rect" id="node26" href="$structmap.html" title="map\&lt; Key, function\l\&lt; void()\&gt; \&gt;" alt="" coords="1123,665,1259,706"/>
-<area shape="rect" id="node27" href="$structarray.html" title="array\&lt; Key \&gt;" alt="" coords="851,657,949,684"/>
-<area shape="rect" id="node28" href="$structbuffer.html" title="buffer\&lt; Key \&gt;" alt="" coords="553,657,655,684"/>
-<area shape="rect" id="node29" href="$structarray.html" title="array\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="813,708,987,735"/>
-<area shape="rect" id="node30" href="$structbuffer.html" title="buffer\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="515,708,693,735"/>
-<area shape="rect" id="node31" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="1141,744,1241,771"/>
-<area shape="rect" id="node32" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="848,759,952,785"/>
+<area shape="rect" id="node6" href="$struct_poll.html" title="Poll is a convenient interface to participate in the event loops. " alt="" coords="1173,168,1217,195"/>
+<area shape="rect" id="node7" href="$struct_thread.html" title="Concurrently runs an event loop. " alt="" coords="871,128,934,155"/>
+<area shape="rect" id="node8" href="$structarray.html" title="array\&lt; Poll * \&gt;" alt="" coords="551,113,657,140"/>
+<area shape="rect" id="node9" href="$structbuffer.html" title="buffer\&lt; Poll * \&gt;" alt="" coords="318,113,429,140"/>
+<area shape="rect" id="node11" href="$struct_lock.html" title="Lock is an initially released binary semaphore which can only be released by the acquiring thread..." alt="" coords="579,219,629,245"/>
+<area shape="rect" id="node18" href="$struct_semaphore.html" title="A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter. " alt="" coords="859,315,947,341"/>
+<area shape="rect" id="node12" href="$structhandle.html" title="handle\&lt; pthread_mutex_t \&gt;" alt="" coords="283,219,464,245"/>
+<area shape="rect" id="node13" href="$structfunction.html" title="function\&lt; void()\&gt;" alt="" coords="1135,269,1255,296"/>
+<area shape="rect" id="node14" href="$struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="1163,460,1226,487"/>
+<area shape="rect" id="node15" href="$struct_image.html" title="2D array of byte4 " alt="" coords="873,429,932,456"/>
+<area shape="rect" id="node16" href="$structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="554,455,654,481"/>
+<area shape="rect" id="node17" href="$structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="549,404,659,431"/>
+<area shape="rect" id="node19" href="$struct_condition.html" title="Condition" alt="" coords="565,315,643,341"/>
+<area shape="rect" id="node20" href="$structhandle.html" title="handle\&lt; pthread_cond_t \&gt;" alt="" coords="287,315,460,341"/>
+<area shape="rect" id="node21" href="$structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="1135,525,1254,552"/>
+<area shape="rect" id="node22" href="$structxy.html" title="xy\&lt; int \&gt;" alt="" coords="865,516,940,543"/>
+<area shape="rect" id="node23" href="$structmap.html" title="map\&lt; uint, unique\&lt;\l Timer \&gt; \&gt;" alt="" coords="1127,602,1262,643"/>
+<area shape="rect" id="node24" href="$structarray.html" title="array\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="817,567,988,593"/>
+<area shape="rect" id="node25" href="$structbuffer.html" title="buffer\&lt; unique\&lt; Timer \&gt; \&gt;" alt="" coords="517,567,691,593"/>
+<area shape="rect" id="node26" href="$structarray.html" title="array\&lt; uint \&gt;" alt="" coords="855,617,951,644"/>
+<area shape="rect" id="node27" href="$structbuffer.html" title="buffer\&lt; uint \&gt;" alt="" coords="554,617,654,644"/>
+<area shape="rect" id="node28" href="$structarray.html" title="array\&lt; Window::QEvent \&gt;" alt="" coords="1107,668,1282,695"/>
+<area shape="rect" id="node29" href="$structbuffer.html" title="buffer\&lt; Window::QEvent \&gt;" alt="" coords="813,668,992,695"/>
+<area shape="rect" id="node30" href="$structmap.html" title="map\&lt; Key, function\l\&lt; void()\&gt; \&gt;" alt="" coords="1127,719,1263,761"/>
+<area shape="rect" id="node31" href="$structarray.html" title="array\&lt; Key \&gt;" alt="" coords="853,719,952,745"/>
+<area shape="rect" id="node32" href="$structbuffer.html" title="buffer\&lt; Key \&gt;" alt="" coords="553,719,655,745"/>
+<area shape="rect" id="node33" href="$structarray.html" title="array\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="816,769,989,796"/>
+<area shape="rect" id="node34" href="$structbuffer.html" title="buffer\&lt; function\&lt; void()\&gt; \&gt;" alt="" coords="515,769,693,796"/>
+<area shape="rect" id="node35" href="$structarray.html" title="array\&lt; byte \&gt;" alt="" coords="1145,803,1245,829"/>
+<area shape="rect" id="node36" href="$structbuffer.html" title="buffer\&lt; byte \&gt;" alt="" coords="851,820,955,847"/>
 </map>

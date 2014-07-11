@@ -92,7 +92,7 @@ $(document).ready(function(){initNavTree('profile_8cc.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -103,6 +103,7 @@ $(document).ready(function(){initNavTree('profile_8cc.html','');});
 
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#define-members">Macros</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
@@ -123,32 +124,152 @@ Include dependency graph for profile.cc:</div>
 </div>
 <p><a href="profile_8cc_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_frame.html">Frame</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_entry.html">Entry</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="define-members"></a>
 Macros</h2></td></tr>
-<tr class="memitem:a5e3894a48ee7dc72356db67d62b8e9f6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5e3894a48ee7dc72356db67d62b8e9f6"></a>
-#define&#160;</td><td class="memItemRight" valign="bottom"><b>readCycleCounter</b>&#160;&#160;&#160;__builtin_readcyclecounter</td></tr>
+<tr class="memitem:a5e3894a48ee7dc72356db67d62b8e9f6"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="profile_8cc.html#a5e3894a48ee7dc72356db67d62b8e9f6">readCycleCounter</a>&#160;&#160;&#160;__builtin_readcyclecounter</td></tr>
 <tr class="separator:a5e3894a48ee7dc72356db67d62b8e9f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:ad0e834b2c274e591b8208835caf392e3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad0e834b2c274e591b8208835caf392e3"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator&lt;</b> (const Entry &amp;a, const Entry &amp;b)</td></tr>
+<tr class="memitem:ad0e834b2c274e591b8208835caf392e3"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="profile_8cc.html#ad0e834b2c274e591b8208835caf392e3">operator&lt;</a> (const <a class="el" href="struct_entry.html">Entry</a> &amp;a, const <a class="el" href="struct_entry.html">Entry</a> &amp;b)</td></tr>
 <tr class="separator:ad0e834b2c274e591b8208835caf392e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a90de5979863fbd998d00060f532d1c80"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a90de5979863fbd998d00060f532d1c80"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>__attribute</b> ((destructor)) logProfile() __attribute((no_instrument_function))</td></tr>
+<tr class="memitem:a90de5979863fbd998d00060f532d1c80"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="profile_8cc.html#a90de5979863fbd998d00060f532d1c80">__attribute</a> ((destructor)) logProfile() __attribute((no_instrument_function))</td></tr>
 <tr class="separator:a90de5979863fbd998d00060f532d1c80"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae9f7341e978b0778d203e653fed1cec5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae9f7341e978b0778d203e653fed1cec5"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>__cyg_profile_func_enter</b> (void *function, void *) <a class="el" href="thread_8h.html#a7b804c210df51cdf7300210b334396a1">__attribute</a>((no_instrument_function))</td></tr>
+<tr class="memitem:ae9f7341e978b0778d203e653fed1cec5"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="profile_8cc.html#ae9f7341e978b0778d203e653fed1cec5">__cyg_profile_func_enter</a> (void *<a class="el" href="structfunction.html">function</a>, void *) <a class="el" href="widget_8cc.html#af4fe44d6d792c1ffc3f147513962656b">__attribute</a>((no_instrument_function))</td></tr>
 <tr class="separator:ae9f7341e978b0778d203e653fed1cec5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab9e1f602d388cef3870f757aa2ec058b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab9e1f602d388cef3870f757aa2ec058b"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>__cyg_profile_func_exit</b> (void *, void *) <a class="el" href="thread_8h.html#a7b804c210df51cdf7300210b334396a1">__attribute</a>((no_instrument_function))</td></tr>
+<tr class="memitem:ab9e1f602d388cef3870f757aa2ec058b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="profile_8cc.html#ab9e1f602d388cef3870f757aa2ec058b">__cyg_profile_func_exit</a> (void *, void *) <a class="el" href="widget_8cc.html#af4fe44d6d792c1ffc3f147513962656b">__attribute</a>((no_instrument_function))</td></tr>
 <tr class="separator:ab9e1f602d388cef3870f757aa2ec058b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Profiles executable when linked (need all sources to be compiled with -finstrument-functions) </p>
 
 <p>Definition in file <a class="el" href="profile_8cc_source.html">profile.cc</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Macro Definition Documentation</h2>
+<a class="anchor" id="a5e3894a48ee7dc72356db67d62b8e9f6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define readCycleCounter&#160;&#160;&#160;__builtin_readcyclecounter</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="profile_8cc_source.html#l00007">7</a> of file <a class="el" href="profile_8cc_source.html">profile.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="ad0e834b2c274e591b8208835caf392e3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool operator&lt; </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_entry.html">Entry</a> &amp;&#160;</td>
+          <td class="paramname"><em>a</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="struct_entry.html">Entry</a> &amp;&#160;</td>
+          <td class="paramname"><em>b</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="profile_8cc_source.html#l00019">19</a> of file <a class="el" href="profile_8cc_source.html">profile.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a90de5979863fbd998d00060f532d1c80"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void __attribute </td>
+          <td>(</td>
+          <td class="paramtype">(destructor)&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="profile_8cc_source.html#l00022">22</a> of file <a class="el" href="profile_8cc_source.html">profile.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae9f7341e978b0778d203e653fed1cec5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void __cyg_profile_func_enter </td>
+          <td>(</td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>function</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname">&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="profile_8cc_source.html#l00034">34</a> of file <a class="el" href="profile_8cc_source.html">profile.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab9e1f602d388cef3870f757aa2ec058b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void __cyg_profile_func_exit </td>
+          <td>(</td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname">, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname">&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="profile_8cc_source.html#l00042">42</a> of file <a class="el" href="profile_8cc_source.html">profile.cc</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

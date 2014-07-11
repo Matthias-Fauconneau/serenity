@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('structutf8__iterator.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -119,31 +119,115 @@ $(document).ready(function(){initNavTree('structutf8__iterator.html','');});
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa0b7967d64f0fd9d73095cb450fbb375"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa0b7967d64f0fd9d73095cb450fbb375"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>utf8_iterator</b> (const byte *pointer)</td></tr>
+<tr class="memitem:aa0b7967d64f0fd9d73095cb450fbb375"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structutf8__iterator.html#aa0b7967d64f0fd9d73095cb450fbb375">utf8_iterator</a> (const <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> *<a class="el" href="structutf8__iterator.html#a73746d8ada56c7fe0bc2cdf97fc1d88b">pointer</a>)</td></tr>
 <tr class="separator:aa0b7967d64f0fd9d73095cb450fbb375"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab671ac2cbd265c778c1bba44a0f880ef"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab671ac2cbd265c778c1bba44a0f880ef"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator!=</b> (const <a class="el" href="structutf8__iterator.html">utf8_iterator</a> &amp;o) const </td></tr>
+<tr class="memitem:ab671ac2cbd265c778c1bba44a0f880ef"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structutf8__iterator.html#ab671ac2cbd265c778c1bba44a0f880ef">operator!=</a> (const <a class="el" href="structutf8__iterator.html">utf8_iterator</a> &amp;o) const </td></tr>
 <tr class="separator:ab671ac2cbd265c778c1bba44a0f880ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9cf0abc2eacddfa891f2c47b5253d2fd"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9cf0abc2eacddfa891f2c47b5253d2fd"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structutf8__iterator.html#a9cf0abc2eacddfa891f2c47b5253d2fd">operator*</a> () const </td></tr>
-<tr class="memdesc:a9cf0abc2eacddfa891f2c47b5253d2fd"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structutf8__iterator.html" title="Iterates UTF-8 encoded strings. ">utf8_iterator</a> <br/></td></tr>
+<tr class="memitem:a9cf0abc2eacddfa891f2c47b5253d2fd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structutf8__iterator.html#a9cf0abc2eacddfa891f2c47b5253d2fd">operator*</a> () const </td></tr>
+<tr class="memdesc:a9cf0abc2eacddfa891f2c47b5253d2fd"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structutf8__iterator.html" title="Iterates UTF-8 encoded strings. ">utf8_iterator</a>  <a href="#a9cf0abc2eacddfa891f2c47b5253d2fd">More...</a><br/></td></tr>
 <tr class="separator:a9cf0abc2eacddfa891f2c47b5253d2fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac8d53edb82f8d61d7b6dac44e17bdaa5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac8d53edb82f8d61d7b6dac44e17bdaa5"></a>
-const <a class="el" href="structutf8__iterator.html">utf8_iterator</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator++</b> ()</td></tr>
+<tr class="memitem:ac8d53edb82f8d61d7b6dac44e17bdaa5"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="structutf8__iterator.html">utf8_iterator</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structutf8__iterator.html#ac8d53edb82f8d61d7b6dac44e17bdaa5">operator++</a> ()</td></tr>
 <tr class="separator:ac8d53edb82f8d61d7b6dac44e17bdaa5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a73746d8ada56c7fe0bc2cdf97fc1d88b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a73746d8ada56c7fe0bc2cdf97fc1d88b"></a>
-const byte *&#160;</td><td class="memItemRight" valign="bottom"><b>pointer</b></td></tr>
+<tr class="memitem:a73746d8ada56c7fe0bc2cdf97fc1d88b"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structutf8__iterator.html#a73746d8ada56c7fe0bc2cdf97fc1d88b">pointer</a></td></tr>
 <tr class="separator:a73746d8ada56c7fe0bc2cdf97fc1d88b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Iterates UTF-8 encoded strings. </p>
 
 <p>Definition at line <a class="el" href="utf8_8h_source.html#l00006">6</a> of file <a class="el" href="utf8_8h_source.html">utf8.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="aa0b7967d64f0fd9d73095cb450fbb375"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">utf8_iterator::utf8_iterator </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a> *&#160;</td>
+          <td class="paramname"><em>pointer</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="utf8_8h_source.html#l00008">8</a> of file <a class="el" href="utf8_8h_source.html">utf8.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="ab671ac2cbd265c778c1bba44a0f880ef"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool utf8_iterator::operator!= </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="structutf8__iterator.html">utf8_iterator</a> &amp;&#160;</td>
+          <td class="paramname"><em>o</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="utf8_8h_source.html#l00009">9</a> of file <a class="el" href="utf8_8h_source.html">utf8.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9cf0abc2eacddfa891f2c47b5253d2fd"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> utf8_iterator::operator* </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p><a class="el" href="structutf8__iterator.html" title="Iterates UTF-8 encoded strings. ">utf8_iterator</a> </p>
+
+<p>Definition at line <a class="el" href="utf8_8cc_source.html#l00004">4</a> of file <a class="el" href="utf8_8cc_source.html">utf8.cc</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ac8d53edb82f8d61d7b6dac44e17bdaa5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="structutf8__iterator.html">utf8_iterator</a> &amp; utf8_iterator::operator++ </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="utf8_8cc_source.html#l00012">12</a> of file <a class="el" href="utf8_8cc_source.html">utf8.cc</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a73746d8ada56c7fe0bc2cdf97fc1d88b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="core_8h.html#a2b7e7856b48ec3327148ac994ad95cd5">byte</a>* utf8_iterator::pointer</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="utf8_8h_source.html#l00007">7</a> of file <a class="el" href="utf8_8h_source.html">utf8.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

@@ -1,5 +1,6 @@
 <map id="SubsetReconstruction" name="SubsetReconstruction">
-<area shape="rect" id="node3" href="$struct_m_l_t_r.html" title="Maximum likelihood expectation maximization for transmission tomography. " alt="" coords="9,155,67,181"/>
-<area shape="rect" id="node4" href="$struct_s_a_r_t.html" title="Simultaneous iterative algebraic reconstruction technique. " alt="" coords="92,155,149,181"/>
-<area shape="rect" id="node2" href="$struct_reconstruction.html" title="Base class for reconstruction. " alt="" coords="25,5,135,32"/>
+<area shape="rect" id="node3" href="$struct_m_l_t_r.html" title="Maximum likelihood expectation maximization for transmission tomography. " alt="" coords="5,155,63,181"/>
+<area shape="rect" id="node4" href="$struct_p_m_l_t_r.html" title="PMLTR" alt="" coords="88,155,155,181"/>
+<area shape="rect" id="node5" href="$struct_s_a_r_t.html" title="Simultaneous iterative algebraic reconstruction technique. " alt="" coords="179,155,236,181"/>
+<area shape="rect" id="node2" href="$struct_reconstruction.html" title="Base class for reconstruction. " alt="" coords="66,5,176,32"/>
 </map>

@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_projection.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -118,82 +118,60 @@ Collaboration diagram for Projection:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_projection__coll__graph.png" border="0" usemap="#_projection_coll__map" alt="Collaboration graph"/></div>
 <map name="_projection_coll__map" id="_projection_coll__map">
-<area shape="rect" id="node2" href="structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,5,131,32"/></map>
+<area shape="rect" id="node2" href="structvec.html" title="vec\&lt; xyz, int, 3 \&gt;" alt="" coords="5,83,131,109"/><area shape="rect" id="node3" href="structxyz.html" title="xyz\&lt; int \&gt;" alt="" coords="27,5,108,32"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a921530bc7e569320d8e3867b1c0b6ac7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a921530bc7e569320d8e3867b1c0b6ac7"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Projection</b> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> volumeSize, <a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> projectionSize, const Trajectory trajectory, const float rotationCount)</td></tr>
+<tr class="memitem:a921530bc7e569320d8e3867b1c0b6ac7"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a921530bc7e569320d8e3867b1c0b6ac7">Projection</a> (<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="struct_projection.html#a16ffdae1018247bbdd13c6922d5b5d41">volumeSize</a>, <a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> <a class="el" href="struct_projection.html#a26d0a990951eccf369d3570bdebc3f55">projectionSize</a>, const <a class="el" href="projection_8h.html#a4e2fc53eaf63e4eaf7ac56ccefddc4f7">Trajectory</a> <a class="el" href="struct_projection.html#a5846ba0ccc734108fe3eff06cb392813">trajectory</a>, const float <a class="el" href="struct_projection.html#aa35ad833d06433eb3e764ea3c5b1b1b2">rotationCount</a>)</td></tr>
 <tr class="separator:a921530bc7e569320d8e3867b1c0b6ac7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a60802358a9390827fcf478cd9d3c73ad"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a60802358a9390827fcf478cd9d3c73ad"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>angle</b> (uint index) const </td></tr>
+<tr class="memitem:a60802358a9390827fcf478cd9d3c73ad"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a60802358a9390827fcf478cd9d3c73ad">angle</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index) const </td></tr>
 <tr class="separator:a60802358a9390827fcf478cd9d3c73ad"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae1fce44c40c875f4314706dcecbf0c48"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae1fce44c40c875f4314706dcecbf0c48"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>dz</b> (uint index) const </td></tr>
+<tr class="memitem:ae1fce44c40c875f4314706dcecbf0c48"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#ae1fce44c40c875f4314706dcecbf0c48">dz</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index) const </td></tr>
 <tr class="separator:ae1fce44c40c875f4314706dcecbf0c48"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a60965000ac654b0949b2360bb038ee25"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a60965000ac654b0949b2360bb038ee25"></a>
-<a class="el" href="structmat4.html">mat4</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a60965000ac654b0949b2360bb038ee25">worldToView</a> (uint index) const </td></tr>
-<tr class="memdesc:a60965000ac654b0949b2360bb038ee25"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation) <br/></td></tr>
+<tr class="memitem:a60965000ac654b0949b2360bb038ee25"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmat4.html">mat4</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a60965000ac654b0949b2360bb038ee25">worldToView</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index) const </td></tr>
+<tr class="memdesc:a60965000ac654b0949b2360bb038ee25"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation)  <a href="#a60965000ac654b0949b2360bb038ee25">More...</a><br/></td></tr>
 <tr class="separator:a60965000ac654b0949b2360bb038ee25"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af2c28e325a352f22e1cdf5acd924864e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af2c28e325a352f22e1cdf5acd924864e"></a>
-<a class="el" href="structmat4.html">mat4</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#af2c28e325a352f22e1cdf5acd924864e">worldToScaledView</a> (uint index) const </td></tr>
-<tr class="memdesc:af2c28e325a352f22e1cdf5acd924864e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME) <br/></td></tr>
+<tr class="memitem:af2c28e325a352f22e1cdf5acd924864e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmat4.html">mat4</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#af2c28e325a352f22e1cdf5acd924864e">worldToScaledView</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index) const </td></tr>
+<tr class="memdesc:af2c28e325a352f22e1cdf5acd924864e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME)  <a href="#af2c28e325a352f22e1cdf5acd924864e">More...</a><br/></td></tr>
 <tr class="separator:af2c28e325a352f22e1cdf5acd924864e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae19626dba1bdbe613bfe185439d3ded6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae19626dba1bdbe613bfe185439d3ded6"></a>
-<a class="el" href="structmat4.html">mat4</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#ae19626dba1bdbe613bfe185439d3ded6">worldToDevice</a> (uint index) const </td></tr>
-<tr class="memdesc:ae19626dba1bdbe613bfe185439d3ded6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transforms from world coordinates [±size] to device coordinates [±size/2]. <br/></td></tr>
+<tr class="memitem:ae19626dba1bdbe613bfe185439d3ded6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structmat4.html">mat4</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#ae19626dba1bdbe613bfe185439d3ded6">worldToDevice</a> (<a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> index) const </td></tr>
+<tr class="memdesc:ae19626dba1bdbe613bfe185439d3ded6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transforms from world coordinates [±size] to device coordinates [±size/2].  <a href="#ae19626dba1bdbe613bfe185439d3ded6">More...</a><br/></td></tr>
 <tr class="separator:ae19626dba1bdbe613bfe185439d3ded6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a16ffdae1018247bbdd13c6922d5b5d41"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a16ffdae1018247bbdd13c6922d5b5d41"></a>
-<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td><td class="memItemRight" valign="bottom"><b>volumeSize</b></td></tr>
+<tr class="memitem:a16ffdae1018247bbdd13c6922d5b5d41"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a16ffdae1018247bbdd13c6922d5b5d41">volumeSize</a></td></tr>
 <tr class="separator:a16ffdae1018247bbdd13c6922d5b5d41"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a26d0a990951eccf369d3570bdebc3f55"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a26d0a990951eccf369d3570bdebc3f55"></a>
-<a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td><td class="memItemRight" valign="bottom"><b>projectionSize</b></td></tr>
+<tr class="memitem:a26d0a990951eccf369d3570bdebc3f55"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a26d0a990951eccf369d3570bdebc3f55">projectionSize</a></td></tr>
 <tr class="separator:a26d0a990951eccf369d3570bdebc3f55"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5fd9a22d01df5a395239277bd008224b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5fd9a22d01df5a395239277bd008224b"></a>
-uint&#160;</td><td class="memItemRight" valign="bottom"><b>count</b> = projectionSize.z</td></tr>
+<tr class="memitem:a5fd9a22d01df5a395239277bd008224b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a5fd9a22d01df5a395239277bd008224b">count</a> = <a class="el" href="opencl_8cc.html#a4154341b19f8c08e19c2e8764454aa78">projectionSize.z</a></td></tr>
 <tr class="separator:a5fd9a22d01df5a395239277bd008224b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9f90c7fe44b172c1b0f7680b8e8137a4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9f90c7fe44b172c1b0f7680b8e8137a4"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>detectorHalfWidth</b> = 1</td></tr>
+<tr class="memitem:a9f90c7fe44b172c1b0f7680b8e8137a4"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a> = 1</td></tr>
 <tr class="separator:a9f90c7fe44b172c1b0f7680b8e8137a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab70e76dda53caddf76e96b5af1ef2842"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab70e76dda53caddf76e96b5af1ef2842"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>cameraLength</b> = 1</td></tr>
+<tr class="memitem:ab70e76dda53caddf76e96b5af1ef2842"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#ab70e76dda53caddf76e96b5af1ef2842">cameraLength</a> = 1</td></tr>
 <tr class="separator:ab70e76dda53caddf76e96b5af1ef2842"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6cf2550e6f7f463bf8adb5c4d7cb0808"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6cf2550e6f7f463bf8adb5c4d7cb0808"></a>
-float&#160;</td><td class="memItemRight" valign="bottom"><b>specimenDistance</b> = 1./16</td></tr>
+<tr class="memitem:a6cf2550e6f7f463bf8adb5c4d7cb0808"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a> = 1./16</td></tr>
 <tr class="separator:a6cf2550e6f7f463bf8adb5c4d7cb0808"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5846ba0ccc734108fe3eff06cb392813"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5846ba0ccc734108fe3eff06cb392813"></a>
-Trajectory&#160;</td><td class="memItemRight" valign="bottom"><b>trajectory</b></td></tr>
+<tr class="memitem:a5846ba0ccc734108fe3eff06cb392813"><td class="memItemLeft" align="right" valign="top"><a class="el" href="projection_8h.html#a4e2fc53eaf63e4eaf7ac56ccefddc4f7">Trajectory</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a5846ba0ccc734108fe3eff06cb392813">trajectory</a></td></tr>
 <tr class="separator:a5846ba0ccc734108fe3eff06cb392813"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa35ad833d06433eb3e764ea3c5b1b1b2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa35ad833d06433eb3e764ea3c5b1b1b2"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>rotationCount</b></td></tr>
+<tr class="memitem:aa35ad833d06433eb3e764ea3c5b1b1b2"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#aa35ad833d06433eb3e764ea3c5b1b1b2">rotationCount</a></td></tr>
 <tr class="separator:aa35ad833d06433eb3e764ea3c5b1b1b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5d4d2a8f528df5e8469c6f3596e3e1f1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5d4d2a8f528df5e8469c6f3596e3e1f1"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>volumeAspectRatio</b> = float(volumeSize.z-1) / float(volumeSize.x-1)</td></tr>
+<tr class="memitem:a5d4d2a8f528df5e8469c6f3596e3e1f1"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a5d4d2a8f528df5e8469c6f3596e3e1f1">volumeAspectRatio</a> = float(<a class="el" href="opencl_8cc.html#a4154341b19f8c08e19c2e8764454aa78">volumeSize.z</a>-1) / float(<a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">volumeSize.x</a>-1)</td></tr>
 <tr class="separator:a5d4d2a8f528df5e8469c6f3596e3e1f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9c8fca8012bb3f82ebb0bc6b1e714df4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9c8fca8012bb3f82ebb0bc6b1e714df4"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>projectionAspectRatio</b> = float(projectionSize.y-1) / float(projectionSize.x-1)</td></tr>
+<tr class="memitem:a9c8fca8012bb3f82ebb0bc6b1e714df4"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a9c8fca8012bb3f82ebb0bc6b1e714df4">projectionAspectRatio</a> = float(<a class="el" href="opencl_8cc.html#a689da9dbd55f86098520b934ecb8a96e">projectionSize.y</a>-1) / float(<a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">projectionSize.x</a>-1)</td></tr>
 <tr class="separator:a9c8fca8012bb3f82ebb0bc6b1e714df4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6f9bfdb1a11ea09ad131266e90cfaf6a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6f9bfdb1a11ea09ad131266e90cfaf6a"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>detectorHalfHeight</b> = projectionAspectRatio * detectorHalfWidth</td></tr>
+<tr class="memitem:a6f9bfdb1a11ea09ad131266e90cfaf6a"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a6f9bfdb1a11ea09ad131266e90cfaf6a">detectorHalfHeight</a> = <a class="el" href="struct_projection.html#a9c8fca8012bb3f82ebb0bc6b1e714df4">projectionAspectRatio</a> * <a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a></td></tr>
 <tr class="separator:a6f9bfdb1a11ea09ad131266e90cfaf6a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a41b5bac3e05f2d20911911581465cd31"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a41b5bac3e05f2d20911911581465cd31"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>volumeRadius</b> = detectorHalfWidth / sqrt(sq(detectorHalfWidth)+sq(cameraLength)) * specimenDistance</td></tr>
+<tr class="memitem:a41b5bac3e05f2d20911911581465cd31"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a> = <a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a> / <a class="el" href="math_8h.html#a5717d31ff34ad2ce2db5e2086b36b612">sqrt</a>(<a class="el" href="volume_8h.html#a581c29907f64811f9454e3a1243b4820">sq</a>(<a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a>)+<a class="el" href="volume_8h.html#a581c29907f64811f9454e3a1243b4820">sq</a>(<a class="el" href="struct_projection.html#ab70e76dda53caddf76e96b5af1ef2842">cameraLength</a>)) * <a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a></td></tr>
 <tr class="separator:a41b5bac3e05f2d20911911581465cd31"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae62389bf0a2caf6109644b917171247b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae62389bf0a2caf6109644b917171247b"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>zExtent</b> = (specimenDistance - volumeRadius) / cameraLength * detectorHalfHeight</td></tr>
+<tr class="memitem:ae62389bf0a2caf6109644b917171247b"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#ae62389bf0a2caf6109644b917171247b">zExtent</a> = (<a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a> - <a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a>) / <a class="el" href="struct_projection.html#ab70e76dda53caddf76e96b5af1ef2842">cameraLength</a> * <a class="el" href="struct_projection.html#a6f9bfdb1a11ea09ad131266e90cfaf6a">detectorHalfHeight</a></td></tr>
 <tr class="separator:ae62389bf0a2caf6109644b917171247b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab2e93cb94a09cb43ffdcf21ad3e3b516"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab2e93cb94a09cb43ffdcf21ad3e3b516"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>deltaZ</b> = volumeAspectRatio - zExtent/volumeRadius</td></tr>
+<tr class="memitem:ab2e93cb94a09cb43ffdcf21ad3e3b516"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#ab2e93cb94a09cb43ffdcf21ad3e3b516">deltaZ</a> = <a class="el" href="struct_projection.html#a5d4d2a8f528df5e8469c6f3596e3e1f1">volumeAspectRatio</a> - <a class="el" href="struct_projection.html#ae62389bf0a2caf6109644b917171247b">zExtent</a>/<a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a></td></tr>
 <tr class="separator:ab2e93cb94a09cb43ffdcf21ad3e3b516"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a279843b00f57c92a2c79d1d89b30914b"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a279843b00f57c92a2c79d1d89b30914b"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>distance</b> = specimenDistance/volumeRadius</td></tr>
+<tr class="memitem:a279843b00f57c92a2c79d1d89b30914b"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a279843b00f57c92a2c79d1d89b30914b">distance</a> = <a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a>/<a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a></td></tr>
 <tr class="separator:a279843b00f57c92a2c79d1d89b30914b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6534239964d23c7f9df9f3325766e116"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6534239964d23c7f9df9f3325766e116"></a>
-const float&#160;</td><td class="memItemRight" valign="bottom"><b>extent</b> = 2/sqrt(1-1/sq(distance))</td></tr>
+<tr class="memitem:a6534239964d23c7f9df9f3325766e116"><td class="memItemLeft" align="right" valign="top">const float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_projection.html#a6534239964d23c7f9df9f3325766e116">extent</a> = 2/<a class="el" href="math_8h.html#a5717d31ff34ad2ce2db5e2086b36b612">sqrt</a>(1-1/<a class="el" href="volume_8h.html#a581c29907f64811f9454e3a1243b4820">sq</a>(<a class="el" href="struct_projection.html#a279843b00f57c92a2c79d1d89b30914b">distance</a>))</td></tr>
 <tr class="separator:a6534239964d23c7f9df9f3325766e116"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
@@ -201,7 +179,370 @@ const float&#160;</td><td class="memItemRight" valign="bottom"><b>extent</b> = 2
 <dl class="section note"><dt>Note</dt><dd>Defines all <em>count</em> projections using an index parameter </dd></dl>
 
 <p>Definition at line <a class="el" href="projection_8h_source.html#l00009">9</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="a921530bc7e569320d8e3867b1c0b6ac7"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">Projection::Projection </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
+          <td class="paramname"><em>volumeSize</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a>&#160;</td>
+          <td class="paramname"><em>projectionSize</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="projection_8h.html#a4e2fc53eaf63e4eaf7ac56ccefddc4f7">Trajectory</a>&#160;</td>
+          <td class="paramname"><em>trajectory</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const float&#160;</td>
+          <td class="paramname"><em>rotationCount</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00031">31</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a60802358a9390827fcf478cd9d3c73ad"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Projection::angle </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00034">34</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae1fce44c40c875f4314706dcecbf0c48"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Projection::dz </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00041">41</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a60965000ac654b0949b2360bb038ee25"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmat4.html">mat4</a> Projection::worldToView </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Transforms from world coordinates [±size/2] to view coordinates (only rotation and translation) </p>
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00056">56</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="af2c28e325a352f22e1cdf5acd924864e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmat4.html">mat4</a> Projection::worldToScaledView </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Transforms from world coordinates to view coordinates (scaled to [±size/2]) (FIXME) </p>
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00060">60</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae19626dba1bdbe613bfe185439d3ded6"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structmat4.html">mat4</a> Projection::worldToDevice </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td>
+          <td class="paramname"><em>index</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Transforms from world coordinates [±size] to device coordinates [±size/2]. </p>
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00064">64</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a class="anchor" id="a16ffdae1018247bbdd13c6922d5b5d41"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> Projection::volumeSize</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00011">11</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a26d0a990951eccf369d3570bdebc3f55"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="vector_8h.html#a93dfd6ae094f58b41710d9a4ba1a9f14">int3</a> Projection::projectionSize</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00012">12</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5fd9a22d01df5a395239277bd008224b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a> Projection::count = <a class="el" href="opencl_8cc.html#a4154341b19f8c08e19c2e8764454aa78">projectionSize.z</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00013">13</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9f90c7fe44b172c1b0f7680b8e8137a4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Projection::detectorHalfWidth = 1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00015">15</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab70e76dda53caddf76e96b5af1ef2842"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Projection::cameraLength = 1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00016">16</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6cf2550e6f7f463bf8adb5c4d7cb0808"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">float Projection::specimenDistance = 1./16</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00017">17</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5846ba0ccc734108fe3eff06cb392813"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="projection_8h.html#a4e2fc53eaf63e4eaf7ac56ccefddc4f7">Trajectory</a> Projection::trajectory</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00018">18</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="aa35ad833d06433eb3e764ea3c5b1b1b2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::rotationCount</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00019">19</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a5d4d2a8f528df5e8469c6f3596e3e1f1"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::volumeAspectRatio = float(<a class="el" href="opencl_8cc.html#a4154341b19f8c08e19c2e8764454aa78">volumeSize.z</a>-1) / float(<a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">volumeSize.x</a>-1)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00022">22</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a9c8fca8012bb3f82ebb0bc6b1e714df4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::projectionAspectRatio = float(<a class="el" href="opencl_8cc.html#a689da9dbd55f86098520b934ecb8a96e">projectionSize.y</a>-1) / float(<a class="el" href="opencl_8cc.html#a011601a145292cfa51692a00986fba79">projectionSize.x</a>-1)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00023">23</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6f9bfdb1a11ea09ad131266e90cfaf6a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::detectorHalfHeight = <a class="el" href="struct_projection.html#a9c8fca8012bb3f82ebb0bc6b1e714df4">projectionAspectRatio</a> * <a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00024">24</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a41b5bac3e05f2d20911911581465cd31"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::volumeRadius = <a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a> / <a class="el" href="math_8h.html#a5717d31ff34ad2ce2db5e2086b36b612">sqrt</a>(<a class="el" href="volume_8h.html#a581c29907f64811f9454e3a1243b4820">sq</a>(<a class="el" href="struct_projection.html#a9f90c7fe44b172c1b0f7680b8e8137a4">detectorHalfWidth</a>)+<a class="el" href="volume_8h.html#a581c29907f64811f9454e3a1243b4820">sq</a>(<a class="el" href="struct_projection.html#ab70e76dda53caddf76e96b5af1ef2842">cameraLength</a>)) * <a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00025">25</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ae62389bf0a2caf6109644b917171247b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::zExtent = (<a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a> - <a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a>) / <a class="el" href="struct_projection.html#ab70e76dda53caddf76e96b5af1ef2842">cameraLength</a> * <a class="el" href="struct_projection.html#a6f9bfdb1a11ea09ad131266e90cfaf6a">detectorHalfHeight</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00026">26</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="ab2e93cb94a09cb43ffdcf21ad3e3b516"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::deltaZ = <a class="el" href="struct_projection.html#a5d4d2a8f528df5e8469c6f3596e3e1f1">volumeAspectRatio</a> - <a class="el" href="struct_projection.html#ae62389bf0a2caf6109644b917171247b">zExtent</a>/<a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00027">27</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a279843b00f57c92a2c79d1d89b30914b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::distance = <a class="el" href="struct_projection.html#a6cf2550e6f7f463bf8adb5c4d7cb0808">specimenDistance</a>/<a class="el" href="struct_projection.html#a41b5bac3e05f2d20911911581465cd31">volumeRadius</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00028">28</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a6534239964d23c7f9df9f3325766e116"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const float Projection::extent = 2/<a class="el" href="math_8h.html#a5717d31ff34ad2ce2db5e2086b36b612">sqrt</a>(1-1/<a class="el" href="volume_8h.html#a581c29907f64811f9454e3a1243b4820">sq</a>(<a class="el" href="struct_projection.html#a279843b00f57c92a2c79d1d89b30914b">distance</a>))</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="projection_8h_source.html#l00029">29</a> of file <a class="el" href="projection_8h_source.html">projection.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

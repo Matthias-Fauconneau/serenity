@@ -93,7 +93,7 @@ $(document).ready(function(){initNavTree('struct_widget_grid.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -127,159 +127,133 @@ Collaboration diagram for WidgetGrid:</div>
 <div class="dyncontent">
 <div class="center"><img src="struct_widget_grid__coll__graph.png" border="0" usemap="#_widget_grid_coll__map" alt="Collaboration graph"/></div>
 <map name="_widget_grid_coll__map" id="_widget_grid_coll__map">
-<area shape="rect" id="node2" href="struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="239,355,324,381"/><area shape="rect" id="node3" href="struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="159,264,220,291"/><area shape="rect" id="node9" href="struct_widget_references.html" title="WidgetReferences" alt="" coords="84,355,213,381"/><area shape="rect" id="node4" href="struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="158,187,220,213"/><area shape="rect" id="node5" href="struct_image.html" title="2D array of byte4 " alt="" coords="160,96,217,123"/><area shape="rect" id="node6" href="structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="75,5,175,32"/><area shape="rect" id="node7" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="199,5,309,32"/><area shape="rect" id="node8" href="structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="245,264,363,291"/><area shape="rect" id="node10" href="structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="5,264,133,291"/></map>
+<area shape="rect" id="node2" href="struct_grid_layout.html" title="Layouts items on an uniform width x height grid. " alt="" coords="191,355,276,381"/><area shape="rect" id="node3" href="struct_layout.html" title="Proxy Widget containing multiple widgets. " alt="" coords="159,264,220,291"/><area shape="rect" id="node10" href="struct_widget_references.html" title="WidgetReferences" alt="" coords="36,355,165,381"/><area shape="rect" id="node4" href="struct_widget.html" title="Abstract component to compose user interfaces. " alt="" coords="158,187,220,213"/><area shape="rect" id="node5" href="struct_image.html" title="2D array of byte4 " alt="" coords="160,96,217,123"/><area shape="rect" id="node6" href="structbuffer.html" title="buffer\&lt; vec \&gt;" alt="" coords="75,5,175,32"/><area shape="rect" id="node7" href="structvec.html" title="vec\&lt; V, T, N \&gt;" alt="" coords="199,5,309,32"/><area shape="rect" id="node8" href="structvec.html" title="vec\&lt; xy, int, 2 \&gt;" alt="" coords="245,264,363,291"/><area shape="rect" id="node9" href="structxy.html" title="xy\&lt; int \&gt;" alt="" coords="267,187,340,213"/><area shape="rect" id="node11" href="structbuffer.html" title="buffer\&lt; Widget * \&gt;" alt="" coords="5,264,133,291"/></map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a40ece37d010a5527e349788b4ecd1667"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a40ece37d010a5527e349788b4ecd1667"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>WidgetGrid</b> (<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="struct_widget.html">Widget</a> * &gt; &amp;&amp;widgets)</td></tr>
+<tr class="memitem:aab7f74c03d174856fd637ef4143e8fe4"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_grid.html#aab7f74c03d174856fd637ef4143e8fe4">WidgetGrid</a> ()</td></tr>
+<tr class="separator:aab7f74c03d174856fd637ef4143e8fe4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a40ece37d010a5527e349788b4ecd1667"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_grid.html#a40ece37d010a5527e349788b4ecd1667">WidgetGrid</a> (<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="struct_widget.html">Widget</a> * &gt; &amp;&amp;widgets)</td></tr>
 <tr class="separator:a40ece37d010a5527e349788b4ecd1667"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_grid_layout"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_grid_layout')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_grid_layout.html">GridLayout</a></td></tr>
-<tr class="memitem:a90b728b2e6e8c98c5688599066a3dd2f inherit pub_methods_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a90b728b2e6e8c98c5688599066a3dd2f"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>GridLayout</b> (int <a class="el" href="struct_grid_layout.html#ac37cc8acc797981c121867c700257b0e">width</a>=0, int <a class="el" href="struct_grid_layout.html#a8d0ad454e99e83f2073b0f8f1ec7567f">height</a>=0, int <a class="el" href="struct_grid_layout.html#a89ebd1e62be6dddda63e35b4f28d074c">margin</a>=0)</td></tr>
+<tr class="memitem:a90b728b2e6e8c98c5688599066a3dd2f inherit pub_methods_struct_grid_layout"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a90b728b2e6e8c98c5688599066a3dd2f">GridLayout</a> (int <a class="el" href="struct_grid_layout.html#ac37cc8acc797981c121867c700257b0e">width</a>=0, int <a class="el" href="struct_grid_layout.html#a8d0ad454e99e83f2073b0f8f1ec7567f">height</a>=0, int <a class="el" href="struct_grid_layout.html#a89ebd1e62be6dddda63e35b4f28d074c">margin</a>=0)</td></tr>
 <tr class="separator:a90b728b2e6e8c98c5688599066a3dd2f inherit pub_methods_struct_grid_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab19ea2b9a4fd88ef8c86fb7fbfddcd41 inherit pub_methods_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#ab19ea2b9a4fd88ef8c86fb7fbfddcd41">sizeHint</a> ()</td></tr>
 <tr class="separator:ab19ea2b9a4fd88ef8c86fb7fbfddcd41 inherit pub_methods_struct_grid_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7dbb4a3e2482dd89bdbc41ef200fa047 inherit pub_methods_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7dbb4a3e2482dd89bdbc41ef200fa047"></a>
-<a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="struct_rect.html">Rect</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a7dbb4a3e2482dd89bdbc41ef200fa047">layout</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> size) override</td></tr>
-<tr class="memdesc:a7dbb4a3e2482dd89bdbc41ef200fa047 inherit pub_methods_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes widgets layout. <br/></td></tr>
+<tr class="memitem:a7dbb4a3e2482dd89bdbc41ef200fa047 inherit pub_methods_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="struct_rect.html">Rect</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a7dbb4a3e2482dd89bdbc41ef200fa047">layout</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>) override</td></tr>
+<tr class="memdesc:a7dbb4a3e2482dd89bdbc41ef200fa047 inherit pub_methods_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes widgets layout.  <a href="#a7dbb4a3e2482dd89bdbc41ef200fa047">More...</a><br/></td></tr>
 <tr class="separator:a7dbb4a3e2482dd89bdbc41ef200fa047 inherit pub_methods_struct_grid_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_layout"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_layout')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_layout.html">Layout</a></td></tr>
-<tr class="memitem:a57b78f1e1cb7072754a72f5881c38b6a inherit pub_methods_struct_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a57b78f1e1cb7072754a72f5881c38b6a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_layout.html#a57b78f1e1cb7072754a72f5881c38b6a">render</a> () override</td></tr>
-<tr class="memdesc:a57b78f1e1cb7072754a72f5881c38b6a inherit pub_methods_struct_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders all visible child widgets. <br/></td></tr>
+<tr class="memitem:a57b78f1e1cb7072754a72f5881c38b6a inherit pub_methods_struct_layout"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_layout.html#a57b78f1e1cb7072754a72f5881c38b6a">render</a> () override</td></tr>
+<tr class="memdesc:a57b78f1e1cb7072754a72f5881c38b6a inherit pub_methods_struct_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders all visible child widgets.  <a href="#a57b78f1e1cb7072754a72f5881c38b6a">More...</a><br/></td></tr>
 <tr class="separator:a57b78f1e1cb7072754a72f5881c38b6a inherit pub_methods_struct_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a72395ea0fb973484b17189fdf11450c8 inherit pub_methods_struct_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a72395ea0fb973484b17189fdf11450c8"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_layout.html#a72395ea0fb973484b17189fdf11450c8">mouseEvent</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> size, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button) override</td></tr>
-<tr class="memdesc:a72395ea0fb973484b17189fdf11450c8 inherit pub_methods_struct_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards event to intersecting child widgets until accepted. <br/></td></tr>
+<tr class="memitem:a72395ea0fb973484b17189fdf11450c8 inherit pub_methods_struct_layout"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_layout.html#a72395ea0fb973484b17189fdf11450c8">mouseEvent</a> (<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button) override</td></tr>
+<tr class="memdesc:a72395ea0fb973484b17189fdf11450c8 inherit pub_methods_struct_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Forwards event to intersecting child widgets until accepted.  <a href="#a72395ea0fb973484b17189fdf11450c8">More...</a><br/></td></tr>
 <tr class="separator:a72395ea0fb973484b17189fdf11450c8 inherit pub_methods_struct_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_widget"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_widget')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_widget.html">Widget</a></td></tr>
-<tr class="memitem:a960adfe48af4e7ae159a96e258627252 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a960adfe48af4e7ae159a96e258627252"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>render</b> (const <a class="el" href="struct_image.html">Image</a> &amp;<a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a>)</td></tr>
+<tr class="memitem:a960adfe48af4e7ae159a96e258627252 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a960adfe48af4e7ae159a96e258627252">render</a> (const <a class="el" href="struct_image.html">Image</a> &amp;<a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a>)</td></tr>
 <tr class="separator:a960adfe48af4e7ae159a96e258627252 inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa3b1e3fe0a10ab2184c9da6b7121f9c6"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#aa3b1e3fe0a10ab2184c9da6b7121f9c6">mouseEvent</a> (<a class="el" href="struct_rect.html">Rect</a> rect, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button)</td></tr>
-<tr class="memdesc:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convenience overload for layout implementation. <br/></td></tr>
+<tr class="memitem:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#aa3b1e3fe0a10ab2184c9da6b7121f9c6">mouseEvent</a> (<a class="el" href="struct_rect.html">Rect</a> rect, <a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a> cursor, <a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> event, <a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> button)</td></tr>
+<tr class="memdesc:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convenience overload for layout implementation.  <a href="#aa3b1e3fe0a10ab2184c9da6b7121f9c6">More...</a><br/></td></tr>
 <tr class="separator:aa3b1e3fe0a10ab2184c9da6b7121f9c6 inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6c724859c52bf62948ef9b6ce0a1105c inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a6c724859c52bf62948ef9b6ce0a1105c">keyPress</a> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, Modifiers modifiers)</td></tr>
+<tr class="memitem:a6c724859c52bf62948ef9b6ce0a1105c inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a6c724859c52bf62948ef9b6ce0a1105c">keyPress</a> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, <a class="el" href="widget_8h.html#a153f7e4dd506d333b40d9b3c27719e0d">Modifiers</a> modifiers)</td></tr>
 <tr class="separator:a6c724859c52bf62948ef9b6ce0a1105c inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8b2e152fad3de4eb05cb97939977d0bb inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8b2e152fad3de4eb05cb97939977d0bb"></a>
-virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>keyRelease</b> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, Modifiers modifiers)</td></tr>
+<tr class="memitem:a8b2e152fad3de4eb05cb97939977d0bb inherit pub_methods_struct_widget"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a8b2e152fad3de4eb05cb97939977d0bb">keyRelease</a> (<a class="el" href="widget_8h.html#ab3c7af4820830f9166ede9e5623c4e73">Key</a> key, <a class="el" href="widget_8h.html#a153f7e4dd506d333b40d9b3c27719e0d">Modifiers</a> modifiers)</td></tr>
 <tr class="separator:a8b2e152fad3de4eb05cb97939977d0bb inherit pub_methods_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_struct_widget_references"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_struct_widget_references')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="struct_widget_references.html">WidgetReferences</a></td></tr>
-<tr class="memitem:aa14515bad376f252422ad0abd49d2fc9 inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa14515bad376f252422ad0abd49d2fc9"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>WidgetReferences</b> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="struct_widget.html">Widget</a> * &gt; &amp;widgets)</td></tr>
+<tr class="memitem:a7f2911370da7e096cdaaaa49dea5aec8 inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_references.html#a7f2911370da7e096cdaaaa49dea5aec8">WidgetReferences</a> ()</td></tr>
+<tr class="separator:a7f2911370da7e096cdaaaa49dea5aec8 inherit pub_methods_struct_widget_references"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa14515bad376f252422ad0abd49d2fc9 inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_references.html#aa14515bad376f252422ad0abd49d2fc9">WidgetReferences</a> (const <a class="el" href="structref.html">ref</a>&lt; <a class="el" href="struct_widget.html">Widget</a> * &gt; &amp;widgets)</td></tr>
 <tr class="separator:aa14515bad376f252422ad0abd49d2fc9 inherit pub_methods_struct_widget_references"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a27d25cc585c018773b8f06a8f39515ae inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top">uint&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_references.html#a27d25cc585c018773b8f06a8f39515ae">count</a> () const override</td></tr>
+<tr class="memitem:a27d25cc585c018773b8f06a8f39515ae inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#a91ad9478d81a7aaf2593e8d9c3d06a14">uint</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_references.html#a27d25cc585c018773b8f06a8f39515ae">count</a> () const override</td></tr>
 <tr class="memdesc:a27d25cc585c018773b8f06a8f39515ae inherit pub_methods_struct_widget_references"><td class="mdescLeft">&#160;</td><td class="mdescRight">Derived classes should override <em>count</em> and <em>at</em> to implement widgets storage.  <a href="#a27d25cc585c018773b8f06a8f39515ae">More...</a><br/></td></tr>
 <tr class="separator:a27d25cc585c018773b8f06a8f39515ae inherit pub_methods_struct_widget_references"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abe4cdd9010e0b273d7b83297497d9c5f inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abe4cdd9010e0b273d7b83297497d9c5f"></a>
-<a class="el" href="struct_widget.html">Widget</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>at</b> (int i) override</td></tr>
+<tr class="memitem:abe4cdd9010e0b273d7b83297497d9c5f inherit pub_methods_struct_widget_references"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_widget.html">Widget</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget_references.html#abe4cdd9010e0b273d7b83297497d9c5f">at</a> (int i) override</td></tr>
 <tr class="separator:abe4cdd9010e0b273d7b83297497d9c5f inherit pub_methods_struct_widget_references"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_structbuffer"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_structbuffer')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="structbuffer.html">buffer&lt; Widget * &gt;</a></td></tr>
-<tr class="memitem:a5e4b67f8834ec79f467a1e11bdebe042 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5e4b67f8834ec79f467a1e11bdebe042"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a5e4b67f8834ec79f467a1e11bdebe042">buffer</a> ()</td></tr>
-<tr class="memdesc:a5e4b67f8834ec79f467a1e11bdebe042 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default constructs an empty buffer. <br/></td></tr>
+<tr class="memitem:a5e4b67f8834ec79f467a1e11bdebe042 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a5e4b67f8834ec79f467a1e11bdebe042">buffer</a> ()</td></tr>
+<tr class="memdesc:a5e4b67f8834ec79f467a1e11bdebe042 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default constructs an empty buffer.  <a href="#a5e4b67f8834ec79f467a1e11bdebe042">More...</a><br/></td></tr>
 <tr class="separator:a5e4b67f8834ec79f467a1e11bdebe042 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2663077d27fea4ed7920d66b29217aea inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2663077d27fea4ed7920d66b29217aea"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a2663077d27fea4ed7920d66b29217aea">buffer</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;o)</td></tr>
-<tr class="memdesc:a2663077d27fea4ed7920d66b29217aea inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">References <em>o.size</em> elements from <em>o.data</em> pointer. <br/></td></tr>
+<tr class="memitem:a2663077d27fea4ed7920d66b29217aea inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a2663077d27fea4ed7920d66b29217aea">buffer</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;o)</td></tr>
+<tr class="memdesc:a2663077d27fea4ed7920d66b29217aea inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">References <em>o.size</em> elements from <em>o.data</em> pointer.  <a href="#a2663077d27fea4ed7920d66b29217aea">More...</a><br/></td></tr>
 <tr class="separator:a2663077d27fea4ed7920d66b29217aea inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a20115b48b5e2adce3ec56976879a3780 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a20115b48b5e2adce3ec56976879a3780"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a20115b48b5e2adce3ec56976879a3780">buffer</a> (<a class="el" href="structbuffer.html">buffer</a> &amp;&amp;o)</td></tr>
-<tr class="memdesc:a20115b48b5e2adce3ec56976879a3780 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Move constructor. <br/></td></tr>
+<tr class="memitem:a20115b48b5e2adce3ec56976879a3780 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a20115b48b5e2adce3ec56976879a3780">buffer</a> (<a class="el" href="structbuffer.html">buffer</a> &amp;&amp;o)</td></tr>
+<tr class="memdesc:a20115b48b5e2adce3ec56976879a3780 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Move constructor.  <a href="#a20115b48b5e2adce3ec56976879a3780">More...</a><br/></td></tr>
 <tr class="separator:a20115b48b5e2adce3ec56976879a3780 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0447d1b77df353740b5c504301fc92b5 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a0447d1b77df353740b5c504301fc92b5"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a0447d1b77df353740b5c504301fc92b5">buffer</a> (size_t capacity, size_t size)</td></tr>
-<tr class="memdesc:a0447d1b77df353740b5c504301fc92b5 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates an uninitialized buffer for <em>capacity</em> elements. <br/></td></tr>
+<tr class="memitem:a0447d1b77df353740b5c504301fc92b5 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a0447d1b77df353740b5c504301fc92b5">buffer</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="structbuffer.html#ae0de4602920b4083caf79d227f210b3c">capacity</a>, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
+<tr class="memdesc:a0447d1b77df353740b5c504301fc92b5 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates an uninitialized buffer for <em>capacity</em> elements.  <a href="#a0447d1b77df353740b5c504301fc92b5">More...</a><br/></td></tr>
 <tr class="separator:a0447d1b77df353740b5c504301fc92b5 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a66b047d1af3863585c0c5ec8204431ef inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a66b047d1af3863585c0c5ec8204431ef"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>buffer</b> (size_t size)</td></tr>
+<tr class="memitem:a66b047d1af3863585c0c5ec8204431ef inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a66b047d1af3863585c0c5ec8204431ef">buffer</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>)</td></tr>
 <tr class="separator:a66b047d1af3863585c0c5ec8204431ef inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3105a9dfdf39eacdce35ec8f311ed19a inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3105a9dfdf39eacdce35ec8f311ed19a"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a3105a9dfdf39eacdce35ec8f311ed19a">buffer</a> (size_t capacity, size_t size, Arg arg, Args &amp;&amp;...args)</td></tr>
-<tr class="memdesc:a3105a9dfdf39eacdce35ec8f311ed19a inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates a buffer for <em>capacity</em> elements and fill with value. <br/></td></tr>
+<tr class="memitem:a3105a9dfdf39eacdce35ec8f311ed19a inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a3105a9dfdf39eacdce35ec8f311ed19a">buffer</a> (<a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="structbuffer.html#ae0de4602920b4083caf79d227f210b3c">capacity</a>, <a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a> <a class="el" href="opencl_8cc.html#a0e46ebffbd30d0c9f61dd66f3adb4729">size</a>, Arg arg, Args &amp;&amp;...args)</td></tr>
+<tr class="memdesc:a3105a9dfdf39eacdce35ec8f311ed19a inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates a buffer for <em>capacity</em> elements and fill with value.  <a href="#a3105a9dfdf39eacdce35ec8f311ed19a">More...</a><br/></td></tr>
 <tr class="separator:a3105a9dfdf39eacdce35ec8f311ed19a inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af9696c6a5f3667fc82c2dfbb681bb1d0 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af9696c6a5f3667fc82c2dfbb681bb1d0"></a>
-<a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (<a class="el" href="structbuffer.html">buffer</a> &amp;&amp;o)</td></tr>
+<tr class="memitem:af9696c6a5f3667fc82c2dfbb681bb1d0 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#af9696c6a5f3667fc82c2dfbb681bb1d0">operator=</a> (<a class="el" href="structbuffer.html">buffer</a> &amp;&amp;o)</td></tr>
 <tr class="separator:af9696c6a5f3667fc82c2dfbb681bb1d0 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2676a1a64b89fd492537129a618b88cf inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2676a1a64b89fd492537129a618b88cf"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a2676a1a64b89fd492537129a618b88cf">~buffer</a> ()</td></tr>
-<tr class="memdesc:a2676a1a64b89fd492537129a618b88cf inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">If the buffer owns the reference, returns the memory to the allocator. <br/></td></tr>
+<tr class="memitem:a2676a1a64b89fd492537129a618b88cf inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a2676a1a64b89fd492537129a618b88cf">~buffer</a> ()</td></tr>
+<tr class="memdesc:a2676a1a64b89fd492537129a618b88cf inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">If the buffer owns the reference, returns the memory to the allocator.  <a href="#a2676a1a64b89fd492537129a618b88cf">More...</a><br/></td></tr>
 <tr class="separator:a2676a1a64b89fd492537129a618b88cf inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad78424f5938eab67d405a8155d67a030 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad78424f5938eab67d405a8155d67a030"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#ad78424f5938eab67d405a8155d67a030">append</a> (Args &amp;&amp;...args)</td></tr>
-<tr class="memdesc:ad78424f5938eab67d405a8155d67a030 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends a value (assumes available capacity and never reallocates) <br/></td></tr>
+<tr class="memitem:ad78424f5938eab67d405a8155d67a030 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#ad78424f5938eab67d405a8155d67a030">append</a> (Args &amp;&amp;...args)</td></tr>
+<tr class="memdesc:ad78424f5938eab67d405a8155d67a030 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends a value (assumes available capacity and never reallocates)  <a href="#ad78424f5938eab67d405a8155d67a030">More...</a><br/></td></tr>
 <tr class="separator:ad78424f5938eab67d405a8155d67a030 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2c078003d6c52d46ab35389cddf89089 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a2c078003d6c52d46ab35389cddf89089"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a2c078003d6c52d46ab35389cddf89089">append</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a)</td></tr>
-<tr class="memdesc:a2c078003d6c52d46ab35389cddf89089 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends values (assumes available capacity and never reallocates) <br/></td></tr>
+<tr class="memitem:a2c078003d6c52d46ab35389cddf89089 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a2c078003d6c52d46ab35389cddf89089">append</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a)</td></tr>
+<tr class="memdesc:a2c078003d6c52d46ab35389cddf89089 inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends values (assumes available capacity and never reallocates)  <a href="#a2c078003d6c52d46ab35389cddf89089">More...</a><br/></td></tr>
 <tr class="separator:a2c078003d6c52d46ab35389cddf89089 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5be6266d9fffde14db773ddc49edc00f inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5be6266d9fffde14db773ddc49edc00f"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a5be6266d9fffde14db773ddc49edc00f">append</a> (<a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;&amp;a)</td></tr>
-<tr class="memdesc:a5be6266d9fffde14db773ddc49edc00f inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends elements (assumes available capacity and never reallocates) <br/></td></tr>
+<tr class="memitem:a5be6266d9fffde14db773ddc49edc00f inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a5be6266d9fffde14db773ddc49edc00f">append</a> (<a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;&amp;a)</td></tr>
+<tr class="memdesc:a5be6266d9fffde14db773ddc49edc00f inherit pub_methods_structbuffer"><td class="mdescLeft">&#160;</td><td class="mdescRight">Appends elements (assumes available capacity and never reallocates)  <a href="#a5be6266d9fffde14db773ddc49edc00f">More...</a><br/></td></tr>
 <tr class="separator:a5be6266d9fffde14db773ddc49edc00f inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab6857664802feb7920ae08b7ec44542c inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab6857664802feb7920ae08b7ec44542c"></a>
-<a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator&lt;&lt;</b> (const T &amp;e)</td></tr>
+<tr class="memitem:ab6857664802feb7920ae08b7ec44542c inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#ab6857664802feb7920ae08b7ec44542c">operator&lt;&lt;</a> (const T &amp;<a class="el" href="math_8h.html#a239fc54a76293a87f4e239ce20cfe69e">e</a>)</td></tr>
 <tr class="separator:ab6857664802feb7920ae08b7ec44542c inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a28fa03fda0ccc1d7a406387b2c7ac688 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a28fa03fda0ccc1d7a406387b2c7ac688"></a>
-<a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator&lt;&lt;</b> (T &amp;&amp;e)</td></tr>
+<tr class="memitem:a28fa03fda0ccc1d7a406387b2c7ac688 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a28fa03fda0ccc1d7a406387b2c7ac688">operator&lt;&lt;</a> (T &amp;&amp;<a class="el" href="math_8h.html#a239fc54a76293a87f4e239ce20cfe69e">e</a>)</td></tr>
 <tr class="separator:a28fa03fda0ccc1d7a406387b2c7ac688 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3e7447f79649bd53b63f4e0dc69131ab inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3e7447f79649bd53b63f4e0dc69131ab"></a>
-<a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator&lt;&lt;</b> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a)</td></tr>
+<tr class="memitem:a3e7447f79649bd53b63f4e0dc69131ab inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#a3e7447f79649bd53b63f4e0dc69131ab">operator&lt;&lt;</a> (const <a class="el" href="structref.html">ref</a>&lt; T &gt; &amp;a)</td></tr>
 <tr class="separator:a3e7447f79649bd53b63f4e0dc69131ab inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa484c0091b83bef781ea7fa5f4ac11d9 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa484c0091b83bef781ea7fa5f4ac11d9"></a>
-<a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator&lt;&lt;</b> (<a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;&amp;a)</td></tr>
+<tr class="memitem:aa484c0091b83bef781ea7fa5f4ac11d9 inherit pub_methods_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structbuffer.html">buffer</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#aa484c0091b83bef781ea7fa5f4ac11d9">operator&lt;&lt;</a> (<a class="el" href="structbuffer.html">buffer</a>&lt; T &gt; &amp;&amp;a)</td></tr>
 <tr class="separator:aa484c0091b83bef781ea7fa5f4ac11d9 inherit pub_methods_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
 <tr class="inherit_header pub_types_struct_widget"><td colspan="2" onclick="javascript:toggleInherit('pub_types_struct_widget')"><img src="closed.png" alt="-"/>&#160;Public Types inherited from <a class="el" href="struct_widget.html">Widget</a></td></tr>
 <tr class="memitem:a95fa7b0a7eeceeae942b6687c687ce5a inherit pub_types_struct_widget"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">Event</a> { <br/>
-&#160;&#160;<b>Press</b>, 
-<b>Release</b>, 
-<b>Motion</b>, 
-<b>Enter</b>, 
+&#160;&#160;<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa13c3bc709025d20052e643828d3f8863">Press</a>, 
+<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa10f0440c09f2ab804b4e23e7a94c5a34">Release</a>, 
+<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aafd8d70b8938cada14b8527dbda205ccb">Motion</a>, 
+<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa487c909293da2d270b62e8265ecb8b50">Enter</a>, 
 <br/>
-&#160;&#160;<b>Leave</b>
+&#160;&#160;<a class="el" href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5aa8bc8f4e388824604fb38252c24c29be1">Leave</a>
 <br/>
  }</td></tr>
-<tr class="memdesc:a95fa7b0a7eeceeae942b6687c687ce5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse event type. <br/></td></tr>
+<tr class="memdesc:a95fa7b0a7eeceeae942b6687c687ce5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse event type.  <a href="struct_widget.html#a95fa7b0a7eeceeae942b6687c687ce5a">More...</a><br/></td></tr>
 <tr class="separator:a95fa7b0a7eeceeae942b6687c687ce5a inherit pub_types_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae852395c66e10fbb55d0a35cab7ffb83 inherit pub_types_struct_widget"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">Button</a> { <br/>
-&#160;&#160;<b>None</b>, 
-<b>LeftButton</b>, 
-<b>MiddleButton</b>, 
-<b>RightButton</b>, 
+&#160;&#160;<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a89e48d1d45cfa0907a6aee0dbaf3768d">None</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a6d1d6891ebbe03cfddf8c568e04793b2">LeftButton</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a02c7030168c26b1d1cd299487a7ccab0">MiddleButton</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a36ec6c806a3861f148bf1903ab8c6169">RightButton</a>, 
 <br/>
-&#160;&#160;<b>WheelUp</b>, 
-<b>WheelDown</b>
+&#160;&#160;<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83aee5721624455aa52d9b3855f307c462d">WheelUp</a>, 
+<a class="el" href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83a44b23427115d6506d6eb99a0acd35dfb">WheelDown</a>
 <br/>
  }</td></tr>
-<tr class="memdesc:ae852395c66e10fbb55d0a35cab7ffb83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse buttons. <br/></td></tr>
+<tr class="memdesc:ae852395c66e10fbb55d0a35cab7ffb83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Mouse buttons.  <a href="struct_widget.html#ae852395c66e10fbb55d0a35cab7ffb83">More...</a><br/></td></tr>
 <tr class="separator:ae852395c66e10fbb55d0a35cab7ffb83 inherit pub_types_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_struct_grid_layout"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_grid_layout')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_grid_layout.html">GridLayout</a></td></tr>
-<tr class="memitem:ac37cc8acc797981c121867c700257b0e inherit pub_attribs_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac37cc8acc797981c121867c700257b0e"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#ac37cc8acc797981c121867c700257b0e">width</a></td></tr>
-<tr class="memdesc:ac37cc8acc797981c121867c700257b0e inherit pub_attribs_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_horizontal.html" title="Layouts widgets on the horizontal axis. ">Horizontal</a> element count, 0 means automatic. <br/></td></tr>
+<tr class="memitem:ac37cc8acc797981c121867c700257b0e inherit pub_attribs_struct_grid_layout"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#ac37cc8acc797981c121867c700257b0e">width</a></td></tr>
+<tr class="memdesc:ac37cc8acc797981c121867c700257b0e inherit pub_attribs_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_horizontal.html" title="Layouts widgets on the horizontal axis. ">Horizontal</a> element count, 0 means automatic.  <a href="#ac37cc8acc797981c121867c700257b0e">More...</a><br/></td></tr>
 <tr class="separator:ac37cc8acc797981c121867c700257b0e inherit pub_attribs_struct_grid_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8d0ad454e99e83f2073b0f8f1ec7567f inherit pub_attribs_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a8d0ad454e99e83f2073b0f8f1ec7567f"></a>
-int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a8d0ad454e99e83f2073b0f8f1ec7567f">height</a></td></tr>
-<tr class="memdesc:a8d0ad454e99e83f2073b0f8f1ec7567f inherit pub_attribs_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_vertical.html" title="Layouts widgets on the vertical axis. ">Vertical</a> element count, 0 means automatic. <br/></td></tr>
+<tr class="memitem:a8d0ad454e99e83f2073b0f8f1ec7567f inherit pub_attribs_struct_grid_layout"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a8d0ad454e99e83f2073b0f8f1ec7567f">height</a></td></tr>
+<tr class="memdesc:a8d0ad454e99e83f2073b0f8f1ec7567f inherit pub_attribs_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="struct_vertical.html" title="Layouts widgets on the vertical axis. ">Vertical</a> element count, 0 means automatic.  <a href="#a8d0ad454e99e83f2073b0f8f1ec7567f">More...</a><br/></td></tr>
 <tr class="separator:a8d0ad454e99e83f2073b0f8f1ec7567f inherit pub_attribs_struct_grid_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a89ebd1e62be6dddda63e35b4f28d074c inherit pub_attribs_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a89ebd1e62be6dddda63e35b4f28d074c"></a>
-<a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a89ebd1e62be6dddda63e35b4f28d074c">margin</a></td></tr>
-<tr class="memdesc:a89ebd1e62be6dddda63e35b4f28d074c inherit pub_attribs_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Margin between elements. <br/></td></tr>
+<tr class="memitem:a89ebd1e62be6dddda63e35b4f28d074c inherit pub_attribs_struct_grid_layout"><td class="memItemLeft" align="right" valign="top"><a class="el" href="vector_8h.html#ac7a1b8f134bbc80aeed76cef94416cf2">int2</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_grid_layout.html#a89ebd1e62be6dddda63e35b4f28d074c">margin</a></td></tr>
+<tr class="memdesc:a89ebd1e62be6dddda63e35b4f28d074c inherit pub_attribs_struct_grid_layout"><td class="mdescLeft">&#160;</td><td class="mdescRight">Margin between elements.  <a href="#a89ebd1e62be6dddda63e35b4f28d074c">More...</a><br/></td></tr>
 <tr class="separator:a89ebd1e62be6dddda63e35b4f28d074c inherit pub_attribs_struct_grid_layout"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_struct_widget"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_struct_widget')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="struct_widget.html">Widget</a></td></tr>
-<tr class="memitem:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae2a033162016b0382f019dca5b434e19"></a>
-<a class="el" href="struct_image.html">Image</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a></td></tr>
-<tr class="memdesc:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders this widget. <br/></td></tr>
+<tr class="memitem:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_image.html">Image</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_widget.html#ae2a033162016b0382f019dca5b434e19">target</a></td></tr>
+<tr class="memdesc:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="mdescLeft">&#160;</td><td class="mdescRight">Renders this widget.  <a href="#ae2a033162016b0382f019dca5b434e19">More...</a><br/></td></tr>
 <tr class="separator:ae2a033162016b0382f019dca5b434e19 inherit pub_attribs_struct_widget"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_structbuffer"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_structbuffer')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="structbuffer.html">buffer&lt; Widget * &gt;</a></td></tr>
-<tr class="memitem:ae0de4602920b4083caf79d227f210b3c inherit pub_attribs_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae0de4602920b4083caf79d227f210b3c"></a>
-size_t&#160;</td><td class="memItemRight" valign="bottom"><b>capacity</b></td></tr>
+<tr class="memitem:ae0de4602920b4083caf79d227f210b3c inherit pub_attribs_structbuffer"><td class="memItemLeft" align="right" valign="top"><a class="el" href="core_8h.html#aa9d55e2f20e580b7445617d0d12fff6e">size_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structbuffer.html#ae0de4602920b4083caf79d227f210b3c">capacity</a></td></tr>
 <tr class="separator:ae0de4602920b4083caf79d227f210b3c inherit pub_attribs_structbuffer"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
@@ -287,7 +261,43 @@ size_t&#160;</td><td class="memItemRight" valign="bottom"><b>capacity</b></td></
 <dl class="section see"><dt>See Also</dt><dd>Widgets </dd></dl>
 
 <p>Definition at line <a class="el" href="layout_8h_source.html#l00117">117</a> of file <a class="el" href="layout_8h_source.html">layout.h</a>.</p>
-</div></div><!-- contents -->
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a class="anchor" id="aab7f74c03d174856fd637ef4143e8fe4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">WidgetGrid::WidgetGrid </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="layout_8h_source.html#l00118">118</a> of file <a class="el" href="layout_8h_source.html">layout.h</a>.</p>
+
+</div>
+</div>
+<a class="anchor" id="a40ece37d010a5527e349788b4ecd1667"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">WidgetGrid::WidgetGrid </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="structbuffer.html">buffer</a>&lt; <a class="el" href="struct_widget.html">Widget</a> * &gt; &amp;&amp;&#160;</td>
+          <td class="paramname"><em>widgets</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Definition at line <a class="el" href="layout_8h_source.html#l00119">119</a> of file <a class="el" href="layout_8h_source.html">layout.h</a>.</p>
+
+</div>
+</div>
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

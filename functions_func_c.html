@@ -78,6 +78,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions.html"><span>All</span></a></li>
       <li class="current"><a href="functions_func.html"><span>Functions</span></a></li>
       <li><a href="functions_vars.html"><span>Variables</span></a></li>
+      <li><a href="functions_type.html"><span>Typedefs</span></a></li>
       <li><a href="functions_enum.html"><span>Enumerations</span></a></li>
       <li><a href="functions_eval.html"><span>Enumerator</span></a></li>
     </ul>
@@ -107,6 +108,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
       <li><a href="functions_func_v.html#index_v"><span>v</span></a></li>
       <li><a href="functions_func_w.html#index_w"><span>w</span></a></li>
       <li><a href="functions_func_x.html#index_x"><span>x</span></a></li>
+      <li><a href="functions_func_y.html#index_y"><span>y</span></a></li>
       <li><a href="functions_func_~.html#index_~"><span>~</span></a></li>
     </ul>
   </div>
@@ -130,7 +132,7 @@ $(document).ready(function(){initNavTree('functions_func_c.html','');});
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Macros</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&#160;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&#160;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&#160;</span>Namespaces</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&#160;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&#160;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&#160;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(6)"><span class="SelectionMark">&#160;</span>Typedefs</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(7)"><span class="SelectionMark">&#160;</span>Enumerations</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(8)"><span class="SelectionMark">&#160;</span>Enumerator</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(9)"><span class="SelectionMark">&#160;</span>Macros</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -143,28 +145,82 @@ $(document).ready(function(){initNavTree('functions_func_c.html','');});
 &#160;
 
 <h3><a class="anchor" id="index_c"></a>- c -</h3><ul>
+<li>cellCount()
+: <a class="el" href="struct_array_view.html#a8fab527b0dec4302864a95d311deab33">ArrayView</a>
+, <a class="el" href="struct_slice_array_view.html#ae925b96bbd43a9bfc78150c246913192">SliceArrayView</a>
+</li>
+<li>CG()
+: <a class="el" href="struct_c_g.html#ae9cdab136c802a07e675a284901bc888">CG</a>
+</li>
 <li>character()
 : <a class="el" href="struct_text_data.html#ac74dd771908638a1f283abeade2ca154">TextData</a>
 </li>
+<li>CLBuffer()
+: <a class="el" href="struct_c_l_buffer.html#a3c2398770b03ddd391434fe787c69f73">CLBuffer</a>
+</li>
 <li>clear()
 : <a class="el" href="structarray.html#a1ff3c2ce7f237a31a0cfc42a23badc6e">array&lt; T &gt;</a>
+, <a class="el" href="structmap.html#a5d1a8dc2e13afc404082badea9a99f8b">map&lt; K, V &gt;</a>
 , <a class="el" href="structmref.html#a45ea6ce5ac28bbc7c8881d5b6193c249">mref&lt; T &gt;</a>
 , <a class="el" href="structsignal.html#ae04d5aca9a9303231c06fdbc47c2450e">signal&lt; Args &gt;</a>
+</li>
+<li>CLImage()
+: <a class="el" href="struct_c_l_image.html#ad9fd25835a1cca96915d96a2869dc719">CLImage</a>
 </li>
 <li>CLKernel()
 : <a class="el" href="struct_c_l_kernel.html#a21016ffaff80d150861adbe9a06d1ddb">CLKernel</a>
 </li>
+<li>CLMem()
+: <a class="el" href="struct_c_l_mem.html#adcf1f52c36091ed097ce031e9a9241c5">CLMem</a>
+</li>
+<li>CLRawBuffer()
+: <a class="el" href="struct_c_l_raw_buffer.html#a7425dbec5ec5627a074347021975bddd">CLRawBuffer</a>
+</li>
+<li>CLVolume()
+: <a class="el" href="struct_c_l_volume.html#a2fddeb90b8e7724fff68a5d661579080">CLVolume</a>
+</li>
+<li>cofactor()
+: <a class="el" href="structmat3.html#a665aef9ff70e33701838c3495855cd89">mat3</a>
+, <a class="el" href="structmat4.html#a6ac73ab5ad8e4aa1631875bdb9261e54">mat4</a>
+</li>
+<li>compileModule()
+: <a class="el" href="struct_build.html#af22396d23ac4d4398077a89b32accbc0">Build</a>
+</li>
+<li>Compute()
+: <a class="el" href="struct_compute.html#a83e5a30d2fb4204ed38a2c12d6b3b5f3">Compute</a>
+</li>
+<li>Condition()
+: <a class="el" href="struct_condition.html#af11513db4fcbde93961fa0b65e7ab764">Condition</a>
+</li>
 <li>connect()
-: <a class="el" href="structsignal.html#a74e5080149c8b87262d0fe0055282363">signal&lt; Args &gt;</a>
+: <a class="el" href="structsignal.html#afc655070cc0858a871e541ff9b820ef0">signal&lt; Args &gt;</a>
+</li>
+<li>const_iterator()
+: <a class="el" href="structmap_1_1const__iterator.html#a48e784486187ff409ecb3e265b8d57ff">map&lt; K, V &gt;::const_iterator</a>
+</li>
+<li>const_method()
+: <a class="el" href="structconst__method_3_01_o_00_01_r_07_args_8_8_8_08_4.html#a9d5f65e9886722cfa182642c5f111b8a">const_method&lt; O, R(Args...)&gt;</a>
 </li>
 <li>contains()
 : <a class="el" href="structarray.html#a60075e43327159dc21ac9be304c08a80">array&lt; T &gt;</a>
+, <a class="el" href="structmap.html#aae72a2c1acb7ea06ee82e64edd995fbb">map&lt; K, V &gt;</a>
+, <a class="el" href="struct_rect.html#a07d39e3ee121a80974d8f79f467d702a">Rect</a>
 , <a class="el" href="structref.html#ac5a5baee0562df26ae8ea460f1eb4a3d">ref&lt; T &gt;</a>
+</li>
+<li>coordinates()
+: <a class="el" href="struct_array_view.html#afb09a6efa039dc936d3c82e5f1a2d1d0">ArrayView</a>
+, <a class="el" href="struct_slice_array_view.html#a6df9aade99ffc8f20a88552fb732c013">SliceArrayView</a>
 </li>
 <li>count()
 : <a class="el" href="struct_layout.html#a9e93651a16acf88b68ad55afcfeb1b38">Layout</a>
 , <a class="el" href="struct_widget_references.html#a27d25cc585c018773b8f06a8f39515ae">WidgetReferences</a>
 , <a class="el" href="struct_widget_values.html#ab9634251383b67eb675ee33ecd9cc39e">WidgetValues&lt; T &gt;</a>
+</li>
+<li>current()
+: <a class="el" href="struct_text_layout.html#a9cb3cf1f3f6ef27522a0b58427982c49">TextLayout</a>
+</li>
+<li>Cursor()
+: <a class="el" href="struct_text_1_1_cursor.html#af8a994eb4538347824a9e71e6a79f90a">Text::Cursor</a>
 </li>
 </ul>
 </div><!-- contents -->
