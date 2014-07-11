@@ -12,9 +12,9 @@ struct Projection {
     int3 projectionSize;
     uint count = projectionSize.z;
     // Parameters
-    float detectorHalfWidth = 1;
-    float cameraLength = 1;
-    float specimenDistance = 1./16;
+    float detectorHalfWidth = 1; // 2048*0.194 ~ 397 / 2
+    float cameraLength = 1; // 328.811
+    float specimenDistance = 1./16; // 2.78845
     Trajectory trajectory;
     const float rotationCount;
 

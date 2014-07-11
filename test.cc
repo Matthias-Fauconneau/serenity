@@ -1,31 +1,61 @@
-#if 1
 #include "project.h"
 #include "window.h"
 
+#if 0
+
+struct OptimalRotation {
+    OptimalRotation() {
+        const int3 volumeSize = int3(256);
+        for(const uint projectionCount: {128,256,512,1024}) {
+            const int2 projectionSize = int2(volumeSize.x,volumeSize.x*3/4);
+            const float r = 1./2, H = Projection(volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
+            const float rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
+            log(H, projectionCount, rotationCount);
+        }
+    }
+} test;
+
+#elif 1
+
 struct TamDanielson : Widget {
     const int3 volumeSize = int3(512);
-    const int3 projectionSize = int3(512,512*3/4,512);
-    Window window {this, "Tam Danielson Window"_, projectionSize.xy()};
+    const uint projectionCount = 1024;
+    const int2 projectionSize = int2(512,512*3/4);
+    const float r = 1./2, H=Projection(volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
+    const float rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
+    const Projection A = Projection(volumeSize, int3(projectionSize, projectionCount), Single, rotationCount);
+    const bool tamDanielson = true;
+    Window window {this, tamDanielson?"Tam Danielson"_:"Origin"_, tamDanielson ? projectionSize : int2(PI*A.volumeSize.x, A.volumeSize.z)};
     uint viewIndex = 0;
     TamDanielson() { window.show(); }
     void render() override {
+        log(projectionCount, rotationCount);
         target.buffer.clear(byte4(0,0,0,0xFF));
-        for(uint viewIndex: range(projectionSize.z)) {
-            for(uint index: range(projectionSize.z)) {
-                if(index == viewIndex) continue;
-                const float2 imageCenter = float2(projectionSize.xy()-int2(1))/2.f;
-                const bool doubleHelix = false;
-                const uint numberOfRotations = 2;
-                const float4 world = Projection(volumeSize, projectionSize, Projection::Adaptive, numberOfRotations).worldToScaledView(index).inverse()[3];
-                const float4 view = Projection(volumeSize, projectionSize, Projection::Adaptive, numberOfRotations).worldToScaledView(viewIndex) * world;
-                float2 image = view.xy() / view.z + imageCenter; // Perspective divide + Image coordinates offset
+        if(tamDanielson) {
+            for(uint viewIndex: range(projectionCount)) {
+                for(uint index: range(projectionCount)) {
+                    if(index == viewIndex) continue;
+                    const float2 imageCenter = float2(projectionSize-int2(1))/2.f;
+                    const float4 world = Projection(volumeSize, int3(projectionSize, projectionCount), Single, rotationCount).worldToScaledView(index).inverse()[3];
+                    const float4 view = Projection(volumeSize, int3(projectionSize, projectionCount), Single, rotationCount).worldToScaledView(viewIndex) * world;
+                    float2 image = view.xy() / view.z + imageCenter; // Perspective divide + Image coordinates offset
+                    int2 integer = int2(round(image));
+                    if(integer>=int2(0) && integer<target.size()) target(integer.x, integer.y) = 0xFF;
+                }
+            }
+        } else {
+            for(uint index: range(projectionCount)) {
+                const float4 world = A.worldToScaledView(index).inverse()[3];
+                float theta = atan(world.y, world.x);
+                const float2 imageCenter = float2(target.size()-int2(1))/2.f;
+                float2 image = float2(theta*(A.volumeSize.x/2), world.z) + imageCenter; // theta, z -> x,y
                 int2 integer = int2(round(image));
                 if(integer>=int2(0) && integer<target.size()) target(integer.x, integer.y) = 0xFF;
             }
         }
     }
     bool mouseEvent(int2 cursor, int2 size, Event, Button button) {
-        if(button) { viewIndex = clip(0, int(cursor.x*(projectionSize.z-1)/(size.x-1)), int(projectionSize.z-1)); render(); putImage(target); return true; }
+        if(button) { viewIndex = clip(0, int(cursor.x*(projectionCount-1)/(size.x-1)), int(projectionCount-1)); render(); putImage(target); return true; }
         return false;
     }
 } app;

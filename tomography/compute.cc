@@ -58,8 +58,10 @@ struct Compute {
                 for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048,0"_),','), [](string s)->uint{ return fromInteger(s); })) {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
                         float rotationCount;
-                        if(rotationCountParameter=="optimal"_) rotationCount = (sqrt(16*PI*projectionCount) - 1) / (4*PI);
-                        else rotationCount = fromDecimal(rotationCountParameter);
+                        if(rotationCountParameter=="optimal"_) {
+                            const float r = 1./2, H=Projection(volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
+                            rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
+                        } else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
                             uint subsetSize;
