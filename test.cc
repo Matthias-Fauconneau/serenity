@@ -1,14 +1,23 @@
 #include "project.h"
 #include "window.h"
 
-#if 0
+const float detectorHalfWidth = 2048*0.194;
+const float cameraLength = 328.811/detectorHalfWidth;
+const float specimenDistance= 2.78845/detectorHalfWidth;
+
+#if 1
 
 struct OptimalRotation {
     OptimalRotation() {
         const int3 volumeSize = int3(256);
+        const int2 projectionSize = int2(volumeSize.x,volumeSize.x*3/4);
+        {Projection A(1, 1./16, volumeSize, int3(projectionSize, 0), Single, 1);
+                log(sin(A.volumeRadius/A.specimenDistance)*180/PI);}
+        Projection A(cameraLength, specimenDistance, volumeSize, int3(projectionSize, 0), Single, 1);
+        log(sin(A.volumeRadius/A.specimenDistance)*180/PI);
+        log(detectorHalfWidth, cameraLength, specimenDistance, cameraLength/specimenDistance);
+        const float r = 1./2, H = A.deltaZ;
         for(const uint projectionCount: {128,256,512,1024}) {
-            const int2 projectionSize = int2(volumeSize.x,volumeSize.x*3/4);
-            const float r = 1./2, H = Projection(volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
             const float rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
             log(H, projectionCount, rotationCount);
         }
@@ -21,23 +30,22 @@ struct TamDanielson : Widget {
     const int3 volumeSize = int3(512);
     const uint projectionCount = 1024;
     const int2 projectionSize = int2(512,512*3/4);
-    const float r = 1./2, H=Projection(volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
+    const float r = 1./2, H=Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, projectionCount), Single, 1).deltaZ;
     const float rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
-    const Projection A = Projection(volumeSize, int3(projectionSize, projectionCount), Single, rotationCount);
-    const bool tamDanielson = true;
+    const Projection A = Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, projectionCount), Single, rotationCount);
+    const bool tamDanielson = false;
     Window window {this, tamDanielson?"Tam Danielson"_:"Origin"_, tamDanielson ? projectionSize : int2(PI*A.volumeSize.x, A.volumeSize.z)};
     uint viewIndex = 0;
     TamDanielson() { window.show(); }
     void render() override {
-        log(projectionCount, rotationCount);
         target.buffer.clear(byte4(0,0,0,0xFF));
         if(tamDanielson) {
             for(uint viewIndex: range(projectionCount)) {
                 for(uint index: range(projectionCount)) {
                     if(index == viewIndex) continue;
                     const float2 imageCenter = float2(projectionSize-int2(1))/2.f;
-                    const float4 world = Projection(volumeSize, int3(projectionSize, projectionCount), Single, rotationCount).worldToScaledView(index).inverse()[3];
-                    const float4 view = Projection(volumeSize, int3(projectionSize, projectionCount), Single, rotationCount).worldToScaledView(viewIndex) * world;
+                    const float4 world = Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, projectionCount), Single, rotationCount).worldToScaledView(index).inverse()[3];
+                    const float4 view = Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, projectionCount), Single, rotationCount).worldToScaledView(viewIndex) * world;
                     float2 image = view.xy() / view.z + imageCenter; // Perspective divide + Image coordinates offset
                     int2 integer = int2(round(image));
                     if(integer>=int2(0) && integer<target.size()) target(integer.x, integer.y) = 0xFF;

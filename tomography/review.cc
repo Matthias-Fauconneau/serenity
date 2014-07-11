@@ -5,7 +5,7 @@
 #include "graphics.h"
 #include "png.h"
 
-static const bool smallestSubsets = true; // Filters subsetSize to only keep configurations with the smallest subsets (fastest convergence)
+static const bool smallestSubsets = false; // Filters subsetSize to only keep configurations with the smallest subsets (fastest convergence)
 static const bool limitAcquisitionTime = false; // Filters configurations with Projections·Photons over acquisition time limit
 
 //TODO: merge ArrayView and SliceArrayView
@@ -32,7 +32,7 @@ struct ArrayView : Widget {
             String result = readFile(fileName, results);
             if(!result) { log("Empty result file", name); continue; }
             Dict configuration = parseDict(name);
-            if(!configuration["photonCount"_]) continue;// configuration["photonCount"_] = 0;
+            if(!configuration["photonCount"_].size) continue;// configuration["photonCount"_] = 0;
             if(configuration["trajectory"_]=="adaptive"_ && (int(configuration.at("rotationCount"_))==1||int(configuration.at("rotationCount"_))==4)) continue; // Skips 1,4 adaptive rotations (only 2,3,5 is relevant)
             if(configuration["trajectory"_]=="adaptive"_) configuration.at("rotationCount"_) = float(configuration["rotationCount"_])-1; // Converts adaptive total rotation count to helical rotation count
             if((float)configuration.at("rotationCount"_)==round((float)configuration.at("rotationCount"_))) configuration.at("rotationCount"_) = int(configuration.at("rotationCount"_));
@@ -93,7 +93,8 @@ struct ArrayView : Widget {
                 }
             }
             assert_(value.size, result);
-            assert_(!points.contains(configuration), name, configuration);
+            if(points.contains(configuration)) { log("Duplicate configuration", configuration); continue; }
+            //assert_(!points.contains(configuration), name, configuration);
             points.insert(move(configuration), move(value));
         }
         if(smallestSubsets) points.filter([this](const Dict& configuration) {
@@ -103,16 +104,17 @@ struct ArrayView : Widget {
             return (uint)configuration.at("per subset"_) > min; // Filters every configuration with larger subsets than minimum
         });
         if(limitAcquisitionTime) points.filter([this](const Dict& configuration) { return !configuration.at("Photons"_) || (uint)configuration.at("Projections"_) * (uint)configuration.at("Photons"_) > 256*4096; }); // Filters every configuration over acquisition time limit
-        assert_(points);
+        assert_(points, valueName);
         min = ::min(points.values);
-        if(0) {
+        max = ::max(points.values);
+        /*if(0) {
             array<Variant> values = copy(points.values);
             for(uint _unused i: range(2)) values.remove(::max(values)); // Removes 2 maximum values before computing maximum bound (discards outliers)
             max = ::max(values);
         } else { // Ignores SART values for maximum bound
             array<Variant> values = filterIndex(points.values, [this](size_t i){ return points.keys[i].at("Method"_)=="SART"_ || (this->valueName=="Time"_ && points.keys[i].at("Method"_)=="MLTR"_ && points.keys[i].at("per subset"_)==points.keys[i].at("Projections"_) ); });
             max = ::max(values);
-        }
+        }*/
     }
     array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Revolutions,Projections,per subset"_,',')};
 
@@ -189,7 +191,8 @@ struct ArrayView : Widget {
                     const Variant& point = points.at(coordinates);
                     assert_(isDecimal(point), point);
                     float value = point;
-                    float v = (value-min)/(max-min);
+                    float v = max>min ? (value-min)/(max-min) : 0;
+                    assert_(v>=0 && v<=1, v, value, min, max);
                     fill(cell, Rect(cell.size()), vec3(0,1-v,v));
                     float realValue = abs(value); // Values where maximum is best have been negated
                     String text = (value==min?format(Bold):""_)+(point.isInteger?dec(realValue):ftoa(realValue));
@@ -265,7 +268,7 @@ struct Application {
     Window window {&view, "Results"_};
     FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
     Application() {
-        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"SNR (dB)"_,"Iterations"_,"Normalized NMSE"_}) {
+        for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"Iterations"_/*"SNR (dB)"_,"Normalized NMSE"_*/}) {
             ArrayView view (valueName, parameters, 64);
             Image image ( abs(view.sizeHint()) );
             assert_( image.size() < int2(16384), view.sizeHint(), view.levelCount(), view.cellCount());
