@@ -16,9 +16,9 @@ inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i
 
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
-    Plot plot; /// NMSE versus iterations plot
+    Plot plot; // NMSE versus iterations plot
     map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"update"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
-    unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; /// User interface for reconstruction monitoring, enabled by the "ui" command line argument
+    unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; // User interface for reconstruction monitoring, enabled by the "ui" command line argument
 
     Compute() {
         const int3 volumeSize = parameters.value("volumeSize"_, int3(256)); // Reconstruction sample count along each dimensions
