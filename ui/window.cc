@@ -27,7 +27,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
-        if(existsFile(".Xauthority"_,home())) {
+        if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()) {
             BinaryData s (readFile(".Xauthority"_,home()), true);
             string name, data;
             uint16 family unused = s.read();
@@ -36,7 +36,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
             {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
             {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
             send(String(raw(r)+name+pad(4, name.size)+data+pad(4,data.size)));
-        } else { error("No such file",home().name()+"/.Xauthority"_); send(raw(r)); }
+        } else send(raw(r));
     }
     {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
     {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();
