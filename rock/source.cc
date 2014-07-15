@@ -9,6 +9,19 @@
 struct Source : VolumeOperation {
     CropVolume crop;
 
+    // Parses slices in folder \a path
+    map<uint,String> slices(const Folder& folder) {
+        map<uint,String> slices;
+        for(String& fileName: folder.list(Files|Sorted)) {
+            TextData s (fileName);
+            s.untilAny("0123456789"_);
+            int index = s.integer();
+            slices.insert(index, move(fileName));
+        }
+        assert_(slices, folder.name());
+        return slices;
+    }
+
     string parameters() const override { return "path resolution cylinder box downsample extra"_; }
     uint outputSampleSize(const Dict& args, const ref<const Result*>&, uint index) override {
         if(index) return 0; // Extra outputs
@@ -40,13 +53,13 @@ struct Source : VolumeOperation {
             crop = parseCrop(args, volume.margin, volume.sampleCount-volume.margin, args.contains("extra"_)?2:0);
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
-            array<String> slices = folder.list(Files|Sorted);
-            assert_(slices, path);
-            size.z=slices.size;
-            Map file (slices.first(), folder);
+            map<uint,String> slices = this->slices(folder);
+            int min = ::min(slices.keys), max = ::max(slices.keys);
+            size.z = max-min;
+            Map file (slices.values.first(), folder);
             if(isTiff(file)) { const Tiff16 image (file); size.x=image.width,  size.y=image.height; }
-            else { Image image = decodeImage(file); assert_(image, path, slices.first());  size.x=image.width, size.y=image.height; }
-            crop = parseCrop(args, 0, size, args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
+            else { Image image = decodeImage(file); assert_(image, path, slices.values.first());  size.x=image.width, size.y=image.height; }
+            crop = parseCrop(args, int3(0,0,min), int3(size.x,size.y,max), args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
         }
         assert(crop.sampleCount);
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(args, inputs, 0);
@@ -116,7 +129,7 @@ struct Source : VolumeOperation {
             } else error(source.sampleSize);
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
-            array<String> slices = folder.list(Files|Sorted);
+            map<uint,String> slices = this->slices(folder);
             if(target.sampleSize==2) {
                 uint16* const targetData = (Volume16&)target;
                 if(args.value("downsample"_,"0"_)!="0"_) { // Streaming downsample (works for larger than RAM source volumes)
@@ -126,7 +139,7 @@ struct Source : VolumeOperation {
                         if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                         uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                         for(uint i: range(2)) {
-                            Map file(slices[(min.z+z)*2+i],folder);
+                            Map file(slices.at((min.z+z)*2+i),folder);
                             assert_(isTiff(file)); // Directly decodes slice images into the slice buffer
                             Tiff16 tiff(file); assert_(tiff);
                             tiff.read(sliceBuffer.begin()+i*sX*sY, min.x*2, min.y*2, size.x*2, size.y*2, sX);
@@ -141,10 +154,10 @@ struct Source : VolumeOperation {
                     for(uint z: range(size.z)) {
                         if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                         uint16* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                        Map file(slices[min.z+z], folder);
+                        Map file(slices.at(min.z+z), folder);
                         assert_(isTiff(file)); // Directly decodes slice images into the volume
                         Tiff16 tiff(file);
-                        assert_(tiff, path, slices[min.z+z]);
+                        assert_(tiff, path, slices.at(min.z+z));
                         tiff.read(targetSlice, min.x, min.y, size.x, size.y, X);
                     }
                 }
@@ -157,10 +170,10 @@ struct Source : VolumeOperation {
                         if(report/1000>=5) { log(z,"/",size.z, (8*z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                         uint8* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
                         for(uint i: range(2)) {
-                            Map file(slices[(min.z+z)*2+i],folder);
+                            Map file(slices.at((min.z+z)*2+i),folder);
                             assert_(!isTiff(file)); // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
                             Image image = decodeImage(file);
-                            assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
+                            assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices.at(min.z+z));
                             for(uint y: range(size.y*2)) for(uint x: range(size.x*2)) sliceBuffer[i*sX*sY+y*sX+x] = image(min.x*2+x, min.y*2+y).b;
                         }
                         for(uint y: range(size.y)) for(uint x: range(size.x)) {
@@ -173,10 +186,10 @@ struct Source : VolumeOperation {
                     for(uint z: range(size.z)) {
                         if(report/1000>=5) { log(z,"/",size.z, (z*size.x*size.y/1024/1024)/(time/1000), "MS/s"); report.reset(); } // Reports progress (initial read from a cold drive may take minutes)
                         uint8* const targetSlice = targetData + (marginZ+z)*X*Y + marginY*X + marginX;
-                        Map file(slices[min.z+z], folder);
+                        Map file(slices.at(min.z+z), folder);
                         assert_(!isTiff(file)); // Use generic image decoder (FIXME: Unnecessary (and lossy for >8bit images) roundtrip to 8bit RGBA)
                         Image image = decodeImage(file);
-                        assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices[min.z+z]);
+                        assert_(int2(min.x,min.y)+image.size()>=size.xy(), slices.at(min.z+z));
                         for(uint y: range(size.y)) for(uint x: range(size.x)) targetSlice[y*X+x] = image(min.x+x, min.y+y).b;
                     }
                 }
