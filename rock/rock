@@ -19,25 +19,27 @@ if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
 # Density distribution
-if !threshold-from-source: histogram-radiodensity = Histogram resampled
-if threshold-from-source: histogram-radiodensity = Histogram source
-histogram-radiodensity-normalizeX = NormalizeX histogram-radiodensity
-distribution-radiodensity = KernelDensityEstimation histogram-radiodensity-normalizeX
+if !threshold-from-source: histogram-attenuation = Histogram resampled
+if threshold-from-source: histogram-attenuation = Histogram source
+histogram-attenuation-normalizeX = NormalizeX histogram-attenuation
+distribution-attenuation = KernelDensityEstimation histogram-attenuation-normalizeX
 
 # Debug
-histogram-radiodensity-normalizeY = NormalizeAreaY histogram-radiodensity
-distribution-radiodensity-unnormalized = KernelDensityEstimation histogram-radiodensity normalize=0
+histogram-attenuation-normalizeY = NormalizeAreaY histogram-attenuation
+distribution-attenuation-unnormalized = KernelDensityEstimation histogram-attenuation normalize=0
 # Compatibility
-histogram-density = histogram-radiodensity
-histogram-density-normalized = histogram-radiodensity-normalizeY
-distribution-density = distribution-radiodensity-unnormalized
+histogram-density = histogram-attenuation
+histogram-density-normalized = histogram-attenuation-normalizeY
+distribution-density = distribution-attenuation-unnormalized
 
 # Threshold determination
 threshold = 'otsu'
-if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-radiodensity # Recommended robust statistic method
+if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
 otsu-interclass-deviation-normalized = NormalizeAreaXY otsu-interclass-deviation
-if threshold == 'gradient': threshold gradient-mean = MaximumMeanGradient source distribution-radiodensity-unnormalized # Use this method for backward compatibility only
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-radiodensity-unnormalized # Explicit model
+gradient-threshold middle-threshold gradient-mean = MaximumMeanGradient source distribution-attenuation-unnormalized # Use this method for backward compatibility only
+if threshold == 'gradient': threshold = gradient-threshold # Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
+if threshold == 'middle': threshold = middle-threshold # Simply Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-attenuation-unnormalized # Explicit model
 
 # Transposes to use an alternate cylinder axis
 transpose = Transpose resampled

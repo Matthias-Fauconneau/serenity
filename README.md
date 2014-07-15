@@ -44,18 +44,18 @@
   - resample = [0]|1 (unused)
     Resamples the denoised volume from resolution to process-resolution
     - "process-resolution" must be given (in the same unit as "resolution" (e.g μm))
-- histogram-radiodensity[-normalizedY]
-  Histogram of the radiodensities (voxels versus radiodensity value)
+- histogram-attenuation[-normalizedY]
+  Histogram of the radiodensities (voxels versus attenuation value)
   - thresholdFromSource = [0]|1 (unused)
     Selects whether to evaluate the histogram from the source or the denoised/resampled volume.
     \note The threshold will only be optimal if computed on the processed volume (default)
-- distribution-radiodensity
-  Estimates the underlying radiodensity probability density (using kernel density estimation on the histogram)
+- distribution-attenuation
+  Estimates the underlying attenuation probability density (using kernel density estimation on the histogram)
   \note Radiodensity is normalized to the 0-1 range and area is normalized to 1 (i.e correct probability density function)
 - threshold
-  The uniform radiodensity threshold used to segment pores
+  The uniform attenuation threshold used to segment pores
   - threshold = [otsu]|gradient|lorentz|<decimal>|<integer>
-   The threshold determination method to use or a manual threshold (given either in normalized or integer radiodensity)
+   The threshold determination method to use or a manual threshold (given either in normalized or integer attenuation)
    \note Otsu is the recommended robust statistic method, gradient is for backward compatibility only, Lorentz is an explicit model which may be more accurate but is prone to fail.
    \note otsu-parameters, otsu-interclass-deviation[-normalized], gradient-mean, lorentz-parameters, lorentz-rock, lorentz-notrock, lorentz-pore, lorentz-notpore can be used for insight in the determination.
 - transposed (internal)

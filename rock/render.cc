@@ -3,21 +3,21 @@
 #include "simd.h"
 #include "volume-operation.h"
 
-void render(Image& target, const Volume8& density, const Volume8& intensity, /*const Volume8& empty,*/ mat3 view) {
-    assert_(density.tiled() && intensity.tiled() /*&& empty.tiled()*/);
+void render(Image& target, const Volume8& attenuation, const Volume8& intensity, /*const Volume8& empty,*/ mat3 view) {
+    assert_(attenuation.tiled() && intensity.tiled() /*&& empty.tiled()*/);
     // Volume
-    int3 size = density.sampleCount-2*density.margin;
+    int3 size = attenuation.sampleCount-2*attenuation.margin;
     assert_(size.x == size.y);
     const float radius = size.x/2-1, halfHeight = size.z/2-1; // Cylinder parameters
     const v4sf capZ = {halfHeight, halfHeight, -halfHeight, -halfHeight};
     const v4sf radiusSqHeight = {radius*radius, radius*radius, halfHeight, halfHeight};
     const v4sf radiusR0R0 = {radius*radius, 0, radius*radius, 0};
-    const uint8* const densityData = density;
+    const uint8* const attenuationData = attenuation;
     const uint8* const intensityData = intensity;
     //const uint8* const emptyData = empty;
-    const uint64* const offsetX = density.offsetX.data + density.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
-    const uint64* const offsetY = density.offsetY.data + density.sampleCount.y/2;
-    const uint64* const offsetZ = density.offsetZ.data + density.sampleCount.z/2;
+    const uint64* const offsetX = attenuation.offsetX.data + attenuation.sampleCount.x/2; // + sampleCount/2 to avoid converting from centered cylinder to unsigned in inner loop
+    const uint64* const offsetY = attenuation.offsetY.data + attenuation.sampleCount.y/2;
+    const uint64* const offsetZ = attenuation.offsetZ.data + attenuation.sampleCount.z/2;
 
     // Image
     #define tileSize 8
@@ -86,9 +86,9 @@ void render(Image& target, const Volume8& density, const Volume8& intensity, /*c
                     const uint vx1 = offsetX[extracti(p1,0)];
                     const uint vy1 = offsetY[extracti(p1,1)];
                     const uint vz1 = offsetZ[extracti(p1,2)];
-                    // Loads samples (FIXME: interleave density and intensity)
-                    const v4si icx0_density = {densityData[vx0 + vy0 + vz0], densityData[vx0 + vy0 + vz1], densityData[vx0 + vy1 + vz0], densityData[vx0 + vy1 + vz1]};
-                    const v4si icx1_density = {densityData[vx1 + vy0 + vz0], densityData[vx1 + vy0 + vz1], densityData[vx1 + vy1 + vz0], densityData[vx1 + vy1 + vz1]};
+                    // Loads samples (FIXME: interleave attenuation and intensity)
+                    const v4si icx0_attenuation = {attenuationData[vx0 + vy0 + vz0], attenuationData[vx0 + vy0 + vz1], attenuationData[vx0 + vy1 + vz0], attenuationData[vx0 + vy1 + vz1]};
+                    const v4si icx1_attenuation = {attenuationData[vx1 + vy0 + vz0], attenuationData[vx1 + vy0 + vz1], attenuationData[vx1 + vy1 + vz0], attenuationData[vx1 + vy1 + vz1]};
                     const v4si icx0_intensity = {intensityData[vx0 + vy0 + vz0], intensityData[vx0 + vy0 + vz1], intensityData[vx0 + vy1 + vz0], intensityData[vx0 + vy1 + vz1]};
                     const v4si icx1_intensity = {intensityData[vx1 + vy0 + vz0], intensityData[vx1 + vy0 + vz1], intensityData[vx1 + vy1 + vz0], intensityData[vx1 + vy1 + vz1]};
                     // Compute trilinear interpolation coefficients
@@ -102,9 +102,9 @@ void render(Image& target, const Volume8& density, const Volume8& intensity, /*c
                     const v4sf x0011 = shuffle(_1mpc, pc, 0,0,0,0);
                     const v4sf x1111 = shuffle(pc, pc, 0,0,0,0);
                     const v4sf sw_yz = z0101 * y0011;
-                    // Discrete gradient from density
-                    const v4sf cx0 = cvtdq2ps(icx0_density);
-                    const v4sf cx1 = cvtdq2ps(icx1_density);
+                    // Discrete gradient from attenuation
+                    const v4sf cx0 = cvtdq2ps(icx0_attenuation);
+                    const v4sf cx1 = cvtdq2ps(icx1_attenuation);
                     const v4sf dx = y0011*z0101*(cx0-cx1);
                     const v4sf dy = x0011*z0101*(shuffle(cx0,cx1, 0,1,0,1)-shuffle(cx0,cx1, 2,3,2,3));
                     const v4sf dz = x0011*y0101*(shuffle(cx0,cx1, 0,2,0,2)-shuffle(cx0,cx1, 1,3,1,3));
