@@ -211,9 +211,6 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
         if(!sameSince(input, queryTime, arguments)) return false;
     }
     if(rule.operation && parseDate(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
-    /*if(Interface<Tool>::factories.contains(rule.operation)) { // Let high level operations reports its custom input for correct cache behavior
-        for(Interface<Tool>::instance(rule.operation)->inputs()
-    }*/
     return true;
 }
 
