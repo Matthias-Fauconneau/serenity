@@ -29,11 +29,11 @@ inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline real sqrt(real f) { return __builtin_sqrt(f); }
 inline real pow(real x, real y) { return __builtin_pow(x,y); }
 
-const real e = 2.71828;
-const real expUnderflow = -7.45133219101941108420e+02;
-const real expOverflow = 7.09782712893383973096e+02;
-inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 inline real ln(real x) { return __builtin_log(x); }
+inline real exp2(real x) { return __builtin_exp2(x); }
+const real expUnderflow = ln(exp2(-1022));
+const real expOverflow = ln(exp2(1023));
+inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 
 inline real cos(real t) { return __builtin_cos(t); }
 inline real acos(real t) { return __builtin_acos(t); }
@@ -46,7 +46,6 @@ inline real sinh(real x) { return __builtin_sinh(x); }
 const real PI = 3.14159265358979323846;
 inline real rad(real t) { return t/180*PI; }
 inline real deg(real t) { return t/PI*180; }
-inline real exp2(real x) { return __builtin_exp2(x); }
 inline real log2(real x) { return __builtin_log2(x); }
 inline real exp10(real x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline real log10(real x) { return __builtin_log10(x); }
