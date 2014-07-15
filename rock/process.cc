@@ -87,7 +87,10 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
     for(const string& argument: allArguments) { // Parses process arguments
         TextData s (argument); string key = s.word("-_."_);
         string scope, parameter = key;
-        if(key.contains('.')) scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
+        if(key.contains('.')) {
+            scope=section(key, '.', 0, 1), parameter=section(key, '.', 1, 2);
+            if(!resultNames.contains(scope)) log("Unknown scope:", scope, "for", argument);
+        }
         if(s.match('=')) { // Explicit argument
             assert_(parameters.contains(parameter) || specialParameters.contains(parameter),"Invalid parameter", parameter);
             string value = s.untilEnd();
