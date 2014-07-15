@@ -8,6 +8,8 @@
  Arguments affects either the process definition or the operations themselves.
 
 ## Targets and arguments
+- indirect
+ Stores metadata in auxiliary files (instead of file names)
 - \ref Source "source"
   %Image slices from the "path" folder concatenated as a volume.
   - path
