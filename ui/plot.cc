@@ -16,11 +16,12 @@ void Plot::render(const Image& target) {
     vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
     else {  // Computes axis scales
-        assert(dataSets);
+        assert_(dataSets);
         for(const auto& data: dataSets.values) {
+            assert_(data);
             for(auto point: data) {
                 vec2 p(point.key,point.value);
-                assert(isNumber(p.x) && isNumber(p.y), p);
+                assert_(isNumber(p.x) && isNumber(p.y), p);
                 min=::min(min,p);
                 max=::max(max,p);
             }

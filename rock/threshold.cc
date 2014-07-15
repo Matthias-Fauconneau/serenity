@@ -160,7 +160,7 @@ struct MaximumMeanGradient : Operation {
         }
         log("Note: Selecting pore peak at", pore,"(",(real)pore/histogram.size,") and rock peak at", rock,"(", (real)rock/histogram.size,")");
         uint threshold=0; real maximum=0;
-        UniformSample differenceMean (source.maximum+1);
+        UniformSample differenceMean (binCount, binCount, 0);
         for(uint i: range(pore, rock)) {
             if(!histogram[i]) continue; // Not enough samples to properly estimate mean difference for this attenuation threshold
             real mean = (real)differenceSum[i]/histogram[i];
