@@ -14,17 +14,16 @@ template <class I> struct Interface {
         virtual string version() abstract;
         virtual unique<I> constructNewInstance() abstract;
     };
-    static map<string, AbstractFactory*> factories;
+    static map<string, AbstractFactory*>& factories() { static map<string, AbstractFactory*> factories; return factories; }
     template <class C> struct Factory : AbstractFactory {
         string version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
-        Factory() { TextData s (str(typeid(C).name())); s.integer(); factories.insert(s.identifier(), this); }
+        Factory() { TextData s (str(typeid(C).name())); s.integer(); factories().insert(s.identifier(), this); }
         static Factory registerFactory;
     };
-    static string version(const string& name) { return factories.at(name)->version(); }
-    static unique<I> instance(const string& name) { return factories.at(name)->constructNewInstance(); }
+    static string version(const string& name) { return factories().at(name)->version(); }
+    static unique<I> instance(const string& name) { return factories().at(name)->constructNewInstance(); }
 };
-template <class I> map<string,typename Interface<I>::AbstractFactory*> Interface<I>::factories;
 template <class I> template <class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
 
 /// Dynamic-typed value

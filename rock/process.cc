@@ -57,7 +57,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
         } else {
             string word = s.identifier("_-"_);
             assert_(word, "Expected operator or input for", outputs);
-            if(!Interface<Operation>::factories.contains(word)) rule.inputs << word; // Forwarding rule
+            if(!Interface<Operation>::factories().contains(word)) rule.inputs << word; // Forwarding rule
             else rule.operation = word; // Generating rule
             s.whileAny(" \t"_);
             for(;!s.match('\n'); s.whileAny(" \t"_)) {

@@ -56,7 +56,8 @@ struct Rock : PersistentProcess, Poll {
             log("Expected more names, skipped targets"_, targets.slice(targetPaths.size), targetPaths?str("using", map<string,string>(targetPaths, targets.slice(0,targetPaths.size))):""_);
         if(specialArguments.contains("dump"_)) {
             log(__DATE__ " " __TIME__);
-            log("Operations:",Interface<Operation>::factories.keys);
+            log("Operations:",Interface<Operation>::factories().keys);
+            log("Views:",Interface<View>::factories().keys);
             log("Results:",resultNames);
             log("Targets:",targets);
             log("Arguments:",arguments);
@@ -179,11 +180,11 @@ struct Rock : PersistentProcess, Poll {
 
      bool view(const string& metadata, const string& name, const buffer<byte>& data) {
          for(array<unique<View>>& views: viewers.values) for(unique<View>& view: views) if( view->view(metadata, name, data) ) return true; // Tries to append to existing view first
-         for(auto viewer: Interface<View>::factories) {
+         for(auto viewer: Interface<View>::factories()) {
              unique<View> view  = viewer.value->constructNewInstance();
              if( view->view(metadata, name, data) ) { viewers[viewer.key] << move(view); return true; }
          }
-         log("Unknown format",metadata, name, Interface<View>::factories.keys);
+         log("Unknown format",metadata, name, Interface<View>::factories().keys);
          return false;
      }
 

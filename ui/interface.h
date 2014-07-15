@@ -6,8 +6,6 @@
 #include "layout.h"
 #include "text.h"
 
-
-
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget
