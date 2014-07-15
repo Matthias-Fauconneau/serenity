@@ -17,19 +17,19 @@ UniformSample normalize(const UniformSample& A) { return (1./(A.scale*A.sum()))*
 struct Otsu : Operation {
     string parameters() const override { return "ignore-clip normalize"_; }
     void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
-        UniformHistogram density = parseUniformSample( inputs[0]->data );
-        if(args.value("ignore-clip"_,"0"_)!="0"_) density.first()=density.last()=0; // Ignores clipped values
+        UniformHistogram attenuation = parseUniformSample( inputs[0]->data );
+        if(args.value("ignore-clip"_,"0"_)!="0"_) attenuation.first()=attenuation.last()=0; // Ignores clipped values
         uint threshold=0; real maximumVariance=0;
         uint64 totalCount=0, totalSum=0;
-        for(uint64 t: range(density.size)) totalCount += density[t], totalSum += t * density[t];
+        for(uint64 t: range(attenuation.size)) totalCount += attenuation[t], totalSum += t * attenuation[t];
         uint64 backgroundCount=0, backgroundSum=0;
-        UniformSample interclassVariance (density.size); interclassVariance.clear();
-        if(args.value("normalize"_,"0"_)!="0"_) interclassVariance.scale = 1./(density.size-1);
+        UniformSample interclassVariance (attenuation.size); interclassVariance.clear();
+        if(args.value("normalize"_,"0"_)!="0"_) interclassVariance.scale = 1./(attenuation.size-1);
         real parameters[4];
-        for(uint64 t: range(density.size)) {
-            backgroundCount += density[t];
+        for(uint64 t: range(attenuation.size)) {
+            backgroundCount += attenuation[t];
             if(backgroundCount == 0) continue;
-            backgroundSum += t*density[t];
+            backgroundSum += t*attenuation[t];
             uint64 foregroundCount = totalCount - backgroundCount, foregroundSum = totalSum - backgroundSum;
             if(foregroundCount == 0) break;
             real foregroundMean = real(foregroundSum)/real(foregroundCount);
@@ -42,12 +42,12 @@ struct Otsu : Operation {
             interclassVariance[t] = variance;
         }
         if(threshold == 0) log("WARNING: threshold=0 (Hint: use ignore-clip=1 to ignore extreme values)");
-        real densityThreshold = real(threshold) / real(density.size-1);
+        real attenuationThreshold = real(threshold) / real(attenuation.size-1);
         output(outputs, "threshold"_, "scalar"_, [&]{return toASCII(threshold);});
         output(outputs, "otsu-parameters"_, "map"_, [&]{
-            return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
+            return "threshold "_+ftoa(attenuationThreshold, 6)+"\n"_
                     "threshold16 "_+dec(threshold)+"\n"_
-                    "maximum "_+dec(density.size-1)+"\n"_
+                    "maximum "_+dec(attenuation.size-1)+"\n"_
                     "backgroundCount "_+dec(parameters[0])+"\n"_
                     "foregroundCount "_+dec(parameters[1])+"\n"_
                     "backgroundMean "_+str(parameters[2])+"\n"_
@@ -91,25 +91,25 @@ UniformSample sample(const Lorentz& lorentz, uint size) {
 /// Lorentzian peak mixture estimation. Works for well separated peaks (intersection under half maximum), proper way would be to use expectation maximization
 struct LorentzianMixtureModel : Operation {
     void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
-        UniformHistogram density = parseUniformSample( inputs[0]->data );
-        const Lorentz rock = estimateLorentz(density); // Rock density is the highest peak
-        const UniformSample notrock = density - sample(rock, density.size); // Substracts first estimated peak in order to estimate second peak
-        Lorentz pore = estimateLorentz(notrock); // Pore density is the new highest peak
-        pore.height = density[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
-        const UniformSample notpore = density - sample(pore, density.size);
+        UniformHistogram attenuation = parseUniformSample( inputs[0]->data );
+        const Lorentz rock = estimateLorentz(attenuation); // Rock attenuation is the highest peak
+        const UniformSample notrock = attenuation - sample(rock, attenuation.size); // Substracts first estimated peak in order to estimate second peak
+        Lorentz pore = estimateLorentz(notrock); // Pore attenuation is the new highest peak
+        pore.height = attenuation[pore.position]; // Use peak height from total data (estimating on not-rock yields too low estimate because rock is estimated so wide its tail overlaps pore peak)
+        const UniformSample notpore = attenuation - sample(pore, attenuation.size);
         uint threshold=0; for(uint i: range(pore.position, rock.position)) if(pore(i) <= notpore[i]) { threshold = i; break; } // First intersection between pore and not-pore (same probability)
-        float densityThreshold = float(threshold) / float(density.size);
-        log("Lorentzian mixture model estimates threshold at", densityThreshold, "between pore at", float(pore.position)/float(density.size), "and rock at", float(rock.position)/float(density.size));
-        output(outputs, "threshold"_, "scalar"_, [&]{return ftoa(densityThreshold, 5)+"\n"_;});
+        float attenuationThreshold = float(threshold) / float(attenuation.size);
+        log("Lorentzian mixture model estimates threshold at", attenuationThreshold, "between pore at", float(pore.position)/float(attenuation.size), "and rock at", float(rock.position)/float(attenuation.size));
+        output(outputs, "threshold"_, "scalar"_, [&]{return ftoa(attenuationThreshold, 5)+"\n"_;});
         output(outputs, "lorentz-parameters"_, "map"_, [&]{
-            return "threshold "_+ftoa(densityThreshold, 6)+"\n"_
+            return "threshold "_+ftoa(attenuationThreshold, 6)+"\n"_
                     "threshold16 "_+dec(threshold)+"\n"_
-                    "maximum "_+dec(density.size-1)+"\n"_
+                    "maximum "_+dec(attenuation.size-1)+"\n"_
                     "rock "+str(rock)+"\n"_
                     "pore "+str(pore)+"\n"_; } );
-        output(outputs, "lorentz-rock"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(sample(rock,density.size)); });
+        output(outputs, "lorentz-rock"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(sample(rock,attenuation.size)); });
         output(outputs, "lorentz-notrock"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(notrock); });
-        output(outputs, "lorentz-pore"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(sample(pore,density.size)); });
+        output(outputs, "lorentz-pore"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(sample(pore,attenuation.size)); });
         output(outputs, "lorentz-notpore"_, "V(μ).tsv"_, [&]{ return "#Lorentz mixture model\n"_+toASCII(notpore); });
     }
 };
@@ -117,47 +117,64 @@ template struct Interface<Operation>::Factory<LorentzianMixtureModel>;
 #endif
 
 #if 1
-/// Computes the mean gradient for each set of voxels with the same density, and defines threshold as the density of the set of voxels with the maximum mean gradient
+/// Computes the mean sum of absolute difference for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute difference
 /// \note Provided for backward compatibility only
 struct MaximumMeanGradient : Operation {
-    void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
-        const Volume16& source = toVolume(*inputs[0]);
+    string parameters() const { return "binCount"_; }
+    void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
+        const Volume& source = toVolume(*inputs[0]);
         const uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-        UniformSample gradientSum (source.maximum+1, source.maximum+1, 0); // Sum of finite differences for voxels belonging to each density value
-        UniformHistogram histogram (source.maximum+1, source.maximum+1, 0); // Count samples belonging to each class to compute mean
-        for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
-            const uint16* const voxel = &source[z*X*Y+y*X+x];
-            uint gradient = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) /*+ abs(voxel[0] - voxel[X*Y])*/; //[sic] Anisotropic for backward compatibility
-            /*const uint binCount = 255; assert(binCount<=source.maximum); // Quantizes to 8bit as this method fails if voxels are not grouped in large enough sets
-            uint bin = uint(voxel[0])*binCount/source.maximum*source.maximum/binCount;*/
-            uint bin = uint(voxel[0]);
-            gradientSum[bin] += gradient, histogram[bin]++;
-            //gradientSum[voxel[1]] += gradient, histogram[voxel[1]]++; //[sic] Asymetric for backward compatibility
-            //gradientSum[voxel[X]] += gradient, histogram[voxel[X]]++; //[sic] Asymetric for backward compatibility
-            //gradientSum[voxel[X*Y]] += gradient, histogram[voxel[X*Y]]++; //[sic] Asymetric for backward compatibility
+        const uint binCount = args.value("binCount"_,source.maximum+1); // This method fails if voxels are not grouped in large enough sets
+        assert(binCount<=source.maximum);
+        buffer<uint> differenceSum (binCount, binCount, 0); // Sum of absolute finite differences for voxels belonging to each attenuation value
+        buffer<uint> histogram (binCount, binCount, 0); // Count samples belonging to each class to compute mean
+        if(source.sampleSize == 1) {
+            const Volume8& source8 = source;
+            for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
+                const uint8* const voxel = &source8[z*X*Y+y*X+x];
+                uint difference = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) + abs(voxel[0] - voxel[X*Y]);
+                {uint bin = uint(voxel[0])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+                {uint bin = uint(voxel[1])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+                {uint bin = uint(voxel[X])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+                {uint bin = uint(voxel[X*Y])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+            }
+        } else if(source.sampleSize == 2) {
+            const Volume16& source16 = source;
+            for(uint z: range(Z-1)) for(uint y: range(Y-1)) for(uint x: range(X-1)) {
+                const uint16* const voxel = &source16[z*X*Y+y*X+x];
+                uint difference = abs(int(voxel[0]) - int(voxel[1])) + abs(int(voxel[0]) - int(voxel[X])) + abs(voxel[0] - voxel[X*Y]);
+                {uint bin = uint(voxel[0])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+                {uint bin = uint(voxel[1])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+                {uint bin = uint(voxel[X])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+                {uint bin = uint(voxel[X*Y])*binCount/source.maximum; differenceSum[bin] += difference, histogram[bin]++;}
+            }
         }
-        // Pick pore and rock space as the two highest density maximums (FIXME: is this backward compatible ?)
-        UniformSample density = parseUniformSample( inputs[1]->data );
+        // Pick pore and rock space as the two highest attenuation maximums (FIXME: is this backward compatible ?)
+        UniformSample attenuation = parseUniformSample( inputs[1]->data );
         uint pore=0, rock=0; real poreMaximum=0, rockMaximum=0;
-        for(uint i: range(1,density.size-1)) {
-            if(density[i-1]<density[i] && density[i]>density[i+1] && density[i]>poreMaximum) {
-                pore=i; poreMaximum = density[i];
+        for(uint i: range(1,attenuation.size-1)) {
+            if(attenuation[i-1]<attenuation[i] && attenuation[i]>attenuation[i+1] && attenuation[i]>poreMaximum) {
+                pore=i; poreMaximum = attenuation[i];
                 if(poreMaximum > rockMaximum) swap(pore, rock), swap(poreMaximum, rockMaximum);
             }
         }
+        log("Note: Selecting pore peak at", pore,"(",(real)pore/histogram.size,") and rock peak at", rock,"(", (real)rock/histogram.size,")");
         uint threshold=0; real maximum=0;
-        UniformSample gradientMean (source.maximum+1);
+        UniformSample differenceMean (source.maximum+1);
         for(uint i: range(pore, rock)) {
-            if(!histogram[i]) continue; // Not enough samples to properly estimate mean gradient for this density threshold
-            real mean = gradientSum[i]/histogram[i];
+            if(!histogram[i]) continue; // Not enough samples to properly estimate mean difference for this attenuation threshold
+            real mean = (real)differenceSum[i]/histogram[i];
             if(mean>maximum) maximum = mean, threshold = i;
-            gradientMean[i] = mean;
+            differenceMean[i] = mean;
         }
-        threshold = (rock+pore)/2;
-        real densityThreshold = (real)threshold/histogram.size;
-        log("Maximum mean gradient estimates threshold at", ftoa(densityThreshold,3), "with mean gradient", maximum, "defined by", dec(histogram[threshold]), "voxels (without gradient would be",ftoa((rock+pore)/(2.*histogram.size),3));
-        output(outputs, "threshold"_, "scalar"_, [&]{ return toASCII(densityThreshold); } );
-        output(outputs, "gradient-mean"_, "tsv"_, [&]{ return toASCII(gradientMean); } );
+        real middleThreshold = (rock+pore)/(2.*histogram.size);
+        real differenceThreshold = (real)threshold/histogram.size;
+        log("Maximum mean sum of absolute difference method estimates threshold at", threshold, "(", ftoa(differenceThreshold,3), ") with mean sum of absolute difference", maximum, "defined by", histogram[threshold], "voxels /", X*Y*Z, "i.e", 100.*histogram[threshold]/(X*Y*Z),"%");
+        log("Note: Without computing any mean sum of absolute difference, simply selecting the middle attenuation value between rock and pore attenuation maximums would give a threshold of",
+            ftoa((rock+pore)/2.,1), "(", ftoa(middleThreshold,3),") within",dec(round(abs(differenceThreshold/middleThreshold-1)*100)),"%");
+        output(outputs, "middle-threshold"_, "scalar"_, [&]{ return toASCII((rock+pore)/2.); } );
+        output(outputs, "difference-threshold"_, "scalar"_, [&]{ return toASCII(threshold); } );
+        output(outputs, "difference-mean"_, "tsv"_, [&]{ return toASCII(differenceMean); } );
     }
 };
 template struct Interface<Operation>::Factory<MaximumMeanGradient>;
@@ -206,7 +223,7 @@ generic void binary(Volume8& target, const VolumeT<T>& source, uint16 threshold,
     target.maximum=1;
 }
 
-/// Segments pore space by comparing density against a uniform threshold
+/// Segments pore space by comparing attenuation against a uniform threshold
 struct Binary : VolumeOperation {
     string parameters() const override { return "threshold invert mask box cylinder"_; }
     uint outputSampleSize(uint) override { return sizeof(uint8); }
