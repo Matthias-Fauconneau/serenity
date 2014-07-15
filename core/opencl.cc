@@ -21,7 +21,7 @@ void __attribute((constructor(1002))) setup_cl() {
     size_t size; clGetDeviceInfo(device, CL_DEVICE_NAME, 0, 0, &size);
     char info[size]; clGetDeviceInfo(device, CL_DEVICE_NAME, size, info, 0); log(string(info,size-1));
     isIntel = startsWith(string(info,size-1), "Intel"_);
-    context = clCreateContext(0, 1, &device, &clNotify, 0, 0); assert_(context);
+    context = clCreateContext(0, 1, &device, &clNotify, 0, 0); assert_(context, "OpenCL device", string(info,size-1), "is exclusively held by another process");
     queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, 0); assert_(queue);
 }
 

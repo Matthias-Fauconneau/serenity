@@ -9,7 +9,7 @@ For each configuration, 4 files are saved in a "Results" under the current worki
 - Two slices of the best reconstruction
 
 ## Arguments
- - ui [=false]
+ - monitor [=false]
     Displays a window with informations to monitor the reconstruction as it runs.
  - reference [=false]
     Instead of running any reconstructions, exports the reference volumes slices in a "Reference" folder and as many analytic projections to "Projection".

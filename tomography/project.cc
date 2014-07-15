@@ -11,7 +11,7 @@ static uint64 project(const CLBufferF& buffer, const Projection& projection, con
     imageToWorld[3] = vec4(origin, 1); // Stores origin in 4th column unused by ray direction transformation (imageToWorld*(x,y,1,0)), allows to get origin directly as imageToWorld*(0,0,0,1) instead of imageToWorld*(size/2,0,1)
     // dataOrigin uses +1/2 offset as samples are defined to be from [1/2..size-1/2] when filtered by OpenCL CLK_FILTER_LINEAR
     CL(project, project) //                                     imageToWorld, plusMinusHalfHeightMinusOriginZ,                         c,                                                                     radiusSq,    halfHeight, dataOrigin
-    return project(projection.projectionSize.xy(), imageToWorld, float2(1,-1) * (halfHeight-1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) + 1 /*fix OOB*/, sq(center.x), halfHeight, float4(origin + center + float3(1./2),0), volume, noneLinearSampler, projection.projectionSize.x, buffer.pointer);
+    return project(projection.projectionSize.xy(), imageToWorld, float2(1,-1) * (halfHeight -1.f/2/*fix OOB*/) - origin.z, sq(origin.xy()) - sq(center.x) /*+1*/ /*fix OOB*/, sq(center.x), halfHeight, float4(origin + center + float3(1./2),0), volume, noneLinearSampler, projection.projectionSize.x, buffer.pointer);
 }
 
 uint64 project(const ImageArray& Ax, const Projection& A, const CLVolume& x, uint index) {

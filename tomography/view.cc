@@ -21,9 +21,9 @@ void SliceView::render() {
     ImageF source = clip(image, (image.size-target.size())/2+Rect(target.size()));
     assert_(target.size() == source.size, target.size(), source.size, image.size, (this->target.size()-image.size)/2+Rect(image.size));
     fill(this->target, Rect(this->target.size()), white);
-    float _unused max = convert(target, source, this->max);
+    convert(target, source, this->max);
     string name = volume ? volume->name : clVolume->name;
-    Text((name?name+"\n"_:""_)+str(index.value/*max*/),16,green).render(this->target, 0);
+    Text(name,16,green).render(this->target, 0);
     putImage(this->target);
 }
 
@@ -44,8 +44,7 @@ void VolumeView::render() {
     if(!target) { log("Empty clip"); return; } // FIXME
     assert_(target.size() == image.size, target.size(), image.size);
     fill(this->target, Rect(this->target.size()), white);
-    float _unused max = convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, this->max);
-    string name = x.name;
-    Text((name?name+"\n"_:""_)+str(index.value/*max*/),16,green).render(this->target, 0);
+    convert(clip(target, (target.size()-image.size)/2+Rect(image.size)), image, this->max);
+    Text(x.name,16,green).render(this->target, 0);
     putImage(this->target);
 }

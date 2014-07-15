@@ -8,19 +8,26 @@
 #include "plot.h"
 #include "layout.h"
 #include "window.h"
+#include "graphics.h"
 #include "png.h"
 #include "deflate.h"
 
 /// Returns the first divisor of \a n below √\a n
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 
+inline const Image& whiteBackground(const Image& target) {
+    int2 size = target.size(); const float2 center = float2(size-int2(1))/2.f; const float radiusSq = sq(center.x);
+    for(uint y: range(size.y)) for(uint x: range(size.x)) if(sq(float2(x,y)-center) > radiusSq) target(x,y) = 0xFF; // White background (for print)
+    return target;
+}
+
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
     Plot plot; // NMSE versus iterations plot
-    map<string, Variant> parameters = parseParameters(arguments(),{"ui"_,"reference"_,"update"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
-    unique<Window> window = parameters.value("ui"_, false) ? unique<Window>() : nullptr; // User interface for reconstruction monitoring, enabled by the "ui" command line argument
+    map<string, Variant> parameters = parseParameters(arguments(),{"monitor"_,"reference"_,"update"_,"folder"_,"sliceCount"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_,"minIterationCount"_,"maxIterationCount"_});
+    unique<Window> window = parameters.value("monitor"_, false) ? unique<Window>() : nullptr; // User interface for reconstruction monitoring, enabled by the "monitor" command line argument
 
-    Compute() {
+    Compute() {       
         const float detectorHalfWidth = 2048*0.194;
         const float cameraLength = 328.811/detectorHalfWidth;
         const float specimenDistance= 2.78845/detectorHalfWidth;
@@ -48,7 +55,6 @@ struct Compute {
                     convert(target,targetf); // Normalizes each slice by its maximum value
                     writeFile(dec(index), encodePNG(target), folder);
                 }}
-            exit();
             return;
         }
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
@@ -68,10 +74,11 @@ struct Compute {
                         } else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
                         for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
-                            uint subsetSize;
-                            /**/  if(method=="CG"_) subsetSize = projectionCount;
-                            else if(method=="SART"_) subsetSize = nearestDivisorToSqrt(projectionCount) * 2;
-                            else /*method=="MLTR"_*/ subsetSize = nearestDivisorToSqrt(projectionCount);
+                            uint subsetSize = parameters.value("subsetSize"_,
+                                                               method=="CG"_ ? subsetSize = projectionCount :
+                                                               method=="SART"_ ? nearestDivisorToSqrt(projectionCount) * 2 :
+                                                             /*method=="MLTR"_ ?*/  nearestDivisorToSqrt(projectionCount));
+                            assert_(subsetSize > 0 && subsetSize <= projectionCount);
                             Dict configuration;
                             configuration["cameraLength"_] = cameraLength;
                             configuration["specimenDistance"_] = specimenDistance;
@@ -92,10 +99,10 @@ struct Compute {
         }
 
         // Filters configuration requiring an update
-        Folder results = Folder("Results"_, currentWorkingDirectory(), true);
+        Folder results = Folder(parameters.value("folder"_,"Results"_), currentWorkingDirectory(), true);
         int64 updateTime = realTime() - 7*24*60*60*1000000000ull; // Updates any old results (default)
         if(parameters.value("update"_,""_)=="missing"_) updateTime = 0; // Updates missing results
-        if(parameters.value("update"_,""_)=="all"_) updateTime = realTime();  // Updates all results
+        if(parameters.value("update"_,""_)=="all"_ || parameters.value("update"_,""_)=="force"_) updateTime = realTime();  // Updates all results
         map<int64, Dict> update;
         for(const Dict& configuration: configurations) {
             int64 mtime = existsFile(toASCII(configuration), results) ? File(toASCII(configuration), results).modifiedTime() : 0;
@@ -175,8 +182,8 @@ struct Compute {
 
                 // Interface
                 Value sliceIndex = Value((volumeSize.z-1) / 2);
-                SliceView x0 {referenceVolume, max(1, 256 / referenceVolume.size.x), sliceIndex};
-                SliceView x {reconstruction->x, max(1, 256 / reconstruction->x.size.x), sliceIndex};
+                SliceView x0 {referenceVolume, max(1, 256 / referenceVolume.size.x), sliceIndex, rock.containerAttenuation};
+                SliceView x {reconstruction->x, max(1, 256 / reconstruction->x.size.x), sliceIndex, rock.containerAttenuation};
                 HBox slices {{&x0, &x}};
 
                 Value projectionIndex = Value((A.projectionSize.z-1) / 2);
@@ -186,10 +193,16 @@ struct Compute {
 
                 VBox layout {{&slices, &projections, &plot}};
                 if(window) {
+                    window->background = Window::NoBackground;
                     window->widget = &layout;
                     window->setSize(min(int2(-1), -window->size));
                     window->setTitle(str(completed)+"/"_+str(update.size())+" "_+str(index)+"/"_+str(configurations.size)+" "_+str(configuration));
                     window->show();
+                    window->actions[PrintScreen] = [&]{ {
+                            int z=volumeSize.z/2; Image target ( reconstruction->x.size.xy() );
+                            convert(target,slice(reconstruction->x,z),rock.containerAttenuation);
+                            writeFile(toASCII(configuration)+"."_+str(z), encodePNG(whiteBackground(target)), home()); }
+                    };
                 }
 
                 // Evaluation
@@ -197,9 +210,9 @@ struct Compute {
                 float bestCenterSSE = inf, bestExtremeSSE = inf;
                 VolumeF best (volumeSize, "best"_);
                 Time time; reconstructionTime.start();
-                const uint minIterationCount = 32, maxIterationCount = 512;
+                const uint minIterationCount = parameters.value("minIterationCount"_, 32), maxIterationCount = parameters.value("maxIterationCount"_, 512);
                 array<map<string, Variant>> result;
-                uint k=0; for(;k < maxIterationCount;k++) {
+                for(uint k=0;;k++) {
                     // Evaluates before stepping as initial volume might be the best if the method does not converge at all
                     float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
                     float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
@@ -215,13 +228,16 @@ struct Compute {
                     plot[str(configuration)].insert(k, -10*log10(totalNMSE));
                     if(window) {
                         window->needRender = true;
+                        fill(plot.target, Rect(plot.target.size()), 1);
                         window->event();
                     }
                     if(centerSSE + extremeSSE < bestCenterSSE + bestExtremeSSE) { bestK=k; reconstruction->x.read(best); }
                     else if(centerSSE < bestCenterSSE || extremeSSE < bestExtremeSSE) {} // Keep running if any region is still converging
-                    else if(k >= minIterationCount-1 /*&& k>2*bestK*/) { log("Divergence stopped after", k, "iterations"); break; }
-                    if(k >= maxIterationCount-1) { log("Slow convergence stopped after maximum iteration count"); break; }
+                    else if(minIterationCount && k >= minIterationCount-1 /*&& k>2*bestK*/) { log("Divergence stopped after", k, "iterations"); break; }
                     bestCenterSSE = min(bestCenterSSE, centerSSE), bestExtremeSSE = min(bestExtremeSSE, extremeSSE);
+                    if(maxIterationCount && k >= maxIterationCount-1) { log("Slow convergence stopped after maximum iteration count"); break; }
+                    extern bool terminate;
+                    if(!maxIterationCount && terminate) break;
 
                     reconstruction->step();
                 }
@@ -235,10 +251,15 @@ struct Compute {
                     if(available(results) < (int64)data.size) log("Not enough available disk space for reconstruction");
                     else writeFile(toASCII(configuration)+".best"_, data, results);
                 }
-                { // Stores 2 slices of the best reconstruction
+                { // Stores \a sliceCount slices of the best reconstruction
                     Image target ( best.size.xy() );
-                    {int z=volumeSize.z/2; convert(target,slice(best,z)); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(target), results); }
-                    {int z=volumeSize.z/8; convert(target,slice(best,z)); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(target), results); }
+                    const uint sliceCount = parameters.value("sliceCount"_,2);
+                    if(sliceCount == 2) {
+                        {int z=volumeSize.z/2; convert(target,slice(best,z),rock.containerAttenuation); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(whiteBackground(target)), results); } // Central slice
+                        {int z=volumeSize.z/8; convert(target,slice(best,z),rock.containerAttenuation); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(whiteBackground(target)), results); } // Extreme slice (outside region of interest)
+                    } else {
+                        for(uint f: range(sliceCount)) {int z=(1+f)*volumeSize.z/(sliceCount+1); convert(target,slice(best,z),rock.containerAttenuation); writeFile(toASCII(configuration)+"."_+str(z), encodePNG(target), results); } // Central slice
+                    }
                 }
                 log(bestK, 100*bestCenterSSE/centerSSQ, 100*bestExtremeSSE/extremeSSQ, 100*(bestCenterSSE+bestExtremeSSE)/(centerSSQ+extremeSSQ), time);
                 if(window) window->widget = 0;

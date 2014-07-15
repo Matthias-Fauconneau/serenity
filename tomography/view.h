@@ -14,7 +14,7 @@ struct SliceView : Widget {
     float max = 0;
 
     static Value staticIndex;
-    SliceView(const VolumeF& volume, const int upsampleFactor, Value& index=staticIndex) : size(volume.size), volume(&volume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)) {}
+    SliceView(const VolumeF& volume, const int upsampleFactor, Value& index=staticIndex, float max=0) : size(volume.size), volume(&volume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)), max(max) {}
     SliceView(const CLVolume& clVolume, const int upsampleFactor, Value& index=staticIndex, float max=0) : size(clVolume.size), clVolume(&clVolume), upsampleFactor(upsampleFactor), index(index.registerWidget(this)), max(max) {}
 
     default_move(SliceView);
