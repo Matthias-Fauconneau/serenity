@@ -19,8 +19,10 @@ if !resample: resampled = denoised # Forwards original volume
 if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
 
 # Density distribution
-if !threshold-from-source: histogram-attenuation = Histogram resampled
-if threshold-from-source: histogram-attenuation = Histogram source
+if !threshold-from-source: histogram-attenuation-full = Histogram resampled
+if threshold-from-source: histogram-attenuation-full = Histogram source
+if !ignore-zero-workaround: histogram-attenuation = histogram-attenuation-full
+if ignore-zero-workaround: histogram-attenuation = Slice histogram-attenuation-full begin=1 # Excluding zero
 histogram-attenuation-normalizeX = NormalizeX histogram-attenuation
 distribution-attenuation = KernelDensityEstimation histogram-attenuation-normalizeX
 
@@ -34,12 +36,13 @@ distribution-density = distribution-attenuation-unnormalized
 
 # Threshold determination
 threshold = 'otsu'
-if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
+if threshold == 'otsu': threshold-value otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
 otsu-interclass-deviation-normalized = NormalizeAreaXY otsu-interclass-deviation
 difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized # Use this method for backward compatibility only
-if threshold == 'gradient': threshold = difference-threshold # Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
-if threshold == 'middle': threshold = middle-threshold # Simply selects the middle value between rock and pore attenuation peaks
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-attenuation-unnormalized # Explicit model
+if threshold == 'gradient': threshold-value = difference-threshold # Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
+if threshold == 'middle': threshold-value = middle-threshold # Simply selects the middle value between rock and pore attenuation peaks
+if threshold == 'lorentz': threshold-value lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-attenuation-unnormalized # Explicit model
+threshold = threshold-value
 
 # Transposes to use an alternate cylinder axis
 transpose = Transpose resampled
@@ -202,7 +205,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
- denoised-connected = Mask maximum-mask denoised-tiled
+ denoised-connected = Mask maximum-mask denoised-tiled value=threshold-value
  flood = Add pore maximum-mask
  histogram-flood = Histogram flood
  not-flood = Negate maximum-mask
