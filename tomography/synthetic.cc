@@ -93,7 +93,7 @@ PorousRock::PorousRock(int3 size) : size(size) {
             const vec2 xy = vec2(random(), random()) * vec2(size.xy());
             if(sq(xy-vec2(volumeRadius)) > sq(innerRadius-r)) continue;
             type.grains.append( vec4(xy, r+random()*((size.z-1)-2*r), r) );
-            if(&type==&types[2] && r > largestGrain.w) largestGrain = type.grains.last(); // Only last type as heavier largest grains  might be overriden
+            if(&type==&types[2] && r > largestGrain.w) largestGrain = type.grains.last(); // Only last type as heavier largest grains might be overriden
         }
     }
 }
@@ -114,7 +114,7 @@ VolumeF PorousRock::volume() {
                 c = (outerRadius+1./2) - r;
             }
             else c = 1; // Full coverage within both edges
-            for(uint z: range(size.z)) volume(x,y,z) = (1-c) * volume(x,y,z) + c *  containerAttenuation; // Coverage resolution by alpha blending (exact)
+            for(uint z: range(size.z)) volume(x,y,z) = (1-c) * volume(x,y,z) + c * containerAttenuation; // Coverage resolution by alpha blending (exact)
         }
     }
 
