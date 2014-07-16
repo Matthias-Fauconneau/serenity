@@ -14,7 +14,7 @@ static void negate(Volume8& target, const Volume8& source) {
 defineVolumePass(Negate, uint8, negate);
 
 /// Adds two volumes
-template<Type T> void add(VolumeT<T>& target, const VolumeT<T>& A, const Volume8& B) {
+generic void add(VolumeT<T>& target, const VolumeT<T>& A, const Volume8& B) {
     const ref<T> aData = A; const ref<uint8> bData = B; const mref<T> targetData = target;
     for(uint index: range(target.size())) targetData[index] = aData[index] + T(bData[index]);
     target.maximum= A.maximum + B.maximum;
