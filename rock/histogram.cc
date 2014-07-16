@@ -6,8 +6,8 @@
 
 generic UniformHistogram histogram(const VolumeT<T>& source, CropVolume crop) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
-    uint radiusSq = crop.cylinder ? sq(crop.size.x/2) : -1;
-    int2 center = ((crop.min+crop.max)/2).xy();
+    uint radiusSq = crop.cylinder ? sq((crop.size.x-1)/2) : -1;
+    int2 center = ((crop.min+(crop.max-int3(1)))/2).xy();
     bool tiled=source.tiled();
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     const T* sourceData = source;
