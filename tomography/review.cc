@@ -5,7 +5,7 @@
 #include "graphics.h"
 #include "png.h"
 
-static const bool smallestSubsets = false; // Filters subsetSize to only keep configurations with the smallest subsets (fastest convergence)
+static const bool smallestSubsets = true; // Filters subsetSize to only keep configurations with the smallest subsets (fastest convergence)
 static const bool limitAcquisitionTime = false; // Filters configurations with Projections·Photons over acquisition time limit
 
 //TODO: merge ArrayView and SliceArrayView
@@ -23,7 +23,7 @@ struct ArrayView : Widget {
     int2 contentCellSize = int2(48*textSize/16, textSize);
 
     ArrayView(string valueName, const map<string, Variant>& parameters, uint textSize=16) : valueName(valueName), textSize(textSize) {
-        Folder results = "Results"_;
+        Folder results = parameters.value("folder"_,"Results"_);
         for(string fileName: results.list()) {
             string name = fileName;
             /**/  if(valueName=="SNR"_ || valueName=="SNR (dB)"_) { if(!endsWith(name, ".snr"_)) continue; name=section(name,'.',0,-2); }
@@ -116,7 +116,8 @@ struct ArrayView : Widget {
             max = ::max(values);
         }*/
     }
-    array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Revolutions,Projections,per subset"_,',')};
+    //array<string> dimensions[2] = {split("Trajectory,Photons,Method"_,','),split("Revolutions,Projections,per subset"_,',')}; //FIXME: remove uniform dimensions
+    array<string> dimensions[2] = {split("Trajectory,Photons"_,','),split("Revolutions,Projections,per subset"_,',')}; //FIXME: remove uniform dimensions
 
     /// Returns coordinates along \a dimension occuring in points matching \a filter
     array<Variant> coordinates(string dimension, const Dict& filter) const {
@@ -263,10 +264,10 @@ struct FileWatcher : File, Poll {
 };
 
 struct Application {
-    map<string, Variant> parameters = parseParameters(arguments()?arguments().slice(1):array<string>(),{"ui"_,"reference"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
+    map<string, Variant> parameters = parseParameters(arguments()?arguments().slice(1):array<string>(),{"folder"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_});
     ArrayView view { arguments()?arguments()[0]:"MSE_T"_, parameters};
-    Window window {&view, "Results"_};
-    FileWatcher watcher{"Results"_, [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
+    Window window {&view, parameters.value("folder"_,"Results"_)};
+    FileWatcher watcher{parameters.value("folder"_,"Results"_), [this](string){ view=ArrayView(view.valueName,parameters);/*Reloads*/ window.render(); } };
     Application() {
         for(string valueName: {"MSE_C"_,"MSE_E"_,"MSE_T"_,"Time (s)"_,"Iterations"_/*"SNR (dB)"_,"Normalized NMSE"_*/}) {
             ArrayView view (valueName, parameters, 64);

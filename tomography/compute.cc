@@ -62,10 +62,10 @@ struct Compute {
 
         // Explicits configurations
         array<Dict> configurations;
-        for(string rotationCountParameter: split(parameters.value("rotationCount"_,"optimal,4,2,1"_),',')) {
+        for(string rotationCountParameter: split(parameters.value("rotationCount"_,"4,2,1"_),',')) {
             for(string trajectory: split(parameters.value("trajectory"_,"single,double,adaptive"_),',')) {
                 if(rotationCountParameter=="optimal"_ && trajectory!="single"_) continue;
-                for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048,0"_),','), [](string s)->uint{ return fromInteger(s); })) {
+                for(const uint photonCount: apply(split(parameters.value("photonCount"_,"8192,4096,2048"_),','), [](string s)->uint{ return fromInteger(s); })) {
                     for(const uint projectionCount: apply(split(parameters.value("projectionCount"_,"128,256,512"_),','), [](string s)->uint{ return fromInteger(s); })) {
                         float rotationCount;
                         if(rotationCountParameter=="optimal"_) {
@@ -73,7 +73,7 @@ struct Compute {
                             rotationCount = H/(8*PI*r)*(sqrt(1 + 32*PI*projectionCount*r/H) - 1);
                         } else rotationCount = fromDecimal(rotationCountParameter);
                         if(trajectory=="adaptive"_) rotationCount = rotationCount + 1;
-                        for(const string method: split(parameters.value("method"_,"SART,MLTR,CG"_),',')) {
+                        for(const string method: split(parameters.value("method"_,"MLTR"_),',')) {
                             uint subsetSize = parameters.value("subsetSize"_,
                                                                method=="CG"_ ? subsetSize = projectionCount :
                                                                method=="SART"_ ? nearestDivisorToSqrt(projectionCount) * 2 :
@@ -214,8 +214,8 @@ struct Compute {
                 array<map<string, Variant>> result;
                 for(uint k=0;;k++) {
                     // Evaluates before stepping as initial volume might be the best if the method does not converge at all
-                    float centerSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
-                    float extremeSSE = ::SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + ::SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
+                    float centerSSE = SSE(referenceVolume, reconstruction->x, int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2));
+                    float extremeSSE = SSE(referenceVolume, reconstruction->x, int3(0,0,0), int3(volumeSize.xy(), volumeSize.z/4)) + SSE(referenceVolume, reconstruction->x, int3(0,0, 3*volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/4));
                     float totalNMSE = (centerSSE+extremeSSE)/(centerSSQ+extremeSSQ);
                     {map<string, Variant> values;
                         values["Iterations"_] = k;
