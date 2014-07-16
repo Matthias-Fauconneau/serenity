@@ -53,7 +53,7 @@
     \note The threshold will only be optimal if computed on the processed volume (default)
 - distribution-attenuation
   Estimates the underlying attenuation probability density (using kernel density estimation on the histogram)
-  \note Radiodensity is normalized to the 0-1 range and area is normalized to 1 (i.e correct probability density function)
+  \note Attenuation is normalized to the 0-1 range and area is normalized to 1 (i.e correct probability density function)
 - threshold
   The uniform attenuation threshold used to segment pores
   - threshold = [otsu]|gradient|lorentz|<decimal>|<integer>
@@ -116,7 +116,7 @@
 - [bmp-]denoised-connected
   Denoised volume with all unconnected pores set to "value"
   - value = <decimal>|<integer> [mandatory]
-   Radiodensity value to set masked voxels
+   Attenuation value to set masked voxels
 - [bmp-]pore-not-flood
   Volume with voxels assigned 255 for unconnected/unflooded pore space, or 0 otherwise (rock and connected/flooded pore space).
   - [bmp-]pore-not-flood
