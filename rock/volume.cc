@@ -121,7 +121,7 @@ Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gam
     assert_(maximum*0xFF/normalizeFactor<=0xFF, maximum, "overflows 8bit (automatic 16bit to 8bit truncation activates only for maximum>0x8000");
     float radiusSq = ((X-1)/2.0-marginX)*((Y-1)/2.0-marginY);
     for(int y=marginY; y<Y-marginY; y++) for(int x=marginX; x<X-marginX; x++) {
-        if(cylinder && source.cylinder && sq(x-(X-1)/2.f)+sq(y-(Y-1)/2.f) > radiusSq) { target(x-marginX,y-marginY) = invert ? byte4(0xFF,0xFF,0xFF,0) : byte4(0,0,0,0xFF/*Avoids transparent window*/); continue; }
+        if(cylinder && source.cylinder && sq(x-(X-1)/2.f)+sq(y-(Y-1)/2.f) > radiusSq) { target(x-marginX,y-marginY) = /*invert ?*/ byte4(0xFF,0xFF,0xFF,0) /*: byte4(0,0,0,0xFF)*/; continue; }
         uint value = 0;
         size_t index = source.index(x,y,z);
         if(source.sampleSize==1) value = ((uint8*)source.data.data)[index];
