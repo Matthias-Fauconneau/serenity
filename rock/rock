@@ -36,13 +36,12 @@ distribution-density = distribution-attenuation-unnormalized
 
 # Threshold determination
 threshold = 'otsu'
-if threshold == 'otsu': threshold-value otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
+if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
 otsu-interclass-deviation-normalized = NormalizeAreaXY otsu-interclass-deviation
 difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized # Use this method for backward compatibility only
-if threshold == 'gradient': threshold-value = difference-threshold # Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
-if threshold == 'middle': threshold-value = middle-threshold # Simply selects the middle value between rock and pore attenuation peaks
-if threshold == 'lorentz': threshold-value lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-attenuation-unnormalized # Explicit model
-threshold = threshold-value
+if threshold == 'gradient': threshold = difference-threshold # Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
+if threshold == 'middle': threshold = middle-threshold # Simply selects the middle value between rock and pore attenuation peaks
+if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-attenuation-unnormalized # Explicit model
 
 # Transposes to use an alternate cylinder axis
 transpose = Transpose resampled
@@ -99,7 +98,7 @@ connected-top = FloodFill unconnected minimalSqRadius seed=000001 # Keeps pore s
 connected-both = Intersect connected-bottom connected-top # Keeps pore space connected to both face
 
 # Discards unconnected pores
-connect-pore = ''
+connect-pore = '0'
 if !connect-pore: connected = unconnected # Forwards unconnected skeleton
 if connect-pore=='bottom': connected = connected-bottom
 if connect-pore=='top': connected = connected-top
@@ -205,7 +204,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  sqrt = SquareRoot maximum
  sqrt-scaled = ScaleValues sqrt process-resolution
  denoised-tiled = ZOrder denoised
- denoised-connected = Mask maximum-mask denoised-tiled value=threshold-value
+ denoised-connected = Mask maximum-mask denoised-tiled value=threshold
  flood = Add pore maximum-mask
  histogram-flood = Histogram flood
  not-flood = Negate maximum-mask
