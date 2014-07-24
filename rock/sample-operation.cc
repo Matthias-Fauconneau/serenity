@@ -122,9 +122,9 @@ struct HistogramMedian : Pass {
         for(pair<real,real> value_count: histogram) {
             real value = value_count.key, count = value_count.value;
             sum += count;
-            if(sum >= sampleCount) { median = value; break; } // FIXME: bias, TODO: linear interpolation
+            if(sum >= sampleCount/2) { median = value; break; } // FIXME: bias, TODO: linear interpolation
         }
-        assert_(median);
+        if(!median) log("Median of",source.name,"is zero");
         target.data = toASCII(median);
     }
 };
