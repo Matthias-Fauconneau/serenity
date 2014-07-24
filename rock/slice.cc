@@ -2,6 +2,7 @@
 #include "slice.h"
 #include "volume-operation.h"
 #include "graphics.h"
+#include "text.h"
 
 float SliceView::sliceZ = 1./2;
 
@@ -51,4 +52,5 @@ void SliceView::render(const Image& target) {
     while(2*imageSize<=target.size()) image=upsample(image), imageSize*=2;
     int2 offset = (target.size()-image.size())/2;
     blit(target, offset, image);
+    Text(names[currentIndex]).render(target, int2(0));
 }
