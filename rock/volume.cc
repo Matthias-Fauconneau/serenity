@@ -111,6 +111,7 @@ Image slice(const Volume& source, real normalizedZ, bool cylinder, bool normaliz
 }
 
 Image slice(const Volume& source, int z, bool cylinder, bool normalize, bool gamma, bool invert, bool binary) {
+    if(!source.maximum) return Image();
     assert_(source.maximum);
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y;
     const int marginX=source.margin.x, marginY=source.margin.y;
