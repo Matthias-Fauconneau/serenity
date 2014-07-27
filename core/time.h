@@ -69,12 +69,13 @@ String str(Date date, const string& format="dddd, dd MMMM yyyy hh:mm:ss"_);
 Date parseDate(TextData& s);
 inline Date parseDate(const string& s) { TextData t(s); return parseDate(t); }
 
-struct Timer : Poll {
-    Timer(long sec=0, function<void()> timeout={}, Thread& thread=mainThread);
-    virtual ~Timer();
+struct Timer : Stream, Poll {
+    Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);
+    virtual ~Timer() {}
     void setAbsolute(uint64 nsec);
+    void setRelative(long msec);
     const function<void()> timeout;
-    virtual void event() { timeout(); }
+    virtual void event();
 };
 
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers

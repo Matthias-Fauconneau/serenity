@@ -156,20 +156,20 @@ Date parseDate(TextData& s) {
     return date;
 }
 
-Timer::Timer(long sec, function<void()> timeout, Thread& thread)
-    : Poll(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC), POLLIN, thread), timeout(timeout) {
+Timer::Timer(const function<void()>& timeout, long sec, Thread& thread)
+    : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(Stream::fd, POLLIN, thread), timeout(timeout) {
     if(sec) setAbsolute(realTime()+sec*1000000000ull);
 }
-Timer::~Timer(){ close(fd); }
+void Timer::event() { read<uint64>(); timeout(); }
 void Timer::setAbsolute(uint64 nsec) {
     timespec time[2]={{0,0},{long(nsec/1000000000ull),long(nsec%1000000000ull)}};
-    timerfd_settime(fd,1,(const itimerspec*)time,0);
+    timerfd_settime(Stream::fd,1,(const itimerspec*)time,0);
 }
 /*void Timer::setAbsolute(long sec, long nsec) {
     timespec time[2]={{0,0},{sec,nsec}};
     timerfd_settime(fd,1,(const itimerspec*)time,0);
-}
+}*/
 void Timer::setRelative(long msec) {
     timespec time[2]={{0,0},{msec/1000,(msec%1000)*1000000}};
-    timerfd_settime(fd,0,(const itimerspec*)time,0);
-}*/
+    timerfd_settime(Stream::fd,0,(const itimerspec*)time,0);
+}
