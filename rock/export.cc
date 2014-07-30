@@ -111,28 +111,30 @@ struct Minimum : VolumeOperation {
 template struct Interface<Operation>::Factory<Minimum>;
 
 /// Sets masked (mask=0) voxels where source is under/over masked value to masked value
-static void mask(Volume16& target, const Volume8& mask, const Volume16& source, uint16 value, bool invert) {
+generic void mask(VolumeT<T>& target, const Volume8& mask, const VolumeT<T>& source, T value, bool invert) {
     assert_(mask.sampleCount-2*mask.margin<=source.sampleCount-2*source.margin);
     if(mask.sampleCount == source.sampleCount && mask.tiled()==source.tiled()) {
-        const uint8* const maskData = mask; const uint16* const sourceData = source; uint16* const targetData = target;
-        if(invert) for(uint index: range(mask.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s<value ? s: value; }
-        else for(uint index: range(mask.size())) { uint16 s=sourceData[index]; targetData[index] = maskData[index] || s>value ? s: value; }
+        const uint8* const maskData = mask; const T* const sourceData = source; T* const targetData = target;
+        if(invert) for(uint index: range(mask.size())) { T s=sourceData[index]; targetData[index] = maskData[index] || s<value ? s: value; }
+        else for(uint index: range(mask.size())) { T s=sourceData[index]; targetData[index] = maskData[index] || s>value ? s: value; }
     } else {
         int3 offset = source.margin-mask.margin; assert_(offset>int3(0));
         const uint64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z;
-        if(invert) for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { uint16 s = source(offset.x+x,offset.y+y,offset.z+z); target(x,y,z) = mask(x,y,z) || s<value ? s: value; }
-        else for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { uint16 s = source(offset.x+x,offset.y+y,offset.z+z); target(x,y,z) = mask(x,y,z) || s>value ? s: value; }
+        if(invert) for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { T s = source(offset.x+x,offset.y+y,offset.z+z); target(x,y,z) = mask(x,y,z) || s<value ? s: value; }
+        else for(uint z: range(Z)) for(uint y: range(Y)) for(uint x: range(X)) { T s = source(offset.x+x,offset.y+y,offset.z+z); target(x,y,z) = mask(x,y,z) || s>value ? s: value; }
     }
     target.maximum = source.maximum; target.squared=source.squared;
 }
 struct Mask : VolumeOperation {
     virtual string parameters() const { return "value invert"_; }
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[1]).sampleSize; }
     void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
         assert_(args.contains("value"_),"Missing mandatory argument 'value' for mask");
         float value = fromDecimal(args.value("value"_,"0"_));
         uint16 integerValue = value <= 1 ? round( value*inputs[0].maximum ) : round(value);
-        mask(outputs[0], inputs[0], inputs[1], integerValue, args.value("invert"_,"0"_)!="0"_);
+        /**/ if(inputs[1].sampleSize==1) mask<uint8>(outputs[0], inputs[0], inputs[1], integerValue, args.value("invert"_,"0"_)!="0"_);
+        else if(inputs[1].sampleSize==2) mask<uint16>(outputs[0], inputs[0], inputs[1], integerValue, args.value("invert"_,"0"_)!="0"_);
+        else error(inputs[1].sampleSize);
     }
 };
 template struct Interface<Operation>::Factory<Mask>;
@@ -213,15 +215,6 @@ struct ToTIFF : VolumeOperation {
     }
 };
 template struct Interface<Operation>::Factory<ToTIFF>;
-
-/// Converts integers to ASCII decimal
-template<uint pad> inline void itoa(byte*& target, uint n) {
-    int i = pad;
-    do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
-    while(i>0) target[--i]=' ';
-    target[pad]=',';
-    target += pad+1;
-}
 
 /// Exports volume to ASCII, one sample per line formatted as "x, y, z, f(x,y,z)"
 static buffer<byte> toASCII(const Volume& source) {

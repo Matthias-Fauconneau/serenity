@@ -3,21 +3,22 @@
 #include "volume-operation.h"
 #include "thread.h"
 #include "crop.h"
+#include "time.h"
 
 /// Converts text file formatted as ([value]:\n(x y z r\t)+)* to lists
 buffer<array<short3> > parseLists(const string& data) {
     buffer<array<short3>> lists;
     TextData s(data);
     while(s) {
-        s.whileAny(" "_); uint value = s.integer(); s.skip(":"_);
+        s.whileAny(" ,"_); uint value = s.integer(); s.skip(":"_);
         if(!lists) lists = buffer<array<short3>>(value+1, value+1, 0);
         array<short3>& list = lists[value];
         while(s) {
             if(s.match('\n')) break;
-            s.whileAny(" "_); uint x=s.integer();
-            s.whileAny(" "_); uint y=s.integer();
-            s.whileAny(" "_); uint z=s.integer();
-            s.whileAny(" "_); s.integer();
+            s.whileAny(" ,"_); uint x=s.integer();
+            s.whileAny(" ,"_); uint y=s.integer();
+            s.whileAny(" ,"_); uint z=s.integer();
+            s.whileAny(" ,"_); s.integer();
             list << short3(x,y,z);
         }
     }
@@ -53,6 +54,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
     familySets << unique<FamilySet>(); // index 0 is no families (background or yet unassigned)
     for(int R2=lists.size-1; R2>=0; R2--) { // Process balls from largest to smallest
         const array<short3>& balls = lists[R2];
+        if(familySets.size + balls.size > 1<<16) { log("Too many family sets to merge efficiently at sqRadius=",R2); break; }
         float R = sqrt((float)R2);
         int D = ceil(2*R);
         log(R, families.size, familySets.size);
@@ -60,7 +62,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             uint32& parentIndex = targetData[parent];
             if(!parentIndex) { // parent is a new root
-                families << unique<Family>(ref<uint64>{parent});
+                families << unique<Family>(ref<uint64>({parent}));
                 unique<FamilySet> set; set->families << families.last().pointer;
                 parentIndex = familySets.size; // New family set lookup index
                 familySets << move(set);
@@ -153,42 +155,54 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
 
 /// Converts sets to a text file formatted as ((x y z r2)+\n)*
 String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
-    String text ( sum(apply(families,[](const Family& family){ return family.size*4*5;})) ); // Estimates text size to avoid unnecessary reallocations
+    String target ( sum(apply(families,[](const Family& family){ return family.size*4*5;})) ); // Estimates text size to avoid unnecessary reallocations
+    byte* targetPtr = target.begin();
+    Time time; log_(str("toASCII",families.size,"families... "_));
     for(const Family& family: families) {
         for(uint64 index: family) {
             int3 p = zOrder(index);
-            text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ' ' << dec(source[index],3) << ' ';
+            itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
         }
-        text.last() = '\n';
+        target.last() = '\n';
     }
-    return text;
+    log(time);
+    target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
+    return target;
 }
 /// Merges intersecting sets of intersections and converts sets to a text file formatted as ((x y z r2)+\n)*
 String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
     array<unique<FamilySet>> mergedSets;
-    while(familySets) {
-        unique<FamilySet> set = familySets.pop();
-        if(set->families.size<=1) continue; // Only intersections
-        for(uint i=0; i<familySets.size;) {
-            const FamilySet& other = familySets[i];
-            if(other.families.size<=1) { i++; continue; } // Only intersections
-            for(Family* family: set->families) if(other.families.contains(family)) { goto break_; }
-            /*else*/ { i++; continue; }
-            break_:
-            set->points << other.points;
-            familySets.removeAt(i);
+    {Time time; log_(str("Merging ",familySets.size,"family sets..."_));
+        //assert_(familySets.size < 1<<16, "Too many family sets to merge efficiently");
+        while(familySets) {
+            //log(familySets.size);
+            unique<FamilySet> set = familySets.pop();
+            if(set->families.size<=1) continue; // Only intersections
+            for(uint i=0; i<familySets.size;) {
+                const FamilySet& other = familySets[i];
+                if(other.families.size<=1) { i++; continue; } // Only intersections
+                for(Family* family: set->families) if(other.families.contains(family)) { goto break_; }
+                /*else*/ { i++; continue; }
+                break_:
+                set->points << other.points;
+                familySets.removeAt(i);
+            }
+            mergedSets << move(set);
         }
-        mergedSets << move(set);
-    }
-    String text ( sum(apply(mergedSets,[](const FamilySet& family){ return family.points.size*4*5;})) ); // Estimates text size to avoid reallocations
-    for(const FamilySet& set: mergedSets) {
-        for(uint64 index: set.points) {
-            int3 p = zOrder(index);
-            text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ' ' << dec(source[index],3) << ' ';
+        log(time);}
+    {String target ( sum(apply(mergedSets,[](const FamilySet& family){ return family.points.size*4*5;})) ); // Estimates text size to avoid reallocations
+        byte* targetPtr = target.begin();
+        Time time; log_(str("toASCII",mergedSets.size,"familySets..."_));
+        for(const FamilySet& set: mergedSets) {
+            for(uint64 index: set.points) {
+                int3 p = zOrder(index);
+                itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
+            }
+            target.last() = '\n';
         }
-        text.last() = '\n';
-    }
-    return text;
+        log(time);
+        target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
+        return target;}
 }
 
 /// Computes trees of overlapping balls

@@ -82,6 +82,15 @@ stringz strz(const string& s);
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array<string> split(const string& str, byte separator=' ');
 
+/// Converts integers to ASCII decimal (fast inline method)
+template<uint pad> inline void itoa(byte*& target, uint n, char separator=',') {
+    int i = pad;
+    do { target[--i]="0123456789"[n%10]; n /= 10; } while( n!=0 );
+    while(i>0) target[--i]=' ';
+    target[pad]=separator;
+    target += pad+1;
+}
+
 /// Converts integers
 template<uint base=10> String utoa(uint64 number, int pad=0, char padChar='0');
 template<uint base=10> String itoa(int64 number, int pad=0, char padChar=' ');

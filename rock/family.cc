@@ -15,11 +15,10 @@ array<Family> parseFamilies(const string& data) {
     while(s) {
         Family family;
         for(;;) {
-            s.whileAny(" "_);
+            s.whileAny(" ,"_);
             uint64 index = zOrder(parse3(s)); uint16 sqRadius = s.integer();
             family << Ball{index, sqRadius};
             if(!s || s.match('\n')) break;
-            s.skip(" "_);
         }
         families << move(family);
     }

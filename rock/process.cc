@@ -222,7 +222,7 @@ array<string> PersistentProcess::configure(const ref<string>& allArguments, cons
     array<string> targets = Process::configure(allArguments, definition);
     if(specialArguments.contains("storageFolder"_)) {
         log("Storing data in user-specified folder:",specialArguments.at("storageFolder"_));
-        storageFolder = Folder(specialArguments.at("storageFolder"_),currentWorkingDirectory());
+        storageFolder = Folder(specialArguments.at("storageFolder"_), currentWorkingDirectory(), true);
     }
     if(specialArguments.contains("indirect"_)) {
         log("Storing metadata in auxiliary files (instead of file names)");

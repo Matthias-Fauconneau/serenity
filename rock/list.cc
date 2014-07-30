@@ -8,7 +8,7 @@
 buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 minimum) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     uint radiusSq = crop.cylinder ? sq((crop.size.x-1)/2) : -1;
-    int2 center = (crop.min+(crop.max-int3(1))/2).xy();
+    int2 center = ((crop.min+(crop.max-int3(1)))/2).xy();
     assert_(source.tiled());
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     const ref<uint16> sourceData = source;
