@@ -72,19 +72,21 @@ histogram-pore-connect-rock = Histogram pore
 histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
+
+
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
 positionxy = PositionY positionx
 position = PositionZ positionxy
 distance = Distance position
 
-# Computes skeleton (medial axis)
-skeleton = Skeleton position
+# Computes surface skeleton (medial axis)
+surface-skeleton = Skeleton position
 
 # Discards small pores
 minimalSqRadius = '0'
-if minimalSqRadius: pruned = ThresholdClip skeleton minimalSqRadius
-if !minimalSqRadius: pruned = skeleton
+if minimalSqRadius: pruned = ThresholdClip surface-skeleton minimalSqRadius
+if !minimalSqRadius: pruned = surface-skeleton
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
 #if crop.cylinder: crop = Crop pruned #FIXME: if crop.cylinder or crop.box
@@ -218,7 +220,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-background = ToPNG background
   png-position = ToPNG position
   png-distance = ToPNG distance invert=1
-  png-skeleton = ToPNG skeleton invert=1
+  png-skeleton = ToPNG surface-skeleton invert=1
   png-unconnected = ToPNG unconnected invert=1 binary=1
   png-pruned = ToPNG pruned invert=1
   png-connected = ToPNG connected invert=1 binary=1
@@ -229,13 +231,13 @@ distribution-radius-normalized = Div volume-distribution-radius volume
   png-pore-colored-boxes = ToPNG pore-colored-boxes
   png-colored-throats = ToPNG colored-throats
   png-throat-colored-boxes = ToPNG throat-colored-boxes
-# Exports to BMP (Stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
+# Exports to BMP (stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
   bmp-source = ToBMP source
   bmp-median = ToBMP median
   bmp-denoised = ToBMP denoised
   bmp-resampled = ToBMP resampled
   bmp-distance = ToBMP distance
-  bmp-skeleton = ToBMP skeleton
+  bmp-skeleton = ToBMP surface-skeleton
   bmp-maximum = ToBMP maximum
   bmp-denoised-connected = ToBMP denoised-connected
   pore-not-flood8 = Normalize8 pore-not-flood
