@@ -72,7 +72,8 @@ histogram-pore-connect-rock = Histogram pore
 histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
-
+# Computes curve skeleton (thinning)
+curve-skeleton = CurveSkeleton rock-connected
 
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
@@ -80,8 +81,8 @@ positionxy = PositionY positionx
 position = PositionZ positionxy
 distance = Distance position
 
-# Computes surface skeleton (medial axis)
-surface-skeleton = Skeleton position
+# Computes surface skeleton (integer medial axis)
+surface-skeleton = SurfaceSkeleton position
 
 # Discards small pores
 minimalSqRadius = '0'

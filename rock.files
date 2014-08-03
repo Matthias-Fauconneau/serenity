@@ -75,7 +75,7 @@ rock/render.h
 rock/rock
 rock/rock.cc
 rock/sample.h
-rock/skeleton.cc
+rock/surface-skeleton.cc
 rock/source.cc
 rock/threshold.cc
 rock/volume.cc
@@ -103,3 +103,4 @@ rock/cluster.cc
 rock/family.cc
 rock/synthetic.cc
 rock/box.cc
+rock/curve-skeleton.cc

@@ -51,4 +51,4 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
     target.maximum = maximum(target), target.squared=true;
     target.field = String("r"_); // Radius
 }
-defineVolumePass(Skeleton, uint16, integerMedialAxis);
+defineVolumePass(SurfaceSkeleton, uint16, integerMedialAxis);
