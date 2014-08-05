@@ -104,3 +104,4 @@ rock/family.cc
 rock/synthetic.cc
 rock/box.cc
 rock/curve-skeleton.cc
+test.cc
