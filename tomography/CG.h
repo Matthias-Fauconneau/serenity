@@ -1,7 +1,7 @@
 #pragma once
 #include "reconstruction.h"
 
-/// Minimizes |Ax-b|² using conjugated gradient (on the normal equations)
+/// Minimizes |Ax-b|² using conjugated gradients (on the normal equations)
 struct CG : Reconstruction  {
     CLBuffer<mat4> At;
     real residualEnergy = 0;

@@ -15,16 +15,17 @@
 /// Returns the first divisor of \a n below √\a n
 inline uint nearestDivisorToSqrt(uint n) { uint i=round(sqrt(float(n))); for(; i>1; i--) if(n%i==0) break; return i; }
 
+/// Sets pixels oustide the inscribed disc to white (for print)
 inline const Image& whiteBackground(const Image& target) {
     int2 size = target.size(); const float2 center = float2(size-int2(1))/2.f; const float radiusSq = sq(center.x);
-    for(uint y: range(size.y)) for(uint x: range(size.x)) if(sq(float2(x,y)-center) > radiusSq) target(x,y) = 0xFF; // White background (for print)
+    for(uint y: range(size.y)) for(uint x: range(size.x)) if(sq(float2(x,y)-center) > radiusSq) target(x,y) = 0xFF;
     return target;
 }
 
 /// Computes reconstruction of a synthetic sample on a series of cases with varying parameters
 struct Compute {
     Plot plot; // NMSE versus iterations plot
-    map<string, Variant> parameters = parseParameters(arguments(),{"monitor"_,"reference"_,"update"_,"folder"_,"sliceCount"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_,"minIterationCount"_,"maxIterationCount"_});
+    map<string, Variant> parameters = parseParameters(arguments(),{"monitor"_,"reference"_,"projectionData"_,"update"_,"folder"_,"sliceCount"_,"volumeSize"_,"projectionSize"_,"trajectory"_,"rotationCount"_,"photonCount"_,"projectionCount"_,"method"_,"subsetSize"_,"minIterationCount"_,"maxIterationCount"_});
     unique<Window> window = parameters.value("monitor"_, false) ? unique<Window>() : nullptr; // User interface for reconstruction monitoring, enabled by the "monitor" command line argument
 
     Compute() {       
@@ -39,22 +40,32 @@ struct Compute {
         PorousRock rock (volumeSize);
         const VolumeF referenceVolume = rock.volume();
         if(parameters.value("reference"_, false)) {
+            // Stores raw reference volume
+            writeFile("slices."_+strx(volumeSize)+".raw"_, cast<byte>(referenceVolume.data));
+            // Stores visualizations of all slices of the reference volume
             {Folder folder ("Reference"_, currentWorkingDirectory(), true);
                 Image target ( referenceVolume.size.xy() );
                 for(uint z: range(referenceVolume.size.z)) {
                     convert(target,slice(referenceVolume,z)); // Normalizes each slice by its maximum value
                     writeFile(dec(z), encodePNG(target),  folder);
-                }}
+                }
+            }
+
             {Folder folder ("Projection"_, currentWorkingDirectory(), true);
                 const Projection A (cameraLength, specimenDistance, volumeSize, int3(projectionSize, volumeSize.z), Single, 1);
-                ImageF targetf ( A.projectionSize.xy() );
+                VolumeF projections ( A.projectionSize, "b"_);
+                // Stores visualizations of projections of the reference volume
                 Image target ( A.projectionSize.xy() );
                 for(uint index: range(A.projectionSize.z)) {
                     log(index);
-                    rock.project(targetf, A, index);
-                    convert(target,targetf); // Normalizes each slice by its maximum value
+                    rock.project(slice(projections, index), A, index);
+                    convert(target, slice(projections, index)); // Normalizes each slice by its maximum value
                     writeFile(dec(index), encodePNG(target), folder);
-                }}
+                }
+                // Stores raw projection data set
+                writeFile("projections."_+strx(volumeSize)+".raw"_, cast<byte>(referenceVolume.data));
+            }
+
             return;
         }
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
@@ -115,6 +126,7 @@ struct Compute {
 
         // Caches projection data between test configurations
         String attenuation0Key; VolumeF attenuation0;
+        Map memoryMap; // When using a projection data file, keep it mapped
         String intensity0Key; VolumeF intensity0;
         String intensityKey; VolumeF intensity;/*MLTR*/ VolumeF attenuation;/*UI, SART, CG*/
         uint maxProjectionCount=0; for(const Dict& configuration: update.values) maxProjectionCount=max<uint>(maxProjectionCount,configuration.at("projectionCount"_));
@@ -142,9 +154,24 @@ struct Compute {
             {// Full resolution exact projection data
                 String key = str(volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount);
                 if(attenuation0Key != key) { // Cache miss
-                    log_("Analytic projection ["_+str(maxProjectionCount)+"]... "_);
                     Time time; projectionTime.start();
-                    attenuation0 = project(rock, Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount));
+                    if(parameters.value("projectionData"_, "analytic"_) != "analytic"_) { // Loads a projection data set precomputed by user
+                        log_("Stored projection ["_+str(maxProjectionCount)+"]... "_);
+                        string path = parameters.at("projectionData"_);
+                        memoryMap = Map(path);
+                        buffer<float> data (memoryMap); // By default, directly references mapped memory
+                        int3 size = volumeSize;
+                        if(data.size != (size_t)size.x*size.y*size.z) { // Inflates if necessary
+                            data = cast<float>(inflate(memoryMap)); memoryMap=Map();
+                            if(data.size != (size_t)size.x*size.y*size.z) { // Invalid volume
+                                error("Expected", size.x*size.y*size.z, "voxels, got", data.size, "for", path);
+                            }
+                        }
+                        attenuation0 = VolumeF(size, move(data), "b"_);
+                    } else {
+                        log_("Analytic projection ["_+str(maxProjectionCount)+"]... "_);
+                        attenuation0 = project(rock, Projection(cameraLength, specimenDistance, volumeSize, int3(projectionSize, maxProjectionCount), trajectory, rotationCount));
+                    }
                     projectionTime.stop(); log(time);
                     attenuation0Key = move(key);
                 }}
