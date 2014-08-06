@@ -50,28 +50,41 @@ void templateThin(Volume8& target, const Volume8& source) {
         }
     }
 
-    int offsets[27] = { -9-3-1, -9-3, -9-3+1, -9-1, -9, -9+1, -9+3-1, -9+3, -9+3+1,
-                          -3-1,   -3,   -3+1,   -1,  0,   +1,   +3-1,   +3,   +3+1,
-                        +9-3-1, +9-3, +9-3+1, +9-1, +9, +9+1, +9+3-1, +9+3, +9+3+1 };
-
-    copy(target.data, source.data);
+    if(source.tiled()) {
+        const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
+        const uint8* const sourceData = source;
+        uint8* const targetData = target;
+        const int64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
+        parallel(Z, [&](uint, uint z) {
+            uint const indexZ = z*XY;
+            for(uint y: range(Y)) {
+                uint const indexZY = indexZ + y*X;
+                for(uint x: range(X)) targetData[indexZY+x] = sourceData[offsetX[x]+offsetY[y]+offsetZ[z]];
+            }
+        });
+        target.offsetX=buffer<uint64>(), target.offsetY=buffer<uint64>(), target.offsetZ=buffer<uint64>();
+    } else copy(target.data, source.data);
 
     uint8* const targetData = target;
     const int64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     const uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
-    buffer<uint> deletedPoints (4096, 0);
+    assert_(!target.tiled());
+    int64 offsets[27] = { -XY-X-1, -XY-X, -XY-X+1, -XY-1, -XY, -XY+1, -XY+X-1, -XY+X, -XY+X+1,
+                             -X-1,    -X,    -X+1,    -1,   0,    +1,    +X-1,    +X,    +X+1,
+                          +XY-X-1, +XY-X, +XY-X+1, +XY-1, +XY, +XY+1, +XY+X-1, +XY+X, +XY+X+1 };
+
+    buffer<uint> deletedPoints (target.size(), 0);
     for(;;) {
         uint deletedPointCount = 0;
         for(uint subiterationIndex: range(8)) {
             deletedPoints.size = 0;
-            log_(str(subiterationIndex)+"\t"_);
             parallel(marginZ, Z-marginZ, [&](uint, uint z) {
                 uint const indexZ = z*XY;
                 for(uint y=marginY; y<Y-marginY; y++) {
                     uint const indexZY = indexZ + y*X;
                     for(uint x=marginX; x<X-marginX; x++) {
                         uint const index = indexZY + x;
-                        uint8* const voxel0 = targetData +index;
+                        uint8* const voxel0 = targetData + index;
                         for(const Template& t: reflectedTemplates[subiterationIndex]) {
                             bool hasX = false; uint match=0;
                             for(uint i: range(27)) {
@@ -99,7 +112,6 @@ void templateThin(Volume8& target, const Volume8& source) {
                 }
             });
             for(uint index: deletedPoints) targetData[index] = 0;
-            log(deletedPoints.size);
         }
         if(!deletedPointCount) break;
     };
