@@ -3,7 +3,8 @@
 
 struct Template {
     char rule[27] = {};
-    char& operator[](int i) { return rule[i]; }
+    char operator[](uint i) const { assert(i<27); return rule[i]; }
+    char& operator[](uint i) { assert(i<27); return rule[i]; }
     operator ref<char>() const { return ref<char>(rule, 27); }
 };
 bool operator==(const Template& a, const Template& b) { return (ref<char>)a == (ref<char>)b; }
@@ -43,37 +44,65 @@ void templateThin(Volume8& target, const Volume8& source) {
             Template& reflectedTemplate = reflectedTemplates[subiterationIndex][templateIndex];
             for(uint z: range(3)) for(uint y: range(3)) for(uint x: range(3)) {
                 uint index = x + 3 * y + 9 * z;
-                uint reflectedIndex = (reflection[0] ? 3-x: x) + 3 * (reflection[1] ? 3-y: y) + 9 * (reflection[2] ? 3-z: z);
+                uint reflectedIndex = (reflection[0] ? 2-x: x) + 3 * (reflection[1] ? 2-y: y) + 9 * (reflection[2] ? 2-z: z);
                 reflectedTemplate[index] = baseTemplate[reflectedIndex]; // or equivalently reflectedTemplate[reflectedIndex] = baseTemplate[index]
             }
         }
     }
 
-    copy(mref<uint>(target, target.size()), source);
+    int offsets[27] = { -9-3-1, -9-3, -9-3+1, -9-1, -9, -9+1, -9+3-1, -9+3, -9+3+1,
+                          -3-1,   -3,   -3+1,   -1,  0,   +1,   +3-1,   +3,   +3+1,
+                        +9-3-1, +9-3, +9-3+1, +9-1, +9, +9+1, +9+3-1, +9+3, +9+3+1 };
+
+    copy(target.data, source.data);
 
     uint8* const targetData = target;
     const int64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
     const uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
-    do {
+    buffer<uint> deletedPoints (4096, 0);
+    for(;;) {
         uint deletedPointCount = 0;
         for(uint subiterationIndex: range(8)) {
-            array<uint> deletedPoints;
-            for(uint z: range(marginZ, Z-marginZ)) {
+            deletedPoints.size = 0;
+            log_(str(subiterationIndex)+"\t"_);
+            parallel(marginZ, Z-marginZ, [&](uint, uint z) {
                 uint const indexZ = z*XY;
                 for(uint y=marginY; y<Y-marginY; y++) {
-                    uint const indexZY = indexZ+y*X;
+                    uint const indexZY = indexZ + y*X;
                     for(uint x=marginX; x<X-marginX; x++) {
-                        uint const index = indexZY+x;
-                        uint8* const voxel = targetData+index;
-                        for(Template t: reflectedTemplates[subiterationIndex]) {
-
+                        uint const index = indexZY + x;
+                        uint8* const voxel0 = targetData +index;
+                        for(const Template& t: reflectedTemplates[subiterationIndex]) {
+                            bool hasX = false; uint match=0;
+                            for(uint i: range(27)) {
+                                char rule = t[i];
+                                char value = voxel0[offsets[i]];
+                                /***/  if(rule == 'o' /*background*/) {
+                                    if(value != 0) goto continue2;
+                                } else if(rule == 'O' /*foreground*/) {
+                                    if(value != 1) goto continue2;
+                                } else if(rule == '.' /*ignore*/) {
+                                } else if(rule == 'x' /*at least one match*/) {
+                                    hasX = true;
+                                    if(value == 1) match++;
+                                } else error(rule);
+                            }
+                            if(hasX && !match) continue;
+                            {size_t i = __sync_fetch_and_add(&deletedPoints.size, 1); // Atomically increments the intersection count
+                                assert_(i < deletedPoints.capacity, i, deletedPoints.capacity);
+                                deletedPoints[i] = index; // Defers deletion to correctly match neighbour templates
+                                __sync_fetch_and_add(&deletedPointCount, 1);
+                                break;}
+                            continue2:;
                         }
-                        deletedPointCount++;
                     }
                 }
-            }
+            });
+            for(uint index: deletedPoints) targetData[index] = 0;
+            log(deletedPoints.size);
         }
-    } while(deletedPoints);
+        if(!deletedPointCount) break;
+    };
     target.margin.x = marginX, target.margin.y = marginY, target.margin.z = marginZ;
 }
-defineVolumePass(CurveSkeleton, uint16, templateThin);
+defineVolumePass(CurveSkeleton, uint8, templateThin);

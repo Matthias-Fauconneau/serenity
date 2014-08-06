@@ -73,7 +73,7 @@ histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # 
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
 # Computes curve skeleton (thinning)
-curve-skeleton = CurveSkeleton rock-connected
+curve-skeleton = CurveSkeleton pore-connect-rock
 
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
