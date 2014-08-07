@@ -301,7 +301,7 @@ shared<Result> PersistentProcess::getResult(const string& target, const Dict& ar
 
     // Simple forwarding rule
     if(!rule.operation) {
-        assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "FIXME: Only single inputs can be forwarded", rule);
+        assert_(!rule.arguments && rule.inputs.size == 1 && rule.outputs.size==1, "Undefined operator", rule.inputs.first());
         depChain.pop();
         return getResult(rule.inputs.first(), arguments);
     }

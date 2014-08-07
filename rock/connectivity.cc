@@ -5,9 +5,9 @@
 void connectivity(Volume8& target, const Volume8& source) {
     const uint8* const sourceData = source;
     uint8* const targetData = target;
-    const int64 X=target.sampleCount.x, Y=target.sampleCount.y, Z=target.sampleCount.z, XY = X*Y;
-    const uint marginX=target.margin.x+1, marginY=target.margin.y+1, marginZ=target.margin.z+1;
-    assert_(!target.tiled());
+    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY = X*Y;
+    const uint marginX=source.margin.x+1, marginY=source.margin.y+1, marginZ=source.margin.z+1;
+    assert_(!source.tiled());
     int64 offsets[26] = { -XY-X-1, -XY-X, -XY-X+1, -XY-1, -XY, -XY+1, -XY+X-1, -XY+X, -XY+X+1,
                              -X-1,    -X,    -X+1,    -1,         +1,    +X-1,    +X,    +X+1,
                           +XY-X-1, +XY-X, +XY-X+1, +XY-1, +XY, +XY+1, +XY+X-1, +XY+X, +XY+X+1 };

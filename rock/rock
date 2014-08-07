@@ -86,10 +86,29 @@ positionxy = PositionY positionx
 position = PositionZ positionxy
 distance = Distance position
 
-# Distance on curve voxels
+# Distance restricted to curve skeleton voxels
 curve-skeleton-distance = Mask curve-skeleton distance invert=1 value=0
+curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 
+# Local extremum of distance curve
+pore-list = LocalExtremumList curve-skeleton-distance
+throat-list = LocalExtremumList curve-skeleton-distance minimum=1
 
+# Writes indices (into the pores/throats list) at each pore/throat position
+pore-indices = RasterizeIndex pore-list voxelSize
+throat-indices = RasterizeIndex throat-list voxelSize
+
+# Rasterizes skeleton voxel as maximum balls (with family index attribute)
+pore-indices-tiled = ZOrder pore-indices
+pore-bins = Bin curve-skeleton-distance-tiled pore-indices-tiled
+throat-indices-tiled = ZOrder throat-indices
+throat-bins = Bin curve-skeleton-distance-tiled throat-indices-tiled
+pore-index = RasterizeAttribute pore-bins
+throat-index = RasterizeAttribute throat-bins
+
+# Colorizes each pore in a different color
+colored-pores = ColorizeIndex pore-index
+colored-throats = ColorizeIndex throat-index
 
 # Computes surface skeleton (integer medial axis)
 surface-skeleton = SurfaceSkeleton position

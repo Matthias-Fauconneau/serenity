@@ -1,7 +1,6 @@
 /// \file family.cc Operations on families (pores)
 #include "volume-operation.h"
 #include "thread.h"
-#include "graphics.h"
 #include "matrix.h"
 #include "time.h"
 
@@ -56,32 +55,6 @@ struct RootIndex : VolumeOperation {
     }
 };
 template struct Interface<Operation>::Factory<RootIndex>;
-
-void colorizeIndex(Volume24& target, const Volume16& source) {
-    const mref<byte3> targetData = target;
-    targetData.clear(0);
-    buffer<byte3> colors(target.maximum+1);
-    Random random; // Unseeded to always keep same sequence
-    for(uint i: range(target.maximum)) {
-        colors[i] = byte3(clip<vec3>(0, float(0xFF)*LChuvtoBGR(53,135,2*PI*random()), 0xFF));
-    }
-    colors[0] = 0;
-    colors[target.maximum] = 0xFF;
-    chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
-        const uint16* const sourceData = source + offset;
-        byte3* const targetData = target + offset;
-        for(uint i : range(size)) targetData[i] = colors[sourceData[i]];
-    });
-    target.maximum = 0xFF;
-}
-/// Colorizes each index in a different color
-struct ColorizeIndex : VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(byte3); }
-    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        colorizeIndex(outputs[0], inputs[0]);
-    }
-};
-template struct Interface<Operation>::Factory<ColorizeIndex>;
 
 /// Converts boxes to a text file formatted as "x y z sx sy sz"
 String toASCII(const ref<mat4>& boxes) {

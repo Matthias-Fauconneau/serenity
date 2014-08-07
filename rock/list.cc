@@ -9,7 +9,7 @@ buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 mini
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     uint radiusSq = crop.cylinder ? sq((crop.size.x-1)/2) : -1;
     int2 center = ((crop.min+(crop.max-int3(1)))/2).xy();
-    assert_(source.tiled());
+    assert_(source.tiled(), "list");
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
     const ref<uint16> sourceData = source;
     buffer<array<short3>> lists[coreCount];
@@ -46,8 +46,8 @@ String toASCII(const buffer<array<short3>>& lists) {
         const array<short3>& list = lists[value];
         if(!list.size) continue;
         text << str(value) << ": "_;
-        for(uint i: range(list.size)) { short3 p = list[i]; text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << " 1"_ << (i<list.size-1?" "_:""_); }
-        text << "\n"_;
+        for(uint i: range(list.size)) { short3 p = list[i]; text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << " 1  "_; }
+        text.last() = '\n'; // Replace trailing space
     }
     return text;
 }

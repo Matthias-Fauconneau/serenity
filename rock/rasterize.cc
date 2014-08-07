@@ -45,7 +45,7 @@ void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    assert_(source.tiled());
+    assert_(source.tiled() && attribute.tiled(), "Bin");
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
 
     Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());

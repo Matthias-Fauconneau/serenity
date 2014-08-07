@@ -20,6 +20,7 @@
 //#include "sample-operation.h"
 //#include "curve-skeleton.h"
 //#include "position.h"
+//#include "extremum.h"
 //#include "surface-skeleton.h"
 //#include "floodfill.h"
 //#include "rasterize.h"
