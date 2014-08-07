@@ -45,6 +45,9 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 extr
             min.x = align(2,min.x)/2, max.x /= 2;
             min.y = align(2,min.y)/2, max.y /= 2;
             min.z = align(2,min.z)/2, max.z /= 2;
+            sourceMin.x = align(2,min.x)/2, sourceMax.x /= 2;
+            sourceMin.y = align(2,min.y)/2, sourceMax.y /= 2;
+            sourceMin.z = align(2,min.z)/2, sourceMax.z /= 2;
         }
     }
 
@@ -80,7 +83,7 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     bool tiled = source.tiled();
     interleavedLookup(target);
     target.sampleCount = crop.sampleCount;
-    assert_(crop.min>=source.margin && crop.max<=source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
+    assert_(crop.min>=source.margin && crop.max<=source.sampleCount-source.margin, "margin", source.margin, "min", crop.min, "max", crop.max, "size", source.sampleCount-source.margin);
     target.margin = crop.margin;
     target.cylinder = crop.cylinder;
     assert_(target.data.size >= target.size()*target.sampleSize);
