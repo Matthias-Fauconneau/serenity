@@ -25,6 +25,7 @@
 //#include "rasterize.h"
 //#include "kernel-density-estimation.h"
 //#include "export.h"
+//#include "connectivity.h"
 //#include "list.h"
 //#include "cluster.h"
 //#include "link.h"

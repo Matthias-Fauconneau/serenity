@@ -105,3 +105,4 @@ rock/synthetic.cc
 rock/box.cc
 rock/curve-skeleton.cc
 test.cc
+rock/connectivity.cc

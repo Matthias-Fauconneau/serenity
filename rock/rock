@@ -75,6 +75,11 @@ volume-connect-rock = Sum histogram-pore-connect-rock-slice
 # Computes curve skeleton (thinning)
 curve-skeleton = CurveSkeleton pore-connect-rock
 
+# Computes connectivity = coordination numbers  = number of edges/neighbours
+connectivity = Connectivity curve-skeleton
+connectivity-histogram-zero = Histogram connectivity
+connectivity-histogram = Slice connectivity-histogram-zero begin=1 # Excluding background
+
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
 positionxy = PositionY positionx
