@@ -55,7 +55,7 @@ struct TextLayout {
 
     Font* getFont(string fontName, int size, string fontType=""_) {
         if(!fonts.contains(NameSize{fontName+fontType, size})) {
-            auto font = filter(fontFolder().list(Files|Recursive), [&](string path) { return fontType ? (!find(path, fontName) || !find(path, fontType+"."_)) : !find(path,fontName+"."_); });
+            auto font = filter(fontFolder().list(Files|Recursive), [&](string path) { return fontType ? !find(path, fontName+"-"_+fontType+"."_) : !find(path,fontName+"."_); });
             if(!font) return 0;
             assert_(font.size==1, font);
             fonts.insert(NameSize{fontName+fontType,size},Font(File(font.first(), fontFolder()), size));
@@ -76,7 +76,7 @@ struct TextLayout {
         pen.y = interline*font->ascender;
         for(uint i=0; i<text.size; i++) {
             uint c = text[i];
-            if(c==' '||c=='\t'||c=='\n') { // Next word/line
+            if(/*c==' '||c=='\t'||c=='\n'*/c<=' ') { // Next word/line
                 column++;
                 previous = spaceIndex;
                 if(word) {
@@ -93,9 +93,10 @@ struct TextLayout {
                     if(c=='\t') pen.x += 4*spaceAdvance; //FIXME: align
                 }
                 if(c=='\n') nextLine(false);
-                continue;
+                //continue;
             }
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
+                if(c==' '||c=='\t'||c=='\n') continue;
                 if(format&Link) {
                     link.end=current();
                     links << move(link);
@@ -104,7 +105,8 @@ struct TextLayout {
                 if(format&Underline && !(newFormat&Underline) && (current()>underlineBegin))
                     lines << Line{underlineBegin, current()};
                 format=newFormat;
-                /**/ if(format&Bold) font = getFont(fontName, size, "Bold"_);
+                /**/ if((format&Bold) && (format&Italic)) font = getFont(fontName, size, "Bold Italic"_);
+                else if(format&Bold) font = getFont(fontName, size, "Bold"_);
                 else if(format&Italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
                 else font = getFont(fontName, size);
                 if(format&Underline) underlineBegin=current();
@@ -123,8 +125,8 @@ struct TextLayout {
             if(previous!=spaceIndex) pen.x += font->kerning(previous,index);
             previous = index;
             float advance = font->advance(index);
-            const Image& image = font->glyph(index).image;
-            if(image) { word << Character{font, vec2(pen.x,0), index, image.width, advance, i}; column++; }
+            const Glyph& glyph = font->glyph(index);
+            if(glyph.image) { word << Character{font, vec2(pen.x,0), index, glyph.offset.x+glyph.image.width, advance, i}; column++; }
             pen.x += advance;
         }
         if(word) {

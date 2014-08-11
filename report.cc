@@ -85,19 +85,30 @@ struct Document : Widget {
             }
 
             String text = center ? String(""_) : repeat(" "_, 4);
-            while(s && !s.match('\n')) text << trim( s.line() )+" "_;
 
             if(level) {
                 if(level > levels.size) levels.grow(level);
                 if(level < levels.size) levels.shrink(level);
                 levels[level-1]++;
-                if(!target) tableOfContents << Entry{copy(levels), copy(text), (uint)pageIndex};
-                bold = true;
+                if(level==1) bold = true;
             }
-            if(bold) text = format(TextFormat::Bold) + text;
+
+            if(bold) text << format(TextFormat::Bold);
+            while(s && !s.match('\n')) { // Paragraph
+                bool italic = false;
+                while(s && !s.match('\n')) { // Line
+                    if(s.match('/')) {
+                        italic=!italic;
+                        text << format((italic?TextFormat::Italic:0)|(bold?TextFormat::Bold:0));
+                    }
+                    else text << s.next();
+                }
+                text << " "_;
+            }
 
             page << &newText(text, size);
 
+            if(level && !target) tableOfContents << Entry{copy(levels), copy(text), (uint)pageIndex};
             if(s.match('\n')) break; // Page break
         }
         if(target) {
@@ -106,7 +117,7 @@ struct Document : Widget {
         }
     }
 
-    int viewPageIndex = 2;
+    int viewPageIndex = 1; //FIXME: persistent
 
     bool keyPress(Key key, Modifiers) {
         /**/ if(key == LeftArrow) viewPageIndex = max(0, viewPageIndex-1);
@@ -146,24 +157,33 @@ struct Document : Widget {
 #include <sys/inotify.h>
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
+    string path;
+    /*const*/ uint watch;
+    function<void(string)> fileModified;
+
     FileWatcher(string path, function<void(string)> fileModified)
-        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_MODIFY))), fileModified(fileModified) {}
+        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(path), watch(check(inotify_add_watch(File::fd, strz(path), IN_MODIFY))), fileModified(fileModified) {}
     void event() override {
         while(poll()) {
             ::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
             inotify_event e = *(inotify_event*)buffer.data;
             fileModified(e.len ? string(e.name, e.len-1) : string());
+            inotify_rm_watch(File::fd, watch);
+            watch = check(inotify_add_watch(File::fd, strz(path), IN_MODIFY));
         }
     }
-    const uint watch;
-    function<void(string)> fileModified;
 };
 
 struct Report {
     String path = homePath()+"/Rapport/rapport.txt"_;
     Document document {readFile(path, home())};
     Window window {&document, int2(1*document.width/document.oversample,document.height/document.oversample), "Report"_};
-    FileWatcher watcher{path, [this](string){ delete &document; new (&document) Document(readFile(path, home()));/*Reloads*/ window.render(); } };
+    FileWatcher watcher{path, [this](string){
+            int index = document.viewPageIndex;
+            document.~Document(); new (&document) Document(readFile(path, home())); // Reloads
+            document.viewPageIndex = index;
+            window.render();
+        } };
     Report() {
         window.actions[Escape]=[]{exit();}; window.background=White; window.focus = &document; window.show();
     }
