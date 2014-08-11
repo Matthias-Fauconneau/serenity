@@ -18,7 +18,7 @@ struct VSyncTest : Widget {
 } test;
 #else
 struct Reminder : Widget {
-    const uint interval = 60*1000;
+    const uint64 interval = 60*1000;
     Timer timer { [this]{ window.show(); } };
     Window window {this,int2(512,512),"Reminder"_};
     Reminder() {

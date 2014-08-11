@@ -26,7 +26,7 @@ struct ScrollArea : Widget {
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    void render(const Image& target) override;
+    void render() override;
     int2 size; // keep last size for ensureVisible
 };
 
@@ -50,7 +50,7 @@ struct ImageWidget : virtual Widget {
     ImageWidget(const Image& image, bool hidden=false):image(move(image)),hidden(hidden){}
 
     int2 sizeHint();
-    void render(const Image& target) override;
+    void render() override;
 };
 /// \typedef ImageView Icon
 /// Displays an icon
@@ -84,7 +84,7 @@ struct ToggleButton : Widget {
     bool enabled = false;
 
     int2 sizeHint();
-    void render(const Image& target) override;
+    void render() override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     const Image& enableIcon;
@@ -100,7 +100,7 @@ struct Progress : Widget {
     Progress(int minimum=0, int maximum=0, int value=-1):minimum(minimum),maximum(maximum),value(value){}
 
     int2 sizeHint();
-    void render(const Image& target) override;
+    void render() override;
 
     static constexpr int height = 32;
 };

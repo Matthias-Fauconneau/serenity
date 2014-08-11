@@ -40,35 +40,15 @@ struct FileWatcher : File, Poll {
 };
 #endif
 
-/// Stores target on every full window render to allow partial updates
-template<Type T> struct BackingStore : T {
-    using T::T;
-    Image backingStore;
-    Image target;
-    void render(const Image& target) override {
-        this->target = share(target);
-        backingStore = copy(target);
-        T::render(target);
+/// Shuffles an array of elements
+generic buffer<T> shuffle(buffer<T>&& a) {
+    Random random; // Unseeded (to return the same sequence for a given size)
+    for(uint i: range(a.size)) {
+        uint j = random%(i+1);
+        swap(a[i], a[j]);
     }
-    /// Directly renders partial update to last known target
-    /// \note Assumes \a target is still a valid rendering target since last full window render
-    void render() {
-        if(!target) return;
-        copy(target, backingStore);
-        render(target);
-    }
-    /// Sends a partial update
-    void putImage(Window& window) {
-        if(!target) return;
-        assert(target.buffer.data);
-        uint offset = target.data - target.buffer.data;
-        uint y = offset/target.stride, x = offset%target.stride;
-        window.putImage(int2(x,y), target.size());
-    }
-    /// Directly renders partial update to last known target and sends a partial update for \a window
-    /// \note Assumes last known target is the rendering target for \a window
-    void render(Window& window) { if(!window.displayState) return; render(); putImage(window); }
-};
+    return move(a);
+}
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player {
@@ -109,8 +89,8 @@ struct Player {
     Text elapsed = "00:00"_;
     Slider slider;
     Text remaining = "00:00"_;
-    BackingStore<HBox> backingStore {{&elapsed, &slider, &remaining}};
-    HBox toolbar {{&randomButton, &playButton, &nextButton, &ejectButton, &backingStore}};
+    HBox status {{&elapsed, &slider, &remaining}};
+    HBox toolbar {{&randomButton, &playButton, &nextButton, &ejectButton, &status}};
     Scroll< List<Text>> albums;
     Scroll< List<Text>> titles;
     HBox main {{ &albums.area(), &titles.area() }};
@@ -128,6 +108,7 @@ struct Player {
 #endif
 
     Player() {
+        window.background = White;
         albums.always=titles.always=true;
         elapsed.minSize.x=remaining.minSize.x=64;
 
@@ -142,8 +123,9 @@ struct Player {
 #else
         window.globalAction(Play) = {this, &Player::togglePlay};
         window.globalAction(F8) = {this, &Player::togglePlay}; // Chromebook Mute
-        window.globalAction(F9) = [this]{  volume=volume-1; }; // Chromebook Decrease volume
-        window.globalAction(F10) = [this]{ volume=volume+1; }; // Chromebook Increase volume
+        //window.globalAction(F9) = [this]{  volume=volume-1; }; // Chromebook Decrease volume (handled by kmix)
+        //window.globalAction(F10) = [this]{ volume=volume+1; }; // Chromebook Increase volume (handled by kmix)
+        window.actions.insert(RightArrow, {this, &Player::next});
 #endif
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};
@@ -245,10 +227,7 @@ struct Player {
         if(random) {
             main << &titles.area(); // Hide albums
             // Explicits random sequence to: resume the sequence from the last played file, ensure files are played once in the sequence.
-            array<String> files = folder.list(Recursive|Files|Sorted); // Lists all files
-            randomSequence.reserve(files.size);
-            Random random; // Unseeded so that the random sequence only depends on collection
-            while(files) randomSequence << files.take(random%files.size);
+            randomSequence = shuffle(folder.list(Recursive|Files|Sorted));
             titles.shrink(titles.index+1); this->files.shrink(titles.index+1); // Replaces all queued titles with the next tracks drawn from the random sequence
             updatePlaylist();
         } else main<<&albums.area()<<&titles.area(); // Show albums
@@ -298,7 +277,11 @@ struct Player {
         slider.value = position; slider.maximum=duration;
         elapsed.setText(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
         if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
-        backingStore.render(window);
+        if(window.pixmap) {
+            renderBackground(status.target, window.background); //FIXME: with Oxygen
+            status.render();
+            window.putImage(Rect(window.size)/*status.target*/); window.present();
+        }
     }
 #if REMOVABLES
     String cmdline = File("/proc/cmdline"_).readUpTo(256);

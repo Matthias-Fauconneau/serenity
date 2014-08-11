@@ -3,9 +3,8 @@
 #include "text.h"
 #include "graphics.h"
 
-
 // ScrollArea
-void ScrollArea::render(const Image& target) {
+void ScrollArea::render() {
     size=target.size();
     int2 hint = abs(widget().sizeHint());
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
@@ -44,7 +43,7 @@ void ScrollArea::center(int2 target) { offset = size/2-target; }
 
 // Progress
 int2 Progress::sizeHint() { return int2(-height,height); }
-void Progress::render(const Image& target) {
+void Progress::render() {
     if(maximum > minimum && value >= minimum && value <= maximum) {
         int x = target.size().x*uint(value-minimum)/uint(maximum-minimum);
         fill(target, Rect(int2(0,1), int2(x,target.size().y-2)), highlight);
@@ -94,7 +93,7 @@ void Selection::setActive(uint i) {
 }
 
 // HighlightSelection
-void HighlightSelection::render(const Image& target) {
+void HighlightSelection::render() {
     array<Rect> widgets = layout(target.size());
     for(uint i: range(count())) {
         if(i==index && (always || hasFocus(this) || hasFocus(&at(i)))) fill(target, widgets[i], highlight);
@@ -103,7 +102,7 @@ void HighlightSelection::render(const Image& target) {
 }
 
 // TabSelection
-void TabSelection::render(const Image& target) {
+void TabSelection::render() {
     array<Rect> widgets = layout(target.size());
     if(index>=count()) fill(target, Rect(target.size()), darkGray); //no active tab
     else {
@@ -117,7 +116,7 @@ void TabSelection::render(const Image& target) {
 
 // ImageWidget
 int2 ImageWidget::sizeHint() { return hidden ? 0 : image.size(); }
-void ImageWidget::render(const Image& target) {
+void ImageWidget::render() {
     if(!image) return;
     int2 offset = (target.size()-image.size())/2;
     blit(target, offset, image);
@@ -131,7 +130,7 @@ bool ImageLink::mouseEvent(int2, int2, Event event, Button) {
 
 //  ToggleButton
 int2 ToggleButton::sizeHint() { return (enabled?disableIcon:enableIcon).size(); }
-void ToggleButton::render(const Image& target) {
+void ToggleButton::render() {
     const Image& image = enabled?disableIcon:enableIcon;
     if(!image) return;
     int2 offset = (target.size()-image.size())/2;

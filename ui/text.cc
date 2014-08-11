@@ -3,15 +3,16 @@
 #include "font.h"
 #include "utf8.h"
 
-map<int,Font> defaultSans;
-map<int,Font> defaultBold;
-map<int,Font> defaultItalic;
-map<int,Font> defaultMono;
+struct NameSize { String name; int size; };
+bool operator ==(const NameSize& a, const NameSize& b) { return a.name == b.name && a.size == b.size; }
+string str(const NameSize& x) { return str(x.name, x.size); }
+static map<NameSize,Font> fonts; // Font cache
 
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
     float size;
     float wrap;
+    float interline;
     float spaceAdvance;
     vec2 pen=0;
     struct Character { Font* font; vec2 pos; uint index; uint width; float advance; uint editIndex; };
@@ -27,13 +28,17 @@ struct TextLayout {
     Text::Cursor current() { return Text::Cursor{lineNumber, column}; }
 
     uint lastIndex=-1;
+    float maxLength = 0;
     void nextLine(bool justify) {
         //justify
         float length=0; for(const Word& word: line) { if(word) { length+=word.last().pos.x+word.last().advance; } } //sum word length
         if(line && line.last()) length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
+        maxLength = max(maxLength, length + (line.size-1)*spaceAdvance);
         float space=0;
-        if(justify && line.size>1) space = (wrap-length)/(line.size-1);
-        if(space<=0 || space>=3*spaceAdvance) space = spaceAdvance; //compact
+        if(justify && line.size>1) {
+            space = (wrap-length)/(line.size-1);
+            assert_(space >= spaceAdvance);
+        } else space = spaceAdvance;
 
         //layout
         column=0; pen.x=0;
@@ -47,15 +52,22 @@ struct TextLayout {
         }
         lastIndex++;
         line.clear();
-        pen.x=0; pen.y+=size;
+        pen.x=0; pen.y += interline*size;
     }
 
-    TextLayout(const ref<uint>& text, int size, int wrap, Font* font=0):size(size),wrap(wrap) {
-        static Folder dejavu( existsFolder("dejavu"_,fonts()) ?  "dejavu"_ : "truetype/ttf-dejavu/"_, fonts());
-        if(!font) {
-            if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("DejaVuSans.ttf"_,dejavu), size));
-            font = &defaultSans.at(size);
+    Font* getFont(string fontName, int size, string fontType=""_) {
+        if(!fonts.contains(NameSize{fontName+fontType, size})) {
+            auto font = filter(fontFolder().list(Files|Recursive), [&](string path) { return fontType ? (!find(path, fontName) || !find(path, fontType+"."_)) : !find(path,fontName+"."_); });
+            if(!font) return 0;
+            assert_(font.size==1, font);
+            fonts.insert(NameSize{fontName+fontType,size},Font(File(font.first(), fontFolder()), size));
         }
+        return &fonts.at(NameSize{fontName+fontType, size});
+    }
+
+    TextLayout(const ref<uint>& text, int size, int wrap, string fontName, float interline, bool justify=false):size(size), wrap(wrap), interline(interline) {
+        Font* font = getFont(fontName, size);
+        assert_(font, fontName, size);
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->advance(spaceIndex); assert(spaceAdvance);
         uint16 previous=spaceIndex;
@@ -71,7 +83,7 @@ struct TextLayout {
                 previous = spaceIndex;
                 float length=0; for(const Word& word: line) if(word) length+=word.last().pos.x+word.last().advance+spaceAdvance;
                 if(word) length += word.last().pos.x+word.last().width; //last word
-                if(wrap && length>=wrap && line) nextLine(true); //doesn't fit
+                if(wrap && length>wrap && line) nextLine(justify); //doesn't fit
                 line << move(word); //add to current line (or first of new line)
                 pen.x=0;
                 if(c=='\n') nextLine(false);
@@ -86,16 +98,9 @@ struct TextLayout {
                 if(format&Underline && !(newFormat&Underline) && (current()>underlineBegin))
                     lines << Line{underlineBegin, current()};
                 format=newFormat;
-                if(format&Bold) {
-                    if(!defaultBold.contains(size)) defaultBold.insert(size,Font(File("DejaVuSans-Bold.ttf"_,dejavu), size));
-                    font = &defaultBold.at(size);
-                } else if(format&Italic) {
-                    if(!defaultItalic.contains(size)) defaultItalic.insert(size,Font(File("DejaVuSans-Oblique.ttf"_,dejavu), size));
-                    font = &defaultItalic.at(size);
-                } else {
-                    if(!defaultSans.contains(size)) defaultSans.insert(size,Font(File("DejaVuSans.ttf"_,dejavu), size));
-                    font = &defaultSans.at(size);
-                }
+                /**/ if(format&Bold) font = getFont(fontName, size, "Bold"_);
+                else if(format&Italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
+                else font = getFont(fontName, size);
                 if(format&Underline) underlineBegin=current();
                 if(format&Link) {
                     for(;;) {
@@ -118,17 +123,20 @@ struct TextLayout {
         }
         float length=0; for(const Word& word: line) if(word) length+=word.last().pos.x+word.last().advance+spaceAdvance;
         if(word) length += word.last().pos.x+word.last().width; //last word
-        if(wrap && length>=wrap) nextLine(true); //doesn't fit
+        if(wrap && length>wrap) nextLine(justify); //doesn't fit
         line << move(word); //add to current line (or first of new line)
         pen.x=0;
         nextLine(false);
     }
 };
 
-Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap) : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap) {}
+Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, float interline)
+    : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), interline(interline) {}
+
 void Text::layout() {
     textSize=int2(0,size);
-    TextLayout layout(text, size, wrap);
+    TextLayout layout(text, size, wrap, font, interline, false); // Layouts without justification
+    layout = TextLayout(text, size, layout.maxLength, font, interline, true); // Layouts with justification to the maximum length (which may be smaller than wrap)
 
     textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;
@@ -152,6 +160,7 @@ void Text::layout() {
         if(currentIndex<=editIndex) cursor = Cursor(textLines.size, textLine.size); //end of line
         textLines << move(textLine);
     }
+    textSize.y += 2*interline*size;
     if(!text.size) { assert(editIndex==0); cursor = Cursor(0,0); }
     else if(currentIndex<=editIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } //end of text
     links = move(layout.links);
@@ -171,10 +180,10 @@ int2 Text::sizeHint() {
     if(!textSize) layout();
     return max(minSize,textSize);
 }
-void Text::render(const Image& target) { render(target, max(int2(0),(target.size()-textSize)/2)); }
+void Text::render() { render(target, max(int2(0),(target.size()-textSize)/2)); }
 void Text::render(const Image& target, int2 offset) {
     if(!textSize) layout();
-    for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(target, offset+b.pos, b.image, color);
+    for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(target, offset+b.pos, b.image, color, alpha);
     for(const Line& l: lines) fill(target, offset+Rect(l.min,l.max), black);
 }
 
@@ -306,8 +315,8 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
     return true;
 }
 
-void TextInput::render(const Image& target) {
-    Text::render(target);
+void TextInput::render() {
+    Text::render();
     if(hasFocus(this)) {
         assert(cursor.line < textLines.size, cursor.line, textLines.size);
         const TextLine& textLine = textLines[cursor.line];

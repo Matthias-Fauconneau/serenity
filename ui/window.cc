@@ -7,6 +7,7 @@ bool hasFocus(Widget* widget) { assert_(window); return window->focus==widget; }
 void setDrag(Widget* widget) { assert(window); window->drag=widget; }
 String getSelection(bool clipboard) { assert(window); return window->getSelection(clipboard); }
 void setCursor(Rect region, Cursor cursor) { assert(window); if(region.contains(window->cursorPosition)) window->cursor=cursor; }
+void putImage(const Image& target) { assert_(window); window->putImage(target); }
 
 #if X11
 #include "file.h"
@@ -140,29 +141,58 @@ void Window::event() {
             {Shm::Attach r; r.seg=id+Segment; r.shm=shm; send(raw(r));}
             {::CreatePixmap r; r.pixmap=id+Pixmap; r.window=id; r.w=size.x, r.h=size.y; send(raw(r));}
             {::CreatePixmap r; r.pixmap=id+Pixmap2; r.window=id; r.w=size.x, r.h=size.y; send(raw(r));}
+            pixmap = Pixmap;
         }
 
         renderBackground(target, background);
         widget->render(target);
 
-        putImage(0, size);
+        putImage(Rect(size));
         present();
     }
 }
 
-void Window::putImage(int2 position, int2 size) {
+void Window::putImage(const Image& target) {
+    if(target.buffer != this->target.buffer) { log("target.buffer == this->target.buffer"); return; }
+    assert_(target.buffer == this->target.buffer);
+    uint delta = target.data - this->target.data;
+    //if(!target.stride) return; // FIXME
+    assert_(target.stride);
+    uint x = delta % target.stride, y = delta / target.stride;
+    assert_(x+target.width<=this->target.width && y+target.height<=this->target.height);
+    this->putImage(int2(x,y)+Rect(target.size()));
+}
+
+void Window::putImage(Rect rect) {
     assert_(state == Idle);
     pixmap = pixmap==Pixmap2 ? Pixmap : Pixmap2; // Double buffer
-    Shm::PutImage r; r.window=id+pixmap; r.context=id+GContext; r.seg=id+Segment;
-    r.totalW=target.stride; r.totalH=target.height;
-    r.srcX = position.x, r.srcY = position.y, r.srcW=size.x; r.srcH=size.y;
-    r.dstX = position.x, r.dstY = position.y;
-    send(raw(r));
-    state=Server;
+    if(rect==Rect(0) || lastUpdate>rect) rect=Rect(lastUpdate);
+    assert_(id); assert_(rect.size());
+    /*if(remote) {
+        Image target = share(this->target);
+        if(rect != Rect(target.size())) {
+            target = Image(rect.size());
+            copy(target, clip(this->target, rect));
+        }
+        assert_(target.buffer.size == (size_t)target.size().x*target.size().y);
+        ::PutImage r; r.drawable=id+XWindow; r.context=id+GContext; r.w=target.size().x, r.h=target.size().y; r.x=rect.min.x, r.y=rect.min.y; r.size += target.buffer.size;
+        assert_(raw(r).size + cast<byte>(target.buffer).size == r.size*4);
+        send(String(raw(r)+cast<byte>(target.buffer)));
+        assert_(r.size <= maximumRequestLength, r.size, maximumRequestLength);
+    } else*/ {
+        Shm::PutImage r; r.window=id+pixmap; r.context=id+GContext; r.seg=id+Segment;
+        r.totalW=target.stride; r.totalH=target.height;
+        r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
+        r.dstX = rect.position().x, r.dstY = rect.position().y;
+        send(raw(r));
+        state=Server;
+    }
+    lastUpdate = rect;
 }
 
 void Window::present() {
     if(presentState != Idle) { presentState=Wait; return; }
+    assert_(id); assert_(pixmap);
     {Present::Pixmap r; assert_(sizeof(r)==r.size*4, sizeof(r)); r.window=id+XWindow; r.pixmap=id+pixmap; send(raw(r));}
     presentState = Server;
 }
@@ -233,7 +263,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
             else exit(0); // Exits application by default
         }
         else if(type==Shm::event+Shm::Completion) {
-            assert_(state==Server || state==Wait);
+            assert_(state==Server || state==Wait, int(state));
             if(state==Wait && presentState==Wait) state=WaitPresent;
             else {
                 State was = state;

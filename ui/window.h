@@ -45,7 +45,8 @@ struct Window : Device {
     function<void()>& globalAction(Key);
 
     /// Sends a partial update
-    void putImage(int2 position, int2 size);
+    void putImage(const Image& target);
+    void putImage(Rect rect);
 
     /// Sets display state
     void setDisplay(bool displayState);
@@ -86,6 +87,8 @@ struct Window : Device {
 
     /// Rendering target
     Image target;
+    /// Extends putImage for correct double buffering
+    Rect lastUpdate = Rect(0);
     /// Drag state
     int2 dragStart, dragPosition, dragSize;
     /// Whether a render request was skipped while unmapped
@@ -155,7 +158,7 @@ struct Window : Device {
     /// System V shared memory
     int shm = 0;
     /// Current pixmap for double buffer
-    uint pixmap = Pixmap;
+    uint pixmap = 0;
     /// Shared window buffer state
     enum State { Idle, Server, Wait, WaitPresent } state = Idle;
     /// Present state

@@ -17,10 +17,9 @@ Image upsample(const Image& source) {
     return target;
 }
 
-Image downsample(const Image& source) {
+void downsample(const Image& target, const Image& source) {
     int w=source.width, h=source.height;
-    Image target(w/2, h/2);
-    assert_(w%2==0 && h%2==0);
+    assert_(w%2==0 && h%2==0, w, h);
 #if 0 // Exact
     extern float sRGB_reverse[0x100];
     extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
@@ -39,6 +38,12 @@ Image downsample(const Image& source) {
     for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
                                                                    int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);
 #endif
+}
+
+Image downsample(const Image& source) {
+    int w=source.width, h=source.height;
+    Image target(w/2, h/2);
+    downsample(target, source);
     return target;
 }
 

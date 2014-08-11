@@ -14,7 +14,7 @@ inline TextFormat format(uint f) { assert(f<32); return TextFormat(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0);
+    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans", float interline=1);
 
     void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
@@ -28,6 +28,10 @@ struct Text : virtual Widget {
     float alpha;
     /// Line wrap limit in pixels (0: no wrap)
     uint wrap=0;
+    /// Font name
+    string font;
+    /// Interline stretch
+    float interline;
     /// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link
@@ -35,7 +39,7 @@ struct Text : virtual Widget {
 
     int2 sizeHint();
     void layout();
-    void render(const Image& target) override;
+    void render() override;
     void render(const Image& target, int2 offset);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
@@ -80,5 +84,5 @@ struct TextInput : Text {
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    void render(const Image& target) override;
+    void render() override;
 };

@@ -1,7 +1,7 @@
 #include "layout.h"
 
 // Layout
-void Layout::render(const Image& target) {
+void Layout::render() {
     array<Rect> widgets = layout(target.size());
     for(uint i: range(count())) at(i).render(clip(target, widgets[i]));
 }

@@ -2,7 +2,7 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 
-/// Axis-aligned rectangle
+/// Axis-aligned rectangle with 2D integer coordinates
 struct Rect {
     int2 min,max;
     Rect(int2 min, int2 max):min(min),max(max){}
@@ -12,10 +12,10 @@ struct Rect {
     int2 position() { return min; }
     int2 size() { return max-min; }
 };
+inline bool operator ==(const Rect& a, const Rect& b) { return a.min==b.min && a.max==b.max; }
+inline bool operator >(const Rect& a, const Rect& b) { return a.min<b.min || a.max>b.max; }
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
-inline Rect operator &(Rect a, Rect b) { return Rect(min(max(a.min,b.min),b.max),max(min(a.max,b.max),b.min)); }
-inline Rect operator |(Rect a, Rect b) { return a && b ? Rect(min(a.min,b.min),max(a.max,b.max)) : (a ? a : b); }
-inline Rect& operator |=(Rect& a, Rect b) { return a = a|b; }
+inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
 struct Image {
@@ -60,6 +60,7 @@ inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.da
 Image clip(const Image& image, Rect region);
 
 /// Downsamples an image by averaging samples
+void downsample(const Image& target, const Image& source);
 Image downsample(const Image& source);
 
 /// Upsamples an image by duplicating samples

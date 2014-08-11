@@ -31,12 +31,15 @@ enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4
 
 /// Abstract component to compose user interfaces
 struct Widget {
+    virtual ~Widget() {}
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint() { return -1; }
     /// Renders this widget.
-    virtual void render(const Image& target)=0;
+    Image target;
+    void render(const Image& target) { this->target=share(target); render(); }
+    virtual void render()=0;
     /// Renders a partial view of this widget with an offset (Default implementation).
     virtual void render(const Image& target, int2 offset, int2 size) {
         Image buffer (size.x, size.y);
@@ -75,6 +78,8 @@ String getSelection(bool clipboard=false);
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
 /// Sets cursor to be shown when mouse is in the given rectangle
 void setCursor(Rect region, Cursor cursor);
+///
+void putImage(const Image& target);
 
 /// Configures global display context to render to an image
 // In this module because the definition depends on display and widget

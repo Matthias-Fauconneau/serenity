@@ -7,7 +7,7 @@
 #include "map.h"
 struct  FT_FaceRec_;
 
-const Folder& fonts();
+const Folder& fontFolder();
 
 struct Glyph {
     bool valid=false;
