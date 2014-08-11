@@ -17,12 +17,13 @@ struct Document : Widget {
     static constexpr float headerSize = 14 * point;
     static constexpr float titleSize = 16 * point;
     const string font = "Computer Modern"_;
+    const float interlineStretch = 1; //4./3
 
     TextData s;
 
     array<unique<Widget>> elements;
 
-    int pageIndex=0;
+    int pageIndex=0, pageCount;
 
     array<uint> levels;
     struct Entry { array<uint> levels; String name; uint page; };
@@ -30,6 +31,7 @@ struct Document : Widget {
 
     Document(string source) : s(filter(source, [](char c) { return c=='\r'; })) {
         while(s) { layoutPage(Image()); pageIndex++; } // Generates table of contents
+        pageCount=pageIndex;
     }
 
     template<Type T, Type... Args> T& element(Args&&... args) {
@@ -38,22 +40,13 @@ struct Document : Widget {
         elements << unique<Widget>(move(t));
         return *pointer;
     }
-    Text& newText(string text, int size=textSize) { return element<Text>(text, size, 0, 1, width, font, 3./2); }
+    Text& newText(string text, int size=textSize) { return element<Text>(text, size, 0, 1, width, font, interlineStretch); }
 
     void layoutPage(const Image& target) {
         elements.clear();
         VBox page (Linear::Center, Linear::Expand);
 
-        uint emptyLine = 0;
         while(s) {
-            if(s.match('\n')) {
-                emptyLine++;
-                continue;
-            } else {
-                if(emptyLine >= 2) break; // Page break
-                emptyLine = 0;
-            }
-
             bool center=false;
             if(s.match(' ')) {
                 assert_(!center);
@@ -62,7 +55,6 @@ struct Document : Widget {
 
             int size = textSize;
             bool bold = false;
-
             if(s.match('!')) {
                 assert_(!bold);
                 bold = true;
@@ -72,15 +64,10 @@ struct Document : Widget {
             uint level = 0;
             while(s.match('#')) level++;
 
-            /*if(s.match('*')) {
-                assert_(!bold);
-                bold = true;
-            }*/
-
             if(s.match('\\')) {
-                string command = s.line();
+                string command = s.whileNot('\n');
                 if(command == "tableOfContents"_) {
-                    auto& vbox = element<VBox>(Linear::Share, Linear::Expand);
+                    auto& vbox = element<VBox>(Linear::Top, Linear::Expand);
                     for(const Entry& entry: tableOfContents) {
                         String header;
                         header << repeat(" "_, entry.levels.size);
@@ -97,7 +84,8 @@ struct Document : Widget {
                 continue;
             }
 
-            String text = String( trim( s.line() ) );
+            String text = center ? String(""_) : repeat(" "_, 4);
+            while(s && !s.match('\n')) text << trim( s.line() )+" "_;
 
             if(level) {
                 if(level > levels.size) levels.grow(level);
@@ -109,6 +97,8 @@ struct Document : Widget {
             if(bold) text = format(TextFormat::Bold) + text;
 
             page << &newText(text, size);
+
+            if(s.match('\n')) break; // Page break
         }
         if(target) {
             fill(target, Rect(target.size()), white);
@@ -116,18 +106,19 @@ struct Document : Widget {
         }
     }
 
-    int viewPageIndex = 0;
+    int viewPageIndex = 2;
 
     bool keyPress(Key key, Modifiers) {
         /**/ if(key == LeftArrow) viewPageIndex = max(0, viewPageIndex-1);
-        else if(key == RightArrow) viewPageIndex++;
+        else if(key == RightArrow) viewPageIndex = min(pageCount-1, viewPageIndex+1);
         else return false;
         return true;
     }
 
     bool mouseEvent(int2, int2, Event, Button button) {
+        setFocus(this);
         /**/ if(button==WheelUp) viewPageIndex = max(0, viewPageIndex-1);
-        else if(button==WheelDown) viewPageIndex++;
+        else if(button==WheelDown) viewPageIndex = min(pageCount-1, viewPageIndex+1);
         else return false;
         return true;
     }
@@ -161,9 +152,7 @@ struct FileWatcher : File, Poll {
         while(poll()) {
             ::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
             inotify_event e = *(inotify_event*)buffer.data;
-            string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
-            assert_(e.mask&IN_MODIFY);
-            fileModified(name);
+            fileModified(e.len ? string(e.name, e.len-1) : string());
         }
     }
     const uint watch;

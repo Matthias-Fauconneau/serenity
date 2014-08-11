@@ -47,6 +47,6 @@ struct Font {
 
     Map keep; array<byte> data;
     handle<FT_FaceRec_*> face;
-    float fontSize=0, ascender=0;
+    float fontSize=0, ascender=0, descender=0;
     map<uint, map<uint16, Glyph>> cache;
 };

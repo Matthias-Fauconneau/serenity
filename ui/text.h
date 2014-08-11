@@ -14,7 +14,7 @@ inline TextFormat format(uint f) { assert(f<32); return TextFormat(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans", float interline=1);
+    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, float interline=1);
 
     void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }

@@ -64,7 +64,7 @@ struct Player {
         for(mref<short2> chunk=output;;) {
             if(!file) break;
             assert(readSize<output.size);
-            if(audio.rate != file->rate) audio.start(file->rate, periodSize);
+            if(audio.rate != file->rate) { audio.stop(); audio.start(file->rate, periodSize); }
             size_t read = read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
@@ -86,14 +86,14 @@ struct Player {
     ICON(next) TriggerButton nextButton{nextIcon()};
     ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
     ICON(eject) TriggerButton ejectButton{ejectIcon(), true};
-    Text elapsed = "00:00"_;
+    Text elapsed {"00:00"_};
     Slider slider;
-    Text remaining = "00:00"_;
+    Text remaining {"00:00"_};
     HBox status {{&elapsed, &slider, &remaining}};
     HBox toolbar {{&randomButton, &playButton, &nextButton, &ejectButton, &status}};
-    Scroll< List<Text>> albums;
-    Scroll< List<Text>> titles;
-    HBox main {{ &albums.area(), &titles.area() }};
+    /*Scroll<*/ List<Text> /*>*/ albums; //FIXME: Scroll
+    /*Scroll<*/ List<Text> /*>*/ titles; //FIXME: Scroll
+    HBox main {{ &albums, &titles }};
     VBox layout {{ &toolbar, &main }};
     Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
 
@@ -149,6 +149,7 @@ struct Player {
     }
     ~Player() { recordPosition(); /*Records current position*/ }
     void recordPosition() {
+        assert_(titles.index<files.size && file);
         if(/*writableFile(".last"_, folder) &&*/ titles.index<files.size && file)
             writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
     }
@@ -158,7 +159,7 @@ struct Player {
         folders.clear(); albums.clear(); files.clear(); titles.clear(); randomSequence.clear();
         folder = path;
         folders = folder.list(Folders|Sorted);
-        for(string folder: folders) albums << String(section(folder,'/',-2,-1));
+        for(string folder: folders) albums.append( section(folder,'/',-2,-1) );
         if(existsFile(".last"_, folder)) {
             String mark = readFile(".last"_, folder);
             string last = section(mark, '\0');
@@ -191,8 +192,8 @@ struct Player {
         while(i<title.size && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
         title = replace(title.slice(i),"_"_," "_);
         if(withAlbumName) title = folder + " - "_ + title;
-        titles << Text(title, 16);
-        files <<  folder+"/"_+file;
+        titles.append(title, 16);
+        files.append( folder+"/"_+file );
     }
     void playAlbum(const string& album) {
         assert(existsFolder(album,folder),album);
@@ -225,12 +226,12 @@ struct Player {
         randomSequence.clear();
         randomButton.enabled = random;
         if(random) {
-            main << &titles.area(); // Hide albums
+            main << &titles; // Hide albums
             // Explicits random sequence to: resume the sequence from the last played file, ensure files are played once in the sequence.
             randomSequence = shuffle(folder.list(Recursive|Files|Sorted));
             titles.shrink(titles.index+1); this->files.shrink(titles.index+1); // Replaces all queued titles with the next tracks drawn from the random sequence
             updatePlaylist();
-        } else main<<&albums.area()<<&titles.area(); // Show albums
+        } else main<<&albums<<&titles; // Show albums
     }
     void updatePlaylist() {
         if(!randomSequence) return;
@@ -246,7 +247,7 @@ struct Player {
             queueFile(folder, file, true);
             randomIndex++;
         }
-        while(titles.count() > 64 && titles.index > 0) { titles.take(0); files.take(0); titles.index--; } // Limits total size
+        while(titles.count() > 64 && titles.index > 0) { titles.removeAt(0); files.removeAt(0); titles.index--; } // Limits total size
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {

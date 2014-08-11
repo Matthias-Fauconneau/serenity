@@ -25,11 +25,13 @@ void Font::load(const ref<byte>& data, int size) {
     fontCount++;
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL/*REAL_DIM*/,size*64,size*64,0,0}; FT_Request_Size(face,&req);
     ascender=((FT_FaceRec*)face)->size->metrics.ascender*0x1p-6;
+    descender=((FT_FaceRec*)face)->size->metrics.descender*0x1p-6;
 }
 void Font::setSize(float size) {
     if(fontSize==size) return; fontSize=size;
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,long(size*0x1p6),long(size*0x1p6),0,0}; FT_Request_Size(face,&req);
     ascender=face->size->metrics.ascender*0x1p-6;
+    descender=face->size->metrics.descender*0x1p-6;
 }
 
 uint16 Font::index(const string& name) {

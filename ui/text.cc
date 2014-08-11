@@ -17,7 +17,7 @@ struct TextLayout {
     vec2 pen=0;
     struct Character { Font* font; vec2 pos; uint index; uint width; float advance; uint editIndex; };
     typedef array<Character> Word;
-    array<Word> line;
+    array<Word> words;
     typedef array<Character> TextLine;
     array<TextLine> text;
     struct Line { Text::Cursor begin,end; };
@@ -30,28 +30,26 @@ struct TextLayout {
     uint lastIndex=-1;
     float maxLength = 0;
     void nextLine(bool justify) {
-        //justify
-        float length=0; for(const Word& word: line) { if(word) { length+=word.last().pos.x+word.last().advance; } } //sum word length
-        if(line && line.last()) length += line.last().last().width - line.last().last().advance; //for last word of line, use glyph bound instead of advance
-        maxLength = max(maxLength, length + (line.size-1)*spaceAdvance);
+        // Justifies
+        float length=0; for(const Word& word: words) { assert_(word,"J"_); length += word.last().pos.x + word.last().advance; } // Sums word lengths
+        if(words && words.last()) length += -words.last().last().advance + words.last().last().width; // For last word of line, use last character width instead of advance
         float space=0;
-        if(justify && line.size>1) {
-            space = (wrap-length)/(line.size-1);
-            assert_(space >= spaceAdvance);
-        } else space = spaceAdvance;
+        if(justify && words.size>1) space = (wrap-length)/(words.size-1);
+        else space = spaceAdvance;
 
-        //layout
+        // Layouts
         column=0; pen.x=0;
         lineNumber++; text << TextLine();
-        for(uint i: range(line.size)) { Word& word=line[i];
+        for(uint i: range(words.size)) { Word& word=words[i];
             for(Character& c: word) text.last() << Character{c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex};
-            if(word) pen.x += word.last().pos.x+word.last().advance;
-            if(i!=line.size-1) //editable justified space
+            maxLength = max(maxLength, pen.x+word.last().pos.x+word.last().width);
+            if(word) pen.x += word.last().pos.x + word.last().advance;
+            if(i!=words.size-1) //editable justified space
                 text.last() << Character{0,pen,0,0,spaceAdvance,lastIndex=lastIndex+1};
             pen.x += space;
         }
         lastIndex++;
-        line.clear();
+        words.clear();
         pen.x=0; pen.y += interline*size;
     }
 
@@ -75,17 +73,25 @@ struct TextLayout {
         Text::Link link;
         Text::Cursor underlineBegin;
         Word word;
-        pen.y = font->ascender;
+        pen.y = interline*font->ascender;
         for(uint i=0; i<text.size; i++) {
             uint c = text[i];
-            if(c==' '||c=='\t'||c=='\n') { //next word/line
+            if(c==' '||c=='\t'||c=='\n') { // Next word/line
                 column++;
                 previous = spaceIndex;
-                float length=0; for(const Word& word: line) if(word) length+=word.last().pos.x+word.last().advance+spaceAdvance;
-                if(word) length += word.last().pos.x+word.last().width; //last word
-                if(wrap && length>wrap && line) nextLine(justify); //doesn't fit
-                line << move(word); //add to current line (or first of new line)
-                pen.x=0;
+                if(word) {
+                    if(words) {
+                        float length = 0; for(const Word& word: words) { assert_(word,"J",toUTF8(text)); length += word.last().pos.x + word.last().advance + spaceAdvance; }
+                        //assert_(length-word.last().advance-spaceAdvance+word.last().width <= wrap, length, length-word.last().advance-spaceAdvance+word.last().width, wrap, words.size);
+                        length += word.last().pos.x + word.last().width; // Next word
+                        //log("expect", length);
+                        if(wrap && length > wrap && words) nextLine(justify); // would not fit
+                    }
+                    words << move(word); pen.x = 0; // Add to current line (might be first of a new line)
+                } else {
+                    if(c==' ') pen.x += spaceAdvance;
+                    if(c=='\t') pen.x += 4*spaceAdvance; //FIXME: align
+                }
                 if(c=='\n') nextLine(false);
                 continue;
             }
@@ -121,12 +127,15 @@ struct TextLayout {
             if(image) { word << Character{font, vec2(pen.x,0), index, image.width, advance, i}; column++; }
             pen.x += advance;
         }
-        float length=0; for(const Word& word: line) if(word) length+=word.last().pos.x+word.last().advance+spaceAdvance;
-        if(word) length += word.last().pos.x+word.last().width; //last word
-        if(wrap && length>wrap) nextLine(justify); //doesn't fit
-        line << move(word); //add to current line (or first of new line)
-        pen.x=0;
-        nextLine(false);
+        if(word) {
+            float length=0; for(const Word& word: words) if(word) length += word.last().pos.x + word.last().advance + spaceAdvance;
+            length += word.last().pos.x + word.last().width; // Last word
+            if(wrap && length>wrap) nextLine(justify); // would not fit
+            words << move(word); pen.x = 0; // Adds to current line (might be first of new line)
+        }
+        nextLine(false); // Clears any remaining words
+        pen.y -= interline*size; // Reverts last line space
+        pen.y += interline*font->ascender; // Adds descender for correct inter widget line spacing
     }
 };
 
@@ -137,6 +146,7 @@ void Text::layout() {
     textSize=int2(0,size);
     TextLayout layout(text, size, wrap, font, interline, false); // Layouts without justification
     layout = TextLayout(text, size, layout.maxLength, font, interline, true); // Layouts with justification to the maximum length (which may be smaller than wrap)
+    textSize = int2(layout.maxLength, layout.pen.y);
 
     textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;
@@ -144,25 +154,23 @@ void Text::layout() {
         TextLine textLine;
         for(const TextLayout::Character& o: line) {
             currentIndex = o.editIndex;
-            if(currentIndex<=editIndex) { //restore cursor after relayout
+            if(currentIndex<=editIndex) { // Restores cursor after relayout
                 cursor = Cursor(textLines.size, textLine.size);
             }
             if(o.font) {
                 const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
                 Character c{int2(o.pos)+glyph.offset, share(glyph.image), o.editIndex, int(o.pos.x+o.advance/2), (int)glyph.image.height, int(o.advance)};
-                textSize=max(textSize,int2(c.pos)+c.image.size());
                 textLine << move(c);
-            } else { //format character
+            } else { // Format character
                 textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size, int(o.advance)};
             }
         }
         currentIndex++;
-        if(currentIndex<=editIndex) cursor = Cursor(textLines.size, textLine.size); //end of line
+        if(currentIndex<=editIndex) cursor = Cursor(textLines.size, textLine.size); // End of line
         textLines << move(textLine);
     }
-    textSize.y += 2*interline*size;
     if(!text.size) { assert(editIndex==0); cursor = Cursor(0,0); }
-    else if(currentIndex<=editIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } //end of text
+    else if(currentIndex<=editIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } // End of text
     links = move(layout.links);
     for(TextLayout::Line layoutLine: layout.lines) {
         for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {

@@ -10,24 +10,25 @@
 
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
-    /// Overrides \a widget to return the proxied widget
-    virtual Widget& widget() =0;
-    /// Ensures \a target is visible inside the region of the viewport
-    void ensureVisible(Rect target);
-    /// Centers \a target in the viewport
-    void center(int2 target);
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
     bool scrollbar = false;
     const int scrollBarWidth = 16;
     int2 offset=0;
     int2 dragStartCursor, dragStartDelta;
+    int2 size; // Keeps last size for ensureVisible
+
+    /// Overrides \a widget to return the proxied widget
+    virtual Widget& widget() =0;
+    /// Ensures \a target is visible inside the region of the viewport
+    void ensureVisible(Rect target);
+    /// Centers \a target in the viewport
+    void center(int2 target);
 
     int2 sizeHint() { return widget().sizeHint(); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
     void render() override;
-    int2 size; // keep last size for ensureVisible
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
@@ -37,6 +38,8 @@ template<class T> struct Scroll : ScrollArea, T {
     Widget& widget() override { return (T&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
     Widget& area() { return (ScrollArea&)*this; }
+    /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
+    Widget& operator&() { return area(); }
 };
 
 /// Displays an image

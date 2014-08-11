@@ -164,7 +164,8 @@ void Window::putImage(const Image& target) {
 }
 
 void Window::putImage(Rect rect) {
-    assert_(state == Idle);
+    assert(state == Idle);
+    if(state != Idle) return;
     pixmap = pixmap==Pixmap2 ? Pixmap : Pixmap2; // Double buffer
     if(rect==Rect(0) || lastUpdate>rect) rect=Rect(lastUpdate);
     assert_(id); assert_(rect.size());
