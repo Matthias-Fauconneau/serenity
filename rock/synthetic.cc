@@ -23,17 +23,17 @@ bool overlaps(const mat4& a, const mat4& b) {
 bool intersects(const mat4& a, const mat4& b) { return overlaps(a, b) && overlaps(b, a); }
 
 struct Synthetic : VolumeOperation {
-    const int3 size = 128;
-
-    string parameters() const { return "cylinder"_; }
+    string parameters() const { return "size"_; }
     uint outputSampleSize(uint index) override { if(index) return 0; /*Extra outputs*/ return sizeof(uint8); }
-    size_t outputSize(const Dict&, const ref<const Result*>&, uint index) override {
+    size_t outputSize(const Dict& args, const ref<const Result*>&, uint index) override {
         if(index) return 0; //Extra outputs
+        const int3 size = args.value("size"_,64);
         return (uint64)size.x*size.y*size.z;
     }
-    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>& otherOutputs) override {
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>& otherOutputs) override {
         Volume8& target = outputs.first();
         assert_(target.data.data, target.data.data, target.data.size, target.data.capacity);
+        const int3 size = args.value("size"_,64);
         target.sampleCount = size;
         target.field = String("μ"_);
         target.maximum = 0xFF;
