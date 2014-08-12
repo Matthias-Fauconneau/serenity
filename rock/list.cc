@@ -27,7 +27,7 @@ buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 mini
                 list[value] << short3(x,y,z);
             }
         }
-    });
+    }, 1);
     buffer<array<short3>> list(source.maximum+1, source.maximum+1, 0);
     for(uint value: range(source.maximum+1)) { // Merges lists
         uint size = 0; for(uint id: range(coreCount)) size += lists[id][value].size;
