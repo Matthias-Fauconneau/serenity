@@ -20,6 +20,8 @@ Image upsample(const Image& source) {
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
     else if(startsWith(file,"\x89PNG"_)) return "PNG"_;
+    else if(startsWith(file,"\x00\x00\x01\x00"_)) return "ICO"_;
+    else if(startsWith(file,"\x00\x00\x02\x00"_)||startsWith(file,"\x00\x00\x0A\x00"_)) return "TGA"_;
     else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return "TIFF"_;
     else if(startsWith(file,"BM"_)) return "BMP"_;
     else return ""_;

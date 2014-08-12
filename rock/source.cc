@@ -13,10 +13,17 @@ struct Source : VolumeOperation {
     map<uint,String> slices(const Folder& folder) {
         map<uint,String> slices;
         for(String& fileName: folder.list(Files|Sorted)) {
-            TextData s (fileName);
-            s.untilAny("0123456789"_);
-            int index = s.integer();
-            slices.insert(index, move(fileName));
+            string extension = section(fileName,'.',-2,-1);
+            if(!ref<string>{"bmp"_,"ico"_,"jpg"_,"png"_,"tga"_,"tif"_}.contains(extension)) {
+                if(!ref<string>{"py"_}.contains(extension)) log("Skipping file", fileName, "with unexpected extension", extension);
+                continue;
+            }
+            assert(imageFileFormat(File(fileName, folder).read(4)));
+            string basename = section(fileName,'.',-3,-2);
+            assert_(basename.size >= 4, "Expected 4 digits before last dot in", fileName, "got", basename);
+            string index = basename.slice(basename.size-4, 4);
+            assert_(isInteger(index), "Expected 4 digits before last dot in", fileName, "got", index);
+            slices.insert(fromInteger(index), move(fileName));
         }
         assert_(slices, folder.name());
         return slices;
