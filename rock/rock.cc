@@ -18,16 +18,23 @@
 //#include "histogram.h"
 //#include "threshold.h"
 //#include "sample-operation.h"
-//#include "curve-skeleton.h"
 //#include "position.h"
-//#include "extremum.h"
 //#include "surface-skeleton.h"
 //#include "floodfill.h"
 //#include "rasterize.h"
+
+//#include "curve-skeleton.h"
+//#include "extremum.h"
+//#include "connectivity.h"
+
+//#include "list.h"
+//#include "cluster.h"
+//#include "link.h"
+//#include "family.h"
+
+//#include "box.h"
 //#include "kernel-density-estimation.h"
 //#include "export.h"
-//#include "connectivity.h"
-//#include "box.h"
 
 //#include "slice.h"
 //#include "plot.h"
