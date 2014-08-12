@@ -300,7 +300,12 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
                 else if(source.sampleSize==4 && source.floatingPoint) value = round(((float*)source.data.data)[index]); //FIXME: converts to ASCII with decimals
                 else error(source.sampleSize);
                 assert(value <= source.maximum, value, source.maximum);
-                if(value) itoa<positionSize>(positionIndex, x), itoa<positionSize>(positionIndex, y), itoa<positionSize>(positionIndex, z), itoa<valueSize>(valueIndex, value);
+                if(value) {
+                    itoa<positionSize>(positionIndex, source.origin.x+x);
+                    itoa<positionSize>(positionIndex, source.origin.y+y);
+                    itoa<positionSize>(positionIndex, source.origin.z+z);
+                    itoa<valueSize>(valueIndex, value);
+                }
             }
         }
     }
