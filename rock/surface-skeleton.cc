@@ -46,7 +46,7 @@ void integerMedialAxis(Volume16& target, const Volume3x16& position, int minimal
                 }
             }
         }
-    });
+    }, 1);
     target.margin.x = marginX, target.margin.y = marginY, target.margin.z = marginZ;
     target.maximum = maximum(target), target.squared=true;
     target.field = String("r"_); // Radius

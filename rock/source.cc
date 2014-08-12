@@ -14,8 +14,8 @@ struct Source : VolumeOperation {
         map<uint,String> slices;
         for(String& fileName: folder.list(Files|Sorted)) {
             string extension = section(fileName,'.',-2,-1);
-            if(!ref<string>{"bmp"_,"ico"_,"jpg"_,"png"_,"tga"_,"tif"_}.contains(extension)) {
-                if(!ref<string>{"py"_}.contains(extension)) log("Skipping file", fileName, "with unexpected extension", extension);
+            if(!ref<string>({"bmp"_,"ico"_,"jpg"_,"jpeg"_,"png"_,"tga"_,"tif"_,"tiff"_}).contains(extension)) {
+                if(!ref<string>({"py"_}).contains(extension)) log("Skipping file", fileName, "with unexpected extension", extension);
                 continue;
             }
             assert(imageFileFormat(File(fileName, folder).read(4)));
