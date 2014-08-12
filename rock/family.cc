@@ -17,7 +17,7 @@ array<Family> parseFamilies(const string& data) {
             s.whileAny(" ,"_);
             uint64 index = zOrder(parse3(s)); uint16 sqRadius = s.integer();
             family << Ball{index, sqRadius};
-            if(!s || s.match('\n')) break;
+            s.whileAny(" ,"_); if(!s || s.match('\n')) break;
         }
         families << move(family);
     }

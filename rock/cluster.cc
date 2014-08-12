@@ -163,7 +163,7 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
             int3 p = zOrder(index);
             itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
         }
-        target.last() = '\n';
+        if(target) target.last() = '\n';
     }
     log(time);
     target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
@@ -198,7 +198,7 @@ String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
                 int3 p = zOrder(index);
                 itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
             }
-            target.last() = '\n';
+            if(target) target.last() = '\n';
         }
         log(time);
         target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);

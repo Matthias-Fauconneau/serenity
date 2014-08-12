@@ -133,7 +133,7 @@ string TextData::whileInteger(bool sign) {
 
 int TextData::integer(bool sign) {
     string s = whileInteger(sign);
-    if(!s) error("Expected integer, got", "'"_+line()+"'"_, "at line", lineIndex);
+    if(!s) error("Expected integer, got", "'"_+line()+"'"_, "at line", lineIndex, buffer);
     return fromInteger(s, 10);
 }
 
