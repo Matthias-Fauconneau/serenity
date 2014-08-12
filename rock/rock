@@ -131,7 +131,7 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
  distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
 
-# -- Throat/pore partition  -- #
+# -- Pores/throats partition  -- #
 
 # - Approximate throat/pore partition using uniform radius threshold - #
 
@@ -142,11 +142,11 @@ not-approximate-pores = Negate approximate-pores
 maximum-mask = Binary maximum threshold=1
 approximate-throats = Intersect maximum-mask not-approximate-pores # Removes background
 approximate-pore-index = FloodFillSplit approximate-pores
+approximate-pores = List approximate-pore-index
 approximate-colored-pores = ColorizeIndex approximate-pore-index
 approximate-colored-pores-throats = Add approximate-colored-pores approximate-throats
 approximate-throat-index = FloodFillSplit approximate-throats
-#pores = List approximate-pore-index
-#throats = List approximate-throat-index
+approximate-throats = List approximate-throat-index
 
 # - Curve Skeleton - #
 
@@ -163,24 +163,20 @@ curve-skeleton-distance = Mask curve-skeleton distance invert=1 value=0
 curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 
 # Local extremum of distance curve
-#pore-list = LocalExtremumList curve-skeleton-distance
-#throat-list = LocalExtremumList curve-skeleton-distance minimum=1
+#pore-skeleton-list = LocalExtremumList curve-skeleton-distance
+#throat-skeleton-list = LocalExtremumList curve-skeleton-distance minimum=1
 
 # Writes indices (into the pores/throats list) at each pore/throat position
-#pore-indices = RasterizeIndex pore-list voxelSize
-#throat-indices = RasterizeIndex throat-list voxelSize
+#pore-skeleton-untiled = RasterizeIndex pore-list voxelSize
+#throat-skeleton-untiled = RasterizeIndex throat-list voxelSize
 
-# Rasterizes skeleton voxel as maximum balls (with family index attribute)
-#pore-indices-tiled = ZOrder pore-indices
-#pore-bins = Bin curve-skeleton-distance-tiled pore-indices-tiled
-#throat-indices-tiled = ZOrder throat-indices
-#throat-bins = Bin curve-skeleton-distance-tiled throat-indices-tiled
-#pore-index = RasterizeAttribute pore-bins
-#throat-index = RasterizeAttribute throat-bins
+#pore-skeleton-tiled = ZOrder pore-skeleton-untiled
+#pore-skeleton = pore-skeleton-tiled
 
-# Colorizes each pore in a different color
-#colored-pores = ColorizeIndex pore-index
-#colored-throats = ColorizeIndex throat-index
+#throat-skeleton-tiled = ZOrder throat-skeleton-untiled
+#throat-skeleton = throat-skeleton-tiled
+
+#skeleton = curve-skeleton-distance-tiled
 
 # - Cluster - #
 
@@ -188,48 +184,50 @@ curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 maximum-balls-lists = List maximum
 
 # Generates a list of pores from the skeleton volume
-last-root-index pores throats = Cluster maximum maximum-balls-lists # Inefficient method (runs on all pore space voxels)
-
-# Bounds pores/throats with bounding boxes
-pore-bounding-boxes = Bound pores
-throat-bounding-boxes = Bound throats
-
-pore-aspect-ratios = AspectRatio pore-bounding-boxes
-throat-aspect-ratios = AspectRatio throat-bounding-boxes
-pore-aspect-ratio = KernelDensityEstimation pore-aspect-ratios
-
-pore-colored-boxes = ColorizeIndex pore-box-volume
-throat-colored-boxes = ColorizeIndex throat-box-volume
+last-root-index pore-skeleton-list throat-skeleton-list = Cluster maximum maximum-balls-lists # Inefficient method (runs on all pore space voxels)
 
 # Writes root index (into the family list) of each voxel
-pore-skeleton = RootIndex pores voxelSize
-throat-skeleton = RootIndex throats voxelSize
+pore-skeleton = RootIndex pore-skeleton-list voxelSize
+throat-skeleton = RootIndex throat-skeleton-list voxelSize
+
+skeleton = connected-skeleton
+
+# - Pores/Throats analysis - #
 
 # Rasterizes skeleton voxel as maximum balls (with family index attribute)
-pore-bins = Bin connected-skeleton pore-skeleton
-throat-bins = Bin connected-skeleton throat-skeleton
+pore-bins = Bin skeleton pore-skeleton
+throat-bins = Bin skeleton throat-skeleton
 pore-index = RasterizeAttribute pore-bins
 throat-index = RasterizeAttribute throat-bins
-
-# Computes volume of each pore
-pore-volume = Histogram pore-index
 
 # Colorizes each pore in a different color
 colored-pores = ColorizeIndex pore-index
 colored-throats = ColorizeIndex throat-index
 
-pore-aspect-ratios = AspectRatio pore-bounding-boxes
-throat-aspect-ratios = AspectRatio throat-bounding-boxes
-pore-aspect-ratio = KernelDensityEstimation pore-aspect-ratios
-throat-aspect-ratio = KernelDensityEstimation throat-aspect-ratios
-pore-nearest-distances = NearestDistance pore-bounding-boxes
-throat-nearest-distances = NearestDistance throat-bounding-boxes
-pore-nearest-distance = KernelDensityEstimation pore-nearest-distances bandwidth=0.5
-throat-nearest-distance = KernelDensityEstimation throat-nearest-distances bandwidth=0.5
+# Volume of each pore
+pore-volume = Histogram pore-index
+
+# Bounds pores/throats with bounding boxes
+pore-box-list = Bound pore-list
+                            pore-list = List pore-index
+throat-box-list = Bound throat-list
+                              throat-list = List throat-index
+
+# Aspect ratio
+pore-aspect-ratio-list = AspectRatio pore-box-list
+throat-aspect-ratio-list = AspectRatio throat-box-list
+pore-aspect-ratio-distribution = KernelDensityEstimation pore-aspect-ratio-list
+throat-aspect-ratio-distribution = KernelDensityEstimation throat-aspect-ratio-list
+
+# Nearest distance
+pore-nearest-distance-list = NearestDistance pore-box-list
+throat-nearest-distance-list = NearestDistance throat-box-list
+pore-nearest-distance-distribution = KernelDensityEstimation pore-nearest-distance-list bandwidth=0.5
+throat-nearest-distance-distribution = KernelDensityEstimation throat-nearest-distance-list bandwidth=0.5
 
 # Rasterizes boxes in a volume
-pore-box-volume = RasterizeBox pore-bounding-boxes voxelSize
-throat-box-volume = RasterizeBox throat-bounding-boxes voxelSize
+pore-box-indices = RasterizeBox pore-box-list voxelSize
+throat-box-indices = RasterizeBox throat-box-list voxelSize
 
 # Colorizes each box in a different color
 pore-colored-boxes = ColorizeIndex pore-box-volume
