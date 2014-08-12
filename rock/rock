@@ -72,14 +72,6 @@ histogram-pore-connect-rock = Histogram pore
 histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
-# Computes curve skeleton (thinning)
-curve-skeleton = CurveSkeleton pore-connect-rock
-
-# Computes connectivity = coordination numbers  = number of edges/neighbours
-connectivity = Connectivity curve-skeleton
-connectivity-histogram-zero = Histogram connectivity
-connectivity-histogram = Slice connectivity-histogram-zero begin=1 # Excluding background
-
 # Computes position of nearest background voxel
 positionx = PositionX rock-connected
 positionxy = PositionY positionx
@@ -168,6 +160,14 @@ distribution-radius-normalized = Div volume-distribution-radius volume
 
 # -- Curve Skeleton -- #
 
+# Computes curve skeleton (thinning)
+curve-skeleton = CurveSkeleton pore-connect-rock
+
+# Computes connectivity = coordination numbers  = number of edges/neighbours
+connectivity = Connectivity curve-skeleton
+connectivity-histogram-zero = Histogram connectivity
+connectivity-histogram = Slice connectivity-histogram-zero begin=1 # Excluding background
+
 # Distance restricted to curve skeleton voxels
 curve-skeleton-distance = Mask curve-skeleton distance invert=1 value=0
 curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
@@ -222,6 +222,9 @@ pore-bins = Bin connected-skeleton pore-skeleton
 throat-bins = Bin connected-skeleton throat-skeleton
 pore-index = RasterizeAttribute pore-bins
 throat-index = RasterizeAttribute throat-bins
+
+# Computes volume of each pore
+pore-volume = Histogram pore-index
 
 # Colorizes each pore in a different color
 colored-pores = ColorizeIndex pore-index
