@@ -33,7 +33,7 @@ histogram-attenuation-normalizeX = NormalizeX histogram-attenuation
 distribution-attenuation = KernelDensityEstimation histogram-attenuation-normalizeX
 
 # Threshold determination
-   threshold = 'otsu'
+   threshold =  'otsu'
 if threshold == 'otsu'    : threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
 if threshold == 'gradient': threshold = difference-threshold                                                 # Use this method for backward compatibility only
                                         difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized

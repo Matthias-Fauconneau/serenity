@@ -34,7 +34,7 @@ array<string> Process::configure(const ref<string>& allArguments, const string& 
             if(!op) op = s.whileAny("!="_);
             if(!op) op = "!="_, value = "0"_;
             if(!value) { s.whileAny(" \t"_); s.skip("'"_); value=s.until('\''); }
-            s.skip(":"_);
+            s.whileAny(" "_); s.skip(":"_);
             assert_(parameter && value);
             rule.condition={op, parameter, value};
             s.whileAny(" \t"_);
