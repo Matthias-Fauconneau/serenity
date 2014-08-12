@@ -131,7 +131,7 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<class F> void parallel(uint64 start, uint64 stop, F f, uint threadCount = coreCount) {
+template<class F> void parallel(uint64 start, uint64 stop, F f, uint unused threadCount = coreCount) {
 #if DEBUG || PROFILE
     for(uint i : range(start, stop)) f(0, i);
 #else

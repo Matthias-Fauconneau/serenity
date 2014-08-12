@@ -14,7 +14,7 @@ buffer<array<short3> > parseLists(const string& data) {
         if(!lists) lists = buffer<array<short3>>(value+1, value+1, 0);
         array<short3>& list = lists[value];
         while(s) {
-            if(s.match('\n')) break;
+            s.whileAny(" "_); if(s.match('\n')) break;
             s.whileAny(" ,"_); uint x=s.integer();
             s.whileAny(" ,"_); uint y=s.integer();
             s.whileAny(" ,"_); uint z=s.integer();
