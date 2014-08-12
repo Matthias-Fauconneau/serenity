@@ -1,129 +1,139 @@
-# Rock process definition
+# -- Source -- #
 
-# Concatenates image slice files in a volume
-# \note Parses resolution from input folder name as "name-resolution"
-synthetic = '0'
-if !synthetic: source name resolution voxelSize physicalSize = Source
-# Generates a synthetic pore network for debugging and validation
-if synthetic: source voxelSize = Synthetic
+# Sources
+    synthetic = '0'
+if !synthetic: source name resolution voxelSize physicalSize = Source                                        # Concatenates image slice files in a volume
+if  synthetic: source voxelSize = Synthetic                                                                  # Generates a synthetic pore network for debugging and validation
 
 # Denoises
-denoise = 'median'
+    denoise = '1'
 if !denoise: denoised = source
-if denoise == 'median': denoised = median
- median = Median source
+if  denoise: denoised = Median source
 
 # Resamples
-if !resample: process-resolution = resolution # Forwards original resolution
-if !resample: resampled = denoised # Forwards original volume
-if resample: resampled mipmap = Resample denoised resolution process-resolution # Resamples from input resolution to process resolution
+if !resample: process-resolution = resolution
+if !resample: resampled = denoised
+if  resample: resampled mipmap = Resample denoised resolution process-resolution                             # Resamples from input resolution to process resolution
+
+# Transposes to use an alternate cylinder axis
+if !transpose     : transposed = resampled
+if  transpose=='Z': transposed = resampled
+if  transpose=='X': transposed = transpose
+                                transpose = Transpose resampled
+if  transpose=='Y': transposed = Transpose transpose
+
+# -- Threshold -- #
 
 # Density distribution
 if !threshold-from-source: histogram-attenuation-full = Histogram resampled
-if threshold-from-source: histogram-attenuation-full = Histogram source
+if  threshold-from-source: histogram-attenuation-full = Histogram source
 if !ignore-zero-workaround: histogram-attenuation = histogram-attenuation-full
-if ignore-zero-workaround: histogram-attenuation = Slice histogram-attenuation-full begin=1 # Excluding zero
+if  ignore-zero-workaround: histogram-attenuation = Slice histogram-attenuation-full begin=1
 histogram-attenuation-normalizeX = NormalizeX histogram-attenuation
 distribution-attenuation = KernelDensityEstimation histogram-attenuation-normalizeX
 
-# Debug
-histogram-attenuation-normalizeY = NormalizeAreaY histogram-attenuation
-distribution-attenuation-unnormalized = KernelDensityEstimation histogram-attenuation normalize=0
-# Compatibility
-histogram-density = histogram-attenuation
-histogram-density-normalized = histogram-attenuation-normalizeY
-distribution-density = distribution-attenuation-unnormalized
-
 # Threshold determination
-threshold = 'otsu'
-if threshold == 'otsu': threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
-otsu-interclass-deviation-normalized = NormalizeAreaXY otsu-interclass-deviation
-difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized # Use this method for backward compatibility only
-if threshold == 'gradient': threshold = difference-threshold # Computes the mean sum of absolute gradient for each set of voxels with the same attenuation, and defines threshold as the attenuation of the set of voxels between rock and pore attenuation peaks with the maximum mean sum of absolute gradient
-if threshold == 'middle': threshold = middle-threshold # Simply selects the middle value between rock and pore attenuation peaks
-if threshold == 'lorentz': threshold lorentz-parameters lorentz-rock lorentz-notrock lorentz-pore lorentz-notpore = LorentzianMixtureModel distribution-attenuation-unnormalized # Explicit model
-
-# Transposes to use an alternate cylinder axis
-transpose = Transpose resampled
-if transpose=='X': transposed = transpose
-if transpose=='Y': transposed = Transpose transpose
-if transpose=='Z': transposed = resampled
-if !transpose: transposed = resampled
+   threshold = 'otsu'
+if threshold == 'otsu'    : threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
+if threshold == 'gradient': threshold = difference-threshold                                                 # Use this method for backward compatibility only
+                                        difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized
+                                         distribution-attenuation-unnormalized = KernelDensityEstimation histogram-attenuation normalize=0
+if threshold == 'middle'  : threshold = middle-threshold                                                     # Simply selects the middle value between rock and pore attenuation peaks
 
 # Segments
-rock = Binary transposed threshold mask=1 # If source.cylinder: Also clips to cylinder before distance field evaluation
-colored = Colorize transposed threshold # For visualization
-background = Maximum transposed threshold # For visualization
-foreground = Minimum transposed threshold # For visualization
-
-# Original volume
+rock = Binary transposed threshold mask=1
 pore = Negate rock
+
+# Unconnected pore space volume
 histogram-pore = Histogram pore
-histogram-pore-slice = Slice histogram-pore begin=1 # Excluding rock
+histogram-pore-slice = Slice histogram-pore begin=1
 volume-unconnected = Sum histogram-pore-slice
 
 # Discards unconnected rocks
-if !connect-rock: rock-connected = rock # Forwards unconnected skeleton
-if connect-rock: rock-connected = FloodFill rock # Flood fills rock
+if !connect-rock: rock-connected = rock
+if  connect-rock: rock-connected = FloodFill rock
 
-# Volume after connect-rock
+# Connected pore space volume
 pore-connect-rock = Negate rock-connected
 histogram-pore-connect-rock = Histogram pore
 histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
+# -- Maximum ball -- #
+
 # Computes position of nearest background voxel
-positionx = PositionX rock-connected
+positionx  = PositionX rock-connected
 positionxy = PositionY positionx
-position = PositionZ positionxy
-distance = Distance position
+position   = PositionZ positionxy
+distance   = Distance position
 
 # Computes surface skeleton (integer medial axis)
 surface-skeleton = SurfaceSkeleton position
 
 # Discards small pores
-minimalSqRadius = '0'
-if minimalSqRadius: pruned = ThresholdClip surface-skeleton minimalSqRadius
+    minimalSqRadius = '0'
+if  minimalSqRadius: pruned = ThresholdClip surface-skeleton minimalSqRadius
 if !minimalSqRadius: pruned = surface-skeleton
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-#if crop.cylinder: crop = Crop pruned #FIXME: if crop.cylinder or crop.box
-#if !crop.cylinder: crop = pruned #FIXME: if !crop.cylinder and !crop.box
 crop = Crop pruned
 
 # Floodfills skeleton
-unconnected = Binary crop threshold=1 # Binary also Z-orders (speeds up FloodFill, Cluster, FIXME: Bin)
-connected-bottom = FloodFill unconnected minimalSqRadius seed=001000 # Keeps pore space connected to bottom face
-connected-top = FloodFill unconnected minimalSqRadius seed=000001 # Keeps pore space connected to top face
-connected-both = Intersect connected-bottom connected-top # Keeps pore space connected to both face
+unconnected      = Binary crop threshold=1
+connected-bottom = FloodFill unconnected minimalSqRadius seed=001000
+connected-top    = FloodFill unconnected minimalSqRadius seed=000001
+connected-both   = Intersect connected-bottom connected-top
 
 # Discards unconnected pores
-connect-pore = '0'
-if !connect-pore: connected = unconnected # Forwards unconnected skeleton
-if connect-pore=='bottom': connected = connected-bottom
-if connect-pore=='top': connected = connected-top
-if connect-pore=='1': connected = connected-both
+    connect-pore = '0'
+if !connect-pore          : connected = unconnected
+if  connect-pore=='bottom': connected = connected-bottom
+if  connect-pore=='top'   : connected = connected-top
+if  connect-pore=='1'     : connected = connected-both
 
 # Masks skeleton keeping only unpruned connected voxels
 if !precomputedSkeleton: connected-skeleton = Mask connected crop invert=1 value=0
-if precomputedSkeleton: connected-skeleton = ZOrder source
-
-# Computes histogram of maximum squared radii of skeleton voxels
-histogram-skeleton-bg = Histogram connected-skeleton
-histogram-skeleton = Slice histogram begin=1 # Excluding background
+if  precomputedSkeleton: connected-skeleton = ZOrder source
 
 # Rasterizes skeleton voxel as maximum balls
 sphere-bins = Bin connected-skeleton connected-skeleton
 maximum = Rasterize sphere-bins
 
-# Computes histogram of maximum squared radii
-histogram = Histogram maximum # Including rock
-histogram-squaredRadius = Slice histogram begin=1 # Excluding rock
-# Square roots radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
+# -- Pore size distribution -- #
+
+# Histogram of maximum squared radii
+histogram-squaredRadius = Slice histogram-squaredRadius-full begin=1
+                                histogram-squaredRadius-full = Histogram maximum
+
+# Square root of radii histogram (As bins are not uniformly spaced anymore, the result cannot be interpreted as a discrete probability density)
 histogram-radius = SquareRootVariable histogram-squaredRadius
 histogram-radius-scaled = ScaleDistribution histogram-radius process-resolution
 
-# -- Approximate throat/pore partition using uniform radius threshold  -- #
+# Properties (pore space volume, porosity, mean radius)
+volume = volume-connect-pore
+         volume-connect-pore = Sum histogram-squaredRadius
+porosity = Div volume volume-total # Computes porosity (= pore space volume / total volume )
+                      volume-total = Sum histogram
+mean-radius = HistogramMean histogram-radius
+
+# Should be removed (kept for backward compatibility)
+ histogram-radius-normalized = Div histogram-radius volume-total # Normalizes histogram (for comparison with distribution-radius, compare histogram-radius with volume-distribution-radius instead)
+ histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
+
+# Kernel density estimation from radii histogram (i.e. pore size distribution)
+volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=0.5 normalize=0
+# Normalizes probability density on total volume (including background (i.e not the same as probability density normalization (area=porosity))
+distribution-radius = Div volume-distribution-radius volume-total
+# Normalizes probability density on pore volume (excluding background (i.e probability density normalization (area=1))
+distribution-radius-normalized = Div volume-distribution-radius volume
+# Scales radius (e.g to original pixel or physical resolution)
+ volume-distribution-radius-scaled = ScaleDistribution volume-distribution-radius process-resolution
+ distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
+ distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
+
+# -- Throat/pore partition  -- #
+
+# - Approximate throat/pore partition using uniform radius threshold - #
 
 # Partitions maximum balls between throats and pores using a uniform radius threshold
 median-radius = HistogramMedian histogram-radius
@@ -135,30 +145,10 @@ approximate-pore-index = FloodFillSplit approximate-pores
 approximate-colored-pores = ColorizeIndex approximate-pore-index
 approximate-colored-pores-throats = Add approximate-colored-pores approximate-throats
 approximate-throat-index = FloodFillSplit approximate-throats
+#pores = List approximate-pore-index
+#throats = List approximate-throat-index
 
-# Computes notable properties from histogram (pore space volume, total volume, porosity and mean radius)
-volume-connect-pore = Sum histogram-squaredRadius
-volume = volume-connect-pore
-volume-total = Sum histogram
-porosity = Div volume volume-total # Computes porosity (= pore space volume / total volume )
-mean-radius = HistogramMean histogram-radius
-
-# Should be removed (kept for backward compatibility)
- histogram-radius-normalized = Div histogram-radius volume-total # Normalizes histogram (for comparison with distribution-radius, compare histogram-radius with volume-distribution-radius instead)
- histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
-
-# Computes kernel density estimation from radii histogram (i.e. pore size distribution)
-volume-distribution-radius = KernelDensityEstimation histogram-radius bandwidth=0.5 normalize=0
-# Normalizes probability density on total volume (including background (i.e not the same as probability density normalization (area=porosity))
-distribution-radius = Div volume-distribution-radius volume-total
-# Normalizes probability density on pore volume (excluding background (i.e probability density normalization (area=1))
-distribution-radius-normalized = Div volume-distribution-radius volume
-# Scales radius (e.g to original pixel or physical resolution)
- volume-distribution-radius-scaled = ScaleDistribution volume-distribution-radius process-resolution
- distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
- distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
-
-# -- Curve Skeleton -- #
+# - Curve Skeleton - #
 
 # Computes curve skeleton (thinning)
 curve-skeleton = CurveSkeleton pore-connect-rock
@@ -192,15 +182,13 @@ curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 #colored-pores = ColorizeIndex pore-index
 #colored-throats = ColorizeIndex throat-index
 
-# -- Cluster -- #
+# - Cluster - #
 
 # Generates lists of balls for each radius from the skeleton volume
 maximum-balls-lists = List maximum
 
 # Generates a list of pores from the skeleton volume
 last-root-index pores throats = Cluster maximum maximum-balls-lists # Inefficient method (runs on all pore space voxels)
-#pores = List approximate-pore-index
-#throats = List approximate-throat-index
 
 # Bounds pores/throats with bounding boxes
 pore-bounding-boxes = Bound pores
@@ -248,64 +236,42 @@ pore-colored-boxes = ColorizeIndex pore-box-volume
 throat-colored-boxes = ColorizeIndex throat-box-volume
 
 # -- Export -- #
- source8 = Normalize8 source
- sqrt = SquareRoot maximum
- sqrt-scaled = ScaleValues sqrt process-resolution
- denoised-tiled = ZOrder denoised
- denoised-connected = Mask maximum-mask denoised-tiled value=threshold
- flood = Add pore maximum-mask
- histogram-flood = Histogram flood
- not-flood = Negate maximum-mask
- pore-not-flood = Intersect pore not-flood
- # Exports to PNG (normalized and gamma-compressed for visualization)
-  png-source = ToPNG source
-  png-denoised = ToPNG denoised
-  png-colored = ToPNG colored
-  png-background = ToPNG background
-  png-position = ToPNG position
-  png-distance = ToPNG distance invert=1
-  png-skeleton = ToPNG surface-skeleton invert=1
-  png-unconnected = ToPNG unconnected invert=1 binary=1
-  png-pruned = ToPNG pruned invert=1
-  png-connected = ToPNG connected invert=1 binary=1
-  png-maximum = ToPNG maximum invert=1
-  png-flood = ToPNG flood
-  png-denoised-connected = ToPNG denoised-connected
-  png-colored-pores = ToPNG colored-pores
-  png-pore-colored-boxes = ToPNG pore-colored-boxes
-  png-colored-throats = ToPNG colored-throats
-  png-throat-colored-boxes = ToPNG throat-colored-boxes
-# Exports to BMP (stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
-  bmp-source = ToBMP source
-  bmp-median = ToBMP median
-  bmp-denoised = ToBMP denoised
-  bmp-resampled = ToBMP resampled
-  bmp-distance = ToBMP distance
-  bmp-skeleton = ToBMP surface-skeleton
-  bmp-maximum = ToBMP maximum
-  bmp-denoised-connected = ToBMP denoised-connected
-  pore-not-flood8 = Normalize8 pore-not-flood
-  bmp-pore-not-flood = ToBMP pore-not-flood8
-  maximum-mask8 = Normalize8 maximum-mask
-  bmp-maximum-mask = ToBMP maximum-mask8
- # Exports to 16bit TIFF (Stores original (unnormalized and linear) values for interoperation)
-  tiff-denoised = ToTIFF denoised
-  tiff-denoised-connected = ToTIFF denoised-connected
- # Exports to CDL
-  cdl-flood = ToCDL flood
-  cdl-maximum = ToCDL sqrt-scaled
-  cdl-pore-index = ToCDL pore-index
-  cdl = cdl-maximum
- # Exports to ASCII
-  ascii-flood = ToASCII flood
-  ascii-maximum = ToASCII sqrt-scaled
-  ascii-colored-pores = ToASCII colored-pores
-  ascii = ascii-maximum
 
-# Tools
- ε(R) ε(R|r<median) ε(R|r>median) PSD(R) PSD(octant|R:first) PSD(octant|R:inflection) PSD(octant|R:last) representative-radius = REV
- critical-radius unconnected(λ) connected(λ) = Prune
- P(Sw) = Prune connect-pore=top
- slices plots summary = Summary
- compare = Compare
- sweep = Sweep
+source8 = Normalize8 source
+sqrt = SquareRoot maximum
+sqrt-scaled = ScaleValues sqrt process-resolution
+denoised-tiled = ZOrder denoised
+denoised-connected = Mask maximum-mask denoised-tiled value=threshold
+flood = Add pore maximum-mask
+histogram-flood = Histogram flood
+not-flood = Negate maximum-mask
+pore-not-flood = Intersect pore not-flood
+pore-not-flood8 = Normalize8 pore-not-flood
+
+# - BMP - # (stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
+bmp-source = ToBMP source
+bmp-denoised = ToBMP denoised
+bmp-resampled = ToBMP resampled
+bmp-distance = ToBMP distance
+bmp-skeleton = ToBMP surface-skeleton
+bmp-maximum = ToBMP maximum
+bmp-denoised-connected = ToBMP denoised-connected
+bmp-pore-not-flood = ToBMP pore-not-flood8
+maximum-mask8 = Normalize8 maximum-mask
+bmp-maximum-mask = ToBMP maximum-mask8
+
+# - 16bit TIFF - # (Stores original (unnormalized and linear) values for interoperation)
+tiff-denoised = ToTIFF denoised
+tiff-denoised-connected = ToTIFF denoised-connected
+
+# - CDL - #
+cdl-flood = ToCDL flood
+cdl-maximum = ToCDL sqrt-scaled
+cdl-pore-index = ToCDL pore-index
+cdl = cdl-maximum
+
+# - ASCII - #
+ascii-flood = ToASCII flood
+ascii-maximum = ToASCII sqrt-scaled
+ascii-colored-pores = ToASCII colored-pores
+ascii = ascii-maximum
