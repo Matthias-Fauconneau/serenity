@@ -2,6 +2,8 @@
 #include "text.h"
 #include "layout.h"
 #include "window.h"
+#include "interface.h"
+#include "png.h"
 
 struct Document : Widget {
     static constexpr int oversample = 2;
@@ -21,9 +23,10 @@ struct Document : Widget {
 
     TextData s;
 
-    array<unique<Widget>> elements;
-
     int pageIndex=0, pageCount;
+
+    array<unique<Widget>> elements;
+    array<unique<Image>> images;
 
     array<uint> levels;
     struct Entry { array<uint> levels; String name; uint page; };
@@ -42,11 +45,46 @@ struct Document : Widget {
     }
     Text& newText(string text, int size=textSize) { return element<Text>(text, size, 0, 1, width, font, interlineStretch); }
 
+    Widget* parseLayout(TextData& s) {
+        array<Widget*> children;
+        char type = 0;
+        while(!s.match(')')) {
+            // Element
+            s.whileAny(" "_);
+            if(s.match('(')) children << parseLayout(s);
+            else {
+                string text = trim(s.whileNo("|-)"_));
+                assert_(text, s.line());
+                if(startsWith(text,"&"_)) {
+                    string path = text.slice(1);
+                    images << unique<Image>(decodeImage(readFile(path+".png"_)));
+                    children << &element<ImageWidget>(images.last());
+                } else {
+                    children << &newText(text);
+                }
+            }
+            // Separator
+            s.whileAny(" "_);
+            /**/ if(s.match(')')) break;
+            else if(!type) type = s.next();
+            else s.skip(string(&type,1));
+        }
+        if(type=='-') return &element<VBox>(move(children));
+        else if(type=='|') return &element<HBox>(move(children));
+        else { error(type); assert_(children.size==1); return children.first(); }
+    }
+
     void layoutPage(const Image& target) {
         elements.clear();
         VBox page (Linear::Center, Linear::Expand);
 
         while(s) {
+            if(s.match('(')) { // Float
+                page << parseLayout(s);
+                s.skip("\n"_);
+                continue;
+            }
+
             bool center=false;
             if(s.match(' ')) {
                 assert_(!center);
@@ -59,10 +97,14 @@ struct Document : Widget {
                 assert_(!bold);
                 bold = true;
                 size = titleSize;
+                center = true;
             }
 
             uint level = 0;
-            while(s.match('#')) level++;
+            while(s.match('#')) {
+                level++;
+                center=true;
+            }
 
             if(s.match('\\')) {
                 string command = s.whileNot('\n');
@@ -71,7 +113,7 @@ struct Document : Widget {
                     for(const Entry& entry: tableOfContents) {
                         String header;
                         header << repeat(" "_, entry.levels.size);
-                        if(entry.levels.size<=1) header << format(TextFormat::Bold);
+                        if(entry.levels.size<=1) header << (char)(TextFormat::Bold);
                         for(int level: entry.levels) header << dec(level) << '.';
                         header << ' ' << entry.name;
                         auto& hbox = element<HBox>(Linear::Spread);
@@ -90,25 +132,30 @@ struct Document : Widget {
                 if(level > levels.size) levels.grow(level);
                 if(level < levels.size) levels.shrink(level);
                 levels[level-1]++;
-                if(level==1) bold = true;
+                /*if(level==1)*/ bold = true;
             }
 
-            if(bold) text << format(TextFormat::Bold);
-            while(s && !s.match('\n')) { // Paragraph
-                bool italic = false;
-                while(s && !s.match('\n')) { // Line
-                    if(s.match('/')) {
-                        italic=!italic;
-                        text << format((italic?TextFormat::Italic:0)|(bold?TextFormat::Bold:0));
-                    }
-                    else text << s.next();
-                }
-                text << " "_;
+            if(bold) text << (char)(TextFormat::Bold);
+            if(level) {
+                for(int level: levels) text << dec(level) << '.';
+                text << ' ';
             }
+
+            String userText;
+            while(s && !s.match('\n')) { // Paragraph
+                while(s && !s.match('\n')) { // Line
+                    /**/ if(s.match('*')) userText << (char)(TextFormat::Bold);
+                    else if(s.match('/')) userText << (char)(TextFormat::Italic);
+                    //else if(s.match('_')) userText << (char)(TextFormat::Underline);
+                    else userText << s.next();
+                }
+                userText << " "_;
+            }
+            text << userText;
+            if(level && !target) tableOfContents << Entry{copy(levels), move(userText), (uint)pageIndex};
 
             page << &newText(text, size);
 
-            if(level && !target) tableOfContents << Entry{copy(levels), copy(text), (uint)pageIndex};
             if(s.match('\n')) break; // Page break
         }
         if(target) {
@@ -117,7 +164,7 @@ struct Document : Widget {
         }
     }
 
-    int viewPageIndex = 1; //FIXME: persistent
+    int viewPageIndex = 2; //FIXME: persistent
 
     bool keyPress(Key key, Modifiers) {
         /**/ if(key == LeftArrow) viewPageIndex = max(0, viewPageIndex-1);
@@ -175,12 +222,12 @@ struct FileWatcher : File, Poll {
 };
 
 struct Report {
-    String path = homePath()+"/Rapport/rapport.txt"_;
-    Document document {readFile(path, home())};
+    string path = "rapport.txt"_;
+    Document document {readFile(path)};
     Window window {&document, int2(1*document.width/document.oversample,document.height/document.oversample), "Report"_};
     FileWatcher watcher{path, [this](string){
             int index = document.viewPageIndex;
-            document.~Document(); new (&document) Document(readFile(path, home())); // Reloads
+            document.~Document(); new (&document) Document(readFile(path)); // Reloads
             document.viewPageIndex = index;
             window.render();
         } };

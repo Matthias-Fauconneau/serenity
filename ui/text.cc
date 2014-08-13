@@ -69,7 +69,7 @@ struct TextLayout {
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->advance(spaceIndex); assert(spaceAdvance);
         uint16 previous=spaceIndex;
-        TextFormat format=Regular;
+        bool bold=false, italic=false;//, underline=false;
         Text::Link link;
         Text::Cursor underlineBegin;
         Word word;
@@ -97,18 +97,17 @@ struct TextLayout {
             }
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
-                if(format&Link) {
-                    link.end=current();
-                    links << move(link);
-                }
-                TextFormat newFormat = ::format(c);
-                if(format&Underline && !(newFormat&Underline) && (current()>underlineBegin))
-                    lines << Line{underlineBegin, current()};
-                format=newFormat;
-                /**/ if((format&Bold) && (format&Italic)) font = getFont(fontName, size, "Bold Italic"_);
-                else if(format&Bold) font = getFont(fontName, size, "Bold"_);
-                else if(format&Italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
+                //if(link) { link.end=current(); links << move(link); }
+                TextFormat format = ::format(c);
+                /**/ if(format==Bold) bold=!bold;
+                else if(format==Italic) italic=!italic;
+                //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
+                else error(int(format));
+                /**/ if(bold && italic) font = getFont(fontName, size, "BoldItalic"_);
+                else if(bold) font = getFont(fontName, size, "Bold"_);
+                else if(italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
                 else font = getFont(fontName, size);
+                assert_(font, int(format), format&Bold?"bold"_:""_, format&Italic?"italic"_:""_);
                 if(format&Underline) underlineBegin=current();
                 if(format&Link) {
                     for(;;) {

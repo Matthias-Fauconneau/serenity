@@ -22,7 +22,7 @@ struct Layout : Widget {
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
-    Widgets(const ref<Widget*>& widgets):array(widgets){}
+    Widgets(array<Widget*>&& widgets):array(move(widgets)){}
     uint count() const { return array::size; }
     Widget& at(int i)  { return *array::at(i); }
 };
@@ -80,12 +80,12 @@ struct Vertical : virtual Linear {
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : Horizontal, Widgets {
-    HBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
+    HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
     HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
-    VBox(const ref<Widget*>& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(widgets){}
+    VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
     VBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 /// Horizontal layout of homogenous items. \sa Array
@@ -114,7 +114,7 @@ struct GridLayout : virtual Layout {
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(){}
-    WidgetGrid(const ref<Widget*>& widgets):Widgets(widgets){}
+    WidgetGrid(array<Widget*>&& widgets):Widgets(move(widgets)){}
 };
 template<class T> struct UniformGrid : GridLayout,  Array<T> {
     UniformGrid(const mref<T>& items={}) : Array<T>(items) {}

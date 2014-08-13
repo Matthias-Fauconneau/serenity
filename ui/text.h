@@ -7,9 +7,9 @@
 
 /// Rich text format control code encoded in 00-1F range
 /// \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
-enum TextFormat { Regular=0,Bold=1,Italic=2,Underline=4, /*8,'\n','\t'*/ Link=16 };
+enum TextFormat { Bold=0,Italic=1,Underline=3,Link=4 /*8,'\n','\t'*/};
 inline String format(TextFormat f) { String s; s << (char)f; return s; }
-inline TextFormat format(uint f) { assert(f<32); return TextFormat(f); }
+inline TextFormat format(uint f) { assert(f<=Link); return TextFormat(f); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {

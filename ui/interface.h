@@ -6,8 +6,6 @@
 #include "layout.h"
 #include "text.h"
 
-
-
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Directions (false: expand, true: scroll)
