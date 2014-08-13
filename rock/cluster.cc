@@ -163,12 +163,13 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
             int3 p = zOrder(index);
             itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
         }
-        if(target) target.last() = '\n';
+        targetPtr[-1] = '\n';
     }
     log(time);
     target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
     return target;
 }
+
 /// Merges intersecting sets of intersections and converts sets to a text file formatted as ((x y z r2)+\n)*
 String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
     array<unique<FamilySet>> mergedSets;
@@ -198,7 +199,7 @@ String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
                 int3 p = zOrder(index);
                 itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
             }
-            if(target) target.last() = '\n';
+            targetPtr[-1] = '\n';
         }
         log(time);
         target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
