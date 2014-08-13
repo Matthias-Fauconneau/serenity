@@ -152,6 +152,12 @@ struct Build {
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
+            static String version = ({
+                                         Stream stdout;
+                                         check_( execute(which("git"_), {"describe"_,"--long"_,"--tags"_,"--dirty"_,"--always"_}, true, currentWorkingDirectory(), &stdout) );
+                                         simplify( stdout.readUpTo(64) );
+                                     });
+            args << "-DVERSION=\""_+version+"\""_;
             log(target);
             while(pids.size>=1) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate

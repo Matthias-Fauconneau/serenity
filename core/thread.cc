@@ -182,7 +182,7 @@ void exit(int status) {
 }
 
 // Environment
-int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
+int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory, Handle* stdout) {
     if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
     array<String> args0(1+args.size);
@@ -200,15 +200,23 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
     for(uint i: range(env0.size)) envp[i]=env0[i].data;
     envp[env0.size]=0;
 
+    int pipe[2];
+    check_( ::pipe(pipe) );
+
     int cwd = workingDirectory.fd;
     int pid = fork();
     if(pid==0) {
+        close(pipe[0]); // Child does not read
+        dup2(pipe[1], 1); // Redirect stdout to pipe
         if(cwd!=AT_FDCWD) check_(fchdir(cwd));
         if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1);
         __builtin_unreachable();
+    } else {
+        close(pipe[1]); // Parent does not write
+        if(stdout) *stdout = pipe[0];
+        if(wait) return ::wait(pid);
+        else { wait4(pid,0,WNOHANG,0); return pid; }
     }
-    else if(wait) return ::wait(pid);
-    else { wait4(pid,0,WNOHANG,0); return pid; }
 }
 int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }

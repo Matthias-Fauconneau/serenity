@@ -61,7 +61,7 @@ struct Rock : PersistentProcess, Poll {
         if(targets.size>targetPaths.size && (targetPaths.size!=1 || !existsFolder(targetPaths[0],cwd)) && specialArguments.value("view"_,"0"_)=="0"_)
             log("Expected more names, skipped targets"_, targets.slice(targetPaths.size), targetPaths?str("using", map<string,string>(targetPaths, targets.slice(0,targetPaths.size))):""_);
         if(specialArguments.contains("dump"_)) {
-            log(__DATE__ " " __TIME__);
+            log("Rock"_, VERSION, __DATE__ " " __TIME__);
             log("Operations:",Interface<Operation>::factories().keys);
             log("Views:",Interface<View>::factories().keys);
             log("Results:",resultNames);
