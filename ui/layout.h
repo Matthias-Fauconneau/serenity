@@ -99,7 +99,7 @@ template<class T> struct VList : Vertical, Array<T> {
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
-/// Layouts items on an uniform #width x #height grid
+/// Layouts items on a #width x #height grid
 struct GridLayout : virtual Layout {
     /// Horizontal element count, 0 means automatic
     int width;

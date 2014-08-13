@@ -14,7 +14,7 @@ inline TextFormat format(uint f) { assert(f<=Link); return TextFormat(f); }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, float interline=1);
+    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, float interline=1, bool center=true);
 
     void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
@@ -32,6 +32,8 @@ struct Text : virtual Widget {
     string font;
     /// Interline stretch
     float interline;
+    /// Horizontal alignment
+    bool center;
     /// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link

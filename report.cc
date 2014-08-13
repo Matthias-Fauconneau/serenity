@@ -4,13 +4,12 @@
 #include "window.h"
 #include "interface.h"
 #include "png.h"
+//#include "jpeg.h"
 
 struct Document : Widget {
-    static constexpr int oversample = 2;
-    //static constexpr int height = oversample * (752*3/4); // 1/4 vertical margin
-    //static constexpr int width = oversample* (532*3/4); // 1/4 horizontal margin
+    static constexpr int oversample = 4;
     static constexpr int height = oversample * 752;
-    static constexpr int pageHeight = oversample * 752 * 4/3; // 1/4 uniform margin
+    static constexpr int pageHeight = oversample * 752 * 6/5; // 1/4 uniform margin
     const int width = oversample * 532;
     static constexpr float pageHeightMM = 297;
     static constexpr float pointMM = 0.3527;
@@ -18,7 +17,12 @@ struct Document : Widget {
     static constexpr float textSize = 12 * point;
     static constexpr float headerSize = 14 * point;
     static constexpr float titleSize = 16 * point;
-    const string font = "Computer Modern"_;
+    static constexpr float inchMM = 25.4;
+    static_assert(pageHeight / (pageHeightMM / inchMM) > 300, ""); // 308.65
+
+    //const string font = "Computer Modern"_;
+    //const string font = "Times_New_Roman"_;
+    const string font = "FreeSerif"_;
     const float interlineStretch = 1; //4./3
 
     TextData s;
@@ -43,45 +47,81 @@ struct Document : Widget {
         elements << unique<Widget>(move(t));
         return *pointer;
     }
-    Text& newText(string text, int size=textSize) { return element<Text>(text, size, 0, 1, width, font, interlineStretch); }
+    Text& newText(string text, int size=textSize, bool center=true) { return element<Text>(text, size, 0, 1, width, font, interlineStretch, center); }
+
+    String parseLine(TextData& s) {
+        String text;
+        while(s && !s.match('\n')) { // Line
+            /**/ if(s.match('*')) text << (char)(TextFormat::Bold);
+            else if(s.match("//"_)) text << "/"_;
+            else if(s.match('/')) text << (char)(TextFormat::Italic);
+            //else if(s.match('_')) userText << (char)(TextFormat::Underline);
+            else text << s.next();
+        }
+        return text;
+    }
+
+    String parseParagraph(TextData& s) {
+        String text;
+        while(s && !s.match('\n')) text << parseLine(s) << ' ';
+        return text;
+    }
 
     Widget* parseLayout(TextData& s) {
         array<Widget*> children;
         char type = 0;
         while(!s.match(')')) {
             // Element
-            s.whileAny(" "_);
+            s.whileAny(" \n"_);
             if(s.match('(')) children << parseLayout(s);
             else {
-                string text = trim(s.whileNo("|-)"_));
+                string text = trim(s.whileNo("|-+)"_));
                 assert_(text, s.line());
                 if(startsWith(text,"&"_)) {
                     string path = text.slice(1);
-                    images << unique<Image>(decodeImage(readFile(path+".png"_)));
+                    /**/ if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
+                    else if(existsFile(path+".jpg"_)) images << unique<Image>(decodeImage(readFile(path+".jpg"_)));
+                    else error("Missing image", path);
                     children << &element<ImageWidget>(images.last());
                 } else {
                     children << &newText(text);
                 }
             }
             // Separator
-            s.whileAny(" "_);
+            s.whileAny(" \n"_);
             /**/ if(s.match(')')) break;
             else if(!type) type = s.next();
             else s.skip(string(&type,1));
         }
         if(type=='-') return &element<VBox>(move(children));
         else if(type=='|') return &element<HBox>(move(children));
-        else { error(type); assert_(children.size==1); return children.first(); }
+        else if(type=='+') return &element<WidgetGrid>(move(children));
+        else { error(type, int(type), s.line()); assert_(children.size==1); return children.first(); }
     }
 
     void layoutPage(const Image& target) {
         elements.clear();
+        images.clear();
         VBox page (Linear::Center, Linear::Expand);
 
         while(s) {
+            if(s.match('%')) { // Comment
+                s.line();
+                continue;
+            }
+
             if(s.match('(')) { // Float
                 page << parseLayout(s);
                 s.skip("\n"_);
+                continue;
+            }
+
+            if(s.match('-')) { // List
+                VBox& list = element<VBox>(VBox::Even);
+                do {
+                    list << &newText("- "_+parseLine(s), textSize, false);
+                } while(s.match('-'));
+                page << &list;
                 continue;
             }
 
@@ -141,22 +181,16 @@ struct Document : Widget {
                 text << ' ';
             }
 
-            String userText;
-            while(s && !s.match('\n')) { // Paragraph
-                while(s && !s.match('\n')) { // Line
-                    /**/ if(s.match('*')) userText << (char)(TextFormat::Bold);
-                    else if(s.match('/')) userText << (char)(TextFormat::Italic);
-                    //else if(s.match('_')) userText << (char)(TextFormat::Underline);
-                    else userText << s.next();
-                }
-                userText << " "_;
+            String userText = parseParagraph(s);
+            if(userText) {
+                text << userText;
+                if(level && !target) tableOfContents << Entry{copy(levels), move(userText), (uint)pageIndex};
+                page << &newText(text, size, center);
             }
-            text << userText;
-            if(level && !target) tableOfContents << Entry{copy(levels), move(userText), (uint)pageIndex};
-
-            page << &newText(text, size);
-
-            if(s.match('\n')) break; // Page break
+            if(s.match('\n')) {
+                //if(pageIndex>0) page << &newText(dec(pageIndex)); //FIXME: should be outside content box
+                break; // Page break
+            }
         }
         if(target) {
             fill(target, Rect(target.size()), white);
@@ -164,12 +198,14 @@ struct Document : Widget {
         }
     }
 
-    int viewPageIndex = 2; //FIXME: persistent
+    int viewPageIndex = 11; //FIXME: persistent
+    signal<int> pageChanged;
 
     bool keyPress(Key key, Modifiers) {
         /**/ if(key == LeftArrow) viewPageIndex = max(0, viewPageIndex-1);
         else if(key == RightArrow) viewPageIndex = min(pageCount-1, viewPageIndex+1);
         else return false;
+        pageChanged(viewPageIndex);
         return true;
     }
 
@@ -178,10 +214,12 @@ struct Document : Widget {
         /**/ if(button==WheelUp) viewPageIndex = max(0, viewPageIndex-1);
         else if(button==WheelDown) viewPageIndex = min(pageCount-1, viewPageIndex+1);
         else return false;
+        pageChanged(viewPageIndex);
         return true;
     }
 
     void render() {
+        renderBackground(this->target, White);
         s.index = 0;
         pageIndex=0;
         elements.clear();
@@ -193,8 +231,10 @@ struct Document : Widget {
             if(pageIndex < viewPageIndex) { pageIndex++; continue; }
             Image image = clip(this->target, int2((pageIndex-viewPageIndex)*(target.size().x/oversample),0)+Rect(target.size()/oversample));
             if(oversample==1) copy(image, target);
-            else if(oversample==2) downsample(image, target);
-            else error(oversample);
+            else if(oversample>=2) {
+                for(int oversample=2; oversample<this->oversample; oversample*=2) target=downsample(target);
+                downsample(image, target);
+            }
             pageIndex++;
         }
     }
@@ -229,10 +269,12 @@ struct Report {
             int index = document.viewPageIndex;
             document.~Document(); new (&document) Document(readFile(path)); // Reloads
             document.viewPageIndex = index;
+            document.pageChanged.connect([&](int pageIndex){ window.setTitle(dec(pageIndex)); });
             window.render();
         } };
     Report() {
         window.actions[Escape]=[]{exit();}; window.background=White; window.focus = &document; window.show();
+        document.pageChanged.connect([&](int pageIndex){ window.setTitle(dec(pageIndex)); });
     }
 
 } app;

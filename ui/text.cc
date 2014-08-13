@@ -55,7 +55,9 @@ struct TextLayout {
 
     Font* getFont(string fontName, int size, string fontType=""_) {
         if(!fonts.contains(NameSize{fontName+fontType, size})) {
-            auto font = filter(fontFolder().list(Files|Recursive), [&](string path) { return fontType ? !find(path, fontName+"-"_+fontType+"."_) : !find(path,fontName+"."_); });
+            auto font = filter(fontFolder().list(Files|Recursive), [&](string path) {
+                    return fontType ? !find(path, fontName+fontType+"."_) && !find(path, fontName+"-"_+fontType+"."_) && !find(path, fontName+"_"_+fontType+"."_)
+                                    : !find(path,fontName+"."_); });
             if(!font) return 0;
             assert_(font.size==1, font);
             fonts.insert(NameSize{fontName+fontType,size},Font(File(font.first(), fontFolder()), size));
@@ -103,11 +105,11 @@ struct TextLayout {
                 else if(format==Italic) italic=!italic;
                 //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
                 else error(int(format));
-                /**/ if(bold && italic) font = getFont(fontName, size, "BoldItalic"_);
+                /**/ if(bold && italic) font = getFont(fontName, size, "BoldItalic"_) ?: getFont(fontName, size, "Bold Italic"_);
                 else if(bold) font = getFont(fontName, size, "Bold"_);
                 else if(italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
                 else font = getFont(fontName, size);
-                assert_(font, int(format), format&Bold?"bold"_:""_, format&Italic?"italic"_:""_);
+                assert_(font, fontName, bold, italic);
                 if(format&Underline) underlineBegin=current();
                 if(format&Link) {
                     for(;;) {
@@ -140,13 +142,17 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, float interline)
-    : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), interline(interline) {}
+Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, float interline, bool center)
+    : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), interline(interline), center(center) {}
 
 void Text::layout() {
     textSize=int2(0,size);
-    TextLayout layout(text, size, wrap, font, interline, false); // Layouts without justification
-    layout = TextLayout(text, size, layout.maxLength, font, interline, true); // Layouts with justification to the maximum length (which may be smaller than wrap)
+    int wrap = this->wrap;
+    if(center) {
+        TextLayout layout(text, size, wrap, font, interline, false); // Layouts without justification
+        wrap = layout.maxLength;
+    }
+    TextLayout layout(text, size, wrap, font, interline, true);
     textSize = int2(layout.maxLength, layout.pen.y);
 
     textLines.clear(); textLines.reserve(layout.text.size);
@@ -189,7 +195,7 @@ int2 Text::sizeHint() {
     if(!textSize) layout();
     return max(minSize,textSize);
 }
-void Text::render() { render(target, max(int2(0),(target.size()-textSize)/2)); }
+void Text::render() { render(target, max(int2(0), int2(center ? (target.size().x-textSize.x)/2 : 0, (target.size().y-textSize.y)/2))); }
 void Text::render(const Image& target, int2 offset) {
     if(!textSize) layout();
     for(const TextLine& line: textLines) for(const Character& b: line) if(b.image) blit(target, offset+b.pos, b.image, color, alpha);

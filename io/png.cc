@@ -80,7 +80,7 @@ Image decodePNG(const ref<byte>& file) {
     }
     ::buffer<byte> data = inflate(buffer, true);
     if(bitDepth==1 || bitDepth==4) {
-        assert(type==3);
+        assert(type==0 || type==3, type);
         assert(depth==1,depth);
         assert(width%(8/bitDepth)==0);
         assert(data.size == height*(1+width*depth*bitDepth/8));
