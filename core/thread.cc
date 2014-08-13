@@ -180,7 +180,13 @@ void exit(int status) {
     for(Thread* thread: threads) thread->post();
 }
 
-// Environment
+String which(string name) {
+    if(!name) return {};
+    if(existsFile(name)) return String(name);
+    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFile(name, folder)) return folder+"/"_+name;
+    return {};
+}
+
 int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
     if(!existsFile(path)) { error("Executable not found",path); return -1; }
 

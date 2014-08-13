@@ -11,14 +11,6 @@ struct Node {
 bool operator ==(const Node& a, const Node& b) { return a.name==b.name; }
 bool operator ==(const Node& a, const string& b) { return a.name==b; }
 
-// Locates an executable
-String which(string name) {
-    if(!name) return {};
-    if(existsFile(name)) return String(name);
-    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFile(name, folder)) return folder+"/"_+name;
-    return {};
-}
-
 struct Build {
     const Folder folder {"."_};
     const String base { section(folder.name(),'/',-2,-1) };

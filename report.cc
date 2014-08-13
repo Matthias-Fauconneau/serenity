@@ -7,21 +7,24 @@
 //#include "jpeg.h"
 
 struct Document : Widget {
+    const int2 windowSize = int2(532, 752);
     static constexpr int oversample = 4;
-    static constexpr int height = oversample * 752;
-    static constexpr int pageHeight = oversample * 752 * 6/5; // 1/4 uniform margin
-    const int width = oversample * 532;
+    const int2 previewSize = oversample * windowSize;
+
+    static constexpr bool showMargins = true;
+    const float margin = 1./10;
+    const int2 pageSize = oversample * int2(round(vec2(windowSize) * (1+(showMargins?0:2*margin))));
+    const int2 contentSize = oversample * int2(round(vec2(windowSize) * (1-(showMargins?2*margin:0))));
+
     static constexpr float pageHeightMM = 297;
     static constexpr float pointMM = 0.3527;
-    static constexpr float point = pointMM * pageHeight / pageHeightMM;
-    static constexpr float textSize = 12 * point;
-    static constexpr float headerSize = 14 * point;
-    static constexpr float titleSize = 16 * point;
+    const float point = pointMM * (pageSize.y * (1+2*margin)) / pageHeightMM;
+    const float textSize = 12 * point;
+    const float headerSize = 14 * point;
+    const float titleSize = 16 * point;
     static constexpr float inchMM = 25.4;
-    static_assert(pageHeight / (pageHeightMM / inchMM) > 300, ""); // 308.65
+    //static_assert(pageHeight / (pageHeightMM / inchMM) > 300, ""); // 308.65
 
-    //const string font = "Computer Modern"_;
-    //const string font = "Times_New_Roman"_;
     const string font = "FreeSerif"_;
     const float interlineStretch = 1; //4./3
 
@@ -47,7 +50,7 @@ struct Document : Widget {
         elements << unique<Widget>(move(t));
         return *pointer;
     }
-    Text& newText(string text, int size=textSize, bool center=true) { return element<Text>(text, size, 0, 1, width, font, interlineStretch, center); }
+    Text& newText(string text, int size, bool center=true) { return element<Text>(text, size, 0, 1, contentSize.x, font, interlineStretch, center); }
 
     String parseLine(TextData& s) {
         String text;
@@ -84,7 +87,7 @@ struct Document : Widget {
                     else error("Missing image", path);
                     children << &element<ImageWidget>(images.last());
                 } else {
-                    children << &newText(text);
+                    children << &newText(text, textSize);
                 }
             }
             // Separator
@@ -157,8 +160,8 @@ struct Document : Widget {
                         for(int level: entry.levels) header << dec(level) << '.';
                         header << ' ' << entry.name;
                         auto& hbox = element<HBox>(Linear::Spread);
-                        hbox << &newText(header);
-                        hbox << &newText(" "_+dec(entry.page));
+                        hbox << &newText(header, textSize);
+                        hbox << &newText(" "_+dec(entry.page), textSize);
                         vbox << &hbox;
                     }
                     page << &vbox;
@@ -183,7 +186,7 @@ struct Document : Widget {
 
             String userText = parseParagraph(s);
             if(userText) {
-                text << userText;
+                text << trim(userText);
                 if(level && !target) tableOfContents << Entry{copy(levels), move(userText), (uint)pageIndex};
                 page << &newText(text, size, center);
             }
@@ -194,11 +197,19 @@ struct Document : Widget {
         }
         if(target) {
             fill(target, Rect(target.size()), white);
-            page.Widget::render(target);
+            if(showMargins) {
+                int2 margin = int2(round(this->margin * vec2(target.size())));
+                Image inner = clip(target, Rect(margin, target.size()-margin));
+                page.Widget::render(inner);
+                Image footer = clip(target, Rect(int2(0,target.size().y-margin.y),target.size()));
+                Text(dec(pageIndex), textSize, 0, 1, 0, font).Widget::render(footer);
+            } else {
+                page.Widget::render(target);
+            }
         }
     }
 
-    int viewPageIndex = 11; //FIXME: persistent
+    int viewPageIndex = 0; //FIXME: persistent
     signal<int> pageChanged;
 
     bool keyPress(Key key, Modifiers) {
@@ -218,17 +229,25 @@ struct Document : Widget {
         return true;
     }
 
-    void render() {
-        renderBackground(this->target, White);
+    void clear() {
         s.index = 0;
         pageIndex=0;
         elements.clear();
         levels.clear();
-        Image target (width, height);
+    }
+    void render() {
+        clear();
+        while(s && pageIndex < viewPageIndex) {
+            assert_( s.until("\n\n\n"_) );
+            pageIndex++;
+        }
+        Image target (pageSize);
+        renderBackground(target, White);
         while(s) {
-            if(pageIndex >= viewPageIndex+1) break;
+            if(pageIndex > viewPageIndex) break;
             layoutPage(target);
-            if(pageIndex < viewPageIndex) { pageIndex++; continue; }
+            //layoutPage(target); // FIXME: auto page break with quick layout for previous pages
+            //if(pageIndex < viewPageIndex) { pageIndex++; continue; }
             Image image = clip(this->target, int2((pageIndex-viewPageIndex)*(target.size().x/oversample),0)+Rect(target.size()/oversample));
             if(oversample==1) copy(image, target);
             else if(oversample>=2) {
@@ -237,6 +256,34 @@ struct Document : Widget {
             }
             pageIndex++;
         }
+    }
+
+    array<Image> renderPages() {
+        clear();
+        array<Image> pages;
+        while(s) {
+            Image target (pageSize);
+            layoutPage(target);
+            pages << move(target);
+            pageIndex++;
+        }
+        return pages;
+    }
+
+    void writePages() {
+        clear();
+        array<String> args;
+        while(s) {
+            Image target (pageSize);
+            layoutPage(target);
+            log(pageIndex);
+            writeFile(dec(pageIndex),encodePNG(target));
+            args << dec(pageIndex);
+            pageIndex++;
+        }
+        args << String("rapport.pdf"_);
+        log("PDF");
+        execute(which("convert"_),toRefs(args));
     }
 };
 
@@ -264,7 +311,7 @@ struct FileWatcher : File, Poll {
 struct Report {
     string path = "rapport.txt"_;
     Document document {readFile(path)};
-    Window window {&document, int2(1*document.width/document.oversample,document.height/document.oversample), "Report"_};
+    Window window {&document, document.windowSize, "Report"_};
     FileWatcher watcher{path, [this](string){
             int index = document.viewPageIndex;
             document.~Document(); new (&document) Document(readFile(path)); // Reloads
@@ -273,6 +320,15 @@ struct Report {
             window.render();
         } };
     Report() {
+        assert_(arguments());
+        /**/ if(arguments()[0]=="export"_) {
+            document.writePages();
+            exit(0);
+            return;
+        }
+        else if(arguments()[0]=="preview"_) {
+        }
+        else error(arguments());
         window.actions[Escape]=[]{exit();}; window.background=White; window.focus = &document; window.show();
         document.pageChanged.connect([&](int pageIndex){ window.setTitle(dec(pageIndex)); });
     }

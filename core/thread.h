@@ -162,6 +162,9 @@ void exit(int status=0);
 /// Immediatly terminates the current thread
 void __attribute((noreturn)) exit_thread(int status);
 
+/// Locates an executable
+String which(string name);
+
 /// Execute binary at \a path with command line arguments \a args
 /// \note if \a wait is false, Returns the PID to be used for wait
 int execute(const string& path, const ref<string>& args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory());

@@ -14,7 +14,7 @@ struct TextLayout {
     float wrap;
     float interline;
     float spaceAdvance;
-    vec2 pen=0;
+    float penY=0;
     struct Character { Font* font; vec2 pos; uint index; uint width; float advance; uint editIndex; };
     typedef array<Character> Word;
     array<Word> words;
@@ -38,19 +38,19 @@ struct TextLayout {
         else space = spaceAdvance;
 
         // Layouts
-        column=0; pen.x=0;
+        column=0; float penX=0; // Line pen
         lineNumber++; text << TextLine();
         for(uint i: range(words.size)) { Word& word=words[i];
-            for(Character& c: word) text.last() << Character{c.font, pen+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex};
-            maxLength = max(maxLength, pen.x+word.last().pos.x+word.last().width);
-            if(word) pen.x += word.last().pos.x + word.last().advance;
+            for(Character& c: word) text.last() << Character{c.font, vec2(penX,penY)+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex};
+            maxLength = max(maxLength, penX+word.last().pos.x+word.last().width);
+            if(word) penX += word.last().pos.x + word.last().advance;
             if(i!=words.size-1) //editable justified space
-                text.last() << Character{0,pen,0,0,spaceAdvance,lastIndex=lastIndex+1};
-            pen.x += space;
+                text.last() << Character{0,vec2(penX, penY),0,0,spaceAdvance,lastIndex=lastIndex+1};
+            penX += space;
         }
         lastIndex++;
         words.clear();
-        pen.x=0; pen.y += interline*size;
+        penY += interline*size;
     }
 
     Font* getFont(string fontName, int size, string fontType=""_) {
@@ -75,7 +75,8 @@ struct TextLayout {
         Text::Link link;
         Text::Cursor underlineBegin;
         Word word;
-        pen.y = interline*font->ascender;
+        int penX = 0; // Word pen
+        penY = interline*font->ascender;
         for(uint i=0; i<text.size; i++) {
             uint c = text[i];
             if(/*c==' '||c=='\t'||c=='\n'*/c<=' ') { // Next word/line
@@ -89,10 +90,10 @@ struct TextLayout {
                         //log("expect", length);
                         if(wrap && length > wrap && words) nextLine(justify); // would not fit
                     }
-                    words << move(word); pen.x = 0; // Add to current line (might be first of a new line)
+                    words << move(word); penX = 0; // Add to current line (might be first of a new line)
                 } else {
-                    if(c==' ') pen.x += spaceAdvance;
-                    if(c=='\t') pen.x += 4*spaceAdvance; //FIXME: align
+                    if(c==' ') penX += spaceAdvance;
+                    if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
                 }
                 if(c=='\n') nextLine(false);
                 //continue;
@@ -123,22 +124,22 @@ struct TextLayout {
                 continue;
             }
             uint16 index = font->index(c);
-            if(previous!=spaceIndex) pen.x += font->kerning(previous,index);
+            if(previous!=spaceIndex) penX += font->kerning(previous,index);
             previous = index;
             float advance = font->advance(index);
             const Glyph& glyph = font->glyph(index);
-            if(glyph.image) { word << Character{font, vec2(pen.x,0), index, glyph.offset.x+glyph.image.width, advance, i}; column++; }
-            pen.x += advance;
+            if(glyph.image) { word << Character{font, vec2(penX,0), index, glyph.offset.x+glyph.image.width, advance, i}; column++; }
+            penX += advance;
         }
         if(word) {
             float length=0; for(const Word& word: words) if(word) length += word.last().pos.x + word.last().advance + spaceAdvance;
             length += word.last().pos.x + word.last().width; // Last word
             if(wrap && length>wrap) nextLine(justify); // would not fit
-            words << move(word); pen.x = 0; // Adds to current line (might be first of new line)
+            words << move(word); penX = 0; // Adds to current line (might be first of new line)
         }
         nextLine(false); // Clears any remaining words
-        pen.y -= interline*size; // Reverts last line space
-        pen.y += interline*font->ascender; // Adds descender for correct inter widget line spacing
+        penY -= interline*size; // Reverts last line space
+        penY += interline*font->ascender; // Adds descender for correct inter widget line spacing
     }
 };
 
@@ -153,7 +154,7 @@ void Text::layout() {
         wrap = layout.maxLength;
     }
     TextLayout layout(text, size, wrap, font, interline, true);
-    textSize = int2(layout.maxLength, layout.pen.y);
+    textSize = int2(layout.maxLength, layout.penY);
 
     textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;
