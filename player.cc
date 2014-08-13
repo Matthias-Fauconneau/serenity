@@ -60,12 +60,18 @@ struct Player {
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
     uint read(const mref<short2>& output) {
+        if(audio.rate != file->rate) { // Previous call returned last partial period. Audio output can now be reset.
+            audio.stop();
+            audio.start(file->rate, periodSize);
+            assert_(audio.rate == file->rate);
+            return 0;
+        }
         uint readSize = 0;
         for(mref<short2> chunk=output;;) {
             if(!file) break;
             assert(readSize<output.size);
-            if(audio.rate != file->rate) { audio.stop(); audio.start(file->rate, periodSize); }
-            size_t read = read = file->read(chunk);
+            if(audio.rate != file->rate) break; // Returns partial period before closing
+            size_t read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
             if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk

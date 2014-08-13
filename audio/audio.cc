@@ -127,11 +127,15 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
 
 void AudioOutput::stop() {
     assert_(status);
-    if(status->state < Suspended) io<DRAIN>();
+    {int state = status->state;
+        if(state < Suspended) io<DRAIN>();
+        else log("Could not drain", state);}
     unregisterPoll();
-    int state = status->state;
-    buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps
-    if(state < Running) io<HW_FREE>(); // Releases hardware
+    {int state = status->state;
+        buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps
+        if(state < Running) io<HW_FREE>(); // Releases hardware
+        else log("Could not free", state);}
+    sampleBits=0, rate=0, periodSize=0, bufferSize=0;
     close(); Poll::fd=0; // Closes file descriptor
 }
 
@@ -150,7 +154,6 @@ void AudioOutput::event() {
     if(available>=(int)periodSize) {
         uint readSize;
         if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
-        //else if(sampleBits==32) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
         else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
@@ -201,6 +204,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     if(!rate) hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
     hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
     iowr<HW_PARAMS>(hparams);
+    assert_(hparams.flags == NoResample);
     this->sampleBits = hparams.interval(SampleBits);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
