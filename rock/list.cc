@@ -1,5 +1,6 @@
 /// \file list.cc Computes lists of positions for each value
 #include "list.h"
+#include "sample.h"
 #include "volume-operation.h"
 #include "thread.h"
 #include "crop.h"
@@ -84,3 +85,23 @@ struct List : Operation {
     }
 };
 template struct Interface<Operation>::Factory<List>;
+
+/// Computes size of each list
+array<real> listSize(const buffer<array<short3>>& lists) {
+    array<real> listSizes (lists.size);
+    for(ref<short3> list: lists) {
+        if(!list) continue;
+        listSizes << list.size;
+    }
+    return move(listSizes);
+}
+
+/// Computes size of each list
+struct ListSize : Operation {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
+        array<real> listSizes = ::listSize(parseLists(inputs[0]->data));
+        outputs[0]->metadata = String("size(index).tsv"_);
+        outputs[0]->data = toASCII(UniformSample(listSizes));
+    }
+};
+template struct Interface<Operation>::Factory<ListSize>;

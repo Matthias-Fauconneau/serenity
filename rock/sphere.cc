@@ -1,9 +1,9 @@
-/// \file sphere.cc Computes lists of radii for each list of voxels
+/// \file sphere.cc Computes radius for each list of voxels
 #include "operation.h"
 #include "list.h"
 #include "sample.h"
 
-/// Computes lists of radii for each list of voxels
+/// Computes radius for each list of voxels
 array<real> radiusList(const buffer<array<short3>>& lists) {
     array<real> radiusList (lists.size);
     for(ref<short3> list: lists) {
@@ -19,7 +19,7 @@ array<real> radiusList(const buffer<array<short3>>& lists) {
     return move(radiusList);
 }
 
-/// Computes lists of radii for each list of voxels
+/// Computes radius for each list of voxels
 struct RadiusList : Operation {
     virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         array<real> radiusList = ::radiusList(parseLists(inputs[0]->data));

@@ -213,8 +213,7 @@ pore-radius-list = RadiusList pore-list
 throat-radius-list = RadiusList throat-list
 
 # Volume of each pore
-pore-volume-full = Histogram pore-index #FIXME: from list sizes
-pore-volume-list = Slice pore-volume-full begin=1
+pore-volume-list = ListSize pore-list
 
 # (radius, volume) pairs of each pore
 pore-radius-volume-list = Pair pore-radius-list pore-volume-list
