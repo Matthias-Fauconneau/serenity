@@ -59,7 +59,7 @@ generic void resample(VolumeT<T>& target, const VolumeT<T>& source, int sourceRe
     }
 }
 
-/// Resamples data
+/// Resamples volume
 struct Resample : VolumeOperation {
     uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
     void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<const Result*>& otherInputs) override {

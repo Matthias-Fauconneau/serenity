@@ -39,9 +39,6 @@ void featureTransformY(Volume2x16& target, const Volume16& source) {
     const uint16* const sourceData = source;
     short2* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    //const int64 marginX=source.margin.x, marginY=source.margin.y-1, marginZ=floor(width/2,source.margin.z);
-    //assert_(source.margin.y>=1 /*&& (Z-2*marginZ)%width == 0*/);
-    //target.margin.y = max(1, source.margin.y);
     parallel(0,X, [&](uint, uint x) {
         const uint16* const sourceX = sourceData + x*Y*Z;
         short2* const targetX = targetData + x*Z;
@@ -86,9 +83,6 @@ void featureTransformZ(Volume3x16& target, const Volume2x16& source) {
     const short2* const sourceData = source;
     short3* const targetData = target;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
-    //const int64 marginX=floor(width/2,source.margin.x), marginY=source.margin.y, marginZ=source.margin.z-1;
-    //assert_(source.margin.z>=1 /*&& (X-2*marginX)%width == 0*/);
-    //target.margin.z = max(1, source.margin.z);
     parallel(0,Y, [&](uint, uint y) {
         const short2* const sourceY = sourceData + y*Z*X;
         short3* const targetY = targetData + y*X;

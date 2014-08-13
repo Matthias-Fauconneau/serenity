@@ -91,14 +91,10 @@ rock/sample-operation.cc
 rock/list.cc
 
 rock/slice.cc
-rock/REV.cc
-rock/prune.cc
 rock/result.h
 rock/view.h
 rock/view.cc
-rock/summary.cc
 rock/slice.h
-rock/diff.cc
 rock/cluster.cc
 rock/family.cc
 rock/synthetic.cc

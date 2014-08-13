@@ -200,18 +200,25 @@ throat-bins = Bin skeleton throat-skeleton
 pore-index = RasterizeAttribute pore-bins
 throat-index = RasterizeAttribute throat-bins
 
+# Lists rasterized voxels for each pore
+pore-list = List pore-index
+throat-list = List throat-index
+
 # Colorizes each pore in a different color
 colored-pores = ColorizeIndex pore-index
 colored-throats = ColorizeIndex throat-index
 
 # Volume of each pore
-pore-volume = Histogram pore-index
+pore-volume-full = Histogram pore-index #FIXME: from list sizes
+pore-volume = Slice pore-volume-full begin=1
+
+# Radius of each pore
+pore-radius = Radius pore-list
+throat-radius = Radius throat-list
 
 # Bounds pores/throats with bounding boxes
 pore-box-list = Bound pore-list
-                            pore-list = List pore-index
-throat-box-list = Bound throat-list
-                              throat-list = List throat-index
+throat-box-list = Bound throat-list                        
 
 # Aspect ratio
 pore-aspect-ratio-list = AspectRatio pore-box-list

@@ -39,11 +39,6 @@
 //#include "slice.h"
 //#include "plot.h"
 
-//#include "REV.h"
-//#include "prune.h"
-//#include "summary.h
-//#include "diff.h
-
 /// Command-line interface for rock volume data processing
 struct Rock : PersistentProcess, Poll {
     FILE(rock) // Rock process definition (embedded in binary)
