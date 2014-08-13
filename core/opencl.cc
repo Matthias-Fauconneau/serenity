@@ -15,7 +15,16 @@ void __attribute((constructor(1002))) setup_cl() {
     uint platformCount; clGetPlatformIDs(0, 0, &platformCount); assert_(platformCount);
     cl_platform_id platforms[platformCount]; clGetPlatformIDs(platformCount, platforms, 0);
     cl_platform_id platform = platforms[0];
-    uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount); assert_(deviceCount);
+    uint deviceCount; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, 0, &deviceCount);
+    if(!deviceCount) {
+        for(cl_platform_info attribute : { CL_PLATFORM_NAME, CL_PLATFORM_VENDOR, CL_PLATFORM_VERSION, CL_PLATFORM_PROFILE, CL_PLATFORM_EXTENSIONS }) {
+            size_t size; clGetPlatformInfo(platform, attribute, 0, 0, &size);
+            char info[size]; clGetPlatformInfo(platform, attribute, size, info, 0);
+        }
+        log("Warning: No OpenCL device available");
+        return;
+    }
+    assert_(deviceCount);
     cl_device_id devices[deviceCount]; clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, deviceCount, devices, 0);
     device = devices[0];
     size_t size; clGetDeviceInfo(device, CL_DEVICE_NAME, 0, 0, &size);

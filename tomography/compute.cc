@@ -38,6 +38,18 @@ struct Compute {
 
         // Reference sample generation
         PorousRock rock (volumeSize);
+#if 0
+            const Projection A (cameraLength, specimenDistance, volumeSize, int3(projectionSize, volumeSize.z), Single, 1);
+            uint index = A.projectionSize.z/2;
+            ImageF projection (A.projectionSize.xy());
+            rock.project(projection, A, index);
+            const float photonCount = parameters.value("photonCount"_, 0);
+            assert_(photonCount);
+            for(float& v: projection.data) v = (poisson(photonCount) * exp(-v)) / photonCount;
+            Image target ( A.projectionSize.xy() );
+            convert(target, projection); // Normalizes each slice by its maximum value
+            writeFile(str(photonCount,index)+".png"_, encodePNG(target));
+#else
         const VolumeF referenceVolume = rock.volume();
         if(parameters.value("reference"_, false)) {
             // Stores raw reference volume
@@ -58,14 +70,17 @@ struct Compute {
                 Image target ( A.projectionSize.xy() );
                 for(uint index: range(A.projectionSize.z)) {
                     log(index);
-                    rock.project(slice(projections, index), A, index);
-                    convert(target, slice(projections, index)); // Normalizes each slice by its maximum value
+                    ImageF projection = slice(projections, index);
+                    rock.project(projection, A, index);
+                    const float photonCount = parameters.value("photonCount"_,0);
+                    if(photonCount) for(uint i: range(projection.data.size)) projection.data[i] = (poisson(photonCount) * exp(-projection.data[i])) / float(photonCount);
+                    else for(uint i: range(projection.data.size)) projection.data[i] = exp(-projection.data[i]);
+                    convert(target, projection); // Normalizes each slice by its maximum value
                     writeFile(dec(index), encodePNG(target), folder);
                 }
                 // Stores raw projection data set
                 writeFile("projections."_+strx(volumeSize)+".raw"_, cast<byte>(referenceVolume.data));
             }
-
             return;
         }
         const float centerSSQ = sq(sub(referenceVolume,  int3(0,0,volumeSize.z/4), int3(volumeSize.xy(), volumeSize.z/2)));
@@ -298,5 +313,6 @@ struct Compute {
         }
         log("Total", totalTime, "Projection", projectionTime, "Poisson", poissonTime, "Reconstruction", reconstructionTime, "Completed", completed, "from", update.size(), "on total", configurations.size, "in average", totalTime.toFloat()/update.size(), "s/configuration");
         exit();
+#endif
     }
 } app; // Static object constructors executes before main. In this application, events are processed explicitly by calling window->event() in the innermost loop instead of using the event loop in main() as it makes parameter sweeps easier to write.

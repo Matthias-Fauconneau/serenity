@@ -41,12 +41,12 @@ Image decodeImage(const ref<byte>& file) {
     else { if(file.size) error("Unknown image format"_,hex(file.slice(0,min<int>(file.size,4)))); return Image(); }
 }
 
-float convert(const Image& target, const ImageF& source, float max) {
-    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) { /*assert_(isNumber(source(x,y)));*/ if(isNumber(source(x,y))) max=::max(max, abs(source(x,y))); }
+float convert(const Image& target, const ImageF& source, float max, float min) {
+    if(min==inf) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) min=::min(min, source(x,y));
+    if(!max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) max=::max(max, source(x,y));
     if(max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
-        float v = source(x,y)/max;
-        //assert_(abs(v) <= 1, source(x,y), max);
-        v = min(1.f, v);
+        float v = (source(x,y)-min)/(max-min);
+        v = ::min(1.f, v);
         uint linear12 = 0xFFF*abs(v);
         extern uint8 sRGB_forward[0x1000];
         assert_(linear12 < 0x1000);

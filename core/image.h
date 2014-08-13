@@ -93,7 +93,7 @@ struct ImageF {
 inline ImageF share(const ImageF& o) { return ImageF(buffer<float>((ref<float>)o.data),o.size); }
 
 /// Converts a linear float image to sRGB
-float convert(const Image& target, const ImageF& source, float max=0);
+float convert(const Image& target, const ImageF& source, float max=0, float min=inf);
 /// Downsamples by adding samples
 ImageF& downsample(ImageF& target, const ImageF& source);
 /// Upsamples an image by duplicating samples
