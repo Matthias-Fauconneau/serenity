@@ -1,4 +1,4 @@
-# -- Source -- #
+# -- Source image -- #
 
 # Sources
     synthetic = '0'
@@ -22,7 +22,7 @@ if  transpose=='X': transposed = transpose
                                 transpose = Transpose resampled
 if  transpose=='Y': transposed = Transpose transpose
 
-# -- Threshold -- #
+# -- Pore space -- #
 
 # Density distribution
 if !threshold-from-source: histogram-attenuation-full = Histogram resampled
@@ -59,7 +59,7 @@ histogram-pore-connect-rock = Histogram pore
 histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
-# -- Maximum ball -- #
+# -- Maximum balls -- #
 
 # Computes position of nearest background voxel
 positionx  = PositionX rock-connected
@@ -131,9 +131,9 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
  distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
 
-# -- Pores/throats partition  -- #
+# -- Pores/throats partitions  -- #
 
-# - Approximate throat/pore partition using uniform radius threshold - #
+# - Uniform radius threshold approximation - #
 
 # Partitions maximum balls between throats and pores using a uniform radius threshold
 median-radius = HistogramMedian histogram-radius
@@ -148,7 +148,7 @@ approximate-colored-pores-throats = Add approximate-colored-pores approximate-th
 approximate-throat-index = FloodFillSplit approximate-throats
 approximate-throats = List approximate-throat-index
 
-# - Curve Skeleton - #
+# - Curve skeleton - #
 
 # Computes curve skeleton (thinning)
 curve-skeleton = CurveSkeleton pore-connect-rock
@@ -178,7 +178,7 @@ curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 
 #skeleton = curve-skeleton-distance-tiled
 
-# - Cluster - #
+# - Cluster method - #
 
 # Generates lists of balls for each radius from the skeleton volume
 maximum-balls-lists = List maximum
@@ -192,7 +192,7 @@ throat-skeleton = RootIndex throat-skeleton-list voxelSize
 
 skeleton = connected-skeleton
 
-# - Pores/Throats analysis - #
+# - Pores/throats analysis - #
 
 # Rasterizes skeleton voxel as maximum balls (with family index attribute)
 pore-bins = Bin skeleton pore-skeleton

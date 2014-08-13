@@ -7,35 +7,33 @@
 #include "window.h"
 #include "png.h"
 
-// Includes all operators, tools and views
-//#include "volume.h"
+// - Source image - //
 //#include "source.h"
 //#include "synthetic.h"
-//include "resample.h"
-//#include "average.h"
-//#include "median.h"
 //#include "resample.h"
+//#include "median.h"
+// - Pore space - //
 //#include "histogram.h"
-//#include "threshold.h"
 //#include "sample-operation.h"
+//#include "threshold.h"
+// - Maximum balls - //
 //#include "position.h"
 //#include "surface-skeleton.h"
 //#include "floodfill.h"
 //#include "rasterize.h"
-
+// - Curve skeleton - //
 //#include "curve-skeleton.h"
 //#include "extremum.h"
 //#include "connectivity.h"
-
+// - Cluster method - //
 //#include "list.h"
 //#include "cluster.h"
-//#include "link.h"
 //#include "family.h"
-
+// - Pores/throat analysis - //
 //#include "box.h"
+// - Export / View - //
 //#include "kernel-density-estimation.h"
 //#include "export.h"
-
 //#include "slice.h"
 //#include "plot.h"
 
