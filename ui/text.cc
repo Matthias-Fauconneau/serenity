@@ -41,11 +41,11 @@ struct TextLayout {
         column=0; float penX=0; // Line pen
         lineNumber++; text << TextLine();
         for(uint i: range(words.size)) { Word& word=words[i];
+            assert_(word);
             for(Character& c: word) text.last() << Character{c.font, vec2(penX,penY)+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex};
             maxLength = max(maxLength, penX+word.last().pos.x+word.last().width);
-            if(word) penX += word.last().pos.x + word.last().advance;
-            if(i!=words.size-1) //editable justified space
-                text.last() << Character{0,vec2(penX, penY),0,0,spaceAdvance,lastIndex=lastIndex+1};
+            penX += word.last().pos.x + word.last().advance;
+            //if(i!=words.size-1) text.last() << Character{0,vec2(penX, penY),0,0,spaceAdvance,lastIndex=lastIndex+1}; // Editable justified space
             penX += space;
         }
         lastIndex++;
@@ -75,11 +75,17 @@ struct TextLayout {
         Text::Link link;
         Text::Cursor underlineBegin;
         Word word;
-        int penX = 0; // Word pen
+        float penX = 0; // Word pen
         penY = interline*font->ascender;
-        for(uint i=0; i<text.size; i++) {
+        uint i=0; for(; i<text.size; i++) {
             uint c = text[i];
-            if(/*c==' '||c=='\t'||c=='\n'*/c<=' ') { // Next word/line
+            /**/ if(c==' ') penX += spaceAdvance;
+            else if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
+            else break;
+        }
+        for(; i<text.size; i++) {
+            uint c = text[i];
+            if(c==' '||c=='\t'||c=='\n' /*c<=' '*/) { // Next word/line
                 column++;
                 previous = spaceIndex;
                 if(word) {
@@ -91,12 +97,9 @@ struct TextLayout {
                         if(wrap && length > wrap && words) nextLine(justify); // would not fit
                     }
                     words << move(word); penX = 0; // Add to current line (might be first of a new line)
-                } else {
-                    if(c==' ') penX += spaceAdvance;
-                    if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
                 }
                 if(c=='\n') nextLine(false);
-                //continue;
+                continue;
             }
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
