@@ -82,7 +82,8 @@ void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
 #if DEBUG
     uint64 maximum=0; for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) maximum = max(maximum, targetData[i].ballCount); log(maximum); assert(maximum);
 #endif
-    target.maximum=attribute.maximum;
+    target.maximum = attribute.maximum;
+    target.field = copy(attribute.field);
 }
 struct Bin : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(Tile)/tileSide/tileSide/tileSide; }

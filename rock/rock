@@ -208,13 +208,18 @@ throat-list = List throat-index
 colored-pores = ColorizeIndex pore-index
 colored-throats = ColorizeIndex throat-index
 
+# Radius of each pore
+pore-radius-list = RadiusList pore-list
+throat-radius-list = RadiusList throat-list
+
 # Volume of each pore
 pore-volume-full = Histogram pore-index #FIXME: from list sizes
-pore-volume = Slice pore-volume-full begin=1
+pore-volume-list = Slice pore-volume-full begin=1
 
-# Radius of each pore
-pore-radius = Radius pore-list
-throat-radius = Radius throat-list
+# (radius, volume) pairs of each pore
+pore-radius-volume-list = Pair pore-radius-list pore-volume-list
+throat-radius-volume-list = Pair throat-radius-list throat-volume-list
+
 
 # Bounds pores/throats with bounding boxes
 pore-box-list = Bound pore-list

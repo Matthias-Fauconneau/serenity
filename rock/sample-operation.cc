@@ -129,3 +129,22 @@ struct HistogramMedian : Pass {
     }
 };
 template struct Interface<Operation>::Factory<HistogramMedian>;
+
+/// Pairs two sample
+struct Pair : Operation {
+    virtual void execute(const Dict&, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
+        assert_(endsWith(inputs[0]->metadata,"tsv"_));
+        assert_(endsWith(inputs[1]->metadata,"tsv"_));
+        string xlabel; { TextData s(inputs[0]->metadata); xlabel = s.until('('); }
+        string ylabel; { TextData s(inputs[1]->metadata); ylabel = s.until('('); }
+        outputs[0]->metadata = ylabel+"("_+xlabel+").tsv"_;
+        NonUniformSample a = parseNonUniformSample(inputs[0]->data);
+        NonUniformSample b = parseNonUniformSample(inputs[1]->data);
+        assert_(a.keys == b.keys, a.keys, b.keys);
+        //outputs[0]->data = toASCII( NonUniformSample{a.values, b.values} );
+        NonUniformSample pairs;
+        for(pair<real,real> p: NonUniformSample{a.values, b.values}) pairs.insertSortedMulti(p.key, p.value);
+        outputs[0]->data = toASCII( pairs );
+    }
+};
+template struct Interface<Operation>::Factory<Pair>;

@@ -103,3 +103,5 @@ rock/curve-skeleton.cc
 test.cc
 rock/connectivity.cc
 rock/extremum.cc
+rock/sphere.cc
+rock/list.h

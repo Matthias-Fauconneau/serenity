@@ -1,29 +1,9 @@
 /// \file cluster.cc Computes trees of overlapping balls
-#include "sample.h"
+#include "list.h"
 #include "volume-operation.h"
 #include "thread.h"
 #include "crop.h"
 #include "time.h"
-
-/// Converts text file formatted as ([value]:\n(x y z r\t)+)* to lists
-buffer<array<short3> > parseLists(const string& data) {
-    buffer<array<short3>> lists;
-    TextData s(data);
-    while(s) {
-        s.whileAny(" ,"_); uint value = s.integer(); s.skip(":"_);
-        if(!lists) lists = buffer<array<short3>>(value+1, value+1, 0);
-        array<short3>& list = lists[value];
-        while(s) {
-            s.whileAny(" "_); if(s.match('\n')) break;
-            s.whileAny(" ,"_); uint x=s.integer();
-            s.whileAny(" ,"_); uint y=s.integer();
-            s.whileAny(" ,"_); uint z=s.integer();
-            s.whileAny(" ,"_); s.integer();
-            list << short3(x,y,z);
-        }
-    }
-    return lists;
-}
 
 /// Set of points belonging together (clustered by maximum ball)
 typedef array<uint64> Family;

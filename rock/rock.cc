@@ -30,6 +30,7 @@
 //#include "cluster.h"
 //#include "family.h"
 // - Pores/throat analysis - //
+//#include "sphere.h"
 //#include "box.h"
 // - Export / View - //
 //#include "kernel-density-estimation.h"

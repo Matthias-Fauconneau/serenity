@@ -1,5 +1,5 @@
 /// \file list.cc Computes lists of positions for each value
-#include "sample.h"
+#include "list.h"
 #include "volume-operation.h"
 #include "thread.h"
 #include "crop.h"
@@ -46,10 +46,29 @@ String toASCII(const buffer<array<short3>>& lists) {
         const array<short3>& list = lists[value];
         if(!list.size) continue;
         text << str(value) << ": "_;
-        for(uint i: range(list.size)) { short3 p = list[i]; text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << " 1  "_; }
+        for(uint i: range(list.size)) { short3 p = list[i]; text << dec(p.x,3) << ' ' << dec(p.y,3) << ' ' << dec(p.z,3) << ' '; }
         text.last() = '\n'; // Replace trailing space
     }
     return text;
+}
+
+/// Converts text file formatted as ([value]:\n(x y z r\t)+)* to lists
+buffer<array<short3> > parseLists(const string& data) {
+    buffer<array<short3>> lists;
+    TextData s(data);
+    while(s) {
+        s.whileAny(" ,"_); uint value = s.integer(); s.skip(":"_);
+        if(!lists) lists = buffer<array<short3>>(value+1, value+1, 0);
+        array<short3>& list = lists[value];
+        while(s) {
+            s.whileAny(" "_); if(s.match('\n')) break;
+            s.whileAny(" ,"_); uint x=s.integer();
+            s.whileAny(" ,"_); uint y=s.integer();
+            s.whileAny(" ,"_); uint z=s.integer();
+            list << short3(x,y,z);
+        }
+    }
+    return lists;
 }
 
 /// Computes lists of positions for each value

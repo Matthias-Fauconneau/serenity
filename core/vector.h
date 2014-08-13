@@ -108,6 +108,8 @@ typedef vec<xyz,int,3> int3;
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
+/// Double precision floating-point x,y,z vector
+typedef vec<xyz,real,3> real3;
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 inline vec3 normal(vec3 v) {
     int index=0; float min=v[0];
