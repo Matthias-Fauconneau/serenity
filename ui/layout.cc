@@ -123,7 +123,7 @@ int2 GridLayout::sizeHint() {
     return size;
 }
 
-array<Rect> GridLayout::layout(int2 /*FIXME: assumes size==sizeHint*/) {
+array<Rect> GridLayout::layout(int2 size) {
     array<Rect> widgets(count());
     if(count()) {
         uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
@@ -150,7 +150,7 @@ array<Rect> GridLayout::layout(int2 /*FIXME: assumes size==sizeHint*/) {
             }
             heights[y] = maxY;
         }
-        mref<int>(widths, w).clear(max(ref<int>(widths,w))); // Uniform width
+        mref<int>(widths, w).clear(/*max(ref<int>(widths,w))*/size.x/w); // Uniform width
         int Y = 0;
         for(uint y : range(h)) {
             int X = 0;

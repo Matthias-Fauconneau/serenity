@@ -42,7 +42,7 @@ bool TextData::matchNo(const string& any) {
 }
 
 void TextData::skip(const string& key) {
-    if(!match(key)) error("'"_+key+"'"_, "'"_+line()+"'"_);
+    if(!match(key)) error("Expected '"_+key+"', got '"_+line()+"'"_);
 }
 
 string TextData::whileNot(char key) {

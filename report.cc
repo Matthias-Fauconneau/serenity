@@ -26,7 +26,7 @@ struct Document : Widget {
     //static_assert(pageHeight / (pageHeightMM / inchMM) > 300, ""); // 308.65
 
     const string font = "FreeSerif"_;
-    const float interlineStretch = 1; //4./3
+    const float interlineStretch = 4./3;
 
     TextData s;
 
@@ -52,15 +52,17 @@ struct Document : Widget {
     }
     Text& newText(string text, int size, bool center=true) { return element<Text>(text, size, 0, 1, contentSize.x, font, interlineStretch, center); }
 
-    String parseLine(TextData& s) {
+    String parseLine(TextData& s, string delimiter="\n"_, bool match=true) {
         String text;
-        while(s && !s.match('\n')) { // Line
+        while(s && !delimiter.contains(s.peek())) { // Line
             /**/ if(s.match('*')) text << (char)(TextFormat::Bold);
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) text << (char)(TextFormat::Italic);
             //else if(s.match('_')) userText << (char)(TextFormat::Underline);
+            else if(s.match('\\')) text << s.next();
             else text << s.next();
         }
+        if(match) s.advance(1);
         return text;
     }
 
@@ -78,13 +80,14 @@ struct Document : Widget {
             s.whileAny(" \n"_);
             if(s.match('(')) children << parseLayout(s);
             else {
-                string text = trim(s.whileNo("|-+)"_));
+                String text = simplify(parseLine(s, "|-+)"_, false));
                 assert_(text, s.line());
                 if(startsWith(text,"&"_)) {
                     string path = text.slice(1);
-                    /**/ if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
+                    /**/ if(existsFile(path)) images << unique<Image>(decodeImage(readFile(path)));
+                    else if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
                     else if(existsFile(path+".jpg"_)) images << unique<Image>(decodeImage(readFile(path+".jpg"_)));
-                    else error("Missing image", path);
+                    else log("Missing image", path);
                     children << &element<ImageWidget>(images.last());
                 } else {
                     children << &newText(text, textSize);
@@ -105,7 +108,7 @@ struct Document : Widget {
     void layoutPage(const Image& target) {
         elements.clear();
         images.clear();
-        VBox page (Linear::Center, Linear::Expand);
+        VBox page (pageIndex ? Linear::Share : Linear::Center, Linear::Expand);
 
         while(s) {
             if(s.match('%')) { // Comment
@@ -120,11 +123,19 @@ struct Document : Widget {
             }
 
             if(s.match('-')) { // List
+#if 1
                 VBox& list = element<VBox>(VBox::Even);
                 do {
                     list << &newText("- "_+parseLine(s), textSize, false);
                 } while(s.match('-'));
                 page << &list;
+#else
+                String list;
+                do {
+                    list << "- "_+parseLine(s)+"\n"_;
+                } while(s.match('-'));
+                page << &newText(list, textSize, false);
+#endif
                 continue;
             }
 
@@ -238,7 +249,9 @@ struct Document : Widget {
     void render() {
         clear();
         while(s && pageIndex < viewPageIndex) {
-            assert_( s.until("\n\n\n"_) );
+            // FIXME: parse levels
+            // FIXME: auto page break with quick layout for previous pages
+            s.until("\n\n\n"_);
             pageIndex++;
         }
         Image target (pageSize);
@@ -246,8 +259,6 @@ struct Document : Widget {
         while(s) {
             if(pageIndex > viewPageIndex) break;
             layoutPage(target);
-            //layoutPage(target); // FIXME: auto page break with quick layout for previous pages
-            //if(pageIndex < viewPageIndex) { pageIndex++; continue; }
             Image image = clip(this->target, int2((pageIndex-viewPageIndex)*(target.size().x/oversample),0)+Rect(target.size()/oversample));
             if(oversample==1) copy(image, target);
             else if(oversample>=2) {

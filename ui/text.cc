@@ -76,7 +76,7 @@ struct TextLayout {
         Text::Cursor underlineBegin;
         Word word;
         float penX = 0; // Word pen
-        penY = interline*font->ascender;
+        penY = /*interline**/font->ascender;
         uint i=0; for(; i<text.size; i++) {
             uint c = text[i];
             /**/ if(c==' ') penX += spaceAdvance;
@@ -142,7 +142,7 @@ struct TextLayout {
         }
         nextLine(false); // Clears any remaining words
         penY -= interline*size; // Reverts last line space
-        penY += interline*font->ascender; // Adds descender for correct inter widget line spacing
+        penY += /*interline**/font->ascender; // Adds descender for correct inter widget line spacing
     }
 };
 

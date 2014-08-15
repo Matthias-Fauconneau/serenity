@@ -11,7 +11,7 @@ enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflo
 void setExceptions(uint except);
 
 /// Logical cores count
-constexpr uint coreCount=8;
+constexpr uint coreCount=7;
 
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
