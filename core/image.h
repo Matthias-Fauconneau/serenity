@@ -59,6 +59,12 @@ inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.da
 /// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, Rect region);
 
+/// Transposes an image
+Image transpose(const Image& source);
+
+/// Rotates an image
+Image rotate(const Image& source);
+
 /// Downsamples an image by averaging samples
 void downsample(const Image& target, const Image& source);
 Image downsample(const Image& source);

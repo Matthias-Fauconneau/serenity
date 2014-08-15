@@ -12,21 +12,22 @@ struct Document : Widget {
     const int2 previewSize = oversample * windowSize;
 
     static constexpr bool showMargins = true;
-    const float margin = 1./10;
-    const int2 pageSize = oversample * int2(round(vec2(windowSize) * (1+(showMargins?0:2*margin))));
-    const int2 contentSize = oversample * int2(round(vec2(windowSize) * (1-(showMargins?2*margin:0))));
-
+    const int2 pageSize = oversample * windowSize; //int2(round(vec2(windowSize) * (1+(showMargins?0:2*margin))));
     static constexpr float pageHeightMM = 297;
+    const float pxMM = pageSize.y / pageHeightMM;
+    const float marginPx = 1.5 * inchMM * pxMM;
+    const int2 contentSize = pageSize - int2(2*marginPx); //oversample * int2(round(vec2(windowSize) * (1-(showMargins?2*margin:0))));
+
     static constexpr float pointMM = 0.3527;
-    const float point = pointMM * (pageSize.y * (1+2*margin)) / pageHeightMM;
-    const float textSize = 12 * point;
-    const float headerSize = 14 * point;
-    const float titleSize = 16 * point;
+    const float pointPx = pointMM * pxMM;
+    const float textSize = 12 * pointPx;
+    const float headerSize = 14 * pointPx;
+    const float titleSize = 16 * pointPx;
     static constexpr float inchMM = 25.4;
     //static_assert(pageHeight / (pageHeightMM / inchMM) > 300, ""); // 308.65
 
     const string font = "FreeSerif"_;
-    const float interlineStretch = 4./3;
+    const float interlineStretch = 3./2;
 
     TextData s;
 
@@ -82,12 +83,15 @@ struct Document : Widget {
             else {
                 String text = simplify(parseLine(s, "|-+)"_, false));
                 assert_(text, s.line());
-                if(startsWith(text,"&"_)) {
+                if(startsWith(text,"^"_) || startsWith(text,"&"_) || startsWith(text,"@"_)) {
                     string path = text.slice(1);
                     /**/ if(existsFile(path)) images << unique<Image>(decodeImage(readFile(path)));
                     else if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
                     else if(existsFile(path+".jpg"_)) images << unique<Image>(decodeImage(readFile(path+".jpg"_)));
                     else log("Missing image", path);
+                    if(startsWith(text,"@"_)) images.last() = unique<Image>(rotate(images.last()));
+                    if(startsWith(text,"^"_)) images.last() = unique<Image>(upsample(images.last()));
+                    else if(!(images.last()->size() <= contentSize)) images.last() = unique<Image>(downsample(images.last()));
                     children << &element<ImageWidget>(images.last());
                 } else {
                     children << &newText(text, textSize);
@@ -102,7 +106,7 @@ struct Document : Widget {
         if(type=='-') return &element<VBox>(move(children));
         else if(type=='|') return &element<HBox>(move(children));
         else if(type=='+') return &element<WidgetGrid>(move(children));
-        else { error(type, int(type), s.line()); assert_(children.size==1); return children.first(); }
+        else { assert_(children.size==1); return children.first(); }
     }
 
     void layoutPage(const Image& target) {
@@ -201,26 +205,25 @@ struct Document : Widget {
                 if(level && !target) tableOfContents << Entry{copy(levels), move(userText), (uint)pageIndex};
                 page << &newText(text, size, center);
             }
-            if(s.match('\n')) {
-                //if(pageIndex>0) page << &newText(dec(pageIndex)); //FIXME: should be outside content box
-                break; // Page break
-            }
+
+            if(s.match('\n')) break; // Page break
         }
         if(target) {
-            fill(target, Rect(target.size()), white);
             if(showMargins) {
-                int2 margin = int2(round(this->margin * vec2(target.size())));
-                Image inner = clip(target, Rect(margin, target.size()-margin));
+                //int2 margin = int2(round(this->margin * vec2(target.size())));
+                Image inner = clip(target, Rect(int2(marginPx,marginPx), target.size() - int2(marginPx,marginPx)));
+                fill(target, Rect(target.size()), !(page.sizeHint().y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
                 page.Widget::render(inner);
-                Image footer = clip(target, Rect(int2(0,target.size().y-margin.y),target.size()));
-                Text(dec(pageIndex), textSize, 0, 1, 0, font).Widget::render(footer);
+                Image footer = clip(target, Rect(int2(0, target.size().y - marginPx), target.size()));
+                if(pageIndex) Text(dec(pageIndex), textSize, 0, 1, 0, font).Widget::render(footer);
             } else {
+                fill(target, Rect(target.size()), !(page.sizeHint() <= target.size()) ? red : white);
                 page.Widget::render(target);
             }
         }
     }
 
-    int viewPageIndex = 0; //FIXME: persistent
+    int viewPageIndex = 23; //FIXME: persistent
     signal<int> pageChanged;
 
     bool keyPress(Key key, Modifiers) {
@@ -255,18 +258,14 @@ struct Document : Widget {
             pageIndex++;
         }
         Image target (pageSize);
-        renderBackground(target, White);
-        while(s) {
-            if(pageIndex > viewPageIndex) break;
-            layoutPage(target);
-            Image image = clip(this->target, int2((pageIndex-viewPageIndex)*(target.size().x/oversample),0)+Rect(target.size()/oversample));
-            if(oversample==1) copy(image, target);
-            else if(oversample>=2) {
-                for(int oversample=2; oversample<this->oversample; oversample*=2) target=downsample(target);
-                downsample(image, target);
-            }
-            pageIndex++;
+        layoutPage(target);
+        Image image = clip(this->target, int2((pageIndex-viewPageIndex)*(target.size().x/oversample),0)+Rect(target.size()/oversample));
+        if(oversample==1) copy(image, target);
+        else if(oversample>=2) {
+            for(int oversample=2; oversample<this->oversample; oversample*=2) target=downsample(target);
+            downsample(image, target);
         }
+        pageIndex++;
     }
 
     array<Image> renderPages() {

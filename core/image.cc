@@ -8,6 +8,29 @@ Image clip(const Image& image, Rect r) {
                  image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
 }
 
+Image transpose(const Image& source) {
+    int w=source.width, h=source.height;
+    Image target(h,w);
+    for(int y: range(h)) for(int x: range(w)) target(y, x) = source(x,y);
+    return target;
+}
+
+#if 0
+Image rotate(const Image& source) {
+    int w=source.width, h=source.height;
+    Image target(h,w);
+    for(int y: range(h)) for(int x: range(w)) target(h-y-1, x) = source(x,y);
+    return target;
+}
+#else
+Image rotate(const Image& source) {
+    int w=source.width, h=source.height;
+    Image target(h,w);
+    for(int y: range(h)) for(int x: range(w)) target(y, w-x-1) = source(x,y);
+    return target;
+}
+#endif
+
 Image upsample(const Image& source) {
     int w=source.width, h=source.height;
     Image target(w*2,h*2);
