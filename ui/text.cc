@@ -60,7 +60,7 @@ struct TextLayout {
                                     : !find(path,fontName+"."_); });
             if(!font) return 0;
             assert_(font.size==1, font);
-            fonts.insert(NameSize{fontName+fontType,size},Font(File(font.first(), fontFolder()), size));
+            fonts.insert(NameSize{fontName+fontType,size},Font(Map(font.first(), fontFolder()), size));
         }
         return &fonts.at(NameSize{fontName+fontType, size});
     }
@@ -169,7 +169,7 @@ void Text::layout() {
                 cursor = Cursor(textLines.size, textLine.size);
             }
             if(o.font) {
-                const Glyph& glyph=o.font->glyph(o.index,o.pos.x);
+                const Glyph& glyph=o.font->glyph(o.index /*,o.pos.x*/);
                 Character c{int2(o.pos)+glyph.offset, share(glyph.image), o.editIndex, int(o.pos.x+o.advance/2), (int)glyph.image.height, int(o.advance)};
                 textLine << move(c);
             } else { // Format character

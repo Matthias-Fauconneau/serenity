@@ -54,15 +54,16 @@ struct Document : Widget {
     Text& newText(string text, int size, bool center=true) { return element<Text>(text, size, 0, 1, contentSize.x, font, interlineStretch, center); }
 
     String parseLine(TextData& s, string delimiter="\n"_, bool match=true) {
-        String text;
+        String text; bool bold=false,italic=false;
         while(s && !delimiter.contains(s.peek())) { // Line
-            /**/ if(s.match('*')) text << (char)(TextFormat::Bold);
+            /**/ if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
             else if(s.match("//"_)) text << "/"_;
-            else if(s.match('/')) text << (char)(TextFormat::Italic);
-            //else if(s.match('_')) userText << (char)(TextFormat::Underline);
+            else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
             else if(s.match('\\')) text << s.next();
             else text << s.next();
         }
+        assert_(!bold, "Expected bold end delimiter *, got end of line");
+        assert_(!italic, "Expected italic end delimiter /, got end of line");
         if(match) s.advance(1);
         return text;
     }
