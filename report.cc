@@ -56,19 +56,57 @@ struct Document : Widget {
     }
     Text& newText(string text, int size, bool center=true) { return element<Text>(text, size, 0, 1, contentSize.x, font, interlineStretch, center); }
 
-    String parseLine(TextData& s, string delimiter="\n"_, bool match=true) {
+    String parseLine(TextData& s, ref<string> delimiters={"\n"_}, bool match=true) {
         String text; bool bold=false,italic=false;
-        while(s && !delimiter.contains(s.peek())) { // Line
+        for(;;) { // Line
+            assert_(s);
+            for(string delimiter: delimiters) {
+                if(s.peek(delimiter.size)==delimiter) {
+                    if(match) { assert_(delimiters.size==1 && delimiters[0].size == 1, delimiter); s.advance(delimiter.size); }
+                    assert_(!bold, "Expected bold end delimiter *, got end of line");
+                    assert_(!italic, "Expected italic end delimiter /, got end of line", text);
+                    return text;
+                }
+            }
+
             /**/ if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
             else if(s.match('\\')) text << s.next();
+            else if(s.match('_')) { text << (char)(TextFormat::SubscriptStart);
+                String subscript;
+                while(s) {
+                    ref<string> lefts {"["_,"("_,"{"_,"⌊"_};
+                    ref<string> rights{"]"_,")"_,"}"_,"⌋"_};
+                    for(int index: range(lefts.size)) {
+                        if(s.match(lefts[index])) {
+                            subscript << lefts[index];
+                            String content = parseLine(s, {rights[index]}, false);
+                            assert_(content);
+                            subscript << content;
+                            subscript << rights[index];
+                            goto break_;
+                        }
+                    } /*else*/ {
+                        byte c = s.peek();
+                        if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
+                        subscript << s.next(); //= s.identifier("+"); //s.whileNo(" ])/\n"_);
+                    }
+                    break_:;
+                }
+                assert_(s && subscript.size && subscript.size<=14, "Expected subscript end delimiter  _]), got end of document", "'"_+subscript.slice(0, min(subscript.size, 8ul))+"'"_, subscript.size, text);
+                text << subscript;
+                text << (char)(TextFormat::SubscriptEnd);
+            }
+            else if(s.match('^')) {
+                text << (char)(TextFormat::Superscript);
+                string superscript = s.identifier("-+,[]"_); //s.whileNo(" ^])/\n"_);
+                assert_(s && superscript.size && superscript.size<8, "Expected subscript end delimiter  ^]), got end of document", superscript, text);
+                text << superscript;
+                text << (char)(TextFormat::Superscript);
+            }
             else text << s.next();
         }
-        assert_(!bold, "Expected bold end delimiter *, got end of line");
-        assert_(!italic, "Expected italic end delimiter /, got end of line");
-        if(match) s.advance(1);
-        return text;
     }
 
     String parseParagraph(TextData& s) {
@@ -85,19 +123,20 @@ struct Document : Widget {
             s.whileAny(" \n"_);
             if(s.match('(')) children << parseLayout(s);
             else {
-                String text = simplify(parseLine(s, "|-+)"_, false));
-                assert_(text, s.line());
-                if(startsWith(text,"^"_) || startsWith(text,"&"_) || startsWith(text,"@"_)) {
-                    string path = text.slice(1);
+                if("^&@"_.contains(s.peek())) {
+                    string type = s.whileAny("^&@"_);
+                    string path = s.untilAny(" \t\n"_);
                     /**/ if(existsFile(path)) images << unique<Image>(decodeImage(readFile(path)));
                     else if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
                     else if(existsFile(path+".jpg"_)) images << unique<Image>(decodeImage(readFile(path+".jpg"_)));
-                    else log("Missing image", path);
-                    if(startsWith(text,"@"_)) images.last() = unique<Image>(rotate(images.last()));
-                    if(startsWith(text,"^"_)) images.last() = unique<Image>(upsample(images.last()));
+                    else error("Missing image", path);
+                    if(type=="@"_) images.last() = unique<Image>(rotate(images.last()));
+                    if(type=="^"_) images.last() = unique<Image>(upsample(images.last()));
                     else if(!(images.last()->size() <= contentSize)) images.last() = unique<Image>(downsample(images.last()));
                     children << &element<ImageWidget>(images.last());
                 } else {
+                    String text = simplify(parseLine(s, {"|"_,"-"_,"+"_,")"_}, false));
+                    assert_(text, s.line());
                     children << &newText(text, textSize);
                 }
             }

@@ -3,7 +3,7 @@
 #include "font.h"
 #include "utf8.h"
 
-struct NameSize { String name; int size; };
+struct NameSize { String name; float size; };
 bool operator ==(const NameSize& a, const NameSize& b) { return a.name == b.name && a.size == b.size; }
 string str(const NameSize& x) { return str(x.name, x.size); }
 static map<NameSize,Font> fonts; // Font cache
@@ -53,7 +53,7 @@ struct TextLayout {
         penY += interline*size;
     }
 
-    Font* getFont(string fontName, int size, string fontType=""_) {
+    Font* getFont(string fontName, float size, string fontType=""_) {
         if(!fonts.contains(NameSize{fontName+fontType, size})) {
             auto font = filter(fontFolder().list(Files|Recursive), [&](string path) {
                     return fontType ? !find(path, fontName+fontType+"."_) && !find(path, fontName+"-"_+fontType+"."_) && !find(path, fontName+"_"_+fontType+"."_)
@@ -65,15 +65,16 @@ struct TextLayout {
         return &fonts.at(NameSize{fontName+fontType, size});
     }
 
-    TextLayout(const ref<uint>& text, int size, int wrap, string fontName, float interline, bool justify=false):size(size), wrap(wrap), interline(interline) {
+    TextLayout(const ref<uint>& text, float size, int wrap, string fontName, float interline, bool justify=false):size(size), wrap(wrap), interline(interline) {
         Font* font = getFont(fontName, size);
         assert_(font, fontName, size);
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->advance(spaceIndex); assert(spaceAdvance);
         uint16 previous=spaceIndex;
-        bool bold=false, italic=false;//, underline=false;
+        bool bold=false, italic=false, /*underline=false,*/ /*subscript=false,*/ superscript=false;
+        int subscript = 0;
         Text::Link link;
-        Text::Cursor underlineBegin;
+        //Text::Cursor underlineBegin;
         Word word;
         float penX = 0; // Word pen
         penY = /*interline**/font->ascender;
@@ -101,21 +102,28 @@ struct TextLayout {
                 if(c=='\n') nextLine(false);
                 continue;
             }
+            const float subscriptScale = 1, superscriptScale = subscriptScale;
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
                 //if(link) { link.end=current(); links << move(link); }
-                TextFormat format = ::format(c);
-                /**/ if(format==Bold) bold=!bold;
-                else if(format==Italic) italic=!italic;
+                //TextFormat format = ::format(c);
+                /**/ if(c==Bold) bold=!bold;
+                else if(c==Italic) italic=!italic;
+                //else if(format==Subscript) subscript=!subscript;
+                else if(c==SubscriptStart) subscript++;
+                else if(c==SubscriptEnd) { subscript--; assert_(subscript>=0); }
+                else if(c==Superscript) superscript=!superscript;
                 //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
-                else error(int(format));
+                else error(c);
                 /**/ if(bold && italic) font = getFont(fontName, size, "BoldItalic"_) ?: getFont(fontName, size, "Bold Italic"_);
                 else if(bold) font = getFont(fontName, size, "Bold"_);
                 else if(italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
+                else if(subscript) font = getFont(fontName, size*pow(subscriptScale, subscript));
+                else if(superscript) font = getFont(fontName, size*superscriptScale);
                 else font = getFont(fontName, size);
                 assert_(font, fontName, bold, italic);
-                if(format&Underline) underlineBegin=current();
-                if(format&Link) {
+                //if(format&Underline) underlineBegin=current();
+                /*if(format&Link) {
                     for(;;) {
                         i++; assert(i<text.size);
                         uint c = text[i];
@@ -123,7 +131,7 @@ struct TextLayout {
                         link.identifier << utf8(c);
                     }
                     link.begin = current();
-                }
+                }*/
                 continue;
             }
             uint16 index = font->index(c);
@@ -131,7 +139,10 @@ struct TextLayout {
             previous = index;
             float advance = font->advance(index);
             Glyph glyph = font->glyph(index);
-            if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(penX,0), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
+            float yOffset = 0;
+            if(subscript) yOffset += size * pow(subscriptScale, subscript);
+            if(superscript) yOffset -= size * superscriptScale/2;
+            if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(penX,yOffset), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
             penX += advance;
         }
         if(word) {
