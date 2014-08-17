@@ -37,7 +37,7 @@ struct Font {
     float kerning(uint leftIndex, uint rightIndex);
     /// Caches and returns glyph for \a index at position \a x
     /// \a x fractional part is used to return subpixel positionned images
-    const Glyph& glyph(uint index);
+    Glyph glyph(uint index);
     /// Renders glyph \a index with transformation matrix \a xx, xy, yx, yy, dx, dy into \a raster
     void render(struct Bitmap& raster, int index, int& xMin, int& xMax, int& yMin, int& yMax, int xx, int xy, int yx, int yy, int dx, int dy);
 

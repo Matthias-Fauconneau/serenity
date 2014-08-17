@@ -52,18 +52,18 @@ vec2 Font::size(uint index) {
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
 }
 
-const Glyph& Font::glyph(uint index) {
+Glyph Font::glyph(uint index) {
     {const Glyph* glyph = cache.find(index);
-        if(glyph) return *glyph;}
+        if(glyph) return {glyph->offset, share(glyph->image)};}
     Glyph& glyph = cache.insert(index);
     FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;
-    if(!bitmap.buffer) return glyph;
+    if(!bitmap.buffer) { return {glyph.offset, share(glyph.image)}; }
     int width = bitmap.width, height = bitmap.rows;
     Image image(width, height, true, false);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0xFF,0xFF,0xFF,bitmap.buffer[y*bitmap.pitch+x]);
     glyph.image = move(image);
-    return glyph;
+    return {glyph.offset, share(glyph.image)};
 }

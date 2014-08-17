@@ -15,7 +15,7 @@ struct TextLayout {
     float interline;
     float spaceAdvance;
     float penY=0;
-    struct Character { Font* font; vec2 pos; uint index; uint width; float advance; uint editIndex; };
+    struct Character { /*Font* font;*/ Glyph glyph; vec2 pos; /*uint index;*/ uint width; float advance; uint editIndex; };
     typedef array<Character> Word;
     array<Word> words;
     typedef array<Character> TextLine;
@@ -42,7 +42,7 @@ struct TextLayout {
         lineNumber++; text << TextLine();
         for(uint i: range(words.size)) { Word& word=words[i];
             assert_(word);
-            for(Character& c: word) text.last() << Character{c.font, vec2(penX,penY)+c.pos, c.index, 0, c.advance, lastIndex=c.editIndex};
+            for(Character& c: word) text.last() << Character{{c.glyph.offset, share(c.glyph.image)},/*c.font,*/ vec2(penX,penY)+c.pos, /*c.index,*/ 0, c.advance, lastIndex=c.editIndex};
             maxLength = max(maxLength, penX+word.last().pos.x+word.last().width);
             penX += word.last().pos.x + word.last().advance;
             //if(i!=words.size-1) text.last() << Character{0,vec2(penX, penY),0,0,spaceAdvance,lastIndex=lastIndex+1}; // Editable justified space
@@ -130,8 +130,8 @@ struct TextLayout {
             if(previous!=spaceIndex) penX += font->kerning(previous,index);
             previous = index;
             float advance = font->advance(index);
-            const Glyph& glyph = font->glyph(index);
-            if(glyph.image) { word << Character{font, vec2(penX,0), index, glyph.offset.x+glyph.image.width, advance, i}; column++; }
+            Glyph glyph = font->glyph(index);
+            if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(penX,0), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
             penX += advance;
         }
         if(word) {
@@ -168,9 +168,9 @@ void Text::layout() {
             if(currentIndex<=editIndex) { // Restores cursor after relayout
                 cursor = Cursor(textLines.size, textLine.size);
             }
-            if(o.font) {
-                const Glyph& glyph=o.font->glyph(o.index /*,o.pos.x*/);
-                Character c{int2(o.pos)+glyph.offset, share(glyph.image), o.editIndex, int(o.pos.x+o.advance/2), (int)glyph.image.height, int(o.advance)};
+            if(/*o.font*/o.glyph.image) {
+                //Glyph glyph = o.font->glyph(o.index /*,o.pos.x*/);
+                Character c{int2(o.pos)+o.glyph.offset, share(o.glyph.image), o.editIndex, int(o.pos.x+o.advance/2), (int)o.glyph.image.height, int(o.advance)};
                 textLine << move(c);
             } else { // Format character
                 textLine << Character{int2(o.pos),Image(),o.editIndex,int(o.pos.x+o.advance/2), this->size, int(o.advance)};
@@ -183,14 +183,14 @@ void Text::layout() {
     if(!text.size) { assert(editIndex==0); cursor = Cursor(0,0); }
     else if(currentIndex<=editIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } // End of text
     links = move(layout.links);
-    for(TextLayout::Line layoutLine: layout.lines) {
+    for(TextLayout::Line& layoutLine: layout.lines) {
         for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
-            const TextLayout::TextLine& textLine = layout.text[line];
+            TextLayout::TextLine& textLine = layout.text[line];
             if(layoutLine.begin.column<textLine.size) {
-                TextLayout::Character first = (line==layoutLine.begin.line) ? textLine[layoutLine.begin.column] : textLine.first();
-                TextLayout::Character last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size) ? textLine[layoutLine.end.column] : textLine.last();
+                TextLayout::Character& first = line==layoutLine.begin.line ? textLine[layoutLine.begin.column] : textLine.first();
+                TextLayout::Character& last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size) ? textLine[layoutLine.end.column] : textLine.last();
                 assert(first.pos.y == last.pos.y);
-                lines << Line{ int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.font?last.font->advance(last.index):0,2))};
+                lines << Line{ int2(first.pos+vec2(0,1)), int2(last.pos+vec2(/*last.font?last.font->advance(last.index):0*/last.advance,2))};
             }
         }
     }

@@ -40,6 +40,9 @@ struct Document : Widget {
     struct Entry { array<uint> levels; String name; uint page; };
     array<Entry> tableOfContents;
 
+    int viewPageIndex = 4; //FIXME: persistent
+    signal<int> pageChanged;
+
     Document(string source) : s(filter(source, [](char c) { return c=='\r'; })) {
         while(s) { layoutPage(Image()); pageIndex++; } // Generates table of contents
         pageCount=pageIndex;
@@ -224,9 +227,6 @@ struct Document : Widget {
         }
     }
 
-    int viewPageIndex = 23; //FIXME: persistent
-    signal<int> pageChanged;
-
     bool keyPress(Key key, Modifiers) {
         /**/ if(key == LeftArrow) viewPageIndex = max(0, viewPageIndex-1);
         else if(key == RightArrow) viewPageIndex = min(pageCount-1, viewPageIndex+1);
@@ -284,17 +284,19 @@ struct Document : Widget {
     void writePages() {
         clear();
         array<String> args;
+        Folder folder("Rapport.out"_, home(), true);
         while(s) {
             Image target (pageSize);
             layoutPage(target);
             log(pageIndex);
-            writeFile(dec(pageIndex),encodePNG(target));
+            writeFile(dec(pageIndex),encodePNG(target),folder);
             args << dec(pageIndex);
             pageIndex++;
         }
         args << String("rapport.pdf"_);
         log("PDF");
-        execute(which("convert"_),toRefs(args));
+        execute(which("convert"_),toRefs(args),true,folder);
+        log("Done");
     }
 };
 
