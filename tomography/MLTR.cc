@@ -22,6 +22,6 @@ void MLTR::step() {
     const ImageArray& w = r; // Reuse for normalization
     time += mulexp(w, Ai[subsetIndex], Ax); // w = Ai exp(-Ax) FIXME: compute exp(-Ax) once
     time += backproject(Atw, subsets[subsetIndex].At, w); // Atw = At w
-    time += adddiv(x, x, Atr, Atw);
+    time += adddiv(x, x, Atr, Atw); // x += Atr / Atw
     this->subsetIndex = (this->subsetIndex+1)%subsetCount; // Ordered subsets (FIXME: better scheduler)
 }

@@ -20,7 +20,7 @@ struct PorousRock {
     const double photonEnergy = 40.0; // [keV]
     const double electronEnergy = 511; // Electron rest mass mₑ [keV]
     const double alpha = photonEnergy/electronEnergy; // hν/mc²
-    const double S = (1+alpha)/sq(alpha)*(2*(1+alpha)/(1+2*alpha) - ln(1+2*alpha)/alpha) + ln(1+2*alpha)/(2*alpha) - (1.+3.*alpha)/sq(1+2*alpha); // Scattering coefficient (Klein-Nishina 1928)
+    const double S = (1+alpha)/sq(alpha)*(2*(1+alpha)/(1+2*alpha) - ln(1+2*alpha)/alpha) + ln(1+2*alpha)/(2*alpha) - (1+3*alpha)/sq(1+2*alpha); // Scattering coefficient (Klein-Nishina 1928)
     const double K2 = 0.0097; // Experiment dependent empirical constant [m²/kg]
     const double B = K2*S; // Attenuation coefficient from Compton scattering (Alvarez 1976) [m²?] (Z/A?)
     // Materials

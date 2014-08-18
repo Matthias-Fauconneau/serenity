@@ -45,7 +45,7 @@ struct Compute {
             rock.project(projection, A, index);
             const float photonCount = parameters.value("photonCount"_, 0);
             assert_(photonCount);
-            for(float& v: projection.data) v = (poisson(photonCount) * exp(-v)) / photonCount;
+            for(float& v: projection.data) v = poisson(photonCount * exp(-v)) / photonCount;
             Image target ( A.projectionSize.xy() );
             convert(target, projection); // Normalizes each slice by its maximum value
             writeFile(str(photonCount,index)+".png"_, encodePNG(target));
@@ -73,7 +73,7 @@ struct Compute {
                     ImageF projection = slice(projections, index);
                     rock.project(projection, A, index);
                     const float photonCount = parameters.value("photonCount"_,0);
-                    if(photonCount) for(uint i: range(projection.data.size)) projection.data[i] = (poisson(photonCount) * exp(-projection.data[i])) / float(photonCount);
+                    if(photonCount) for(uint i: range(projection.data.size)) projection.data[i] = poisson(photonCount * exp(-projection.data[i])) / float(photonCount);
                     else for(uint i: range(projection.data.size)) projection.data[i] = exp(-projection.data[i]);
                     convert(target, projection); // Normalizes each slice by its maximum value
                     writeFile(dec(index), encodePNG(target), folder);
@@ -197,7 +197,7 @@ struct Compute {
                     intensity0 = VolumeF(attenuation0.size, "intensity0"_);
                     log_("Poisson noise ["_+str(maxProjectionCount)+"]... "_);
                     Time time; poissonTime.start();
-                    if(photonCount) for(uint i: range(intensity0.data.size)) intensity0.data[i] = (poisson(photonCount) * exp(-attenuation0.data[i])) / float(photonCount);
+                    if(photonCount) for(uint i: range(intensity0.data.size)) intensity0.data[i] = poisson(photonCount * exp(-attenuation0.data[i])) / float(photonCount);
                     else for(uint i: range(intensity0.data.size)) intensity0.data[i] = exp(-attenuation0.data[i]);
                     poissonTime.stop(); log(time);
                     intensity0Key = move(key);
