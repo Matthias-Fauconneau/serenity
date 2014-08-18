@@ -347,9 +347,10 @@ uint Window::KeyCode(Key sym) {
     for(uint i: range(minKeyCode,maxKeyCode+1)) if(KeySym(i,0)==sym) { keycode=i; break;  }
     if(!keycode) {
         if(sym==Play) return 172; //FIXME
-        if(sym==F8) return 74; //FIXME
+        if(sym==Media) return 234; //FIXME
+        /*if(sym==F8) return 74; //FIXME
         if(sym==F9) return 75; //FIXME
-        if(sym==F10) return 76; //FIXME
+        if(sym==F10) return 76; //FIXME*/
         log("Unknown KeySym",int(sym)); return sym; }
     return keycode;
 }

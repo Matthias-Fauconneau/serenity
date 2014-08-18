@@ -17,7 +17,7 @@ enum Key {
     F1=0xffbe,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11,
     ShiftKey=0xffe1, ControlKey=0xffe3,
     Delete=0xffff,
-    Play=0x1008ff14, WWW=0x1008ff18, Email=0x1008ff19,
+    Play=0x1008ff14, Media=0x1008ff32
 #else
     None, Escape, _1,_2,_3,_4,_5,_6,_7,_8,_9,_0, Minus, Equal, Backspace, Tab, Q,W,E,R,T,Y,U,I,O,P, LeftBrace, RightBrace, Return, LeftCtrl,
     A,S,D,F,G,H,J,K,L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z,X,C,V,B,N,M, Comma, Dot, Slash, RightShift, KP_Asterisk, LeftAlt,
