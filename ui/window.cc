@@ -164,30 +164,17 @@ void Window::putImage(const Image& target) {
 }
 
 void Window::putImage(Rect rect) {
-    assert(state == Idle);
+    //assert(state == Idle);
     if(state != Idle) return;
     pixmap = pixmap==Pixmap2 ? Pixmap : Pixmap2; // Double buffer
     if(rect==Rect(0) || lastUpdate>rect) rect=Rect(lastUpdate);
     assert_(id); assert_(rect.size());
-    /*if(remote) {
-        Image target = share(this->target);
-        if(rect != Rect(target.size())) {
-            target = Image(rect.size());
-            copy(target, clip(this->target, rect));
-        }
-        assert_(target.buffer.size == (size_t)target.size().x*target.size().y);
-        ::PutImage r; r.drawable=id+XWindow; r.context=id+GContext; r.w=target.size().x, r.h=target.size().y; r.x=rect.min.x, r.y=rect.min.y; r.size += target.buffer.size;
-        assert_(raw(r).size + cast<byte>(target.buffer).size == r.size*4);
-        send(String(raw(r)+cast<byte>(target.buffer)));
-        assert_(r.size <= maximumRequestLength, r.size, maximumRequestLength);
-    } else*/ {
-        Shm::PutImage r; r.window=id+pixmap; r.context=id+GContext; r.seg=id+Segment;
-        r.totalW=target.stride; r.totalH=target.height;
-        r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
-        r.dstX = rect.position().x, r.dstY = rect.position().y;
-        send(raw(r));
-        state=Server;
-    }
+    Shm::PutImage r; r.window=id+pixmap; r.context=id+GContext; r.seg=id+Segment;
+    r.totalW=target.stride; r.totalH=target.height;
+    r.srcX = rect.position().x, r.srcY = rect.position().y, r.srcW=rect.size().x; r.srcH=rect.size().y;
+    r.dstX = rect.position().x, r.dstY = rect.position().y;
+    send(raw(r));
+    state=Server;
     lastUpdate = rect;
 }
 
@@ -370,6 +357,7 @@ uint Window::KeyCode(Key sym) {
 function<void()>& Window::globalAction(Key key) {
     uint code = KeyCode(key);
     if(code){GrabKey r; r.window=root; r.keycode=code; send(raw(r));}
+    else error("No such key", key);
     return actions.insert(key, []{});
 }
 

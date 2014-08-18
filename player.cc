@@ -128,7 +128,7 @@ struct Player {
         window.longActions[Power] = [this](){ window.setDisplay(false); execute("/sbin/poweroff"_); };
 #else
         window.globalAction(Play) = {this, &Player::togglePlay};
-        window.globalAction(F8) = {this, &Player::togglePlay}; // Chromebook Mute
+        //window.globalAction(F8) = {this, &Player::togglePlay}; // Chromebook Mute
         //window.globalAction(F9) = [this]{  volume=volume-1; }; // Chromebook Decrease volume (handled by kmix)
         //window.globalAction(F10) = [this]{ volume=volume+1; }; // Chromebook Increase volume (handled by kmix)
         window.actions.insert(RightArrow, {this, &Player::next});

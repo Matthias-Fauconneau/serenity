@@ -80,13 +80,15 @@ struct Vertical : virtual Linear {
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : Horizontal, Widgets {
-    HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
     HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
+    HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
+    HBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(array<Widget*>(widgets)){}
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
-    VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
     VBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
+    VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
+    VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(array<Widget*>(widgets)){}
 };
 /// Horizontal layout of homogenous items. \sa Array
 template<class T> struct HList : Horizontal, Array<T> {
