@@ -40,7 +40,7 @@ struct Document : Widget {
     struct Entry { array<uint> levels; String name; uint page; };
     array<Entry> tableOfContents;
 
-    int viewPageIndex = 4; //FIXME: persistent
+    int viewPageIndex = 9; //FIXME: persistent
     signal<int> pageChanged;
 
     Document(string source) : s(filter(source, [](char c) { return c=='\r'; })) {
@@ -68,9 +68,10 @@ struct Document : Widget {
             else if(s.match('\\')) text << s.next();
             else if(s.match('_')) { text << (char)(TextFormat::SubscriptStart);
                 String subscript;
+                subscript << s.next();
                 for(;;) {
                     assert_(s, subscript);
-                    if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
+                    if(s.wouldMatchAny(delimiters)) break;
                     else {
                         ref<string> lefts {"["_,"{"_,"⌊"_}; //"("_,
                         ref<string> rights{"]"_,"}"_,"⌋"_}; //")"_,
@@ -84,7 +85,7 @@ struct Document : Widget {
                                 goto break_;
                             }
                         } /*else*/
-                        if(s.wouldMatchAny(" ()^/"_) || s.wouldMatchAny({"·"_})) break; //if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
+                        if(s.wouldMatchAny(" \t\n,()^/+|"_) || s.wouldMatchAny({"·"_})) break; //if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
                         else subscript << s.next(); //= s.identifier("+"); //s.whileNo(" ])/\n"_);
                         break_:;
                     }

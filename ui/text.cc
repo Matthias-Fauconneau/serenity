@@ -17,6 +17,9 @@ struct TextLayout {
     float penY=0;
     struct Character { /*Font* font;*/ Glyph glyph; vec2 pos; /*uint index;*/ uint width; float advance; uint editIndex; };
     typedef array<Character> Word;
+    float width(const Word& word) { float max=0; for(const Character& c : word) max=::max(max, c.pos.x + c.width); return max; }
+    float advance(const Word& word) { float max=0; for(const Character& c : word) max=::max(max, c.pos.x + c.advance); return max; }
+
     array<Word> words;
     typedef array<Character> TextLine;
     array<TextLine> text;
@@ -31,8 +34,8 @@ struct TextLayout {
     float maxLength = 0;
     void nextLine(bool justify) {
         // Justifies
-        float length=0; for(const Word& word: words) { assert_(word,"J"_); length += word.last().pos.x + word.last().advance; } // Sums word lengths
-        if(words && words.last()) length += -words.last().last().advance + words.last().last().width; // For last word of line, use last character width instead of advance
+        float length=0; for(const Word& word: words) { assert_(word,"J"_); length += advance(word); } // Sums word lengths
+        if(words && words.last()) length += -advance(words.last()) + width(words.last()); // For last word of line, use last character width instead of advance
         float space=0;
         if(justify && words.size>1) space = (wrap-length)/(words.size-1);
         else space = spaceAdvance;
@@ -43,8 +46,8 @@ struct TextLayout {
         for(uint i: range(words.size)) { Word& word=words[i];
             assert_(word);
             for(Character& c: word) text.last() << Character{{c.glyph.offset, share(c.glyph.image)},/*c.font,*/ vec2(penX,penY)+c.pos, /*c.index,*/ 0, c.advance, lastIndex=c.editIndex};
-            maxLength = max(maxLength, penX+word.last().pos.x+word.last().width);
-            penX += word.last().pos.x + word.last().advance;
+            maxLength = max(maxLength, penX+width(word));
+            penX += advance(word);
             //if(i!=words.size-1) text.last() << Character{0,vec2(penX, penY),0,0,spaceAdvance,lastIndex=lastIndex+1}; // Editable justified space
             penX += space;
         }
@@ -73,7 +76,7 @@ struct TextLayout {
         uint16 previous=spaceIndex;
         bool bold=false, italic=false, /*underline=false,*/ /*subscript=false,*/ superscript=false;
         int subscript = 0;
-        Text::Link link;
+        //Text::Link link;
         //Text::Cursor underlineBegin;
         Word word;
         float penX = 0 , subscriptPen = 0; // Word pen
@@ -86,22 +89,7 @@ struct TextLayout {
         }
         for(; i<text.size; i++) {
             uint c = text[i];
-            if((c==' '||c=='\t'||c=='\n') && !subscript) { // Next word/line
-                column++;
-                previous = spaceIndex;
-                if(word) {
-                    if(words) {
-                        float length = 0; for(const Word& word: words) { assert_(word,"J",toUTF8(text)); length += word.last().pos.x + word.last().advance + spaceAdvance; }
-                        //assert_(length-word.last().advance-spaceAdvance+word.last().width <= wrap, length, length-word.last().advance-spaceAdvance+word.last().width, wrap, words.size);
-                        length += word.last().pos.x + word.last().width; // Next word
-                        //log("expect", length);
-                        if(wrap && length > wrap && words) nextLine(justify); // would not fit
-                    }
-                    words << move(word); penX = 0; subscriptPen=0; // Add to current line (might be first of a new line)
-                }
-                if(c=='\n') nextLine(false);
-                continue;
-            }
+
             const float subscriptScale = 7./8, superscriptScale = subscriptScale;
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
@@ -134,17 +122,36 @@ struct TextLayout {
                 }*/
                 continue;
             }
+
+            if(!subscript && !superscript) penX = max(subscriptPen, penX);
+
+            if((c==' '||c=='\t'||c=='\n') && !subscript) { // Next word/line
+                column++;
+                previous = spaceIndex;
+                if(word) {
+                    if(words) {
+                        float length = 0;
+                        for(const Word& word: words) length += advance(word) + spaceAdvance;
+                        length += width(word); // Next word
+                        //log("expect", length);
+                        if(wrap && length > wrap && words) nextLine(justify); // would not fit
+                    }
+                    words << move(word); penX = 0; subscriptPen=0; // Add to current line (might be first of a new line)
+                }
+                if(c=='\n') nextLine(false);
+                continue;
+            }
+
             uint16 index = font->index(c);
             if(previous!=spaceIndex) penX += font->kerning(previous,index);
             previous = index;
             float advance = font->advance(index);
             Glyph glyph = font->glyph(index);
             float yOffset = 0;
-            if(subscript) yOffset += size * pow(subscriptScale, subscript)/2;
+            if(subscript) yOffset += size * pow(subscriptScale, subscript)/3;
             if(superscript) yOffset -= size * superscriptScale/2;
             if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(subscript ? subscriptPen : penX, yOffset), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
             (subscript ? subscriptPen : penX) += advance;
-            if(!subscript && !superscript) penX = max(subscriptPen, penX);
         }
         if(word) {
             float length=0; for(const Word& word: words) if(word) length += word.last().pos.x + word.last().advance + spaceAdvance;
