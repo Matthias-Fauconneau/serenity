@@ -98,12 +98,12 @@ struct TextLayout {
                 /**/ if(c==Bold) bold=!bold;
                 else if(c==Italic) italic=!italic;
                 //else if(format==Subscript) subscript=!subscript;
-                else if(c==SubscriptStart) subscript++;
+                else if(c==SubscriptStart) { subscript++; if(subscript==1) subscriptPen=penX; }
                 else if(c==SubscriptEnd) { subscript--; assert_(subscript>=0); }
                 else if(c==Superscript) superscript=!superscript;
                 //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
                 else error(c);
-                /**/ if(subscript) { font = getFont(fontName, size*pow(subscriptScale, subscript)); if(subscript==1) subscriptPen=penX; }
+                /**/ if(subscript) { font = getFont(fontName, size*pow(subscriptScale, subscript)); }
                 else if(superscript) font = getFont(fontName, size*superscriptScale);
                 else if(bold && italic) font = getFont(fontName, size, "BoldItalic"_) ?: getFont(fontName, size, "Bold Italic"_);
                 else if(bold) font = getFont(fontName, size, "Bold"_);
@@ -150,6 +150,7 @@ struct TextLayout {
             float yOffset = 0;
             if(subscript) yOffset += size * pow(subscriptScale, subscript)/3;
             if(superscript) yOffset -= size * superscriptScale/2;
+            if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yOffset += size/3; // Fixes too high floor signs from FreeSerif
             if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(subscript ? subscriptPen : penX, yOffset), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
             (subscript ? subscriptPen : penX) += advance;
         }

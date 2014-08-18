@@ -18,8 +18,8 @@ void TextData::advance(uint step) {
     for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
 }
 
-bool TextData::match(char key) {
-    if(available(1) && peek() == key) { advance(1); return true; }
+bool TextData::wouldMatch(char key) {
+    if(available(1) && peek() == key) return true;
     else return false;
 }
 
@@ -40,16 +40,20 @@ string TextData::wouldMatchAny(const ref<string>& keys) {
     return ""_;
 }
 
+bool TextData::match(char key) {
+    if(wouldMatch(key)) { advance(1); return true; }
+    else return false;
+}
+
 bool TextData::match(const string& key) {
     if(wouldMatch(key)) { advance(key.size); return true; }
     else return false;
 }
 
 char TextData::matchAny(const string& any) {
-    if(!available(1)) return false;
-    byte c=peek();
-    for(const byte& e: any) if(c == e) { advance(1); return c; }
-    return 0;
+    char c = wouldMatchAny(any);
+    if(c) advance(1);
+    return c;
 }
 
 string TextData::matchAny(const ref<string>& keys) {

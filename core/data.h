@@ -143,6 +143,8 @@ struct TextData : Data {
     void advance(uint step) /*override*/;
 
     /// Returns whether input match \a key
+    bool wouldMatch(char key);
+    /// Returns whether input match \a key
     bool wouldMatch(const string& key);
     /// Returns whether input match any of \a keys
     char wouldMatchAny(const string& any);
