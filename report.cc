@@ -95,7 +95,7 @@ struct Document : Widget {
             }
             else if(s.match('^')) {
                 text << (char)(TextFormat::Superscript);
-                string superscript = s.whileNo(" ^])/\n"_); //s.identifier("-+,[]"_); //s.whileNo(" ^])/\n"_);
+                string superscript = s.whileNo(" ^)/\n"_); //s.identifier("-+,[]"_); //s.whileNo(" ^])/\n"_);
                 assert_(s && superscript.size && superscript.size<=14, "Expected superscript end delimiter  ^]), got end of document", superscript, superscript.size, text);
                 text << superscript;
                 text << (char)(TextFormat::Superscript);

@@ -76,7 +76,7 @@ struct TextLayout {
         Text::Link link;
         //Text::Cursor underlineBegin;
         Word word;
-        float penX = 0; // Word pen
+        float penX = 0 , subscriptPen = 0; // Word pen
         penY = /*interline**/font->ascender;
         uint i=0; for(; i<text.size; i++) {
             uint c = text[i];
@@ -86,7 +86,7 @@ struct TextLayout {
         }
         for(; i<text.size; i++) {
             uint c = text[i];
-            if(c==' '||c=='\t'||c=='\n' /*c<=' '*/) { // Next word/line
+            if((c==' '||c=='\t'||c=='\n') && !subscript) { // Next word/line
                 column++;
                 previous = spaceIndex;
                 if(word) {
@@ -97,7 +97,7 @@ struct TextLayout {
                         //log("expect", length);
                         if(wrap && length > wrap && words) nextLine(justify); // would not fit
                     }
-                    words << move(word); penX = 0; // Add to current line (might be first of a new line)
+                    words << move(word); penX = 0; subscriptPen=0; // Add to current line (might be first of a new line)
                 }
                 if(c=='\n') nextLine(false);
                 continue;
@@ -115,11 +115,11 @@ struct TextLayout {
                 else if(c==Superscript) superscript=!superscript;
                 //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
                 else error(c);
-                /**/ if(bold && italic) font = getFont(fontName, size, "BoldItalic"_) ?: getFont(fontName, size, "Bold Italic"_);
+                /**/ if(subscript) { font = getFont(fontName, size*pow(subscriptScale, subscript)); if(subscript==1) subscriptPen=penX; }
+                else if(superscript) font = getFont(fontName, size*superscriptScale);
+                else if(bold && italic) font = getFont(fontName, size, "BoldItalic"_) ?: getFont(fontName, size, "Bold Italic"_);
                 else if(bold) font = getFont(fontName, size, "Bold"_);
                 else if(italic) font = getFont(fontName, size, "Oblique"_) ?: getFont(fontName, size, "Italic"_);
-                else if(subscript) font = getFont(fontName, size*pow(subscriptScale, subscript));
-                else if(superscript) font = getFont(fontName, size*superscriptScale);
                 else font = getFont(fontName, size);
                 assert_(font, fontName, bold, italic);
                 //if(format&Underline) underlineBegin=current();
@@ -142,14 +142,15 @@ struct TextLayout {
             float yOffset = 0;
             if(subscript) yOffset += size * pow(subscriptScale, subscript)/2;
             if(superscript) yOffset -= size * superscriptScale/2;
-            if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(penX,yOffset), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
-            penX += advance;
+            if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(subscript ? subscriptPen : penX, yOffset), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
+            (subscript ? subscriptPen : penX) += advance;
+            if(!subscript && !superscript) penX = max(subscriptPen, penX);
         }
         if(word) {
             float length=0; for(const Word& word: words) if(word) length += word.last().pos.x + word.last().advance + spaceAdvance;
             length += word.last().pos.x + word.last().width; // Last word
             if(wrap && length>wrap) nextLine(justify); // would not fit
-            words << move(word); penX = 0; // Adds to current line (might be first of new line)
+            words << move(word); penX = 0; subscriptPen=0; // Adds to current line (might be first of new line)
         }
         nextLine(false); // Clears any remaining words
         penY -= interline*size; // Reverts last line space
