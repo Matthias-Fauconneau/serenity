@@ -23,16 +23,38 @@ bool TextData::match(char key) {
     else return false;
 }
 
-bool TextData::match(const string& key) {
-    if(available(key.size)>=key.size && peek(key.size) == key) { advance(key.size); return true; }
+bool TextData::wouldMatch(const string& key) {
+    if(available(key.size)>=key.size && peek(key.size) == key) return true;
     else return false;
 }
 
-bool TextData::matchAny(const string& any) {
+char TextData::wouldMatchAny(const string& any) {
     if(!available(1)) return false;
     byte c=peek();
-    for(const byte& e: any) if(c == e) { advance(1); return true; }
-    return false;
+    for(const byte& e: any) if(c == e) return c;
+    return 0;
+}
+
+string TextData::wouldMatchAny(const ref<string>& keys) {
+    for(string key: keys) if(wouldMatch(key)) return key;
+    return ""_;
+}
+
+bool TextData::match(const string& key) {
+    if(wouldMatch(key)) { advance(key.size); return true; }
+    else return false;
+}
+
+char TextData::matchAny(const string& any) {
+    if(!available(1)) return false;
+    byte c=peek();
+    for(const byte& e: any) if(c == e) { advance(1); return c; }
+    return 0;
+}
+
+string TextData::matchAny(const ref<string>& keys) {
+    for(string key: keys) if(match(key)) return key;
+    return ""_;
 }
 
 bool TextData::matchNo(const string& any) {

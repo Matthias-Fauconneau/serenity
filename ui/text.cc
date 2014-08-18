@@ -102,7 +102,7 @@ struct TextLayout {
                 if(c=='\n') nextLine(false);
                 continue;
             }
-            const float subscriptScale = 1, superscriptScale = subscriptScale;
+            const float subscriptScale = 7./8, superscriptScale = subscriptScale;
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
                 //if(link) { link.end=current(); links << move(link); }
@@ -140,7 +140,7 @@ struct TextLayout {
             float advance = font->advance(index);
             Glyph glyph = font->glyph(index);
             float yOffset = 0;
-            if(subscript) yOffset += size * pow(subscriptScale, subscript);
+            if(subscript) yOffset += size * pow(subscriptScale, subscript)/2;
             if(superscript) yOffset -= size * superscriptScale/2;
             if(glyph.image) { word << Character{{glyph.offset, share(glyph.image)},/*font,*/ vec2(penX,yOffset), /*index,*/ glyph.offset.x+glyph.image.width, advance, i}; column++; }
             penX += advance;

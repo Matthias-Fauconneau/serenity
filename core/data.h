@@ -43,9 +43,9 @@ struct Data {
     Data(::buffer<byte>&& array) : buffer(move(array)) {}
     /// Creates a Data interface to a \a reference
     explicit Data(const ref<byte>& reference) : buffer(reference.data,reference.size) {}
-    /// Slices a reference to the buffer from \a pos to \a pos + \a size
+    /// Slices a reference to the buffer from \a index to \a index + \a size
     ref<byte> slice(uint pos, uint size) const { return buffer.slice(pos,size); }
-    /// Slices a reference to the buffer from \a pos to the end of the buffer
+    /// Slices a reference to the buffer from \a index to the end of the buffer
     ref<byte> slice(uint pos) const { return buffer.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
@@ -82,9 +82,9 @@ struct BinaryData : Data {
     /// Creates a BinaryData interface to a \a reference
     explicit BinaryData(const ref<byte>& reference, bool isBigEndian=false):Data(reference),isBigEndian(isBigEndian){}
 
-    /// Slices a reference to the buffer from \a pos to \a pos + \a size
+    /// Slices a reference to the buffer from \a index to \a index + \a size
     BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
-    /// Slices a reference to the buffer from \a pos to \a pos + \a size
+    /// Slices a reference to the buffer from \a index to \a index + \a size
     BinaryData slice(uint pos) { return BinaryData(Data::slice(pos),isBigEndian); }
 
     /// Seeks to /a index
@@ -142,13 +142,22 @@ struct TextData : Data {
     using Data::Data;
     void advance(uint step) /*override*/;
 
-    /// If input match \a key, advances \a pos by \a key size
+    /// Returns whether input match \a key
+    bool wouldMatch(const string& key);
+    /// Returns whether input match any of \a keys
+    char wouldMatchAny(const string& any);
+    /// Returns whether input match any of \a keys
+    string wouldMatchAny(const ref<string>& keys);
+
+    /// If input match \a key, advances \a index by \a key size
     bool match(char key);
-    /// If input match \a key, advances \a pos by \a key size
+    /// If input match \a key, advances \a index by \a key size
     bool match(const string& key);
-    /// If input match any of \a key, advances \a pos
-    bool matchAny(const string& any);
-    /// If input match none of \a key, advances \a pos
+    /// If input match any of \a key, advances \a index
+    char matchAny(const string& any);
+    /// If input match any of \a keys, advances \a index
+    string matchAny(const ref<string>& keys);
+    /// If input match none of \a key, advances \a index
     bool matchNo(const string& any);
 
     /// Asserts stream matches \a key and advances \a key length bytes

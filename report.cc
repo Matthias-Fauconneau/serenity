@@ -60,14 +60,7 @@ struct Document : Widget {
         String text; bool bold=false,italic=false;
         for(;;) { // Line
             assert_(s);
-            for(string delimiter: delimiters) {
-                if(s.peek(delimiter.size)==delimiter) {
-                    if(match) { assert_(delimiters.size==1 && delimiters[0].size == 1, delimiter); s.advance(delimiter.size); }
-                    assert_(!bold, "Expected bold end delimiter *, got end of line");
-                    assert_(!italic, "Expected italic end delimiter /, got end of line", text);
-                    return text;
-                }
-            }
+            if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
 
             /**/ if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
             else if(s.match("//"_)) text << "/"_;
@@ -75,38 +68,43 @@ struct Document : Widget {
             else if(s.match('\\')) text << s.next();
             else if(s.match('_')) { text << (char)(TextFormat::SubscriptStart);
                 String subscript;
-                while(s) {
-                    ref<string> lefts {"["_,"("_,"{"_,"⌊"_};
-                    ref<string> rights{"]"_,")"_,"}"_,"⌋"_};
-                    for(int index: range(lefts.size)) {
-                        if(s.match(lefts[index])) {
-                            subscript << lefts[index];
-                            String content = parseLine(s, {rights[index]}, false);
-                            assert_(content);
-                            subscript << content;
-                            subscript << rights[index];
-                            goto break_;
-                        }
-                    } /*else*/ {
-                        byte c = s.peek();
-                        if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
-                        subscript << s.next(); //= s.identifier("+"); //s.whileNo(" ])/\n"_);
+                for(;;) {
+                    assert_(s, subscript);
+                    if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
+                    else {
+                        ref<string> lefts {"["_,"{"_,"⌊"_}; //"("_,
+                        ref<string> rights{"]"_,"}"_,"⌋"_}; //")"_,
+                        for(int index: range(lefts.size)) {
+                            if(s.match(lefts[index])) {
+                                if(lefts[index] != "["_) subscript << lefts[index];
+                                String content = parseLine(s, {rights[index]}, false);
+                                assert_(content);
+                                subscript << content;
+                                //subscript << rights[index]; //?
+                                goto break_;
+                            }
+                        } /*else*/
+                        if(s.wouldMatchAny(" ()^/"_) || s.wouldMatchAny({"·"_})) break; //if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
+                        else subscript << s.next(); //= s.identifier("+"); //s.whileNo(" ])/\n"_);
+                        break_:;
                     }
-                    break_:;
                 }
-                assert_(s && subscript.size && subscript.size<=14, "Expected subscript end delimiter  _]), got end of document", "'"_+subscript.slice(0, min(subscript.size, 8ul))+"'"_, subscript.size, text);
+                assert_(s && subscript.size && subscript.size<=15, "Expected subscript end delimiter  _]), got end of document", "'"_+subscript.slice(0, min(subscript.size, 16ul))+"'"_, subscript.size, text);
                 text << subscript;
                 text << (char)(TextFormat::SubscriptEnd);
             }
             else if(s.match('^')) {
                 text << (char)(TextFormat::Superscript);
-                string superscript = s.identifier("-+,[]"_); //s.whileNo(" ^])/\n"_);
-                assert_(s && superscript.size && superscript.size<8, "Expected subscript end delimiter  ^]), got end of document", superscript, text);
+                string superscript = s.whileNo(" ^])/\n"_); //s.identifier("-+,[]"_); //s.whileNo(" ^])/\n"_);
+                assert_(s && superscript.size && superscript.size<=14, "Expected superscript end delimiter  ^]), got end of document", superscript, superscript.size, text);
                 text << superscript;
                 text << (char)(TextFormat::Superscript);
             }
             else text << s.next();
         }
+        assert_(!bold, "Expected bold end delimiter *, got end of line");
+        assert_(!italic, "Expected italic end delimiter /, got end of line", text);
+        return text;
     }
 
     String parseParagraph(TextData& s) {
