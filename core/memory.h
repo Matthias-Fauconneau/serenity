@@ -57,6 +57,7 @@ generic struct unique {
     explicit operator bool() const { return pointer; }
     bool operator !() const { return !pointer; }
     bool operator ==(const unique<T>& o) const { return pointer==o.pointer; }
+    bool operator ==(const T* o) const { return pointer==o; }
 
     T* pointer;
 };

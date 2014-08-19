@@ -41,7 +41,8 @@ generic struct array : buffer<T> {
     void clear() { if(size) shrink(0); }
 
     /// Appends a new element constructing it directly into the array (avoids using a move operations)
-    template<Type... Args> array& append(Args&&... args) { size_t s=size+1; reserve(s); new (end()) T(forward<Args>(args)...); size=s; return *this;}
+    template<Type Arg, Type... Args> array& append(Arg&& arg, Args&&... args) { size_t s=size+1; reserve(s); new (end()) T(forward<Arg>(arg), forward<Args>(args)...); size=s; return *this;}
+    T& append() { size_t s=size+1; reserve(s); new (end()) T(); size=s; return mref<T>::last(); }
 
     /// \name Append operators
     array& operator<<(T&& e) { size_t s=size+1; reserve(s); new (end()) T(move(e)); size=s; return *this; }
