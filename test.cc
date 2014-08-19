@@ -40,18 +40,23 @@ struct PDFWriteTest {
                         xImage.insert("Height"_, dec(image.height));
                         xImage.insert("ColorSpace"_, String("/DeviceRGB"_));
                         xImage.insert("BitsPerComponent"_, String("8"_));
-                        xImage/*.data*/ = cast<byte>(copy(image.buffer));
-                        assert_(xImage.data.size == image.height * image.width * 4);
-                        //xImage.insert("Length"_, xImage.data.size);
+                        buffer<byte> rgb3 (image.height * image.width * 3);
+                        assert_(image.buffer.size == image.height * image.width);
+                        for(uint index: range(image.buffer.size)) {
+                            rgb3[index*3+0] = image.buffer[index].r;
+                            rgb3[index*3+1] = image.buffer[index].g;
+                            rgb3[index*3+2] = image.buffer[index].b;
+                        }
+                        xImage = move(rgb3);
                         xObjects.insert("Image"_, ref(xImage));}
                     resources.insert("XObject"_, move(xObjects));}
                 page.insert("Resources"_, move(resources));}
             {array<Variant> mediaBox; mediaBox.append( 0 ).append( 0 ).append( image.width ).append( image.height );
                 page.insert("MediaBox"_, move(mediaBox));}
             {Object& contents = objects.append();
-                mat3 im (vec3(1.f/image.width,0,0), vec3(0,-1.f/image.height,0), vec3(0,1,1));
+                mat3 im (vec3(1.f/image.width,0,0), vec3(0,1.f/image.height,0), vec3(0,0,1));
                 mat3 m = im.inverse();
-                contents/*.data*/ = dec<float>({m(0,0),m(0,1),m(1,0),m(1,1),m(0,2),m(1,2)})+" cm /Image Do"_;
+                contents = dec<float>({m(0,0),m(0,1),m(1,0),m(1,1),m(0,2),m(1,2)})+" cm /Image Do"_;
                 page.insert("Contents"_, ref(contents));}
             pages.at("Kids"_).list << ref(page);
             pages.at("Count"_).number++;
