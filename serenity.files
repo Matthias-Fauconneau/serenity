@@ -86,3 +86,4 @@ music/encoder.h
 test.cc
 report.cc
 ui/variant.h
+test.cc

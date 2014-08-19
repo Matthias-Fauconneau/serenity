@@ -28,16 +28,18 @@ String utf8(uint c) {
     return utf8;
 }
 
-array<uint> toUTF32(string utf8) {
-    array<uint> utf32(utf8.size);
-    for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) {
-        utf32 << *it;
-    }
-    return utf32;
+generic array<T> toUCS(string utf8) {
+    array<T> ucs(utf8.size);
+    for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) ucs << *it;
+    return ucs;
 }
+array<uint16> toUCS2(string utf8) { return toUCS<uint16>(utf8); }
+array<uint32> toUCS4(string utf8) { return toUCS<uint32>(utf8); }
 
-String toUTF8(ref<uint> utf32) {
-    String utf8(utf32.size);
-    for(uint c: utf32) utf8 << ::utf8(c);
+generic String toUTF8(ref<T> ucs) {
+    String utf8(ucs.size);
+    for(uint c: ucs) utf8 << ::utf8(c);
     return utf8;
 }
+String toUTF8(ref<uint16> ucs) { return toUTF8(ucs); }
+String toUTF8(ref<uint32> ucs) { return toUTF8(ucs); }

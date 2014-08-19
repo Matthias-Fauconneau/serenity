@@ -33,7 +33,7 @@ String str(const map<string,Variant>& dict) {
     String s;
     s << "<<"_;
     for(const const_pair<string,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
-    if(dict) s.last() = '>'; else s << '>'; s << '>';
+    /*if(dict) s.last() = '>'; else*/ s << '>'; s << '>';
     return s;
 }
 
@@ -62,7 +62,7 @@ String str(const Object& o) {
     String s = str((const Dict&)o);
     if(o.data) {
         assert_(o.at("Length"_) == int(o.data.size), (const Dict&)o);
-        s << "stream\n"_;
+        s << "\nstream\n"_;
         s << o.data;
         s << "\nendstream"_;
     }

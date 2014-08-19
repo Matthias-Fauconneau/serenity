@@ -14,8 +14,12 @@ struct utf8_iterator {
 /// Converts Unicode code point to UTF-8
 String utf8(uint code);
 
-/// Converts UTF8 String to UTF32
-array<uint> toUTF32(string utf8);
+/// Converts UTF-8 String to UCS-2
+array<uint16> toUCS2(string utf8);
+/// Converts UTF-8 String to UCS-4
+array<uint32> toUCS4(string utf8);
 
-/// Converts UTF32 String to UTF8
-String toUTF8(ref<uint> utf32);
+/// Converts UCS-2 String to UTF-8
+String toUTF8(ref<uint16> ucs);
+/// Converts UCS-4 String to UTF-8
+String toUTF8(ref<uint32> ucs);

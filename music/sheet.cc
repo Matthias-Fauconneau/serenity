@@ -11,7 +11,7 @@ float Sheet::glyph(int2 position, const string name, Font& font) {
 
 uint Sheet::text(int2 position, const string& text, Font& font, array<Blit>& blits) {
     uint x = position.x;
-    for(uint code: toUTF32(text)) {
+    for(uint code: toUCS4(text)) {
         uint16 index = font.index(code);
         const Glyph& glyph = font.glyph(index);
         blits << Blit{int2(x, position.y)+glyph.offset, share(glyph.image)};

@@ -130,6 +130,7 @@ template<Type T, class Function, class... Args> auto apply(const ref<T>& a, Func
     for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...));
     return r;
 }
+
 /// Filters elements matching predicate
 template<Type T, Type F> array<T> filter(const ref<T>& a, F f) { array<T> r(a.size); for(const T& e: a) if(!f(e)) r << copy(e); return r; }
 

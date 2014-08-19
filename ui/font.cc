@@ -6,6 +6,22 @@
 #include "file.h"
 
 const Folder& fontFolder() { static Folder folder("/usr/share/fonts"_); return folder; }
+String findFont(string fontName, ref<string> fontTypes) {
+    array<String> fonts = filter(fontFolder().list(Files|Recursive), [&](string path) {
+        if(!endsWith(path,".ttf"_)) return true;
+        for(string fontType: fontTypes) {
+            if(fontType) {
+                if(find(path, fontName+fontType+"."_) || find(path, fontName+"-"_+fontType+"."_) || find(path, fontName+"_"_+fontType+"."_))
+                    return false;
+            } else if(find(path,fontName+"."_)) {
+                return false;
+            }
+        }
+        return true;
+    });
+    assert_(fonts.size==1, fontName, fontTypes, fonts);
+    return move(fonts[0]);
+}
 
 static FT_Library ft; static int fontCount=0;
 Font::Font(Map&& map, float size, bool hint) : Font(buffer<byte>(map), size, hint) { keep=move(map); }

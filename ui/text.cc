@@ -62,24 +62,7 @@ struct TextLayout {
     Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
         String key = fontName+fontTypes[0]+(hint?"H"_:""_);
         Font* font = fonts.find(NameSize{copy(key), size});
-        if(font) return font;
-        else {
-            auto font = filter(fontFolder().list(Files|Recursive), [&](string path) {
-                    if(!endsWith(path,".ttf"_)) return true;
-                    for(string fontType: fontTypes) {
-                        if(fontType) {
-                            if(find(path, fontName+fontType+"."_) || find(path, fontName+"-"_+fontType+"."_) || find(path, fontName+"_"_+fontType+"."_))
-                                return false;
-                        } else if(find(path,fontName+"."_)) {
-                                return false;
-                        }
-                   }
-                   return true;
-            });
-            if(!font) return 0;
-            assert_(font.size<=1, font);
-            return &fonts.insert(NameSize{copy(key),size},Font(Map(font.first(), fontFolder()), size, hint));
-        }
+        return font ?: &fonts.insert(NameSize{copy(key),size},Font(Map(findFont(fontName, fontTypes), fontFolder()), size, hint));
     }
 
     TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify=false)
@@ -175,11 +158,11 @@ struct TextLayout {
             float advance = font->advance(index);
             if(glyph.image) {
                 int yGlyphOffset = 0;
-                 if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yGlyphOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
+                 if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) yGlyphOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
 
                 word << Character{{glyph.offset, share(glyph.image), 0,0,0}, vec2(pen, yOffset+yGlyphOffset), glyph.size.x, advance, i};
                 column++;
-            } else if(c!=' ') log("Missing glyph", toUTF8({c}));
+            } else if(c!=' ') log("Missing glyph", toUTF8(ref<uint>{c}));
             pen += advance;
         }
         if(word) {
@@ -195,7 +178,7 @@ struct TextLayout {
 };
 
 Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, bool hint, float interline, bool center)
-    : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
+    : text(toUCS4(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
 
 void Text::layout() {
     textSize=int2(0,size);
@@ -302,7 +285,7 @@ bool TextInput::mouseEvent(int2 position, int2 size, Event event, Button button)
     if(event==Press) setFocus(this);
     if(event==Press && button==MiddleButton) {
         Text::mouseEvent(position,size,event,button);
-        array<uint> selection = toUTF32(getSelection());
+        array<uint> selection = toUCS4(getSelection());
         if(!text) { editIndex=selection.size; text=move(selection); }
         else { editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat); }
         layout();
@@ -320,7 +303,7 @@ bool TextInput::keyPress(Key key, Modifiers modifiers) {
     const TextLine& textLine = textLines[cursor.line];
 
     if(modifiers&Control && key=='v') {
-        array<uint> selection = toUTF32(getSelection(true));
+        array<uint> selection = toUCS4(getSelection(true));
         if(!text) { text=move(selection); editIndex=selection.size; }
         else { editIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat); }
         layout();

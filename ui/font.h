@@ -8,6 +8,7 @@
 struct  FT_FaceRec_;
 
 const Folder& fontFolder();
+String findFont(string fontName, ref<string> fontTypes={""_});
 
 struct Glyph {
     int2 offset; // (left bearing, min.y-baseline)
