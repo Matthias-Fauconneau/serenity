@@ -12,6 +12,9 @@ const Folder& fontFolder();
 struct Glyph {
     int2 offset; // (left bearing, min.y-baseline)
     Image image;
+    int leftDelta, rightDelta; // Bearing delta to correct kerning with hinting
+    vec2 size;
+    //vec2 bearing;
 };
 
 /// Freetype wrapper
@@ -27,14 +30,19 @@ struct Font {
     uint index(const string& name);
     /// Returns font glyph index for Unicode codepoint \a code
     uint index(uint code);
-    /// Returns hinted advance for \a index
-    float advance(uint index);
-    /// Returns unhinted advance for \a index
-    float linearAdvance(uint index);
-    /// Returns size for \a index
-    vec2 size(uint index);
+
     /// Returns scaled kerning adjustment between \a leftIndex and \a rightIndex
     float kerning(uint leftIndex, uint rightIndex);
+
+    /// Returns hinted advance for \a index
+    float advance(uint index);
+    /*/// Returns unhinted advance for \a index
+    float linearAdvance(uint index);
+    /// Returns size for \a index
+    vec2 size(uint index);*/
+    /*/// Returns bearing for \a index
+    vec2 bearing(uint index);*/
+
     /// Caches and returns glyph for \a index at position \a x
     /// \a x fractional part is used to return subpixel positionned images
     Glyph glyph(uint index);

@@ -60,8 +60,8 @@ uint AudioFile::read(const mref<short2>& output) {
                 else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
                     shortBuffer = buffer<short2>(bufferSize);
                     for(uint i : range(bufferSize)) for(uint j : range(2)) {
-                        int s = ((float*)frame->data[j])[i]*(1<<15);
-                        if(s<-(1<<15) || s >= (1<<15)) error("Clip", s);
+                        int s = ((float*)frame->data[j])[i]*(1<<14); //TODO: ReplayGain
+                        if(s<-(1<<15) || s >= (1<<15)) error("Clip", s, ((float*)frame->data[j])[i]);
                         shortBuffer[i][j] = s;
                     }
                 }

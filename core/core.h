@@ -102,9 +102,6 @@ generic struct ref;
 /// Convenient typedef for ref<byte> holding UTF8 text strings
 typedef ref<byte> string;
 inline constexpr string operator "" _(const char* data, size_t size);
-#if !__GXX_EXPERIMENTAL_CXX0X__
-#define _ // QtCreator doesn't parse custom literal operators (""_)
-#endif
 
 // Debugging
 /// Logs a message to standard output without newline

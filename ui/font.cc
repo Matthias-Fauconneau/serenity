@@ -12,7 +12,7 @@ Font::Font(Map&& map, float size) : Font(buffer<byte>(map), size) { keep=move(ma
 Font::Font(buffer<byte>&& data_, float size) : data(move(data_)) {
     if(!ft) {
         FT_Init_FreeType(&ft);
-        FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
+        //FT_Library_SetLcdFilter(ft,FT_LCD_FILTER_DEFAULT);
     }
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;
@@ -46,24 +46,32 @@ uint Font::index(uint code) {
 float Font::kerning(uint leftIndex, uint rightIndex) {
     FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6;
 }
-float Font::advance(uint index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->advance.x*0x1p-6; }
-float Font::linearAdvance(uint index) { FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return face->glyph->linearHoriAdvance*0x1p-16; }
-vec2 Font::size(uint index) {
-    FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
-}
+static constexpr int hinting = FT_LOAD_TARGET_LIGHT; //FT_LOAD_TARGET_NORMAL
+float Font::advance(uint index) { FT_Load_Glyph(face, index, hinting); return face->glyph->advance.x*0x1p-6; }
+//float Font::linearAdvance(uint index) { FT_Load_Glyph(face, index, hinting); return face->glyph->linearHoriAdvance*0x1p-16; }
+/*vec2 Font::size(uint index) {
+    FT_Load_Glyph(face, index, hinting); return vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
+}*/
+/*vec2 Font::bearing(uint index) {
+    FT_Load_Glyph(face, index, hinting); return vec2(face->glyph->metrics.horiBearingX*0x1p-6, face->glyph->metrics.horiBearingY*0x1p-6);
+}*/
 
 Glyph Font::glyph(uint index) {
     {const Glyph* glyph = cache.find(index);
-        if(glyph) return {glyph->offset, share(glyph->image)};}
+        if(glyph) return {glyph->offset, share(glyph->image), glyph->leftDelta, glyph->rightDelta, glyph->size};}
     Glyph& glyph = cache.insert(index);
-    FT_Load_Glyph(face, index, FT_LOAD_TARGET_NORMAL);
+    FT_Load_Glyph(face, index, hinting);
+    glyph.leftDelta = face->glyph->lsb_delta;
+    glyph.rightDelta = face->glyph->rsb_delta;
+    glyph.size = vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
+    //glyph.bearing = vec2(face->glyph->metrics.horiBearingX*0x1p-6, face->glyph->metrics.horiBearingY*0x1p-6);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;
-    if(!bitmap.buffer) { return {glyph.offset, share(glyph.image)}; }
+    if(!bitmap.buffer) { return {glyph.offset, share(glyph.image), glyph.leftDelta, glyph.rightDelta, glyph.size}; }
     int width = bitmap.width, height = bitmap.rows;
     Image image(width, height, true, false);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0xFF,0xFF,0xFF,bitmap.buffer[y*bitmap.pitch+x]);
     glyph.image = move(image);
-    return {glyph.offset, share(glyph.image)};
+    return {glyph.offset, share(glyph.image), glyph.leftDelta, glyph.rightDelta, glyph.size};
 }

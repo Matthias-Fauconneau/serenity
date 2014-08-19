@@ -7,26 +7,27 @@
 //#include "jpeg.h"
 
 struct Document : Widget {
-    const int2 windowSize = int2(532, 752);
-    static constexpr int oversample = 4;
+    static constexpr int2 windowSize = int2(1080, 1527);
+    //const int2 windowSize = int2(532, 752);
+    static constexpr int oversample = 1;
     const int2 previewSize = oversample * windowSize;
 
     static constexpr bool showMargins = true;
-    const int2 pageSize = oversample * windowSize; //int2(round(vec2(windowSize) * (1+(showMargins?0:2*margin))));
+    static constexpr int2 pageSize = int2(oversample * windowSize.x, oversample * windowSize.y);
     static constexpr float pageHeightMM = 297;
-    const float pxMM = pageSize.y / pageHeightMM;
-    const float marginPx = 1.5 * inchMM * pxMM;
+    static constexpr float inchMM = 25.4;
+    static constexpr float pxMM = pageSize.y / pageHeightMM;
+    static constexpr float marginPx = 1.5 * inchMM * pxMM;
     const int2 contentSize = pageSize - int2(2*marginPx); //oversample * int2(round(vec2(windowSize) * (1-(showMargins?2*margin:0))));
 
     static constexpr float pointMM = 0.3527;
-    const float pointPx = pointMM * pxMM;
-    const float textSize = 12 * pointPx;
-    const float headerSize = 14 * pointPx;
-    const float titleSize = 16 * pointPx;
-    static constexpr float inchMM = 25.4;
-    //static_assert(pageHeight / (pageHeightMM / inchMM) > 300, ""); // 308.65
+    static constexpr float pointPx = pointMM * pxMM;
+    static constexpr float textSize = 12 * pointPx;
+    static constexpr float headerSize = 14 * pointPx;
+    static constexpr float titleSize = 16 * pointPx;
+    static_assert(pageSize.y / (pageHeightMM / inchMM) > 130, ""); // 261.18
 
-    const string font = "FreeSerif"_;
+    const string font = "LiberationSerif"_; //"FreeSerif"_;
     const float interlineStretch = 3./2;
 
     TextData s;
@@ -40,7 +41,7 @@ struct Document : Widget {
     struct Entry { array<uint> levels; String name; uint page; };
     array<Entry> tableOfContents;
 
-    int viewPageIndex = 9; //FIXME: persistent
+    int viewPageIndex = 2; //FIXME: persistent
     signal<int> pageChanged;
 
     Document(string source) : s(filter(source, [](char c) { return c=='\r'; })) {
@@ -56,6 +57,40 @@ struct Document : Widget {
     }
     Text& newText(string text, int size, bool center=true) { return element<Text>(text, size, 0, 1, contentSize.x, font, interlineStretch, center); }
 
+    ref<string> lefts {"["_,"{"_,"⌊"_};
+    ref<string> rights{"]"_,"}"_,"⌋"_};
+
+    String parseSubscript(TextData& s, const ref<string>& delimiters) {
+        String subscript;
+        if(!s.wouldMatchAny(lefts)) subscript << s.next();
+        for(;;) {
+            assert_(s, subscript);
+            if(s.wouldMatchAny(delimiters)) break;
+            else if(s.match('_')) subscript << parseSubscript(s, delimiters);
+            else {
+                for(int index: range(lefts.size)) {
+                    if(s.match(lefts[index])) {
+                        if(lefts[index] != "["_) subscript << lefts[index];
+                        String content = parseLine(s, {rights[index]}, true);
+                        assert_(content);
+                        subscript << content;
+                        if(rights[index] != "]"_) subscript << rights[index];
+                        goto break_;
+                    }
+                } /*else*/
+                if(s.wouldMatchAny(" \t\n,()^/+|"_) || s.wouldMatchAny({"·"_,"⌋"_})) break; //if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
+                else subscript << s.next(); //= s.identifier("+"); //s.whileNo(" ])/\n"_);
+break_:;
+            }
+        }
+        assert_(s && subscript.size && subscript.size<=15, "Expected subscript end delimiter  _]), got end of document", "'"_+subscript.slice(0, min(subscript.size, 16ul))+"'"_, subscript.size, delimiters);
+        String text;
+        text << (char)(TextFormat::SubscriptStart);
+        text << subscript;
+        text << (char)(TextFormat::SubscriptEnd);
+        return text;
+    }
+
     String parseLine(TextData& s, const ref<string>& delimiters={"\n"_}, bool match=true) {
         String text; bool bold=false,italic=false;
         for(;;) { // Line
@@ -66,36 +101,7 @@ struct Document : Widget {
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
             else if(s.match('\\')) text << s.next();
-            else if(s.match('_')) { text << (char)(TextFormat::SubscriptStart);
-                String subscript;
-                subscript << s.next();
-                for(;;) {
-                    assert_(s, subscript);
-                    if(s.wouldMatchAny(delimiters)) break;
-                    else if(s.wouldMatch('_')) subscript << parseLine(s, delimiters, match);
-                    else {
-                        ref<string> lefts {"["_,"{"_,"⌊"_}; //"("_,
-                        ref<string> rights{"]"_,"}"_,"⌋"_}; //")"_,
-                        for(int index: range(lefts.size)) {
-                            if(s.match(lefts[index])) {
-                                if(lefts[index] != "["_) subscript << lefts[index];
-                                String content = parseLine(s, {rights[index]}, true);
-                                assert_(content);
-                                subscript << content;
-                                if(rights[index] != "]"_) subscript << rights[index];
-                                goto break_;
-                            }
-                        } /*else*/
-                        if(s.wouldMatchAny(" \t\n,()^/+|"_) || s.wouldMatchAny({"·"_,"⌋"_})) break; //if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"+"_.contains(c))) break;
-                        else subscript << s.next(); //= s.identifier("+"); //s.whileNo(" ])/\n"_);
-                        break_:;
-                    }
-                }
-                assert_(s && subscript.size && subscript.size<=15, "Expected subscript end delimiter  _]), got end of document", "'"_+subscript.slice(0, min(subscript.size, 16ul))+"'"_, subscript.size, text);
-                text << subscript;
-                log(subscript);
-                text << (char)(TextFormat::SubscriptEnd);
-            }
+            else if(s.match('_')) text << parseSubscript(s, delimiters);
             else if(s.match('^')) {
                 text << (char)(TextFormat::Superscript);
                 String superscript;
@@ -126,25 +132,23 @@ struct Document : Widget {
         char type = 0;
         while(!s.match(')')) {
             // Element
-            s.whileAny(" \n"_);
+            s.whileAny(" \t\n"_);
             if(s.match('(')) children << parseLayout(s);
-            else {
-                if("^&@"_.contains(s.peek())) {
-                    string type = s.whileAny("^&@"_);
-                    string path = s.untilAny(" \t\n"_);
-                    /**/ if(existsFile(path)) images << unique<Image>(decodeImage(readFile(path)));
-                    else if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
-                    else if(existsFile(path+".jpg"_)) images << unique<Image>(decodeImage(readFile(path+".jpg"_)));
-                    else error("Missing image", path);
-                    if(type=="@"_) images.last() = unique<Image>(rotate(images.last()));
-                    if(type=="^"_) images.last() = unique<Image>(upsample(images.last()));
-                    else if(!(images.last()->size() <= contentSize)) images.last() = unique<Image>(downsample(images.last()));
-                    children << &element<ImageWidget>(images.last());
-                } else {
-                    String text = simplify(parseLine(s, {"|"_,"-"_,"+"_,")"_}, false));
-                    assert_(text, s.line());
-                    children << &newText(text, textSize);
-                }
+            else if(s.wouldMatchAny("^&@"_)) {
+                string type = s.whileAny("^&@"_);
+                string path = s.untilAny(" \t\n"_);
+                /**/ if(existsFile(path)) images << unique<Image>(decodeImage(readFile(path)));
+                else if(existsFile(path+".png"_)) images << unique<Image>(decodeImage(readFile(path+".png"_)));
+                else if(existsFile(path+".jpg"_)) images << unique<Image>(decodeImage(readFile(path+".jpg"_)));
+                else error("Missing image", path);
+                if(type=="@"_) images.last() = unique<Image>(rotate(images.last()));
+                if(type=="^"_) images.last() = unique<Image>(upsample(images.last()));
+                else if(!(images.last()->size() <= contentSize)) images.last() = unique<Image>(downsample(images.last()));
+                children << &element<ImageWidget>(images.last());
+            } else {
+                String text = simplify(parseLine(s, {"|"_,"-"_,"+"_,")"_}, false));
+                assert_(text, s.line());
+                children << &newText(text, textSize);
             }
             // Separator
             s.whileAny(" \n"_);
@@ -365,6 +369,8 @@ struct FileWatcher : File, Poll {
         }
     }
 };
+constexpr int2 Document::windowSize;
+constexpr int2 Document::pageSize;
 
 struct Report {
     string path = "rapport.txt"_;
@@ -392,4 +398,3 @@ struct Report {
     }
 
 } app;
-
