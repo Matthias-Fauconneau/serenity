@@ -1,35 +1,47 @@
 #include "thread.h"
 #include "variant.h"
-
-String str(const Dict& dict) {
-    String s;
-    s << "<< "_;
-    for(const const_pair<string,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
-    s << ">>"_;
-    return s;
-}
-String str(const array<Variant>& array) {
-    String s;
-    s << "["_;
-    for(const Variant& element: array) s << element << " "_;
-    s << "]"_;
-    return s;
-}
+#include "image.h"
+#include "png.h"
 
 struct PDFWriteTest {
     PDFWriteTest() {
-        Dict catalog;
-        catalog.insert("Type"_, String("/Catalog"_));
-        catalog.insert("Pages"_, String("2 0 R"_));
-        Dict pagesDict;
-        pagesDict.insert("Type"_, String("/Pages"_));
+        constexpr string catalog = "1 0 R"_;
+        constexpr string pagesRoot = "2 0 R"_;
+
         array<Dict> pages;
-        array<Variant> pageReferences; for(int index: range(pages.size)) pageReferences.append(dec(2+index)+" 0 R"_);
-        pagesDict.insert("Kids"_, str(pageReferences));
-        pagesDict.insert("Count"_, str(pages.size));
+        Folder folder("Rapport.out"_,home());
+        array<String> files = folder.list(Files|Sorted);
+        for(;;) {
+            String path = dec(pages.size);
+            if(!files.contains(path)) { log(path, files); break; }
+            Image image = decodeImage(readFile(path, folder));
+            assert_(image, path);
+            Dict page;
+            page.insert("Type"_, String("/Page"_));
+            page.insert("Parent"_, String(pagesRoot));
+            page.insert("Resources"_, Dict());
+            array<Variant> mediaBox; mediaBox.append( 0 ).append( 0 ).append( image.width ).append( image.height );
+            page.insert("MediaBox"_, move(mediaBox));
+            pages << move(page);
+        }
+
         array<String> objects;
-        objects << str(catalog);
-        objects << str(pagesDict);
+
+        {Dict catalog;
+            catalog.insert("Type"_, String("/Catalog"_));
+            catalog.insert("Pages"_, String(pagesRoot));
+            objects << str(catalog);}
+
+        {Dict pagesDict;
+            pagesDict.insert("Type"_, String("/Pages"_));
+            array<Variant> pageReferences; for(int index: range(pages.size)) pageReferences.append(dec(3+index)+" 0 R"_);
+            pagesDict.insert("Kids"_, str(pageReferences));
+            pagesDict.insert("Count"_, str(pages.size));
+            objects << str(pagesDict);
+        }
+
+        for(const Dict& page: pages) objects << str(page);
+
         array<byte> file = String("%PDF-1.7\n"_);
         array<uint> xrefs (objects.size);
         for(uint index: range(objects.size)) {
@@ -44,7 +56,7 @@ struct PDFWriteTest {
             assert(entry.size==20);
             file << entry;
         }
-        Dict trailer; trailer.insert("Size"_, int(1+xrefs.size)); assert_(objects); trailer.insert("Root"_, String("1 0 R"_));
+        Dict trailer; trailer.insert("Size"_, int(1+xrefs.size)); assert_(objects); trailer.insert("Root"_, String(catalog));
         file << "trailer "_ << str(trailer) << "\n"_;
         file << "startxref\n"_ << dec(index) << "\r\n%%EOF"_;
         log(file);
