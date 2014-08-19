@@ -66,6 +66,8 @@ ui/window.h
 ui/x.h
 ui/plot.cc
 ui/plot.h
+ui/pdf.h
+ui/pdf.cc
 
 audio/audio.h
 audio/audio.cc
