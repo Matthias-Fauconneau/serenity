@@ -174,9 +174,10 @@ struct TextLayout {
 
             float advance = font->advance(index);
             if(glyph.image) {
-                 if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
+                int yGlyphOffset = 0;
+                 if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yGlyphOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
 
-                word << Character{{glyph.offset, share(glyph.image), 0,0,0}, vec2(pen, yOffset), glyph.size.x, advance, i};
+                word << Character{{glyph.offset, share(glyph.image), 0,0,0}, vec2(pen, yOffset+yGlyphOffset), glyph.size.x, advance, i};
                 column++;
             } else if(c!=' ') log("Missing glyph", toUTF8({c}));
             pen += advance;
