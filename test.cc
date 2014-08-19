@@ -7,7 +7,7 @@ struct PDFTest {
     /*Scroll<*/PDF/*>*/ pdf;
     Window window {&pdf/*.area()*/,int2(0,0),"PDFTest"_};
     PDFTest() {
-        pdf.open(readFile("convert.pdf"_,home()));
+        pdf.open(readFile("0.pdf"_,home()));
         window.background = White;
         window.actions[Escape]=[]{exit();};
         window.show();

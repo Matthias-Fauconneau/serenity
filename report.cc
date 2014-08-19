@@ -7,7 +7,7 @@
 //#include "jpeg.h"
 
 struct Document : Widget {
-    static constexpr int2 windowSize = int2(1080, 1527);
+    static constexpr int2 windowSize = int2(1050, 1485);
     static constexpr int oversample = 1;
     const int2 previewSize = oversample * windowSize;
 
@@ -24,7 +24,7 @@ struct Document : Widget {
     static constexpr float textSize = 12 * pointPx;
     static constexpr float headerSize = 14 * pointPx;
     static constexpr float titleSize = 16 * pointPx;
-    static_assert(pageSize.y / (pageHeightMM / inchMM) > 130, "");
+    static_assert(pageSize.y / (pageHeightMM / inchMM) > 126, "");
 
     const string font = "FreeSerif"_;
     //const string font = "LiberationSerif"_;
@@ -58,6 +58,15 @@ struct Document : Widget {
         return *pointer;
     }
     Text& newText(string text, int size, bool center=true) { return element<Text>(text, size, 0, 1, contentSize.x, font, false, interlineStretch, center); }
+
+    // Skip whitespaces and comments
+    void skip(TextData& s) {
+        for(;;) {
+            s.whileAny(" \n"_);
+            if(s.match('%')) s.line(); // Comment
+            else break;
+        }
+    }
 
     String parseSubscript(TextData& s, const ref<string>& delimiters) {
         ref<string> lefts {"["_,"{"_,"⌊"_};
@@ -143,7 +152,7 @@ struct Document : Widget {
         char type = 0;
         while(!s.match(')')) {
             // Element
-            s.whileAny(" \t\n"_);
+            skip(s);
             if(s.match('(')) children << parseLayout(s);
             else if(s.wouldMatchAny("&_^@"_)) {
                 string prefix = s.whileAny("&_^@"_);
@@ -170,8 +179,8 @@ struct Document : Widget {
                 children << &newText(text, textSize);
                 if(s.match('\n')) continue;
             }
+            skip(s);
             // Separator
-            s.whileAny(" \n"_);
             /**/ if(s.match(')')) break;
             else if(!type) type = s.next();
             else s.skip(string(&type,1));
@@ -188,10 +197,7 @@ struct Document : Widget {
         VBox page (pageIndex ? Linear::Share : Linear::Center, Linear::Expand);
 
         while(s) {
-            if(s.match('%')) { // Comment
-                s.line();
-                continue;
-            }
+            while(s.match('%')) s.line(); // Comment
 
             if(s.match('(')) { // Float
                 page << parseLayout(s);

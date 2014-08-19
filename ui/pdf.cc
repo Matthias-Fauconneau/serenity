@@ -32,6 +32,24 @@ String str(const Variant& o) {
     error("Invalid Variant"_,int(o.type));
 }
 
+buffer<byte> decodeRunLength(const ref<byte>& source) {
+    array<byte> buffer (source.size);
+    Data s (source);
+    for(;;) {
+        assert_(s);
+        uint8 code = s.next();
+        if(code < 128) buffer << s.read(code+1);
+        else if(code != 128) {
+            byte value = s.next();
+            uint size = 257-code;
+            buffer.reserve(buffer.size+size);
+            for(uint unused i: range(size)) buffer << value;
+        }
+        else break;
+    }
+    return move(buffer);
+}
+
 static Variant parseVariant(TextData& s) {
     s.skip();
     if("0123456789.-"_.contains(s.peek())) {
@@ -65,6 +83,7 @@ static Variant parseVariant(TextData& s) {
             if(v.dict.contains("Filter"_)) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
                 if(filter=="FlateDecode"_) stream=inflate(stream, true);
+                else if(filter=="RunLengthDecode"_) stream=decodeRunLength(stream);
                 else { log("Unsupported filter",v.dict); return Variant(); }
             }
             if(v.dict.contains("DecodeParms"_)) {
@@ -122,7 +141,7 @@ void PDF::open(const string& data) {
     clear();
     array<String> xref; map<string,Variant> catalog;
     {
-        TextData s(data);
+        TextData s (data);
         for(s.index=s.buffer.size-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
         int index=s.integer(); assert(index!=-1,s.untilEnd()); s.index=index;
         int root=0;
@@ -287,7 +306,7 @@ void PDF::open(const string& data) {
         Variant* contents = dict.find("Contents"_);
         if(contents) {
             // Keeps current page first geometry indices to translate the page primitives after full parse
-            uint firstBlit = blits.size, firstLine = lines.size, firstCharacter = characters.size, firstPath=paths.size, firstPolygon=polygons.size;
+            uint firstBlit = blits.size, firstLine = lines.size, firstCharacter = characters.size, firstPolygon=polygons.size;
             // Parses page bounds
             const array<Variant>& box = // Lower-left, upper-right
                     (dict.value("ArtBox"_)?:dict.value("TrimBox"_)?:dict.value("BleedBox"_)?:dict.value("CropBox"_)?:dict.at("MediaBox"_)).list;
@@ -361,7 +380,7 @@ void PDF::open(const string& data) {
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
                         blits<<Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)),{}};
-                    }
+                    } else error("No such image", args[0].data);
                     OP2('E','T') ;
                     OP2('g','s') ;
                     OP2('r','e') {
@@ -404,13 +423,9 @@ void PDF::open(const string& data) {
             for(Blit& b: blits.slice(firstBlit)) b.position = m*b.position ;
             for(Line& l: lines.slice(firstLine)) { l.a=m*l.a; l.b=m*l.b; }
             for(Character& c: characters.slice(firstCharacter)) c.position=m*c.position;
-            for(array<vec2>& path: paths.slice(firstPath)) for(vec2& pos: path) pos=m*pos;
             for(Polygon& polygon: polygons.slice(firstPolygon)) {
                 { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
                 for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
-#if GL
-                for(vec2& pos: polygon.vertices) pos=m*pos;
-#endif
             }
             // Updates document bounds
             documentMin = min(documentMin, pageMin);
@@ -423,10 +438,9 @@ void PDF::open(const string& data) {
     // Normalizes coordinates (aligns top-left to 0, fit width to 1)
     float width = documentMax.x-documentMin.x;
     mat3x2 m (1/width, 0,0, 1/width, -documentMin.x/width, -documentMin.y/width);
-    for(Blit& b: blits) b.position = m*b.position ;
+    for(Blit& b: blits) b.position = m*b.position, b.size /= width;
     for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
     for(Character& c: characters) c.position=m*c.position, c.size /= width;
-    for(array<vec2>& path: paths) for(vec2& pos: path) pos=m*pos;
     for(Polygon& polygon: polygons) {
         { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
         for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
@@ -435,12 +449,6 @@ void PDF::open(const string& data) {
 
     // Sorts primitives for culling
     quicksort(blits), quicksort(lines), quicksort(characters);
-
-    /*//FIXME: interface directly with an array of paths and of characters
-    for(const array<vec2>& path : paths) onPath(path);
-    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, c.position, c.size, c.font.name, c.code, c.index); }
-    for(uint i: range(characters.size)) { Character& c = characters[i]; onGlyph(i, c.position, c.size, c.font.name, c.code, c.index); }
-    paths.clear();*/
 }
 
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
@@ -483,9 +491,7 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b); // Converts to CCW winding in top-left coordinate system
             polygons << move(polygon);
         }
-        if(flags&Trace) this->paths << move(path);
     }
-    paths.clear();
 }
 
 Font& PDF::getFont(Fonts& fonts, float size) {
@@ -522,7 +528,11 @@ void PDF::render(int2 offset, int2 fullSize) {
     for(Blit& blit: blits) {
         if(offset.y+scale*(blit.position.y+blit.size.y) < 0) continue;
         if(offset.y+scale*blit.position.y > size.y) break;
-        //if(!blit.resized) blit.resized=resize(blit.image,scale*blit.size.x,scale*blit.size.y);
+        if(!blit.resized) {
+            int2 target = int2(round(scale*blit.size));
+            assert_(target <= int2(4096));
+            blit.resized = target != blit.image.size() ? resize(target, blit.image) : share(blit.image);
+        }
         ::blit(target, offset+int2(scale*blit.position),blit.resized);
     }
 

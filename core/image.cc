@@ -15,21 +15,12 @@ Image transpose(const Image& source) {
     return target;
 }
 
-#if 0
-Image rotate(const Image& source) {
-    int w=source.width, h=source.height;
-    Image target(h,w);
-    for(int y: range(h)) for(int x: range(w)) target(h-y-1, x) = source(x,y);
-    return target;
-}
-#else
 Image rotate(const Image& source) {
     int w=source.width, h=source.height;
     Image target(h,w);
     for(int y: range(h)) for(int x: range(w)) target(y, w-x-1) = source(x,y);
     return target;
 }
-#endif
 
 Image upsample(const Image& source) {
     int w=source.width, h=source.height;
@@ -43,32 +34,43 @@ Image upsample(const Image& source) {
 void downsample(const Image& target, const Image& source) {
     int w=source.width, h=source.height;
     assert_(w%2==0 && h%2==0, w, h);
-#if 0 // Exact
-    extern float sRGB_reverse[0x100];
-    extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
-    for(uint y: range(h/2)) for(uint x: range(w/2)) {
-        for(uint c: range(3)) {
-            float linear =
-                    ( sRGB_reverse[source(x*2+0,y*2+0)[c]]
-                    + sRGB_reverse[source(x*2+1,y*2+0)[c]]
-                    + sRGB_reverse[source(x*2+0,y*2+1)[c]]
-                    + sRGB_reverse[source(x*2+1,y*2+1)[c]] ) / 4;
-            target(x,y)[c] = sRGB_forward[int(round(0xFFF*linear))];
-        }
-        target(x,y).a = 0xFF;
-    }
-#else
+    // Averages values as if in linear space (not sRGB)
     for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
                                                                    int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);
-#endif
 }
 
 Image downsample(const Image& source) {
-    int w=source.width, h=source.height;
-    Image target(w/2, h/2);
+    Image target(source.size()/2);
     downsample(target, source);
     return target;
 }
+
+Image resize(Image&& target, const Image& source) {
+    assert_(source && target && target.size() != source.size() && source.alpha==false && target.alpha==false, source.size(), target.size());
+    // Integer box downsample
+    assert_(source.width/target.width==source.height/target.height && source.width%target.width==0 && source.height%target.height==0,
+            source.size(), target.size());
+    byte4* dst = target.data;
+    const byte4* src = source.data;
+    int scale = source.width/target.width;
+    for(uint unused y: range(target.height)) {
+        const byte4* line = src;
+        for(uint unused x: range(target.width)) {
+            int4 s = 0;
+            for(uint i: range(scale)) {
+                for(uint j: range(scale)) {
+                    s += int4(line[i*source.stride+j]);
+                }
+            }
+            s /= scale*scale;
+            *dst = byte4(s);
+            line += scale, dst++;
+        }
+        src += scale * source.stride;
+    }
+    return move(target);
+}
+
 
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;

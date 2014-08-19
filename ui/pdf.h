@@ -26,7 +26,7 @@ struct mat3x2 {
 
 /// Portable Document Format renderer
 struct PDF : Widget {
-    void clear() { images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); paths.clear(); polygons.clear(); annotations.clear(); }
+    void clear() { images.clear(); blits.clear(); lines.clear(); fonts.clear(); characters.clear(); polygons.clear(); annotations.clear(); }
     void open(const ref<byte>& data);
     int2 sizeHint() override;
     void render() override { render(0, target.size()); }
@@ -74,11 +74,6 @@ struct PDF : Widget {
 
     // Document height (normalized by width=1]
     float height;
-
-    /// Hooks which can be used to provide additionnal semantics or interactions to the PDF document
-    signal<int /*index*/, vec2 /*position*/, float /*size*/,const string& /*font*/, int /*code*/, int /*fontIndex*/> onGlyph;
-    signal<const ref<vec2>&> onPath;
-    array<array<vec2>> paths;
 
     map<int,vec3> colors;
     /// Overrides color for the given characters

@@ -66,11 +66,16 @@ Image transpose(const Image& source);
 Image rotate(const Image& source);
 
 /// Downsamples an image by averaging samples
+/// \note Averages values as if in linear space (not sRGB)
 void downsample(const Image& target, const Image& source);
 Image downsample(const Image& source);
 
 /// Upsamples an image by duplicating samples
 Image upsample(const Image& source);
+
+/// Resizes \a source into \a target
+/// \note Only supports integer box downsample
+Image resize(Image&& target, const Image& source);
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);

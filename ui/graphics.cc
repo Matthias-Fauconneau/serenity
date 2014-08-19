@@ -77,6 +77,7 @@ void fill(const Image& target, Rect rect, vec3 color, float alpha) {
 }
 
 void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
+    assert_(source);
     Rect rect = (position+Rect(source.size())) & Rect(target.size());
     color = clip(vec3(0), color, vec3(1));
     if(color!=vec3(0) || alpha<1 || source.sRGB) {
@@ -135,7 +136,7 @@ void line(const Image& target, float x1, float y1, float x2, float y2, vec3 colo
 }
 
 void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color, float alpha) {
-    if(p0.x > p1.x) swap(p0.x, p1.x); //assert_(p0.x < p1.x);
+    if(p0.x > p1.x) swap(p0.x, p1.x);
     for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
         float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
         float f0 = floor(y0);
@@ -147,9 +148,6 @@ void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color, fl
         }
         if(uint(i0)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
     }
-    //TODO: optimize solid fill
-    //int3 linear = int3(round(float(0xFFF)*color));
-    //byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
 }
 
 // 8bit signed integer (for edge flags)
