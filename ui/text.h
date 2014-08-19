@@ -14,7 +14,7 @@ inline String format(TextFormat f) { String s; s << (char)f; return s; }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, float interline=1, bool center=true);
+    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true);
 
     void setText(const string& text) { this->text=toUTF32(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
     void setSize(int size) { this->size=size; textSize=0; }
@@ -30,6 +30,8 @@ struct Text : virtual Widget {
     uint wrap=0;
     /// Font name
     string font;
+    /// Whether font should be hinted for display
+    bool hint;
     /// Interline stretch
     float interline;
     /// Horizontal alignment

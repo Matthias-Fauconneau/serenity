@@ -50,7 +50,7 @@ uint AudioFile::read(const mref<short2>& output) {
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
                 shortBuffer = buffer<short2>();
-                if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
+                if(!frame) frame = av_frame_alloc(); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
@@ -86,7 +86,7 @@ uint AudioFile::read(const mref<int2>& output) {
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
                 intBuffer = buffer<int2>();
-                if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
+                if(!frame) frame = av_frame_alloc(); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
@@ -127,7 +127,7 @@ uint AudioFile::read(const mref<float2>& output) {
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
-                if(!frame) frame = avcodec_alloc_frame(); int gotFrame=0;
+                if(!frame) frame = av_frame_alloc(); int gotFrame=0;
 #if __x86_64
                 setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormals and underflows in FFmpeg AAC decoder
 #endif
@@ -178,7 +178,7 @@ uint AudioFile::read(const mref<float2>& output) {
 void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, (uint64)position*audioStream->time_base.den/(rate*audioStream->time_base.num), 0); }
 
 void AudioFile::close() {
-    if(frame) avcodec_free_frame(&frame);
+    if(frame) av_frame_free(&frame);
     rate=0, position=0, duration=0; audioStream = 0; audio=0;
     intBuffer=buffer<int2>(); floatBuffer=buffer<float2>(); bufferIndex=0, bufferSize=0;
     if(file) avformat_close_input(&file);

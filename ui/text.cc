@@ -62,8 +62,11 @@ struct TextLayout {
         penY += interline*size;
     }
 
-    Font* getFont(string fontName, float size, ref<string> fontTypes={""_}) {
-        if(!fonts.contains(NameSize{fontName+fontTypes[0], size})) {
+    Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
+        String key = fontName+fontTypes[0]+(hint?"H"_:""_);
+        Font* font = fonts.find(NameSize{copy(key), size});
+        if(font) return font;
+        else {
             auto font = filter(fontFolder().list(Files|Recursive), [&](string path) {
                     for(string fontType: fontTypes) {
                         if(fontType) {
@@ -75,17 +78,15 @@ struct TextLayout {
                    }
                    return true;
             });
-
             if(!font) return 0;
             assert_(font.size==1, font);
-            fonts.insert(NameSize{fontName+fontTypes[0],size},Font(Map(font.first(), fontFolder()), size));
+            return &fonts.insert(NameSize{copy(key),size},Font(Map(font.first(), fontFolder()), size, hint));
         }
-        return &fonts.at(NameSize{fontName+fontTypes[0], size});
     }
 
-    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, float interline, bool justify=false)
+    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify=false)
         : size(size), wrap(wrap), interline(interline) {
-        Font* font = getFont(fontName, size) ?: getFont(fontName, size, {"Regular"_});
+        Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
         assert_(font, fontName, size);
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->advance(spaceIndex); assert(spaceAdvance);
@@ -93,6 +94,8 @@ struct TextLayout {
         bool bold=false, italic=false, superscript=false;
         int subscript = 0;
         float fontSize = size;
+        array<float> yOffsetStack;
+        float yOffset = 0;
         //Text::Link link;
         //Text::Cursor underlineBegin;
         Word word;
@@ -108,24 +111,35 @@ struct TextLayout {
         for(; i<text.size; i++) {
             uint c = text[i];
 
-            const float subscriptScale = 7./8, superscriptScale = subscriptScale;
+            const float subscriptScale = 2./3, superscriptScale = subscriptScale;
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
                 //if(link) { link.end=current(); links << move(link); }
                 /**/ if(c==Bold) bold=!bold;
                 else if(c==Italic) italic=!italic;
-                else if(c==SubscriptStart) { subscript++; if(subscript==1) subscriptPen=penX; }
-                else if(c==SubscriptEnd) { subscript--; assert_(subscript>=0); }
-                else if(c==Superscript) superscript=!superscript;
+                else if(c==SubscriptStart) {
+                    subscript++;
+                    if(subscript==1) subscriptPen=penX;
+                    yOffsetStack << yOffset;
+                }
+                else if(c==SubscriptEnd) {
+                    subscript--;
+                    assert_(subscript>=0);
+                    yOffset = yOffsetStack.pop();
+                }
+                else if(c==Superscript) {
+                    superscript=!superscript;
+                    //if(!superscript) { yOffsetStack.clear(); yOffset=0; }
+                }
                 //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
                 else error(c);
                 fontSize = size;
                 if(subscript) fontSize *= pow(subscriptScale, subscript);
                 if(superscript) fontSize *= superscriptScale;
-                if(bold && italic) font = getFont(fontName, fontSize, {"Bold Italic"_,"RBI"_,"BoldItalic"_});
-                else if(bold) font = getFont(fontName, fontSize, {"Bold"_,"RB"_});
-                else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_});
-                else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_});
+                if(bold && italic) font = getFont(fontName, fontSize, {"Bold Italic"_,"RBI"_,"BoldItalic"_}, hint);
+                else if(bold) font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint);
+                else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
+                else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
                 assert_(font, fontName, bold, italic, subscript, superscript);
                 //if(format&Underline) underlineBegin=current();
                 /*if(format&Link) {
@@ -137,6 +151,9 @@ struct TextLayout {
                     }
                     link.begin = current();
                 }*/
+                if(c==SubscriptStart) yOffset += font->ascender/2;
+                if(c==Superscript && superscript) yOffset -= fontSize/2;
+                if(c==Superscript && !superscript) yOffset = 0;
                 continue;
             }
 
@@ -173,13 +190,12 @@ struct TextLayout {
 
             float advance = font->advance(index);
             if(glyph.image) {
-                 float yOffset = 0;
-                 if(subscript) yOffset += fontSize/3;
-                 if(superscript) yOffset -= fontSize/2;
                  //if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
 
                 word << Character{{glyph.offset, share(glyph.image), 0,0,0}, vec2(pen, yOffset), glyph.size.x, advance, i};
                 column++;
+            } else {
+                if(c!=' ') log("Missing glyph", toUTF8({c}));
             }
             pen += advance;
         }
@@ -195,17 +211,17 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, float interline, bool center)
-    : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), interline(interline), center(center) {}
+Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, bool hint, float interline, bool center)
+    : text(toUTF32(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
 
 void Text::layout() {
     textSize=int2(0,size);
     float wrap = this->wrap;
     if(center) {
-        TextLayout layout(text, size, wrap, font, interline, false); // Layouts without justification
+        TextLayout layout(text, size, wrap, font, hint, interline, false); // Layouts without justification
         wrap = layout.maxLength;
     }
-    TextLayout layout(text, size, wrap, font, interline, true);
+    TextLayout layout(text, size, wrap, font, hint, interline, true);
     textSize = int2(ceil(layout.maxLength), ceil(layout.penY-layout.minY));
 
     textLines.clear(); textLines.reserve(layout.text.size);

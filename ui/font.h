@@ -20,9 +20,9 @@ struct Glyph {
 /// Freetype wrapper
 struct Font {
     /// Loads font at /a data to /a size pixels high
-    Font(Map&& data, float size);
+    Font(Map&& data, float size, bool hint=false);
     /// Loads font /a data scaled to /a size pixels high
-    Font(buffer<byte>&& data, float size);
+    Font(buffer<byte>&& data, float size, bool hint=false);
     default_move(Font);
     ~Font();
 
@@ -54,4 +54,5 @@ struct Font {
     map<uint, Glyph> cache;
     buffer<byte> data;
     Map keep;
+    bool hint = false;
 };
