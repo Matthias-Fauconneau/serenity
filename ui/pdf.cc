@@ -5,33 +5,6 @@
 #include "graphics.h"
 #include "text.h" //annotations
 
-struct Variant { //TODO: union
-    enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
-    double number=0; String data; array<Variant> list; map<string,Variant> dict;
-    Variant():type(Empty){}
-    Variant(bool boolean) : type(Boolean), number(boolean) {}
-    Variant(int number) : type(Integer), number(number) {}
-    Variant(int64 number) : type(Integer), number(number) {}
-    Variant(long number) : type(Integer), number(number) {}
-    Variant(double number) : type(Real), number(number) {}
-    Variant(String&& data) : type(Data), data(move(data)) {}
-    Variant(array<Variant>&& list) : type(List), list(move(list)) {}
-    Variant(map<string,Variant>&& dict) : type(Dict), dict(move(dict)) {}
-    explicit operator bool() const { return type!=Empty; }
-    operator int() const { assert(type==Integer, *this); return number; }
-    int integer() const { assert(type==Integer, *this); return number; }
-    double real() const { assert(type==Real||type==Integer); return number; }
-};
-String str(const Variant& o) {
-    if(o.type==Variant::Boolean) return String(o.number?"true"_:"false"_);
-    if(o.type==Variant::Integer) return str(int(o.number));
-    if(o.type==Variant::Real) return str(float(o.number));
-    if(o.type==Variant::Data) return copy(o.data);
-    if(o.type==Variant::List) return str(o.list);
-    if(o.type==Variant::Dict) return str(o.dict);
-    error("Invalid Variant"_,int(o.type));
-}
-
 buffer<byte> decodeRunLength(const ref<byte>& source) {
     array<byte> buffer (source.size);
     Data s (source);
@@ -70,7 +43,7 @@ static Variant parseVariant(TextData& s) {
         return move(list);
     }
     if(s.match("<<"_)) {
-        map<string,Variant> dict;
+        Dict dict;
         for(;;) {
             for(;!s.match('/');s.advance(1)) if(s.match(">>"_)) goto dictionaryEnd;
             string key = s.identifier("."_);
@@ -135,11 +108,11 @@ static Variant parseVariant(TextData& s) {
     return Variant();
 }
 static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
-static map<string,Variant> toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
+static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
 
 void PDF::open(const string& data) {
     clear();
-    array<String> xref; map<string,Variant> catalog;
+    array<String> xref; Dict catalog;
     {
         TextData s (data);
         for(s.index=s.buffer.size-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
@@ -167,10 +140,10 @@ void PDF::open(const string& data) {
                 uint unused n=s.integer(); s.skip();
                 if(!s.match("obj"_)) error("");
                 if(xref.size<=i) xref.grow(i+1);
-                xref[i]=String(s.slice(s.index));
+                xref[i]=String(s.until("endobj"_)); //FIXME: until endobj
             }
             Variant object = parseVariant(s);
-            map<string,Variant>& dict = object.dict;
+            Dict& dict = object.dict;
             if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
                 assert(W[0].integer()==1);
@@ -232,7 +205,7 @@ void PDF::open(const string& data) {
             // Parses font definitions
             if(resources.contains("Font"_)) for(auto e : toDict(xref,move(resources.at("Font"_)))) {
                 if(fonts.contains(e.key)) continue;
-                map<string,Variant> fontDict = parseVariant(xref[e.value.integer()]).dict;
+                Dict fontDict = parseVariant(xref[e.value.integer()]).dict;
                 Variant* descendant = fontDict.find("DescendantFonts"_);
                 if(descendant) {
                     if(descendant->type==Variant::Integer)
@@ -256,7 +229,7 @@ void PDF::open(const string& data) {
             // Parses image definitions
             if(resources.contains("XObject"_)) {
                 Variant& object = resources.at("XObject"_);
-                map<string,Variant> dict = object.type==Variant::Integer ? parseVariant(xref[object.integer()]).dict : move(object.dict);
+                Dict dict = object.type==Variant::Integer ? parseVariant(xref[object.integer()]).dict : move(object.dict);
                 for(auto e: dict) {
                     if(images.contains(String(e.key))) continue;
                     Variant object = parseVariant(xref[e.value.integer()]);
