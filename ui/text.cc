@@ -45,8 +45,6 @@ struct TextLayout {
         // Layouts
         column=0; float penX=0; // Line pen
         lineNumber++; text << TextLine();
-        /*for(uint i: range(words.size)) {
-            const Word& word = words[i];*/
         for(const Word& word: words) {
             for(const Character& c: word) {
                 text.last() << Character{{c.glyph.offset, share(c.glyph.image), 0,0,0}, vec2(penX,penY)+c.pos, c.width, c.advance, lastIndex=c.editIndex};
@@ -54,7 +52,6 @@ struct TextLayout {
             }
             maxLength = max(maxLength, penX+width(word));
             penX += advance(word);
-            //if(i!=words.size-1) text.last() << Character{0,vec2(penX, penY),0,0,spaceAdvance,lastIndex=lastIndex+1}; // Editable justified space
             penX += space;
         }
         lastIndex++;
@@ -68,6 +65,7 @@ struct TextLayout {
         if(font) return font;
         else {
             auto font = filter(fontFolder().list(Files|Recursive), [&](string path) {
+                    if(!endsWith(path,".ttf"_)) return true;
                     for(string fontType: fontTypes) {
                         if(fontType) {
                             if(find(path, fontName+fontType+"."_) || find(path, fontName+"-"_+fontType+"."_) || find(path, fontName+"_"_+fontType+"."_))
@@ -79,7 +77,7 @@ struct TextLayout {
                    return true;
             });
             if(!font) return 0;
-            assert_(font.size==1, font);
+            assert_(font.size<=1, font);
             return &fonts.insert(NameSize{copy(key),size},Font(Map(font.first(), fontFolder()), size, hint));
         }
     }
@@ -96,7 +94,6 @@ struct TextLayout {
         float fontSize = size;
         array<float> yOffsetStack;
         float yOffset = 0;
-        //Text::Link link;
         //Text::Cursor underlineBegin;
         Word word;
         float penX = 0 , subscriptPen = 0; // Word pen
@@ -114,9 +111,9 @@ struct TextLayout {
             const float subscriptScale = 2./3, superscriptScale = subscriptScale;
             if(c<0x20) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c==' '||c=='\t'||c=='\n') continue;
-                //if(link) { link.end=current(); links << move(link); }
                 /**/ if(c==Bold) bold=!bold;
                 else if(c==Italic) italic=!italic;
+                else if(c==Superscript)  superscript=!superscript;
                 else if(c==SubscriptStart) {
                     subscript++;
                     if(subscript==1) subscriptPen=penX;
@@ -126,10 +123,6 @@ struct TextLayout {
                     subscript--;
                     assert_(subscript>=0);
                     yOffset = yOffsetStack.pop();
-                }
-                else if(c==Superscript) {
-                    superscript=!superscript;
-                    //if(!superscript) { yOffsetStack.clear(); yOffset=0; }
                 }
                 //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
                 else error(c);
@@ -142,15 +135,6 @@ struct TextLayout {
                 else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
                 assert_(font, fontName, bold, italic, subscript, superscript);
                 //if(format&Underline) underlineBegin=current();
-                /*if(format&Link) {
-                    for(;;) {
-                        i++; assert(i<text.size);
-                        uint c = text[i];
-                        if(c == ' ') break;
-                        link.identifier << utf8(c);
-                    }
-                    link.begin = current();
-                }*/
                 if(c==SubscriptStart) yOffset += font->ascender/2;
                 if(c==Superscript && superscript) yOffset -= fontSize/2;
                 if(c==Superscript && !superscript) yOffset = 0;
@@ -190,13 +174,11 @@ struct TextLayout {
 
             float advance = font->advance(index);
             if(glyph.image) {
-                 //if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
+                 if(c==toUTF32("⌊"_)[0] || c==toUTF32("⌋"_)[0]) yOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
 
                 word << Character{{glyph.offset, share(glyph.image), 0,0,0}, vec2(pen, yOffset), glyph.size.x, advance, i};
                 column++;
-            } else {
-                if(c!=' ') log("Missing glyph", toUTF8({c}));
-            }
+            } else if(c!=' ') log("Missing glyph", toUTF8({c}));
             pen += advance;
         }
         if(word) {

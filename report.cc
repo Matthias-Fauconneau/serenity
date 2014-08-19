@@ -26,7 +26,8 @@ struct Document : Widget {
     static constexpr float titleSize = 16 * pointPx;
     static_assert(pageSize.y / (pageHeightMM / inchMM) > 130, "");
 
-    const string font = "LiberationSerif"_;
+    const string font = "FreeSerif"_;
+    //const string font = "LiberationSerif"_;
     const float interlineStretch = 3./2;
 
     TextData s;
@@ -40,12 +41,12 @@ struct Document : Widget {
     struct Entry { array<uint> levels; String name; uint page; };
     array<Entry> tableOfContents;
 
-    int viewPageIndex = 19; //FIXME: persistent
+    int viewPageIndex;
     signal<int> pageChanged;
 
     array<uint> stack;
 
-    Document(string source) : s(filter(source, [](char c) { return c=='\r'; })) {
+    Document(string source, int viewPageIndex) : s(filter(source, [](char c) { return c=='\r'; })), viewPageIndex(viewPageIndex) {
         while(s) { layoutPage(Image()); pageIndex++; } // Generates table of contents
         pageCount=pageIndex;
     }
@@ -392,16 +393,23 @@ constexpr int2 Document::windowSize;
 constexpr int2 Document::pageSize;
 
 struct Report {
-    string path = "rapport.txt"_;
-    Document document {readFile(path)};
+    const string path = "rapport.txt"_;
+    const String lastPageIndexPath = "."_+path+".last-page-index"_;
+    const int lastPageIndex = existsFile(lastPageIndexPath) ? fromInteger(readFile(lastPageIndexPath)) : 0;
+    Document document {readFile(path), lastPageIndex};
     Window window {&document, document.windowSize, "Report"_};
+
+    void pageChanged(int pageIndex) {
+        window.render();
+        window.setTitle(dec(pageIndex));
+        writeFile(lastPageIndexPath, dec(pageIndex));
+    }
+
     FileWatcher watcher{path, [this](string){
-            int index = document.viewPageIndex;
-            document.~Document(); new (&document) Document(readFile(path)); // Reloads
-            document.viewPageIndex = index;
-            document.pageChanged.connect([&](int pageIndex){ window.setTitle(dec(pageIndex)); });
-            window.render();
+            document.~Document(); new (&document) Document(readFile(path), document.viewPageIndex); // Reloads
+            document.pageChanged.connect(this, &Report::pageChanged);
         } };
+
     Report() {
         assert_(arguments());
         /**/ if(arguments()[0]=="export"_) {
@@ -413,7 +421,7 @@ struct Report {
         }
         else error(arguments());
         window.actions[Escape]=[]{exit();}; window.background=White; window.focus = &document; window.show();
-        document.pageChanged.connect([&](int pageIndex){ window.setTitle(dec(pageIndex)); });
+        document.pageChanged.connect(this, &Report::pageChanged);
     }
 
 } app;

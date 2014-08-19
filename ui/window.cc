@@ -274,8 +274,8 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 if(state==WaitPresent) { state=Idle; assert_(needUpdate); if(mapped) queue(); }
             }
         }
-        else if( type==DestroyNotify || type==MappingNotify) {}
-        else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type));
+        else if( type==DestroyNotify || type==MappingNotify || type==KeymapNotify) {}
+        else log("Event", type<sizeof(::events)/sizeof(*::events)?::events[type]:str(type), Shm::event, Present::event);
         window=0;
     }
 }
