@@ -52,6 +52,7 @@ struct Font {
 
     handle<FT_FaceRec_*> face;
     float ascender=0, descender=0;
+    vec2 bboxMin, bboxMax;
     map<uint, Glyph> cache;
     buffer<byte> data;
     Map keep;

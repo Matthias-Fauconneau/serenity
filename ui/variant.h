@@ -7,6 +7,7 @@ struct Variant { //FIXME: union
     double number=0; String data; array<Variant> list; map<string,Variant> dict;
     Variant(bool boolean) : type(Boolean), number(boolean) {}
     Variant(int number) : type(Integer), number(number) {}
+    Variant(int64 number) : type(Integer), number(number) {}
     Variant(uint number) : type(Integer), number(number) {}
     Variant(size_t number) : type(Integer), number(number) {}
     Variant(double number) : type(Real), number(number) {}
@@ -21,7 +22,7 @@ struct Variant { //FIXME: union
 };
 
 String str(const Variant& o);
-String str(const array<Variant>& array) {
+inline String str(const array<Variant>& array) {
     String s;
     s << "["_;
     for(const Variant& element: array) s << str(element) << " "_;
@@ -29,7 +30,7 @@ String str(const array<Variant>& array) {
     return s;
 }
 
-String str(const map<string,Variant>& dict) {
+inline String str(const map<string,Variant>& dict) {
     String s;
     s << "<<"_;
     for(const const_pair<string,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
@@ -37,7 +38,7 @@ String str(const map<string,Variant>& dict) {
     return s;
 }
 
-String str(const Variant& o) {
+inline String str(const Variant& o) {
     if(o.type==Variant::Boolean) return String(o.number?"true"_:"false"_);
     if(o.type==Variant::Integer) return str(int(o.number));
     if(o.type==Variant::Real) return str(float(o.number));
@@ -58,7 +59,7 @@ struct Object : Dict {
     buffer<byte> data;
 };
 
-String str(const Object& o) {
+inline String str(const Object& o) {
     String s = str((const Dict&)o);
     if(o.data) {
         assert_(o.at("Length"_) == int(o.data.size), (const Dict&)o);

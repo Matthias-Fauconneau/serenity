@@ -57,7 +57,7 @@ static Variant parseVariant(TextData& s) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
                 if(filter=="FlateDecode"_) stream=inflate(stream, true);
                 else if(filter=="RunLengthDecode"_) stream=decodeRunLength(stream);
-                else { log("Unsupported filter",v.dict); return Variant(); }
+                else { error("Unsupported filter",v.dict); /*return Variant();*/ }
             }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
@@ -104,8 +104,8 @@ static Variant parseVariant(TextData& s) {
     }
     if(s.match("true"_)) return true;
     if(s.match("false"_)) return false;
-    log("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.buffer.size-s.index);
-    return Variant();
+    error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.buffer.size-s.index);
+    //return Variant();
 }
 static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
 static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
@@ -178,7 +178,7 @@ void PDF::open(const string& data) {
                     }
                 }
             }
-            if(!root && dict.contains("Root"_)) root=dict.at("Root"_).integer();
+            if(!root && dict.contains("Root"_)) { assert_(dict.at("Root"_).type==Variant::Integer, dict); root=dict.at("Root"_).integer(); }
             if(!dict.contains("Prev"_)) break;
             s.index=dict.at("Prev"_).integer();
         }
@@ -282,7 +282,7 @@ void PDF::open(const string& data) {
             uint firstBlit = blits.size, firstLine = lines.size, firstCharacter = characters.size, firstPolygon=polygons.size;
             // Parses page bounds
             const array<Variant>& box = // Lower-left, upper-right
-                    (dict.value("ArtBox"_)?:dict.value("TrimBox"_)?:dict.value("BleedBox"_)?:dict.value("CropBox"_)?:dict.at("MediaBox"_)).list;
+                    (dict.find("ArtBox"_)?:dict.find("TrimBox"_)?:dict.find("BleedBox"_)?:dict.find("CropBox"_)?:&dict.at("MediaBox"_))->list;
             boxMin = vec2(min(box[0].real(),box[2].real()),min(box[1].real(),box[3].real()));
             boxMax = vec2(max(box[0].real(),box[2].real()),max(box[1].real(),box[3].real()));
             // Resets rendering context
@@ -405,7 +405,7 @@ void PDF::open(const string& data) {
             documentMax = max(documentMax, pageMax);
         }
         // add any children
-        pages << move(dict["Kids"_].list);
+        if(dict.contains("Kids"_)) pages << move(dict.at("Kids"_).list);
     }
 
     // Normalizes coordinates (aligns top-left to 0, fit width to 1)

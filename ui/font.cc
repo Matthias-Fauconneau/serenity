@@ -30,9 +30,13 @@ Font::Font(buffer<byte>&& data_, float size, bool hint) : data(move(data_)), hin
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;
     assert_(size);
-    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,long(round(size*64)),long(round(size*64)),0,0}; FT_Request_Size(face,&req);
-    ascender=((FT_FaceRec*)face)->size->metrics.ascender*0x1p-6;
-    descender=((FT_FaceRec*)face)->size->metrics.descender*0x1p-6;
+    FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,long(round(size*0x1p6)),long(round(size*0x1p6)),0,0};
+    FT_Request_Size(face,&req);
+    ascender=face->size->metrics.ascender*0x1p-6;
+    descender=face->size->metrics.descender*0x1p-6;
+    vec2 scale (face->size->metrics.x_scale*0x1p-16*0x1p-6, face->size->metrics.y_scale*0x1p-16*0x1p-6);
+    bboxMin = scale*vec2(face->bbox.xMin, face->bbox.yMin);
+    bboxMax = scale*vec2(face->bbox.xMax, face->bbox.yMax);
 }
 
 Font::~Font(){
@@ -53,6 +57,7 @@ uint Font::index(uint code) {
         uint index = FT_Get_Char_Index(face, code);
         if(index) return index;
     }
+    error("Missing code", code);
     return code;
 }
 
