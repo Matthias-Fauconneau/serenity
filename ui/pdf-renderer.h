@@ -1,46 +1,9 @@
 #pragma once
 /// \file pdf.h Portable Document Format renderer
-#include "string.h"
-#include "vector.h"
-#include "map.h"
-#include "font.h"
 #include "widget.h"
-#include "function.h"
-#include "time.h"
-#include "variant.h"
 #include "matrix.h"
-
-/*/// 2D affine transformation
-struct mat3x2 {
-    float data[3*2];
-    mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
-    mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
-    mat3x2(float m00, float m01, float m10, float m11, float dx, float dy):data{m00,m10,m01,m11, dx,dy}{assert(m01==0 && m10==0);}
-
-    float M(int i, int j) const {assert(i<2 && j<3); return data[j*2+i]; }
-    float& M(int i, int j) {assert(i<2 && j<3); return data[j*2+i]; }
-    float operator()(int i, int j) const { return M(i,j); }
-    float& operator()(int i, int j) { return M(i,j); }
-
-    mat3x2 operator*(mat3x2 b) const {mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r; }
-    vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
-};*/
-
-/*/// 2D affine transformation (FIXME: use matrix:mat3x2)
-struct mat3x2 {
-    float m11, m12, m21, m22, dx, dy;
-    mat3x2(float m11, float m12, float m21, float m22, float dx, float dy):m11(m11),m12(m12),m21(m21),m22(m22),dx(dx),dy(dy){}
-    mat3x2(float dx, float dy) : mat3x2(1,0,0,1,dx,dy) {}
-    mat3x2() : mat3x2(1,0,0,1,0,0) {}
-    float M(int i, int j) const {assert(i<2 && j<3); return (&m11)[j*2+i]; }
-    float& M(int i, int j) {assert(i<2 && j<3); return (&m11)[j*2+i]; }
-    float operator()(int i, int j) const { return M(i,j); }
-    float& operator()(int i, int j) { return M(i,j); }
-    mat3x2 operator*(mat3x2 m) const { return mat3x2( m11*m.m11 + m12*m.m21, m11*m.m12 + m12*m.m22,
-                                                          m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22,
-                                                          dx*m.m11  + dy*m.m21 + m.dx, dx*m.m12  + dy*m.m22 + m.dy ); }
-    vec2 operator*(vec2 v) const { return vec2( m11*v.x + m21*v.y + dx, m12*v.x + m22*v.y + dy ); }
-};*/
+#include "font.h"
+#include "function.h"
 
 /// Portable Document Format renderer
 struct PDF : Widget {
@@ -101,6 +64,5 @@ struct PDF : Widget {
     void setAnnotations(const map<vec2, String>& annotations) { this->annotations=copy(annotations); contentChanged(); }
 
     signal<> contentChanged;
-    signal<int> hiddenHighlight;
     int lastSize = 0;
 };

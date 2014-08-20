@@ -21,6 +21,7 @@ struct Layout : Widget {
 /// Implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct Widgets : virtual Layout, array<Widget*> {
+    default_move(Widgets);
     Widgets(){}
     Widgets(array<Widget*>&& widgets):array(move(widgets)){}
     uint count() const { return array::size; }
@@ -86,6 +87,7 @@ struct HBox : Horizontal, Widgets {
 };
 /// Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
+    default_move(VBox);
     VBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
     VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
     VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(array<Widget*>(widgets)){}

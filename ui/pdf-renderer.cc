@@ -1,27 +1,10 @@
-#include "pdf.h"
+#include "pdf-renderer.h"
+#include "variant.h"
 #include "file.h"
 #include "font.h"
 #include "deflate.h"
 #include "graphics.h"
-#include "text.h" //annotations
-
-buffer<byte> decodeRunLength(const ref<byte>& source) {
-    array<byte> buffer (source.size);
-    Data s (source);
-    for(;;) {
-        assert_(s);
-        uint8 code = s.next();
-        if(code < 128) buffer << s.read(code+1);
-        else if(code != 128) {
-            byte value = s.next();
-            uint size = 257-code;
-            buffer.reserve(buffer.size+size);
-            for(uint unused i: range(size)) buffer << value;
-        }
-        else break;
-    }
-    return move(buffer);
-}
+#include "text.h"
 
 static Variant parseVariant(TextData& s) {
     s.skip();

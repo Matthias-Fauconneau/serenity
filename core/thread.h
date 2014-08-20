@@ -6,6 +6,7 @@
 #include "string.h"
 #include <poll.h>
 #include <pthread.h> //pthread
+#include <sys/inotify.h>
 
 enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
 void setExceptions(uint except);
@@ -185,3 +186,22 @@ string homePath(); //$HOME
 const Folder& home(); //$HOME
 const Folder& config(); //$HOME/.config
 const Folder& cache(); //$HOME/.cache
+
+/// Watches a folder for new files
+struct FileWatcher : File, Poll {
+    string path;
+    /*const*/ uint watch;
+    function<void(string)> fileModified;
+
+    FileWatcher(string path, function<void(string)> fileModified) : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(path),
+        watch(check(inotify_add_watch(File::fd, strz(path), IN_MODIFY))), fileModified(fileModified) {}
+    void event() override {
+        while(poll()) {
+            ::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
+            inotify_event e = *(inotify_event*)buffer.data;
+            fileModified(e.len ? string(e.name, e.len-1) : string());
+            inotify_rm_watch(File::fd, watch);
+            watch = check(inotify_add_watch(File::fd, strz(path), IN_MODIFY));
+        }
+    }
+};

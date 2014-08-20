@@ -87,16 +87,16 @@ array<string> split(const string& str, byte separator=' ');
 template<uint base=10> String utoa(uint64 number, int pad=0, char padChar='0');
 template<uint base=10> String itoa(int64 number, int pad=0, char padChar=' ');
 inline String dec(int64 n, int pad=0, char padChar=' ') { return itoa<10>(n,pad,padChar); }
-inline String str(const uint8& n) { return dec(n); }
-inline String str(const int8& n) { return dec(n); }
-inline String str(const uint16& n) { return dec(n); }
-inline String str(const int16& n) { return dec(n); }
-inline String str(const uint32& n) { return dec(n); }
-inline String str(const int32& n) { return dec(n); }
-inline String str(const unsigned long& n) { return dec(n); }
-inline String str(const long& n) { return dec(n); }
-inline String str(const uint64& n) { return dec(n); }
-inline String str(const int64& n) { return dec(n); }
+inline String str(uint8 n) { return dec(n); }
+inline String str(int8 n) { return dec(n); }
+inline String str(uint16 n) { return dec(n); }
+inline String str(int16 n) { return dec(n); }
+inline String str(uint32 n) { return dec(n); }
+inline String str(int32 n) { return dec(n); }
+inline String str(unsigned long n) { return dec(n); }
+inline String str(long n) { return dec(n); }
+inline String str(uint64 n) { return dec(n); }
+inline String str(int64 n) { return dec(n); }
 inline String hex(uint64 n, int pad=0) { return utoa<16>(n,pad); }
 generic inline String str(T* const& p) { return "0x"_+hex(ptr(p)); }
 generic String str(const unique<T>& t) { return str(*t.pointer); }
@@ -104,8 +104,8 @@ generic String str(const shared<T>& t) { return str(*t.pointer); }
 
 /// Converts floating-point numbers
 String ftoa(double number, int precision=2, uint pad=0, int exponent=0);
-inline String str(const float& n) { return ftoa(n); }
-inline String str(const double& n) { return ftoa(n); }
+String str(float n);
+String str(double n);
 
 /// Formats value using best binary prefix
 String binaryPrefix(size_t value, string unit="B"_);

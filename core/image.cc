@@ -74,11 +74,25 @@ Image resize(Image&& target, const Image& source) {
 
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
-    else if(startsWith(file,"\x89PNG"_)) return "PNG"_;
+    else if(startsWith(file,"\x89PNG\r\n\x1A\n"_)) return "PNG"_;
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return "ICO"_;
     else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return "TIFF"_;
     else if(startsWith(file,"BM"_)) return "BMP"_;
     else return ""_;
+}
+
+int2 imageSize(const ref<byte>& file) {
+    BinaryData s(file, true);
+    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) {
+        for(;;) {
+            s.advance(4);
+            if(s.read<byte>(4) == "IHDR"_) {
+                uint width = s.read(), height = s.read();
+                return int2(width, height);
+            }
+        }
+    }
+    else return {};
 }
 
 Image  __attribute((weak)) decodePNG(const ref<byte>&) { error("PNG support not linked"_); }

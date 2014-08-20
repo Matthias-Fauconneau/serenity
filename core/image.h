@@ -80,6 +80,9 @@ Image resize(Image&& target, const Image& source);
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);
 
+/// Returns the image size
+int2 imageSize(const ref<byte>& file);
+
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte>& file);
 

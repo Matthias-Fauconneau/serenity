@@ -61,10 +61,13 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="MIT-SHM"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"MIT-SHM"_+pad(4,r.length));}));
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
-
     {QueryExtensionReply r=readReply<QueryExtensionReply>((
         {QueryExtension r; r.length="RENDER"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"RENDER"_+pad(4,r.length));}));
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
+    {QueryExtensionReply r=readReply<QueryExtensionReply>((
+        {QueryExtension r; r.length="Present"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"Present"_+pad(4,r.length));}));
+        Present::EXT=r.major; Present::event=r.firstEvent; Present::errorBase=r.firstError;}
+
     {QueryPictFormatsReply r=readReply<QueryPictFormatsReply>(raw(QueryPictFormats()));
         array<PictFormInfo> formats = read<PictFormInfo>( r.numFormats);
         for(uint unused i: range(r.numScreens)) { PictScreen screen = read<PictScreen>();
@@ -93,19 +96,16 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
                 |EnterWindowMask|LeaveWindowMask|PointerMotionMask|ExposureMask;
         send(raw(r));
     }
+    {Present::SelectInput r; r.window=id+XWindow; r.eid=id+PresentEvent; send(raw(r));}
     {CreateGC r; r.context=id+GContext; r.window=id+XWindow; send(raw(r));}
     {ChangeProperty r; r.window=id+XWindow; r.property=Atom("WM_PROTOCOLS"_); r.type=Atom("ATOM"_); r.format=32;
         r.length=1; r.size+=r.length; send(String(raw(r)+raw(Atom("WM_DELETE_WINDOW"_))));}
-    {ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
-        r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}
+    /*{ChangeProperty r; r.window=id+XWindow; r.property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_); r.type=Atom("CARDINAL"_); r.format=32;
+        r.length=1; r.size+=r.length; send(String(raw(r)+raw(1)));}*/
     setTitle(title);
     setIcon(icon);
     actions[Escape] = []{exit();};
-
-    {QueryExtensionReply r=readReply<QueryExtensionReply>((
-        {QueryExtension r; r.length="Present"_.size; r.size+=align(4,r.length)/4; String(raw(r)+"Present"_+pad(4,r.length));}));
-        Present::EXT=r.major; Present::event=r.firstEvent; Present::errorBase=r.firstError;}
-    {Present::SelectInput r; r.window=id+XWindow; r.eid=id+PresentEvent; send(raw(r));}
+    show();
 }
 Window::~Window() {
     {FreeGC r; r.context=id+GContext; send(raw(r));}
@@ -207,7 +207,7 @@ void Window::processEvent(uint8 type, const XEvent& event) {
                 log("XError",::xErrors[code],"request",e.minor<reqSize?String(Shm::requests[e.minor]):dec(e.minor));
             }
         } else {
-            assert(code<sizeof(::errors)/sizeof(*::errors),code,e.major);
+            assert_(code<sizeof(::errors)/sizeof(*::errors), "major", e.major, "code", code);
             int reqSize=sizeof(::requests)/sizeof(*::requests);
             log("XError",::xErrors[code],"request",e.major<reqSize?String(::requests[e.major]):dec(e.major),"minor",e.minor);
         }
@@ -337,8 +337,9 @@ void Window::setGeometry(int2 position, int2 size) {
 Key Window::KeySym(uint8 code, uint8 state) {
     //FIXME: not atomic
     GetKeyboardMapping req; GetKeyboardMappingReply r=readReply<GetKeyboardMappingReply>(({req.keycode=code; raw(req);}));
+    assert_(r.numKeySymsPerKeyCode==r.length, r.numKeySymsPerKeyCode, r.length);
     ::buffer<uint> keysyms = read<uint>(r.numKeySymsPerKeyCode);
-    if(!keysyms) error(code,state);
+    assert_(keysyms, "No KeySym for code", code, "in state",state);
     if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
     return (Key)keysyms[state&1 && keysyms.size>=2];
 }

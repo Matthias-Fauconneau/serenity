@@ -139,7 +139,13 @@ struct BinaryData : Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : Data {
-    using Data::Data;
+    //using Data::Data; Incompatible with Clang code model
+    TextData(){}
+    /// Creates a TextData interface to an \a array
+    TextData(::buffer<byte>&& buffer) : Data(move(buffer)) {}
+    /// Creates a TextData interface to a \a reference
+    explicit TextData(const ref<byte>& reference) : Data(reference) {}
+
     void advance(uint step) /*override*/;
 
     /// Returns whether input match \a key

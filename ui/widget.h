@@ -31,6 +31,8 @@ enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4
 
 /// Abstract component to compose user interfaces
 struct Widget {
+    Widget(){}
+    default_move(Widget);
     virtual ~Widget() {}
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))

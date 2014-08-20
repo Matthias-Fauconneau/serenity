@@ -66,7 +66,7 @@ struct Window : Device {
     /// Actions triggered when a key is pressed for a long time
     map<Key, function<void()>> longActions;
     /// Current widget that has the keyboard input focus
-    Widget* focus=0;
+    Widget* focus = widget;
     /// Current widget that has the drag focus
     Widget* drag=0;
     /// Current widget that gets keyboard events reported without modifiers (when in focus)
@@ -76,7 +76,7 @@ struct Window : Device {
     /// Current cursor
     Cursor cursor = Cursor::Arrow;
     /// Background style
-    Background background = Oxygen;
+    Background background = White;
 
     /// Gets current text selection
     /// \note The selection owner might lock this process if it fails to notify

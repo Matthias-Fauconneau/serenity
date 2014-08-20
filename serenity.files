@@ -3,7 +3,6 @@ README.md
 TODO
 build.sh
 build.cc
-player.cc
 
 core/array.h
 core/core.h
@@ -18,8 +17,6 @@ core/map.h
 core/math.h
 core/matrix.h
 core/memory.h
-core/profile.cc
-core/simd.h
 core/string.cc
 core/string.h
 core/thread.cc
@@ -30,27 +27,20 @@ core/trace.cc
 core/trace.h
 core/vector.h
 
-io/bmp.cc
-io/bmp.h
-io/deflate.cc
+io/rle.h
+io/variant.h
 io/deflate.h
-io/jpeg.cc
 io/png.cc
 io/png.h
-io/tga.cc
-io/tiff.cc
-io/tiff.h
-io/xml.h
-io/xml.cc
-io/dbus.h
-io/dbus.cc
+io/font.cc
+io/font.h
+io/pdf.h
+io/pdf.cc
+io/jpeg.cc
 
 ui/graphics.cc
 ui/graphics.h
-ui/font.cc
-ui/font.h
-ui/gl.cc
-ui/gl.h
+
 ui/interface.h
 ui/interface.cc
 ui/layout.h
@@ -63,27 +53,10 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/x.h
-ui/plot.cc
-ui/plot.h
-ui/pdf.h
-ui/pdf.cc
+ui/pdf-renderer.h
+ui/pdf-renderer.cc
 
-audio/audio.h
-audio/audio.cc
-audio/ffmpeg.cc
+test.cc
+document.cc
+player.cc
 
-music/sheet.cc
-music/MusicXML.cc
-music/notation.h
-music/midi.h
-music/midi.cc
-music/MusicXML.h
-music/music.cc
-music/music.cc
-music/sheet.h
-music/encoder.cc
-music/encoder.h
-test.cc
-report.cc
-ui/variant.h
-test.cc
