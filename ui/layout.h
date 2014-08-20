@@ -41,8 +41,6 @@ template<class T> struct Array : virtual Layout, array<T> {
 /// Layouts widgets on an axis
 /// \note This is an abstract class, use \a Horizontal or \a Vertical
 struct Linear : virtual Layout {
-    /// Expands main axis even when no widget is expanding
-    bool expanding = false;
     /// How to use any extra space when no widget is expanding
     enum Extra {
         Left,Top=Left, /// Aligns tightly packed widgets
@@ -57,12 +55,12 @@ struct Linear : virtual Layout {
         Expand /// For side axis, sets all widgets side size to layout available side size
     };
     Extra main, side;
-    /// Identifier to help understand layout behaviour.
-    string name;
+    /// Expands main axis even when no widget is expanding
+    bool expanding;
 
     /// Constructs a linear layout
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
-    Linear(Extra main=Share, Extra side=AlignCenter):main(main),side(side){}
+    Linear(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : main(main), side(side), expanding(expanding) {}
 
     int2 sizeHint() override;
     array<Rect> layout(int2 size) override;
@@ -81,22 +79,35 @@ struct Vertical : virtual Linear {
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
 struct HBox : Horizontal, Widgets {
-    HBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
-    HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
-    HBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(array<Widget*>(widgets)){}
+    /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
+    HBox(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : Linear(main, side, expanding){}
+    /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
+    HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
+        : Linear(main, side, expanding), Widgets(move(widgets)){}
+    /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
+    HBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
+        : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)){}
 };
+
 /// Vertical layout of heterogenous widgets. \sa Widgets
 struct VBox : Vertical, Widgets {
     default_move(VBox);
-    VBox(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
-    VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(move(widgets)){}
-    VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter):Linear(main,side),Widgets(array<Widget*>(widgets)){}
+    /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
+    VBox(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : Linear(main, side, expanding) {}
+    /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
+    VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
+        : Linear(main, side, expanding), Widgets(move(widgets)) {}
+    /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
+    VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
+        : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)) {}
 };
+
 /// Horizontal layout of homogenous items. \sa Array
 template<class T> struct HList : Horizontal, Array<T> {
     HList(array<T>&& widgets):Array<T>(move(widgets)){}
     HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
+
 /// Vertical layout of homogenous items. \sa Array
 template<class T> struct VList : Vertical, Array<T> {
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
@@ -115,11 +126,13 @@ struct GridLayout : virtual Layout {
     int2 sizeHint();
     array<Rect> layout(int2 size) override;
 };
+
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(){}
     WidgetGrid(array<Widget*>&& widgets):Widgets(move(widgets)){}
 };
+
 template<class T> struct UniformGrid : GridLayout,  Array<T> {
     UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
 };

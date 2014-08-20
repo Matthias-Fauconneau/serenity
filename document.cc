@@ -7,6 +7,10 @@
 //#include "jpeg.h"
 //include "pdf.h"
 
+struct Placeholder : Widget {
+    void render() {}
+};
+
 /// Header of a section from a \a Document
 struct Header {
     array<uint> indices; // Header index for each level
@@ -24,7 +28,7 @@ struct Page : VBox {
     Widget* footer = 0;
 
     Page(uint index, float marginPx)
-        : VBox(index ? Linear::Share : Linear::Center, Linear::Expand), index(index), marginPx(marginPx) {}
+        : Linear(index ? Linear::Spread/*Share*/ : /*Linear::Center*/Linear::Share, Linear::Expand, true), index(index), marginPx(marginPx) {}
 
     void render() override {
         Image page = share(this->target);
@@ -38,33 +42,30 @@ struct Page : VBox {
     }
 };
 
+struct Format { const int2 pageSize; float marginPx; const string font; const float footerSize, textSize, headerSize, titleSize; };
+struct A4 : Format {
+    static constexpr int pageWidth = 1050, pageHeight = 1485;
+    static constexpr float inchPx = pageHeight / (297/*mm*/ / 25.4/*inch/mm*/);
+    static constexpr float pointPx = inchPx / 72;
+    A4() : Format{int2(pageWidth, pageHeight), 1.5 * inchPx, "FreeSerif"_, 12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx} {}
+};
+
 /// Layouts a document
 struct Document {
-    // Page properties
-    const int2 pageSize = int2(1050, 1485);
-    const float pageHeightMM = 297;
-    const float inchMM = 25.4;
-    const float pageHeightInch = pageHeightMM / inchMM;
-    const float inchPx = pageSize.y / pageHeightInch;
-    const float pointPx = inchPx / 72;
-    const float marginPx = 1.5 * inchPx;
-    const int2 contentSize = pageSize - int2(2*marginPx);
-
-    // Font properties
-    const string font = "FreeSerif"_;
+    const String source;
+    string formatString;
+    Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32};
+    const int2 contentSize = format.pageSize - int2(2*format.marginPx);
+    const float textSize = format.textSize;
     const float interlineStretch = 3./2;
-    const float textSize = 12 * pointPx;
-    const float headerSize = 14 * pointPx;
-    const float titleSize = 16 * pointPx;
 
     // Document properties
-    const String source;
     array<Header> headers;
     array<string> pages; // Source slices for each page
     array<array<uint>> indices; // Level counters state at start of each page for correct single page rendering
 
     /// Generates page starts table, table of contents
-    Document(String&& source_) : source(move(source_)) {
+    Document(String&& source_) : source(move(source_)), formatString(startsWith(source,"%"_)?section(source.slice(1),'\n'):"A4"_) {
         assert_(!source.contains('\r')); //filter(source, [](char c) { return c=='\r'; }
         array<uint> indices;
         for(TextData s (source); s;) {
@@ -85,10 +86,17 @@ struct Document {
     }
     /// Registers a new text element and returns it
     Text& newText(Page& page, string text, int size, bool center=true) const {
-        return element<Text>(page, text, size, 0, 1, contentSize.x, font, false, interlineStretch, center);
+        return element<Text>(page, text, size, 0, 1, contentSize.x, format.font, false, interlineStretch, center);
     }
 
     // Parser
+
+    template<Type... Args> String warn(TextData& s, const Args&... args) const {
+        String text = str(s.lineIndex)+": "_+str(args...); log(text); return text;
+    }
+    template<Type... Args> Text& warnText(TextData& s, Page& page, const Args&... args) const {
+        return newText(page, warn(s, args...), textSize);
+    }
 
     /// Skips whitespaces and comments
     void skip(TextData& s) const {
@@ -138,8 +146,7 @@ struct Document {
     /// Parses a line expression
     String parseLine(TextData& s, const ref<string>& delimiters={"\n"_}, bool match=true) const {
         String text; bool bold=false,italic=false;
-        for(;;) { // Line
-            assert_(s);
+        while(s) { // Line
             if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
 
             /**/ if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
@@ -161,8 +168,8 @@ struct Document {
             }
             else text << s.next();
         }
-        assert_(!bold, "Expected bold end delimiter *, got end of line");
-        assert_(!italic, "Expected italic end delimiter /, got end of line");
+        if(bold) warn(s, "Expected bold end delimiter *, got end of line");
+        if(italic) warn(s, "Expected italic end delimiter /, got end of line");
         return text;
     }
 
@@ -170,60 +177,75 @@ struct Document {
     Widget* parseLayout(TextData& s, Page& page, bool quick) const {
         array<Widget*> children;
         char type = 0;
+        int start = s.index;
         while(!s.match(')')) {
             // Element
             skip(s);
             if(s.match('(')) children << parseLayout(s, page, quick);
-            else if(s.wouldMatchAny("&_^@"_)) {
-                string prefix = s.whileAny("&_^@"_);
-                string path = s.untilAny(" \t\n"_);
+            else if(s.wouldMatchAny("&_$^@"_)) {
+                string prefix = s.whileAny("$&_^@"_);
+                string path = s.whileNo(" \t\n)-|+"_);
+                assert_(s);
                 if(quick) {
-                    //TODO: Layout dummy box with image size for page numbers in table of contents with auto page break
+                    //TODO: Layout image size for page numbers in table of contents with auto page break
+                    children << &element<Placeholder>(page);
                 } else {
                     unique<Image> image;
                     /**/ if(existsFile(path)) image = unique<Image>(decodeImage(readFile(path)));
                     else if(existsFile(path+".png"_)) image = unique<Image>(decodeImage(readFile(path+".png"_)));
                     else if(existsFile(path+".jpg"_)) image = unique<Image>(decodeImage(readFile(path+".jpg"_)));
-                    else error("Missing image", path);
-                    for(char operation: prefix.reverse()) {
-                        if(operation=='@') image = unique<Image>(rotate(image));
-                        else if(operation=='^') image = unique<Image>(upsample(image));
-                        else if(operation=='_') image = unique<Image>(downsample(image));
-                        else if(operation=='&') {}
-                        else error("Unknown image operation", operation);
+                    if(image) {
+                        for(char operation: prefix.reverse()) {
+                            if(operation=='@') image = unique<Image>(rotate(image));
+                            else if(operation=='^') image = unique<Image>(upsample(image));
+                            else if(operation=='_') image = unique<Image>(downsample(image));
+                            else if(operation=='$') { for(byte4& v: image->buffer) if(!v.r && !v.g && !v.b) v=0xFF; } // Sets 0 to FF
+                            else if(operation=='&') {}
+                            else error("Unknown image operation", operation);
+                        }
+                        while(!(image->size() <= contentSize)) image = unique<Image>(downsample(image));
+                        children << &element<ImageWidget>(page, image);
+                        page.images << move(image);
                     }
-                    while(!(image->size() <= contentSize)) image = unique<Image>(downsample(image));
-                    children << &element<ImageWidget>(page, image);
-                    page.images << move(image);
+                    else warn(s, "Missing image", path);
                 }
             } else {
-                String text = simplify(parseLine(s, {"\n"_,"_"_,"-"_,"+"_,")"_}, false));
-                assert_(text, s.line());
+                String text = simplify(parseLine(s, {"|"_,"-"_,"+"_,/*"("_,*/")"_}, false));
+                //if(!text) { text=warn(s, "Expected element"); }
                 children << &newText(page, text, textSize);
                 if(s.match('\n')) continue;
+                assert_(s);
             }
             skip(s);
             // Separator
             /**/ if(s.match(')')) break;
-            else if(!type) type = s.next();
-            else s.skip(string(&type,1));
+            else if(s.wouldMatchAny("-|+"_)) type = s.next();
+            else if(!s.match(type)) {
+                children << &warnText(s, page, "Expected"_+(type?str(type):"-, |, +"_," or )"_));
+                break;
+            }
         }
-        if(type=='-') return &element<VBox>(page, move(children));
-        else if(type=='|') return &element<HBox>(page, move(children));
+        if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, true);
+        else if(type=='|') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
         else if(type=='+') return &element<WidgetGrid>(page, move(children));
-        else { assert_(children.size==1); return children.first(); }
+        else if(!type) {
+            if(!children) return &warnText(s, page, "Empty layout", s.buffer(start-1,s.index));
+            assert_(children.size==1);
+            return children.first();
+        }
+        else error("Unknown layout type", type);
     }
 
     /// Parses a page statement
     /// \arg quick Quick layout for table of contents (skips images)
     Page parsePage(TextData& s, array<uint>& indices, uint pageIndex, bool quick=false) const {
-        Page page (pageIndex, marginPx);
+        Page page (pageIndex, format.marginPx);
         while(s) {
             while(s.match('%')) s.line(); // Comment
 
             if(s.match('(')) { // Float
                 page << parseLayout(s, page, quick);
-                s.skip("\n"_);
+                s.match("\n"_);
                 continue;
             }
 
@@ -247,14 +269,15 @@ struct Document {
             if(s.match('!')) {
                 assert_(!bold);
                 bold = true;
-                size = titleSize;
+                size = format.titleSize;
                 center = true;
             }
 
             uint level = 0;
             while(s.match('#')) {
                 level++;
-                center=true;
+                //center=true;
+                size = format.headerSize;
             }
 
             if(s.match('\\')) {
@@ -302,7 +325,7 @@ struct Document {
 
             if(s.match('\n')) break; // Page break
         }
-        if(page.index) page.footer = &newText(page, dec(page.index), textSize);
+        if(format.footerSize && page.index) page.footer = &newText(page, dec(page.index), textSize);
         return move(page);
     }
     Page parsePage(TextData&& s, array<uint>&& indices, uint pageIndex) const { return parsePage(s, indices, pageIndex); }
@@ -356,7 +379,7 @@ struct DocumentViewer {
     const int lastPageIndex = existsFile(lastPageIndexPath) ? fromInteger(readFile(lastPageIndexPath)) : 0;
     Document document { readFile(path) };
     PageView view {(int)document.pages.size, {this, &DocumentViewer::getPage}, lastPageIndex};
-    Window window {&view, document.pageSize, dec(view.pageIndex)};
+    Window window {&view, document.format.pageSize, dec(view.pageIndex)};
 
     Page getPage(int pageIndex) {
         if(window) {
@@ -367,7 +390,13 @@ struct DocumentViewer {
         return document.parsePage(pageIndex);
     }
 
-    FileWatcher watcher{path, [this](string){ document.~Document(); new (&document) Document(readFile(path)); } };
+    FileWatcher watcher{path, [this](string){ //TODO: watch images
+            document.~Document(); new (&document) Document(readFile(path));
+            view.pageCount = document.pages.size;
+            view.page = document.parsePage(view.pageIndex);
+            window.render();
+            window.show();
+        } };
 
     DocumentViewer(const string path) : path(path) {}
 };

@@ -61,7 +61,7 @@ array<Rect> Linear::layout(int2 size) {
         }
     }
 
-    int margin = (main==Spread && count>1) ? width/(count-1) : 0; //spreads any margin between all widgets
+    int margin = (main==Spread && count>1) ? width/(count-1) : 0; // Spreads any margin between all widgets
     width -= margin*(count-1); //width%(count-1) space remains as margin is rounded down
 
     if(main==Even) {
@@ -70,8 +70,8 @@ array<Rect> Linear::layout(int2 size) {
     }
 
     int2 pen = 0;
-    if(main==Left) pen.x+=0;
-    else if(main==Center || main==Even || main==Spread || main==Share) pen.x+=width/2;
+    if(main==Spread || main==Left) pen.x+=0;
+    else if(main==Center || main==Even || /*main==Spread ||*/ main==Share) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
     else error("");
     if(side==AlignLeft) pen.y+=0;
@@ -94,11 +94,12 @@ array<Rect> Linear::layout(int2 size) {
 // Grid
 int2 GridLayout::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-#if 0
-    int2 max(0,0);
-    for(uint i: range(count())) max = ::max(max,at(i).sizeHint());
-#else
     int2 size = int2(w,h)*margin;
+#if 1
+    int2 max(0,0);
+    for(uint i: range(count())) max = ::max(max, abs(at(i).sizeHint()));
+    size += int2(w,h)*max;
+#else
     for(uint x: range(w)) {
         int maxX = 0;
         for(uint y : range(h)) {
@@ -128,7 +129,7 @@ array<Rect> GridLayout::layout(int2 size) {
     if(count()) {
         uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
         assert(w && h);
-#if 0 // Uniform element size
+#if 1 // Uniform element size
         int2 elementSize = int2(size.x/w,size.y/h);
         int2 margin = (size - int2(w,h)*elementSize) / 2;
         for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) widgets << margin + int2(x,y)*elementSize + Rect(elementSize);

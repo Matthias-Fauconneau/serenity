@@ -118,7 +118,7 @@ struct Slider : Progress {
 
 /// ::Icon with \ref Text "text"
 struct Item : Linear {
-    Item(Image&& icon, const string& text, int size=16, bool under=false):icon(move(icon)),text(text,size),under(under){}
+    Item(Image&& icon, const string& text, int size=16, bool under=false) : icon(move(icon)), text(text,size), under(under){}
     Widget& at(int i) override { return i==0?(Widget&)icon:(Widget&)text; }
     uint count() const override { return 2; }
     int2 xy(int2 xy) override { return under ? int2(xy.y,xy.x) : xy /*right*/; }

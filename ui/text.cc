@@ -14,7 +14,7 @@ struct TextLayout {
     float wrap;
     float interline;
     float spaceAdvance;
-    float minY=0;
+    float minX=-2, minY=0;
     float penY=0;
     struct Character { Glyph glyph; vec2 pos; float width, advance; uint editIndex; };
     typedef array<Character> Word;
@@ -48,6 +48,7 @@ struct TextLayout {
         for(const Word& word: words) {
             for(const Character& c: word) {
                 text.last() << Character{{c.glyph.offset, share(c.glyph.image), 0,0,0}, vec2(penX,penY)+c.pos, c.width, c.advance, lastIndex=c.editIndex};
+                minX = min(minX, penX+c.pos.x+c.glyph.offset.x);
                 minY = min(minY, penY+c.pos.y+c.glyph.offset.y);
             }
             maxLength = max(maxLength, penX+width(word));
@@ -188,7 +189,7 @@ void Text::layout() {
         wrap = layout.maxLength;
     }
     TextLayout layout(text, size, wrap, font, hint, interline, true);
-    textSize = int2(ceil(layout.maxLength), ceil(layout.penY-layout.minY));
+    textSize = int2(ceil(layout.maxLength-layout.minX), ceil(layout.penY-layout.minY));
 
     textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;

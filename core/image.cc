@@ -33,7 +33,7 @@ Image upsample(const Image& source) {
 
 void downsample(const Image& target, const Image& source) {
     int w=source.width, h=source.height;
-    assert_(w%2==0 && h%2==0, w, h);
+    //assert_(w%2==0 && h%2==0, w, h);
     // Averages values as if in linear space (not sRGB)
     for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
                                                                    int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);

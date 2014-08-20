@@ -37,7 +37,7 @@ struct Widget {
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint() { return -1; }
+    virtual int2 sizeHint() { return 0; }
     /// Renders this widget.
     Image target;
     void render(const Image& target) { this->target=share(target); render(); }
