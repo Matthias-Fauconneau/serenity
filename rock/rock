@@ -3,7 +3,7 @@
 # Sources
     synthetic = '0'
 if !synthetic: source name resolution voxelSize physicalSize = Source                                        # Concatenates image slice files in a volume
-if  synthetic: source voxelSize = Synthetic                                                                  # Generates a synthetic pore network for debugging and validation
+if  synthetic: source voxelSize = Synthetic                                                                  # Generates a synthetic pore network
 
 # Denoises
     denoise = '1'
@@ -13,7 +13,7 @@ if  denoise: denoised = Median source
 # Resamples
 if !resample: process-resolution = resolution
 if !resample: resampled = denoised
-if  resample: resampled mipmap = Resample denoised resolution process-resolution                             # Resamples from input resolution to process resolution
+if  resample: resampled mipmap = Resample denoised resolution process-resolution             # Resamples from input resolution to process resolution
 
 # Transposes to use an alternate cylinder axis
 if !transpose     : transposed = resampled
@@ -34,11 +34,11 @@ distribution-attenuation = KernelDensityEstimation histogram-attenuation-normali
 
 # Threshold determination
    threshold =  'otsu'
-if threshold == 'otsu'    : threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Recommended robust statistic method
+if threshold == 'otsu'    : threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Statistic recommended method
 if threshold == 'gradient': threshold = difference-threshold                                                 # Use this method for backward compatibility only
-                                        difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized
+                                   difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized
                                          distribution-attenuation-unnormalized = KernelDensityEstimation histogram-attenuation normalize=0
-if threshold == 'middle'  : threshold = middle-threshold                                                     # Simply selects the middle value between rock and pore attenuation peaks
+if threshold == 'middle'  : threshold = middle-threshold                            # Selects the middle value between rock and pore attenuation peaks
 
 # Segments
 rock = Binary transposed threshold mask=1
@@ -117,7 +117,8 @@ porosity = Div volume volume-total # Computes porosity (= pore space volume / to
 mean-radius = HistogramMean histogram-radius
 
 # Should be removed (kept for backward compatibility)
- histogram-radius-normalized = Div histogram-radius volume-total # Normalizes histogram (for comparison with distribution-radius, compare histogram-radius with volume-distribution-radius instead)
+ # Normalizes histogram (for comparison with distribution-radius, compare histogram-radius with volume-distribution-radius instead)
+ histogram-radius-normalized = Div histogram-radius volume-total
  histogram-radius-normalized-scaled = ScaleDistribution histogram-radius-normalized process-resolution
 
 # Kernel density estimation from radii histogram (i.e. pore size distribution)
@@ -218,7 +219,6 @@ pore-volume-list = ListSize pore-list
 # (radius, volume) pairs of each pore
 pore-radius-volume-list = Pair pore-radius-list pore-volume-list
 throat-radius-volume-list = Pair throat-radius-list throat-volume-list
-
 
 # Bounds pores/throats with bounding boxes
 pore-box-list = Bound pore-list
