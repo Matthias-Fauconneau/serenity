@@ -40,6 +40,7 @@ void downsample(const Image& target, const Image& source) {
 }
 
 Image downsample(const Image& source) {
+    assert_(source.size()>int2(2), source.size());
     Image target(source.size()/2);
     downsample(target, source);
     return target;

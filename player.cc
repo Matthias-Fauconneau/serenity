@@ -61,6 +61,7 @@ struct Player {
     mref<short2> lastPeriod;
     uint read(const mref<short2>& output) {
         if(audio.rate != file->rate) { // Previous call returned last partial period. Audio output can now be reset.
+            log(audio.rate, file->rate);
             audio.stop();
             audio.start(file->rate, periodSize);
             assert_(audio.rate == file->rate);
@@ -68,9 +69,9 @@ struct Player {
         }
         uint readSize = 0;
         for(mref<short2> chunk=output;;) {
-            if(!file) break;
+            if(!file) return readSize;
             assert(readSize<output.size);
-            if(audio.rate != file->rate) break; // Returns partial period before closing
+            if(audio.rate != file->rate) { log(readSize, output.size); return readSize; } // Returns partial period before closing
             size_t read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
@@ -260,8 +261,10 @@ struct Player {
     void setPlaying(bool play) {
         if(play) {
             assert_(file);
-            audio.start(file->rate, periodSize);
-            window.setIcon(playIcon());
+            if(!playButton.enabled) {
+                audio.start(file->rate, periodSize);
+                window.setIcon(playIcon());
+            }
         } else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
             for(uint i: range(lastPeriod.size)) {

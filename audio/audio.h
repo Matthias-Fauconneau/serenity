@@ -7,14 +7,6 @@
 enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused, Suspended };
 struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
 struct Control { ptr swPointer; long availableMinimum; };
-#define MMAP 1
-#if !MMAP
-struct SyncPtr {
-    uint flags;
-    union { Status status; byte pad1[64]; };
-    union { Control control; byte pad2[64]; };
-};
-#endif
 
 /// Audio output using ALSA PCM interface
 struct AudioOutput : Device, Poll {
@@ -22,9 +14,7 @@ struct AudioOutput : Device, Poll {
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
-#if !MMAP
-    SyncPtr syncPtr;
-#endif
+
     static constexpr uint channels = 2;
     uint sampleBits = 0;
     uint rate = 0;
@@ -73,9 +63,6 @@ private:
     void* buffer = 0;
     const struct Status* status = 0;
     struct Control* control = 0;
-#if !MMAP
-    SyncPtr syncPtr;
-#endif
 };
 
 /// Audio control using ALSA Control interface

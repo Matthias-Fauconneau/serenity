@@ -50,12 +50,6 @@ typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x43> DROP;
 typedef IO<'A', 0x44> DRAIN;
 
-#if !MMAP
-// No direct memory access support on OMAP
-enum { HWSYNC=1<<0, APPL=1<<1, AVAIL_MIN=1<<2 };
-typedef IOWR<'A', 0x23,SyncPtr> SYNC_PTR;
-#endif
-
 /// Playback
 
 Device getPlaybackDevice() {
@@ -108,19 +102,11 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
         this->periodSize = hparams.interval(PeriodSize);
         bufferSize = hparams.interval(Periods) * this->periodSize;
         buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
-#if MMAP
         status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
         control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
-#else
-        status = &syncPtr.status;
-        control = &syncPtr.control;
-#endif
         control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
     }
     if(!thread.contains(this)) { Poll::fd = Device::fd; registerPoll(); }
-#if !MMAP
-    syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
-#endif
     if(status->state < Prepared) io<PREPARE>();
     event();
 }
@@ -140,14 +126,8 @@ void AudioOutput::stop() {
 }
 
 void AudioOutput::event() {
-#if !MMAP
-    syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
-#endif
     if(status->state == XRun) {
         io<PREPARE>();
-#if !MMAP
-        syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
-#endif
         log("Overrun");
     }
     int available = status->hwPointer + bufferSize - control->swPointer;
@@ -157,9 +137,6 @@ void AudioOutput::event() {
         else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
-#if !MMAP
-        syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
-#endif
         if(readSize<periodSize) return;
     }
     if(status->state < Running) io<START>();
@@ -211,33 +188,23 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     assert(hparams.interval(Channels)==2);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
-#if MMAP
     status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
     control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
-#else
-    status = &syncPtr.status;
-    control = &syncPtr.control;
     control->availableMinimum = periodSize; // Minimum available space to trigger POLLIN
     io<PREPARE>();
     io<START>();
-#endif
+
 }
 AudioInput::~AudioInput(){
      io<DRAIN>();
 }
 
 void AudioInput::event() {
-#if !MMAP
-    syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
-#endif
     if(status->state == XRun) {
         overruns++;
         log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns);
         io<PREPARE>();
         io<START>();
-#if !MMAP
-        syncPtr.flags=APPL; iowr<SYNC_PTR>(syncPtr);
-#endif
     }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
@@ -246,9 +213,6 @@ void AudioInput::event() {
         else error(sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
-#if !MMAP
-        syncPtr.flags = 0; iowr<SYNC_PTR>(syncPtr);
-#endif
         assert_(readSize==periodSize);
         periods++;
     }

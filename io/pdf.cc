@@ -1,9 +1,10 @@
 #include "pdf.h"
-
-#if 0
 #include "variant.h"
 #include "matrix.h"
-buffer<byte> imagesToPDF(const ref<Image>& images) {
+#include "deflate.h"
+
+#if RASTERIZED_PDF
+buffer<byte> toPDF(const ref<Image>& images) {
     array<unique<Object>> objects;
     auto ref = [&](const Object& object) { return dec(objects.indexOf(&object))+" 0 R"_; };
 
@@ -36,7 +37,8 @@ buffer<byte> imagesToPDF(const ref<Image>& images) {
                         rgb3[index*3+1] = image.buffer[index].g;
                         rgb3[index*3+2] = image.buffer[index].b;
                     }
-                    xImage = move(rgb3);
+                    xImage.insert("Filter"_,"/FlateDecode"_);
+                    xImage = deflate(move(rgb3));
                     xObjects.insert("Image"_, ref(xImage));}
                 resources.insert("XObject"_, move(xObjects));}
             page.insert("Resources"_, move(resources));}
@@ -49,7 +51,6 @@ buffer<byte> imagesToPDF(const ref<Image>& images) {
             page.insert("Contents"_, ref(contents));}
         pages.at("Kids"_).list << ref(page);
         pages.at("Count"_).number++;
-        log(pages.at("Count"_));
     }
     root.insert("Pages"_, ref(pages));
 
@@ -72,8 +73,7 @@ buffer<byte> imagesToPDF(const ref<Image>& images) {
     file << "startxref\n"_ << dec(index) << "\r\n%%EOF"_;
     return move(file);
 }
-#endif
-
+#else
 buffer<byte> toPDF(/*ref<string> texts*/) {
     array<unique<Object>> objects;
     auto ref = [&](const Object& object) { return dec(objects.indexOf(&object))+" 0 R"_; };
@@ -177,3 +177,4 @@ buffer<byte> toPDF(/*ref<string> texts*/) {
     file << "startxref\n"_ << dec(index) << "\r\n%%EOF"_;
     return move(file);
 }
+#endif

@@ -41,5 +41,5 @@ generic String toUTF8(ref<T> ucs) {
     for(uint c: ucs) utf8 << ::utf8(c);
     return utf8;
 }
-String toUTF8(ref<uint16> ucs) { return toUTF8(ucs); }
-String toUTF8(ref<uint32> ucs) { return toUTF8(ucs); }
+String toUTF8(ref<uint16> ucs) { return toUTF8<uint16>(ucs); }
+String toUTF8(ref<uint32> ucs) { return toUTF8<uint32>(ucs); }

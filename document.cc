@@ -5,7 +5,9 @@
 #include "interface.h"
 //#include "png.h"
 //#include "jpeg.h"
-//include "pdf.h"
+#include "pdf.h"
+
+static constexpr int oversample = 1;
 
 struct Placeholder : Widget {
     void render() {}
@@ -27,13 +29,13 @@ struct Page : VBox {
     array<unique<Image>> images;
     Widget* footer = 0;
 
-    Page(uint index, float marginPx)
-        : Linear(index ? Linear::Spread/*Share*/ : /*Linear::Center*/Linear::Share, Linear::Expand, true), index(index), marginPx(marginPx) {}
+    Page(Linear::Extra main, uint index, float marginPx)
+        : Linear(main, Linear::Expand, true), index(index), marginPx(marginPx) {}
 
     void render() override {
         Image page = share(this->target);
         Image inner = clip(page, Rect(int2(marginPx,marginPx), page.size() - int2(marginPx,marginPx)));
-        //fill(target, Rect(target.size()), !(sizeHint().y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
+        fill(target, Rect(target.size()), !(sizeHint().y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
        {this->target = share(inner);
             VBox::render();
         this->target = share(page);}
@@ -42,21 +44,37 @@ struct Page : VBox {
     }
 };
 
-struct Format { const int2 pageSize; float marginPx; const string font; const float footerSize, textSize, headerSize, titleSize; };
+struct Format {
+    const int2 pageSize;
+    float marginPx;
+    const string font;
+    const float footerSize, textSize, headerSize, titleSize;
+    Linear::Extra titlePageLayout, pageLayout;
+};
 struct A4 : Format {
+#if 0
     static constexpr int pageWidth = 1050, pageHeight = 1485;
     static constexpr float inchPx = pageHeight / (297/*mm*/ / 25.4/*inch/mm*/);
+#else
+    static constexpr float inchMM = 25.4, inchPx = 90;
+    static constexpr int pageWidth = 210/*mm*/ * (inchPx/inchMM), pageHeight = 297/*mm*/ * (inchPx/inchMM);
+#endif
     static constexpr float pointPx = inchPx / 72;
-    A4() : Format{int2(pageWidth, pageHeight), 1.5 * inchPx, "FreeSerif"_, 12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx} {}
+    A4() : Format{int2(pageWidth, pageHeight), 1.5 * inchPx, "FreeSerif"_, 12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx,
+                  Linear::Center, Linear::Share} {}
 };
 
 /// Layouts a document
 struct Document {
     const String source;
     string formatString;
-    Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32};
-    const int2 contentSize = format.pageSize - int2(2*format.marginPx);
-    const float textSize = format.textSize;
+    Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32, Linear::Spread, Linear::Spread};
+    const int2 pageSize= oversample*format.pageSize;
+    const float marginPx = oversample*format.marginPx;
+    const int2 contentSize = pageSize - int2(2*marginPx);
+    const float textSize = oversample*format.textSize;
+    const float headerSize = oversample*format.headerSize;
+    const float titleSize = oversample*format.titleSize;
     const float interlineStretch = 3./2;
 
     // Document properties
@@ -66,7 +84,8 @@ struct Document {
 
     /// Generates page starts table, table of contents
     Document(String&& source_) : source(move(source_)), formatString(startsWith(source,"%"_)?section(source.slice(1),'\n'):"A4"_) {
-        assert_(!source.contains('\r')); //filter(source, [](char c) { return c=='\r'; }
+        assert_(contentSize > int2(0), pageSize, marginPx);
+        assert_(!source.contains('\r'));
         array<uint> indices;
         for(TextData s (source); s;) {
             uint start = s.index;
@@ -156,7 +175,7 @@ struct Document {
             else if(s.match('_')) text << parseSubscript(s, delimiters);
             else if(s.match('^')) {
                 text << (char)(TextFormat::Superscript);
-                String superscript = parseLine(s,{" "_,"\n"_,"("_,")"_,"^"_,"/"_,"|"_,"·"_,"⌋"_}, false);
+                String superscript = parseLine(s,{" "_,"."_,":"_,"\n"_,"("_,")"_,"^"_,"/"_,"|"_,"·"_,"⌋"_}, false);
                 if(superscript.size<1 || superscript.size>14) {
                     log("Expected superscript end delimiter  ^]), got end of document", superscript.size, "'"_+superscript+"'"_);
                     log("'"_+(string)text.slice(0, min(text.size,14ul))+"'"_);
@@ -210,9 +229,11 @@ struct Document {
                     else warn(s, "Missing image", path);
                 }
             } else {
-                String text = simplify(parseLine(s, {"|"_,"-"_,"+"_,/*"("_,*/")"_}, false));
-                //if(!text) { text=warn(s, "Expected element"); }
-                children << &newText(page, text, textSize);
+                String text;
+                if(s.match('"')) text = parseLine(s, {"\""_}, true);
+                else text = parseLine(s, {"|"_,"-"_,"+"_,")"_}, false);
+                assert_(trim(text)==simplify(copy(text)), trim(text),"\n"_,simplify(copy(text)));
+                children << &newText(page, trim(text), textSize);
                 if(s.match('\n')) continue;
                 assert_(s);
             }
@@ -225,9 +246,10 @@ struct Document {
                 break;
             }
         }
-        if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, true);
+        if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false/*true*/);
         else if(type=='|') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
-        else if(type=='+') return &element<WidgetGrid>(page, move(children));
+        else if(type=='+') return &element<WidgetGrid>(page, move(children), false/*true*/);
+        //else if(type=='*') return &element<WidgetGrid>(page, move(children), false);
         else if(!type) {
             if(!children) return &warnText(s, page, "Empty layout", s.buffer(start-1,s.index));
             assert_(children.size==1);
@@ -239,7 +261,7 @@ struct Document {
     /// Parses a page statement
     /// \arg quick Quick layout for table of contents (skips images)
     Page parsePage(TextData& s, array<uint>& indices, uint pageIndex, bool quick=false) const {
-        Page page (pageIndex, format.marginPx);
+        Page page (pageIndex ? format.pageLayout : format.titlePageLayout, pageIndex, marginPx);
         while(s) {
             while(s.match('%')) s.line(); // Comment
 
@@ -269,7 +291,7 @@ struct Document {
             if(s.match('!')) {
                 assert_(!bold);
                 bold = true;
-                size = format.titleSize;
+                size = titleSize;
                 center = true;
             }
 
@@ -277,7 +299,7 @@ struct Document {
             while(s.match('#')) {
                 level++;
                 //center=true;
-                size = format.headerSize;
+                size = headerSize;
             }
 
             if(s.match('\\')) {
@@ -334,14 +356,21 @@ struct Document {
         return parsePage(TextData(pages[pageIndex]), copy(indices[pageIndex]), pageIndex);
     }
 
-    /*buffer<byte> toPDF() {
+#if RASTERIZED_PDF
+    array<Image> images() {
+        return apply(pages.size, [this](int index){ Image target(pageSize); parsePage(index).Widget::render(target); return move(target); });
+    }
+    buffer<byte> toPDF() { return ::toPDF(images()); }
+#else
+    buffer<byte> toPDF() {
         uint pageIndex = 0;
         for(TextData s (source); s;) {
             parsePage(pageIndex);
             pageIndex++;
         }
         pageCount = pageIndex;
-    }*/
+    }
+#endif
 };
 
 struct PageView : Widget {
@@ -370,7 +399,14 @@ struct PageView : Widget {
         return true;
     }
 
-    void render() override { page.Widget::render(target); }
+    void render() override {
+        /***/ if(oversample==1) page.Widget::render(target);
+        else if(oversample==2) {
+            Image large(2*target.size());
+            page.Widget::render(large);
+            downsample(target, large);
+        } else error(oversample);
+    }
 };
 
 struct DocumentViewer {
@@ -398,21 +434,16 @@ struct DocumentViewer {
             window.show();
         } };
 
-    DocumentViewer(const string path) : path(path) {}
+    DocumentViewer(const string path) : path(path) { window.background=NoBackground; }
 };
 
 struct DocumentApp {
     unique<DocumentViewer> viewer = nullptr;
     DocumentApp() {
         assert_(arguments().size==2 && ref<string>({"preview"_,"export"_}).contains(arguments()[1]), "Usage: <path> preview|export");
-        /***/ if(arguments()[1]=="preview"_) viewer = unique<DocumentViewer>(arguments()[0]);
-        /*else if(arguments()[1]=="export"_) {
-            writeFile("rapport.pdf"_, imagesToPDF(document.pages()));
-                exit(0);
-                return;
-            }
-            else
-        }*/
-        else error(""_);
+        string path = arguments()[0], command = arguments()[1];
+        /***/ if(command=="preview"_) viewer = unique<DocumentViewer>(path);
+        else if(command=="export"_) writeFile(section(path,'.',0,-2)+".pdf"_, Document(readFile(path)).toPDF());
+        else error("Unknown command"_, arguments());
     }
 } app;

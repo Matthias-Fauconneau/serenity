@@ -28,7 +28,7 @@ struct Image {
     }
     Image(int2 size, bool alpha=false, bool sRGB=true) : Image(size.x, size.y, alpha, sRGB) {}
 
-    explicit operator bool() const { return data; }
+    explicit operator bool() const { return data && width && height; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
     inline byte4& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*stride+x]; }
     int2 size() const { return int2(width,height); }

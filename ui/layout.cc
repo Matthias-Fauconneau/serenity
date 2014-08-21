@@ -95,32 +95,32 @@ array<Rect> Linear::layout(int2 size) {
 int2 GridLayout::sizeHint() {
     uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 size = int2(w,h)*margin;
-#if 1
-    int2 max(0,0);
-    for(uint i: range(count())) max = ::max(max, abs(at(i).sizeHint()));
-    size += int2(w,h)*max;
-#else
-    for(uint x: range(w)) {
-        int maxX = 0;
-        for(uint y : range(h)) {
-            uint i = y*w+x;
-            if(i<count()) {
-                maxX = ::max(maxX, abs(at(i).sizeHint().x));
-            }
-        }
-        size.x += maxX;
-    }
-    for(uint y : range(h)) {
-        int maxY = 0;
+    if(uniform) {
+        int2 max(0,0);
+        for(uint i: range(count())) max = ::max(max, abs(at(i).sizeHint()));
+        size += int2(w,h)*max;
+    } else {
         for(uint x: range(w)) {
-            uint i = y*w+x;
-            if(i<count()) {
-                maxY = ::max(maxY, abs(at(i).sizeHint().y));
+            int maxX = 0;
+            for(uint y : range(h)) {
+                uint i = y*w+x;
+                if(i<count()) {
+                    maxX = ::max(maxX, abs(at(i).sizeHint().x));
+                }
             }
+            size.x += maxX;
         }
-        size.y += maxY;
+        for(uint y : range(h)) {
+            int maxY = 0;
+            for(uint x: range(w)) {
+                uint i = y*w+x;
+                if(i<count()) {
+                    maxY = ::max(maxY, abs(at(i).sizeHint().y));
+                }
+            }
+            size.y += maxY;
+        }
     }
-#endif
     return size;
 }
 
@@ -129,50 +129,42 @@ array<Rect> GridLayout::layout(int2 size) {
     if(count()) {
         uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
         assert(w && h);
-#if 1 // Uniform element size
+        if(uniform) {
         int2 elementSize = int2(size.x/w,size.y/h);
         int2 margin = (size - int2(w,h)*elementSize) / 2;
         for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) widgets << margin + int2(x,y)*elementSize + Rect(elementSize);
-#elif 1
-        int widths[w], heights[h];
-        for(uint x: range(w)) {
-            int maxX = 0;
-            for(uint y : range(h)) {
-                uint i = y*w+x;
-                if(i<count()) maxX = ::max(maxX, abs(at(i).sizeHint().x));
-            }
-            widths[x] = maxX;
-        }
-        for(uint y : range(h)) {
-            int maxY = 0;
+        } else {
+            int widths[w], heights[h];
             for(uint x: range(w)) {
-                uint i = y*w+x;
-                if(i<count()) maxY = ::max(maxY, abs(at(i).sizeHint().y));
-            }
-            heights[y] = maxY;
-        }
-        mref<int>(widths, w).clear(/*max(ref<int>(widths,w))*/size.x/w); // Uniform width
-        int Y = 0;
-        for(uint y : range(h)) {
-            int X = 0;
-            for(uint x: range(w)) {
-                uint i = y*w+x;
-                if(i<count()) {
-                    widgets << int2(X,Y) + Rect(int2(widths[x], heights[y]));
-                    X += widths[x];
+                int maxX = 0;
+                for(uint y : range(h)) {
+                    uint i = y*w+x;
+                    if(i<count()) maxX = ::max(maxX, abs(at(i).sizeHint().x));
                 }
+                widths[x] = maxX;
             }
-            Y += heights[y];
+            for(uint y : range(h)) {
+                int maxY = 0;
+                for(uint x: range(w)) {
+                    uint i = y*w+x;
+                    if(i<count()) maxY = ::max(maxY, abs(at(i).sizeHint().y));
+                }
+                heights[y] = maxY;
+            }
+            mref<int>(widths, w).clear(/*max(ref<int>(widths,w))*/size.x/w); // Uniform width
+            int Y = 0;
+            for(uint y : range(h)) {
+                int X = 0;
+                for(uint x: range(w)) {
+                    uint i = y*w+x;
+                    if(i<count()) {
+                        widgets << int2(X,Y) + Rect(int2(widths[x], heights[y]));
+                        X += widths[x];
+                    }
+                }
+                Y += heights[y];
+            }
         }
-#else // TODO: Layout with all the Linear complexity (probably best to merge with Linear and make a special case of Grid)
-        int widths[w], heights[h];
-        clear(widths), clear(heights);
-        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) {
-            int2 size = at(i).sizeHint();
-            widths[x] = max(widths[x], size.x)
-            heights[y] = max(heights[y], size.y)
-        }
-#endif
     }
     return widgets;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "string.h"
 #include "map.h"
+#include "deflate.h" //DEBUG
 
 struct Variant {
     enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
@@ -23,6 +24,7 @@ struct Variant {
     //operator int() const { assert(type==Integer, *this); return number; }
     int integer() const { assert(type==Integer, *this); return number; }
     double real() const { assert(type==Real||type==Integer); return number; }
+    explicit operator string() const { assert(type==Data); return data; }
 };
 
 String str(const Variant& o);
@@ -69,6 +71,7 @@ inline String str(const Object& o) {
     if(o.data) {
         assert_(o.at("Length"_).integer() == int(o.data.size), (const Dict&)o);
         s << "\nstream\n"_;
+        assert_(o.data.size <= 30 || o.value("Filter"_,""_)=="/FlateDecode"_, o.data.size, deflate(o.data).size, o.value("Filter"_,""_));
         s << o.data;
         s << "\nendstream"_;
     }
