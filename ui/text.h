@@ -16,9 +16,10 @@ struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true);
 
-    void setText(const string& text) { this->text=toUCS4(text); textSize=0; editIndex=min<uint>(editIndex,text.size); }
+    void setText(const string& text) { this->text=toUCS4(text); textSize=0; /*editIndex=min<uint>(editIndex,text.size);*/ }
     void setSize(int size) { this->size=size; textSize=0; }
 
+    // Parameters
     /// Displayed text in UTF32
     array<uint> text;
     /// Font size
@@ -36,30 +37,32 @@ struct Text : virtual Widget {
     float interline;
     /// Horizontal alignment
     bool center;
-    /// User clicked on this Text
+    /// Minimal size hint
+    int2 minimalSizeHint=0;
+
+    /*/// User clicked on this Text
     signal<> textClicked;
     /// User clicked on a \a Format::Link
-    signal<const string&> linkActivated;
+    signal<const string&> linkActivated;*/
 
-    int2 sizeHint();
-    void layout(float wrap);
-    void render() override;
-    void render(const Image& target, int2 offset);
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-
+    // Variables
     // Layout bounding box
     int2 textSize=0;
-    // Minimal size hint
-    int2 minSize=0;
-
     // Characters to render
-    struct Character { int2 pos; Image image; uint editIndex; int center,height,advance;};
-    typedef array<Character> TextLine;
-    array<TextLine> textLines;
+    struct Character { int2 pos; Image image; uint editIndex; int center, advance; /*int height;*/ };
+    array<array<Character>> characters;
 
-    // Underlines and strikes
+    void layout(float wrap);
+
+    int2 sizeHint(int2 size) override;
+    void render() override;
+    void render(const Image& target, int2 offset);
+
+    /*// Underlines and strikes
     struct Line { int2 min,max; };
-    array<Line> lines;
+    array<Line> lines;*/
+
+    /*bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     // Cursor
     struct Cursor {
@@ -74,5 +77,5 @@ struct Text : virtual Widget {
 
     // Inline links
     struct Link { Cursor begin,end; String identifier;};
-    array<Link> links;
+    array<Link> links;*/
 };

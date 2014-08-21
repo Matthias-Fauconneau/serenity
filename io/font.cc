@@ -77,7 +77,6 @@ Glyph Font::glyph(uint index) {
     glyph.leftDelta = face->glyph->lsb_delta;
     glyph.rightDelta = face->glyph->rsb_delta;
     glyph.size = vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
-    //glyph.bearing = vec2(face->glyph->metrics.horiBearingX*0x1p-6, face->glyph->metrics.horiBearingY*0x1p-6);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;

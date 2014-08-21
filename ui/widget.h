@@ -37,7 +37,7 @@ struct Widget {
 // Layout
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint() { return 0; }
+    virtual int2 sizeHint(int2) { return sizeHint(); }
     /// Renders this widget.
     Image target;
     void render(const Image& target) { this->target=share(target); render(); }
@@ -65,6 +65,8 @@ struct Widget {
     /// \return Whether the key press was accepted
     virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
     virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
+private:
+    virtual int2 sizeHint() { return 0; }
 };
 
 // Accessors to the window which received the current event (may only be called from event methods)

@@ -62,7 +62,7 @@ struct Linear : virtual Layout {
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
     Linear(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : main(main), side(side), expanding(expanding) {}
 
-    int2 sizeHint() override;
+    int2 sizeHint(int2) override;
     array<Rect> layout(int2 size) override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
     virtual int2 xy(int2 xy) =0;
@@ -116,8 +116,8 @@ template<class T> struct VList : Vertical, Array<T> {
 
 /// Layouts items on a #width x #height grid
 struct GridLayout : virtual Layout {
-    /// Whether the cell size is uniform
-    const bool uniform = false;
+    /// Whether the column widths are uniform
+    const bool uniformColumnWidths;
     /// Horizontal element count, 0 means automatic
     const int width;
     /// Vertical element count, 0 means automatic
@@ -125,16 +125,18 @@ struct GridLayout : virtual Layout {
     /// Margin between elements
     const int2 margin;
 
-    GridLayout(bool uniform=false, int width=0, int height=0, int margin=0) : uniform(uniform), width(width), height(height), margin(margin) {}
-    int2 sizeHint() override;
+    GridLayout(bool uniformColumnWidths=false, int width=0, int height=0, int margin=0)
+        : uniformColumnWidths(uniformColumnWidths), width(width), height(height), margin(margin) {}
+    int2 sizeHint(int2) override;
     array<Rect> layout(int2 size) override;
 };
 
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : GridLayout, Widgets {
-    WidgetGrid(bool uniform=false, int width=0, int height=0, int margin=0) : GridLayout(uniform, width, height, margin) {}
-    WidgetGrid(array<Widget*>&& widgets, bool uniform=false, int width=0, int height=0, int margin=0)
-        : GridLayout(uniform, width, height, margin), Widgets(move(widgets)) {}
+    WidgetGrid(bool uniformColumnWidths=false, int width=0, int height=0, int margin=0)
+        : GridLayout(uniformColumnWidths, width, height, margin) {}
+    WidgetGrid(array<Widget*>&& widgets, bool uniformColumnWidths=false, int width=0, int height=0, int margin=0)
+        : GridLayout(uniformColumnWidths, width, height, margin), Widgets(move(widgets)) {}
 };
 
 template<class T> struct UniformGrid : GridLayout,  Array<T> {

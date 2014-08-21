@@ -82,7 +82,7 @@ Window::Window(Widget* widget, int2 size, const string& unused title, const Imag
     {CreateColormap r; r.colormap=id+Colormap; r.window=root; r.visual=visual; send(raw(r));}
 
     if((size.x<0||size.y<0) && widget) {
-        int2 hint=widget->sizeHint();
+        int2 hint=widget->sizeHint(0);
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }
@@ -310,7 +310,7 @@ void Window::setPosition(int2 position) {
 }
 void Window::setSize(int2 size) {
     if(size.x<0||size.y<0) {
-        int2 hint=widget->sizeHint();
+        int2 hint=widget->sizeHint(0);
         if(size.x<0) size.x=max(abs(hint.x),-size.x);
         if(size.y<0) size.y=max(abs(hint.y),-size.y);
     }

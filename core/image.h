@@ -16,6 +16,7 @@ inline bool operator ==(const Rect& a, const Rect& b) { return a.min==b.min && a
 inline bool operator >(const Rect& a, const Rect& b) { return a.min<b.min || a.max>b.max; }
 inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
 inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
 
 struct Image {

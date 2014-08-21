@@ -13,28 +13,28 @@ bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 }
 
 // Linear
-int2 Linear::sizeHint() {
+int2 Linear::sizeHint(int2 size) {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
     for(uint i: range(count())) { Widget& child=at(i); assert(*(void**)&child);
-        int2 size=xy(child.sizeHint());
-        if(size.y<0) expandingHeight=true;
-        height = max(height,abs(size.y));
-        if(size.x<0) expandingWidth=true;
-        width += abs(size.x);
+        int2 sizeHint = xy(child.sizeHint(size));
+        if(sizeHint .y<0) expandingHeight=true;
+        height = max(height,abs(sizeHint .y));
+        if(sizeHint .x<0) expandingWidth=true;
+        width += abs(sizeHint .x);
     }
     return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
 
-array<Rect> Linear::layout(int2 size) {
+array<Rect> Linear::layout(const int2 originalSize) {
     uint count=this->count();
     if(!count) return {};
-    size = xy(size);
+    const int2 size = xy(originalSize);
     int width = size.x /*remaining space*/; int expanding=0, height=0;
     int widths[count], heights[count];
 
     for(uint i: range(count)) { Widget& child=at(i); assert(*(void**)&child);
-        int2 sizeHint = xy(child.sizeHint());
+        int2 sizeHint = xy(child.sizeHint(originalSize));
         width -= abs(widths[i]=sizeHint.x); //commits minimum width for all widgets
         if(sizeHint.x<0) expanding++; //counts expanding widgets
         height=max(height, heights[i]=(sizeHint.y<0 ? size.y : min(size.y,sizeHint.y))); //necessary height
@@ -92,84 +92,61 @@ array<Rect> Linear::layout(int2 size) {
 }
 
 // Grid
-int2 GridLayout::sizeHint() {
-    uint w=width, h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-    int2 size = int2(w,h)*margin;
-    if(uniform) {
-        int2 max(0,0);
-        for(uint i: range(count())) max = ::max(max, abs(at(i).sizeHint()));
-        size += int2(w,h)*max;
-    } else {
-        for(uint x: range(w)) {
-            int maxX = 0;
-            for(uint y : range(h)) {
-                uint i = y*w+x;
-                if(i<count()) {
-                    maxX = ::max(maxX, abs(at(i).sizeHint().x));
-                }
-            }
-            size.x += maxX;
-        }
-        for(uint y : range(h)) {
-            int maxY = 0;
-            for(uint x: range(w)) {
-                uint i = y*w+x;
-                if(i<count()) {
-                    maxY = ::max(maxY, abs(at(i).sizeHint().y));
-                }
-            }
-            size.y += maxY;
-        }
-    }
-    return size;
-}
-
 array<Rect> GridLayout::layout(int2 size) {
+    if(!count()) return {};
     array<Rect> widgets(count());
-    if(count()) {
-        uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
-        assert(w && h);
-        if(uniform) {
-        int2 elementSize = int2(size.x/w,size.y/h);
-        int2 margin = (size - int2(w,h)*elementSize) / 2;
-        for(uint i=0, y=0;y<h;y++) for(uint x=0;x<w && i<count();x++,i++) widgets << margin + int2(x,y)*elementSize + Rect(elementSize);
-        } else {
-            int widths[w], heights[h];
-            for(uint x: range(w)) {
-                int maxX = 0;
-                for(uint y : range(h)) {
-                    uint i = y*w+x;
-                    if(i<count()) maxX = ::max(maxX, abs(at(i).sizeHint().x));
-                }
-                widths[x] = maxX;
-            }
-            for(uint y : range(h)) {
-                int maxY = 0;
-                for(uint x: range(w)) {
-                    uint i = y*w+x;
-                    if(i<count()) maxY = ::max(maxY, abs(at(i).sizeHint().y));
-                }
-                heights[y] = maxY;
-            }
-            //mref<int>(widths, w).clear(/*max(ref<int>(widths,w))*/size.x/w); // Uniform width
-            int2 size (sum(ref<int>(widths,w)), sum(ref<int>(heights,h)));
-            int2 remaining = target.size()-size; // Remaining space after fixed allocation
-            int2 extra = remaining/int2(w,h); // Extra space per cell
-            for(int& v: widths) v+=extra.x; for(int& v: heights) v+=extra.y; // Distributes extra space
-            int2 margin = remaining - int2(w, h)*extra; // Removes distributed extra space from remaining space for margin
-            int Y = margin.y/2;
-            for(uint y : range(h)) {
-                int X = margin.x/2;
-                for(uint x: range(w)) {
-                    uint i = y*w+x;
-                    if(i<count()) {
-                        widgets << int2(X,Y) + Rect(int2(widths[x], heights[y]));
-                        X += widths[x];
-                    }
-                }
-                Y += heights[y];
+    int w=this->width,h=this->height; for(;;) { if(w*h>=(int)count()) break; if(!this->width && w<=h) w++; else h++; }
+    int widths[w], heights[h];
+    for(uint x: range(w)) {
+        int maxX = 0;
+        for(uint y : range(h)) {
+            uint i = y*w+x;
+            if(i<count()) maxX = ::max(maxX, abs(at(i).sizeHint(size).x));
+        }
+        widths[x] = maxX;
+    }
+    int availableWidth;
+    if(uniformColumnWidths) {
+        const int requiredWidth = max(ref<int>(widths,w)) * w;
+        availableWidth = size.x ?: requiredWidth;
+        const int fixedWidth = availableWidth / w;
+        for(int& v: widths) { v = fixedWidth; availableWidth -= v; }
+    } else if(size.x) {
+        const int requiredWidth = sum(ref<int>(widths,w));
+        availableWidth = size.x ?: requiredWidth;
+        const int extra = (availableWidth-requiredWidth) / w; // Extra space per column (may be negative for missing space)
+        for(int& v: widths) { v += extra; availableWidth -= v; } // Distributes extra/missing space
+    }
+    for(uint y : range(h)) {
+        int maxY = 0;
+        for(uint x: range(w)) {
+            uint i = y*w+x;
+            if(i<count()) maxY = ::max(maxY, abs(at(i).sizeHint(int2(widths[x],size.y)).y));
+        }
+        heights[y] = maxY;
+    }
+    const int requiredHeight = sum(ref<int>(heights,h)); // Remaining space after fixed allocation
+    int availableHeight = size.y ?: requiredHeight;
+    {
+        const int extra = (availableHeight-requiredHeight) / h; // Extra space per cell
+        for(int& v: heights) { v += extra; availableHeight -= v; } // Distributes extra space
+    }
+    int Y = availableHeight/2;
+    for(uint y : range(h)) {
+        int X = availableWidth/2;
+        for(uint x: range(w)) {
+            uint i = y*w+x;
+            if(i<count()) {
+                widgets << int2(X,Y) + Rect(int2(widths[x], heights[y]));
+                X += widths[x];
             }
         }
+        Y += heights[y];
     }
     return widgets;
+}
+int2 GridLayout::sizeHint(int2 size) {
+    int2 requiredSize=0;
+    for(Rect r: layout(int2(size.x,0))) requiredSize=max(requiredSize, r.max);
+    return requiredSize;
 }

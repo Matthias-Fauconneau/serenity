@@ -23,7 +23,7 @@ struct ScrollArea : Widget {
     /// Centers \a target in the viewport
     void center(int2 target);
 
-    int2 sizeHint() { return widget().sizeHint(); }
+    int2 sizeHint(int2 size) { return widget().sizeHint(size); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
     void render() override;

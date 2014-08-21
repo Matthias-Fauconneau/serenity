@@ -37,7 +37,7 @@ struct Page : VBox {
     void render() override {
         Image page = share(this->target);
         Image inner = clip(page, Rect(int2(marginPx,marginPx), page.size() - int2(marginPx,marginPx)));
-        fill(target, Rect(target.size()), !(sizeHint().y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
+        fill(target, Rect(target.size()), !(sizeHint(inner.size()).y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
        {this->target = share(inner);
             VBox::render();
         this->target = share(page);}
@@ -54,13 +54,8 @@ struct Format {
     Linear::Extra titlePageLayout, pageLayout;
 };
 struct A4 : Format {
-#if 0
-    static constexpr int pageWidth = 1050, pageHeight = 1485;
-    static constexpr float inchPx = pageHeight / (297/*mm*/ / 25.4/*inch/mm*/);
-#else
     static constexpr float inchMM = 25.4, inchPx = 90;
     static constexpr int pageWidth = 210/*mm*/ * (inchPx/inchMM), pageHeight = 297/*mm*/ * (inchPx/inchMM);
-#endif
     static constexpr float pointPx = inchPx / 72;
     A4() : Format{int2(pageWidth, pageHeight), 1.5 * inchPx, "FreeSerif"_, 12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx,
                   Linear::Center, Linear::Share} {}
@@ -150,7 +145,7 @@ struct Document {
                         goto break_;
                     }
                 } /*else*/
-                if(s.wouldMatchAny(" \t\n,;()^/+-|"_) || s.wouldMatchAny({"·"_,"⌋"_,"²"_})) break;
+                if(s.wouldMatchAny(" \t\n,;()^/+-|"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
                 else subscript << s.next();
                 break_:;
             }
@@ -173,8 +168,10 @@ struct Document {
             /**/ if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
-            else if(s.match('\\')) text << s.next();
-            else if(s.match('_')) text << parseSubscript(s, delimiters);
+            else if(s.match('\\')) {
+                if(s.match('n')) text << '\n';
+                else text << s.next();
+            } else if(s.match('_')) text << parseSubscript(s, delimiters);
             else if(s.match('^')) {
                 text << (char)(TextFormat::Superscript);
                 String superscript = parseLine(s,{" "_,"."_,":"_,"\n"_,"("_,")"_,"^"_,"/"_,"|"_,"·"_,"⌋"_}, false);
@@ -210,11 +207,9 @@ struct Document {
                     else if(s.match('_')) sample--;
                     else break;
                 }
-                string path = s.whileNo(" \t\n)-|+"_);
+                string path = s.whileNo(" \t\n)-|+$"_);
                 assert_(s);
-                if(quick) {
-                    //TODO: Layout image size for page numbers in table of contents with auto page break
-                    children << &element<Placeholder>(page);
+                if(quick) { children << &element<Placeholder>(page); //FIXME
                 } else {
                     unique<Image> image;
                     /**/ if(existsFile(path)) image = unique<Image>(decodeImage(readFile(path)));
@@ -222,7 +217,6 @@ struct Document {
                     else if(existsFile(path+".jpg"_)) image = unique<Image>(decodeImage(readFile(path+".jpg"_)));
                     if(image) {
                         if(sample<0) for(;sample<0;sample++) image = unique<Image>(downsample(image));
-                        //while(!(image->size() <= contentSize)) image = unique<Image>(downsample(image));
                         for(;rotate>0;rotate--) image = unique<Image>(::rotate(image));
                         if(sample>0) for(;sample>0;sample--) image = unique<Image>(upsample(image));
                         children << &element<ImageWidget>(page, image);
@@ -232,25 +226,31 @@ struct Document {
             } else {
                 String text;
                 if(s.match('"')) text = parseLine(s, {"\""_}, true);
-                else text = parseLine(s, {"\n"_,"|"_,"-"_,"+"_,")"_}, false);
-                //if(!text) warn(s, s.slice(s.index-16,16), "^"_, s.slice(s.index,16));
-                //assert_(trim(text)==simplify(copy(text)), trim(text),"\n"_,simplify(copy(text)));
+                else text = parseLine(s, {"\n"_,"|"_,"-"_,"+"_,"$"_,")"_}, false);
                 children << &newText(page, trim(text), textSize);
             }
             s.whileAny(" "_);
             // Separator
-            if(type=='+' && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
-            else {
+            if((type=='+'||type=='$') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
+            else if(!type && s.match('\n')) {
                 s.whileAny(" \n"_);
+                if(s.wouldMatchAny("-|+$"_)) type = s.next();
+                else type='\n';
+            }
+            else if(type=='\n' && s.match('\n')) {}
+            else {
+                s.whileAny(" \n"_); // \n might be tight list or array width specifier
                 /**/ if(s.match(')')) break;
                 else if(type && s.match(type)) {}
-                else if(!type && s.wouldMatchAny("-|+"_)) type = s.next();
-                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +"_), "or ), got '"_+str(s.peek())+"'"_); break; }
+                else if(!type && s.wouldMatchAny("-|+$"_)) type = s.next();
+                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, $"_), "or ), got '"_+str(s.peek())+"'"_); break; }
             }
         }
         if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false);
         else if(type=='|') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
         else if(type=='+') return &element<WidgetGrid>(page, move(children), false, width);
+        else if(type=='$') return &element<WidgetGrid>(page, move(children), true, width);
+        else if(type=='\n') return &element<VBox>(page, move(children), VBox::Center, VBox::AlignCenter, false);
         else if(!type) {
             if(!children) return &warnText(s, page, "Empty layout");
             assert_(children.size==1);

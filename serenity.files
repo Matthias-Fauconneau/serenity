@@ -53,12 +53,8 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/x.h
-ui/pdf-renderer.h
-ui/pdf-renderer.cc
 
 test.cc
 document.cc
 player.cc
 
-ui/edit.h
-ui/edit.cc

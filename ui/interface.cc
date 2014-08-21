@@ -6,14 +6,14 @@
 // ScrollArea
 void ScrollArea::render() {
     size=target.size();
-    int2 hint = abs(widget().sizeHint());
+    int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     if(view <= size) widget().render(target);
     else widget().render(target, offset, view);
     if(scrollbar && size.y<view.y) fill(target, Rect(int2(size.x-scrollBarWidth, -offset.y*size.y/view.y), int2(size.x,(-offset.y+size.y)*size.y/view.y)), 0.5);
 }
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
-    int2 hint = abs(widget().sizeHint());
+    int2 hint = abs(widget().sizeHint(size));
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
         offset.y += (button==WheelUp?1:-1) * 64;
         offset = min(int2(0,0), max(size-hint, offset));
@@ -34,7 +34,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) 
     return false;
 }
 bool ScrollArea::keyPress(Key key, Modifiers) {
-    int2 hint = abs(widget().sizeHint());
+    int2 hint = abs(widget().sizeHint(size));
     if(key==PageUp || key==PageDown) { offset.y += (key==PageUp?1:-1) * size.y; offset = min(int2(0,0), max(size-hint, offset)); return true; }
     return false;
 }
