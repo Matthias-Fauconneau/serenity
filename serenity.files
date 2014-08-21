@@ -60,3 +60,5 @@ test.cc
 document.cc
 player.cc
 
+ui/edit.h
+ui/edit.cc

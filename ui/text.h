@@ -27,7 +27,7 @@ struct Text : virtual Widget {
     vec3 color;
     float alpha;
     /// Line wrap limit in pixels (0: no wrap)
-    uint wrap=0;
+    float wrap = 0;
     /// Font name
     string font;
     /// Whether font should be hinted for display
@@ -42,7 +42,7 @@ struct Text : virtual Widget {
     signal<const string&> linkActivated;
 
     int2 sizeHint();
-    void layout();
+    void layout(float wrap);
     void render() override;
     void render(const Image& target, int2 offset);
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
@@ -75,18 +75,4 @@ struct Text : virtual Widget {
     // Inline links
     struct Link { Cursor begin,end; String identifier;};
     array<Link> links;
-};
-
-/// TextInput is an editable \a Text
-struct TextInput : Text {
-    /// User edited this text
-    signal<const string&> textChanged;
-    /// User pressed enter
-    signal<const string&> textEntered;
-    /// Cursor start position for selections
-    Cursor selectionStart;
-
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-    bool keyPress(Key key, Modifiers modifiers) override;
-    void render() override;
 };
