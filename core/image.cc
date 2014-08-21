@@ -33,10 +33,25 @@ Image upsample(const Image& source) {
 
 void downsample(const Image& target, const Image& source) {
     int w=source.width, h=source.height;
-    //assert_(w%2==0 && h%2==0, w, h);
+#if 1 // Exact
+    extern float sRGB_reverse[0x100];
+    extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
+    for(uint y: range(h/2)) for(uint x: range(w/2)) {
+        for(uint c: range(3)) {
+            float linear =
+                    ( sRGB_reverse[source(x*2+0,y*2+0)[c]]
+                    + sRGB_reverse[source(x*2+1,y*2+0)[c]]
+                    + sRGB_reverse[source(x*2+0,y*2+1)[c]]
+                    + sRGB_reverse[source(x*2+1,y*2+1)[c]] ) / 4;
+            target(x,y)[c] = sRGB_forward[int(round(0xFFF*linear))];
+        }
+        target(x,y).a = 0xFF;
+    }
+#else
     // Averages values as if in linear space (not sRGB)
     for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
                                                                    int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);
+#endif
 }
 
 Image downsample(const Image& source) {

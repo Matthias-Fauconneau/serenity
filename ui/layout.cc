@@ -93,7 +93,7 @@ array<Rect> Linear::layout(int2 size) {
 
 // Grid
 int2 GridLayout::sizeHint() {
-    uint w=width,h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
+    uint w=width, h=height; for(;;) { if(w*h>=count()) break; if(!width && w<=h) w++; else h++; }
     int2 size = int2(w,h)*margin;
     if(uniform) {
         int2 max(0,0);
@@ -151,10 +151,15 @@ array<Rect> GridLayout::layout(int2 size) {
                 }
                 heights[y] = maxY;
             }
-            mref<int>(widths, w).clear(/*max(ref<int>(widths,w))*/size.x/w); // Uniform width
-            int Y = 0;
+            //mref<int>(widths, w).clear(/*max(ref<int>(widths,w))*/size.x/w); // Uniform width
+            int2 size (sum(ref<int>(widths,w)), sum(ref<int>(heights,h)));
+            int2 remaining = target.size()-size; // Remaining space after fixed allocation
+            int2 extra = remaining/int2(w,h); // Extra space per cell
+            for(int& v: widths) v+=extra.x; for(int& v: heights) v+=extra.y; // Distributes extra space
+            int2 margin = remaining - int2(w, h)*extra; // Removes distributed extra space from remaining space for margin
+            int Y = margin.y/2;
             for(uint y : range(h)) {
-                int X = 0;
+                int X = margin.x/2;
                 for(uint x: range(w)) {
                     uint i = y*w+x;
                     if(i<count()) {

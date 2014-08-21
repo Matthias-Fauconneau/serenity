@@ -117,23 +117,24 @@ template<class T> struct VList : Vertical, Array<T> {
 /// Layouts items on a #width x #height grid
 struct GridLayout : virtual Layout {
     /// Whether the cell size is uniform
-    bool uniform = false;
+    const bool uniform = false;
     /// Horizontal element count, 0 means automatic
-    int width;
+    const int width;
     /// Vertical element count, 0 means automatic
-    int height;
+    const int height;
     /// Margin between elements
-    int2 margin;
+    const int2 margin;
 
     GridLayout(bool uniform=false, int width=0, int height=0, int margin=0) : uniform(uniform), width(width), height(height), margin(margin) {}
-    int2 sizeHint();
+    int2 sizeHint() override;
     array<Rect> layout(int2 size) override;
 };
 
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : GridLayout, Widgets {
-    WidgetGrid(){}
-    WidgetGrid(array<Widget*>&& widgets, bool uniform=false) : GridLayout(uniform), Widgets(move(widgets)) {}
+    WidgetGrid(bool uniform=false, int width=0, int height=0, int margin=0) : GridLayout(uniform, width, height, margin) {}
+    WidgetGrid(array<Widget*>&& widgets, bool uniform=false, int width=0, int height=0, int margin=0)
+        : GridLayout(uniform, width, height, margin), Widgets(move(widgets)) {}
 };
 
 template<class T> struct UniformGrid : GridLayout,  Array<T> {

@@ -126,10 +126,7 @@ void AudioOutput::stop() {
 }
 
 void AudioOutput::event() {
-    if(status->state == XRun) {
-        io<PREPARE>();
-        log("Overrun");
-    }
+    if(status->state == XRun) { io<PREPARE>(); log("Overrun"); }
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
@@ -137,7 +134,6 @@ void AudioOutput::event() {
         else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
-        if(readSize<periodSize) return;
     }
     if(status->state < Running) io<START>();
 }

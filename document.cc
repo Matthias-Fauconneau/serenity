@@ -7,7 +7,9 @@
 //#include "jpeg.h"
 #include "pdf.h"
 
-static constexpr int oversample = 1;
+uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+
+static constexpr uint oversample = 2;
 
 struct Placeholder : Widget {
     void render() {}
@@ -69,7 +71,7 @@ struct Document {
     const String source;
     string formatString;
     Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32, Linear::Spread, Linear::Spread};
-    const int2 pageSize= oversample*format.pageSize;
+    const int2 pageSize= int(oversample)*format.pageSize;
     const float marginPx = oversample*format.marginPx;
     const int2 contentSize = pageSize - int2(2*marginPx);
     const float textSize = oversample*format.textSize;
@@ -195,14 +197,19 @@ struct Document {
     /// Parses a layout expression
     Widget* parseLayout(TextData& s, Page& page, bool quick) const {
         array<Widget*> children;
-        char type = 0;
-        int start = s.index;
+        char type = 0; int width=0;
         while(!s.match(')')) {
             // Element
             skip(s);
             if(s.match('(')) children << parseLayout(s, page, quick);
             else if(s.wouldMatchAny("&_$^@"_)) {
-                string prefix = s.whileAny("$&_^@"_);
+                int sample = log2(oversample), rotate=0;
+                if(!s.match('&')) for(;;) {
+                    if(s.match('@')) rotate++;
+                    else if(s.match('^')) sample++;
+                    else if(s.match('_')) sample--;
+                    else break;
+                }
                 string path = s.whileNo(" \t\n)-|+"_);
                 assert_(s);
                 if(quick) {
@@ -214,44 +221,38 @@ struct Document {
                     else if(existsFile(path+".png"_)) image = unique<Image>(decodeImage(readFile(path+".png"_)));
                     else if(existsFile(path+".jpg"_)) image = unique<Image>(decodeImage(readFile(path+".jpg"_)));
                     if(image) {
-                        for(char operation: prefix.reverse()) {
-                            if(operation=='@') image = unique<Image>(rotate(image));
-                            else if(operation=='^') image = unique<Image>(upsample(image));
-                            else if(operation=='_') image = unique<Image>(downsample(image));
-                            else if(operation=='$') { for(byte4& v: image->buffer) if(!v.r && !v.g && !v.b) v=0xFF; } // Sets 0 to FF
-                            else if(operation=='&') {}
-                            else error("Unknown image operation", operation);
-                        }
-                        while(!(image->size() <= contentSize)) image = unique<Image>(downsample(image));
+                        if(sample<0) for(;sample<0;sample++) image = unique<Image>(downsample(image));
+                        //while(!(image->size() <= contentSize)) image = unique<Image>(downsample(image));
+                        for(;rotate>0;rotate--) image = unique<Image>(::rotate(image));
+                        if(sample>0) for(;sample>0;sample--) image = unique<Image>(upsample(image));
                         children << &element<ImageWidget>(page, image);
                         page.images << move(image);
-                    }
-                    else warn(s, "Missing image", path);
+                    } else warn(s, "Missing image", path);
                 }
             } else {
                 String text;
                 if(s.match('"')) text = parseLine(s, {"\""_}, true);
-                else text = parseLine(s, {"|"_,"-"_,"+"_,")"_}, false);
-                assert_(trim(text)==simplify(copy(text)), trim(text),"\n"_,simplify(copy(text)));
+                else text = parseLine(s, {"\n"_,"|"_,"-"_,"+"_,")"_}, false);
+                //if(!text) warn(s, s.slice(s.index-16,16), "^"_, s.slice(s.index,16));
+                //assert_(trim(text)==simplify(copy(text)), trim(text),"\n"_,simplify(copy(text)));
                 children << &newText(page, trim(text), textSize);
-                if(s.match('\n')) continue;
-                assert_(s);
             }
-            skip(s);
+            s.whileAny(" "_);
             // Separator
-            /**/ if(s.match(')')) break;
-            else if(s.wouldMatchAny("-|+"_)) type = s.next();
-            else if(!s.match(type)) {
-                children << &warnText(s, page, "Expected"_+(type?str(type):"-, |, +"_," or )"_));
-                break;
+            if(type=='+' && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
+            else {
+                s.whileAny(" \n"_);
+                /**/ if(s.match(')')) break;
+                else if(type && s.match(type)) {}
+                else if(!type && s.wouldMatchAny("-|+"_)) type = s.next();
+                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +"_), "or ), got '"_+str(s.peek())+"'"_); break; }
             }
         }
-        if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false/*true*/);
+        if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false);
         else if(type=='|') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
-        else if(type=='+') return &element<WidgetGrid>(page, move(children), false/*true*/);
-        //else if(type=='*') return &element<WidgetGrid>(page, move(children), false);
+        else if(type=='+') return &element<WidgetGrid>(page, move(children), false, width);
         else if(!type) {
-            if(!children) return &warnText(s, page, "Empty layout", s.buffer(start-1,s.index));
+            if(!children) return &warnText(s, page, "Empty layout");
             assert_(children.size==1);
             return children.first();
         }
@@ -305,19 +306,17 @@ struct Document {
             if(s.match('\\')) {
                 string command = s.whileNot('\n');
                 if(command == "tableOfContents"_) {
-                    auto& vbox = element<VBox>(page, Linear::Top, Linear::Expand);
+                    auto& grid = element<WidgetGrid>(page, false, 2);
                     for(const Header& header: headers) {
                         String text;
                         text << repeat(" "_, header.indices.size);
                         if(header.indices.size<=1) text << (char)(TextFormat::Bold);
                         for(int level: header.indices) text << dec(level) << '.';
-                        text << ' ' << header.name;
-                        auto& hbox = element<HBox>(page, Linear::Spread);
-                        hbox << &newText(page, text, textSize);
-                        hbox << &newText(page, " "_+dec(header.page), textSize);
-                        vbox << &hbox;
+                        text << ' ' << TextData(header.name).until('(');
+                        grid << &newText(page, text, textSize, false);
+                        grid << &newText(page, " "_+dec(header.page), textSize);
                     }
-                    page << &vbox;
+                    page << &grid;
                 } else error(command);
                 continue;
             }
