@@ -64,7 +64,7 @@ struct Player {
             log(audio.rate, file->rate);
             audio.stop();
             audio.start(file->rate, periodSize);
-            assert_(audio.rate == file->rate);
+            assert_(audio.rate == file->rate && audio.status->state==Running);
             return 0;
         }
         uint readSize = 0;

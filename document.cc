@@ -57,7 +57,7 @@ struct A4 : Format {
     static constexpr float inchMM = 25.4, inchPx = 90;
     static constexpr int pageWidth = 210/*mm*/ * (inchPx/inchMM), pageHeight = 297/*mm*/ * (inchPx/inchMM);
     static constexpr float pointPx = inchPx / 72;
-    A4() : Format{int2(pageWidth, pageHeight), 1.5 * inchPx, "FreeSerif"_, 12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx,
+    A4() : Format{int2(pageWidth, pageHeight), 1/*.5*/ * inchPx, "FreeSerif"_, 0/*12 * pointPx*/, 12 * pointPx, 14 * pointPx, 16 * pointPx,
                   Linear::Center, Linear::Share} {}
 };
 
@@ -123,40 +123,36 @@ struct Document {
         }
     }
 
-    /// Parses a subscript expression
-    String parseSubscript(TextData& s, const ref<string>& delimiters) const {
+    /// Parses an expression
+    String parseExpression(TextData& s, const ref<string>& delimiters) const {
         ref<string> lefts {"["_,"{"_,"⌊"_};
         ref<string> rights{"]"_,"}"_,"⌋"_};
 
-        String subscript;
-        if(!s.wouldMatchAny(lefts)) subscript << s.next();
+        String e;
+        if(!s.wouldMatchAny(lefts)) e << s.next();
         for(;;) {
-            assert_(s, subscript);
+            assert_(s, e);
             if(s.wouldMatchAny(delimiters)) break;
-            else if(s.match('_')) subscript << parseSubscript(s, delimiters);
+            else if(s.match('_')) e << subscript(parseExpression(s, delimiters));
             else {
                 for(int index: range(lefts.size)) {
                     if(s.match(lefts[index])) {
-                        if(index>=2) subscript << lefts[index];
+                        if(index>=2) e << lefts[index];
                         String content = parseLine(s, {rights[index]}, true);
                         assert_(content);
-                        subscript << content;
-                        if(index>=2) subscript << rights[index];
+                        e << content;
+                        if(index>=2) e << rights[index];
                         goto break_;
                     }
                 } /*else*/
                 if(s.wouldMatchAny(" \t\n,;()^/+-|"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
-                else subscript << s.next();
+                else e << s.next();
                 break_:;
             }
         }
-        assert_(s && subscript.size && subscript.size<=15, "Expected subscript end delimiter  _]), got end of document",
-                "'"_+subscript.slice(0, min(subscript.size, 16ul))+"'"_, subscript.size, delimiters, s.buffer);
-        String text;
-        text << (char)(TextFormat::SubscriptStart);
-        text << subscript;
-        text << (char)(TextFormat::SubscriptEnd);
-        return text;
+        assert_(s && e.size && e.size<=15, "Expected expression end delimiter, got end of document",
+                "'"_+e.slice(0, min(e.size, 16ul))+"'"_, e.size, delimiters, s.buffer);
+        return e;
     }
 
     /// Parses a line expression
@@ -169,10 +165,11 @@ struct Document {
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
             else if(s.match('\\')) {
-                if(s.match('n')) text << '\n';
+                /***/ if(s.match('n')) text << '\n';
+                else if(s.match('t')) text << '\t';
                 else text << s.next();
-            } else if(s.match('_')) text << parseSubscript(s, delimiters);
-            else if(s.match('^')) {
+            } else if(s.match('_')) text << subscript(parseExpression(s, delimiters));
+            else if(s.match('^')) text << superscript(parseExpression(s, delimiters)); /*{
                 text << (char)(TextFormat::Superscript);
                 String superscript = parseLine(s,{" "_,"."_,":"_,"\n"_,"("_,")"_,"^"_,"/"_,"|"_,"·"_,"⌋"_}, false);
                 if(superscript.size<1 || superscript.size>14) {
@@ -183,7 +180,7 @@ struct Document {
                 }
                 text << superscript;
                 text << (char)(TextFormat::Superscript);
-            }
+            }*/
             else text << s.next();
         }
         if(bold) warn(s, "Expected bold end delimiter *, got end of line");

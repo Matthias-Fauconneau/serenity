@@ -147,6 +147,7 @@ struct TextLayout {
                     }
                     words << move(word); penX = 0; subscriptPen=0; // Add to current line (might be first of a new line)
                 }
+                if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
                 if(c=='\n') nextLine(false);
                 continue;
             }

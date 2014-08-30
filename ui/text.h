@@ -8,8 +8,22 @@
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
 enum TextFormat { Bold, Italic, Underline, SubscriptStart, SubscriptEnd, Superscript/*, Link*/ /*8,'\n','\t'*/};
-inline String format(TextFormat f) { String s; s << (char)f; return s; }
-//inline TextFormat format(uint f) { assert(f<=Link); return TextFormat(f); }
+
+inline String subscript(const string& s) {
+    String subscript;
+    subscript << TextFormat::SubscriptStart;
+    subscript << s;
+    subscript << TextFormat::SubscriptEnd;
+    return subscript;
+}
+
+inline String superscript(const string& s) {
+    String superscript;
+    superscript << TextFormat::Superscript;
+    superscript << s;
+    superscript << TextFormat::Superscript;
+    return superscript;
+}
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
