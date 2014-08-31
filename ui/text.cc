@@ -32,9 +32,9 @@ struct TextLayout {
     float spaceAdvance;
 
     // Variables
-    float penY=0;
+    float lineOriginY = 0;
     array<array<Glyph>> words;
-    vec2 bbMin = 0;
+    //vec2 bbMin = 0;
     vec2 bbMax = 0;
 
     // Outputs
@@ -42,97 +42,96 @@ struct TextLayout {
 
     void nextLine(bool justify) {
         if(words) {
-            // Justifies
             float length=0; for(const ref<Glyph>& word: words) length += advance(word); // Sums word lengths
-            // For last word of line, use last glyph width instead of advance
-            if(words.last()) length += -advance(words.last()) + width(words.last());
-            float space=0;
-            if(justify && words.size>1) space = (wrap-length)/(words.size-1);
-            else space = spaceAdvance;
+            if(words.last()) length += -advance(words.last()) + width(words.last()); // For last word of line, use last glyph width instead of advance
+            float space = (justify && words.size>1) ? (wrap-length)/(words.size-1) : spaceAdvance;
 
             // Layouts
-            /*column=0;*/ float penX=0; // Line pen
-            /*lineNumber++;*/
+            float x=0; // Line pen
             auto& line = glyphs.append();
             for(const ref<Glyph>& word: words) {
                 for(Glyph glyph: word) {
-                    glyph.origin += vec2(penX,penY);
-                    line << glyph; //lastIndex=glyph.editIndex
-                    bbMin=min(bbMin, glyph.origin-glyph.bearing);
-                    bbMax=max(bbMax, glyph.origin-glyph.bearing+glyph.size);
+                    glyph.origin += vec2(x, lineOriginY);
+                    bbMax = max(bbMax, glyph.origin-glyph.bearing+glyph.size);
+                    line << glyph;
                 }
-                penX += advance(word);
-                penX += space;
+                x += advance(word);
+                x += space;
             }
-            //lastIndex++;
             words.clear();
         }
-        penY += interline*size;
+        lineOriginY += interline*size;
     }
 
-    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify=false)
+    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify)
         : size(size), wrap(wrap), interline(interline) {
-        assert_(wrap >= 0, wrap);
+
         Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
-        assert_(font, fontName, size);
         uint16 spaceIndex = font->index(' ');
-        spaceAdvance = font->metrics(spaceIndex).advance; assert(spaceAdvance);
-        uint16 previous=spaceIndex;
-        bool bold=false, italic=false, superscript=false;
-        int subscript = 0;
+        spaceAdvance = font->metrics(spaceIndex).advance;
+
+        lineOriginY = interline*font->ascender;
+
+        // Format context
+        bool bold=false, italic=false;
+        struct Context { TextFormat format, previousFormat; float fontSize; vec2 position, previousPosition; };
+        array<Context> stack;
         float fontSize = size;
-        array<float> yOffsetStack;
-        float yOffset = 0;
+        TextFormat format = Regular, previousFormat = Regular;
+        // Glyph positions
         array<Glyph> word;
-        float penX = 0 , subscriptPen = 0; // Word pen
-        //int previousRightDelta = 0;
-        penY = interline*font->ascender;
+        vec2 position = 0, previousPosition = 0;
+        // Kerning
+        uint16 previous=spaceIndex;
+        int previousRightDelta = 0; // Hinted kerning
+
         uint i=0;
         for(; i<text.size; i++) {
             uint c = text[i];
-            /***/ if(c==' ') penX += spaceAdvance;
-            else if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
+            /***/ if(c==' ') position.x += spaceAdvance;
+            else if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
             else break;
         }
         for(; i<text.size; i++) {
             uint c = text[i];
 
-            const float subscriptScale = 2./3, superscriptScale = subscriptScale;
-            if(c<=Superscript) { //00-1F format control flags (bold,italic,underline,strike,link)
-                if(c==' '||c=='\t'||c=='\n') continue;
-                /**/ if(c==Bold) bold=!bold;
+            if(c<LastTextFormat) { //00-1F format control flags (bold,italic,underline,strike,link)
+                if(c<End) {
+                    stack << Context{format, previousFormat, fontSize, position, previousPosition};
+
+                    format = TextFormat(c);
+                    if( (format==Superscript && previousFormat==Subscript)
+                     || (format==Subscript && previousFormat==Superscript)) // Stack sub/super script
+                        position.x = previousPosition.x;
+                    if(format==Subscript || format==Superscript) fontSize *= 2./3;
+
+                    previousFormat = Regular;
+                    previousPosition = position;
+                }
+                else if(c==End) {
+                    previousFormat = format;
+                    Context context = stack.pop();
+                    previousPosition = context.position;
+                    fontSize = context.fontSize;
+                    position.y = context.position.y;
+                    format = context.format;
+                }
+                else if(c==Bold) bold=!bold;
                 else if(c==Italic) italic=!italic;
-                else if(c==Superscript)  superscript=!superscript;
-                else if(c==SubscriptStart) {
-                    subscript++;
-                    if(subscript==1) subscriptPen=penX;
-                    yOffsetStack << yOffset;
-                }
-                else if(c==SubscriptEnd) {
-                    subscript--;
-                    assert_(subscript>=0);
-                    yOffset = yOffsetStack.pop();
-                }
-                //else if(format==Underline) { if(underline && current()>underlineBegin) lines << Line{underlineBegin, current()}; }
                 else error(c);
-                fontSize = size;
-                if(subscript) fontSize *= pow(subscriptScale, subscript);
-                if(superscript) fontSize *= superscriptScale;
+
                 if(bold && italic) font = getFont(fontName, fontSize, {"BoldItalic"_,"RBI"_,"Bold Italic"_}, hint);
                 else if(bold) font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint);
                 else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
                 else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
-                assert_(font, fontName, bold, italic, subscript, superscript);
-                if(c==SubscriptStart) yOffset += font->ascender/2;
-                if(c==Superscript && superscript) yOffset -= fontSize/2;
-                if(c==Superscript && !superscript) yOffset = 0;
+
+                if(c==Subscript) position.y += font->ascender/2;
+                if(c==Superscript) position.y -= fontSize/2;
+
                 continue;
             }
 
-            if(!subscript && !superscript) penX = max(subscriptPen, penX);
-
-            if((c==' '||c=='\t'||c=='\n') && !subscript) { // Next word/line
-                //column++;
+            if((c==' '||c=='\t'||c=='\n') && !stack) { // Next word/line
                 previous = spaceIndex;
                 if(word) {
                     if(words) {
@@ -141,44 +140,44 @@ struct TextLayout {
                         length += width(word); // Next word
                         if(wrap && length > wrap && words) nextLine(justify); // Would not fit
                     }
-                    words << move(word); penX = 0; subscriptPen=0; // Add to current line (might be first of a new line)
+                    words << move(word); position.x = 0; // Add to current line (might be first of a new line)
                 }
-                if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
+                if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
                 if(c=='\n') nextLine(false);
                 continue;
             }
+            previousFormat = Regular;
 
             uint16 index = font->index(c);
 
-            float& pen = subscript ? subscriptPen : penX;
-
-            if(previous != spaceIndex) pen += font->kerning(previous, index);
+            // Kerning
+            if(previous != spaceIndex) position.x += font->kerning(previous, index);
             previous = index;
 
             Font::Metrics metrics = font->metrics(index);
 
-            /*if(hint) {
-                if(previousRightDelta - metrics.leftDelta >= 32) pen--;
-                if(previousRightDelta - metrics.leftDelta < -32 ) pen++;
+            if(hint) { // Hinted kerning
+                if(previousRightDelta - metrics.leftDelta >= 32) position.x -= 1;
+                if(previousRightDelta - metrics.leftDelta < -32 ) position.x += 1;
                 previousRightDelta = metrics.rightDelta;
-            }*/
+            }
 
             if(c != ' ' && c != 0xA0) {
-                int yGlyphOffset = 0;
-                if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) yGlyphOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
+                vec2 offset = 0;
+                if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += fontSize/3; // Fixes too high floor signs from FreeSerif
                 assert_(metrics.size, hex(c));
-                word << Glyph(metrics,::Glyph{vec2(pen, yOffset+yGlyphOffset), *font, c});
+                word << Glyph(metrics,::Glyph{position+offset, *font, c});
             }
-            pen += metrics.advance;
+            position.x += metrics.advance;
         }
         if(word) {
             float length=0; for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
             length += width(word); // Last word
             if(wrap && length>wrap && words) nextLine(justify); // would not fit
-            words << move(word); penX = 0; subscriptPen=0; // Adds to current line (might be first of new line)
+            words << move(word); // Adds to current line (might be first of new line)
         }
         if(words) nextLine(false); // Clears any remaining words
-        bbMax.y = max(bbMax.y, penY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
+        bbMax.y = max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
     }
 };
 
@@ -188,7 +187,7 @@ Text::Text(const string& text, float size, vec3 color, float alpha, float wrap, 
 TextLayout Text::layout(float wrap) const {
     if(center) {
         TextLayout layout(text, size, wrap, font, hint, interline, false); // Layouts without justification
-        assert_(layout.bbMin >= vec2(-2,0));
+        //assert_(layout.bbMin >= vec2(-2,0));
         wrap = layout.bbMax.x;
         assert_(wrap >= 0, wrap);
     }
@@ -202,7 +201,7 @@ int2 Text::sizeHint(int2 size) const {
 
 Graphics Text::graphics(int2 size) const {
     TextLayout layout = this->layout(min<float>(wrap, size.x));
-    assert_(layout.bbMin >= vec2(-2,0), layout.bbMin);
+    //assert_(layout.bbMin >= vec2(-2,0), layout.bbMin);
     vec2 textSize = layout.bbMax;
 
     Graphics graphics;

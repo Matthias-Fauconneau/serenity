@@ -26,7 +26,7 @@ struct Font {
     struct Metrics {
         float advance;
         vec2 bearing;
-        //int leftDelta, rightDelta; // 26.6 bearing delta to correct kerning with hinting
+        int leftDelta, rightDelta; // 26.6 bearing delta to correct kerning with hinting
         union {
             struct { float width, height; };
             vec2 size;

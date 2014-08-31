@@ -7,24 +7,20 @@
 
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
-enum TextFormat { Bold, Italic, Underline, SubscriptStart, SubscriptEnd, Superscript/*, Link*/ /*8,'\n','\t'*/};
+enum TextFormat : char {
+    Regular,
+    Subscript, Superscript, Line, Numerator, Denominator, End, // Nest
+    Bold, Italic, // Toggle
+    LastTextFormat
+};
+static_assert(LastTextFormat <= '\t', "");
 
-inline String subscript(const string& s) {
-    String subscript;
-    subscript << TextFormat::SubscriptStart;
-    subscript << s;
-    subscript << TextFormat::SubscriptEnd;
-    return subscript;
+inline String subscript(const string& s) { return string{TextFormat::Subscript} + s + string{TextFormat::End}; }
+inline String superscript(const string& s) { return string{TextFormat::Superscript} + s + string{TextFormat::End}; }
+inline String fraction(const string& num, const string& den) {
+    return string{TextFormat::Line, TextFormat::Numerator} + num + string{TextFormat::End, TextFormat::Denominator}
+               + den + string{TextFormat::End};
 }
-
-inline String superscript(const string& s) {
-    String superscript;
-    superscript << TextFormat::Superscript;
-    superscript << s;
-    superscript << TextFormat::Superscript;
-    return superscript;
-}
-
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font

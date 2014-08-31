@@ -25,7 +25,7 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
 
 static Image box(Image&& target, const Image& source) {
     assert_(source.width/target.width==source.height/target.height, source.size, target.size);
-    assert_(source.width%target.width<=2 && source.height%target.height<=2, source.width%target.width, source.height%target.height);
+    assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height, source.width%target.width, source.height%target.height);
     //assert_(!source.alpha); FIXME: not alpha correct
     byte4* dst = target.data;
     const byte4* src = source.data;

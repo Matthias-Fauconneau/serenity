@@ -41,7 +41,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
                             xFont.insert("Type"_, String("/Font"_));
                             xFont.insert("Subtype"_, String("/Type0"_));
                             xFont.insert("BaseFont"_, String("/Font"_));
-                            xFont.insert("Encoding"_, String("/Identity"_));
+                            xFont.insert("Encoding"_, String("/Identity-H"_));
                             {array<Variant> descendantFonts;
                                 {Dict cidFont;
                                     cidFont.insert("Type"_, String("/Font"_));
@@ -109,8 +109,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
                             xObjects.insert(copy(id), ref(xImage));
                         }
                         assert_(image.width && image.height, image.size);
-                        content << "q "_+str(image.width*px,0,0,image.height*px, blit.origin.x*px, (pageSize.y-blit.origin.y-image.height)*px)+" cm"
-                                                                                                                                               "/"_+id+" Do Q\n"_;
+                        content << "q "_+str(blit.size.x*px,0,0,blit.size.y*px, blit.origin.x*px, (pageSize.y-blit.origin.y-blit.size.y)*px)+" cm /"_+id+" Do Q\n"_;
                     }
                     resources.insert("XObject"_, move(xObjects));
                 }

@@ -65,7 +65,7 @@ Font::Metrics Font::metrics(uint index) const {
     return {
         face->glyph->advance.x*0x1p-6f,
         vec2(face->glyph->metrics.horiBearingX*0x1p-6f, face->glyph->metrics.horiBearingY*0x1p-6f),
-        //(int)face->glyph->lsb_delta, (int)face->glyph->rsb_delta,
+        (int)face->glyph->lsb_delta, (int)face->glyph->rsb_delta,
         {{face->glyph->metrics.width*0x1p-6f, face->glyph->metrics.height*0x1p-6f}}};
 }
 
