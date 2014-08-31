@@ -4,6 +4,7 @@
 #include "graphics.h"
 
 // ScrollArea
+
 Graphics ScrollArea::graphics(int2 size) const {
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
@@ -11,6 +12,7 @@ Graphics ScrollArea::graphics(int2 size) const {
     else return move(Graphics().append(widget().graphics(view), vec2(offset)));
     //if(scrollbar && size.y<view.y) fill(target, Rect(int2(size.x-scrollBarWidth, -offset.y*size.y/view.y), int2(size.x,(-offset.y+size.y)*size.y/view.y)), 0.5);
 }
+
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint(size));
     if(event==Press && (button==WheelDown || button==WheelUp) && size.y<hint.y) {
@@ -32,16 +34,24 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) 
     }
     return false;
 }
+
 bool ScrollArea::keyPress(Key key, Modifiers) {
     int2 hint = abs(widget().sizeHint(size));
     if(key==PageUp || key==PageDown) { offset.y += (key==PageUp?1:-1) * size.y; offset = min(int2(0,0), max(size-hint, offset)); return true; }
     return false;
 }
+
 void ScrollArea::ensureVisible(Rect target) { offset = max(-target.min, min(size-target.max, offset)); }
+
 void ScrollArea::center(int2 target) { offset = size/2-target; }
 
 // ImageWidget
-int2 ImageWidget::sizeHint() const { return /*hidden ? 0 :*/ image.size; }
+
+int2 ImageWidget::sizeHint(int2 size) const {
+    int2 target = min(image.size*size.x/image.size.x, image.size/**size.y/image.size.y*/);
+    return min(image.size, target);
+}
+
 Graphics ImageWidget::graphics(int2 size) const {
     Graphics graphics;
     if(image) {

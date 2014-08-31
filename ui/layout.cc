@@ -57,7 +57,7 @@ array<Rect> Linear::layout(const int2 originalSize) const {
         while(width<=-int(count)) { //while layout is overcommited
             uint best=0; for(uint i: range(count)) if(widths[i]>widths[best]) best=i;
             int& first = widths[best]; //largest size
-            int next=0; for(int size: widths) if(size>next && size<first) next=size; //next largest widget size
+            int next=0; for(uint i: range(count)) if(i!=best && widths[i]>=next) next=widths[i]; // Next largest widget size
             int delta = min(-width, first-next);
             if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
             else { int delta=-width/count; for(uint i: range(count)) widths[i]-=delta, width+=delta; } //all widgets already have the same size
@@ -139,7 +139,7 @@ array<Rect> GridLayout::layout(int2 size) const {
         else while(availableHeight <= -h) { // While layout is overcommited
             uint best=0; for(uint i: range(h)) if(heights[i]>heights[best]) best=i;
             int& first = heights[best]; // Largest size
-            int next=0; for(int size: heights) if(size>next && size<first) next=size; // Next largest widget size
+            int next=0; for(uint i: range(h)) if(i!=best && heights[i]>=next) next=heights[i]; // Next largest widget size
             int delta = min(-availableHeight, first-next);
             if(delta!=0) { first -= delta; availableHeight += delta; } // Caps size to next largest
             else { int delta = -availableHeight/h; for(uint i: range(h)) heights[i] -= delta, availableHeight += delta; } // All widgets already have the same size

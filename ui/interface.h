@@ -44,13 +44,11 @@ template<class T> struct Scroll : ScrollArea, T {
 struct ImageWidget : virtual Widget {
     /// Displayed image
     const Image& image;
-    /// Hides image
-    //bool hidden = false;
 
     /// Creates a widget displaying \a image
-    ImageWidget(const Image& image/*, bool hidden=false*/) : image(move(image))/*, hidden(hidden)*/ {}
+    ImageWidget(const Image& image) : image(move(image)) {}
 
-    int2 sizeHint() const override;
+    int2 sizeHint(int2) const override;
     Graphics graphics(int2 size) const override;
 };
 

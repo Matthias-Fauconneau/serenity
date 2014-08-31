@@ -23,52 +23,9 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
     }
 }
 
-/*Image clip(const Image& image, Rect r) {
-    r = r & Rect(image.size);
-    return Image(unsafeReference(image.buffer),
-                 image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
-}
-
-Image transpose(const Image& source) {
-    int w=source.width, h=source.height;
-    Image target(h,w);
-    for(int y: range(h)) for(int x: range(w)) target(y, x) = source(x,y);
-    return target;
-}
-
-Image rotate(const Image& source) {
-    int w=source.width, h=source.height;
-    Image target(h,w);
-    for(int y: range(h)) for(int x: range(w)) target(y, w-x-1) = source(x,y);
-    return target;
-}
-
-Image upsample(const Image& source) {
-    int w=source.width, h=source.height;
-    Image target(w*2,h*2);
-    for(int y=0; y<h; y++) for(int x=0; x<w; x++) {
-        target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
-    }
-    return target;
-}
-
-void downsample(const Image& target, const Image& source) {
-    int w=source.width, h=source.height;
-    // Averages values as if in linear space (not sRGB)
-    for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
-                                                                   int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);
-}
-    Image downsample(const Image& source) {
-        assert_(source.size>int2(2), source.size);
-        Image target(source.size/2);
-        downsample(target, source);
-        return target;
-    }
-*/
-
 static Image box(Image&& target, const Image& source) {
-    //assert_(source.width*target.height==source.height*target.width, source.size, target.size);
-    assert_(source.width%target.width<=1 && source.height%target.height==0, source.width%target.width, source.height%target.height);
+    assert_(source.width/target.width==source.height/target.height, source.size, target.size);
+    assert_(source.width%target.width<=2 && source.height%target.height<=2, source.width%target.width, source.height%target.height);
     //assert_(!source.alpha); FIXME: not alpha correct
     byte4* dst = target.data;
     const byte4* src = source.data;
@@ -90,7 +47,6 @@ static Image box(Image&& target, const Image& source) {
     }
     return move(target);
 }
-
 
 static Image bilinear(Image&& target, const Image& source) {
     const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
@@ -120,11 +76,14 @@ Image resize(Image&& target, const Image& source) {
     else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
-
 Image negate(Image&& target, const Image& source) {
-    //assert_(!source.alpha);
-    //for(uint y: range(target.height)) for(uint x: range(target.width)) target(x,y) = byte4(byte3(0xFF)-source(x,y).bgr(), source(x,y).a);
-    for(uint y: range(target.height)) for(uint x: range(target.width)) target(x,y) = byte4(byte3(0xFF)-source(x,y).bgr(), source(x,y).a);
+    assert_(source.sRGB);
+    for(uint y: range(target.height)) for(uint x: range(target.width)) {
+        byte4 BGRA = source(x, y);
+        vec3 linear = source.sRGB ? vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : vec3(BGRA.bgr())/float(0xFF);
+        int3 negate = int3(round((float(0xFFF)*(vec3(1)-linear))));
+        target(x,y) = byte4(sRGB_forward[negate[0]], sRGB_forward[negate[1]], sRGB_forward[negate[2]], BGRA.a);
+    }
     return move(target);
 }
 
