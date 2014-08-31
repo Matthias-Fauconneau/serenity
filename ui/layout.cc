@@ -55,12 +55,12 @@ array<Rect> Linear::layout(const int2 originalSize) const {
     } else {
         for(uint i: range(count)) widths[i]=abs(widths[i]); //converts all expanding widgets to fixed
         while(width<=-int(count)) { //while layout is overcommited
-            uint best=0; for(uint i: range(count)) if(widths[i]>widths[best]) best=i;
-            int& first = widths[best]; //largest size
-            int next=0; for(uint i: range(count)) if(i!=best && widths[i]>=next) next=widths[i]; // Next largest widget size
-            int delta = min(-width, first-next);
-            if(delta!=0) { first -= delta; width += delta; } //cap size to next largest
-            else { int delta=-width/count; for(uint i: range(count)) widths[i]-=delta, width+=delta; } //all widgets already have the same size
+            int first = max(ref<int>(widths,count)); // First largest size
+            uint firstCount=0; for(int size: widths) if(size == first) firstCount++; // Counts how many widgets already have the largest size
+            assert_(firstCount);
+            int second=0; for(int size: widths) if(second<size && size<first) second=size; // Second largest size
+            int delta = min(-width, first-second) / firstCount; // Distributes reduction to all largest widgets
+            for(int& size: widths) if(size == first) { size -= delta, width += delta; }
         }
     }
 
@@ -137,12 +137,11 @@ array<Rect> GridLayout::layout(int2 size) const {
         const int extra = (availableHeight-requiredHeight) / h; // Extra space per cell
         if(extra > 0) for(int& v: heights) { v += extra; availableHeight -= v; } // Distributes extra space
         else while(availableHeight <= -h) { // While layout is overcommited
-            uint best=0; for(uint i: range(h)) if(heights[i]>heights[best]) best=i;
-            int& first = heights[best]; // Largest size
-            int next=0; for(uint i: range(h)) if(i!=best && heights[i]>=next) next=heights[i]; // Next largest widget size
-            int delta = min(-availableHeight, first-next);
-            if(delta!=0) { first -= delta; availableHeight += delta; } // Caps size to next largest
-            else { int delta = -availableHeight/h; for(uint i: range(h)) heights[i] -= delta, availableHeight += delta; } // All widgets already have the same size
+            int first = max(ref<int>(heights,h)); // First largest size
+            uint firstCount=0; for(int size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
+            int second=0; for(int size: heights) if(second<size && size<first) second=size; // Second largest size
+            int delta = min(-availableHeight, first-second) / firstCount; // Distributes reduction to all largest widgets
+            for(int& size: heights) if(size == first) { size -= delta, availableHeight += delta; }
         }
     }
     int Y = availableHeight/2;
@@ -156,7 +155,7 @@ array<Rect> GridLayout::layout(int2 size) const {
             }
         }
         Y += heights[y];
-        assert_(size.y ==0 || int2(X,Y) <= size, X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
+        //assert_(size.y ==0 || int2(X,Y) < size+int2(w,h), X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
     }
     return widgets;
 }

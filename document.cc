@@ -108,12 +108,12 @@ struct Document {
         return newText(page, warn(s, args...), format.textSize);
     }
 
-    /// Skips whitespaces and comments
+    /// Skips whitespaces /*and comments*/
     void skip(TextData& s) const {
         for(;;) {
             s.whileAny(" \n"_);
-            if(s.match('%')) s.line(); // Comment
-            else break;
+            /*if(s.match('%')) s.line(); // Comment
+            else*/ break;
         }
     }
 
@@ -154,7 +154,7 @@ struct Document {
         while(s) { // Line
             if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
 
-            /**/ if(s.match('%')) { while(s && !s.match("%"_) && !s.wouldMatch("\n"_)) s.advance(1); } // Comment
+            /**/ if(s.match('%')) { s.whileNo("%\n"_,'(',')'); s.match('%'); } // Comment
             else if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
@@ -284,7 +284,7 @@ struct Document {
                         for(int level: header.indices) text << dec(level) << '.';
                         text << ' ' << TextData(header.name).until('(');
                         grid << &newText(page, text, format.textSize, false);
-                        grid << &newText(page, " "_+dec(header.page-1), format.textSize);
+                        grid << &newText(page, " "_+dec(header.page), format.textSize);
                     }
                     page << &grid;
                 } else error(command);
@@ -316,7 +316,7 @@ struct Document {
 
             if(s.match('\n')) break; // Page break
         }
-        if(format.footerSize && page.index>=2) page.footer = &newText(page, dec(page.index-1), format.textSize);
+        if(format.footerSize && page.index>=3) page.footer = &newText(page, dec(page.index), format.textSize);
         return move(page);
     }
     Page parsePage(TextData&& s, array<uint>&& indices, uint pageIndex) const { return parsePage(s, indices, pageIndex); }
