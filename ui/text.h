@@ -28,10 +28,7 @@ inline String superscript(const string& s) {
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, float wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true);
-
-    //void setText(const string& text) { this->text=toUCS4(text); textSize=0; /*editIndex=min<uint>(editIndex,text.size);*/ }
-    //void setSize(int size) { this->size=size; textSize=0; }
+    Text(const string& text=""_, float size=16, vec3 color=0, float alpha=1, float wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true);
 
     // Parameters
     /// Displayed text in UTF32
@@ -54,41 +51,8 @@ struct Text : virtual Widget {
     /// Minimal size hint
     int2 minimalSizeHint=0;
 
-    /*/// User clicked on this Text
-    signal<> textClicked;
-    /// User clicked on a \a Format::Link
-    signal<const string&> linkActivated;*/
-
-    // Variables
-    // Layout bounding box
-    vec2 textSize = 0;
-    // Glyphs to render
-    //struct Glyphs { int2 pos; /*Image image;*/ /*uint editIndex; int center, advance;*/ /*int height;*/ };
-    array<array<Glyph>> glyphs;
-
     struct TextLayout layout(float wrap) const;
 
     int2 sizeHint(int2 size) const override;
     Graphics graphics(int2 size) const override;
-
-    /*// Underlines and strikes
-    struct Line { int2 min,max; };
-    array<Line> lines;*/
-
-    /*bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
-
-    // Cursor
-    struct Cursor {
-        uint line=0,column=0;
-        Cursor(){}
-        Cursor(uint line, uint column):line(line),column(column){}
-        bool operator ==(const Cursor& o) const { return line==o.line && column==o.column; }
-        bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
-    };
-    Cursor cursor; uint editIndex=0;
-    uint index();
-
-    // Inline links
-    struct Link { Cursor begin,end; String identifier;};
-    array<Link> links;*/
 };

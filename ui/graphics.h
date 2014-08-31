@@ -3,6 +3,23 @@
 #include "image.h"
 #include "font.h"
 
+/// Axis-aligned rectangle with 2D integer coordinates
+struct Rect {
+    int2 min,max;
+    Rect(int2 min, int2 max):min(min),max(max){}
+    explicit Rect(int2 max):min(0,0),max(max){}
+    explicit operator bool() { return min<max; }
+    bool contains(int2 p) { return p>=min && p<max; }
+    int2 position() { return min; }
+    int2 size() { return max-min; }
+};
+inline bool operator ==(const Rect& a, const Rect& b) { return a.min==b.min && a.max==b.max; }
+inline bool operator >(const Rect& a, const Rect& b) { return a.min<b.min || a.max>b.max; }
+inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
+inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
+inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
+
 /// Image graphic element
 struct Blit {
     vec2 origin, size;

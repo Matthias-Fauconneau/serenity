@@ -1,26 +1,5 @@
 #include "graphics.h"
 
-uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
-void __attribute((constructor(1001))) generate_sRGB_forward() {
-    for(uint index: range(sizeof(sRGB_forward))) {
-        real linear = (real) index / (sizeof(sRGB_forward)-1);
-        real sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
-        assert(abs(linear-(sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92))<exp2(-50));
-        sRGB_forward[index] = round(0xFF*sRGB);
-    }
-}
-
-float sRGB_reverse[0x100];
-void __attribute((constructor(1001))) generate_sRGB_reverse() {
-    for(uint index: range(0x100)) {
-        real sRGB = (real) index / 0xFF;
-        real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
-        assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))<exp2(-50));
-        sRGB_reverse[index] = linear;
-        assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
-    }
-}
-
 static void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha) {
     byte4& target_sRGB = target(x,y);
     vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
@@ -209,7 +188,8 @@ void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha
 void render(const Image& target, const Graphics& graphics) {
     for(const auto& e: graphics.blits) {
         assert(e.image.width && e.image.height, e.image.size);
-        blit(target, int2(round(e.origin)), resize(int2(e.size), e.image), 1, 1);
+        if(int2(e.size) == e.image.size) blit(target, int2(round(e.origin)), e.image, 1, 1);
+        else blit(target, int2(round(e.origin)), resize(int2(e.size), e.image), 1, 1);
     }
     for(const auto& e: graphics.glyphs) {
         Font::Glyph glyph = e.font.render(e.font.index(e.code));

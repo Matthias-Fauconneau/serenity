@@ -39,7 +39,7 @@ struct Widget {
     /// \return Whether the mouse event was accepted
     virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { (void)cursor, (void)size, (void)event, (void)button; return false; }
     /// Convenience overload for layout implementation
-    bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.position(),rect.size(),event,button); }
+    //bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.position(),rect.size(),event,button); }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
@@ -61,4 +61,4 @@ String getSelection(bool clipboard=false);
 /// Cursor icons
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
 /// Sets cursor to be shown when mouse is in the given rectangle
-void setCursor(Rect region, Cursor cursor);
+//void setCursor(Rect region, Cursor cursor);

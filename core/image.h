@@ -2,22 +2,8 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 
-/// Axis-aligned rectangle with 2D integer coordinates
-struct Rect {
-    int2 min,max;
-    Rect(int2 min, int2 max):min(min),max(max){}
-    explicit Rect(int2 max):min(0,0),max(max){}
-    explicit operator bool() { return min<max; }
-    bool contains(int2 p) { return p>=min && p<max; }
-    int2 position() { return min; }
-    int2 size() { return max-min; }
-};
-inline bool operator ==(const Rect& a, const Rect& b) { return a.min==b.min && a.max==b.max; }
-inline bool operator >(const Rect& a, const Rect& b) { return a.min<b.min || a.max>b.max; }
-inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
-inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
-inline Rect operator |(Rect a, Rect b) { return Rect(min(a.min,b.min),max(a.max,b.max)); }
-inline String str(const Rect& r) { return "Rect("_+str(r.min)+" - "_+str(r.max)+")"_; }
+extern uint8 sRGB_forward[0x1000];
+extern float sRGB_reverse[0x100];
 
 struct Image {
     Image(){}
@@ -32,7 +18,6 @@ struct Image {
     explicit operator bool() const { return data && width && height; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
     inline byte4& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*stride+x]; }
-    //int2 size() const { return int2(width,height); }
 
     ::buffer<byte4> buffer; //FIXME: shared
     byte4* data=0; // First pixel
@@ -61,7 +46,7 @@ inline Image copy(const Image& source) {
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha,o.sRGB); }
 
-/// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
+/*/// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
 Image clip(const Image& image, Rect region);
 
 /// Transposes an image
@@ -76,11 +61,13 @@ void downsample(const Image& target, const Image& source);
 Image downsample(const Image& source);
 
 /// Upsamples an image by duplicating samples
-Image upsample(const Image& source);
+Image upsample(const Image& source);*/
 
 /// Resizes \a source into \a target
 /// \note Only supports integer box downsample
 Image resize(Image&& target, const Image& source);
+
+Image negate(Image&& target, const Image& source);
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);

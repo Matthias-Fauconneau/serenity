@@ -20,7 +20,6 @@ Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
     struct Glyph : Font::Metrics, ::Glyph {
-        //uint editIndex;
         Glyph(const Font::Metrics& metrics, const ::Glyph& glyph) : Font::Metrics(metrics), ::Glyph(glyph) {}
     };
     float width(const ref<Glyph>& word) { float max=0; for(const Glyph& glyph : word) if(glyph.code!=',' && glyph.code!='.') max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width); return max; }
@@ -37,15 +36,9 @@ struct TextLayout {
     array<array<Glyph>> words;
     vec2 bbMin = 0;
     vec2 bbMax = 0;
-    /*uint lastIndex=-1;
-    uint lineNumber=0, column=0;
-    Text::Cursor current() { return Text::Cursor{lineNumber, column}; }*/
 
     // Outputs
     array<array<::Glyph>> glyphs;
-    /*struct Line { Text::Cursor begin,end; };
-    array<Line> lines;
-    array<Text::Link> links;*/
 
     void nextLine(bool justify) {
         if(words) {
@@ -90,7 +83,6 @@ struct TextLayout {
         float fontSize = size;
         array<float> yOffsetStack;
         float yOffset = 0;
-        //Text::Cursor underlineBegin;
         array<Glyph> word;
         float penX = 0 , subscriptPen = 0; // Word pen
         //int previousRightDelta = 0;
@@ -131,7 +123,6 @@ struct TextLayout {
                 else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
                 else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
                 assert_(font, fontName, bold, italic, subscript, superscript);
-                //if(format&Underline) underlineBegin=current();
                 if(c==SubscriptStart) yOffset += font->ascender/2;
                 if(c==Superscript && superscript) yOffset -= fontSize/2;
                 if(c==Superscript && !superscript) yOffset = 0;
@@ -179,7 +170,6 @@ struct TextLayout {
                 word << Glyph(metrics,::Glyph{vec2(pen, yOffset+yGlyphOffset), *font, c});
             }
             pen += metrics.advance;
-            //column++;
         }
         if(word) {
             float length=0; for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
@@ -192,7 +182,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, uint size, vec3 color, float alpha, float wrap, string font, bool hint, float interline, bool center)
+Text::Text(const string& text, float size, vec3 color, float alpha, float wrap, string font, bool hint, float interline, bool center)
     : text(toUCS4(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
 
 TextLayout Text::layout(float wrap) const {

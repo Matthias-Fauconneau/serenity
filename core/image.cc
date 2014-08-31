@@ -2,7 +2,28 @@
 #include "data.h"
 #include "vector.h"
 
-Image clip(const Image& image, Rect r) {
+uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
+void __attribute((constructor(1001))) generate_sRGB_forward() {
+    for(uint index: range(sizeof(sRGB_forward))) {
+        real linear = (real) index / (sizeof(sRGB_forward)-1);
+        real sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
+        assert(abs(linear-(sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92))<exp2(-50));
+        sRGB_forward[index] = round(0xFF*sRGB);
+    }
+}
+
+float sRGB_reverse[0x100];
+void __attribute((constructor(1001))) generate_sRGB_reverse() {
+    for(uint index: range(0x100)) {
+        real sRGB = (real) index / 0xFF;
+        real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
+        assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))<exp2(-50));
+        sRGB_reverse[index] = linear;
+        assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
+    }
+}
+
+/*Image clip(const Image& image, Rect r) {
     r = r & Rect(image.size);
     return Image(unsafeReference(image.buffer),
                  image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
@@ -33,84 +54,79 @@ Image upsample(const Image& source) {
 
 void downsample(const Image& target, const Image& source) {
     int w=source.width, h=source.height;
-#if 1 // Exact
-    extern float sRGB_reverse[0x100];
-    extern uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
-    for(uint y: range(h/2)) for(uint x: range(w/2)) {
-        for(uint c: range(3)) {
-            float linear =
-                    ( sRGB_reverse[source(x*2+0,y*2+0)[c]]
-                    + sRGB_reverse[source(x*2+1,y*2+0)[c]]
-                    + sRGB_reverse[source(x*2+0,y*2+1)[c]]
-                    + sRGB_reverse[source(x*2+1,y*2+1)[c]] ) / 4;
-            target(x,y)[c] = sRGB_forward[int(round(0xFFF*linear))];
-        }
-        target(x,y).a = 0xFF;
-    }
-#else
     // Averages values as if in linear space (not sRGB)
     for(uint y: range(h/2)) for(uint x: range(w/2)) target(x,y) = byte4((int4(source(x*2+0,y*2+0)) + int4(source(x*2+1,y*2+0)) +
                                                                    int4(source(x*2+0,y*2+1)) + int4(source(x*2+1,y*2+1)) + int4(2)) / 4);
-#endif
+}
+    Image downsample(const Image& source) {
+        assert_(source.size>int2(2), source.size);
+        Image target(source.size/2);
+        downsample(target, source);
+        return target;
+    }
+*/
+
+static Image box(Image&& target, const Image& source) {
+    //assert_(source.width*target.height==source.height*target.width, source.size, target.size);
+    assert_(source.width%target.width<=1 && source.height%target.height==0, source.width%target.width, source.height%target.height);
+    //assert_(!source.alpha); FIXME: not alpha correct
+    byte4* dst = target.data;
+    const byte4* src = source.data;
+    int scale = source.width/target.width;
+    for(uint unused y: range(target.height)) {
+        const byte4* line = src;
+        for(uint unused x: range(target.width)) {
+            int4 s = 0;
+            for(uint i: range(scale)) {
+                for(uint j: range(scale)) {
+                    s += int4(line[i*source.stride+j]);
+                }
+            }
+            s /= scale*scale;
+            *dst = byte4(s);
+            line += scale, dst++;
+        }
+        src += scale * source.stride;
+    }
+    return move(target);
 }
 
-Image downsample(const Image& source) {
-    assert_(source.size>int2(2), source.size);
-    Image target(source.size/2);
-    downsample(target, source);
-    return target;
-}
 
-void bilinear(Image& target, const Image& source) {
-    const uint stride = source.stride, width=source.width-1, height=source.height-1;
+static Image bilinear(Image&& target, const Image& source) {
+    const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
-    const byte4* src = source.data; byte4* dst = target.data;
+    const uint8* src = (uint8*)source.data; byte4* dst = target.data;
     for(uint y: range(targetHeight)) {
         for(uint x: range(targetWidth)) {
             const uint fx = x*256*width/targetWidth, fy = y*256*height/targetHeight; //TODO: incremental
             uint ix = fx/256, iy = fy/256;
             uint u = fx%256, v = fy%256;
-            byte* s = (byte*)src+iy*stride+ix*4;
+            const uint8* s = src+iy*stride+ix*4;
             byte4 d;
             for(int i=0; i<4; i++) { // Interpolates values as if in linear space (not sRGB)
-                d[i] = ((s[       i] * (256-u) + s[       4+i] * u) * (256-v)
-                        + (s[stride+i] * (256-u) + s[stride+4+i] * u) * (    v) ) / (256*256);
+                d[i] = ((uint(s[           i]) * (256-u) + uint(s[           4+i]) * u) * (256-v)
+                       + (uint(s[stride+i]) * (256-u) + uint(s[stride+4+i]) * u) * (       v) ) / (256*256);
             }
             dst[y*targetStride+x] = d;
         }
     }
+    return move(target);
 }
 
 Image resize(Image&& target, const Image& source) {
     assert_(source && target && target.size != source.size, source.size, target.size);
-    if(target.size < source.size) { // Integer box downsample
-        assert_(source.alpha==false && target.alpha==false, source.alpha, target.alpha);
-        assert_(source.width/target.width==source.height/target.height && source.width%target.width==0 && source.height%target.height==0,
-                source.size, target.size);
-        byte4* dst = target.data;
-        const byte4* src = source.data;
-        int scale = source.width/target.width;
-        for(uint unused y: range(target.height)) {
-            const byte4* line = src;
-            for(uint unused x: range(target.width)) {
-                int4 s = 0;
-                for(uint i: range(scale)) {
-                    for(uint j: range(scale)) {
-                        s += int4(line[i*source.stride+j]);
-                    }
-                }
-                s /= scale*scale;
-                *dst = byte4(s);
-                line += scale, dst++;
-            }
-            src += scale * source.stride;
-        }
-    } else { // Bilinear upsample
-        bilinear(target, source);
-    }
-    return move(target);
+    if(source.width%target.width==0 && source.height%target.height==0) return box(move(target), source); // Integer box downsample
+    else if(target.size > source.size/2) return bilinear(move(target), source); // Bilinear resample
+    else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
+
+Image negate(Image&& target, const Image& source) {
+    //assert_(!source.alpha);
+    //for(uint y: range(target.height)) for(uint x: range(target.width)) target(x,y) = byte4(byte3(0xFF)-source(x,y).bgr(), source(x,y).a);
+    for(uint y: range(target.height)) for(uint x: range(target.width)) target(x,y) = byte4(byte3(0xFF)-source(x,y).bgr(), source(x,y).a);
+    return move(target);
+}
 
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;

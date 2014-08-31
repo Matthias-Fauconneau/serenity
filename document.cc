@@ -180,31 +180,33 @@ struct Document {
             skip(s);
             if(s.match('(')) children << parseLayout(s, page, quick);
             else if(s.match('@')) {
-                string path = s.whileNo(" \t\n)-|+"_);
+                bool negate = s.match('-');
+                string path = s.whileNo(" \t\n)-|+$"_);
                 assert_(s);
                 if(quick) { children << &element<Placeholder>(page); //FIXME
                 } else {
-                    unique<Image> image;
-                    /**/ if(existsFile(path)) image = unique<Image>(decodeImage(readFile(path)));
-                    else if(existsFile(path+".png"_)) image = unique<Image>(decodeImage(readFile(path+".png"_)));
-                    else if(existsFile(path+".jpg"_)) image = unique<Image>(decodeImage(readFile(path+".jpg"_)));
+                    Image image;
+                    /**/ if(existsFile(path)) image = decodeImage(readFile(path));
+                    else if(existsFile(path+".png"_)) image = decodeImage(readFile(path+".png"_));
+                    else if(existsFile(path+".jpg"_)) image = decodeImage(readFile(path+".jpg"_));
                     if(image) {
-                        children << &element<ImageWidget>(page, image);
-                        page.images << move(image);
+                        if(negate) image = ::negate(move(image), image);
+                        page.images << unique<Image>(move(image));
+                        children << &element<ImageWidget>(page, page.images.last());
                     } else warn(s, "Missing image", path);
                 }
             } else {
                 String text;
                 if(s.match('"')) text = parseText(s, {"\""_}, true);
-                else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,")"_}, false);
+                else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,"$"_,")"_}, false);
                 children << &newText(page, trim(text), format.textSize);
             }
             s.whileAny(" "_);
             // Separator
-            if((type=='+') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
+            if((type=='+' || type=='$') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
             else if(!type && s.match('\n')) {
                 s.whileAny(" \n"_);
-                if(s.wouldMatchAny("-|+"_)) type = s.next();
+                if(s.wouldMatchAny("-|+$"_)) type = s.next();
                 else type='\n';
             }
             else if(type=='\n' && s.match('\n')) {}
@@ -212,13 +214,14 @@ struct Document {
                 s.whileAny(" \n"_); // \n might be tight list or array width specifier
                 /**/ if(s.match(')')) break;
                 else if(type && s.match(type)) {}
-                else if(!type && s.wouldMatchAny("-|+"_)) type = s.next();
-                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, "_), "or ), got '"_+str(s.peek())+"'"_); break; }
+                else if(!type && s.wouldMatchAny("-|+$"_)) type = s.next();
+                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, $ "_), "or ), got '"_+str(s.peek())+"'"_); break; }
             }
         }
         if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false);
         else if(type=='|') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
         else if(type=='+') return &element<WidgetGrid>(page, move(children), false, width);
+        else if(type=='$') return &element<WidgetGrid>(page, move(children), true, width);
         else if(type=='\n') return &element<VBox>(page, move(children), VBox::Center, VBox::AlignCenter, false);
         else if(!type) {
             if(!children) return &warnText(s, page, "Empty layout");

@@ -45,8 +45,8 @@ int2 ImageWidget::sizeHint() const { return /*hidden ? 0 :*/ image.size; }
 Graphics ImageWidget::graphics(int2 size) const {
     Graphics graphics;
     if(image) {
-        int2 target = max(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
-        graphics.blits.append(Blit{vec2(0), vec2(target), share(image)});
+        int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
+        graphics.blits.append(Blit{vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image)});
     }
     return graphics;
 }
