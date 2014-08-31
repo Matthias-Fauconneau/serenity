@@ -26,7 +26,7 @@ struct ScrollArea : Widget {
     int2 sizeHint(int2 size) { return widget().sizeHint(size); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    void render() override;
+    Graphics graphics(int2 size) override;
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
@@ -44,19 +44,21 @@ template<class T> struct Scroll : ScrollArea, T {
 struct ImageWidget : virtual Widget {
     /// Displayed image
     const Image& image;
-    /// Hides button
+    /// Hides image
     bool hidden = false;
 
     /// Creates a widget displaying \a image
     ImageWidget(const Image& image, bool hidden=false):image(move(image)),hidden(hidden){}
 
     int2 sizeHint();
-    void render() override;
+    Graphics graphics(int2 size) override;
 };
+
 /// \typedef ImageView Icon
 /// Displays an icon
 typedef ImageWidget Icon;
 
+#if CONTROL
 /// Clickable image
 struct ImageLink : ImageWidget {
     /// Argument given to triggered
@@ -85,7 +87,7 @@ struct ToggleButton : Widget {
     bool enabled = false;
 
     int2 sizeHint();
-    void render() override;
+    Graphics graphics(int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 
     const Image& enableIcon;
@@ -138,3 +140,4 @@ struct TriggerItem : Item {
 
 /// Bar of \link Item items\endlink
 typedef Bar<Item> TabBar;
+#endif

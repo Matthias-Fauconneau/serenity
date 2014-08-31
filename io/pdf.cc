@@ -77,7 +77,7 @@ buffer<byte> toPDF(const ref<Image>& images) {
 #else
 #include "data.h"
 
-buffer<byte> toPDF(const ref<PDFPage>& pages) {
+buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages) {
     array<unique<Object>> objects;
     auto ref = [&](const Object& object) { return dec(objects.indexOf(&object))+" 0 R"_; };
 
@@ -91,24 +91,24 @@ buffer<byte> toPDF(const ref<PDFPage>& pages) {
     pdfPages.insert("Kids"_, array<Variant>());
     pdfPages.insert("Count"_, 0);
 
-    map<const Font*, String> fonts;
+    map<String, String> fonts; // font ID to font ref
 
-    for(const PDFPage& page: pages) {
+    for(const Graphics& page: pages) {
         Object& pdfPage = objects.append();
         pdfPage.insert("Parent"_, ref(pdfPages));
         pdfPage.insert("Type"_, String("/Page"_));
         {array<Variant> mediaBox;
-            mediaBox.append( 0 ).append( 0 ).append(page.size.x).append(page.size.y);
+            mediaBox.append( 0 ).append( 0 ).append(pageSize.x).append(pageSize.y);
             pdfPage.insert("MediaBox"_, move(mediaBox));}
         {Object& contents = objects.append();
             String content;
             content << "BT\n"_;
             Dict xFonts;
             vec2 last = 0;
-            for(const PDFPage::Character& c: page.characters) { // FIXME: Optimize redundant state changes
-                const Font& font = c.font;
+            for(const Glyph& glyph: page.glyphs) { // FIXME: Optimize redundant state changes
+                const Font& font = glyph.font;
                 if(!xFonts.contains(font.id)) {
-                    if(!fonts.contains(&font)) {
+                    if(!fonts.contains(font.id)) {
                         Object& xFont = objects.append();
                         xFont.insert("Type"_, String("/Font"_));
                         xFont.insert("Subtype"_, String("/Type0"_));
@@ -144,15 +144,15 @@ buffer<byte> toPDF(const ref<PDFPage>& pages) {
                                 descendantFonts << move(cidFont);}
                             xFont.insert("DescendantFonts"_, move(descendantFonts));}
                         //TODO: ToUnicode
-                        fonts.insert(&font, ref(xFont));
+                        fonts.insert(copy(font.id), ref(xFont));
                     }
-                    xFonts.insert(font.id, fonts.at(&font));
+                    xFonts.insert(font.id, fonts.at(font.id));
                 }
-                content << "/"_+font.id+" "_+dec(c.size)+" Tf\n"_; // Font size in pixels
-                vec2 delta = c.position - last; // Position delta of glyph origin in pixels
-                last = c.position;
+                content << "/"_+font.id+" "_+dec(glyph.font.size)+" Tf\n"_; // Font size in pixels
+                vec2 delta = glyph.origin - last; // Position delta of glyph origin in pixels
+                last = glyph.origin;
                 content << dec<float>({delta.x, delta.y}) << " Td\n"_;
-                uint index = font.index(c.code);
+                uint index = font.index(glyph.code);
                 assert_(index < 1<<15);
                 content << "("_+raw<uint16>(big16(index))+") Tj\n"_;
             }

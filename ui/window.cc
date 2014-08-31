@@ -125,7 +125,7 @@ void Window::event() {
         if(state!=Idle) { if(state==Server) state=Wait; return; }
         needUpdate = false;
         assert(size);
-        if(target.size() != size) {
+        if(target.size != size) {
             if(shm) {
                 {Shm::Detach r; r.seg=id+Segment; send(raw(r));}
                 shmdt(target.data);
@@ -143,7 +143,7 @@ void Window::event() {
         }
 
         renderBackground(target, background);
-        widget->render(target);
+        widget->graphics(target.size).render(target);
 
         putImage(Rect(size));
         present();
@@ -158,7 +158,7 @@ void Window::putImage(const Image& target) {
     assert_(target.stride);
     uint x = delta % target.stride, y = delta / target.stride;
     assert_(x+target.width<=this->target.width && y+target.height<=this->target.height);
-    this->putImage(int2(x,y)+Rect(target.size()));
+    this->putImage(int2(x,y)+Rect(target.size));
 }
 
 void Window::putImage(Rect rect) {
@@ -423,7 +423,8 @@ Image Window::getSnapshot() {
 }
 
 void renderBackground(const Image& target, Background background) {
-    int2 size = target.size();
+    int2 size = target.size;
+#if 0
     if(background==Oxygen) { // Oxygen-like radial gradient background
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
         const vec3 radial = vec3(246./255); // linear
@@ -453,13 +454,15 @@ void renderBackground(const Image& target, Background background) {
             else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
             else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
         }
-    }
-    else if(background==White) {
+    } else
+#endif
+    /***/ if(background==White) {
         for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
     }
     else if(background==Black) {
         for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
     }
+    else error((int)background);
 }
 
 void Window::keyPress(Key key, Modifiers modifiers) {

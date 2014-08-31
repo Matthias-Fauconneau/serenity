@@ -15,29 +15,21 @@ enum Key {
     Play=0x1008ff14, Media=0x1008ff32
 };
 inline String str(Key key) { return str(uint(key)); }
-enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4/*, Meta=1<<6*/ };
+enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4};
 
 /// Abstract component to compose user interfaces
 struct Widget {
     Widget(){}
     default_move(Widget);
     virtual ~Widget() {}
-// Layout
+// Graphics
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint(int2) { return sizeHint(); }
-    /// Renders this widget.
-    Image target;
-    void render(const Image& target) { this->target=share(target); render(); }
-    virtual void render()=0;
-    /// Renders a partial view of this widget with an offset (Default implementation).
-    virtual void render(const Image& target, int2 offset, int2 size) {
-        Image buffer (size.x, size.y);
-        buffer.buffer.clear(0);
-        render(buffer);
-        blit(target, offset, buffer);
-    }
-// Event
+    /// Returns graphic elements representing this widget at the given \a size.
+    virtual Graphics graphics(int2 size) = 0;
+
+// Control
     /// Mouse event type
     enum Event { Press, Release, Motion, Enter, Leave };
     /// Mouse buttons
@@ -70,9 +62,3 @@ String getSelection(bool clipboard=false);
 enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
 /// Sets cursor to be shown when mouse is in the given rectangle
 void setCursor(Rect region, Cursor cursor);
-///
-void putImage(const Image& target);
-
-/// Configures global display context to render to an image
-// In this module because the definition depends on display and widget
-Image renderToImage(Widget& widget, int2 size);

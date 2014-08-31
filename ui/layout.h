@@ -13,7 +13,7 @@ struct Layout : Widget {
     virtual array<Rect> layout(int2 size)=0;
 
     /// Renders all visible child widgets
-    void render() override;
+    Graphics graphics(int2 size) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
@@ -162,12 +162,12 @@ struct Selection : virtual Layout {
 struct HighlightSelection : virtual Selection {
     /// Whether to always display the highlight or only when focused
     bool always=true;
-    void render() override;
+    Graphics graphics(int2 size) override;
 };
 
 /// Displays a selection using horizontal tabs
 struct TabSelection : virtual Selection {
-    void render() override;
+    Graphics graphics(int2 size) override;
 };
 
 /// Array with Selection

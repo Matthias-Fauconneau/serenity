@@ -32,18 +32,22 @@ struct Image {
     explicit operator bool() const { return data && width && height; }
     explicit operator ref<byte>() const { assert(width==stride); return ref<byte>((byte*)data,height*stride*sizeof(byte4)); }
     inline byte4& operator()(uint x, uint y) const {assert(x<width && y<height); return data[y*stride+x]; }
-    int2 size() const { return int2(width,height); }
+    //int2 size() const { return int2(width,height); }
 
     ::buffer<byte4> buffer; //FIXME: shared
     byte4* data=0; // First pixel
-    uint width=0, height=0, stride=0;
+    union {
+        struct { uint width=0, height=0; };
+        int2 size;
+    };
+    uint stride=0;
     bool alpha=false, sRGB=true;
 };
 inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
 /// Copies an image
 inline void copy(const Image& target, const Image& source) {
-    assert_(target.size() == source.size(), target.size(), source.size());
+    assert_(target.size == source.size, target.size, source.size);
     for(uint y: range(source.height)) for(uint x: range(source.width)) target(x,y) = source(x,y);
 }
 

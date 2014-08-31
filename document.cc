@@ -12,7 +12,7 @@ uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 static constexpr uint oversample = 2;
 
 struct Placeholder : Widget {
-    void render() {}
+    Graphics graphics(int2) override { return {}; }
 };
 
 /// Header of a section from a \a Document
@@ -34,15 +34,12 @@ struct Page : VBox {
     Page(Linear::Extra main, uint index, int2 marginPx)
         : Linear(main, Linear::Expand, true), index(index), marginPx(marginPx) {}
 
-    void render() override {
-        Image page = share(this->target);
-        Image inner = clip(page, Rect(marginPx, page.size() - marginPx));
-        fill(target, Rect(target.size()), !(sizeHint(inner.size()).y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
-       {this->target = share(inner);
-            VBox::render();
-        this->target = share(page);}
-        Image footer = clip(page, Rect(int2(0, page.size().y - marginPx.y), page.size()));
-        if(this->footer) this->footer->render(footer);
+    Graphics graphics(int2 size) override {
+        Graphics graphics;
+        //fill(target, Rect(target.size()), !(sizeHint(inner.size()).y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
+        graphics.append(VBox::graphics(size - 2*marginPx), vec2(marginPx));
+        if(this->footer) graphics.append( this->footer->graphics(int2(size.x, marginPx.y)), vec2(0, size.y - marginPx.y));
+        return graphics;
     }
 };
 
@@ -358,11 +355,7 @@ struct Document {
     buffer<byte> toPDF() { return ::toPDF(images()); }
 #else
     buffer<byte> toPDF() {
-        return ::toPDF(apply(pages.size, [this](int index){
-            PDFPage target {pageSize,{}};
-            parsePage(index).Widget::render(target);
-            return move(target);
-        }));
+        return ::toPDF(pageSize, apply(pages.size, [this](int index){ return parsePage(index).graphics(pageSize); }));
     }
 #endif
 };
@@ -393,14 +386,7 @@ struct PageView : Widget {
         return true;
     }
 
-    void render() override {
-        /***/ if(oversample==1) page.Widget::render(target);
-        else if(oversample==2) {
-            Image large(2*target.size());
-            page.Widget::render(large);
-            downsample(target, large);
-        } else error(oversample);
-    }
+    Graphics graphics(int2 size) override { return page.graphics(size); }
 };
 
 struct DocumentViewer {

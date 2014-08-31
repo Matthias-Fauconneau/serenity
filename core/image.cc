@@ -3,7 +3,7 @@
 #include "vector.h"
 
 Image clip(const Image& image, Rect r) {
-    r = r & Rect(image.size());
+    r = r & Rect(image.size);
     return Image(unsafeReference(image.buffer),
                  image.data+r.position().y*image.stride+r.position().x, r.size().x, r.size().y, image.stride, image.alpha, image.sRGB);
 }
@@ -55,17 +55,17 @@ void downsample(const Image& target, const Image& source) {
 }
 
 Image downsample(const Image& source) {
-    assert_(source.size()>int2(2), source.size());
-    Image target(source.size()/2);
+    assert_(source.size>int2(2), source.size);
+    Image target(source.size/2);
     downsample(target, source);
     return target;
 }
 
 Image resize(Image&& target, const Image& source) {
-    assert_(source && target && target.size() != source.size() && source.alpha==false && target.alpha==false, source.size(), target.size());
+    assert_(source && target && target.size != source.size && source.alpha==false && target.alpha==false, source.size, target.size);
     // Integer box downsample
     assert_(source.width/target.width==source.height/target.height && source.width%target.width==0 && source.height%target.height==0,
-            source.size(), target.size());
+            source.size, target.size);
     byte4* dst = target.data;
     const byte4* src = source.data;
     int scale = source.width/target.width;

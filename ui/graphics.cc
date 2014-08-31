@@ -21,10 +21,10 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
     }
 }
 
-vec3 LChuvtoLuv(float L, float C, float h) {
+static vec3 LChuvtoLuv(float L, float C, float h) {
     return vec3(L, C*cos(h) , C*sin(h));
 }
-vec3 LuvtoXYZ(float L, float u, float v) {
+static vec3 LuvtoXYZ(float L, float u, float v) {
     const float xn=0.3127, yn=0.3290; // D65 white point (2° observer)
     const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
     float u2 = un + u / (13*L);
@@ -34,18 +34,17 @@ vec3 LuvtoXYZ(float L, float u, float v) {
     float Z = Y * (12-3*u2-20*v2)/(4*v2);
     return vec3(X, Y, Z);
 }
-vec3 LuvtoXYZ(vec3 Luv) { return LuvtoXYZ(Luv[0], Luv[1], Luv[2]); }
-vec3 XYZtoBGR(float X, float Y, float Z) {
+static vec3 LuvtoXYZ(vec3 Luv) { return LuvtoXYZ(Luv[0], Luv[1], Luv[2]); }
+static vec3 XYZtoBGR(float X, float Y, float Z) {
     float R = + 3.240479 * X - 1.53715 * Y - 0.498535 * Z;
     float G = - 0.969256 * X + 1.875992 * Y + 0.041556 * Z;
     float B	= + 0.055648 * X - 0.204043 * Y + 1.057311 * Z;
     return vec3(B, G, R);
 }
-vec3 XYZtoBGR(vec3 XYZ) { return XYZtoBGR(XYZ[0], XYZ[1], XYZ[2]); }
+static vec3 XYZtoBGR(vec3 XYZ) { return XYZtoBGR(XYZ[0], XYZ[1], XYZ[2]); }
 vec3 LChuvtoBGR(float L, float C, float h) { return XYZtoBGR(LuvtoXYZ(LChuvtoLuv(L, C, h))); }
 
-void blend(const Image& target, uint x, uint y, vec3 color, float alpha) notrace;
-void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha) {
+static void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha) {
     byte4& target_sRGB = target(x,y);
     vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
     int3 linearBlend = int3(round((0xFFF*(1-alpha))*vec3(target_linear) + (0xFFF*alpha)*source_linear));
@@ -61,7 +60,7 @@ static void fill(uint* target, uint stride, uint w, uint h, uint value) {
 }
 
 void fill(const Image& target, Rect rect, vec3 color, float alpha) {
-    rect = rect & Rect(target.size());
+    rect = rect & Rect(target.size);
     if(rect) {
         color = clip(vec3(0), color, vec3(1));
         if(alpha<1) {
@@ -78,7 +77,7 @@ void fill(const Image& target, Rect rect, vec3 color, float alpha) {
 
 void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
     assert_(source);
-    Rect rect = (position+Rect(source.size())) & Rect(target.size());
+    Rect rect = (position+Rect(source.size)) & Rect(target.size);
     color = clip(vec3(0), color, vec3(1));
     if(color!=vec3(0) || alpha<1 || source.sRGB) {
         for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
@@ -98,32 +97,32 @@ void blit(const Image& target, int2 position, const Image& source, vec3 color, f
     }
 }
 
-void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool transpose) {
+static void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool transpose) {
     if(transpose) swap(x,y);
     if(x>=target.width || y>=target.height) return;
     blend(target, x,y, color, alpha);
 }
 
-void line(const Image& target, float x1, float y1, float x2, float y2, vec3 color, float alpha) {
+void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float alpha) {
     color = clip(vec3(0), color, vec3(1));
-    float dx = x2 - x1, dy = y2 - y1;
+    float dx = p2.x - p1.x, dy = p2.y - p1.y;
     bool transpose=false;
-    if(abs(dx) < abs(dy)) { swap(x1, y1); swap(x2, y2); swap(dx, dy); transpose=true; }
-    if(x1 > x2) { swap(x1, x2); swap(y1, y2); }
+    if(abs(dx) < abs(dy)) { swap(p1.x, p1.y); swap(p2.x, p2.y); swap(dx, dy); transpose=true; }
+    if(p1.x > p2.x) { swap(p1.x, p2.x); swap(p1.y, p2.y); }
     if(dx==0) return; //p1==p2
     float gradient = dy / dx;
     int i1,i2; float intery;
     {
-        float xend = round(x1), yend = y1 + gradient * (xend - x1);
-        float xgap = 1 - fract(x1 + 1./2);
+        float xend = round(p1.x), yend = p1.y + gradient * (xend - p1.x);
+        float xgap = 1 - fract(p1.x + 1./2);
         blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
         blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
         i1 = int(xend);
         intery = yend + gradient;
     }
     {
-        float xend = round(x2), yend = y2 + gradient * (xend - x2);
-        float xgap = fract(x2 + 1./2);
+        float xend = round(p2.x), yend = p2.y + gradient * (xend - p2.x);
+        float xgap = fract(p2.x + 1./2);
         blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
         blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
         i2 = int(xend);
@@ -176,7 +175,7 @@ static void line(Image8& raster, int2 p0, int2 p1) {
         if(x0 == x1 && y0 == y1) break;
         int e2 = 2*err;
         if(e2 > -dy) { err -= dy, x0 += sx; }
-        if(e2 < dx) { err += dx, y0 += sy; raster(x0,y0) -= sy; } //only raster at y step
+        if(e2 < dx) { err += dx, y0 += sy; raster(x0,y0) -= sy; } // Only rasters at y step
     }
     lastStepY=sy;
 }
@@ -194,11 +193,11 @@ static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 
 // Renders cubic spline (two control points between each end point)
 void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha, const uint oversample) {
-    vec2 pMin = vec2(target.size()), pMax = 0;
+    vec2 pMin = vec2(target.size), pMax = 0;
     for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
     pMin = floor(pMin), pMax = ceil(pMax);
     const int2 iMin = int2(pMin), iMax = int2(pMax);
-    const int2 cMin = max(int2(0),iMin), cMax = min(target.size(), iMax);
+    const int2 cMin = max(int2(0),iMin), cMax = min(target.size, iMax);
     if(!(cMin < cMax)) return;
     const int2 size = iMax-iMin;
     Image8 raster(oversample*size.x+1,oversample*size.y+1);

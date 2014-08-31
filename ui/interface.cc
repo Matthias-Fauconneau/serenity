@@ -4,13 +4,12 @@
 #include "graphics.h"
 
 // ScrollArea
-void ScrollArea::render() {
-    size=target.size();
+Graphics ScrollArea::graphics(int2 size) {
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
-    if(view <= size) widget().render(target);
-    else widget().render(target, offset, view);
-    if(scrollbar && size.y<view.y) fill(target, Rect(int2(size.x-scrollBarWidth, -offset.y*size.y/view.y), int2(size.x,(-offset.y+size.y)*size.y/view.y)), 0.5);
+    if(view <= size) return widget().graphics(size);
+    else return move(Graphics().append(widget().graphics(view), vec2(offset)));
+    //if(scrollbar && size.y<view.y) fill(target, Rect(int2(size.x-scrollBarWidth, -offset.y*size.y/view.y), int2(size.x,(-offset.y+size.y)*size.y/view.y)), 0.5);
 }
 bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
     int2 hint = abs(widget().sizeHint(size));
@@ -41,6 +40,15 @@ bool ScrollArea::keyPress(Key key, Modifiers) {
 void ScrollArea::ensureVisible(Rect target) { offset = max(-target.min, min(size-target.max, offset)); }
 void ScrollArea::center(int2 target) { offset = size/2-target; }
 
+// ImageWidget
+int2 ImageWidget::sizeHint() { return hidden ? 0 : image.size; }
+Graphics ImageWidget::graphics(int2 size) {
+    Graphics graphics;
+    if(image) graphics.blits.append(Blit{vec2(size-image.size)/2.f, share(image)});
+    return graphics;
+}
+
+#if CONTROL
 // Progress
 int2 Progress::sizeHint() { return int2(-height,height); }
 void Progress::render() {
@@ -114,14 +122,6 @@ void TabSelection::render() {
     for(uint i: range(count()))  at(i).render(clip(target, widgets[i]));
 }
 
-// ImageWidget
-int2 ImageWidget::sizeHint() { return hidden ? 0 : image.size(); }
-void ImageWidget::render() {
-    if(!image) return;
-    int2 offset = (target.size()-image.size())/2;
-    blit(target, offset, image);
-}
-
 // ImageLink
 bool ImageLink::mouseEvent(int2, int2, Event event, Button) {
     if(event==Press) { if(triggered) triggered(); linkActivated(link); return true; }
@@ -146,3 +146,4 @@ bool TriggerItem::mouseEvent(int2, int2, Event event, Button) {
     if(event==Press) { triggered(); return true; }
     return false;
 }
+#endif

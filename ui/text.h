@@ -30,8 +30,8 @@ struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
     Text(const string& text=""_, uint size=16, vec3 color=0, float alpha=1, uint wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true);
 
-    void setText(const string& text) { this->text=toUCS4(text); textSize=0; /*editIndex=min<uint>(editIndex,text.size);*/ }
-    void setSize(int size) { this->size=size; textSize=0; }
+    //void setText(const string& text) { this->text=toUCS4(text); textSize=0; /*editIndex=min<uint>(editIndex,text.size);*/ }
+    //void setSize(int size) { this->size=size; textSize=0; }
 
     // Parameters
     /// Displayed text in UTF32
@@ -61,16 +61,15 @@ struct Text : virtual Widget {
 
     // Variables
     // Layout bounding box
-    int2 textSize=0;
-    // Characters to render
-    struct Character { int2 pos; Image image; /*uint editIndex; int center, advance;*/ /*int height;*/ };
-    array<array<Character>> characters;
+    vec2 textSize = 0;
+    // Glyphs to render
+    //struct Glyphs { int2 pos; /*Image image;*/ /*uint editIndex; int center, advance;*/ /*int height;*/ };
+    array<array<Glyph>> glyphs;
 
     void layout(float wrap);
 
     int2 sizeHint(int2 size) override;
-    void render() override;
-    void render(const Image& target, int2 offset);
+    Graphics graphics(int2 size) override;
 
     /*// Underlines and strikes
     struct Line { int2 min,max; };

@@ -253,8 +253,8 @@ String ftoa(double n, int precision, uint pad, int exponent) {
     return pad>s.size ? repeat(" "_,pad-s.size)+s : move(s);
 }
 
-String str(float n) { return n==round(n)?dec(int(n)):ftoa(n); }
-String str(double n) { return n==round(n)?dec(int(n)):ftoa(n); }
+String str(float n) { return (isNumber(n) && n==round(n)) ? dec(int(n)) : ftoa(n); }
+String str(double n) { return (isNumber(n) && n==round(n)) ? dec(int(n)) : ftoa(n); }
 
 String binaryPrefix(size_t value, string unit) {
     if(value < 1u<<10) return str(value, unit);

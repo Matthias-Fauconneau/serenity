@@ -1,9 +1,11 @@
 #include "layout.h"
 
 // Layout
-void Layout::render() {
-    array<Rect> widgets = layout(target.size());
-    for(uint i: range(count())) at(i).render(clip(target, widgets[i]));
+Graphics Layout::graphics(int2 size) {
+    array<Rect> widgets = layout(size);
+    Graphics graphics;
+    for(uint i: range(count())) graphics.append(at(i).graphics(widgets[i].size()), vec2(widgets[i].position()));
+    return graphics;
 }
 
 bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {

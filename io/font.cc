@@ -24,8 +24,8 @@ String findFont(string fontName, ref<string> fontTypes) {
 }
 
 static FT_Library ft; static int fontCount=0;
-Font::Font(Map&& map, float size, bool hint) : Font(buffer<byte>(map), size, hint) { keep=move(map); }
-Font::Font(buffer<byte>&& data_, float size, bool hint) : data(move(data_)), hint(hint) {
+Font::Font(Map&& map, float size, bool hint, string id) : Font(buffer<byte>(map), size, hint, id) { keep=move(map); }
+Font::Font(buffer<byte>&& data_, float size, bool hint, string id) : data(move(data_)), size(size), hint(hint), id(id) {
     if(!ft) FT_Init_FreeType(&ft);
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;
@@ -65,26 +65,27 @@ uint Font::index(uint code) const {
 float Font::kerning(uint leftIndex, uint rightIndex) {
     FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6;
 }
-float Font::advance(uint index) {
+
+Font::Metrics Font::metrics(uint index) const {
     FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
-    return face->glyph->advance.x*0x1p-6;
+    return {
+        face->glyph->advance.x*0x1p-6f,
+        (int)face->glyph->lsb_delta, (int)face->glyph->rsb_delta,
+        {{face->glyph->metrics.width*0x1p-6f, face->glyph->metrics.height*0x1p-6f}}};
 }
 
-Glyph Font::glyph(uint index) {
+Font::Glyph Font::render(uint index) {
     {const Glyph* glyph = cache.find(index);
-        if(glyph) return {glyph->offset, share(glyph->image), glyph->leftDelta, glyph->rightDelta, glyph->size};}
+        if(glyph) return {glyph->offset, share(glyph->image)};}
     Glyph& glyph = cache.insert(index);
     FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
-    glyph.leftDelta = face->glyph->lsb_delta;
-    glyph.rightDelta = face->glyph->rsb_delta;
-    glyph.size = vec2(face->glyph->metrics.width*0x1p-6, face->glyph->metrics.height*0x1p-6);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;
-    if(!bitmap.buffer) { return {glyph.offset, share(glyph.image), glyph.leftDelta, glyph.rightDelta, glyph.size}; }
+    if(!bitmap.buffer) { return {glyph.offset, share(glyph.image)}; }
     int width = bitmap.width, height = bitmap.rows;
     Image image(width, height, true, false);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0xFF,0xFF,0xFF,bitmap.buffer[y*bitmap.pitch+x]);
     glyph.image = move(image);
-    return {glyph.offset, share(glyph.image), glyph.leftDelta, glyph.rightDelta, glyph.size};
+    return {glyph.offset, share(glyph.image)};
 }
