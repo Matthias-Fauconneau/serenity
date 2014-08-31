@@ -1,7 +1,7 @@
 #include "layout.h"
 
 // Layout
-Graphics Layout::graphics(int2 size) {
+Graphics Layout::graphics(int2 size) const {
     array<Rect> widgets = layout(size);
     Graphics graphics;
     for(uint i: range(count())) graphics.append(at(i).graphics(widgets[i].size()), vec2(widgets[i].position()));
@@ -15,7 +15,7 @@ bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
 }
 
 // Linear
-int2 Linear::sizeHint(int2 size) {
+int2 Linear::sizeHint(int2 size) const {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
     for(uint i: range(count())) { Widget& child=at(i); assert(*(void**)&child);
@@ -28,7 +28,7 @@ int2 Linear::sizeHint(int2 size) {
     return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
 }
 
-array<Rect> Linear::layout(const int2 originalSize) {
+array<Rect> Linear::layout(const int2 originalSize) const {
     uint count=this->count();
     if(!count) return {};
     const int2 size = xy(originalSize);
@@ -94,10 +94,10 @@ array<Rect> Linear::layout(const int2 originalSize) {
 }
 
 // Grid
-array<Rect> GridLayout::layout(int2 size) {
+array<Rect> GridLayout::layout(int2 size) const {
     if(!count()) return {};
     array<Rect> widgets(count());
-    int w=this->width,h=this->height; for(;;) { if(w*h>=(int)count()) break; if(!this->width && w<=h) w++; else h++; }
+    int w=this->width,h=0/*this->height*/; for(;;) { if(w*h>=(int)count()) break; if(!this->width && w<=h) w++; else h++; }
     int widths[w], heights[h];
     for(uint x: range(w)) {
         int maxX = 0;
@@ -147,7 +147,8 @@ array<Rect> GridLayout::layout(int2 size) {
     }
     return widgets;
 }
-int2 GridLayout::sizeHint(int2 size) {
+
+int2 GridLayout::sizeHint(int2 size) const {
     int2 requiredSize=0;
     for(Rect r: layout(int2(size.x,0))) requiredSize=max(requiredSize, r.max);
     return requiredSize;

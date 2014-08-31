@@ -149,10 +149,3 @@ template<Type K, Type V> String toASCII(const map<K,V>& m) {
     }
     return replace(move(s),'/','\\');
 }
-
-/*template<Type K, Type V> void operator<<(map<K,V>& a, const map<K,V>& b) {
-    for(const_pair<K, V> e: b) { assert_(!a.contains(e.key)); a.insert(copy(e.key), copy(e.value)); }
-}
-template<Type K, Type V> void operator<<(map<K,V>& a, map<K,V>&& b) {
-    for(pair<K, V> e: b) { a.insertMulti(move(e.key), move(e.value)); }
-}*/

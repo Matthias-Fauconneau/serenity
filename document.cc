@@ -10,7 +10,7 @@
 uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 struct Placeholder : Widget {
-    Graphics graphics(int2) override { return {}; }
+    Graphics graphics(int2) const override { return {}; }
 };
 
 /// Header of a section from a \a Document
@@ -32,9 +32,14 @@ struct Page : VBox {
     Page(Linear::Extra main, uint index, int2 marginPx)
         : Linear(main, Linear::Expand, true), index(index), marginPx(marginPx) {}
 
-    Graphics graphics(int2 size) override {
+    Graphics graphics(int2 size) const override {
         Graphics graphics;
-        graphics.append(VBox::graphics(size - 2*marginPx), vec2(marginPx));
+        int2 inner = size - 2*marginPx;
+        //int extra = inner.y-abs(VBox::sizeHint(inner).y);
+        //if(extra < inner.y/16 || extra > inner.y/3) graphics.append(Text(string{TextFormat::Bold}+str(inner.y/16, extra, inner.y/3)).graphics(int2(size.x, marginPx.y)), 0);
+        //if(!(abs(VBox::sizeHint(inner)) <= inner)) log("Tight page", index, abs(VBox::sizeHint(inner)), inner);
+        //if(!(abs(VBox::sizeHint(inner)) > inner*2/3)) log("Loose page", index, VBox::sizeHint(inner), inner);
+        graphics.append(VBox::graphics(inner), vec2(marginPx));
         if(this->footer) graphics.append( this->footer->graphics(int2(size.x, marginPx.y)), vec2(0, size.y - marginPx.y));
         return graphics;
     }
@@ -45,13 +50,14 @@ struct Format {
     int2 marginPx;
     const string font;
     const float footerSize, textSize, headerSize, titleSize;
+    float pointPx; // Pixel per point (1/72 dpi)
     Linear::Extra titlePageLayout, pageLayout;
 };
 struct A4 : Format {
     static constexpr float inchMM = 25.4, inchPx = 90;
     static constexpr int pageWidth = 210/*mm*/ * (inchPx/inchMM), pageHeight = 297/*mm*/ * (inchPx/inchMM);
     static constexpr float pointPx = inchPx / 72;
-    A4() : Format{int2(pageWidth, pageHeight), int2(1.5 * inchPx), "FreeSerif"_, /*0*/12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx,
+    A4() : Format{int2(pageWidth, pageHeight), int2(1.5 * inchPx), "FreeSerif"_, /*0*/12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx, pointPx,
                   Linear::Center, Linear::Share} {}
 };
 
@@ -59,7 +65,7 @@ struct A4 : Format {
 struct Document {
     const String source;
     string formatString;
-    Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32, Linear::Spread, Linear::Spread};
+    Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32, 1, Linear::Spread, Linear::Spread};
     const float interlineStretch = 3./2;
 
     // Document properties
@@ -174,7 +180,7 @@ struct Document {
             // Element
             skip(s);
             if(s.match('(')) children << parseLayout(s, page, quick);
-            else if(s.wouldMatchAny("&_$^@"_)) {
+            else if(s.wouldMatchAny("&_^@"_)) {
                 int sample = 0, rotate=0;
                 if(!s.match('&')) for(;;) {
                     if(s.match('@')) rotate++;
@@ -182,7 +188,7 @@ struct Document {
                     else if(s.match('_')) sample--;
                     else break;
                 }
-                string path = s.whileNo(" \t\n)-|+$"_);
+                string path = s.whileNo(" \t\n)-|+"_);
                 assert_(s);
                 if(quick) { children << &element<Placeholder>(page); //FIXME
                 } else {
@@ -201,15 +207,15 @@ struct Document {
             } else {
                 String text;
                 if(s.match('"')) text = parseText(s, {"\""_}, true);
-                else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,"$"_,")"_}, false);
+                else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,")"_}, false);
                 children << &newText(page, trim(text), format.textSize);
             }
             s.whileAny(" "_);
             // Separator
-            if((type=='+'||type=='$') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
+            if((type=='+') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
             else if(!type && s.match('\n')) {
                 s.whileAny(" \n"_);
-                if(s.wouldMatchAny("-|+$"_)) type = s.next();
+                if(s.wouldMatchAny("-|+"_)) type = s.next();
                 else type='\n';
             }
             else if(type=='\n' && s.match('\n')) {}
@@ -217,14 +223,13 @@ struct Document {
                 s.whileAny(" \n"_); // \n might be tight list or array width specifier
                 /**/ if(s.match(')')) break;
                 else if(type && s.match(type)) {}
-                else if(!type && s.wouldMatchAny("-|+$"_)) type = s.next();
-                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, $"_), "or ), got '"_+str(s.peek())+"'"_); break; }
+                else if(!type && s.wouldMatchAny("-|+"_)) type = s.next();
+                else { children << &warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, "_), "or ), got '"_+str(s.peek())+"'"_); break; }
             }
         }
         if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false);
         else if(type=='|') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
         else if(type=='+') return &element<WidgetGrid>(page, move(children), false, width);
-        else if(type=='$') return &element<WidgetGrid>(page, move(children), true, width);
         else if(type=='\n') return &element<VBox>(page, move(children), VBox::Center, VBox::AlignCenter, false);
         else if(!type) {
             if(!children) return &warnText(s, page, "Empty layout");
@@ -237,7 +242,7 @@ struct Document {
     /// Parses a page statement
     /// \arg quick Quick layout for table of contents (skips images)
     Page parsePage(TextData& s, array<uint>& indices, uint pageIndex, bool quick=false) const {
-        Page page (pageIndex ? format.pageLayout : format.titlePageLayout, pageIndex, format.marginPx);
+        Page page (format.pageLayout, pageIndex, format.marginPx);
         while(s) {
             if(s.match('(')) { // Float
                 page << parseLayout(s, page, quick);
@@ -287,7 +292,7 @@ struct Document {
                         for(int level: header.indices) text << dec(level) << '.';
                         text << ' ' << TextData(header.name).until('(');
                         grid << &newText(page, text, format.textSize, false);
-                        grid << &newText(page, " "_+dec(header.page), format.textSize);
+                        grid << &newText(page, " "_+dec(header.page-1), format.textSize);
                     }
                     page << &grid;
                 } else error(command);
@@ -319,7 +324,7 @@ struct Document {
 
             if(s.match('\n')) break; // Page break
         }
-        if(format.footerSize && page.index) page.footer = &newText(page, dec(page.index), format.textSize);
+        if(format.footerSize && page.index>=2) page.footer = &newText(page, dec(page.index-1), format.textSize);
         return move(page);
     }
     Page parsePage(TextData&& s, array<uint>&& indices, uint pageIndex) const { return parsePage(s, indices, pageIndex); }
@@ -330,7 +335,10 @@ struct Document {
 
     buffer<byte> toPDF() {
         //return ::toPDF(format.pageSize, {parsePage(1).graphics(format.pageSize)});
-        return ::toPDF(format.pageSize, apply(pages.size, [this](int index){ return parsePage(index).graphics(format.pageSize); }));
+        //return ::toPDF(format.pageSize, apply(pages.size, [this](int index){ return parsePage(index).graphics(format.pageSize); }));
+        // Releases pages after toPDF to keep valid weak references to images in graphics
+        return ::toPDF(format.pageSize, apply( apply(pages.size, [&](int index){ return parsePage(index);}),
+                                               [&](const Page& page) { return page.graphics(format.pageSize); }), 1./format.pointPx);
     }
 };
 
@@ -360,7 +368,7 @@ struct PageView : Widget {
         return true;
     }
 
-    Graphics graphics(int2 size) override { return page.graphics(size); }
+    Graphics graphics(int2 size) const override { return page.graphics(size); }
 };
 
 struct DocumentViewer {

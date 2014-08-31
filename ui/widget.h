@@ -25,9 +25,9 @@ struct Widget {
 // Graphics
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint(int2) { return sizeHint(); }
+    virtual int2 sizeHint(int2) const { return sizeHint(); }
     /// Returns graphic elements representing this widget at the given \a size.
-    virtual Graphics graphics(int2 size) = 0;
+    virtual Graphics graphics(int2 size) const = 0;
 
 // Control
     /// Mouse event type
@@ -46,7 +46,7 @@ struct Widget {
     virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
     virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 private:
-    virtual int2 sizeHint() { return 0; }
+    virtual int2 sizeHint() const { return 0; }
 };
 
 // Accessors to the window which received the current event (may only be called from event methods)

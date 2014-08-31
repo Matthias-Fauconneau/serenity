@@ -4,7 +4,7 @@
 #include "graphics.h"
 
 // ScrollArea
-Graphics ScrollArea::graphics(int2 size) {
+Graphics ScrollArea::graphics(int2 size) const {
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     if(view <= size) return widget().graphics(size);
@@ -41,9 +41,9 @@ void ScrollArea::ensureVisible(Rect target) { offset = max(-target.min, min(size
 void ScrollArea::center(int2 target) { offset = size/2-target; }
 
 // ImageWidget
-int2 ImageWidget::sizeHint() { return hidden ? 0 : image.size; }
-Graphics ImageWidget::graphics(int2 size) {
+int2 ImageWidget::sizeHint() const { return /*hidden ? 0 :*/ image.size; }
+Graphics ImageWidget::graphics(int2 size) const {
     Graphics graphics;
-    if(image) graphics.blits.append(Blit{vec2((size-image.size)/2), clip(image, int2(image.size-size)/2+Rect(size))});
+    if(image) graphics.blits.append(Blit{max(vec2(0),vec2((size-image.size)/2)), clip(image, int2(image.size-size)/2+Rect(size))});
     return graphics;
 }

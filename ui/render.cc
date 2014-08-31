@@ -207,7 +207,10 @@ void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha
 #endif
 
 void render(const Image& target, const Graphics& graphics) {
-    for(const auto& e: graphics.blits) blit(target, int2(round(e.origin)), e.image, 1, 1);
+    for(const auto& e: graphics.blits) {
+        assert(e.image.width && e.image.height, e.image.size);
+        blit(target, int2(round(e.origin)), e.image, 1, 1);
+    }
     for(const auto& e: graphics.glyphs) {
         Font::Glyph glyph = e.font.render(e.font.index(e.code));
         blit(target, int2(round(e.origin))+glyph.offset, glyph.image, 0, 1);

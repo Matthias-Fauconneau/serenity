@@ -1,8 +1,8 @@
 #include "pdf.h"
 #include "variant.h"
 #include "data.h"
-
-buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages) {
+#include "matrix.h"
+buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
     array<unique<Object>> objects;
     auto ref = [&](const Object& object) { return dec(objects.indexOf(&object))+" 0 R"_; };
 
@@ -18,20 +18,21 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages) {
 
     map<String, String> fonts; // font ID to font ref
 
-    for(const Graphics& page: pages) {
-        Object& pdfPage = objects.append();
-        pdfPage.insert("Parent"_, ref(pdfPages));
-        pdfPage.insert("Type"_, String("/Page"_));
+    for(const Graphics& graphics: pages) {
+        Object& page = objects.append();
+        page.insert("Parent"_, ref(pdfPages));
+        page.insert("Type"_, String("/Page"_));
         {array<Variant> mediaBox;
-            mediaBox.append( 0 ).append( 0 ).append(pageSize.x).append(pageSize.y);
-            pdfPage.insert("MediaBox"_, move(mediaBox));}
+            mediaBox.append( 0 ).append( 0 ).append(pageSize.x*px).append(pageSize.y*px);
+            page.insert("MediaBox"_, move(mediaBox));}
+        //page.insert("UserUnit"_, userUnit); log(userUnit); // Minimum user unit is 1
         {Object& contents = objects.append();
             String content;
             content << "BT\n"_;
             Dict xFonts;
             String fontID; float fontSize=0;
             vec2 last = 0;
-            for(const Glyph& glyph: page.glyphs) { // FIXME: Optimize redundant state changes
+            for(const Glyph& glyph: graphics.glyphs) { // FIXME: Optimize redundant state changes
                 const Font& font = glyph.font;
                 if(font.id != fontID || font.size != fontSize) {
                     if(!xFonts.contains(font.id)) {
@@ -76,27 +77,52 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages) {
                         }
                         xFonts.insert(font.id, fonts.at(font.id));
                     }
-                    content << "/"_+font.id+" "_+dec(glyph.font.size)+" Tf\n"_; // Font size in pixels
+                    content << "/"_+font.id+" "_+dec(glyph.font.size*px)+" Tf\n"_; // Font size in pixels
                 }
-                vec2 absolute = vec2(glyph.origin.x, pageSize.y-glyph.origin.y);
+                vec2 absolute = vec2(glyph.origin.x, pageSize.y-glyph.origin.y)*px;
                 vec2 relative = absolute - last; // Position update of glyph origin in pixels
                 last = absolute;
-                assert_(relative);
-                content << dec<float>({relative.x, relative.y}) << " Td\n"_;
+                content << ftoa(relative.x,1) << " "_ << ftoa(relative.y,1) << " Td\n"_;
                 uint index = font.index(glyph.code);
                 assert_(index < 1<<15);
                 content << "<"_+hex(index,4)+"> Tj\n"_;
             }
             content << "ET\n"_;
-            contents.insert("Filter"_,"/FlateDecode"_);
-            contents = deflate(content);
-            pdfPage.insert("Contents"_, ref(contents));
 
             {Dict resources;
+                if(graphics.blits) {
+                    map<String, Variant> xObjects;
+                    for(int index: range(graphics.blits.size)) {
+                        const Blit& blit = graphics.blits[index];
+                        const auto& image = blit.image;
+                        String id = "Image"_+str(pdfPages.at("Count"_).number)+"_"_+str(index);
+                        {Object& xImage = objects.append();
+                            xImage.insert("Subtype"_, String("/Image"_));
+                            xImage.insert("Width"_, dec(image.width));
+                            xImage.insert("Height"_, dec(image.height));
+                            xImage.insert("ColorSpace"_, String("/DeviceRGB"_));
+                            xImage.insert("BitsPerComponent"_, String("8"_));
+                            buffer<byte3> rgb3 (image.height * image.width); static_assert(sizeof(byte3)==3, "");
+                            for(uint y: range(image.height)) for(uint x: range(image.width)) rgb3[y*image.width+x] = image.data[y*image.stride+x].rgb();
+                            xImage.insert("Filter"_,"/FlateDecode"_);
+                            xImage = deflate(cast<byte>(rgb3));
+                            xObjects.insert(copy(id), ref(xImage));
+                        }
+                        assert_(image.width && image.height, image.size);
+                        content << "q "_+str(image.width*px,0,0,image.height*px, blit.origin.x*px, (pageSize.y-blit.origin.y-image.height)*px)+" cm"
+                                                                                                                                               "/"_+id+" Do Q\n"_;
+                    }
+                    resources.insert("XObject"_, move(xObjects));
+                }
                 resources.insert("Font"_, move(xFonts));
-                pdfPage.insert("Resources"_, move(resources));}
+                page.insert("Resources"_, move(resources));
+            }
+
+            contents.insert("Filter"_,"/FlateDecode"_);
+            contents = deflate(content);
+            page.insert("Contents"_, ref(contents));
         }
-        pdfPages.at("Kids"_).list << ref(pdfPage);
+        pdfPages.at("Kids"_).list << ref(page);
         pdfPages.at("Count"_).number++;
     }
     root.insert("Pages"_, ref(pdfPages));

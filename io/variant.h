@@ -8,7 +8,7 @@ struct Variant {
     double number=0;
     String data;
     array<Variant> list;
-    map<string,Variant> dict;
+    map<String,Variant> dict;
 
     Variant(bool boolean) : type(Boolean), number(boolean) {}
     Variant(int number) : type(Integer), number(number) {}
@@ -19,7 +19,8 @@ struct Variant {
     Variant(string data) : type(Data), data(data) {}
     Variant(String&& data) : type(Data), data(move(data)) {}
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
-    Variant(map<string,Variant>&& dict) : type(Dict), dict(move(dict)) {}
+    Variant(map<String,Variant>&& dict) : type(Dict), dict(move(dict)) {}
+    Variant(map<string,Variant>&& dict) : type(Dict) { for(auto e: dict) this->dict.insert(String(e.key), move(e.value)); }
     explicit operator bool() const { return type!=Empty; }
     //operator int() const { assert(type==Integer, *this); return number; }
     int integer() const { assert(type==Integer, *this); return number; }
@@ -41,7 +42,15 @@ inline String str(const map<string,Variant>& dict) {
     String s;
     s << "<<"_;
     for(const const_pair<string,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
-    /*if(dict) s.last() = '>'; else*/ s << '>'; s << '>';
+    s << ">>"_;
+    return s;
+}
+
+inline String str(const map<String,Variant>& dict) {
+    String s;
+    s << "<<"_;
+    for(const const_pair<String,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
+    s << ">>"_;
     return s;
 }
 

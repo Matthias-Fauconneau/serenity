@@ -134,7 +134,8 @@ typedef vec<bgr,uint8,3> byte3;
 
 generic struct bgra {
     T b,g,r,a;
-    vec< ::bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
+    byte3& bgr() const { return *(vec< ::bgr,T,3>*)this; }
+    byte3 rgb() const { return byte3(r,g,b); }
 };
 /// Integer b,g,r,a vector (8bit)
 typedef vec<bgra,uint8,4> byte4;

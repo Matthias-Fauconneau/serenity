@@ -66,10 +66,10 @@ struct Text : virtual Widget {
     //struct Glyphs { int2 pos; /*Image image;*/ /*uint editIndex; int center, advance;*/ /*int height;*/ };
     array<array<Glyph>> glyphs;
 
-    void layout(float wrap);
+    struct TextLayout layout(float wrap) const;
 
-    int2 sizeHint(int2 size) override;
-    Graphics graphics(int2 size) override;
+    int2 sizeHint(int2 size) const override;
+    Graphics graphics(int2 size) const override;
 
     /*// Underlines and strikes
     struct Line { int2 min,max; };

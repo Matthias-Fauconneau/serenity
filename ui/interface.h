@@ -17,7 +17,7 @@ struct ScrollArea : Widget {
     int2 size; // Keeps last size for ensureVisible
 
     /// Overrides \a widget to return the proxied widget
-    virtual Widget& widget() =0;
+    virtual Widget& widget() const abstract;
     /// Ensures \a target is visible inside the region of the viewport
     void ensureVisible(Rect target);
     /// Centers \a target in the viewport
@@ -26,14 +26,14 @@ struct ScrollArea : Widget {
     int2 sizeHint(int2 size) { return widget().sizeHint(size); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
     bool keyPress(Key key, Modifiers modifiers) override;
-    Graphics graphics(int2 size) override;
+    Graphics graphics(int2 size) const override;
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
 template<class T> struct Scroll : ScrollArea, T {
     using T::T;
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
-    Widget& widget() override { return (T&)*this; }
+    Widget& widget() const override { return (T&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
     Widget& area() { return (ScrollArea&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
@@ -45,13 +45,13 @@ struct ImageWidget : virtual Widget {
     /// Displayed image
     const Image& image;
     /// Hides image
-    bool hidden = false;
+    //bool hidden = false;
 
     /// Creates a widget displaying \a image
-    ImageWidget(const Image& image, bool hidden=false):image(move(image)),hidden(hidden){}
+    ImageWidget(const Image& image/*, bool hidden=false*/) : image(move(image))/*, hidden(hidden)*/ {}
 
-    int2 sizeHint();
-    Graphics graphics(int2 size) override;
+    int2 sizeHint() const override;
+    Graphics graphics(int2 size) const override;
 };
 
 /// \typedef ImageView Icon

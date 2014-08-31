@@ -6,14 +6,14 @@
 /// Proxy Widget containing multiple widgets.
 struct Layout : Widget {
     /// Derived classes should override \a count and \a at to implement widgets storage. \sa Widgets Array Tuple
-    virtual uint count() const =0;
-    virtual Widget& at(int) =0;
+    virtual uint count() const abstract;
+    virtual Widget& at(int) const abstract;
 
     /// Computes widgets layout
-    virtual array<Rect> layout(int2 size)=0;
+    virtual array<Rect> layout(int2 size) const abstract;
 
     /// Renders all visible child widgets
-    Graphics graphics(int2 size) override;
+    Graphics graphics(int2 size) const override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button) override;
 };
@@ -25,7 +25,7 @@ struct Widgets : virtual Layout, array<Widget*> {
     Widgets(){}
     Widgets(array<Widget*>&& widgets):array(move(widgets)){}
     uint count() const { return array::size; }
-    Widget& at(int i)  { return *array::at(i); }
+    Widget& at(int i)  const { return *array::at(i); }
 };
 
 /// Implements Layout storage using array<T> (i.e by value)
@@ -35,7 +35,7 @@ template<class T> struct Array : virtual Layout, array<T> {
     Array(const mref<T>& items) : array<T>(items){}
     Array(array<T>&& items) : array<T>(move(items)){}
     uint count() const { return array<T>::size; }
-    Widget& at(int i) { return array<T>::at(i); }
+    Widget& at(int i) const { return array<T>::at(i); }
 };
 
 /// Layouts widgets on an axis
@@ -62,19 +62,19 @@ struct Linear : virtual Layout {
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
     Linear(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : main(main), side(side), expanding(expanding) {}
 
-    int2 sizeHint(int2) override;
-    array<Rect> layout(int2 size) override;
+    int2 sizeHint(int2) const override;
+    array<Rect> layout(int2 size) const override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
-    virtual int2 xy(int2 xy) =0;
+    virtual int2 xy(int2 xy) const abstract;
 };
 
 /// Layouts widgets on the horizontal axis
 struct Horizontal : virtual Linear {
-    int2 xy(int2 xy) override { return xy; }
+    int2 xy(int2 xy) const override { return xy; }
 };
 /// Layouts widgets on the vertical axis
 struct Vertical : virtual Linear {
-    int2 xy(int2 xy) override { return int2(xy.y,xy.x); }
+    int2 xy(int2 xy) const override { return int2(xy.y,xy.x); }
 };
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
@@ -120,23 +120,23 @@ struct GridLayout : virtual Layout {
     const bool uniformColumnWidths;
     /// Horizontal element count, 0 means automatic
     const int width;
-    /// Vertical element count, 0 means automatic
+    /*/// Vertical element count, 0 means automatic
     const int height;
     /// Margin between elements
-    const int2 margin;
+    const int2 margin;*/
 
-    GridLayout(bool uniformColumnWidths=false, int width=0, int height=0, int margin=0)
-        : uniformColumnWidths(uniformColumnWidths), width(width), height(height), margin(margin) {}
-    int2 sizeHint(int2) override;
-    array<Rect> layout(int2 size) override;
+    GridLayout(bool uniformColumnWidths=false, int width=0/*, int height=0, int margin=0*/)
+        : uniformColumnWidths(uniformColumnWidths), width(width)/*, height(height), margin(margin)*/ {}
+    int2 sizeHint(int2) const override;
+    array<Rect> layout(int2 size) const override;
 };
 
 /// Grid of heterogenous widgets. \sa Widgets
 struct WidgetGrid : GridLayout, Widgets {
-    WidgetGrid(bool uniformColumnWidths=false, int width=0, int height=0, int margin=0)
-        : GridLayout(uniformColumnWidths, width, height, margin) {}
-    WidgetGrid(array<Widget*>&& widgets, bool uniformColumnWidths=false, int width=0, int height=0, int margin=0)
-        : GridLayout(uniformColumnWidths, width, height, margin), Widgets(move(widgets)) {}
+    WidgetGrid(bool uniformColumnWidths=false, int width=0/*, int height=0, int margin=0*/)
+        : GridLayout(uniformColumnWidths, width/*, height, margin*/) {}
+    WidgetGrid(array<Widget*>&& widgets, bool uniformColumnWidths=false, int width=0/*, int height=0, int margin=0*/)
+        : GridLayout(uniformColumnWidths, width/*, height, margin*/), Widgets(move(widgets)) {}
 };
 
 template<class T> struct UniformGrid : GridLayout,  Array<T> {
@@ -162,12 +162,12 @@ struct Selection : virtual Layout {
 struct HighlightSelection : virtual Selection {
     /// Whether to always display the highlight or only when focused
     bool always=true;
-    Graphics graphics(int2 size) override;
+    Graphics graphics(int2 size) const override;
 };
 
 /// Displays a selection using horizontal tabs
 struct TabSelection : virtual Selection {
-    Graphics graphics(int2 size) override;
+    Graphics graphics(int2 size) const override;
 };
 
 /// Array with Selection
@@ -192,6 +192,6 @@ template<class T> struct Bar : Horizontal, ArraySelection<T>, TabSelection {
 };
 /// GridSelection is a Grid layout of selectable items. \sa ArraySelection
 template<class T> struct GridSelection : GridLayout, ArraySelection<T>, HighlightSelection {
-    GridSelection(int width=0, int height=0, int margin=0) : GridLayout(width,height,margin){}
+    GridSelection(int width=0/*, int height=0, int margin=0*/) : GridLayout(width/*,height,margin*/){}
     GridSelection(array<T>&& items) : ArraySelection<T>(move(items)){}
 };
