@@ -26,9 +26,9 @@ struct Font {
     ~Font();
 
     /// Returns font glyph index for glyph \a name
-    uint index(const string& name);
+    //uint index(const string& name) const;
     /// Returns font glyph index for Unicode codepoint \a code
-    uint index(uint code);
+    uint index(uint code) const;
 
     /// Returns scaled kerning adjustment between \a leftIndex and \a rightIndex
     float kerning(uint leftIndex, uint rightIndex);
@@ -55,4 +55,5 @@ struct Font {
     buffer<byte> data;
     Map keep;
     bool hint = false;
+    String id;
 };

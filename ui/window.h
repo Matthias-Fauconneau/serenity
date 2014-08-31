@@ -5,16 +5,7 @@
 #include "function.h"
 #include "map.h"
 #include "time.h"
-#if X11
 union XEvent;
-#else
-struct PollDevice : Device, Poll {
-    PollDevice() {}
-    PollDevice(const string &path) : Device(path,root(),Flags(ReadWrite|NonBlocking)), Poll(Device::fd){}
-    void event() override { if(eventReceived) eventReceived(); }
-    function<void()> eventReceived;
-};
-#endif
 
 // -> graphics
 /// Background style
@@ -22,11 +13,7 @@ enum Background { NoBackground, Black, White, Oxygen };
 void renderBackground(const Image& target, Background background);
 
 /// Interfaces \a widget as a window on an X11 display server
-#if X11
 struct Window : Socket, Poll {
-#else
-struct Window : Device {
-#endif
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
     Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image());
@@ -47,11 +34,6 @@ struct Window : Device {
     /// Sends a partial update
     void putImage(const Image& target);
     void putImage(Rect rect);
-
-    /// Sets display state
-    void setDisplay(bool displayState);
-    /// Toggles display state
-    inline void toggleDisplay() { setDisplay(!displayState); }
 
     /// Display size
     int2 displaySize=0;
@@ -97,7 +79,7 @@ struct Window : Device {
     bool displayState = true;
     /// Pending long actions
     map<uint, unique<Timer>> longActionTimers;
-#if X11
+
     /// Properly destroys X GC and Window
     virtual ~Window();
 
@@ -179,23 +161,4 @@ struct Window : Device {
 
     /// Reads an X reply (checks for errors and queue events)
     template<class T> T readReply(const ref<byte>& request);
-#else
-    /// Renders immediately current widget to framebuffer
-    void render();
-    /// Touchscreen event handler
-    void touchscreenEvent();
-    /// Buttons event handler
-    void buttonEvent();
-    /// Keyboard event handler
-    void keyboardEvent();
-
-    Device vt {"/dev/console"_};
-    uint previousVT = 1;
-    uint stride=0, bytesPerPixel=0;
-    Map framebuffer;
-    PollDevice touchscreen {"/dev/input/event0"_};
-    PollDevice buttons {"/dev/input/event4"_};
-    PollDevice keyboard;
-    int previousPressState = 0, pressState = 0;
-#endif
 };

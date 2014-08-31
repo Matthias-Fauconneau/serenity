@@ -25,30 +25,30 @@ struct Header {
 /// \a Page from a \a Document
 struct Page : VBox {
     uint index;
-    float marginPx;
+    int2 marginPx;
     array<Header> headers;
     array<unique<Widget>> elements;
     array<unique<Image>> images;
     Widget* footer = 0;
 
-    Page(Linear::Extra main, uint index, float marginPx)
+    Page(Linear::Extra main, uint index, int2 marginPx)
         : Linear(main, Linear::Expand, true), index(index), marginPx(marginPx) {}
 
     void render() override {
         Image page = share(this->target);
-        Image inner = clip(page, Rect(int2(marginPx,marginPx), page.size() - int2(marginPx,marginPx)));
+        Image inner = clip(page, Rect(marginPx, page.size() - marginPx));
         fill(target, Rect(target.size()), !(sizeHint(inner.size()).y <= inner.size().y) ? vec3(3./4,3./4,1) : white);
        {this->target = share(inner);
             VBox::render();
         this->target = share(page);}
-        Image footer = clip(page, Rect(int2(0, page.size().y - marginPx), page.size()));
+        Image footer = clip(page, Rect(int2(0, page.size().y - marginPx.y), page.size()));
         if(this->footer) this->footer->render(footer);
     }
 };
 
 struct Format {
     const int2 pageSize;
-    float marginPx;
+    int2 marginPx;
     const string font;
     const float footerSize, textSize, headerSize, titleSize;
     Linear::Extra titlePageLayout, pageLayout;
@@ -57,7 +57,7 @@ struct A4 : Format {
     static constexpr float inchMM = 25.4, inchPx = 90;
     static constexpr int pageWidth = 210/*mm*/ * (inchPx/inchMM), pageHeight = 297/*mm*/ * (inchPx/inchMM);
     static constexpr float pointPx = inchPx / 72;
-    A4() : Format{int2(pageWidth, pageHeight), 1/*.5*/ * inchPx, "FreeSerif"_, 0/*12 * pointPx*/, 12 * pointPx, 14 * pointPx, 16 * pointPx,
+    A4() : Format{int2(pageWidth, pageHeight), int2(1.5 * inchPx), "FreeSerif"_, /*0*/12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx,
                   Linear::Center, Linear::Share} {}
 };
 
@@ -67,8 +67,8 @@ struct Document {
     string formatString;
     Format format = formatString == "A4"_ ? A4() : Format{int2(1050,768), 64, "DejaVuSans"_, 0, 24, 24, 32, Linear::Spread, Linear::Spread};
     const int2 pageSize= int(oversample)*format.pageSize;
-    const float marginPx = oversample*format.marginPx;
-    const int2 contentSize = pageSize - int2(2*marginPx);
+    const int2 marginPx = int(oversample)*format.marginPx;
+    const int2 contentSize = pageSize - 2*marginPx;
     const float textSize = oversample*format.textSize;
     const float headerSize = oversample*format.headerSize;
     const float titleSize = oversample*format.titleSize;
@@ -145,7 +145,7 @@ struct Document {
                         goto break_;
                     }
                 } /*else*/
-                if(s.wouldMatchAny(" \t\n,;()^/+-|"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
+                if(s.wouldMatchAny(" \t\n,.;()^/+-|"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
                 else e << s.next();
                 break_:;
             }
@@ -161,7 +161,8 @@ struct Document {
         while(s) { // Line
             if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
 
-            /**/ if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
+            /**/ if(s.match('%')) { while(s && !s.match("%"_) && !s.wouldMatch("\n"_)) s.advance(1); } // Comment
+            else if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
             else if(s.match("//"_)) text << "/"_;
             else if(s.match('/')) { text << (char)(TextFormat::Italic); italic=!italic; }
             else if(s.match('\\')) {
@@ -261,8 +262,6 @@ struct Document {
     Page parsePage(TextData& s, array<uint>& indices, uint pageIndex, bool quick=false) const {
         Page page (pageIndex ? format.pageLayout : format.titlePageLayout, pageIndex, marginPx);
         while(s) {
-            while(s.match('%')) s.line(); // Comment
-
             if(s.match('(')) { // Float
                 page << parseLayout(s, page, quick);
                 s.match("\n"_);
@@ -359,12 +358,11 @@ struct Document {
     buffer<byte> toPDF() { return ::toPDF(images()); }
 #else
     buffer<byte> toPDF() {
-        uint pageIndex = 0;
-        for(TextData s (source); s;) {
-            parsePage(pageIndex);
-            pageIndex++;
-        }
-        pageCount = pageIndex;
+        return ::toPDF(apply(pages.size, [this](int index){
+            PDFPage target {pageSize,{}};
+            parsePage(index).Widget::render(target);
+            return move(target);
+        }));
     }
 #endif
 };

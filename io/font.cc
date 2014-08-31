@@ -46,12 +46,13 @@ Font::~Font(){
     }
 }
 
-uint Font::index(const string& name) {
+/*uint Font::index(const string& name) {
     uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));
     if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
     assert(index,name); return index;
-}
-uint Font::index(uint code) {
+}*/
+
+uint Font::index(uint code) const {
     for(int i=0;i<face->num_charmaps;i++) {
         FT_Set_Charmap(face, face->charmaps[i] );
         uint index = FT_Get_Char_Index(face, code);

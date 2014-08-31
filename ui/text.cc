@@ -63,7 +63,7 @@ struct TextLayout {
         for(const ref<Character>& word: words) {
             for(const Character& c: word) {
                 int2 origin = int2(round(vec2(penX,penY)+c.pos))+c.offset; // Top-left image origin
-                line << Text::Character{origin, share(c.image), /*lastIndex=*/c.editIndex, int(round(c.pos.x+c.advance/2)), int(round(c.advance))};
+                line << Text::Character{origin, share(c.image), /*lastIndex=c.editIndex, int(round(c.pos.x+c.advance/2)), int(round(c.advance))*/};
                 bbox.min=min(bbox.min, origin); bbox.max=max(bbox.max, origin+c.image.size());
             }
             penX += advance(word);

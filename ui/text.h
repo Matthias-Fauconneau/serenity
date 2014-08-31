@@ -63,7 +63,7 @@ struct Text : virtual Widget {
     // Layout bounding box
     int2 textSize=0;
     // Characters to render
-    struct Character { int2 pos; Image image; uint editIndex; int center, advance; /*int height;*/ };
+    struct Character { int2 pos; Image image; /*uint editIndex; int center, advance;*/ /*int height;*/ };
     array<array<Character>> characters;
 
     void layout(float wrap);

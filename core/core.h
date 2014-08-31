@@ -31,6 +31,7 @@ generic struct handle {
     operator T&() { return pointer; }
     T* operator &() { return &pointer; }
     T operator ->() { return pointer; }
+    const T operator ->() const { return pointer; }
 
     T pointer;
 };
