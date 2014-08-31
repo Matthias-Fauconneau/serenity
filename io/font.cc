@@ -70,6 +70,7 @@ Font::Metrics Font::metrics(uint index) const {
     FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
     return {
         face->glyph->advance.x*0x1p-6f,
+        vec2(face->glyph->metrics.horiBearingX*0x1p-6f, face->glyph->metrics.horiBearingY*0x1p-6f),
         (int)face->glyph->lsb_delta, (int)face->glyph->rsb_delta,
         {{face->glyph->metrics.width*0x1p-6f, face->glyph->metrics.height*0x1p-6f}}};
 }

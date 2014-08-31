@@ -10,9 +10,10 @@ string str(const NameSize& x) { return str(x.name, x.size); }
 /// Returns a font, loading from disk and caching as needed
 Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
     String key = fontName+fontTypes[0]+(hint?"H"_:""_);
-    static map<NameSize,Font> fonts; // Font cache
-    Font* font = fonts.find(NameSize{copy(key), size});
-    return font ?: &fonts.insert(NameSize{copy(key),size},Font(Map(findFont(fontName, fontTypes), fontFolder()), size, hint));
+    static map<NameSize,unique<Font>> fonts; // Font cache
+    unique<Font>* font = fonts.find(NameSize{copy(key), size});
+    return font ? font->pointer
+                : fonts.insert(NameSize{copy(key),size},unique<Font>(Map(findFont(fontName, fontTypes), fontFolder()), size, hint)).pointer;
 }
 
 /// Layouts formatted text with wrapping, justification and links
@@ -33,7 +34,8 @@ struct TextLayout {
     // Variables
     float penY=0;
     array<array<Glyph>> words;
-    vec2 bbMin = inf, bbMax = -inf;
+    //vec2 bbMin = inf;
+    vec2 bbMax = -inf;
     /*uint lastIndex=-1;
     uint lineNumber=0, column=0;
     Text::Cursor current() { return Text::Cursor{lineNumber, column}; }*/
@@ -45,34 +47,38 @@ struct TextLayout {
     array<Text::Link> links;*/
 
     void nextLine(bool justify) {
-        // Justifies
-        float length=0; for(const ref<Glyph>& word: words) length += advance(word); // Sums word lengths
-        // For last word of line, use last glyph width instead of advance
-        if(words && words.last()) length += -advance(words.last()) + width(words.last());
-        float space=0;
-        if(justify && words.size>1) space = (wrap-length)/(words.size-1);
-        else space = spaceAdvance;
+        if(words) {
+            // Justifies
+            float length=0; for(const ref<Glyph>& word: words) length += advance(word); // Sums word lengths
+            // For last word of line, use last glyph width instead of advance
+            if(words.last()) length += -advance(words.last()) + width(words.last());
+            float space=0;
+            if(justify && words.size>1) space = (wrap-length)/(words.size-1);
+            else space = spaceAdvance;
 
-        // Layouts
-        /*column=0;*/ float penX=0; // Line pen
-        /*lineNumber++;*/
-        auto& line = glyphs.append();
-        for(const ref<Glyph>& word: words) {
-            for(Glyph glyph: word) {
-                glyph.origin += vec2(penX,penY);
-                line << glyph; //lastIndex=glyph.editIndex
-                bbMin=min(bbMin, glyph.origin); bbMax=max(bbMax, glyph.origin+glyph.size);
+            // Layouts
+            /*column=0;*/ float penX=0; // Line pen
+            /*lineNumber++;*/
+            auto& line = glyphs.append();
+            for(const ref<Glyph>& word: words) {
+                for(Glyph glyph: word) {
+                    glyph.origin += vec2(penX,penY);
+                    line << glyph; //lastIndex=glyph.editIndex
+                    //bbMin=min(bbMin, glyph.origin-glyph.bearing);
+                    bbMax=max(bbMax, glyph.origin-glyph.bearing+glyph.size);
+                }
+                penX += advance(word);
+                penX += space;
             }
-            penX += advance(word);
-            penX += space;
+            //lastIndex++;
+            words.clear();
         }
-        //lastIndex++;
-        words.clear();
         penY += interline*size;
     }
 
     TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify=false)
         : size(size), wrap(wrap), interline(interline) {
+        assert_(wrap >= 0, wrap);
         Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
         assert_(font, fontName, size);
         uint16 spaceIndex = font->index(' ');
@@ -89,7 +95,7 @@ struct TextLayout {
         int previousRightDelta = 0;
         penY = interline*font->ascender;
         uint i=0;
-#if 0
+#if 1
         for(; i<text.size; i++) {
             uint c = text[i];
             /***/ if(c==' ') penX += spaceAdvance;
@@ -165,36 +171,41 @@ struct TextLayout {
             else if(previousRightDelta - metrics.leftDelta < -32 ) pen++;
             previousRightDelta = metrics.rightDelta;
 
-            int yGlyphOffset = 0;
-            if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) yGlyphOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
-            word << Glyph(metrics,::Glyph{vec2(pen, yOffset+yGlyphOffset), *font, c});
+            if(c != ' ' && c != 0xA0) {
+                int yGlyphOffset = 0;
+                if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) yGlyphOffset += fontSize/3; // Fixes too high floor signs from FreeSerif
+                assert_(metrics.size, hex(c));
+                word << Glyph(metrics,::Glyph{vec2(pen, yOffset+yGlyphOffset), *font, c});
+            }
             pen += metrics.advance;
             //column++;
         }
         if(word) {
             float length=0; for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
             length += width(word); // Last word
-            if(wrap && length>wrap) nextLine(justify); // would not fit
+            if(wrap && length>wrap && words) nextLine(justify); // would not fit
             words << move(word); penX = 0; subscriptPen=0; // Adds to current line (might be first of new line)
         }
-        nextLine(false); // Clears any remaining words
-        bbMax.y = max(bbMax.y, penY -interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
+        if(words) nextLine(false); // Clears any remaining words
+        //log(bbMin, bbMax, penY, - interline*size /*Reverts last line space*/ + interline*(-font->descender), penY - interline*size /*Reverts last line space*/ + interline*(-font->descender));
+        bbMax.y = max(bbMax.y, penY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
     }
 };
 
-Text::Text(const string& text, uint size, vec3 color, float alpha, uint wrap, string font, bool hint, float interline, bool center)
+Text::Text(const string& text, uint size, vec3 color, float alpha, float wrap, string font, bool hint, float interline, bool center)
     : text(toUCS4(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
 
 void Text::layout(float wrap) {
     //textSize=int2(0,size);
     if(center) {
         TextLayout layout(text, size, wrap, font, hint, interline, false); // Layouts without justification
-        wrap = layout.bbMax.x - layout.bbMin.y;
+        wrap = glyphs ? layout.bbMax.x : 0;
+        assert_(wrap >= 0, wrap);
     }
     TextLayout layout(text, size, wrap, font, hint, interline, true);
     glyphs = move(layout.glyphs);
-    assert_(isNumber(layout.bbMin) && isNumber(layout.bbMax), layout.bbMin, layout.bbMax);
-    textSize = glyphs ? layout.bbMax - layout.bbMin : 0;
+    textSize = glyphs ? layout.bbMax : 0;
+    assert_(textSize > vec2(0), textSize, text);
 
     /*textLines.clear(); textLines.reserve(layout.text.size);
     cursor=Cursor(0,0); uint currentIndex=0;
@@ -247,7 +258,8 @@ void Text::render(const Image& target, int2 offset) {
 Graphics Text::graphics(int2 size) {
     layout(min<float>(wrap, size.x));
     Graphics graphics;
-    for(const ref<Glyph>& line: glyphs) graphics.glyphs << line;
+    vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, (size.y-textSize.y)/2.f));
+    for(const ref<Glyph>& line: glyphs) for(Glyph e: line) { e.origin += offset; graphics.glyphs << e; }
     return graphics;
 }
 

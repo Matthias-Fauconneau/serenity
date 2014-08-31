@@ -60,7 +60,7 @@ struct Glyph {
     uint code;
     void render(const Image& target) const {
         Font::Glyph glyph = font.render(font.index(code));
-        blit(target, int2(round(origin))+glyph.offset, glyph.image);
+        blit(target, int2(round(origin))+glyph.offset, glyph.image, black);
     }
 };
 
@@ -69,6 +69,7 @@ struct Graphics {
     array<Blit> blits;
     array<Glyph> glyphs;
     Graphics& append(const Graphics& o, vec2 offset) {
+        for(const auto& e: o.blits) blits << Blit{offset+e.origin, share(e.image)};
         for(auto e: o.glyphs) { e.origin += offset; glyphs << e; }
         return *this;
     }

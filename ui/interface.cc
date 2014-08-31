@@ -44,7 +44,7 @@ void ScrollArea::center(int2 target) { offset = size/2-target; }
 int2 ImageWidget::sizeHint() { return hidden ? 0 : image.size; }
 Graphics ImageWidget::graphics(int2 size) {
     Graphics graphics;
-    if(image) graphics.blits.append(Blit{vec2(size-image.size)/2.f, share(image)});
+    if(image) graphics.blits.append(Blit{vec2((size-image.size)/2), clip(image, int2(image.size-size)/2+Rect(size))});
     return graphics;
 }
 

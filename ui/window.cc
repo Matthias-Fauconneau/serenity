@@ -424,8 +424,15 @@ Image Window::getSnapshot() {
 
 void renderBackground(const Image& target, Background background) {
     int2 size = target.size;
+    /***/ if(background==NoBackground) {}
+    else if(background==White) {
+        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
+    }
+    else if(background==Black) {
+        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
+    }
 #if 0
-    if(background==Oxygen) { // Oxygen-like radial gradient background
+    else if(background==Oxygen) { // Oxygen-like radial gradient background
         const int y0 = -32-8, splitY = min(300, 3*size.y/4);
         const vec3 radial = vec3(246./255); // linear
         const vec3 top = vec3(221, 223, 225); // sRGB
@@ -454,14 +461,8 @@ void renderBackground(const Image& target, Background background) {
             else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
             else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
         }
-    } else
+    }
 #endif
-    /***/ if(background==White) {
-        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = 0xFF;
-    }
-    else if(background==Black) {
-        for(uint y: range(size.y)) for(uint x: range(size.x)) target.data[y*target.stride+x] = byte4(0, 0, 0, 0xFF);
-    }
     else error((int)background);
 }
 
