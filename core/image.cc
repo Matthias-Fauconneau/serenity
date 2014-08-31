@@ -61,28 +61,52 @@ Image downsample(const Image& source) {
     return target;
 }
 
-Image resize(Image&& target, const Image& source) {
-    assert_(source && target && target.size != source.size && source.alpha==false && target.alpha==false, source.size, target.size);
-    // Integer box downsample
-    assert_(source.width/target.width==source.height/target.height && source.width%target.width==0 && source.height%target.height==0,
-            source.size, target.size);
-    byte4* dst = target.data;
-    const byte4* src = source.data;
-    int scale = source.width/target.width;
-    for(uint unused y: range(target.height)) {
-        const byte4* line = src;
-        for(uint unused x: range(target.width)) {
-            int4 s = 0;
-            for(uint i: range(scale)) {
-                for(uint j: range(scale)) {
-                    s += int4(line[i*source.stride+j]);
-                }
+void bilinear(Image& target, const Image& source) {
+    const uint stride = source.stride, width=source.width-1, height=source.height-1;
+    const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
+    const byte4* src = source.data; byte4* dst = target.data;
+    for(uint y: range(targetHeight)) {
+        for(uint x: range(targetWidth)) {
+            const uint fx = x*256*width/targetWidth, fy = y*256*height/targetHeight; //TODO: incremental
+            uint ix = fx/256, iy = fy/256;
+            uint u = fx%256, v = fy%256;
+            byte* s = (byte*)src+iy*stride+ix*4;
+            byte4 d;
+            for(int i=0; i<4; i++) { // Interpolates values as if in linear space (not sRGB)
+                d[i] = ((s[       i] * (256-u) + s[       4+i] * u) * (256-v)
+                        + (s[stride+i] * (256-u) + s[stride+4+i] * u) * (    v) ) / (256*256);
             }
-            s /= scale*scale;
-            *dst = byte4(s);
-            line += scale, dst++;
+            dst[y*targetStride+x] = d;
         }
-        src += scale * source.stride;
+    }
+}
+
+Image resize(Image&& target, const Image& source) {
+    assert_(source && target && target.size != source.size, source.size, target.size);
+    if(target.size < source.size) { // Integer box downsample
+        assert_(source.alpha==false && target.alpha==false, source.alpha, target.alpha);
+        assert_(source.width/target.width==source.height/target.height && source.width%target.width==0 && source.height%target.height==0,
+                source.size, target.size);
+        byte4* dst = target.data;
+        const byte4* src = source.data;
+        int scale = source.width/target.width;
+        for(uint unused y: range(target.height)) {
+            const byte4* line = src;
+            for(uint unused x: range(target.width)) {
+                int4 s = 0;
+                for(uint i: range(scale)) {
+                    for(uint j: range(scale)) {
+                        s += int4(line[i*source.stride+j]);
+                    }
+                }
+                s /= scale*scale;
+                *dst = byte4(s);
+                line += scale, dst++;
+            }
+            src += scale * source.stride;
+        }
+    } else { // Bilinear upsample
+        bilinear(target, source);
     }
     return move(target);
 }

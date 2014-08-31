@@ -144,8 +144,7 @@ struct Document {
                 break_:;
             }
         }
-        assert_(s && e.size && e.size<=15, "Expected expression end delimiter, got end of document",
-                "'"_+e.slice(0, min(e.size, 16ul))+"'"_, e.size, delimiters, s.buffer);
+        assert_(s && e.size && e.size<=15, "Expected expression end delimiter, got end of document", "'"_+e.slice(0, min(e.size, 16ul))+"'"_);
         return e;
     }
 
@@ -180,14 +179,7 @@ struct Document {
             // Element
             skip(s);
             if(s.match('(')) children << parseLayout(s, page, quick);
-            else if(s.wouldMatchAny("&_^@"_)) {
-                int sample = 0, rotate=0;
-                if(!s.match('&')) for(;;) {
-                    if(s.match('@')) rotate++;
-                    else if(s.match('^')) sample++;
-                    else if(s.match('_')) sample--;
-                    else break;
-                }
+            else if(s.match('@')) {
                 string path = s.whileNo(" \t\n)-|+"_);
                 assert_(s);
                 if(quick) { children << &element<Placeholder>(page); //FIXME
@@ -197,9 +189,6 @@ struct Document {
                     else if(existsFile(path+".png"_)) image = unique<Image>(decodeImage(readFile(path+".png"_)));
                     else if(existsFile(path+".jpg"_)) image = unique<Image>(decodeImage(readFile(path+".jpg"_)));
                     if(image) {
-                        if(sample<0) for(;sample<0;sample++) image = unique<Image>(downsample(image));
-                        for(;rotate>0;rotate--) image = unique<Image>(::rotate(image));
-                        if(sample>0) for(;sample>0;sample--) image = unique<Image>(upsample(image));
                         children << &element<ImageWidget>(page, image);
                         page.images << move(image);
                     } else warn(s, "Missing image", path);

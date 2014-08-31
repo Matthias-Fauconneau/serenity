@@ -5,7 +5,7 @@
 
 /// Image graphic element
 struct Blit {
-    vec2 origin;
+    vec2 origin, size;
     Image image;
 };
 
@@ -21,7 +21,7 @@ struct Graphics {
     array<Blit> blits;
     array<Glyph> glyphs;
     Graphics& append(const Graphics& o, vec2 offset) {
-        for(const auto& e: o.blits) blits << Blit{offset+e.origin, share(e.image)};
+        for(const auto& e: o.blits) blits << Blit{offset+e.origin, e.size, share(e.image)};
         for(auto e: o.glyphs) { e.origin += offset; glyphs << e; }
         return *this;
     }
