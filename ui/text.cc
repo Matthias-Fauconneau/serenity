@@ -13,7 +13,7 @@ Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
     static map<NameSize,unique<Font>> fonts; // Font cache
     unique<Font>* font = fonts.find(NameSize{copy(key), size});
     return font ? font->pointer
-                : fonts.insert(NameSize{copy(key),size},unique<Font>(Map(findFont(fontName, fontTypes), fontFolder()), size, hint)).pointer;
+                : fonts.insert(NameSize{copy(key),size},unique<Font>(Map(findFont(fontName, fontTypes), fontFolder()), size, key, hint)).pointer;
 }
 
 /// Layouts formatted text with wrapping, justification and links
@@ -95,14 +95,12 @@ struct TextLayout {
         int previousRightDelta = 0;
         penY = interline*font->ascender;
         uint i=0;
-#if 1
         for(; i<text.size; i++) {
             uint c = text[i];
             /***/ if(c==' ') penX += spaceAdvance;
             else if(c=='\t') penX += 4*spaceAdvance; //FIXME: align
             else break;
         }
-#endif
         for(; i<text.size; i++) {
             uint c = text[i];
 
@@ -187,7 +185,6 @@ struct TextLayout {
             words << move(word); penX = 0; subscriptPen=0; // Adds to current line (might be first of new line)
         }
         if(words) nextLine(false); // Clears any remaining words
-        //log(bbMin, bbMax, penY, - interline*size /*Reverts last line space*/ + interline*(-font->descender), penY - interline*size /*Reverts last line space*/ + interline*(-font->descender));
         bbMax.y = max(bbMax.y, penY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
     }
 };
@@ -196,65 +193,22 @@ Text::Text(const string& text, uint size, vec3 color, float alpha, float wrap, s
     : text(toUCS4(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
 
 void Text::layout(float wrap) {
-    //textSize=int2(0,size);
     if(center) {
         TextLayout layout(text, size, wrap, font, hint, interline, false); // Layouts without justification
-        wrap = glyphs ? layout.bbMax.x : 0;
+        wrap = layout.glyphs ? layout.bbMax.x : 0;
         assert_(wrap >= 0, wrap);
     }
     TextLayout layout(text, size, wrap, font, hint, interline, true);
+    textSize = layout.glyphs ? layout.bbMax : 0;
     glyphs = move(layout.glyphs);
-    textSize = glyphs ? layout.bbMax : 0;
     assert_(textSize > vec2(0), textSize, text);
-
-    /*textLines.clear(); textLines.reserve(layout.text.size);
-    cursor=Cursor(0,0); uint currentIndex=0;
-    for(const auto& line: layout.text) {
-        TextLine textLine;
-        for(const TextLayout::Glyph& o: line) {
-            currentIndex = o.editIndex;
-            if(currentIndex<=editIndex) { // Restores cursor after relayout
-                cursor = Cursor(textLines.size, textLine.size);
-            }
-            textLine << ;
-        }
-        currentIndex++;
-        if(currentIndex<=editIndex) cursor = Cursor(textLines.size, textLine.size); // End of line
-        textLines << move(textLine);
-    }
-    if(!text.size) { assert(editIndex==0); cursor = Cursor(0,0); }
-    else if(currentIndex<=editIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } // End of text
-    links = move(layout.links);
-    for(TextLayout::Line& layoutLine: layout.lines) {
-        for(uint line: range(layoutLine.begin.line, layoutLine.end.line+1)) {
-            TextLayout::TextLine& textLine = layout.text[line];
-            if(layoutLine.begin.column<textLine.size) {
-                TextLayout::Glyph& first = line==layoutLine.begin.line ? textLine[layoutLine.begin.column] : textLine.first();
-                TextLayout::Glyph& last = (line==layoutLine.end.line && layoutLine.end.column<textLine.size) ? textLine[layoutLine.end.column]
-                                                                                                                                                                           : textLine.last();
-                assert(first.pos.y == last.pos.y);
-                lines << Line{ int2(first.pos+vec2(0,1)), int2(last.pos+vec2(last.advance,2))};
-            }
-        }
-    }*/
 }
+
 int2 Text::sizeHint(int2 size) {
-    /*if(!textSize || (size.x && size.x < textSize.x))*/
     layout(size.x ? min<float>(wrap, size.x) : wrap);
     return max(minimalSizeHint, int2(ceil(textSize)));
 }
-#if 0
-void Text::render() {
-    layout(min<float>(wrap, target.size().x));
-    render(target, max(int2(0), int2(center ? (target.size().x-textSize.x)/2 : 0, (target.size().y-textSize.y)/2)));
-}
-void Text::render(const Image& target, int2 offset) {
-    /*if(!textSize || target.size().x < textSize.x)*/
-    layout(min<float>(wrap, target.size().x)); //FIXME: not when called from render()
-    for(const ref<Glyph>& line: glyphs) for(const Glyph& c: line) if(c.image) blit(target, offset+c.pos, c.image, color, alpha);
-    //for(const Line& l: lines) fill(target, offset+Rect(l.min,l.max), black);
-}
-#else
+
 Graphics Text::graphics(int2 size) {
     layout(min<float>(wrap, size.x));
     Graphics graphics;
@@ -262,52 +216,3 @@ Graphics Text::graphics(int2 size) {
     for(const ref<Glyph>& line: glyphs) for(Glyph e: line) { e.origin += offset; graphics.glyphs << e; }
     return graphics;
 }
-
-#endif
-
-#if 0
-bool Text::mouseEvent(int2 position, int2 size, Event event, Button button) {
-    if(event==Release || (event==Motion && !button)) return false;
-    position -= max(int2(0),(size-textSize)/2);
-    if(!Rect(textSize).contains(position)) return false;
-    for(uint line: range(textLines.size)) {
-        if(position.y < (int)(line*this->size) || position.y > (int)(line+1)*this->size) continue;
-        const TextLine& textLine = textLines[line];
-        if(!textLine) goto break_;
-        // Before first glyph
-        const Glyph& first = textLine.first();
-        if(position.x <= first.center) { cursor = Cursor(line,0); goto break_; }
-        // Between glyphs
-        for(uint column: range(0,textLine.size-1)) {
-            const Glyph& prev = textLine[column];
-            const Glyph& next = textLine[column+1];
-            if(position.x >= prev.center && position.x <= next.center) { cursor = Cursor(line,column+1); goto break_; }
-        }
-        // After last glyph
-        const Glyph& last = textLine.last();
-        if(position.x >= last.center) { cursor = Cursor(line,textLine.size); goto break_; }
-    }
-    if(event == Press && textClicked) { textClicked(); return true; }
-    break_:;
-    if(event == Press) for(const Link& link: links) if(link.begin<cursor && cursor<link.end) { linkActivated(link.identifier); return true; }
-    if(event == Press && textClicked) { textClicked(); return true; }
-    return false;
-}
-
-uint Text::index() {
-    if(!textLines) return 0;
-    if(cursor.line==textLines.size) return textLines.last().last().editIndex;
-    assert(cursor.line<textLines.size,cursor.line,textLines.size);
-    assert(cursor.column<=textLines[cursor.line].size, cursor.column, textLines[cursor.line].size);
-    if(cursor.column<textLines[cursor.line].size) {
-        uint index = textLines[cursor.line][cursor.column].editIndex;
-        assert(index<text.size);
-        return index;
-    }
-    uint index = 1; // ' ', '\t' or '\n' immediately after last glyph
-    uint line=cursor.line;
-    while(line>0 && !textLines[line]) line--, index++; //count \n (not included as glyphs)
-    if(textLines[line]) index += textLines[line].last().editIndex;
-    return index;
-}
-#endif

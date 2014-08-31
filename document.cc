@@ -328,16 +328,10 @@ struct Document {
         return parsePage(TextData(pages[pageIndex]), copy(indices[pageIndex]), pageIndex);
     }
 
-#if RASTERIZED_PDF
-    array<Image> images() {
-        return apply(pages.size, [this](int index){ Image target(pageSize); parsePage(index).Widget::render(target); return move(target); });
-    }
-    buffer<byte> toPDF() { return ::toPDF(images()); }
-#else
     buffer<byte> toPDF() {
+        //return ::toPDF(format.pageSize, {parsePage(1).graphics(format.pageSize)});
         return ::toPDF(format.pageSize, apply(pages.size, [this](int index){ return parsePage(index).graphics(format.pageSize); }));
     }
-#endif
 };
 
 struct PageView : Widget {

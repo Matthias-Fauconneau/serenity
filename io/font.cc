@@ -24,8 +24,8 @@ String findFont(string fontName, ref<string> fontTypes) {
 }
 
 static FT_Library ft; static int fontCount=0;
-Font::Font(Map&& map, float size, bool hint, string id) : Font(buffer<byte>(map), size, hint, id) { keep=move(map); }
-Font::Font(buffer<byte>&& data_, float size, bool hint, string id) : data(move(data_)), size(size), hint(hint), id(id) {
+Font::Font(Map&& map, float size, string id, bool hint) : Font(buffer<byte>(map), size, id, hint) { keep=move(map); }
+Font::Font(buffer<byte>&& data_, float size, string id, bool hint) : data(move(data_)), size(size), id(id), hint(hint) {
     if(!ft) FT_Init_FreeType(&ft);
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;
@@ -45,12 +45,6 @@ Font::~Font(){
         assert(fontCount>=0); if(fontCount == 0) { assert(ft); FT_Done_FreeType(ft), ft=0; }
     }
 }
-
-/*uint Font::index(const string& name) {
-    uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));
-    if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
-    assert(index,name); return index;
-}*/
 
 uint Font::index(uint code) const {
     for(int i=0;i<face->num_charmaps;i++) {

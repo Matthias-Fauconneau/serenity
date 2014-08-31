@@ -21,29 +21,6 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
     }
 }
 
-static vec3 LChuvtoLuv(float L, float C, float h) {
-    return vec3(L, C*cos(h) , C*sin(h));
-}
-static vec3 LuvtoXYZ(float L, float u, float v) {
-    const float xn=0.3127, yn=0.3290; // D65 white point (2° observer)
-    const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
-    float u2 = un + u / (13*L);
-    float v2 = vn + v / (13*L);
-    float Y = L<=8 ? L * cb(3./29) : cb((L+16)/116);
-    float X = Y * (9*u2)/(4*v2);
-    float Z = Y * (12-3*u2-20*v2)/(4*v2);
-    return vec3(X, Y, Z);
-}
-static vec3 LuvtoXYZ(vec3 Luv) { return LuvtoXYZ(Luv[0], Luv[1], Luv[2]); }
-static vec3 XYZtoBGR(float X, float Y, float Z) {
-    float R = + 3.240479 * X - 1.53715 * Y - 0.498535 * Z;
-    float G = - 0.969256 * X + 1.875992 * Y + 0.041556 * Z;
-    float B	= + 0.055648 * X - 0.204043 * Y + 1.057311 * Z;
-    return vec3(B, G, R);
-}
-static vec3 XYZtoBGR(vec3 XYZ) { return XYZtoBGR(XYZ[0], XYZ[1], XYZ[2]); }
-vec3 LChuvtoBGR(float L, float C, float h) { return XYZtoBGR(LuvtoXYZ(LChuvtoLuv(L, C, h))); }
-
 static void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha) {
     byte4& target_sRGB = target(x,y);
     vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
@@ -52,6 +29,7 @@ static void blend(const Image& target, uint x, uint y, vec3 source_linear, float
             min(0xFF,target_sRGB.a+int(round(0xFF*alpha)))); // Additive alpha accumulation
 }
 
+#if FILL
 static void fill(uint* target, uint stride, uint w, uint h, uint value) {
     for(uint y=0; y<h; y++) {
         for(uint x=0; x<w; x++) target[x] = value;
@@ -74,8 +52,9 @@ void fill(const Image& target, Rect rect, vec3 color, float alpha) {
         }
     }
 }
+#endif
 
-void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
+static void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
     assert_(source);
     Rect rect = (position+Rect(source.size)) & Rect(target.size);
     color = clip(vec3(0), color, vec3(1));
@@ -97,6 +76,7 @@ void blit(const Image& target, int2 position, const Image& source, vec3 color, f
     }
 }
 
+#if LINE
 static void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool transpose) {
     if(transpose) swap(x,y);
     if(x>=target.width || y>=target.height) return;
@@ -133,7 +113,9 @@ void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float alpha) {
         intery += gradient;
     }
 }
+#endif
 
+#if POLYGON
 void parallelogram(const Image& target, int2 p0, int2 p1, int dy, vec3 color, float alpha) {
     if(p0.x > p1.x) swap(p0.x, p1.x);
     for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
@@ -179,7 +161,9 @@ static void line(Image8& raster, int2 p0, int2 p1) {
     }
     lastStepY=sy;
 }
+#endif
 
+#if CUBIC
 static vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
     const int N = 16; //FIXME
@@ -218,5 +202,14 @@ void cubic(const Image& target, const ref<vec2>& points, vec3 color, float alpha
             }
             if(coverage) blend(target, x, y, color, float(coverage)/sq(oversample)*alpha);
         }
+    }
+}
+#endif
+
+void render(const Image& target, const Graphics& graphics) {
+    for(const auto& e: graphics.blits) blit(target, int2(round(e.origin)), e.image, 1, 1);
+    for(const auto& e: graphics.glyphs) {
+        Font::Glyph glyph = e.font.render(e.font.index(e.code));
+        blit(target, int2(round(e.origin))+glyph.offset, glyph.image, 0, 1);
     }
 }

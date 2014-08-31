@@ -1,5 +1,5 @@
 #include "window.h"
-#include "graphics.h"
+#include "render.h"
 #include "file.h"
 #include "data.h"
 #include "time.h"
@@ -143,7 +143,7 @@ void Window::event() {
         }
 
         renderBackground(target, background);
-        widget->graphics(target.size).render(target);
+        ::render(target, widget->graphics(target.size));
 
         putImage(Rect(size));
         present();

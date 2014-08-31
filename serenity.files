@@ -38,7 +38,6 @@ io/pdf.h
 io/pdf.cc
 io/jpeg.cc
 
-ui/graphics.cc
 ui/graphics.h
 
 ui/interface.h
@@ -58,3 +57,7 @@ test.cc
 document.cc
 player.cc
 
+ui/render.cc
+ui/render.h
+ui/control.h
+ui/control.cc

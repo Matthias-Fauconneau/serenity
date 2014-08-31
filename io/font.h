@@ -11,9 +11,9 @@ String findFont(string fontName, ref<string> fontTypes={""_});
 /// Freetype wrapper
 struct Font {
     /// Loads font at /a data to /a size pixels high
-    Font(Map&& data, float size, bool hint=false, string id=""_);
+    Font(Map&& data, float size, string id, bool hint=false);
     /// Loads font /a data scaled to /a size pixels high
-    Font(buffer<byte>&& data, float size, bool hint=false, string id=""_);
+    Font(buffer<byte>&& data, float size, string id, bool hint=false);
     default_move(Font);
     ~Font();
 
@@ -46,8 +46,8 @@ struct Font {
 
     buffer<byte> data;
     float size;
-    bool hint;
     String id;
+    bool hint;
 
     handle<FT_FaceRec_*> face;
     float ascender, descender;
