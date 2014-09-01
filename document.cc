@@ -168,7 +168,7 @@ struct Document {
                 String num (trim(parseText(s, {"/"_})));
                 bool fraction = s.match('/');
                 String den = denominator(trim(parseText(s, {"}"_})));
-                text << (fraction ? ::fraction(numerator(num)+den) : regular(num)+den);
+                text << (fraction ? ::fraction(numerator(num)+den) : ::stack(regular(num)+den));
             }
             else text << s.next();
         }
