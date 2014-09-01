@@ -35,8 +35,8 @@ struct Page : VBox {
     Graphics graphics(int2 size) const override {
         Graphics graphics;
         int2 inner = size - 2*marginPx;
-        //int extra = inner.y-abs(VBox::sizeHint(inner).y);
-        //if(extra < inner.y/16 || extra > inner.y/3) graphics.append(Text(string{TextFormat::Bold}+str(inner.y/16, extra, inner.y/3)).graphics(int2(size.x, marginPx.y)), 0);
+        int extra = inner.y-abs(VBox::sizeHint(inner).y);
+        if(extra <= 0/*inner.y/16 || extra > inner.y/3*/) graphics.append(Text(string{TextFormat::Bold}+str(extra)).graphics(int2(size.x, marginPx.y)), 0);
         //if(!(abs(VBox::sizeHint(inner)) <= inner)) log("Tight page", index, abs(VBox::sizeHint(inner)), inner);
         //if(!(abs(VBox::sizeHint(inner)) > inner*2/3)) log("Loose page", index, VBox::sizeHint(inner), inner);
         graphics.append(VBox::graphics(inner), vec2(marginPx));
@@ -165,10 +165,10 @@ struct Document {
             } else if(s.match('_')) text << subscript(parseScript(s, delimiters));
             else if(s.match('^')) text << superscript(parseScript(s, delimiters));
             else if(s.match('{')) {
-                String num (trim(parseText(s, {"/"_})));
+                String num = regular(trim(parseText(s, {"/"_})));
                 bool fraction = s.match('/');
-                String den = denominator(trim(parseText(s, {"}"_})));
-                text << (fraction ? ::fraction(numerator(num)+den) : ::stack(regular(num)+den));
+                String den = regular(trim(parseText(s, {"}"_})));
+                text << (fraction ? ::fraction(num+den) : ::stack(num+den));
             }
             else text << s.next();
         }

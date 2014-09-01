@@ -8,7 +8,7 @@
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
 enum TextFormat : char {
-    Regular, Superscript, Subscript, Numerator, Denominator, Stack, Fraction, End, // (position, size) context nest
+    Regular, Superscript, Subscript, /*Numerator, Denominator,*/ Stack, Fraction, End, // (position, size) context nest
     /*\t=8,\n=9*/ Toggle='\n'+1, Bold=Toggle, Italic, // font type toggle
     LastTextFormat
 };
@@ -20,8 +20,8 @@ inline String subscript(const string& s) { return string{TextFormat::Subscript} 
 inline String superscript(const string& s) { return string{TextFormat::Superscript} + s + string{TextFormat::End}; }
 inline String stack(const string& s) { return string{TextFormat::Stack} + s + string{TextFormat::End}; }
 inline String fraction(const string& s) { return string{TextFormat::Fraction} + s + string{TextFormat::End}; }
-inline String numerator(const string& s) { return string{TextFormat::Numerator} + s + string{TextFormat::End}; }
-inline String denominator(const string& s) { return string{TextFormat::Denominator} + s + string{TextFormat::End}; }
+//inline String numerator(const string& s) { return string{TextFormat::Numerator} + s + string{TextFormat::End}; }
+//inline String denominator(const string& s) { return string{TextFormat::Denominator} + s + string{TextFormat::End}; }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {

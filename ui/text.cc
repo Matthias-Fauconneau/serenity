@@ -22,30 +22,28 @@ struct TextLayout {
     struct Glyph : Font::Metrics, ::Glyph {
         Glyph(const Font::Metrics& metrics, const ::Glyph& glyph) : Font::Metrics(metrics), ::Glyph(glyph) {}
     };
-    float width(const ref<Glyph>& word) {
-        float max=0;
-        for(const Glyph& glyph : word) if(glyph.code!=',' && glyph.code!='.') max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width);
+    // Bounding box for stacking
+    vec2 min(const ref<Glyph>& word) {
+        assert_(word);
+        vec2 min=inf;
+        for(const Glyph& g : word) min=::min(min, g.origin - g.bearing);
+        return min;
+    }
+    vec2 max(const ref<Glyph>& word) {
+        assert_(word);
+        vec2 max=-inf;
+        for(const Glyph& g : word) max=::max(max, g.origin - g.bearing + g.size);
         return max;
     }
-    /*float bbWidth(const ref<Glyph>& word) {
-        float min=inf, max=-inf;
-        for(const Glyph& glyph : word) {
-            min=::min(min, glyph.origin.x - glyph.bearing.x);
-            max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width);
-        }
-        return max-min;
-    }*/
-    float min(const ref<Glyph>& word) {
-        assert_(word);
-        float min=inf; for(const Glyph& glyph : word) min=::min(min, glyph.origin.x - glyph.bearing.x); return min;
-    }
-    float max(const ref<Glyph>& word) {
-        assert_(word);
-        float max=-inf; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width); return max;
+    // Length for justification
+    float width(const ref<Glyph>& word) {
+        float max=0;
+        for(const Glyph& g : word) if(g.code!=',' && g.code!='.') max=::max(max, g.origin.x - g.bearing.x + g.width);
+        return max;
     }
     float advance(const ref<Glyph>& word) {
         assert_(word);
-        float max=-inf; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x + glyph.advance); return max;
+        float max=-inf; for(const Glyph& g : word) max=::max(max, g.origin.x + g.advance); return max;
     }
 
     // Parameters
@@ -57,7 +55,7 @@ struct TextLayout {
     // Variables
     float lineOriginY = 0;
     array<array<Glyph>> words;
-    vec2 bbMax = 0;
+    vec2 bbMin = 0, bbMax = 0;
 
     // Outputs
     array<array<array<Glyph>>> glyphs;
@@ -76,6 +74,7 @@ struct TextLayout {
                 auto& wordOut = line.append();
                 for(Glyph glyph: word) {
                     glyph.origin += vec2(x, lineOriginY);
+                    bbMin = ::min(bbMin, glyph.origin-glyph.bearing);
                     bbMax = ::max(bbMax, glyph.origin-glyph.bearing+glyph.size);
                     wordOut.append( glyph );
                 }
@@ -100,10 +99,10 @@ struct TextLayout {
         : size(size), wrap(wrap), interline(interline) {
         // Fraction lines
         struct Context {
-            TextFormat format; float fontSize; vec2 origin; size_t start; array<Context> children; float maxX; vec2 position; size_t end;
+            TextFormat format; float fontSize; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
             //mref<Glyph> word(const mref<Glyph>& word) const { return word(children[0].start, children[0].end); }
             void translate(/*const mref<Glyph>& word, */vec2 offset) {
-                origin += offset; position += offset; maxX += offset.x;
+                origin += offset; position += offset;
                 for(auto& e: children) e.translate(offset);
                 //for(auto& e: this->word(word)) e.origin.x += offset;
             }
@@ -114,7 +113,7 @@ struct TextLayout {
             Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
             uint16 spaceIndex = font->index(' ');
             spaceAdvance = font->metrics(spaceIndex).advance;
-            float xHeight = font->metrics(font->index('x')).height;
+            //float xHeight = font->metrics(font->index('x')).height;
 
             lineOriginY = interline*font->ascender;
 
@@ -129,7 +128,6 @@ struct TextLayout {
             size_t start = 0;
             array<Context> children;
             vec2 position = 0;
-            float maxX = 0;
 
             // Toggle format
             bool bold=false, italic=false;
@@ -168,8 +166,7 @@ struct TextLayout {
                             split = word.size; // Center*/
                         //if(c==Numerator || c==Regular) start = word.size;
 
-                        maxX = ::max(position.x, maxX);
-                        stack << Context{format, fontSize, origin, start, move(children), maxX, position, word.size};
+                        stack << Context{format, fontSize, origin, start, move(children), position, word.size};
 
                         format = TextFormat(c);
                         if(format==Subscript || format==Superscript) fontSize *= 2./3;
@@ -184,21 +181,38 @@ struct TextLayout {
                         origin = position;
                     }
                     else if(c==End) { // Pop context
-                        /*if(format == Stack || format == Fraction) {
+                        if(format == Stack || format == Fraction) {
                             assert_(children.size==2 && children[0].end == children[1].start, children.size);
+                            auto flatten = [](Context& c) {
+                                while(c.children.size == 1 && c.format==Regular && c.start==c.children[0].start && c.children[0].end==c.end)
+                                    c = move(c.children[0]);
+                            };
+                            flatten(children[0]);
+                            flatten(children[1]);
                             mref<Glyph> word0 = word(children[0].start, children[0].end);
                             mref<Glyph> word1 = word(children[1].start, children[1].end);
                             assert_(word0 && word1, word.size, word0.size, word1.size);
-                            float offset = min(word0)-min(word1) + ((max(word0)-min(word0))-(max(word1)-min(word1)))/2;
-                            if(offset > 0) { children[1].translate(vec2( offset,0)); for(auto& e: word1) e.origin.x += offset; }
-                            else              { children[0].translate(vec2(-offset,0)); for(auto& e: word0) e.origin.x -= offset; }
-                        }*/
+                            vec2 min0 = min(word0), max0 = max(word0), size0 = max0-min0;
+                            vec2 min1 = min(word1), max1 = max(word1), size1 = max1-min1;
+                            { // Horizontal center align
+                                vec2 offset ( (min0-min1 + (size0-size1)/2.f).x, 0);
+                                if(offset.x < 0) { children[0].translate(-offset); for(auto& e: word0) e.origin -= offset; }
+                                else                 { children[1].translate( offset); for(auto& e: word1) e.origin += offset; }
+                            }
+                            if(children[0].format == Regular && children[1].format==Subscript) { // Regular over Subscript
+                                {vec2 offset (0, size1.y/2); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
+                            }
+                            else if(children[0].format == children[1].format) { // Vertical even share
+                                float margin = format == Fraction ? fontSize/3 : 0;
+                                {vec2 offset (0, size0.y/2 + margin); children[0].translate(-offset); for(auto& e: word0) e.origin -= offset;}
+                                {vec2 offset (0, size1.y/2 + margin); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
+                            }
+                        }
                         if(format == Fraction) {
                             assert_(children.size==2 && children[0].end == children[1].start, children.size);
                             lines << Line{glyphs.size, words.size, children[0].start, children[0].end, children[1].end};
                         }
-                        maxX = ::max(position.x, maxX);
-                        Context child = {format, fontSize, origin, start, move(children), maxX, position, word.size};
+                        Context child = {format, fontSize, origin, start, move(children), position, word.size};
                         Context context = stack.pop();
                         format = context.format;
                         fontSize = context.fontSize;
@@ -206,18 +220,11 @@ struct TextLayout {
                         start = context.start;
                         children = move(context.children);
                         children << move(child);
-                        assert_(context.position.x <= context.maxX);
-                        //maxX = context.maxX; //::max(maxX, context.maxX);
                         position.y = context.position.y;
                         if(format == Stack || format == Fraction) {
-                            //maxX = context.maxX;
                             assert_(children.size<=2);
                             if(children.size==1) position.x = context.position.x;
-                        } else {
-                            //maxX = ::max(maxX, context.maxX);
-                            //position.x = maxX;
                         }
-                        assert_(position.x <= maxX);
                     }
                     else if(c==Bold) bold=!bold;
                     else if(c==Italic) italic=!italic;
@@ -230,8 +237,8 @@ struct TextLayout {
 
                     if(c==Superscript) position.y -= fontSize/2;
                     if(c==Subscript) position.y += font->ascender/2;
-                    if(c==Numerator) position.y += -xHeight - (-font->descender)*(1+2./3+4./9);
-                    if(c==Denominator) position.y += -xHeight + font->ascender +  -(font->descender)*(2./3+4./9) /*VAlign*/;
+                    //if(c==Numerator) position.y += -xHeight - (-font->descender)*(1+2./3+4./9);
+                    //if(c==Denominator) position.y += -xHeight + font->ascender +  -(font->descender)*(2./3+4./9) /*VAlign*/;
 
                     continue;
                 }
@@ -285,7 +292,6 @@ Text::Text(const string& text, float size, vec3 color, float alpha, float wrap, 
 TextLayout Text::layout(float wrap) const {
     if(center) {
         TextLayout layout(text, size, wrap, font, hint, interline, false); // Layouts without justification
-        //assert_(layout.bbMin >= vec2(-2,0));
         wrap = layout.bbMax.x;
         assert_(wrap >= 0, wrap);
     }
@@ -293,17 +299,18 @@ TextLayout Text::layout(float wrap) const {
 }
 
 int2 Text::sizeHint(int2 size) const {
-    vec2 textSize = layout(size.x ? min<float>(wrap, size.x) : wrap).bbMax;
+    TextLayout layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
+    vec2 textSize = ceil(layout.bbMax - layout.bbMin);
     return max(minimalSizeHint, int2(textSize));
 }
 
 Graphics Text::graphics(int2 size) const {
     TextLayout layout = this->layout(min<float>(wrap, size.x));
-    //assert_(layout.bbMin >= vec2(-2,0), layout.bbMin);
-    vec2 textSize = layout.bbMax;
+    vec2 textSize = ceil(layout.bbMax - layout.bbMin);
 
     Graphics graphics;
-    vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, (size.y-textSize.y)/2.f));
+    //assert_(abs(size.y - textSize.y)<=1, size, textSize);
+    vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, -layout.bbMin.y + (size.y-textSize.y)/2.f));
     for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics.glyphs << e; }
     for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics.lines << e; }
     return graphics;
