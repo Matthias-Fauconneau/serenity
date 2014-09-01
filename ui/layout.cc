@@ -1,10 +1,15 @@
 #include "layout.h"
+#include "text.h"
 
 // Layout
 Graphics Layout::graphics(int2 size) const {
     array<Rect> widgets = layout(size);
     Graphics graphics;
-    for(uint i: range(count())) graphics.append(at(i).graphics(widgets[i].size()), vec2(widgets[i].position()));
+    for(uint i: range(count())) {
+        graphics.append(at(i).graphics(widgets[i].size()), vec2(widgets[i].position()));
+        /*graphics.append(Text(str(widgets[i].size())).graphics(widgets[i].size()), vec2(widgets[i].position()));
+        graphics.lines << Line{vec2(widgets[i].min), vec2(widgets[i].max)};*/
+    }
     return graphics;
 }
 
@@ -43,7 +48,7 @@ array<Rect> Linear::layout(const int2 originalSize) const {
         height=max(height, heights[i]=(sizeHint.y<0 ? size.y : min(size.y,sizeHint.y))); //necessary height
     }
 
-    int sharing = expanding ?: (main==Share? count : 0);
+    int sharing = expanding ?: (main==Share ? count : (main == ShareTight ? count+2 : 0));
     if(sharing && width >= sharing) { // Shares extra space evenly between sharing widgets
         int extra = width/sharing;
         for(uint i: range(count)) {
@@ -74,7 +79,7 @@ array<Rect> Linear::layout(const int2 originalSize) const {
 
     int2 pen = 0;
     if(main==Spread || main==Left) pen.x+=0;
-    else if(main==Center || main==Even || /*main==Spread ||*/ main==Share) pen.x+=width/2;
+    else if(main==Center || main==Even || main==Share || main==ShareTight) pen.x+=width/2;
     else if(main==Right) pen.x+=size.x-width;
     else error("");
     if(side==AlignLeft) pen.y+=0;
@@ -108,45 +113,57 @@ array<Rect> GridLayout::layout(int2 size) const {
         }
         widths[x] = maxX;
     }
-    int availableWidth;
-    if(uniformColumnWidths) {
+
+    int extraWidth;
+    if(uniformX) {
         const int requiredWidth = max(ref<int>(widths,w)) * w;
-        availableWidth = size.x ?: requiredWidth;
+        const int availableWidth = size.x ?: requiredWidth;
         const int fixedWidth = availableWidth / w;
-        for(int& v: widths) { v = fixedWidth; availableWidth -= v; }
+        for(int& v: widths) v = fixedWidth;
+        extraWidth = availableWidth - w*fixedWidth;
     } else if(size.x) {
         const int requiredWidth = sum(ref<int>(widths,w));
-        availableWidth = size.x ?: requiredWidth;
-        const int extra = (availableWidth-requiredWidth) / w; // Extra space per column (may be negative for missing space)
-        for(int& v: widths) { v += extra; availableWidth -= v; } // Distributes extra/missing space
+        extraWidth = size.x ? size.x-requiredWidth: 0;
+        const int extra = extraWidth / w; // Extra space per column (may be negative for missing space)
+        for(int& v: widths) { v += extra; extraWidth -= extra; } // Distributes extra/missing space
     }
 
-    int availableHeight = size.y;
-    for(uint y : range(h)) {
-        int maxY = 0;
-        for(uint x: range(w)) {
-            uint i = y*w+x;
-            if(i<count()) maxY = ::max(maxY, abs(at(i).sizeHint(int2(widths[x],size.y)).y));
+    int extraHeight;
+    if(uniformY) {
+        const int requiredHeight = max(ref<int>(heights,h)) * h;
+        const int availableHeight = size.y ?: requiredHeight;
+        const int fixedHeight = availableHeight / h;
+        for(int& v: heights) v = fixedHeight;
+        extraHeight = availableHeight - w*fixedHeight;
+    } else {
+        for(uint y : range(h)) {
+            int maxY = 0;
+            for(uint x: range(w)) {
+                uint i = y*w+x;
+                if(i<count()) maxY = ::max(maxY, abs(at(i).sizeHint(int2(widths[x],size.y)).y));
+            }
+            heights[y] = maxY;
         }
-        heights[y] = maxY;
-        availableHeight -= maxY; // Commits minimum height for all widgets
-    }
-    const int requiredHeight = sum(ref<int>(heights,h)); // Remaining space after fixed allocation
-    if(!size.y) availableHeight = requiredHeight;
-    {
-        const int extra = (availableHeight-requiredHeight) / h; // Extra space per cell
-        if(extra > 0) for(int& v: heights) { v += extra; availableHeight -= v; } // Distributes extra space
-        else while(availableHeight <= -h) { // While layout is overcommited
-            int first = max(ref<int>(heights,h)); // First largest size
-            int firstCount=0; for(int size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
-            int second=0; for(int size: heights) if(second<size && size<first) second=size; // Second largest size
-            int offset = max(1, min(-availableHeight, first-second) / firstCount); // Distributes reduction to all largest widgets
-            for(int& size: heights) if(size == first) { size -= offset, availableHeight += offset; }
+        const int requiredHeight = sum(ref<int>(heights,h)); // Remaining space after fixed allocation
+        extraHeight = size.y ? size.y-requiredHeight: 0;
+        const int extra = extraHeight / h; // Extra space per cell
+        if(extra > 0) {
+            for(int& v: heights) { v += extra; extraHeight -= extra; } // Distributes extra space
+        } else {
+            while(extraHeight <= -h) { // While layout is overcommited
+                int first = max(ref<int>(heights,h)); // First largest size
+                int firstCount=0; for(int size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
+                int second=0; for(int size: heights) if(second<size && size<first) second=size; // Second largest size
+                int offset = max(1, min(-extraHeight, first-second) / firstCount); // Distributes reduction to all largest widgets
+                for(int& size: heights) if(size == first) { size -= offset, extraHeight += offset; }
+            }
         }
+        assert_(extraHeight > -h, extraHeight, size, "(", ref<int>(widths,w), ")", "(", ref<int>(heights,h),")", sum(ref<int>(heights,h)));
     }
-    int Y = availableHeight/2;
+
+    int Y = extraHeight/2;
     for(uint y : range(h)) {
-        int X = availableWidth/2;
+        int X = extraWidth/2;
         for(uint x: range(w)) {
             uint i = y*w+x;
             if(i<count()) {
@@ -155,7 +172,7 @@ array<Rect> GridLayout::layout(int2 size) const {
             }
         }
         Y += heights[y];
-        //assert_(size.y ==0 || int2(X,Y) < size+int2(w,h), X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
+        assert_(size.y ==0 || int2(0) < int2(X,Y) && int2(X,Y) < size+int2(w,h), X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
     }
     return widgets;
 }

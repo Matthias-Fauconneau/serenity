@@ -315,7 +315,7 @@ struct Player {
 #endif
         String target;
         String mounts = File("/proc/self/mounts"_).readUpTo(2048);
-        for(TextData s(mounts); s; s.line()) if(s.match(device)) { s.skip(" "_); target = String(s.until(' ')); break; }
+        for(TextData s(mounts); s; s.line()) if(s.match(device)) { s.skip(' '); target = String(s.until(' ')); break; }
         bool wasPlaying = playButton.enabled;
         if(wasPlaying) setPlaying(false);
         if(!target) { // Mounts drive

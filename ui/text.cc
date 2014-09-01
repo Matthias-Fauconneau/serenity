@@ -9,12 +9,14 @@ string str(const NameSize& x) { return str(x.name, x.size); }
 
 /// Returns a font, loading from disk and caching as needed
 Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
-    String key = fontName+fontTypes[0]+(hint?"H"_:""_);
+    String key = fontName+(hint?"H"_:""_)+fontTypes[0];
     assert_(!key.contains(' '));
     static map<NameSize,unique<Font>> fonts; // Font cache
     unique<Font>* font = fonts.find(NameSize{copy(key), size});
-    return font ? font->pointer
-                : fonts.insert(NameSize{copy(key),size},unique<Font>(Map(findFont(fontName, fontTypes), fontFolder()), size, key, hint)).pointer;
+    if(font) return font->pointer;
+    String path = findFont(fontName, fontTypes);
+    String name = String(section(section(path, '/', -2, -1),'.'));
+    return fonts.insert(NameSize{copy(key),size}, unique<Font>(Map(path, fontFolder()), size, name, hint)).pointer;
 }
 
 /// Layouts formatted text with wrapping, justification and links
@@ -95,11 +97,11 @@ struct TextLayout {
         words << move(word); // Adds to current line (might be first of a new line)
     }
 
-    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify)
+    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify, bool justifyExplicit, bool justifyLast)
         : size(size), wrap(wrap), interline(interline) {
         // Fraction lines
         struct Context {
-            TextFormat format; float fontSize; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
+            TextFormat format; Font* font; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
             //mref<Glyph> word(const mref<Glyph>& word) const { return word(children[0].start, children[0].end); }
             void translate(/*const mref<Glyph>& word, */vec2 offset) {
                 origin += offset; position += offset;
@@ -123,150 +125,117 @@ struct TextLayout {
             // Format context
             array<Context> stack;
             TextFormat format = Regular;
-            float fontSize = size;
             vec2 origin = 0;
             size_t start = 0;
             array<Context> children;
             vec2 position = 0;
 
-            // Toggle format
-            bool bold=false, italic=false;
             // Kerning
             uint16 previous=spaceIndex;
             int previousRightOffset = 0; // Hinted kerning
 
-            uint i=0;
-            for(; i<text.size; i++) {
-                uint c = text[i];
-                /***/ if(c==' ') position.x += spaceAdvance;
-                else if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
-                else break;
-            }
-            for(; i<text.size; i++) {
-                uint c = text[i];
-
-                if(c==' '||c=='\t'||c=='\n') { // Next word/line
+            for(uint c: text) {
+                // Breaking whitespace
+                /***/ if(c==' '||c=='\t'||c=='\n') {
                     previous = spaceIndex;
-                    if(!stack) {
-                        if(word) nextWord(move(word), justify);
-                        position.x = 0;
+                    auto parentFormats = apply(stack,[](const Context& c){return c.format;});
+                    /***/ if(!parentFormats.contains(Stack) && !parentFormats.contains(Fraction) && (word || words || glyphs)) {
+                        if(word) {
+                            nextWord(move(word), justify);
+                            position.x = 0;
+                        }
+                        if(c=='\n') nextLine(justifyExplicit);
                         if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
-                        if(c=='\n') nextLine(false);
-                    } else {
-                        assert_(c==' ', c);
-                        position.x += spaceAdvance;
                     }
-                    continue;
+                    else if(c==' ') position.x += spaceAdvance;
+                    else if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
+                    else error("Unexpected code"_, hex(c), toUTF8(text));
                 }
-
-                if(c<LastTextFormat) { //00-1F format control flags (bold,italic,underline,strike,link)
-                    assert_(c!='\t' && c!='\n');
-                    if(c<End) { // Push context
-                        /*if((c==Numerator && previousFormat==Denominator) || (c==Denominator))
-                            split = word.size; // Center*/
-                        //if(c==Numerator || c==Regular) start = word.size;
-
-                        stack << Context{format, fontSize, origin, start, move(children), position, word.size};
-
-                        format = TextFormat(c);
-                        if(format==Subscript || format==Superscript) fontSize *= 2./3;
-
-                        /*TextFormat previousFormat = children ? children.last().format : TextFormat::Regular;
-                        if((format==Superscript && previousFormat==Subscript) || (format==Subscript && previousFormat==Superscript))
-                            position.x = previousPosition.x; // Stack
-                        if((format==Numerator && previousFormat==Denominator) || (format==Denominator))
-                            position.x = previousPosition.x; // Stack*/
-
-                        start = word.size;
-                        origin = position;
-                    }
-                    else if(c==End) { // Pop context
-                        if(format == Stack || format == Fraction) {
-                            assert_(children.size==2 && children[0].end == children[1].start, children.size);
-                            auto flatten = [](Context& c) {
-                                while(c.children.size == 1 && c.format==Regular && c.start==c.children[0].start && c.children[0].end==c.end)
-                                    c = move(c.children[0]);
-                            };
-                            flatten(children[0]);
-                            flatten(children[1]);
-                            mref<Glyph> word0 = word(children[0].start, children[0].end);
-                            mref<Glyph> word1 = word(children[1].start, children[1].end);
-                            assert_(word0 && word1, word.size, word0.size, word1.size);
-                            vec2 min0 = min(word0), max0 = max(word0), size0 = max0-min0;
-                            vec2 min1 = min(word1), max1 = max(word1), size1 = max1-min1;
-                            { // Horizontal center align
-                                vec2 offset ( (min0-min1 + (size0-size1)/2.f).x, 0);
-                                if(offset.x < 0) { children[0].translate(-offset); for(auto& e: word0) e.origin -= offset; }
-                                else                 { children[1].translate( offset); for(auto& e: word1) e.origin += offset; }
-                            }
-                            if(children[0].format == Regular && children[1].format==Subscript) { // Regular over Subscript
-                                {vec2 offset (0, size1.y/2); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
-                            }
-                            else if(children[0].format == children[1].format) { // Vertical even share
-                                float margin = format == Fraction ? fontSize/3 : 0;
-                                {vec2 offset (0, size0.y/2 + margin); children[0].translate(-offset); for(auto& e: word0) e.origin -= offset;}
-                                {vec2 offset (0, size1.y/2 + margin); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
-                            }
+                // Push format context
+                else if(c<End) {
+                    stack << Context{format, font, origin, start, move(children), position, word.size};
+                    start = word.size;
+                    origin = position;
+                    String fontName = copy(font->name);
+                    float fontSize = font->size;
+                    format = TextFormat(c);
+                    if(format==Bold) { assert_(!find(fontName,"Bold"_), toUTF8(text)); font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint); }
+                    if(format==Italic) { assert_(!find(fontName,"Italic"_)); font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint); }
+                    if(format==Subscript || format==Superscript) fontSize *= 2./3;
+                    if(format==Superscript) position.y -= fontSize/2;
+                    if(format==Subscript) position.y += font->ascender/2;
+                }
+                // Pop format context
+                else if(c==End) {
+                    if(format == Stack || format == Fraction) {
+                        assert_(children.size==2 && children[0].end == children[1].start, children.size);
+                        auto flatten = [](Context& c) {
+                            while(c.children.size == 1 && c.format==Regular && c.start==c.children[0].start && c.children[0].end==c.end)
+                                c = move(c.children[0]);
+                        };
+                        flatten(children[0]);
+                        flatten(children[1]);
+                        assert(children[0].start < children[0].end && children[0].end < word.size, children[0].start, children[0].end, word.size, toUTF8(text));
+                        mref<Glyph> word0 = word(children[0].start, children[0].end);
+                        mref<Glyph> word1 = word(children[1].start, children[1].end);
+                        assert_(word0 && word1, word.size, word0.size, word1.size);
+                        vec2 min0 = min(word0), max0 = max(word0), size0 = max0-min0;
+                        vec2 min1 = min(word1), max1 = max(word1), size1 = max1-min1;
+                        { // Horizontal center align
+                            vec2 offset ( ((min0-min1)/2.f + (size0-size1)/2.f).x, 0);
+                            if(offset.x < 0) { children[0].translate(-offset); for(auto& e: word0) e.origin -= offset; }
+                            else                 { children[1].translate( offset); for(auto& e: word1) e.origin += offset; }
                         }
-                        if(format == Fraction) {
-                            assert_(children.size==2 && children[0].end == children[1].start, children.size);
-                            lines << Line{glyphs.size, words.size, children[0].start, children[0].end, children[1].end};
+                        if(/*children[0].format == Regular &&*/ children[1].format==Subscript) { // Regular over Subscript
+                            {vec2 offset (0, size1.y/2); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
                         }
-                        Context child = {format, fontSize, origin, start, move(children), position, word.size};
-                        Context context = stack.pop();
-                        format = context.format;
-                        fontSize = context.fontSize;
-                        origin = context.origin;
-                        start = context.start;
-                        children = move(context.children);
-                        children << move(child);
-                        position.y = context.position.y;
-                        if(format == Stack || format == Fraction) {
-                            assert_(children.size<=2);
-                            if(children.size==1) position.x = context.position.x;
+                        else if(children[0].format == children[1].format) { // Vertical even share
+                            float margin = format == Fraction ? font->size/3 : 0;
+                            {vec2 offset (0, size0.y/2 + margin); children[0].translate(-offset); for(auto& e: word0) e.origin -= offset;}
+                            {vec2 offset (0, size1.y/2 + margin); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
                         }
                     }
-                    else if(c==Bold) bold=!bold;
-                    else if(c==Italic) italic=!italic;
-                    else error(c);
-
-                    if(bold && italic) font = getFont(fontName, fontSize, {"BoldItalic"_,"RBI"_,"Bold Italic"_}, hint);
-                    else if(bold) font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint);
-                    else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
-                    else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
-
-                    if(c==Superscript) position.y -= fontSize/2;
-                    if(c==Subscript) position.y += font->ascender/2;
-                    //if(c==Numerator) position.y += -xHeight - (-font->descender)*(1+2./3+4./9);
-                    //if(c==Denominator) position.y += -xHeight + font->ascender +  -(font->descender)*(2./3+4./9) /*VAlign*/;
-
-                    continue;
+                    if(format == Fraction) {
+                        assert_(children.size==2 && children[0].end == children[1].start, children.size);
+                        lines << Line({glyphs.size, words.size, children[0].start, children[0].end, children[1].end});
+                    }
+                    Context child = {format, font, origin, start, move(children), position, word.size};
+                    Context context = stack.pop();
+                    format = context.format;
+                    font = context.font;
+                    origin = context.origin;
+                    start = context.start;
+                    children = move(context.children);
+                    children << move(child);
+                    position.y = context.position.y;
+                    if(format == Stack || format == Fraction) {
+                        assert_(children.size<=2);
+                        if(children.size==1) position.x = context.position.x;
+                    }
                 }
-
-                uint16 index = font->index(c);
-
-                // Kerning
-                if(previous != spaceIndex) position.x += font->kerning(previous, index);
-                previous = index;
-
-                Font::Metrics metrics = font->metrics(index);
-
-                if(hint) { // Hinted kerning
-                    if(previousRightOffset - metrics.leftOffset >= 32) position.x -= 1;
-                    if(previousRightOffset - metrics.leftOffset < -32 ) position.x += 1;
-                    previousRightOffset = metrics.rightOffset;
+                // Glyph
+                else {
+                    uint16 index = font->index(c);
+                    Font::Metrics metrics = font->metrics(index);
+                    // Kerning
+                    if(previous != spaceIndex) position.x += font->kerning(previous, index);
+                    previous = index;
+                    if(hint) {
+                        if(previousRightOffset - metrics.leftOffset >= 32) position.x -= 1;
+                        if(previousRightOffset - metrics.leftOffset < -32 ) position.x += 1;
+                        previousRightOffset = metrics.rightOffset;
+                    }
+                    if(c != 0xA0) {
+                        vec2 offset = 0;
+                        if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += font->size/3; // Fixes too high floor signs from FreeSerif
+                        assert_(metrics.size, hex(c));
+                        word << Glyph(metrics,::Glyph{position+offset, *font, c});
+                    }
+                    position.x += metrics.advance;
                 }
-
-                if(c != ' ' && c != 0xA0) {
-                    vec2 offset = 0;
-                    if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += fontSize/3; // Fixes too high floor signs from FreeSerif
-                    assert_(metrics.size, hex(c));
-                    word << Glyph(metrics,::Glyph{position+offset, *font, c});
-                }
-                position.x += metrics.advance;
             }
-            if(word) nextWord(move(word), false);
-            nextLine(false);
+            if(word) nextWord(move(word), justify);
+            nextLine(justifyLast && glyphs.size>1/*if multiple lines*/);
             bbMax.y = ::max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
         }
 
@@ -291,11 +260,11 @@ Text::Text(const string& text, float size, vec3 color, float alpha, float wrap, 
 
 TextLayout Text::layout(float wrap) const {
     if(center) {
-        TextLayout layout(text, size, wrap, font, hint, interline, false); // Layouts without justification
+        TextLayout layout(text, size, wrap, font, hint, interline, false, false, false); // Layouts without justification
         wrap = layout.bbMax.x;
         assert_(wrap >= 0, wrap);
     }
-    return TextLayout(text, size, wrap, font, hint, interline, true);
+    return TextLayout(text, size, wrap, font, hint, interline, true, true, true);
 }
 
 int2 Text::sizeHint(int2 size) const {

@@ -67,7 +67,7 @@ struct Build {
     bool tryParseFiles(TextData& s) {
         if(!s.match("FILE("_) && !s.match("ICON("_)) return false;
         string name = s.identifier("_-"_);
-        s.skip(")"_);
+        s.skip(')');
 
         String filesPath = tmp+"/files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
         Folder(filesPath, root(), true);

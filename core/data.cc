@@ -67,8 +67,18 @@ bool TextData::matchNo(const string& any) {
     advance(1); return true;
 }
 
+void TextData::skip(const char key) {
+    if(!match(key)) error("Expected '"_+string{key}+"', got '"_+line()+"'"_);
+}
 void TextData::skip(const string& key) {
     if(!match(key)) error("Expected '"_+key+"', got '"_+line()+"'"_);
+}
+
+string TextData::whileAny(char key) {
+    uint start=index; while(match(key)) {} return slice(start, index-start);
+}
+string TextData::whileAny(const string& any) {
+    uint start=index; while(matchAny(any)){} return slice(start,index-start);
 }
 
 string TextData::whileNot(char key) {
@@ -78,9 +88,6 @@ string TextData::whileNot(char key) {
         if(peek() == key) { end=index; break; }
     }
     return slice(start, end-start);
-}
-string TextData::whileAny(const string& any) {
-    uint start=index; while(available(1) && matchAny(any)){} return slice(start,index-start);
 }
 string TextData::whileNo(const string& any) {
     uint start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);

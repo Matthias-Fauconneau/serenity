@@ -11,7 +11,10 @@ String findFont(string fontName, ref<string> fontTypes) {
         if(!endsWith(path,".ttf"_)) return true;
         for(string fontType: fontTypes) {
             if(fontType) {
-                if(find(path, fontName+fontType+"."_) || find(path, fontName+"-"_+fontType+"."_) || find(path, fontName+"_"_+fontType+"."_))
+                if(find(path, fontName+fontType+"."_) ||
+                   find(path, fontName+"-"_+fontType+"."_) ||
+                   find(path, fontName+"_"_+fontType+"."_) ||
+                   find(path, fontName+" "_+fontType+"."_))
                     return false;
             } else if(find(path,fontName+"."_)) {
                 return false;
@@ -24,8 +27,8 @@ String findFont(string fontName, ref<string> fontTypes) {
 }
 
 static FT_Library ft; static int fontCount=0;
-Font::Font(Map&& map, float size, string id, bool hint) : Font(buffer<byte>(map), size, id, hint) { keep=move(map); }
-Font::Font(buffer<byte>&& data_, float size, string id, bool hint) : data(move(data_)), size(size), id(id), hint(hint) {
+Font::Font(Map&& map, float size, string name, bool hint) : Font(buffer<byte>(map), size, name, hint) { keep=move(map); }
+Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move(data_)), size(size), name(name), hint(hint) {
     if(!ft) FT_Init_FreeType(&ft);
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;

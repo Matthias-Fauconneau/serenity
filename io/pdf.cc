@@ -34,9 +34,9 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
             vec2 last = 0;
             for(const Glyph& glyph: graphics.glyphs) { // FIXME: Optimize redundant state changes
                 const Font& font = glyph.font;
-                if(font.id != fontID || font.size != fontSize) {
-                    if(!xFonts.contains(font.id)) {
-                        if(!fonts.contains(font.id)) {
+                if(font.name != fontID || font.size != fontSize) {
+                    if(!xFonts.contains(font.name)) {
+                        if(!fonts.contains(font.name)) {
                             Object& xFont = objects.append();
                             xFont.insert("Type"_, String("/Font"_));
                             xFont.insert("Subtype"_, String("/Type0"_));
@@ -73,11 +73,11 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
                                     descendantFonts << move(cidFont);}
                                 xFont.insert("DescendantFonts"_, move(descendantFonts));}
                             //TODO: ToUnicode
-                            fonts.insert(copy(font.id), ref(xFont));
+                            fonts.insert(copy(font.name), ref(xFont));
                         }
-                        xFonts.insert(font.id, fonts.at(font.id));
+                        xFonts.insert(font.name, fonts.at(font.name));
                     }
-                    content << "/"_+font.id+" "_+dec(glyph.font.size*px)+" Tf\n"_; // Font size in pixels
+                    content << "/"_+font.name+" "_+dec(glyph.font.size*px)+" Tf\n"_; // Font size in pixels
                 }
                 uint index = font.index(glyph.code);
                 assert_(index < 1<<15);

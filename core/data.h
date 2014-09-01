@@ -169,8 +169,12 @@ struct TextData : Data {
     bool matchNo(const string& any);
 
     /// Asserts stream matches \a key and advances \a key length bytes
+    void skip(char key);
+    /// Asserts stream matches \a key and advances \a key length bytes
     void skip(const string& key);
 
+    /// Advances while input match \a key.
+    string whileAny(char key);
     /// Advances while input doesn't match \a key. \sa until
     string whileNot(char key);
     /// Advances while input match any of \a any
@@ -211,5 +215,6 @@ struct TextData : Data {
     /// Reads a decimal number
     double decimal();
 
+    /// 1-based line index
     uint lineIndex = 1;
 };
