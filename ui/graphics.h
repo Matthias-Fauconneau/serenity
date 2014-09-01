@@ -33,13 +33,20 @@ struct Glyph {
     uint code;
 };
 
+/// Line graphic element
+struct Line {
+    vec2 a, b;
+};
+
 /// Set of graphic elements
 struct Graphics {
     array<Blit> blits;
     array<Glyph> glyphs;
+    array<Line> lines;
     Graphics& append(const Graphics& o, vec2 offset) {
         for(const auto& e: o.blits) blits << Blit{offset+e.origin, e.size, share(e.image)};
         for(auto e: o.glyphs) { e.origin += offset; glyphs << e; }
+        for(auto e: o.lines) { e.a += offset; e.b += offset; lines << e; }
         return *this;
     }
 };

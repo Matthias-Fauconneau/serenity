@@ -30,9 +30,46 @@ static void blit(const Image& target, int2 position, const Image& source, vec3 c
     }
 }
 
+
+static void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool transpose) {
+    if(transpose) swap(x,y);
+    if(x>=target.width || y>=target.height) return;
+    blend(target, x,y, color, alpha);
+}
+
+void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float alpha) {
+    color = clip(vec3(0), color, vec3(1));
+    float dx = p2.x - p1.x, dy = p2.y - p1.y;
+    bool transpose=false;
+    if(abs(dx) < abs(dy)) { swap(p1.x, p1.y); swap(p2.x, p2.y); swap(dx, dy); transpose=true; }
+    if(p1.x > p2.x) { swap(p1.x, p2.x); swap(p1.y, p2.y); }
+    if(dx==0) return; //p1==p2
+    float gradient = dy / dx;
+    int i1,i2; float intery;
+    {
+        float xend = round(p1.x), yend = p1.y + gradient * (xend - p1.x);
+        float xgap = 1 - fract(p1.x + 1./2);
+        blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
+        blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
+        i1 = int(xend);
+        intery = yend + gradient;
+    }
+    {
+        float xend = round(p2.x), yend = p2.y + gradient * (xend - p2.x);
+        float xgap = fract(p2.x + 1./2);
+        blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
+        blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
+        i2 = int(xend);
+    }
+    for(int x=i1+1;x<i2;x++) {
+        blend(target, x, intery, color, (1-fract(intery)) * alpha, transpose);
+        blend(target, x, intery+1, color, fract(intery) * alpha, transpose);
+        intery += gradient;
+    }
+}
+
 void render(const Image& target, const Graphics& graphics) {
     for(const auto& e: graphics.blits) {
-        assert(e.image.width && e.image.height, e.image.size);
         if(int2(e.size) == e.image.size) blit(target, int2(round(e.origin)), e.image, 1, 1);
         else blit(target, int2(round(e.origin)), resize(int2(e.size), e.image), 1, 1);
     }
@@ -40,4 +77,5 @@ void render(const Image& target, const Graphics& graphics) {
         Font::Glyph glyph = e.font.render(e.font.index(e.code));
         blit(target, int2(round(e.origin))+glyph.offset, glyph.image, 0, 1);
     }
+    for(const auto& e: graphics.lines) line(target, e.a, e.b, 0, 1);
 }

@@ -9,7 +9,7 @@
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
 enum TextFormat : char {
     Regular,
-    Subscript, Superscript, Line, Numerator, Denominator, End, // Nest
+    Subscript, Superscript, FractionLine, Numerator, Denominator, End, // Nest
     Bold, Italic, // Toggle
     LastTextFormat
 };
@@ -18,8 +18,8 @@ static_assert(LastTextFormat <= '\t', "");
 inline String subscript(const string& s) { return string{TextFormat::Subscript} + s + string{TextFormat::End}; }
 inline String superscript(const string& s) { return string{TextFormat::Superscript} + s + string{TextFormat::End}; }
 inline String fraction(const string& num, const string& den) {
-    return string{TextFormat::Line, TextFormat::Numerator} + num + string{TextFormat::End, TextFormat::Denominator}
-               + den + string{TextFormat::End};
+    return string{TextFormat::FractionLine, TextFormat::Numerator} + num + string{TextFormat::End, TextFormat::Denominator}
+               + den + string{TextFormat::End,TextFormat::End};
 }
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {

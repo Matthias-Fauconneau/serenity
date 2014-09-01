@@ -117,6 +117,10 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
                 page.insert("Resources"_, move(resources));
             }
 
+            for(auto& line: graphics.lines) {
+                 content << str(line.a.x, pageSize.y-line.a.y)+" m "_+str(line.b.x, pageSize.y-line.b.y)+" l\n"_;
+            }
+
             contents.insert("Filter"_,"/FlateDecode"_);
             contents = deflate(content);
             page.insert("Contents"_, ref(contents));

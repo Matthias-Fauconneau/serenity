@@ -22,7 +22,25 @@ struct TextLayout {
     struct Glyph : Font::Metrics, ::Glyph {
         Glyph(const Font::Metrics& metrics, const ::Glyph& glyph) : Font::Metrics(metrics), ::Glyph(glyph) {}
     };
-    float width(const ref<Glyph>& word) { float max=0; for(const Glyph& glyph : word) if(glyph.code!=',' && glyph.code!='.') max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width); return max; }
+    float width(const ref<Glyph>& word) {
+        float max=0;
+        for(const Glyph& glyph : word) if(glyph.code!=',' && glyph.code!='.') max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width);
+        return max;
+    }
+    /*float bbWidth(const ref<Glyph>& word) {
+        float min=inf, max=-inf;
+        for(const Glyph& glyph : word) {
+            min=::min(min, glyph.origin.x - glyph.bearing.x);
+            max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width);
+        }
+        return max-min;
+    }*/
+    float min(const ref<Glyph>& word) {
+        float min=inf; for(const Glyph& glyph : word) min=::min(min, glyph.origin.x - glyph.bearing.x); return min;
+    }
+    float max(const ref<Glyph>& word) {
+        float max=-inf; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width); return max;
+    }
     float advance(const ref<Glyph>& word) { float max=0; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x + glyph.advance); return max; }
 
     // Parameters
@@ -34,11 +52,11 @@ struct TextLayout {
     // Variables
     float lineOriginY = 0;
     array<array<Glyph>> words;
-    //vec2 bbMin = 0;
     vec2 bbMax = 0;
 
     // Outputs
-    array<array<::Glyph>> glyphs;
+    array<array<array<Glyph>>> glyphs;
+    array<Line> lines;
 
     void nextLine(bool justify) {
         if(words) {
@@ -50,10 +68,11 @@ struct TextLayout {
             float x=0; // Line pen
             auto& line = glyphs.append();
             for(const ref<Glyph>& word: words) {
+                auto& wordOut = line.append();
                 for(Glyph glyph: word) {
                     glyph.origin += vec2(x, lineOriginY);
-                    bbMax = max(bbMax, glyph.origin-glyph.bearing+glyph.size);
-                    line << glyph;
+                    bbMax = ::max(bbMax, glyph.origin-glyph.bearing+glyph.size);
+                    wordOut.append( glyph );
                 }
                 x += advance(word);
                 x += space;
@@ -63,18 +82,29 @@ struct TextLayout {
         lineOriginY += interline*size;
     }
 
+    void nextWord(array<Glyph>&& word, bool justify) {
+        float length = 0;
+        for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
+        length += width(word); // Last word
+        if(wrap && length > wrap && words) nextLine(justify); // Would not fit
+        assert_(word);
+        words << move(word); // Adds to current line (might be first of a new line)
+    }
+
     TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify)
         : size(size), wrap(wrap), interline(interline) {
 
         Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
         uint16 spaceIndex = font->index(' ');
         spaceAdvance = font->metrics(spaceIndex).advance;
+        float xHeight = font->metrics(font->index('x')).height;
 
         lineOriginY = interline*font->ascender;
 
         // Format context
         bool bold=false, italic=false;
-        struct Context { TextFormat format, previousFormat; float fontSize; vec2 position, previousPosition; };
+        //struct Cursor {size_t line, word, letter; };
+        struct Context { TextFormat format; float fontSize; vec2 position; /*Cursor start;*/ size_t split; };
         array<Context> stack;
         float fontSize = size;
         TextFormat format = Regular, previousFormat = Regular;
@@ -84,6 +114,12 @@ struct TextLayout {
         // Kerning
         uint16 previous=spaceIndex;
         int previousRightDelta = 0; // Hinted kerning
+        // Fractions
+        struct Line { size_t line, word, split; };
+        array<Line> lines;
+        // Stack center
+        size_t split = -1;
+        //float width = 0;
 
         uint i=0;
         for(; i<text.size; i++) {
@@ -97,12 +133,15 @@ struct TextLayout {
 
             if(c<LastTextFormat) { //00-1F format control flags (bold,italic,underline,strike,link)
                 if(c<End) {
-                    stack << Context{format, previousFormat, fontSize, position, previousPosition};
+                    if((c==Numerator && previousFormat==Denominator) || (c==Denominator && previousFormat==Numerator))
+                        split = word.size; // Center
+                    stack << Context{format, fontSize, position, split};
 
                     format = TextFormat(c);
-                    if( (format==Superscript && previousFormat==Subscript)
-                     || (format==Subscript && previousFormat==Superscript)) // Stack sub/super script
-                        position.x = previousPosition.x;
+                    if((format==Superscript && previousFormat==Subscript) || (format==Subscript && previousFormat==Superscript))
+                        position.x = previousPosition.x; // Stack
+                    if((format==Numerator && previousFormat==Denominator) || (format==Denominator && previousFormat==Numerator))
+                        position.x = previousPosition.x; // Stack
                     if(format==Subscript || format==Superscript) fontSize *= 2./3;
 
                     previousFormat = Regular;
@@ -110,11 +149,22 @@ struct TextLayout {
                 }
                 else if(c==End) {
                     previousFormat = format;
+                    if(split != invalid && (format == Denominator || format == Numerator)) {
+                        auto word1 = word.slice(0, split), word2 = word.slice(split);
+                        float delta = min(word1)-min(word2) + ((max(word1)-min(word1))-(max(word2)-min(word2)))/2;
+                        if(delta > 0) for(auto& e: word2) e.origin.x += delta;
+                        else for(auto& e: word1) e.origin.x -= delta;
+                    }
                     Context context = stack.pop();
+                    if(format == FractionLine) {
+                        assert_(split != invalid, split, context.split);
+                        lines << Line{glyphs.size, words.size, split};
+                    }
                     previousPosition = context.position;
                     fontSize = context.fontSize;
                     position.y = context.position.y;
                     format = context.format;
+                    split = context.split;
                 }
                 else if(c==Bold) bold=!bold;
                 else if(c==Italic) italic=!italic;
@@ -125,25 +175,25 @@ struct TextLayout {
                 else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
                 else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
 
-                if(c==Subscript) position.y += font->ascender/2;
+                if(c==Numerator) position.y += -xHeight - (-font->descender)*(1+2./3+4./9);
                 if(c==Superscript) position.y -= fontSize/2;
+                if(c==Subscript) position.y += font->ascender/2;
+                if(c==Denominator) position.y += -xHeight + font->ascender +  -(font->descender)*(2./3+4./9) /*VAlign*/;
 
                 continue;
             }
 
-            if((c==' '||c=='\t'||c=='\n') && !stack) { // Next word/line
+            if(c==' '||c=='\t'||c=='\n') { // Next word/line
                 previous = spaceIndex;
-                if(word) {
-                    if(words) {
-                        float length = 0;
-                        for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
-                        length += width(word); // Next word
-                        if(wrap && length > wrap && words) nextLine(justify); // Would not fit
-                    }
-                    words << move(word); position.x = 0; // Add to current line (might be first of a new line)
+                if(!stack) {
+                    if(word) nextWord(move(word), justify);
+                    position.x = 0;
+                    if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
+                    if(c=='\n') nextLine(false);
+                } else {
+                    assert_(c==' ');
+                    position.x += spaceAdvance;
                 }
-                if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
-                if(c=='\n') nextLine(false);
                 continue;
             }
             previousFormat = Regular;
@@ -170,14 +220,21 @@ struct TextLayout {
             }
             position.x += metrics.advance;
         }
-        if(word) {
-            float length=0; for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
-            length += width(word); // Last word
-            if(wrap && length>wrap && words) nextLine(justify); // would not fit
-            words << move(word); // Adds to current line (might be first of new line)
+        if(word) nextWord(move(word), false);
+        nextLine(false);
+        bbMax.y = ::max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
+
+        for(auto& line: lines) {
+            const auto& fract = glyphs[line.line][line.word];
+            const auto& num = fract.slice(0, line.split);
+            const auto& den = fract.slice(line.split);
+            float numMaxY = ::max(apply(num, [](const Glyph& g) { return g.origin.y - g.bearing.y + g.height; }));
+            float denMinY = ::min(apply(den, [](const Glyph& g) { return g.origin.y - g.bearing.y; }));
+            float midY = (numMaxY+denMinY) / 2;
+            float minX  = ::min(apply(fract, [](const Glyph& g) { return g.origin.x - g.bearing.x; }));
+            float maxX  = ::max(apply(fract, [](const Glyph& g) { return g.origin.x - g.bearing.x + g.width; }));
+            this->lines << ::Line{vec2(minX, midY), vec2(maxX, midY)};
         }
-        if(words) nextLine(false); // Clears any remaining words
-        bbMax.y = max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
     }
 };
 
@@ -206,6 +263,7 @@ Graphics Text::graphics(int2 size) const {
 
     Graphics graphics;
     vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, (size.y-textSize.y)/2.f));
-    for(const ref<Glyph>& line: layout.glyphs) for(Glyph e: line) { e.origin += offset; graphics.glyphs << e; }
+    for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics.glyphs << e; }
+    for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics.lines << e; }
     return graphics;
 }

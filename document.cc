@@ -164,6 +164,11 @@ struct Document {
                 else text << s.next();
             } else if(s.match('_')) text << subscript(parseScript(s, delimiters));
             else if(s.match('^')) text << superscript(parseScript(s, delimiters));
+            else if(s.match('{')) {
+                String num = parseText(s, {"//"_});
+                String den = parseText(s, {"}"_});
+                text << fraction(trim(num), trim(den));
+            }
             else text << s.next();
         }
         if(bold) warn(s, "Expected bold end delimiter *, got end of line");
@@ -275,7 +280,7 @@ struct Document {
 
             if(s.match('\\')) {
                 string command = s.whileNot('\n');
-                if(command == "tableOfContents"_) {
+                if(command == "tableofcontents"_) {
                     auto& grid = element<WidgetGrid>(page, false, 2);
                     for(const Header& header: headers) {
                         String text;
