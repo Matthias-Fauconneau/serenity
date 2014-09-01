@@ -56,10 +56,10 @@ array<Rect> Linear::layout(const int2 originalSize) const {
         for(uint i: range(count)) widths[i]=abs(widths[i]); //converts all expanding widgets to fixed
         while(width<=-int(count)) { //while layout is overcommited
             int first = max(ref<int>(widths,count)); // First largest size
-            uint firstCount=0; for(int size: widths) if(size == first) firstCount++; // Counts how many widgets already have the largest size
+            int firstCount=0; for(int size: widths) if(size == first) firstCount++; // Counts how many widgets already have the largest size
             assert_(firstCount);
             int second=0; for(int size: widths) if(second<size && size<first) second=size; // Second largest size
-            int delta = min(-width, first-second) / firstCount; // Distributes reduction to all largest widgets
+            int delta = max(1, min(-width, first-second) / firstCount); // Distributes reduction to all largest widgets (max(1,...) to account for flooring)
             for(int& size: widths) if(size == first) { size -= delta, width += delta; }
         }
     }
@@ -138,9 +138,9 @@ array<Rect> GridLayout::layout(int2 size) const {
         if(extra > 0) for(int& v: heights) { v += extra; availableHeight -= v; } // Distributes extra space
         else while(availableHeight <= -h) { // While layout is overcommited
             int first = max(ref<int>(heights,h)); // First largest size
-            uint firstCount=0; for(int size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
+            int firstCount=0; for(int size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
             int second=0; for(int size: heights) if(second<size && size<first) second=size; // Second largest size
-            int delta = min(-availableHeight, first-second) / firstCount; // Distributes reduction to all largest widgets
+            int delta = max(1, min(-availableHeight, first-second) / firstCount); // Distributes reduction to all largest widgets
             for(int& size: heights) if(size == first) { size -= delta, availableHeight += delta; }
         }
     }

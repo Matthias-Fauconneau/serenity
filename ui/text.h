@@ -17,10 +17,11 @@ static_assert(LastTextFormat <= '\t', "");
 
 inline String subscript(const string& s) { return string{TextFormat::Subscript} + s + string{TextFormat::End}; }
 inline String superscript(const string& s) { return string{TextFormat::Superscript} + s + string{TextFormat::End}; }
-inline String fraction(const string& num, const string& den) {
-    return string{TextFormat::FractionLine, TextFormat::Numerator} + num + string{TextFormat::End, TextFormat::Denominator}
-               + den + string{TextFormat::End,TextFormat::End};
-}
+inline String numerator(const string& s) { return string{TextFormat::Numerator} + s + string{TextFormat::End}; }
+inline String denominator(const string& s) { return string{TextFormat::Denominator} + s + string{TextFormat::End}; }
+inline String fraction(const string& s) { return string{TextFormat::FractionLine} + s + string{TextFormat::End}; }
+inline String regular(const string& s) { return string{TextFormat::Regular} + s + string{TextFormat::End}; }
+
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font

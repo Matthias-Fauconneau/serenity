@@ -165,9 +165,10 @@ struct Document {
             } else if(s.match('_')) text << subscript(parseScript(s, delimiters));
             else if(s.match('^')) text << superscript(parseScript(s, delimiters));
             else if(s.match('{')) {
-                String num = parseText(s, {"//"_});
-                String den = parseText(s, {"}"_});
-                text << fraction(trim(num), trim(den));
+                String num (trim(parseText(s, {"/"_})));
+                bool fraction = s.match('/');
+                String den = denominator(trim(parseText(s, {"}"_})));
+                text << (fraction ? ::fraction(numerator(num)+den) : regular(num)+den);
             }
             else text << s.next();
         }

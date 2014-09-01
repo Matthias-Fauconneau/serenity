@@ -36,12 +36,17 @@ struct TextLayout {
         return max-min;
     }*/
     float min(const ref<Glyph>& word) {
+        assert_(word);
         float min=inf; for(const Glyph& glyph : word) min=::min(min, glyph.origin.x - glyph.bearing.x); return min;
     }
     float max(const ref<Glyph>& word) {
+        assert_(word);
         float max=-inf; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x - glyph.bearing.x + glyph.width); return max;
     }
-    float advance(const ref<Glyph>& word) { float max=0; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x + glyph.advance); return max; }
+    float advance(const ref<Glyph>& word) {
+        assert_(word);
+        float max=-inf; for(const Glyph& glyph : word) max=::max(max, glyph.origin.x + glyph.advance); return max;
+    }
 
     // Parameters
     float size;
@@ -93,141 +98,148 @@ struct TextLayout {
 
     TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify)
         : size(size), wrap(wrap), interline(interline) {
-
-        Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
-        uint16 spaceIndex = font->index(' ');
-        spaceAdvance = font->metrics(spaceIndex).advance;
-        float xHeight = font->metrics(font->index('x')).height;
-
-        lineOriginY = interline*font->ascender;
-
-        // Format context
-        bool bold=false, italic=false;
-        //struct Cursor {size_t line, word, letter; };
-        struct Context { TextFormat format; float fontSize; vec2 position; /*Cursor start;*/ size_t split; };
-        array<Context> stack;
-        float fontSize = size;
-        TextFormat format = Regular, previousFormat = Regular;
-        // Glyph positions
-        array<Glyph> word;
-        vec2 position = 0, previousPosition = 0;
-        // Kerning
-        uint16 previous=spaceIndex;
-        int previousRightDelta = 0; // Hinted kerning
         // Fractions
-        struct Line { size_t line, word, split; };
+        struct Line { size_t line, word, start, split; };
         array<Line> lines;
-        // Stack center
-        size_t split = -1;
-        //float width = 0;
+        {
+            Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
+            uint16 spaceIndex = font->index(' ');
+            spaceAdvance = font->metrics(spaceIndex).advance;
+            float xHeight = font->metrics(font->index('x')).height;
 
-        uint i=0;
-        for(; i<text.size; i++) {
-            uint c = text[i];
-            /***/ if(c==' ') position.x += spaceAdvance;
-            else if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
-            else break;
-        }
-        for(; i<text.size; i++) {
-            uint c = text[i];
+            lineOriginY = interline*font->ascender;
 
-            if(c<LastTextFormat) { //00-1F format control flags (bold,italic,underline,strike,link)
-                if(c<End) {
-                    if((c==Numerator && previousFormat==Denominator) || (c==Denominator && previousFormat==Numerator))
-                        split = word.size; // Center
-                    stack << Context{format, fontSize, position, split};
-
-                    format = TextFormat(c);
-                    if((format==Superscript && previousFormat==Subscript) || (format==Subscript && previousFormat==Superscript))
-                        position.x = previousPosition.x; // Stack
-                    if((format==Numerator && previousFormat==Denominator) || (format==Denominator && previousFormat==Numerator))
-                        position.x = previousPosition.x; // Stack
-                    if(format==Subscript || format==Superscript) fontSize *= 2./3;
-
-                    previousFormat = Regular;
-                    previousPosition = position;
-                }
-                else if(c==End) {
-                    previousFormat = format;
-                    if(split != invalid && (format == Denominator || format == Numerator)) {
-                        auto word1 = word.slice(0, split), word2 = word.slice(split);
-                        float delta = min(word1)-min(word2) + ((max(word1)-min(word1))-(max(word2)-min(word2)))/2;
-                        if(delta > 0) for(auto& e: word2) e.origin.x += delta;
-                        else for(auto& e: word1) e.origin.x -= delta;
-                    }
-                    Context context = stack.pop();
-                    if(format == FractionLine) {
-                        assert_(split != invalid, split, context.split);
-                        lines << Line{glyphs.size, words.size, split};
-                    }
-                    previousPosition = context.position;
-                    fontSize = context.fontSize;
-                    position.y = context.position.y;
-                    format = context.format;
-                    split = context.split;
-                }
-                else if(c==Bold) bold=!bold;
-                else if(c==Italic) italic=!italic;
-                else error(c);
-
-                if(bold && italic) font = getFont(fontName, fontSize, {"BoldItalic"_,"RBI"_,"Bold Italic"_}, hint);
-                else if(bold) font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint);
-                else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
-                else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
-
-                if(c==Numerator) position.y += -xHeight - (-font->descender)*(1+2./3+4./9);
-                if(c==Superscript) position.y -= fontSize/2;
-                if(c==Subscript) position.y += font->ascender/2;
-                if(c==Denominator) position.y += -xHeight + font->ascender +  -(font->descender)*(2./3+4./9) /*VAlign*/;
-
-                continue;
-            }
-
-            if(c==' '||c=='\t'||c=='\n') { // Next word/line
-                previous = spaceIndex;
-                if(!stack) {
-                    if(word) nextWord(move(word), justify);
-                    position.x = 0;
-                    if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
-                    if(c=='\n') nextLine(false);
-                } else {
-                    assert_(c==' ');
-                    position.x += spaceAdvance;
-                }
-                continue;
-            }
-            previousFormat = Regular;
-
-            uint16 index = font->index(c);
-
+            // Format context
+            bool bold=false, italic=false;
+            //struct Cursor {size_t line, word, letter; };
+            struct Context { TextFormat format; float fontSize; vec2 position; /*Cursor start;*/ size_t start, split; };
+            array<Context> stack;
+            float fontSize = size;
+            TextFormat format = Regular, previousFormat = Regular;
+            // Glyph positions
+            array<Glyph> word;
+            vec2 position = 0, previousPosition = 0;
             // Kerning
-            if(previous != spaceIndex) position.x += font->kerning(previous, index);
-            previous = index;
+            uint16 previous=spaceIndex;
+            int previousRightDelta = 0; // Hinted kerning
+            // Stack center
+            size_t start = 0;
+            size_t split = -1;
+            //float width = 0;
 
-            Font::Metrics metrics = font->metrics(index);
-
-            if(hint) { // Hinted kerning
-                if(previousRightDelta - metrics.leftDelta >= 32) position.x -= 1;
-                if(previousRightDelta - metrics.leftDelta < -32 ) position.x += 1;
-                previousRightDelta = metrics.rightDelta;
+            uint i=0;
+            for(; i<text.size; i++) {
+                uint c = text[i];
+                /***/ if(c==' ') position.x += spaceAdvance;
+                else if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
+                else break;
             }
+            for(; i<text.size; i++) {
+                uint c = text[i];
 
-            if(c != ' ' && c != 0xA0) {
-                vec2 offset = 0;
-                if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += fontSize/3; // Fixes too high floor signs from FreeSerif
-                assert_(metrics.size, hex(c));
-                word << Glyph(metrics,::Glyph{position+offset, *font, c});
+                if(c<LastTextFormat) { //00-1F format control flags (bold,italic,underline,strike,link)
+                    if(c<End) {
+                        if((c==Numerator && previousFormat==Denominator) || (c==Denominator /*&& previousFormat==Numerator*/))
+                            split = word.size; // Center
+                        if(c==Numerator || c==Regular) start = word.size;
+                        stack << Context{format, fontSize, position, start, split};
+                        format = TextFormat(c);
+                        if((format==Superscript && previousFormat==Subscript) || (format==Subscript && previousFormat==Superscript))
+                            position.x = previousPosition.x; // Stack
+                        if((format==Numerator && previousFormat==Denominator) || (format==Denominator /*&& previousFormat==Numerator*/))
+                            position.x = previousPosition.x; // Stack
+                        if(format==Subscript || format==Superscript) fontSize *= 2./3;
+
+                        previousFormat = Regular;
+                        previousPosition = position;
+                    }
+                    else if(c==End) {
+                        if(split != invalid && (format == Denominator /*&& (previousFormat==Numerator||previousFormat==Regular)*//*|| format == Numerator*/)) {
+                            assert_(start < word.size && start < split && split < word.size, start, split, toUTF8(text));
+                            mref<Glyph> word1 = word(start, split), word2 = word.slice(split);
+                            assert_(word1 && word2, word.size, word1.size, word2.size, start, split);
+                            float delta = min(word1)-min(word2) + ((max(word1)-min(word1))-(max(word2)-min(word2)))/2;
+                            if(delta > 0) for(auto& e: word2) e.origin.x += delta;
+                            else for(auto& e: word1) e.origin.x -= delta;
+                        }
+                        previousFormat = format;
+                        Context context = stack.pop();
+                        if(format == FractionLine) {
+                            assert_(start < word.size && start < split && split < word.size, start, split, toUTF8(text));
+                            lines << Line{glyphs.size, words.size, start, split};
+                        }
+                        previousPosition = context.position;
+                        fontSize = context.fontSize;
+                        position.y = context.position.y;
+                        format = context.format;
+                        start = context.start;
+                        split = context.split;
+                    }
+                    else if(c==Bold) bold=!bold;
+                    else if(c==Italic) italic=!italic;
+                    else error(c);
+
+                    if(bold && italic) font = getFont(fontName, fontSize, {"BoldItalic"_,"RBI"_,"Bold Italic"_}, hint);
+                    else if(bold) font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint);
+                    else if(italic) font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint);
+                    else font = getFont(fontName, fontSize, {""_,"R"_,"Regular"_}, hint);
+
+                    if(c==Numerator) position.y += -xHeight - (-font->descender)*(1+2./3+4./9);
+                    if(c==Superscript) position.y -= fontSize/2;
+                    if(c==Subscript) position.y += font->ascender/2;
+                    if(c==Denominator) position.y += -xHeight + font->ascender +  -(font->descender)*(2./3+4./9) /*VAlign*/;
+
+                    continue;
+                }
+
+                if(c==' '||c=='\t'||c=='\n') { // Next word/line
+                    previous = spaceIndex;
+                    if(!stack) {
+                        if(word) nextWord(move(word), justify);
+                        position.x = 0;
+                        if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
+                        if(c=='\n') nextLine(false);
+                    } else {
+                        assert_(c==' ');
+                        position.x += spaceAdvance;
+                    }
+                    continue;
+                }
+                previousFormat = Regular;
+
+                uint16 index = font->index(c);
+
+                // Kerning
+                if(previous != spaceIndex) position.x += font->kerning(previous, index);
+                previous = index;
+
+                Font::Metrics metrics = font->metrics(index);
+
+                if(hint) { // Hinted kerning
+                    if(previousRightDelta - metrics.leftDelta >= 32) position.x -= 1;
+                    if(previousRightDelta - metrics.leftDelta < -32 ) position.x += 1;
+                    previousRightDelta = metrics.rightDelta;
+                }
+
+                if(c != ' ' && c != 0xA0) {
+                    vec2 offset = 0;
+                    if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += fontSize/3; // Fixes too high floor signs from FreeSerif
+                    assert_(metrics.size, hex(c));
+                    word << Glyph(metrics,::Glyph{position+offset, *font, c});
+                }
+                position.x += metrics.advance;
             }
-            position.x += metrics.advance;
+            if(word) nextWord(move(word), false);
+            nextLine(false);
+            bbMax.y = ::max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
         }
-        if(word) nextWord(move(word), false);
-        nextLine(false);
-        bbMax.y = ::max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->descender)); // inter widget spacing
 
         for(auto& line: lines) {
-            const auto& fract = glyphs[line.line][line.word];
-            const auto& num = fract.slice(0, line.split);
-            const auto& den = fract.slice(line.split);
+            const auto& word = glyphs[line.line][line.word];
+            assert_(line.start < word.size && line.split < word.size, "line"_, line.start, line.split);
+            const auto& fract = word.slice(line.start);
+            const auto& num = word.slice(line.start, line.split);
+            const auto& den = word.slice(line.split);
             float numMaxY = ::max(apply(num, [](const Glyph& g) { return g.origin.y - g.bearing.y + g.height; }));
             float denMinY = ::min(apply(den, [](const Glyph& g) { return g.origin.y - g.bearing.y; }));
             float midY = (numMaxY+denMinY) / 2;

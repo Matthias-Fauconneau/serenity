@@ -237,6 +237,8 @@ generic struct mref : ref<T> {
     mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
     /// Slices a reference to elements from to the end of the reference
     mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+    /// Slices a reference to elements from \a start to \a stop
+    mref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
     /// Initializes reference using the same constructor for all elements
     template<Type... Args> void clear(Args... args) const { for(size_t i: range(size)) new (&at(i)) T(args...); }
