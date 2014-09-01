@@ -59,8 +59,8 @@ array<Rect> Linear::layout(const int2 originalSize) const {
             int firstCount=0; for(int size: widths) if(size == first) firstCount++; // Counts how many widgets already have the largest size
             assert_(firstCount);
             int second=0; for(int size: widths) if(second<size && size<first) second=size; // Second largest size
-            int delta = max(1, min(-width, first-second) / firstCount); // Distributes reduction to all largest widgets (max(1,...) to account for flooring)
-            for(int& size: widths) if(size == first) { size -= delta, width += delta; }
+            int offset = max(1, min(-width, first-second) / firstCount); // Distributes reduction to all largest widgets (max(1,...) to account for flooring)
+            for(int& size: widths) if(size == first) { size -= offset, width += offset; }
         }
     }
 
@@ -140,8 +140,8 @@ array<Rect> GridLayout::layout(int2 size) const {
             int first = max(ref<int>(heights,h)); // First largest size
             int firstCount=0; for(int size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
             int second=0; for(int size: heights) if(second<size && size<first) second=size; // Second largest size
-            int delta = max(1, min(-availableHeight, first-second) / firstCount); // Distributes reduction to all largest widgets
-            for(int& size: heights) if(size == first) { size -= delta, availableHeight += delta; }
+            int offset = max(1, min(-availableHeight, first-second) / firstCount); // Distributes reduction to all largest widgets
+            for(int& size: heights) if(size == first) { size -= offset, availableHeight += offset; }
         }
     }
     int Y = availableHeight/2;

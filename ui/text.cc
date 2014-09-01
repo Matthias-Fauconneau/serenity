@@ -99,7 +99,15 @@ struct TextLayout {
     TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify)
         : size(size), wrap(wrap), interline(interline) {
         // Fraction lines
-        struct Context { TextFormat format; float fontSize; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end; };
+        struct Context {
+            TextFormat format; float fontSize; vec2 origin; size_t start; array<Context> children; float maxX; vec2 position; size_t end;
+            //mref<Glyph> word(const mref<Glyph>& word) const { return word(children[0].start, children[0].end); }
+            void translate(/*const mref<Glyph>& word, */vec2 offset) {
+                origin += offset; position += offset; maxX += offset.x;
+                for(auto& e: children) e.translate(offset);
+                //for(auto& e: this->word(word)) e.origin.x += offset;
+            }
+        };
         struct Line { size_t line, word; size_t start, split, end; };
         array<Line> lines;
         {
@@ -121,12 +129,13 @@ struct TextLayout {
             size_t start = 0;
             array<Context> children;
             vec2 position = 0;
+            float maxX = 0;
 
             // Toggle format
             bool bold=false, italic=false;
             // Kerning
             uint16 previous=spaceIndex;
-            int previousRightDelta = 0; // Hinted kerning
+            int previousRightOffset = 0; // Hinted kerning
 
             uint i=0;
             for(; i<text.size; i++) {
@@ -159,7 +168,8 @@ struct TextLayout {
                             split = word.size; // Center*/
                         //if(c==Numerator || c==Regular) start = word.size;
 
-                        stack << Context{format, fontSize, origin, start, move(children), position, word.size};
+                        maxX = ::max(position.x, maxX);
+                        stack << Context{format, fontSize, origin, start, move(children), maxX, position, word.size};
 
                         format = TextFormat(c);
                         if(format==Subscript || format==Superscript) fontSize *= 2./3;
@@ -174,23 +184,21 @@ struct TextLayout {
                         origin = position;
                     }
                     else if(c==End) { // Pop context
-                        if(format == Stack || format == Fraction) {
+                        /*if(format == Stack || format == Fraction) {
                             assert_(children.size==2 && children[0].end == children[1].start, children.size);
                             mref<Glyph> word0 = word(children[0].start, children[0].end);
                             mref<Glyph> word1 = word(children[1].start, children[1].end);
                             assert_(word0 && word1, word.size, word0.size, word1.size);
-                            float delta = min(word0)-min(word1) + ((max(word0)-min(word0))-(max(word1)-min(word1)))/2;
-                            if(delta > 0) {
-                                children[1].origin += delta; children[1].position += delta; for(auto& e: word1) e.origin.x += delta;
-                            } else {
-                                children[0].origin -= delta; children[0].position -= delta; for(auto& e: word0) e.origin.x -= delta;
-                            }
-                        }
+                            float offset = min(word0)-min(word1) + ((max(word0)-min(word0))-(max(word1)-min(word1)))/2;
+                            if(offset > 0) { children[1].translate(vec2( offset,0)); for(auto& e: word1) e.origin.x += offset; }
+                            else              { children[0].translate(vec2(-offset,0)); for(auto& e: word0) e.origin.x -= offset; }
+                        }*/
                         if(format == Fraction) {
                             assert_(children.size==2 && children[0].end == children[1].start, children.size);
                             lines << Line{glyphs.size, words.size, children[0].start, children[0].end, children[1].end};
                         }
-                        Context child = {format, fontSize, origin, start, move(children), position, word.size};
+                        maxX = ::max(position.x, maxX);
+                        Context child = {format, fontSize, origin, start, move(children), maxX, position, word.size};
                         Context context = stack.pop();
                         format = context.format;
                         fontSize = context.fontSize;
@@ -198,8 +206,18 @@ struct TextLayout {
                         start = context.start;
                         children = move(context.children);
                         children << move(child);
+                        assert_(context.position.x <= context.maxX);
+                        //maxX = context.maxX; //::max(maxX, context.maxX);
                         position.y = context.position.y;
-                        if(format == Stack || format == Fraction) position.x = context.position.x;
+                        if(format == Stack || format == Fraction) {
+                            //maxX = context.maxX;
+                            assert_(children.size<=2);
+                            if(children.size==1) position.x = context.position.x;
+                        } else {
+                            //maxX = ::max(maxX, context.maxX);
+                            //position.x = maxX;
+                        }
+                        assert_(position.x <= maxX);
                     }
                     else if(c==Bold) bold=!bold;
                     else if(c==Italic) italic=!italic;
@@ -227,9 +245,9 @@ struct TextLayout {
                 Font::Metrics metrics = font->metrics(index);
 
                 if(hint) { // Hinted kerning
-                    if(previousRightDelta - metrics.leftDelta >= 32) position.x -= 1;
-                    if(previousRightDelta - metrics.leftDelta < -32 ) position.x += 1;
-                    previousRightDelta = metrics.rightDelta;
+                    if(previousRightOffset - metrics.leftOffset >= 32) position.x -= 1;
+                    if(previousRightOffset - metrics.leftOffset < -32 ) position.x += 1;
+                    previousRightOffset = metrics.rightOffset;
                 }
 
                 if(c != ' ' && c != 0xA0) {
