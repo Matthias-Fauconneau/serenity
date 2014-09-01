@@ -35,8 +35,8 @@ struct Page : VBox {
     Graphics graphics(int2 size) const override {
         Graphics graphics;
         int2 inner = size - 2*marginPx;
-        int extra = inner.y-abs(VBox::sizeHint(inner).y);
-        if(extra <= 0/*inner.y/16 || extra > inner.y/3*/) graphics.append(Text(string{TextFormat::Bold}+str(extra)).graphics(int2(size.x, marginPx.y)), 0);
+        //int extra = inner.y-abs(VBox::sizeHint(inner).y);
+        //if(extra <= 0/*inner.y/16 || extra > inner.y/3*/) graphics.append(Text(string{TextFormat::Bold}+str(extra)).graphics(int2(size.x, marginPx.y)), 0);
         //if(!(abs(VBox::sizeHint(inner)) <= inner)) log("Tight page", index, abs(VBox::sizeHint(inner)), inner);
         //if(!(abs(VBox::sizeHint(inner)) > inner*2/3)) log("Loose page", index, VBox::sizeHint(inner), inner);
         graphics.append(VBox::graphics(inner), vec2(marginPx));
@@ -132,7 +132,7 @@ struct Document {
                 for(int index: range(lefts.size)) {
                     if(s.match(lefts[index])) {
                         if(index>=2) e << lefts[index];
-                        String content = parseText(s, {rights[index]}, true);
+                        String content = parseText(s, {rights[index]});
                         assert_(content);
                         e << content;
                         if(index>=2) e << rights[index];
@@ -149,10 +149,10 @@ struct Document {
     }
 
     /// Parses a text statement
-    String parseText(TextData& s, const ref<string>& delimiters={"\n"_}, bool match=true) const {
+    String parseText(TextData& s, const ref<string>& delimiters={"\n"_}) const {
         String text; bool bold=false,italic=false;
         while(s) { // Line
-            if(match ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
+            if(delimiters.size==1 ? s.matchAny(delimiters) : s.wouldMatchAny(delimiters)) break;
 
             /**/ if(s.match('%')) { s.whileNo("%\n"_,'(',')'); s.match('%'); } // Comment
             else if(s.match('*')) { text << (char)(TextFormat::Bold); bold=!bold; }
@@ -165,9 +165,11 @@ struct Document {
             } else if(s.match('_')) text << subscript(parseScript(s, delimiters));
             else if(s.match('^')) text << superscript(parseScript(s, delimiters));
             else if(s.match('{')) {
-                String num = regular(trim(parseText(s, {"/"_})));
+                String num = regular(trim(parseText(s, {"/"_,"}"_,"\n"_})));
+                if(!s.match('/')) warn(s, "Expected / stack delimiter, got '"_+string{s.peek()}+"'"_);
                 bool fraction = s.match('/');
-                String den = regular(trim(parseText(s, {"}"_})));
+                String den = regular(trim(parseText(s, {"}"_,"\n"_})) ?: "?"_);
+                if(!s.match('}')) warn(s, "Expected } stack delimiter, got '"_+string{s.peek()}+"'"_);
                 text << (fraction ? ::fraction(num+den) : ::stack(num+den));
             }
             else text << s.next();
@@ -203,8 +205,8 @@ struct Document {
                 }
             } else {
                 String text;
-                if(s.match('"')) text = parseText(s, {"\""_}, true);
-                else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,"$"_,")"_}, false);
+                if(s.match('"')) text = parseText(s, {"\""_});
+                else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,"$"_,")"_});
                 children << &newText(page, trim(text), format.textSize);
             }
             s.whileAny(" "_);

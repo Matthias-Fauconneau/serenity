@@ -153,7 +153,7 @@ struct TextLayout {
                         if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
                         if(c=='\n') nextLine(false);
                     } else {
-                        assert_(c==' ');
+                        assert_(c==' ', c);
                         position.x += spaceAdvance;
                     }
                     continue;
