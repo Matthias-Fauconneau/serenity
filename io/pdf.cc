@@ -79,13 +79,12 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
                     }
                     content << "/"_+font.id+" "_+dec(glyph.font.size*px)+" Tf\n"_; // Font size in pixels
                 }
-                vec2 absolute = vec2(glyph.origin.x, pageSize.y-glyph.origin.y)*px;
-                vec2 relative = absolute - last; // Position update of glyph origin in pixels
-                last = absolute;
-                content << ftoa(relative.x,1) << " "_ << ftoa(relative.y,1) << " Td\n"_;
                 uint index = font.index(glyph.code);
                 assert_(index < 1<<15);
-                content << "<"_+hex(index,4)+"> Tj\n"_;
+                vec2 origin = vec2(glyph.origin.x, pageSize.y-glyph.origin.y)*px;
+                vec2 relative = origin - last; // Position update of glyph origin in pixels
+                last = origin;
+                content << str(relative.x,relative.y)+" Td <"_+hex(index,4)+"> Tj\n"_;
             }
             content << "ET\n"_;
 
@@ -117,9 +116,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
                 page.insert("Resources"_, move(resources));
             }
 
-            for(auto& line: graphics.lines) {
-                 content << str(line.a.x, pageSize.y-line.a.y)+" m "_+str(line.b.x, pageSize.y-line.b.y)+" l\n"_;
-            }
+            for(auto& line: graphics.lines) content << str(line.a.x*px, (pageSize.y-line.a.y)*px)+" m "_+str(line.b.x*px, (pageSize.y-line.b.y)*px)+" l S\n"_;
 
             contents.insert("Filter"_,"/FlateDecode"_);
             contents = deflate(content);
