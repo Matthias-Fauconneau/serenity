@@ -11,34 +11,6 @@
 #include "time.h"
 #include "image.h"
 #include "png.h"
-#if REMOVABLES
-#include <sys/inotify.h>
-#include <sys/mount.h>
-#include <sys/stat.h>
-#if DBUS
-#include "dbus.h"
-DBus system (DBus::System);
-#endif
-
-/// Watches a folder for new files
-struct FileWatcher : File, Poll {
-    FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted)
-        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
-          fileCreated(fileCreated), fileDeleted(fileDeleted) {}
-    void event() override {
-        while(poll()) {
-            ::buffer<byte> buffer = readUpTo(2*sizeof(inotify_event)+4); // Maximum size fitting only a single event (FIXME)
-            inotify_event e = *(inotify_event*)buffer.data;
-            string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
-            if((e.mask&IN_CREATE) && fileCreated) fileCreated(name);
-            if((e.mask&IN_DELETE) && fileDeleted) fileDeleted(name);
-        }
-    }
-    const uint watch;
-    function<void(string)> fileCreated;
-    function<void(string)> fileDeleted;
-};
-#endif
 
 /// Shuffles an array of elements
 generic buffer<T> shuffle(buffer<T>&& a) {
@@ -110,9 +82,6 @@ struct Player {
     array<String> folders;
     array<String> files;
     array<String> randomSequence;
-#if REMOVABLES
-    FileWatcher fileWatcher {"/dev"_,{this, &Player::deviceCreated}, {this,&Player::deviceDeleted}};
-#endif
 
     Player() {
         window.background = White;
@@ -122,36 +91,21 @@ struct Player {
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.actions[Escape] = []{ exit(); };
         window.actions[Space] = {this, &Player::togglePlay};
-#if ARM
-        window.actions[Extra] = {this, &Player::togglePlay};
-        window.longActions[Extra]= {this, &Player::next};
-        window.actions[Power] = {&window, &Window::toggleDisplay};
-        window.longActions[Power] = [this](){ window.setDisplay(false); execute("/sbin/poweroff"_); };
-#else
+
         window.globalAction(Play) = {this, &Player::togglePlay};
         window.globalAction(Media) = [this]{ if(window.mapped) window.hide(); else window.show(); };
-        //window.globalAction(F8) = {this, &Player::togglePlay}; // Chromebook Mute
-        //window.globalAction(F9) = [this]{  volume=volume-1; }; // Chromebook Decrease volume (handled by kmix)
-        //window.globalAction(F10) = [this]{ volume=volume+1; }; // Chromebook Increase volume (handled by kmix)
         window.actions.insert(RightArrow, {this, &Player::next});
-#endif
+
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};
         nextButton.triggered = {this, &Player::next};
-#if REMOVABLES
-        ejectButton.triggered = {this, &Player::eject};
-#endif
+
         slider.valueChanged = {this, &Player::seek};
         albums.activeChanged = {this, &Player::playAlbum};
         titles.activeChanged = {this, &Player::playTitle};
 
         if(arguments()) setFolder(arguments().first());
-        else {
-#if REMOVABLES
-            for(string device: Folder("/dev"_).list(Drives)) if(mount(device)) break;
-#endif
-            if(!folder) setFolder("/Music"_);
-        }
+        else if(!folder) setFolder("/Music"_);
         window.show();
         mainThread.setPriority(-20);
     }
@@ -294,75 +248,4 @@ struct Player {
             window.putImage(Rect(window.size)/*status.target*/); window.present();
         }
     }
-#if REMOVABLES
-    String cmdline = File("/proc/cmdline"_).readUpTo(256);
-    void deviceCreated(string name) { mount(name); }
-    bool mount(string name) {
-        TextData s (name);
-        if(!s.match("sd"_)) return false; // Only acts on new SATA/USB drives
-        if(!s.word()) return false;
-        if(!s.whileInteger()) return false; // Only acts on partitions
-        String device = "/dev/"_+name;
-        //if(File(device,root(), Descriptor).type() != FileType::Drive) return false; // Only acts on drives
-        struct stat stat; ::stat(strz(device),&stat); if((stat.st_mode&__S_IFMT) !=__S_IFBLK) return false; // Only acts on drives
-        if(find(cmdline, device)) return false; // Do not act on root drive
-#if DBUS
-        DBus::Object uDevices{&system, String("org.freedesktop.UDisks2"_),String("/org/freedesktop/UDisks2/block_devices"_)};
-        while(!uDevices.children().contains(name)) sched_yield(); // FIXME: connect to InterfaceAdded instead of busy looping
-        DBus::Object uDevice{&system, String("org.freedesktop.UDisks2"_),"/org/freedesktop/UDisks2/block_devices/"_+name};
-        DBus::Object uDrive{&system, String("org.freedesktop.UDisks2"_),uDevice.get<String>("org.freedesktop.UDisks2.Block.Drive"_)};
-        if(!uDrive.get<uint>("org.freedesktop.UDisks2.Drive.Removable"_)) return false; // Only acts on removable drives
-#endif
-        String target;
-        String mounts = File("/proc/self/mounts"_).readUpTo(2048);
-        for(TextData s(mounts); s; s.line()) if(s.match(device)) { s.skip(' '); target = String(s.until(' ')); break; }
-        bool wasPlaying = playButton.enabled;
-        if(wasPlaying) setPlaying(false);
-        if(!target) { // Mounts drive
-#if MOUNT
-            log_(str("Mounting ",device));
-#if DBUS
-            target = uDevice("org.freedesktop.UDisks2.Filesystem.Mount"_, Dict());
-            if(!target) { log(" failed"); return false; }
-            log_(str(" on", target));
-#else
-            target = "/media/"_+name;
-            log_(str(" on",target));
-            Folder(target, root(), true);
-            auto mount = [](string device, string target) {
-                for(string fs: {"vfat"_,"ext4"_}) {
-                    if( ::mount(strz(device),strz(target),strz(fs),MS_NOATIME|MS_NODEV|MS_NOEXEC,0) == OK ) // not MS_RDONLY to allow writing .last mark
-                        return true;
-                }
-                return false;
-            };
-            if(!mount(device, target)) { log(" failed"); return false; }
-#endif
-            log(" succeeded");
-#else
-            return false;
-#endif
-        }
-        this->device = String(name);
-        ejectButton.hidden = false;
-        if(existsFolder("Music"_,target)) setFolder(target+"/Music"_);
-        else setFolder(target);
-        if(wasPlaying) setPlaying(true);
-        return true;
-    }
-    void deviceDeleted(string name) { if(name == device) eject(); }
-    void eject() {
-        ejectButton.hidden = true;
-        bool wasPlaying = playButton.enabled;
-        if(wasPlaying) setPlaying(false);
-        setFolder(arguments() ? arguments().first() : "/Music"_);
-#if !DBUS
-        String target = "/media/"_+device;
-        umount2(strz(target), 0);
-        removeFolder(target);
-#endif
-        device.clear();
-        if(wasPlaying) setPlaying(true);
-    }
-#endif // REMOVABLES
 } application;
