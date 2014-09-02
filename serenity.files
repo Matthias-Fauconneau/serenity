@@ -52,14 +52,14 @@ ui/utf8.h
 ui/widget.h
 ui/window.cc
 ui/window.h
-ui/x.h
+ui/display.h
 
 document.cc
 player.cc
 
 ui/render.cc
 ui/render.h
-ui/control.h
-ui/control.cc
 ui/selection.h
 ui/selection.cc
+ui/display.cc
+ui/x.h

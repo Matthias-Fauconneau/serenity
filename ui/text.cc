@@ -255,8 +255,8 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, float size, vec3 color, float alpha, float wrap, string font, bool hint, float interline, bool center)
-    : text(toUCS4(text)), size(size), color(color), alpha(alpha), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
+Text::Text(const string& text, float size, vec3 color, float opacity, float wrap, string font, bool hint, float interline, bool center)
+    : text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
 
 TextLayout Text::layout(float wrap) const {
     if(center) {

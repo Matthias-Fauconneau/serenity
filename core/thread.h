@@ -12,7 +12,7 @@ enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflo
 void setExceptions(uint except);
 
 /// Logical cores count
-constexpr uint coreCount=7;
+constexpr uint coreCount=8;
 
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
@@ -190,7 +190,7 @@ const Folder& cache(); //$HOME/.cache
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
     string path;
-    /*const*/ uint watch;
+    uint watch;
     function<void(string)> fileModified;
 
     FileWatcher(string path, function<void(string)> fileModified) : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(path),

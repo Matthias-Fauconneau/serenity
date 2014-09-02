@@ -6,16 +6,19 @@ Graphics Layout::graphics(int2 size) const {
     array<Rect> widgets = layout(size);
     Graphics graphics;
     for(uint i: range(count())) {
-        graphics.append(at(i).graphics(widgets[i].size()), vec2(widgets[i].position()));
+        graphics.append(at(i).graphics(widgets[i].size), vec2(widgets[i].origin));
         /*graphics.append(Text(str(widgets[i].size())).graphics(widgets[i].size()), vec2(widgets[i].position()));
         graphics.lines << Line{vec2(widgets[i].min), vec2(widgets[i].max)};*/
     }
     return graphics;
 }
 
-bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button) {
+bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
     array<Rect> widgets = layout(size);
-    for(uint i: range(count())) if(widgets[i].contains(cursor)) if(at(i).mouseEvent(cursor-widgets[i].position(),widgets[i].size(),event,button)) return true;
+    for(uint i: range(count()))
+        if(widgets[i].contains(cursor))
+            if(at(i).mouseEvent(cursor-widgets[i].origin,widgets[i].size,event,button,focus))
+                return true;
     return false;
 }
 
@@ -93,7 +96,7 @@ array<Rect> Linear::layout(const int2 originalSize) const {
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];
-        widgets<< xy(pen+int2(0,y))+Rect(xy(int2(widths[i],heights[i])));
+        widgets << Rect{xy(pen+int2(0,y)), xy(int2(widths[i],heights[i]))};
         pen.x += widths[i]+margin;
     }
     return widgets;
@@ -167,7 +170,7 @@ array<Rect> GridLayout::layout(int2 size) const {
         for(uint x: range(w)) {
             uint i = y*w+x;
             if(i<count()) {
-                widgets << int2(X,Y) + Rect(int2(widths[x], heights[y]));
+                widgets << Rect{int2(X,Y), int2(widths[x], heights[y])};
                 X += widths[x];
             }
         }
@@ -179,6 +182,6 @@ array<Rect> GridLayout::layout(int2 size) const {
 
 int2 GridLayout::sizeHint(int2 size) const {
     int2 requiredSize=0;
-    for(Rect r: layout(int2(size.x,0))) requiredSize=max(requiredSize, r.max);
+    for(Rect r: layout(int2(size.x,0))) requiredSize=max(requiredSize, r.origin+r.size);
     return requiredSize;
 }

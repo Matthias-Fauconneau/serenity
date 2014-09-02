@@ -138,7 +138,7 @@ generic struct ref {
     /// Converts an std::initializer_list to ref
     constexpr ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
     /// Converts a static array to ref
-    template<size_t N> ref(const T (&a)[N]):  ref(a,N) {}
+    template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
     explicit operator bool() const { if(size) assert(data); return size; }
     explicit operator const T*() const { return data; }
@@ -186,6 +186,11 @@ generic struct ref {
     size_t size = 0;
 };
 
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 /// Returns const reference to memory used by \a t
@@ -200,15 +205,15 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 // ref<Arithmetic> operations
 generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
-template<Type T> auto sum(const ref<T>& a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
 generic uint argmin(const ref<T>& a) { uint min=0; for(uint i: range(a.size)) if(a[i] < a[min]) min=i; return min; }
 generic uint argmax(const ref<T>& a) { uint max=0; for(uint i: range(a.size)) if(a[i] > a[max]) max=i; return max; }
+template<Type T> auto sum(const ref<T>& a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
 
-template<Type T, size_t N> const T&  min(const T (&a)[N]) { return min(ref<T>(a)); }
-template<Type T, size_t N> const T&  max(const T (&a)[N]) { return max(ref<T>(a)); }
+template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
+template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
+/*template<Type T, size_t N> uint argmin(const T (&a)[N]) { return argmin(ref<T>(a)); }
+template<Type T, size_t N> uint argmax(const T (&a)[N]) { return argmax(ref<T>(a)); }*/
 template<Type T, size_t N> auto sum(const T (&a)[N]) -> decltype(T()+T()) { return sum(ref<T>(a)); }
-template<Type T, size_t N> uint argmin(const T (&a)[N]) { return argmin(ref<T>(a)); }
-template<Type T, size_t N> uint argmax(const T (&a)[N]) { return argmax(ref<T>(a)); }
 
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) throw() { return p; }

@@ -1,43 +1,44 @@
 #include "graphics.h"
 
-static void blend(const Image& target, uint x, uint y, vec3 source_linear, float alpha) {
+static void blend(const Image& target, uint x, uint y, vec3 source_linear, float opacity) {
     byte4& target_sRGB = target(x,y);
     vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
-    int3 linearBlend = int3(round((0xFFF*(1-alpha))*vec3(target_linear) + (0xFFF*alpha)*source_linear));
+    int3 linearBlend = int3(round((0xFFF*(1-opacity))*vec3(target_linear) + (0xFFF*opacity)*source_linear));
     target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
-            min(0xFF,target_sRGB.a+int(round(0xFF*alpha)))); // Additive alpha accumulation
+            min(0xFF,target_sRGB.a+int(round(0xFF*opacity)))); // Additive opacity accumulation
 }
 
-static void blit(const Image& target, int2 position, const Image& source, vec3 color, float alpha) {
+static void blit(const Image& target, int2 position, const Image& source, vec3 color, float opacity) {
     assert_(source);
-    Rect rect = (position+Rect(source.size)) & Rect(target.size);
+    int2 min = ::max(int2(0), position);
+    int2 max = ::min(target.size, position+source.size);
     color = clip(vec3(0), color, vec3(1));
-    if(color!=vec3(0) || alpha<1 || source.sRGB) {
-        for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
+    if(color!=vec3(0) || opacity<1 || source.sRGB) {
+        for(int y: range(min.y,max.y)) for(int x: range(min.x,max.x)) {
             byte4 BGRA = source(x-position.x,y-position.y);
             vec3 linear = source.sRGB ? vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : vec3(BGRA.bgr())/float(0xFF);
-            blend(target, x, y, color*linear, alpha*BGRA.a/0xFF);
+            blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
         }
     } else { // Alpha multiply (e.g. glyphs)
-        for(int y: range(rect.min.y,rect.max.y)) for(int x: range(rect.min.x,rect.max.x)) {
-            int alpha = source(x-position.x,y-position.y).a; // FIXME: single channel images
+        for(int y: range(min.y,max.y)) for(int x: range(min.x,max.x)) {
+            int opacity = source(x-position.x,y-position.y).a; // FIXME: single channel images
             byte4& target_sRGB = target(x,y);
             vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
-            int3 linearBlend = int3(round((0xFFF*(1-float(alpha)/0xFF))*vec3(target_linear)));
+            int3 linearBlend = int3(round((0xFFF*(1-float(opacity)/0xFF))*vec3(target_linear)));
             target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
-                    min(0xFF,int(target_sRGB.a)+alpha)); // Additive alpha accumulation
+                    ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
     }
 }
 
 
-static void blend(const Image& target, uint x, uint y, vec3 color, float alpha, bool transpose) {
+static void blend(const Image& target, uint x, uint y, vec3 color, float opacity, bool transpose) {
     if(transpose) swap(x,y);
     if(x>=target.width || y>=target.height) return;
-    blend(target, x,y, color, alpha);
+    blend(target, x,y, color, opacity);
 }
 
-void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float alpha) {
+void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float opacity) {
     color = clip(vec3(0), color, vec3(1));
     float dx = p2.x - p1.x, dy = p2.y - p1.y;
     bool transpose=false;
@@ -49,21 +50,21 @@ void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float alpha) {
     {
         float xend = round(p1.x), yend = p1.y + gradient * (xend - p1.x);
         float xgap = 1 - fract(p1.x + 1./2);
-        blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
-        blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
+        blend(target, xend, yend, color, (1-fract(yend)) * xgap * opacity, transpose);
+        blend(target, xend, yend+1, color, fract(yend) * xgap * opacity, transpose);
         i1 = int(xend);
         intery = yend + gradient;
     }
     {
         float xend = round(p2.x), yend = p2.y + gradient * (xend - p2.x);
         float xgap = fract(p2.x + 1./2);
-        blend(target, xend, yend, color, (1-fract(yend)) * xgap * alpha, transpose);
-        blend(target, xend, yend+1, color, fract(yend) * xgap * alpha, transpose);
+        blend(target, xend, yend, color, (1-fract(yend)) * xgap * opacity, transpose);
+        blend(target, xend, yend+1, color, fract(yend) * xgap * opacity, transpose);
         i2 = int(xend);
     }
     for(int x=i1+1;x<i2;x++) {
-        blend(target, x, intery, color, (1-fract(intery)) * alpha, transpose);
-        blend(target, x, intery+1, color, fract(intery) * alpha, transpose);
+        blend(target, x, intery, color, (1-fract(intery)) * opacity, transpose);
+        blend(target, x, intery+1, color, fract(intery) * opacity, transpose);
         intery += gradient;
     }
 }

@@ -16,8 +16,8 @@ generic struct buffer : mref<T> {
     buffer(){}
     /// References \a size elements from const \a data pointer
     buffer(const T* data, size_t size) : mref<T>((T*)data, size) {}
-    /// References \a o.size elements from \a o.data pointer
-    explicit buffer(const ref<T>& o): mref<T>((T*)o.data, o.size) {}
+    /// References \a o.size elements from \a o.data pointer (use unsafeReference)
+    //explicit buffer(const ref<T>& o): mref<T>((T*)o.data, o.size) {}
     /// Move constructor
     buffer(buffer&& o) : mref<T>((T*)o.data, o.size), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
@@ -39,6 +39,10 @@ generic struct buffer : mref<T> {
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
+/// Initializes a new buffer with the content of \a o
+// Not named copy as it would be prevent "copying" references as references
+// TODO: rename to explicit buffer(const ref<T>& o)
+generic buffer<T> bufferCopy(const ref<T>& o){ buffer<T> t(o.size, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
 generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.size); }
 

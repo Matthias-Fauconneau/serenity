@@ -5,6 +5,7 @@
 #include "resample.h"
 #include "audio.h"
 #include "interface.h"
+#include "selection.h"
 #include "layout.h"
 #include "window.h"
 #include "text.h"
@@ -23,7 +24,7 @@ generic buffer<T> shuffle(buffer<T>&& a) {
 }
 
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
-struct Player {
+struct Player : Poll {
 // Playback
     AudioControl volume;
     static constexpr uint channels = 2;
@@ -32,18 +33,12 @@ struct Player {
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
     uint read(const mref<short2>& output) {
-        if(audio.rate != file->rate) { // Previous call returned last partial period. Audio output can now be reset.
-            log(audio.rate, file->rate);
-            audio.stop();
-            audio.start(file->rate, periodSize);
-            assert_(audio.rate == file->rate && audio.status->state==Running);
-            return 0;
-        }
+        assert_(audio.rate != file->rate);
         uint readSize = 0;
         for(mref<short2> chunk=output;;) {
             if(!file) return readSize;
             assert(readSize<output.size);
-            if(audio.rate != file->rate) { log(readSize, output.size); return readSize; } // Returns partial period before closing
+            if(audio.rate != file->rate) { queue(); return readSize; } // Returns partial period and schedule restart
             size_t read = file->read(chunk);
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
@@ -56,7 +51,6 @@ struct Player {
             output[i][1] *= level;
         }
         lastPeriod = output;
-        assert_(readSize == output.size);
         return readSize;
     }
 
@@ -64,14 +58,13 @@ struct Player {
     ICON(random) ICON(random2) ToggleButton randomButton {randomIcon(), random2Icon()};
     ICON(next) TriggerButton nextButton{nextIcon()};
     ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
-    ICON(eject) TriggerButton ejectButton{ejectIcon(), true};
     Text elapsed {"00:00"_};
     Slider slider;
     Text remaining {"00:00"_};
     HBox status {{&elapsed, &slider, &remaining}};
-    HBox toolbar {{&randomButton, &playButton, &nextButton, &ejectButton, &status}};
-    /*Scroll<*/ List<Text> /*>*/ albums; //FIXME: Scroll
-    /*Scroll<*/ List<Text> /*>*/ titles; //FIXME: Scroll
+    HBox toolbar {{&randomButton, &playButton, &nextButton, &status}};
+    Scroll<List<Text>> albums;
+    Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
     VBox layout {{ &toolbar, &main }};
     Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
@@ -84,9 +77,7 @@ struct Player {
     array<String> randomSequence;
 
     Player() {
-        window.background = White;
-        albums.always=titles.always=true;
-        elapsed.minSize.x=remaining.minSize.x=64;
+        elapsed.minimalSizeHint.x=remaining.minimalSizeHint.x=64;
 
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.actions[Escape] = []{ exit(); };
@@ -240,12 +231,12 @@ struct Player {
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
         slider.value = position; slider.maximum=duration;
-        elapsed.setText(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
-        if(position<duration) remaining.setText(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
-        if(window.pixmap) {
-            renderBackground(status.target, window.background); //FIXME: with Oxygen
-            status.render();
-            window.putImage(Rect(window.size)/*status.target*/); window.present();
-        }
+        elapsed = Text(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
+        if(position<duration) remaining = Text(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
+        window.render();
+    }
+    void event() override {
+        audio.stop();
+        audio.start(file->rate, periodSize);
     }
 } application;

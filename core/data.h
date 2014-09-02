@@ -6,11 +6,6 @@
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
 
-/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
-inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
-
 /// Reinterpret cast a const reference to another type
 template<Type T, Type O> ref<T> cast(const ref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
@@ -139,12 +134,16 @@ struct BinaryData : Data {
 
 /// Provides a convenient interface to parse text streams
 struct TextData : Data {
-    //using Data::Data; Incompatible with Clang code model
+    /// 1-based line index
+    uint lineIndex = 1;
+
+    using Data::Data;
+    /*//using Data::Data; Incompatible with Clang code model
     TextData(){}
     /// Creates a TextData interface to an \a array
     TextData(::buffer<byte>&& buffer) : Data(move(buffer)) {}
     /// Creates a TextData interface to a \a reference
-    explicit TextData(const ref<byte>& reference) : Data(reference) {}
+    explicit TextData(const ref<byte>& reference) : Data(reference) {}*/
 
     void advance(uint step) /*override*/;
 
@@ -214,7 +213,4 @@ struct TextData : Data {
     string whileDecimal();
     /// Reads a decimal number
     double decimal();
-
-    /// 1-based line index
-    uint lineIndex = 1;
 };

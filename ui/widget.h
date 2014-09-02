@@ -2,6 +2,10 @@
 /// \file widget.h Widget interface to compose user interfaces
 #include "graphics.h"
 
+/// User interface colors
+static constexpr vec3 lightBlue (7./8, 3./4, 1./2);
+static constexpr vec3 gray (3./4, 3./4, 3./4);
+
 /// Key symbols
 enum Key {
     Space=' ',
@@ -25,7 +29,7 @@ struct Widget {
 // Graphics
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint(int2) const { return sizeHint(); }
+    virtual int2 sizeHint(int2) const { return 0; }
     /// Returns graphic elements representing this widget at the given \a size.
     virtual Graphics graphics(int2 size) const = 0;
 
@@ -37,28 +41,12 @@ struct Widget {
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted
-    virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button) { (void)cursor, (void)size, (void)event, (void)button; return false; }
-    /// Convenience overload for layout implementation
-    //bool mouseEvent(Rect rect, int2 cursor, Event event, Button button) { return mouseEvent(cursor-rect.position(),rect.size(),event,button); }
+    virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+        (void)cursor, (void)size, (void)event, (void)button; (void)focus; return false;
+    }
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
     virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
     virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
-private:
-    virtual int2 sizeHint() const { return 0; }
 };
-
-// Accessors to the window which received the current event (may only be called from event methods)
-/// Reports keyboard events to this widget
-void setFocus(Widget* widget);
-/// Returns whether this widget has the keyboard focus
-bool hasFocus(Widget* widget);
-/// Reports further mouse motion events only to this widget (until mouse button is released)
-void setDrag(Widget* widget);
-/// Returns last text selection (or if clipboard is true, last copy)
-String getSelection(bool clipboard=false);
-/// Cursor icons
-enum class Cursor { Arrow, Horizontal, Vertical, FDiagonal, BDiagonal, Move, Text };
-/// Sets cursor to be shown when mouse is in the given rectangle
-//void setCursor(Rect region, Cursor cursor);
