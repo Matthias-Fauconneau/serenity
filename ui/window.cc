@@ -103,7 +103,7 @@ void Window::setIcon(const Image& icon) {
 }
 
 // Render
-void Window::render() { needUpdate=true; if(mapped) queue(); }
+void Window::render() { needUpdate=true; if(mapped && state == Idle) queue(); }
 
 void Window::event() {
     Display::event();

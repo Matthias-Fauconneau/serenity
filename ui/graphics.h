@@ -34,6 +34,7 @@ struct Graphics {
     array<Glyph> glyphs;
     array<Line> lines;
     void append(const Graphics& o, vec2 offset) {
+        for(auto e: o.fills) { e.origin += offset; fills << e; }
         for(const auto& e: o.blits) blits << Blit{offset+e.origin, e.size, share(e.image)};
         for(auto e: o.glyphs) { e.origin += offset; glyphs << e; }
         for(auto e: o.lines) { e.a += offset; e.b += offset; lines << e; }

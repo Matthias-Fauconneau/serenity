@@ -29,7 +29,7 @@ struct Widget {
 // Graphics
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint(int2) const { return 0; }
+    virtual int2 sizeHint(int2) const = 0;
     /// Returns graphic elements representing this widget at the given \a size.
     virtual Graphics graphics(int2 size) const = 0;
 

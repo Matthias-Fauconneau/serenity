@@ -18,7 +18,7 @@ struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() const abstract;
 
-    int2 sizeHint(int2 size) { return widget().sizeHint(size); }
+    int2 sizeHint(int2 size) const override { return widget().sizeHint(size); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
     //bool keyPress(Key key, Modifiers modifiers) override;
     Graphics graphics(int2 size) const override;

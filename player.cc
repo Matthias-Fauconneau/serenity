@@ -66,7 +66,7 @@ struct Player : Poll {
     Scroll<List<Text>> albums;
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
-    VBox layout {{ &toolbar, &main }};
+    VBox layout {{ &toolbar, &main },VBox::Spread};
     Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
 
 // Content
