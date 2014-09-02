@@ -30,6 +30,7 @@ core/vector.h
 io/rle.h
 io/variant.h
 io/deflate.h
+io/deflate.cc
 io/png.cc
 io/png.h
 io/font.cc
@@ -60,3 +61,5 @@ ui/render.cc
 ui/render.h
 ui/control.h
 ui/control.cc
+ui/selection.h
+ui/selection.cc

@@ -1,5 +1,6 @@
 #include "deflate.h"
 #include "string.h"
+#include <string.h>
 
 // Decompression flags used by decompress().
 // FLAG_PARSE_ZLIB_HEADER: If set, the input has a valid zlib header and ends with an adler32 checksum (it's a valid zlib stream). Otherwise, the input is a raw deflate stream.
@@ -19,13 +20,9 @@ enum status {
   STATUS_OKAY, STATUS_DONE, STATUS_NEEDS_MORE_INPUT, STATUS_HAS_MORE_OUTPUT
 };
 
-// Initializes the decompressor to its initial state.
-#define init(r) { (r)->m_state = 0; }
-#define get_adler32(r) (r)->m_check_adler32
-
-// Internal/private bits follow.
 const int MAX_HUFF_TABLES = 3, MAX_HUFF_SYMBOLS_0 = 288, MAX_HUFF_SYMBOLS_1 = 32, MAX_HUFF_SYMBOLS_2 = 19;
-const int LZ_DICT_SIZE = 32768, LZ_DICT_SIZE_MASK = LZ_DICT_SIZE - 1, MIN_MATCH_LEN = 3, MAX_MATCH_LEN = 258;
+const uint LZ_DICT_SIZE = 32768;
+const int LZ_DICT_SIZE_MASK = LZ_DICT_SIZE - 1, MIN_MATCH_LEN = 3, MAX_MATCH_LEN = 258;
 const int FAST_LOOKUP_BITS = 10, FAST_LOOKUP_SIZE = 1 << FAST_LOOKUP_BITS;
 
 struct huff_table {
@@ -106,7 +103,7 @@ typedef struct
   uint8 m_output_buf[OUT_BUF_SIZE];
 } compressor;
 
-#define clear(obj) mref<byte>(&(obj), sizeof(obj)).clear();
+template<Type T, size_t N> void clear(T (&a)[N]) { mref<T>(a).clear(); }
 
 uint32 adler32(uint32 adler, const unsigned char *ptr, size_t buf_len)
 {
@@ -134,10 +131,8 @@ uint32 crc32(uint32 crc, const uint8 *ptr, size_t buf_len)
   return ~crcu32;
 }
 
-#define BEGIN switch(r->m_state) { case 0:
 #define RETURN(state_index, result) { status = result; r->m_state = state_index; goto common_exit; case state_index:; }
 #define RETURN_FOREVER(state_index, result) { for ( ; ; ) { RETURN(state_index, result); } }
-#define FINISH }
 
 // TODO: If the caller has indicated that there's no more input, and we attempt to read beyond the input buf, then something is wrong with the input because the inflator never
 // reads ahead more than it needs to. Currently GET_BYTE() pads the end of the stream with 0's in this scenario.
@@ -159,7 +154,7 @@ uint32 crc32(uint32 crc, const uint8 *ptr, size_t buf_len)
 
 #define NEED_BITS(state_index, n) do { uint c; GET_BYTE(state_index, c); bit_buf |= (((uint64)c) << num_bits); num_bits += 8; } while (num_bits < (uint)(n))
 #define SKIP_BITS(state_index, n) { if (num_bits < (uint)(n)) { NEED_BITS(state_index, n); } bit_buf >>= (n); num_bits -= (n); }
-#define GET_BITS(state_index, b, n) { if (num_bits < (uint)(n)) { NEED_BITS(state_index, n); } b = bit_buf & ((1 << (n)) - 1); bit_buf >>= (n); num_bits -= (n); }
+#define GET_BITS(state_index, b, n) ({ if (num_bits < (uint)(n)) { NEED_BITS(state_index, n); } b = bit_buf & ((1 << (n)) - 1); bit_buf >>= (n); num_bits -= (n); })
 
 // HUFF_BITBUF_FILL() is only used rarely, when the number of bytes remaining in the input buffer falls below 2.
 // It reads just enough bytes from the input stream that are needed to decode the next Huffman code (and absolutely no more). It works by trying to fully decode a
@@ -217,7 +212,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
   if (((out_buf_size_mask + 1) & out_buf_size_mask) || (pOut_buf_next < pOut_buf_start)) { *pIn_buf_size = *pOut_buf_size = 0; return STATUS_BAD_PARAM; }
 
   num_bits = r->m_num_bits; bit_buf = r->m_bit_buf; dist = r->m_dist; counter = r->m_counter; num_extra = r->m_num_extra; dist_from_out_buf_start = r->m_dist_from_out_buf_start;
-  BEGIN
+  switch(r->m_state) { case 0:
 
   bit_buf = num_bits = dist = counter = num_extra = r->m_zhdr0 = r->m_zhdr1 = 0; r->m_z_adler32 = r->m_check_adler32 = 1;
   if (decomp_flags & FLAG_PARSE_ZLIB_HEADER)
@@ -234,7 +229,10 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
     if (r->m_type == 0)
     {
       SKIP_BITS(5, num_bits & 7);
-      for (counter = 0; counter < 4; ++counter) { if (num_bits) GET_BITS(6, r->m_raw_header[counter], 8); else GET_BYTE(7, r->m_raw_header[counter]); }
+      for(counter = 0; counter < 4; ++counter) {
+          if(num_bits) GET_BITS(6, r->m_raw_header[counter], 8);
+          else GET_BYTE(7, r->m_raw_header[counter]);
+      }
       if ((counter = (r->m_raw_header[0] | (r->m_raw_header[1] << 8))) != (uint)(0xFFFF ^ (r->m_raw_header[2] | (r->m_raw_header[3] << 8)))) { RETURN_FOREVER(39, STATUS_FAILED); }
       while ((counter) && (num_bits))
       {
@@ -257,8 +255,8 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
             RETURN_FOREVER(40, STATUS_FAILED);
           }
         }
-        n = min(min((size_t)(pOut_buf_end - pOut_buf_cur), (size_t)(pIn_buf_end - pIn_buf_cur)), counter);
-        memcpy(pOut_buf_cur, pIn_buf_cur, n); pIn_buf_cur += n; pOut_buf_cur += n; counter -= (uint)n;
+        n = min(min(size_t(pOut_buf_end - pOut_buf_cur), size_t(pIn_buf_end - pIn_buf_cur)), size_t(counter));
+        copy(mref<uint8>(pOut_buf_cur, n), ref<uint8>(pIn_buf_cur, n)); pIn_buf_cur += n; pOut_buf_cur += n; counter -= (uint)n;
       }
     }
     else if (r->m_type == 3)
@@ -270,7 +268,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
       if (r->m_type == 1)
       {
         uint8 *p = r->m_tables[0].m_code_size; uint i;
-        r->m_table_sizes[0] = 288; r->m_table_sizes[1] = 32; memset(r->m_tables[1].m_code_size, 5, 32);
+        r->m_table_sizes[0] = 288; r->m_table_sizes[1] = 32; mref<uint8>(r->m_tables[1].m_code_size, 32).clear(5);
         for ( i = 0; i <= 143; ++i) *p++ = 8; for ( ; i <= 255; ++i) *p++ = 9; for ( ; i <= 279; ++i) *p++ = 7; for ( ; i <= 287; ++i) *p++ = 8;
       }
       else
@@ -439,7 +437,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
     SKIP_BITS(32, num_bits & 7); for (counter = 0; counter < 4; ++counter) { uint s; if (num_bits) GET_BITS(41, s, 8); else GET_BYTE(42, s); r->m_z_adler32 = (r->m_z_adler32 << 8) | s; }
   }
   RETURN_FOREVER(34, STATUS_DONE);
-  FINISH
+  }
 
 common_exit:
   r->m_num_bits = num_bits; r->m_bit_buf = bit_buf; r->m_dist = dist; r->m_counter = counter; r->m_num_extra = num_extra; r->m_dist_from_out_buf_start = dist_from_out_buf_start;
@@ -467,7 +465,7 @@ void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
 {
   decompressor decomp; void *pBuf = NULL, *pNew_buf; size_t src_buf_ofs = 0, out_buf_capacity = 0;
   *pOut_len = 0;
-  init(&decomp);
+  decomp.m_state = 0;
   for ( ; ; )
   {
     size_t src_buf_size = src_buf_len - src_buf_ofs, dst_buf_size = out_buf_capacity - *pOut_len, new_out_buf_capacity;
@@ -491,40 +489,14 @@ void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
   return pBuf;
 }
 
-size_t decompress_mem_to_mem(void *pOut_buf, size_t out_buf_len, const void *pSrc_buf, size_t src_buf_len, int flags)
-{
-  decompressor decomp; status status; init(&decomp);
-  status = decompress(&decomp, (const uint8*)pSrc_buf, &src_buf_len, (uint8*)pOut_buf, (uint8*)pOut_buf, &out_buf_len, (flags & ~FLAG_HAS_MORE_INPUT) | FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
-  return (status != STATUS_DONE) ? -1 : out_buf_len;
+buffer<byte> inflate(const ref<byte>& source, bool zlib) {
+    buffer<byte> data; size_t size;
+    data.data = (byte*)decompress_mem_to_heap(source.data, source.size, &size, zlib?FLAG_PARSE_ZLIB_HEADER:0);
+    data.capacity=data.size=size;
+    return data;
 }
 
-int decompress_mem_to_callback(const void *pIn_buf, size_t *pIn_buf_size, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
-{
-  int result = 0;
-  decompressor decomp;
-  uint8 *pDict = (uint8*)malloc(LZ_DICT_SIZE); size_t in_buf_ofs = 0, dict_ofs = 0;
-  if (!pDict)
-    return STATUS_FAILED;
-  init(&decomp);
-  for ( ; ; )
-  {
-    size_t in_buf_size = *pIn_buf_size - in_buf_ofs, dst_buf_size = LZ_DICT_SIZE - dict_ofs;
-    status status = decompress(&decomp, (const uint8*)pIn_buf + in_buf_ofs, &in_buf_size, pDict, pDict + dict_ofs, &dst_buf_size,
-      (flags & ~(FLAG_HAS_MORE_INPUT | FLAG_USING_NON_WRAPPING_OUTPUT_BUF)));
-    in_buf_ofs += in_buf_size;
-    if ((dst_buf_size) && (!(*pPut_buf_func)(pDict + dict_ofs, (int)dst_buf_size, pPut_buf_user)))
-      break;
-    if (status != STATUS_HAS_MORE_OUTPUT)
-    {
-      result = (status == STATUS_DONE);
-      break;
-    }
-    dict_ofs = (dict_ofs + dst_buf_size) & (LZ_DICT_SIZE - 1);
-  }
-  free(pDict);
-  *pIn_buf_size = in_buf_ofs;
-  return result;
-}
+/// DEFLATE
 
 // Purposely making these tables static for faster init and thread safety.
 static const uint16 s_len_sym[256] = {
@@ -666,7 +638,7 @@ static void optimize_huffman_table(compressor *d, int table_num, int table_len, 
   }
 }
 
-#define PUT_BITS(b, l) { \
+#define PUT_BITS(b, l) ({ \
   uint bits = b; uint len = l; assert(bits <= ((1U << len) - 1U)); \
   d->m_bit_buffer |= (bits << d->m_bits_in); d->m_bits_in += len; \
   while (d->m_bits_in >= 8) { \
@@ -675,7 +647,7 @@ static void optimize_huffman_table(compressor *d, int table_num, int table_len, 
       d->m_bit_buffer >>= 8; \
       d->m_bits_in -= 8; \
   } \
-}
+})
 
 #define RLE_PREV_CODE_SIZE() { if (rle_repeat_count) { \
   if (rle_repeat_count < 3) { \
@@ -856,7 +828,7 @@ static bool compress_lz_codes(compressor *d)
 
   while (bits_in)
   {
-    uint32 n = min(bits_in, 16);
+    uint32 n = min(bits_in, 16u);
     PUT_BITS((uint)bit_buffer & bitmasks[n], n);
     bit_buffer >>= n;
     bits_in -= n;
@@ -989,7 +961,7 @@ static bool compress_fast(compressor *d)
   {
     const uint COMP_FAST_LOOKAHEAD_SIZE = 4096;
     uint dst_pos = (lookahead_pos + lookahead_size) & LZ_DICT_SIZE_MASK;
-    uint num_bytes_to_process = (uint)min(d->m_src_buf_left, COMP_FAST_LOOKAHEAD_SIZE - lookahead_size);
+    uint num_bytes_to_process = min(uint(d->m_src_buf_left), COMP_FAST_LOOKAHEAD_SIZE - lookahead_size);
     d->m_src_buf_left -= num_bytes_to_process;
     lookahead_size += num_bytes_to_process;
 
@@ -1125,7 +1097,7 @@ static status flush_output_buffer(compressor *d)
 
   if (d->m_pOut_buf_size)
   {
-    size_t n = min(*d->m_pOut_buf_size - d->m_out_buf_ofs, d->m_output_flush_remaining);
+    size_t n = min<size_t>(*d->m_pOut_buf_size - d->m_out_buf_ofs, d->m_output_flush_remaining);
     memcpy((uint8 *)d->m_pOut_buf + d->m_out_buf_ofs, d->m_output_buf + d->m_output_flush_ofs, n);
     d->m_output_flush_ofs += (uint)n;
     d->m_output_flush_remaining -= (uint)n;
@@ -1164,8 +1136,7 @@ status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *
   if ((d->m_output_flush_remaining) || (d->m_finished))
     return (d->m_prev_return_status = flush_output_buffer(d));
 
-  if (((d->m_flags & MAX_PROBES_MASK) == 1) &&
-      ((d->m_flags & GREEDY_PARSING_FLAG) != 0) &&
+  if (((d->m_flags & GREEDY_PARSING_FLAG) != 0) &&
       ((d->m_flags & (FILTER_MATCHES | FORCE_ALL_RAW_BLOCKS | RLE_MATCHES)) == 0))
   {
     compress_fast(d);
@@ -1234,7 +1205,7 @@ static bool output_buffer_putter(const void *pBuf, int len, void *pUser)
   if (new_size > p->m_capacity)
   {
     size_t new_capacity = p->m_capacity; uint8 *pNew_buf; if (!p->m_expandable) return false;
-    do { new_capacity = max(128U, new_capacity << 1U); } while (new_size > new_capacity);
+    do { new_capacity = max(128UL, new_capacity << 1U); } while (new_size > new_capacity);
     pNew_buf = (uint8*)realloc(p->m_pBuf, new_capacity); if (!pNew_buf) return false;
     p->m_pBuf = pNew_buf; p->m_capacity = new_capacity;
   }
@@ -1244,33 +1215,17 @@ static bool output_buffer_putter(const void *pBuf, int len, void *pUser)
 
 void *compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags)
 {
-  output_buffer out_buf; clear(out_buf);
-  if (!pOut_len) return false; else *pOut_len = 0;
+  output_buffer out_buf = {0,0,0,0};
+  if (!pOut_len) return 0; else *pOut_len = 0;
   out_buf.m_expandable = true;
   compress_mem_to_output(pSrc_buf, src_buf_len, output_buffer_putter, &out_buf, flags);
   *pOut_len = out_buf.m_size; return out_buf.m_pBuf;
 }
 
-size_t compress_mem_to_mem(void *pOut_buf, size_t out_buf_len, const void *pSrc_buf, size_t src_buf_len, int flags)
-{
-  output_buffer out_buf; clear(out_buf);
-  if (!pOut_buf) return 0;
-  out_buf.m_pBuf = (uint8*)pOut_buf; out_buf.m_capacity = out_buf_len;
-  if (!compress_mem_to_output(pSrc_buf, src_buf_len, output_buffer_putter, &out_buf, flags)) return 0;
-  return out_buf.m_size;
-}
-
-buffer<byte> inflate(const ref<byte>& source, bool zlib) {
-    buffer<byte> data; size_t size;
-    data.data = (byte*)decompress_mem_to_heap(source.data, source.size, &size, zlib?FLAG_PARSE_ZLIB_HEADER:0);
-    data.capacity=data.size=size;
-    return data;
-}
-
 buffer<byte> deflate(const ref<byte>& source, bool zlib) {
     buffer<byte> data; size_t size=0;
     assert(source.data && source.size);
-    data.data = (byte*)compress_mem_to_heap(source.data, source.size, &size, DEFAULT_MAX_PROBES|(zlib?WRITE_ZLIB_HEADER:0));
+    data.data = (byte*)compress_mem_to_heap(source.data, source.size, &size, zlib?WRITE_ZLIB_HEADER:0);
     data.capacity=data.size=size;
     assert(data, data.size, data.data, data.capacity, size);
     return data;
