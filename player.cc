@@ -77,8 +77,6 @@ struct Player : Poll {
     array<String> randomSequence;
 
     Player() {
-        elapsed.minimalSizeHint.x=remaining.minimalSizeHint.x=64;
-
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
         window.actions[Escape] = []{ exit(); };
         window.actions[Space] = {this, &Player::togglePlay};
@@ -231,8 +229,10 @@ struct Player : Poll {
     void update(uint position, uint duration) {
         if(slider.value == (int)position) return;
         slider.value = position; slider.maximum=duration;
-        elapsed = Text(String(dec(position/60,2,'0')+":"_+dec(position%60,2,'0')));
-        if(position<duration) remaining = Text(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')));
+        elapsed    = Text(String(dec(                position/60,2,'0')+":"_+dec(                 position%60,2,'0')),
+                          16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
+        remaining = Text(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')),
+                          16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
         window.render();
     }
     void event() override {

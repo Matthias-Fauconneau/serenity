@@ -49,8 +49,8 @@ Graphics Progress::graphics(int2 size) const {
     Graphics graphics;
     assert_(minimum <= value && value <= maximum);
     int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-    graphics.fills << Fill{vec2(0,1), vec2(x,size.y-2), lightBlue, 1};
-    graphics.fills << Fill{vec2(x,1), vec2(size.x,size.y-2), gray, 1};
+    graphics.fills << Fill{vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1};
+    graphics.fills << Fill{vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1};
     return graphics;
 }
 

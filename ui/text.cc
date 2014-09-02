@@ -255,8 +255,9 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, float size, vec3 color, float opacity, float wrap, string font, bool hint, float interline, bool center)
-    : text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center) {}
+Text::Text(const string& text, float size, vec3 color, float opacity, float wrap, string font, bool hint, float interline, bool center, int2 minimalSizeHint)
+    : text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center),
+      minimalSizeHint(minimalSizeHint) {}
 
 TextLayout Text::layout(float wrap) const {
     if(center) {
@@ -269,17 +270,17 @@ TextLayout Text::layout(float wrap) const {
 
 int2 Text::sizeHint(int2 size) const {
     TextLayout layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-    vec2 textSize = ceil(layout.bbMax - layout.bbMin);
+    vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
     return max(minimalSizeHint, int2(textSize));
 }
 
 Graphics Text::graphics(int2 size) const {
     TextLayout layout = this->layout(min<float>(wrap, size.x));
-    vec2 textSize = ceil(layout.bbMax - layout.bbMin);
+    vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 
     Graphics graphics;
     //assert_(abs(size.y - textSize.y)<=1, size, textSize);
-    vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, -layout.bbMin.y + (size.y-textSize.y)/2.f));
+    vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, (size.y-textSize.y)/2.f));
     for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics.glyphs << e; }
     for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics.lines << e; }
     return graphics;

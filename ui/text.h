@@ -21,7 +21,7 @@ inline String fraction(const string& s) { return string{TextFormat::Fraction} + 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string& text=""_, float size=16, vec3 color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true);
+    Text(const string& text=""_, float size=16, vec3 color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true, int2 minimalSizeHint=0);
 
     // Parameters
     /// Displayed text in UTF32
@@ -30,6 +30,7 @@ struct Text : virtual Widget {
     int size;
     /// Text color
     vec3 color;
+    /// Text opacity
     float opacity;
     /// Line wrap limit in pixels (0: no wrap)
     float wrap = 0;
@@ -42,7 +43,7 @@ struct Text : virtual Widget {
     /// Horizontal alignment
     bool center;
     /// Minimal size hint
-    int2 minimalSizeHint=0;
+    int2 minimalSizeHint;
 
     struct TextLayout layout(float wrap) const;
 
