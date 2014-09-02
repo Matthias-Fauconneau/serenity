@@ -207,9 +207,8 @@ void AudioInput::event() {
         uint readSize;
         if(sampleBits==32) readSize=write32(ref<int2>(((int2*)buffer)+(control->swPointer%bufferSize), periodSize));
         else error(sampleBits);
-        assert(readSize<=periodSize);
-        control->swPointer += readSize;
         assert_(readSize==periodSize);
+        control->swPointer += readSize;
         periods++;
     }
 }
