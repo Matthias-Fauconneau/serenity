@@ -33,7 +33,7 @@ struct Player : Poll {
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
     uint read(const mref<short2>& output) {
-        assert_(audio.rate != file->rate);
+        assert_(audio.rate == file->rate);
         uint readSize = 0;
         for(mref<short2> chunk=output;;) {
             if(!file) return readSize;

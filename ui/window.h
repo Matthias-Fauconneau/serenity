@@ -23,7 +23,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };
     /// System V shared memory
-    int shm = 0;
+    uint shm = 0;
     /// Shared window buffer state
     enum State { Idle, Copy, Present } state = Idle;
 

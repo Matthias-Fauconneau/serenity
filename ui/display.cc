@@ -7,6 +7,7 @@ String str(XEvent::Error e) {
     uint8 code = e.code;
     ref<string> requests = X11::requests;
     ref<string> errors = X11::errors;
+    uint16 request = e.minor;
     /***/  if(e.major==Shm::EXT) {
         requests = Shm::requests;
         if(code >= Shm::errorBase && code <= ref<string>(Shm::errors).size) {
@@ -19,8 +20,8 @@ String str(XEvent::Error e) {
             code -= XRender::errorBase;
             errors = XRender::errors;
         }
-    } else assert_(e.major == 0, e.major);
-    return str(errors[code],"error for request",requests[e.minor]);
+    } else request = e.major;
+    return str(errors[code], "error for request", requests[request], e.code, e.seq, e.id, e.major, e.minor);
 }
 
 String str(XEvent e) {
@@ -74,7 +75,7 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
     {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
     {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
-        XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
+        Present::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
 }
 
 void Display::event() {
@@ -87,23 +88,28 @@ void Display::event() {
             }
             onEvent(e);
         }
-        Locker lock(this->lock);
+        array<byte> o;
         if(!poll()) break;
-        XEvent e = read<XEvent>();
-        if(e.type==Error) log(e);
-        array<byte> o (raw(e));
-        if(e.type==GenericEvent) o << read(e.genericEvent.size*4);
+        {Locker lock(this->lock);
+            XEvent e = read<XEvent>();
+            if(e.type==Error) { log(e); continue; }
+            o = array<byte>(raw(e));
+            if(e.type==GenericEvent) o << read(e.genericEvent.size*4);
+        }
         onEvent(o);
     }
 }
 
-uint16 Display::send(const ref<byte>& request) { write(request); return ++sequence; }
-
-buffer<byte> Display::readReply(uint16 sequence) {
+buffer<byte> Display::readReply(uint16 sequence, uint elementSize) {
     for(;;) {
         XEvent e = read<XEvent>();
-        if(e.type==Reply) { assert_(e.seq==sequence); return bufferCopy(raw(e)); }
-        if(e.type==Error) { log(e); assert_(e.seq!=sequence); }
+        if(e.type==Reply) {
+            assert_(e.seq==sequence);
+            array<byte> r (raw(e.reply));
+            if(e.reply.size) { assert_(elementSize); r << read(e.reply.size*elementSize); }
+            return move(r);
+        }
+        if(e.type==Error) { log(e); assert_(e.seq!=sequence); continue; }
         array<byte> o (raw(e));
         if(e.type==GenericEvent) o << read(e.genericEvent.size*4);
         events << move(o);
@@ -113,18 +119,17 @@ buffer<byte> Display::readReply(uint16 sequence) {
 
 // Keyboard
 uint Display::keySym(uint8 code, uint8 state) {
-    Locker lock(this->lock);
     ::buffer<uint> keysyms;
     auto r = request(GetKeyboardMapping{.keycode=code}, keysyms);
-    assert(keysyms.size == r.numKeySymsPerKeyCode);
+    assert_(keysyms.size == r.numKeySymsPerKeyCode, keysyms.size, r.numKeySymsPerKeyCode, r.size);
     assert_(keysyms, "No KeySym for code", code, "in state",state);
     if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
     return keysyms[state&1 && keysyms.size>=2];
 }
 
 uint8 Display::keyCode(uint sym) {
-    uint keycode=0;
-    for(uint i: range(minKeyCode,maxKeyCode+1)) if(keySym(i,0)==sym) { keycode=i; break;  }
+    uint8 keycode=0;
+    for(uint8 i: range(minKeyCode,maxKeyCode+1)) if(keySym(i,0)==sym) { keycode=i; break;  }
     if(!keycode) {
         if(sym==0x1008ff14/*Play*/) return 172; //FIXME
         if(sym==0x1008ff32/*Media*/) return 234; //FIXME
@@ -140,5 +145,5 @@ function<void()>& Display::globalAction(uint key) {
 }
 
 uint Display::Atom(const string& name) {
-    return request(InternAtom{ .length=uint16(name.size), .size=uint16(2+align(4,name.size)/4)}, name).atom;
+    return request(InternAtom{.size=uint16(2+align(4,name.size)/4),  .length=uint16(name.size)}, name).atom;
 }

@@ -8,7 +8,7 @@ struct XEvent {
     struct Generic { uint8 ext; uint16 seq; uint size; uint16 type; } packed;
     union {
         Error error;
-        struct { byte unknown; uint16 seq; uint size; } packed reply;
+        struct { byte unknown; uint16 seq; uint size; byte pad[24]; } packed reply;
         struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed; // input
         struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;
         struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
@@ -139,7 +139,7 @@ struct QueryVersion {
     int8 ext=EXT, req=0; uint16 size=1;
     struct Reply { int8 sharedPixmaps; uint16 seq; uint size; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
 };
-struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg,shm; int8 readOnly=0, pad[3]={}; };
+struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg, shm; int8 readOnly=0, pad[3]={}; };
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
 struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalW, totalH, srcX=0, srcY=0, srcW, srcH,
                   dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
@@ -183,7 +183,7 @@ enum { ConfigureNotifyMask=1<<0, CompleteNotifyMask=1<<1, RedirectNotifyMask=1<<
 struct Pixmap { int8 ext=EXT,req=1; uint16 size=18; uint window, pixmap, serial=0, validArea=0, updateArea=0; int16 xOffset=0, yOffset=0; uint targetCRTC=0;
                 uint waitFence=0, idleFence=0; uint options=0; uint64 targetMSC=0, divisor=0, remainder=0; };
 struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pad; uint64 targetMSC=0, divisor=0, remainder=0; };
-struct SelectInput { int8 ext=EXT,req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
+struct SelectInput { int8 ext=EXT, req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
 enum { ConfigureNotify, CompleteNotify, RedirectNotify };
 struct CompleteNotify : XEvent::Generic { uint8 kind, mode; uint event_id; uint window; uint serial; uint64 ust; uint64 msc; } packed;
 }
