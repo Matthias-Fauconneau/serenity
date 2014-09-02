@@ -46,23 +46,6 @@ inline Image copy(const Image& source) {
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o.buffer),o.data,o.width,o.height,o.stride,o.alpha,o.sRGB); }
 
-/*/// Returns a weak reference to clipped \a image (unsafe if referenced image is freed) [FIXME: shared]
-Image clip(const Image& image, Rect region);
-
-/// Transposes an image
-Image transpose(const Image& source);
-
-/// Rotates an image
-Image rotate(const Image& source);
-
-/// Downsamples an image by averaging samples
-/// \note Averages values as if in linear space (not sRGB)
-void downsample(const Image& target, const Image& source);
-Image downsample(const Image& source);
-
-/// Upsamples an image by duplicating samples
-Image upsample(const Image& source);*/
-
 /// Resizes \a source into \a target
 /// \note Only supports integer box downsample
 Image resize(Image&& target, const Image& source);
