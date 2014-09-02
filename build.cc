@@ -50,8 +50,8 @@ struct Build {
         s.whileAny(" "_);
         if(!s.match('0')) defines << toLower(id);
     }
-    void tryParseConditions(TextData& s) {
-        if(!s.match("#if "_)) return;
+    bool tryParseConditions(TextData& s, string fileName) {
+        if(!s.match("#if "_)) return false;
         bool condition = !s.match('!');
         string id = s.identifier("_"_);
         bool value = false;
@@ -61,8 +61,12 @@ struct Build {
         else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
         else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
         if(value != condition) {
-            for(; !s.match("#endif"_); s.line()) tryParseConditions(s);
+            while(!s.match("#endif"_)) {
+                assert_(s, fileName+": Expected #endif, got EOD"_);
+                if(!tryParseConditions(s, fileName)) s.line();
+            }
         }
+        return true;
     }
     bool tryParseFiles(TextData& s) {
         if(!s.match("FILE("_) && !s.match("ICON("_)) return false;
@@ -87,21 +91,22 @@ struct Build {
     }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
-    int64 parse(const string& name, Node& parent) {
-        File file(name, folder);
+    int64 parse(const string& fileName, Node& parent) {
+        File file(fileName, folder);
         int64 lastEdit = file.modifiedTime();
         for(TextData s = file.read(file.size()); s; s.line()) {
-            string name = tryParseIncludes(s);
-            if(name) {
-                String header = find(name+".h"_);
-                if(header) lastEdit = max(lastEdit, parse(header+".h"_, parent));
-                String module = find(name+".cc"_);
-                if(!module || module == parent) continue;
-                if(!modules.contains(module)) compileModule(module);
-                parent.children << modules[modules.indexOf(module)].pointer;
+            {string name = tryParseIncludes(s);
+                if(name) {
+                    String header = find(name+".h"_);
+                    if(header) lastEdit = max(lastEdit, parse(header+".h"_, parent));
+                    String module = find(name+".cc"_);
+                    if(!module || module == parent) continue;
+                    if(!modules.contains(module)) compileModule(module);
+                    parent.children << modules[modules.indexOf(module)].pointer;
+                }
             }
             tryParseDefines(s);
-            tryParseConditions(s);
+            tryParseConditions(s, fileName);
             do { s.whileAny(" "_); } while(tryParseFiles(s));
         }
         return lastEdit;
@@ -113,6 +118,7 @@ struct Build {
         assert(target);
         modules << unique<Node>(target);
         Node& module = modules.last();
+        log(target);
         int64 lastEdit = parse(target+".cc"_, module);
         String object = tmp+"/"_+join(flags,"-"_)+"/"_+target+".o"_;
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
@@ -132,7 +138,6 @@ struct Build {
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
-            log(target);
             while(pids.size>=1) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
                 if(wait(pid)) fail();
