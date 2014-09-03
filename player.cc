@@ -215,7 +215,7 @@ struct Player : Poll {
                 lastPeriod[i] *= level;
             }
             lastPeriod=mref<short2>();
-            audio.stop();
+            if(audio) audio.stop();
             window.setIcon(pauseIcon());
             file->seek(max(0, int(file->position-lastPeriod.size)));
         }
@@ -233,10 +233,15 @@ struct Player : Poll {
                           16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
         remaining = Text(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')),
                           16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
-        window.render();
+        {Rect toolbarRect = layout.layout(window.size)[0];
+            Graphics update;
+            update.append(toolbar.graphics(toolbarRect.size), vec2(toolbarRect.origin));
+            window.render(move(update), toolbarRect.origin, toolbarRect.size);
+        }
     }
     void event() override {
-        audio.stop();
+        log("reset");
+        if(audio) audio.stop();
         audio.start(file->rate, periodSize);
     }
 } application;

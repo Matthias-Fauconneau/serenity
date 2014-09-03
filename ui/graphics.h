@@ -33,6 +33,7 @@ struct Graphics {
     array<Blit> blits;
     array<Glyph> glyphs;
     array<Line> lines;
+    explicit operator bool() const { return fills || blits || glyphs || lines; }
     void append(const Graphics& o, vec2 offset) {
         for(auto e: o.fills) { e.origin += offset; fills << e; }
         for(const auto& e: o.blits) blits << Blit{offset+e.origin, e.size, share(e.image)};
@@ -40,3 +41,4 @@ struct Graphics {
         for(auto e: o.lines) { e.a += offset; e.b += offset; lines << e; }
     }
 };
+inline String str(const Graphics& o) { return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size); }

@@ -21,7 +21,8 @@ String str(XEvent::Error e) {
             errors = XRender::errors;
         }
     } else request = e.major;
-    return str(errors[code], "error for request", requests[request], e.code, e.seq, e.id, e.major, e.minor);
+    return str(code<errors.size?errors[code]:str(code), "error for request", request<requests.size?requests[request]:str(request),
+               e.code, e.seq, e.id, e.major, e.minor);
 }
 
 String str(XEvent e) {

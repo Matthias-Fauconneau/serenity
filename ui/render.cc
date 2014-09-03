@@ -96,6 +96,37 @@ void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float opacity) {
     }
 }
 
+void oxygen(const Image& target, int2 min, int2 max) {
+    const int y0 = -32-8, splitY = ::min(300, 3*target.size.y/4);
+    const vec3 radial = vec3(246./255); // linear
+    const vec3 top = vec3(221, 223, 225); // sRGB
+    const vec3 bottom = vec3(184, 187, 194); // sRGB
+    const vec3 middle = (bottom+top)/2.f; //FIXME
+    // Draws upper linear gradient
+    for(int y: range(min.y, ::min(max.y, ::max(0, y0+splitY/2)))) {
+        float t = (float) (y-y0) / (splitY/2);
+        for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
+    }
+    for(int y: range(::max(min.y, y0+splitY/2), ::min(max.y, y0+splitY))) {
+        float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
+        byte4 verticalGradient (byte3((1-t)*middle + t*bottom), 0xFF); // mid -> dark
+        for(int x: range(min.x, max.x)) target(x,y) = verticalGradient;
+    }
+    // Draws lower flat part
+    for(int y: range(::max(min.y, y0+splitY), max.y)) for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
+    // Draws upper radial gradient (600x64)
+    const int w = ::min(600, target.size.x), h = 64;
+    for(int y: range(0, ::min(max.y, y0+h))) for(int x: range(::max(min.x,(target.size.x-w)/2), ::min(max.x,(target.size.x+w)/2))) {
+        const float cx = target.size.x/2, cy = y0+h/2;
+        float r = sqrt(sq((x-cx)/(w/2)) + sq((y-cy)/(h/2)));
+        const float r0 = 0./4, r1 = 2./4, r2 = 3./4, r3 = 4./4;
+        const float a0 = 255./255, a1 = 101./255, a2 = 37./255, a3 = 0./255;
+        /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }
+        else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
+        else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
+    }
+}
+
 void render(const Image& target, const Graphics& graphics) {
     for(const auto& e: graphics.fills) fill(target, int2(round(e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.blits) {

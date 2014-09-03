@@ -141,8 +141,8 @@ struct QueryVersion {
 };
 struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg, shm; int8 readOnly=0, pad[3]={}; };
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
-struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalW, totalH, srcX=0, srcY=0, srcW, srcH,
-                  dstX=0, dstY=0; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
+struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalW, totalH, srcX, srcY, srcW, srcH,
+                  dstX, dstY; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
 struct GetImage {
     int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0;
     struct Reply { uint8 depth; uint16 seq; uint size; uint visual, length, pad[4]; } packed;

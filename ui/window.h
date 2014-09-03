@@ -14,12 +14,13 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     bool mapped = false;
     /// Window size
     int2 size=0;
-    /// Whether a render request was skipped while unmapped
-    bool needUpdate = false;
-    /// Rendering target
+    /// Updates to be rendered
+    struct Update { Graphics graphics; int2 origin, size; };
+    array<Update> updates;
+    /// Rendering target in shared memory
     Image target;
     /// Background style
-    enum Background { NoBackground, Black, White, Oxygen } background = White;
+    enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };
     /// System V shared memory
@@ -58,6 +59,10 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void setIcon(const Image& icon);
 
 // Display
+    /// Resizes Shm pixmap
+    void setSize(int2 size);
+    /// Schedules partial rendering after all events have been processed (\sa Poll::queue)
+    void render(Graphics&& graphics, int2 origin, int2 size);
     /// Schedules window rendering after all events have been processed (\sa Poll::queue)
     void render();
     /// Event handler

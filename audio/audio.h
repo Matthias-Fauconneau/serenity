@@ -22,6 +22,7 @@ struct AudioOutput : Device, Poll {
 
     AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread=mainThread);
     virtual ~AudioOutput() { if(status) stop(); }
+    explicit operator bool() const { return status; }
 
     /// Configures PCM for 16bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples

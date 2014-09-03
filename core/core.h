@@ -140,7 +140,7 @@ generic struct ref {
     /// Converts a static array to ref
     template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
-    explicit operator bool() const { if(size) assert(data); return size; }
+    explicit operator bool() const { assert_(!size || data); return size; }
     explicit operator const T*() const { return data; }
 
     const T* begin() const { return data; }
@@ -229,7 +229,7 @@ generic struct mref : ref<T> {
     /// Converts a static array to ref
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
-    explicit operator bool() const { if(size) assert(data); return size; }
+    explicit operator bool() const { assert(!size || data, size); return size; }
     explicit operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
