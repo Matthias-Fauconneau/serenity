@@ -27,6 +27,7 @@ inline real ceil(real x) { return __builtin_ceil(x); }
 inline real mod(real q, real d) { return __builtin_fmod(q, d); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline real sqrt(real f) { return __builtin_sqrt(f); }
+inline real cbrt(real f) { return __builtin_cbrt(f); }
 inline real pow(real x, real y) { return __builtin_pow(x,y); }
 
 inline real ln(real x) { return __builtin_log(x); }
