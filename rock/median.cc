@@ -61,6 +61,7 @@ struct Median : VolumeOperation {
         if(radius==1) {
             /**/  if(inputs[0].sampleSize==sizeof(uint8)) median<1, uint8>(outputs[0], inputs[0]); // Median in a 3³ window (27 samples)
             else if(inputs[0].sampleSize==sizeof(uint16)) median<1, uint16>(outputs[0], inputs[0]); // Median in a 3³ window (27 samples)
+            else error(inputs[0].sampleSize);
         }
         else error("Unsupported radius",radius);
     }

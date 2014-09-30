@@ -3,14 +3,24 @@
 #include "time.h"
 
 /// Transposes a volume permuting its coordinates
-void transpose(Volume16& target, const Volume16& source) {
+generic void transpose(VolumeT<T>& target, const VolumeT<T>& source) {
     const uint sX=source.sampleCount.x, sY=source.sampleCount.y, sZ=source.sampleCount.z;
     const uint tX=sY, tY=sZ;
-    const uint16* const sourceData = source;
-    uint16* const targetData = target;
+    const T* const sourceData = source;
+    T* const targetData = target;
     for(uint z: range(sZ)) for(uint y: range(sY)) for(uint x: range(sX)) targetData[x*tX*tY + z*tX + y] = sourceData[z*sX*sY + y*sX + x];
 }
-defineVolumePass(Transpose, uint16, transpose);
+struct Transpose : VolumeOperation {
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override { return toVolume(*inputs[0]).sampleSize; }
+    string parameters() const override { return "radius"_; }
+    void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        /**/ if(inputs[0].sampleSize==sizeof(uint8)) transpose<uint8>(outputs[0], inputs[0]); // Median in a 3³ window (27 samples)
+        else if(inputs[0].sampleSize==sizeof(uint16)) transpose<uint16>(outputs[0], inputs[0]); // Median in a 3³ window (27 samples)
+        else error(inputs[0].sampleSize);
+    }
+};
+template struct Interface<Operation>::Factory<Transpose>;
+
 
 /// Clips volume to values above a thresold
 void thresholdClip(Volume16& target, const Volume16& source, uint threshold) {
