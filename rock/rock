@@ -283,7 +283,7 @@ png-source = ToPNG source
 bmp-source = ToBMP source
 bmp-denoised = ToBMP denoised
 bmp-resampled = ToBMP resampled
-bmp-rock = ToBMP rock
+bmp-rock = ToBMP rock binary=1
 
 bmp-distance = ToBMP distance
 bmp-skeleton = ToBMP surface-skeleton
