@@ -214,14 +214,15 @@ template struct Interface<Operation>::Factory<ToPNG>;
 
 /// Exports volume to 8bit BMPs for interoperation (deprecated: use ToTIFF instead)
 struct ToBMP : VolumeOperation {
-    void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
+    virtual string parameters() const { return "binary"_; }
+    void execute(const Dict& args, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         const Volume& volume = inputs[0];
         outputs[0]->metadata = String("bmp"_);
         uint marginZ = volume.margin.z;
         Time time; Time report;
         for(int z: range(marginZ, volume.sampleCount.z-marginZ)) {
             if(report/1000>=7) { log(z-marginZ,"/",volume.sampleCount.z-marginZ, ((z-marginZ)*volume.sampleCount.x*volume.sampleCount.y/1024/1024)/(time/1000), "MB/s"); report.reset(); }
-            outputs[0]->elements.insert(dec(z-marginZ,4,'0'), encodeBMP(slice(volume,z,false, false, false)));
+            outputs[0]->elements.insert(dec(z-marginZ,4,'0'), encodeBMP(slice(volume,z,false, false, false, false, args.contains("binary"_))));
         }
     }
 };
