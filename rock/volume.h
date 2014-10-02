@@ -40,7 +40,7 @@ struct Volume {
     bool squared=false; // Whether the sample are a squared magnitude
     bool floatingPoint=false;  // Whether the sample are stored as floats
     String field; // Symbol of the sampled field
-    int3 origin=0; // Coordinates of the origin in some reference coordinates
+    int3 origin=0; // Coordinates in this volume of the first voxel of the original volume
     bool cylinder=false; // Whether only data within the inscribed cylinder is valid
 };
 

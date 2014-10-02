@@ -100,7 +100,7 @@ inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 
 generic struct xyz {
     T x,y,z;
-    vec<xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
+    vec<xy,T,2>& xy() const { return *(vec< ::xy,T,2>*)this; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;

@@ -77,8 +77,7 @@ struct List : Operation {
     string parameters() const override { return "cylinder downsample minimum"_; }
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
-        CropVolume crop = parseCrop(args, source.origin+source.margin, source.origin+source.sampleCount-source.margin);
-        crop.min -= source.origin, crop.max -= source.origin;
+        CropVolume crop = parseCrop(args, source.margin, source.sampleCount-source.margin, source.origin);
         buffer<array<short3>> lists = list(source, crop, args.value("minimum"_,0));
         outputs[0]->metadata = String("lists"_);
         outputs[0]->data = toASCII(lists);

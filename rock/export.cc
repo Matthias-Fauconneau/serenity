@@ -302,9 +302,9 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
                 else error(source.sampleSize);
                 assert(value <= source.maximum, value, source.maximum);
                 if(value) {
-                    itoa<positionSize>(positionIndex, source.origin.x+x);
-                    itoa<positionSize>(positionIndex, source.origin.y+y);
-                    itoa<positionSize>(positionIndex, source.origin.z+z);
+                    itoa<positionSize>(positionIndex, x-source.origin.x);
+                    itoa<positionSize>(positionIndex, y-source.origin.y);
+                    itoa<positionSize>(positionIndex, z-source.origin.z);
                     itoa<valueSize>(valueIndex, value);
                 }
             }

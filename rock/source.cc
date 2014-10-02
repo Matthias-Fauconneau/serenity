@@ -57,7 +57,7 @@ struct Source : VolumeOperation {
             TextData s (path); if(path.contains('}')) s.whileNot('}'); s.until('.'); string metadata = s.untilEnd();
             Volume volume;
             if(!parseVolumeFormat(volume, metadata)) error("Unknown format");
-            crop = parseCrop(args, volume.margin, volume.sampleCount-volume.margin, args.contains("extra"_)?2:0);
+            crop = parseCrop(args, volume.margin, volume.sampleCount-volume.margin, 0, args.contains("extra"_)?2:0);
         } else {
             Folder folder = Folder(path, currentWorkingDirectory());
             map<uint,String> slices = this->slices(folder);
@@ -66,7 +66,7 @@ struct Source : VolumeOperation {
             Map file (slices.values.first(), folder);
             if(isTiff(file)) { const Tiff16 image (file); size.x=image.width,  size.y=image.height; }
             else { Image image = decodeImage(file); assert_(image, path, slices.values.first());  size.x=image.width, size.y=image.height; }
-            crop = parseCrop(args, int3(0,0,min), int3(size.x,size.y,max), args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
+            crop = parseCrop(args, int3(0,0,min), int3(size.x,size.y,max), 0, args.contains("extra"_)?2:0 /*HACK: Enlarges crop volume slightly to compensate margins lost to median and skeleton*/);
         }
         assert(crop.sampleCount);
         return (uint64)crop.sampleCount.x*crop.sampleCount.y*crop.sampleCount.z*outputSampleSize(args, inputs, 0);
@@ -80,7 +80,7 @@ struct Source : VolumeOperation {
         target.sampleCount = crop.sampleCount;
         target.margin = crop.margin;
         target.field = String("μ"_); // Radiodensity
-        target.origin = crop.min-target.margin;
+        target.origin = crop.origin;
         target.cylinder = crop.cylinder;
         const uint64 X= target.sampleCount.x, Y= target.sampleCount.y;
         const int64 marginX = target.margin.x, marginY = target.margin.y, marginZ = target.margin.z;
