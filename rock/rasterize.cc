@@ -39,14 +39,14 @@ inline uint dmin(int size, int vx, int vy, int vz) {
 }
 
 /// Bins each skeleton voxel as a ball to tiles of 16³ voxels
-void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
-    const uint16* const sourceData = source;
+void bin(Volume& target, const Volume16& radius, const Volume16& attribute) {
+    const uint16* const radiusData = radius;
     const uint16* const attributeData = attribute;
-    const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
+    const int64 X=radius.sampleCount.x, Y=radius.sampleCount.y, Z=radius.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
-    const int marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
-    assert_(source.tiled() && attribute.tiled(), "Bin");
-    const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
+    const int marginX=radius.margin.x, marginY=radius.margin.y, marginZ=radius.margin.z;
+    assert_(radius.tiled() && attribute.tiled(), "Bin");
+    const ref<uint64> offsetX = radius.offsetX, offsetY = radius.offsetY, offsetZ = radius.offsetZ;
 
     Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
     assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
@@ -56,8 +56,9 @@ void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
         for(int y=marginY; y<Y-marginY; y++) {
             for(int x=marginX; x<X-marginX; x++) {
                 uint64 offset = offsetZ[z]+offsetY[y]+offsetX[x];
-                uint16 sqRadius = sourceData[offset];
                 uint16 attribute = attributeData[offset];
+                if(!attribute) continue;
+                uint16 sqRadius = radiusData[offset];
                 if(!sqRadius) continue;
                 float ballRadius = sqrt(float(sqRadius));
                 int radius = ceil(ballRadius);
@@ -67,8 +68,6 @@ void bin(Volume& target, const Volume16& source, const Volume16& attribute) {
                             Tile* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
                             int tileX = dx*tileSide, tileY = dy*tileSide, tileZ = dz*tileSide;
                             if(dmin(tileSide,x-tileX,y-tileY,int(z)-tileZ) < sqRadius) { // Intersects tile
-                                /*float r = norm(vec3(tileX,tileY,tileZ)+vec3((tileSide-1)/2.)-vec3(x,y,z)), tileRadius = sqrt(3.*sq((tileSide-1)/2.));
-                                assert(r<tileRadius+ballRadius); // Intersects ball with the tile bounding sphere*/
                                 assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), dx, X/tileSide, dy, Y/tileSide, dz, Z/tileSide,  tile->ballCount);
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
                                 tile->balls[index] = {uint16(x),uint16(y),uint16(z),sqRadius,attribute}; // Appends the ball to intersecting tiles
