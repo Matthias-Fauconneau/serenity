@@ -240,7 +240,6 @@ struct Player : Poll {
         }
     }
     void event() override {
-        log("reset");
         if(audio) audio.stop();
         audio.start(file->rate, periodSize);
     }

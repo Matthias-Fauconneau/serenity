@@ -105,6 +105,7 @@ void Window::setIcon(const Image& icon) {
 // Render
 #include "trace.h"
 void Window::setSize(int2 size) {
+    if(this->size) send(FreePixmap{.pixmap=id+Pixmap});
     if(size == this->size) return;
     this->size = size;
     if(shm) {
