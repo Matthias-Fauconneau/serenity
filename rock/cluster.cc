@@ -38,7 +38,10 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
         float R = sqrt((float)R2);
         int D = ceil(2*R);
         log(R, families.size, familySets.size);
-        for(short3 P: balls) {
+        Time time; Time report;
+        for(size_t i: range(balls.size)) {
+            if(report/1000>=1) { log(i,"/",balls.size, i/(time/1000), "balls/s"); report.reset(); }
+            short3 P = balls[i];
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             uint32& parentIndex = targetData[parent];
             if(!parentIndex) { // parent is a new root
