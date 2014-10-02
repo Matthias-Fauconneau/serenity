@@ -1,10 +1,11 @@
-# -- Source image -- #
+# Defaults: storageFolder=/var/tmp/$TARGET.$ARCH
+
+# --- Source image --- #
 
 # Sources
-    synthetic = '0'
-    size = 64
+# Defaults: synthetic=false, if synthetic: source.size = 64
 if !synthetic: source name resolution voxelSize physicalSize = Source                                        # Concatenates image slice files in a volume
-if  synthetic: source voxelSize = Synthetic                                                                  # Generates a synthetic pore network
+if  synthetic: source voxelSize = Synthetic                                                                                   # Generates a synthetic pore network
 
 # Denoises
     denoise = '1'
@@ -23,7 +24,7 @@ if  transpose=='X': transposed = transpose
                                 transpose = Transpose resampled
 if  transpose=='Y': transposed = Transpose transpose
 
-# -- Pore space -- #
+# --- Pore space --- #
 
 # Density distribution
 if !threshold-from-source: histogram-attenuation-full = Histogram resampled
@@ -36,10 +37,10 @@ distribution-attenuation = KernelDensityEstimation histogram-attenuation-normali
 # Threshold determination
    threshold =  'otsu'
 if threshold == 'otsu'    : threshold otsu-parameters otsu-interclass-deviation = Otsu histogram-attenuation # Statistic recommended method
-if threshold == 'gradient': threshold = difference-threshold                                                 # Use this method for backward compatibility only
+if threshold == 'gradient': threshold = difference-threshold                                                              # Use this method for backward compatibility only
                                    difference-threshold middle-threshold difference-mean = MaximumMeanGradient source distribution-attenuation-unnormalized
-                                         distribution-attenuation-unnormalized = KernelDensityEstimation histogram-attenuation normalize=0
-if threshold == 'middle'  : threshold = middle-threshold                            # Selects the middle value between rock and pore attenuation peaks
+                                                                            distribution-attenuation-unnormalized = KernelDensityEstimation histogram-attenuation normalize=0
+if threshold == 'middle'  : threshold = middle-threshold                                     # Selects the middle value between rock and pore attenuation peaks
 
 # Segments
 rock = Binary transposed threshold mask=1
@@ -53,14 +54,19 @@ volume-unconnected = Sum histogram-pore-slice
 # Discards unconnected rocks
 if !connect-rock: rock-connected = rock
 if  connect-rock: rock-connected = FloodFill rock
+pore-connect-rock = Negate rock-connected
 
 # Connected pore space volume
-pore-connect-rock = Negate rock-connected
 histogram-pore-connect-rock = Histogram pore-connect-rock
 histogram-pore-connect-rock-slice = Slice histogram-pore-connect-rock begin=1 # Excluding rock
 volume-connect-rock = Sum histogram-pore-connect-rock-slice
 
-# -- Maximum balls -- #
+# --- Curve skeleton --- #
+
+# Computes curve skeleton (thinning)
+curve-skeleton = CurveSkeleton pore-connect-rock
+
+# --- Surface skeleton --- #
 
 # Computes position of nearest background voxel
 positionx  = PositionX rock-connected
@@ -70,6 +76,8 @@ distance   = Distance position
 
 # Computes surface skeleton (integer medial axis)
 surface-skeleton = SurfaceSkeleton position
+
+# --- Maximum balls --- #
 
 # Discards small pores
     minimalSqRadius = '0'
@@ -101,7 +109,7 @@ if  precomputedSkeleton: connected-skeleton = ZOrder source
 sphere-bins = Bin connected-skeleton connected-skeleton
 maximum = Rasterize sphere-bins
 
-# -- Pore size distribution -- #
+# --- Pore size distribution --- #
 
 # Histogram of maximum squared radii
 histogram-squaredRadius = Slice histogram-squaredRadius-full begin=1
@@ -135,9 +143,9 @@ distribution-radius-normalized = Div volume-distribution-radius volume
  distribution-radius-scaled = ScaleDistribution distribution-radius process-resolution
  distribution-radius-scaled-normalized = ScaleDistribution distribution-radius-normalized process-resolution
 
-# -- Pores/throats partitions  -- #
+# --- Pores/throats partitions  --- #
 
-# - Uniform radius threshold approximation - #
+# -- Uniform radius threshold approximation -- #
 
 # Partitions maximum balls between throats and pores using a uniform radius threshold
 median-radius = HistogramMedian histogram-radius
@@ -152,10 +160,7 @@ approximate-colored-pores-throats = Add approximate-colored-pores approximate-th
 approximate-throat-index = FloodFillSplit approximate-throats
 approximate-throats = List approximate-throat-index
 
-# - Curve skeleton - #
-
-# Computes curve skeleton (thinning)
-curve-skeleton = CurveSkeleton pore-connect-rock
+# -- Curve skeleton method -- #
 
 # Computes connectivity = coordination numbers  = number of edges/neighbours
 connectivity = Connectivity curve-skeleton
@@ -164,59 +169,56 @@ connectivity-histogram = Slice connectivity-histogram-zero begin=1 # Excluding b
 
 # Distance restricted to curve skeleton voxels
 curve-skeleton-distance = Mask curve-skeleton distance invert=1 value=0
-curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 
 # Local extremum of distance curve
-#pore-skeleton-list = LocalExtremumList curve-skeleton-distance
-#throat-skeleton-list = LocalExtremumList curve-skeleton-distance minimum=1
+pore-curve-skeleton-extremum-list = LocalExtremumList curve-skeleton-distance
+throat-curve-skeleton-extremum-list = LocalExtremumList curve-skeleton-distance minimum=1
 
 # Writes indices (into the pores/throats list) at each pore/throat position
-#pore-skeleton-untiled = RasterizeIndex pore-list voxelSize
-#throat-skeleton-untiled = RasterizeIndex throat-list voxelSize
+pore-root-index-untiled = RasterizeIndex pore-curve-skeleton-extremum-list voxelSize
+throat-root-index-untiled = RasterizeIndex throat-curve-skeleton-extremum-list voxelSize
 
-#pore-skeleton-tiled = ZOrder pore-skeleton-untiled
-#pore-skeleton = pore-skeleton-tiled
+pore-root-index = ZOrder pore-root-index-untiled
+throat-root-index = ZOrder throat-root-index-untiled
 
-#throat-skeleton-tiled = ZOrder throat-skeleton-untiled
-#throat-skeleton = throat-skeleton-tiled
+# Rasterizes curve extremum roots as maximum balls (with index attribute) #FIXME TODO: Walk edges to next overlap
+pore-root-bins = Bin curve-skeleton-distance pore-root-index
+throat-root-bins = Bin curve-skeleton-distance throat-root-index
+if method == 'curve': pore-index = RasterizeAttribute pore-root-bins
+if method == 'curve': throat-index = RasterizeAttribute throat-root-bins
+# Lists rasterized voxels for each pore
+if method == 'curve': pore-list = List pore-index
+if method == 'curve': throat-list = List throat-index
 
-#skeleton = curve-skeleton-distance-tiled
-skeleton-by-curve = curve-skeleton-distance-tiled
-
-# - Cluster method - #
+# -- Cluster method -- #
+# Defaults: minimum=0
 
 # Generates lists of balls for each radius from the skeleton volume
 maximum-balls-lists = List maximum
 
-# Generates a list of pores from the skeleton volume
-last-root-index pore-skeleton-list throat-skeleton-list = Cluster maximum maximum-balls-lists # Inefficient method (runs on all pore space voxels)
-# Rui
-last-root-index0 pore-skeleton-list0 throat-skeleton-list0 = Cluster connected-skeleton maximum-balls-lists # efficient method
+# - Correct inefficient cluster method processing full pore space - #
 
+# Generates a list of pores from the pore space
+if method == 'cluster': last-root-index pore-list throat-list = Cluster maximum maximum-balls-lists                # Correct inefficient method
+# Writes indices (into the pores/throats list) at each pore/throat position
+if method == 'cluster': pore-index = RasterizeIndex pore-list
+if method == 'cluster': throat-index = RasterizeIndex throat-list
 
-
-# Writes root index (into the family list) of each voxel
-pore-skeleton = RootIndex pore-skeleton-list voxelSize
-throat-skeleton = RootIndex throat-skeleton-list voxelSize
-# Rui
-pore-skeleton0 = RootIndex pore-skeleton-list0 voxelSize
-
-skeleton = connected-skeleton
-
-# - Pores/throats analysis - #
-
+# - Incorrect efficient method processing from surface skeleton - #
+last-root-index-skeleton pore-list-skeleton throat-list-skeleton = Cluster connected-skeleton maximum-balls-lists
+# Writes root index of each skeleton voxel
+pore-skeleton = RootIndex pore-list-skeleton voxelSize
+throat-skeleton = RootIndex throat-list-skeleton voxelSize
 # Rasterizes skeleton voxel as maximum balls (with family index attribute)
-pore-bins = Bin skeleton pore-skeleton
-# Rui
-pore-bins0 = Bin pore-skeleton0 pore-skeleton0
-pore-index0 = RasterizeAttribute pore-bins0
-throat-bins = Bin skeleton throat-skeleton
-pore-index = RasterizeAttribute pore-bins
-throat-index = RasterizeAttribute throat-bins
-
+pore-skeleton-bins = Bin connected-skeleton pore-skeleton
+throat-skeleton-bins = Bin connected-skeleton throat-skeleton
+if method == 'cluster-skeleton': pore-index = RasterizeAttribute pore-skeleton-bins
+if method == 'cluster-skeleton': throat-index = RasterizeAttribute throat-skeleton-bins
 # Lists rasterized voxels for each pore
-pore-list = List pore-index
-throat-list = List throat-index
+if method == 'cluster-skeleton': pore-list = List pore-index
+if method == 'cluster-skeleton': throat-list = List throat-index
+
+# --- Pores/throats analysis --- #
 
 # Colorizes each pore in a different color
 colored-pores = ColorizeIndex pore-index
@@ -261,9 +263,8 @@ throat-box-indices = RasterizeBox throat-box-list voxelSize
 pore-colored-boxes = ColorizeIndex pore-box-volume
 throat-colored-boxes = ColorizeIndex throat-box-volume
 
-# -- Export -- #
+# --- Export --- #
 
-source8 = Normalize8 source
 sqrt = SquareRoot maximum
 sqrt-scaled = ScaleValues sqrt process-resolution
 denoised-tiled = ZOrder denoised
@@ -272,56 +273,39 @@ flood = Add pore maximum-mask
 histogram-flood = Histogram flood
 not-flood = Negate maximum-mask
 pore-not-flood = Intersect pore not-flood
-pore-not-flood8 = Normalize8 pore-not-flood
 
-# Exports to PNG (normalized and gamma-compressed for visualization)
+# - PNG - # Exports to PNG (normalized and gamma-compressed for visualization)
 png-source = ToPNG source
-# Rui
-# Still want to export png
 
-# - BMP - # (stores original (unnormalized and linear) values for interoperation, quantize 16bit values to 8bit when necessary) [deprecated: use TIFF]
+# - BMP - # Stores unnormalized linear values for interoperation (for 16bit input, discards lowest 8 bits to store only highest 8 bits)
 bmp-source = ToBMP source
 bmp-denoised = ToBMP denoised
 bmp-resampled = ToBMP resampled
 bmp-rock = ToBMP rock binary=1
 
 bmp-distance = ToBMP distance
-bmp-skeleton = ToBMP surface-skeleton
+bmp-surface-skeleton = ToBMP surface-skeleton
 bmp-connected = ToBMP connected
 bmp-maximum = ToBMP maximum
 bmp-denoised-connected = ToBMP denoised-connected
-bmp-pore-not-flood = ToBMP pore-not-flood8
-maximum-mask8 = Normalize8 maximum-mask
-bmp-maximum-mask = ToBMP maximum-mask8
+bmp-pore-not-flood = ToBMP pore-not-flood binary=1
+bmp-maximum-mask = ToBMP maximum-mask binary=1
 
-# - 16bit TIFF - # (Stores original (unnormalized and linear) values for interoperation)
+# - 16bit TIFF - # Stores original (unnormalized and linear) values for interoperation
 tiff-denoised = ToTIFF denoised
 tiff-denoised-connected = ToTIFF denoised-connected
 
 # - CDL - #
 cdl-flood = ToCDL flood
+cdl-curve-skeleton = ToCDL curve-skeleton
+cdl-surface-skeleton = ToCDL surface-skeleton
 cdl-maximum = ToCDL sqrt-scaled
-cdl-pore-index = ToCDL pore-index
-cdl-pore-index0 = ToCDL pore-index0
-cdl = cdl-maximum
-# Rui
-cdl-skeleton = ToCDL surface-skeleton
-cdl-skeleton-by-curve = ToCDL skeleton-by-curve
 cdl-connectivity = ToCDL connectivity
+cdl-pore-index = ToCDL pore-index
 cdl-pore-skeleton = ToCDL pore-skeleton
-cdl-pore-skeleton0 = ToCDL pore-skeleton0
-
 
 # - ASCII - #
 ascii-flood = ToASCII flood
 ascii-maximum = ToASCII sqrt-scaled
 ascii-colored-pores = ToASCII colored-pores
 ascii = ascii-maximum
-
-# - Additional options - #
-### define syntheic size ###
-# size=64
-### define storage ###
-# storageFolder=/dev/shm/rock 
-### minimum radius used in cluster ###
-# minimum=0
