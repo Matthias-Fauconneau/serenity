@@ -201,8 +201,8 @@ maximum-balls-lists = List maximum
 # Generates a list of pores from the pore space
 if method == 'cluster': last-root-index pore-list throat-list = Cluster maximum maximum-balls-lists                # Correct inefficient method
 # Writes indices (into the pores/throats list) at each pore/throat position
-if method == 'cluster': pore-index = RasterizeIndex pore-list
-if method == 'cluster': throat-index = RasterizeIndex throat-list
+if method == 'cluster': pore-index = RootIndex pore-list voxelSize
+if method == 'cluster': throat-index = RootIndex throat-list voxelSize
 
 # - Incorrect efficient method processing from surface skeleton - #
 last-root-index-skeleton pore-list-skeleton throat-list-skeleton = Cluster connected-skeleton maximum-balls-lists
