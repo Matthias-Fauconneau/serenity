@@ -155,7 +155,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
         }
         reentrant = false;
     }
-    if(hasTrace) log(message);
+    log(message);
     exit(-1); // Signals all threads to terminate
     {Locker lock(threadsLock);
         for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
