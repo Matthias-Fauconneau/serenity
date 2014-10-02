@@ -193,19 +193,18 @@ if method == 'curve': throat-list = List throat-index
 # -- Cluster method -- #
 # Defaults: minimum=0
 
-# Generates lists of balls for each radius from the skeleton volume
+# - Correct inefficient maximum balls cluster method processing full pore space - #
+# Generates lists of balls for each radius
 maximum-balls-lists = List maximum
-
-# - Correct inefficient cluster method processing full pore space - #
-
 # Generates a list of pores from the pore space
 if method == 'cluster': last-root-index pore-list throat-list = Cluster maximum maximum-balls-lists                # Correct inefficient method
 # Writes indices (into the pores/throats list) at each pore/throat position
 if method == 'cluster': pore-index = RootIndex pore-list voxelSize
 if method == 'cluster': throat-index = RootIndex throat-list voxelSize
 
-# - Incorrect efficient method processing from surface skeleton - #
-last-root-index-skeleton pore-list-skeleton throat-list-skeleton = Cluster connected-skeleton maximum-balls-lists
+# - Incorrect efficient maximum balls cluster method processing from surface skeleton - #
+skeleton-balls-lists = List connected-skeleton
+last-root-index-skeleton pore-list-skeleton throat-list-skeleton = Cluster maximum skeleton-balls-lists
 # Writes root index of each skeleton voxel
 pore-skeleton = RootIndex pore-list-skeleton voxelSize
 throat-skeleton = RootIndex throat-list-skeleton voxelSize
