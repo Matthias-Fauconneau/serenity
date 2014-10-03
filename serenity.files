@@ -40,7 +40,6 @@ io/pdf.cc
 io/jpeg.cc
 
 ui/graphics.h
-
 ui/interface.h
 ui/interface.cc
 ui/layout.h
@@ -53,13 +52,18 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/display.h
-
-document.cc
-player.cc
-
 ui/render.cc
 ui/render.h
 ui/selection.h
 ui/selection.cc
 ui/display.cc
 ui/x.h
+
+tuner/fft.h
+tuner/list.h
+tuner/pitch.h
+tuner/profile.h
+tuner/benchmark.cc
+tuner/tuner.cc
+
+player.cc
