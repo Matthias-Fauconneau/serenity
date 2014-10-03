@@ -6,7 +6,7 @@ extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
 
 struct Image {
-    Image(){}
+    Image():size(0){}
     Image(::buffer<byte4>&& buffer, byte4* data, uint width, uint height, uint stride, bool alpha, bool sRGB) :
         buffer(move(buffer)),data(data),width(width),height(height),stride(stride),alpha(alpha),sRGB(sRGB){}
     Image(uint width, uint height, bool alpha=false, bool sRGB=true) : width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {

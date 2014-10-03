@@ -31,7 +31,7 @@ void Poll::registerPoll() {
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered<<this;}
-void Poll::queue() {Locker lock(thread.lock); bool wasEmpty = thread.queue.size == 0; thread.queue+=this; if(wasEmpty) thread.post();}
+void Poll::queue() {Locker lock(thread.lock); /*bool wasEmpty = thread.queue.size == 0;*/ thread.queue+=this; /*if(wasEmpty)*/ thread.post();}
 
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 

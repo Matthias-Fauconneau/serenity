@@ -18,7 +18,7 @@ struct Tuner : Poll {
     // Static parameters
     static constexpr uint rate = 96000;
     static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
-    static constexpr uint periodSize = 4096; // Overlaps to increase time resolution (compensates loss from Hann window (which improves frequency resolution))
+    const uint periodSize = 4096; // Overlaps to increase time resolution (compensates loss from Hann window (which improves frequency resolution))
 
     // Input
     Thread thread {-20}; // Audio thread to buffer periods (when kernel driver buffer was configured too low)
@@ -93,10 +93,12 @@ struct Tuner : Poll {
             log("Overflow", writeCount, input.size, readCount);
             writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow
         }
+        //log("Acquired writes", writeCount, periodSize, readCount);
         assert(writeIndex+input.size<=signal.size);
         for(uint i: range(input.size)) signal[writeIndex+i] = input[i][0] * 0x1p-24; // Left channel only
         writeIndex = (writeIndex+input.size)%signal.size; // Updates ring buffer pointer
         readCount.release(input.size); // Releases new samples
+        //log("Released reads", readCount, periodSize, writeCount);
         queue(); // Queues processing thread
         return input.size;
     }
@@ -108,19 +110,22 @@ struct Tuner : Poll {
             /*if((float)lastReport > 1)*/ { // Limits report rate
                 log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
                 lastReport.reset(); skipped=0;
-                abort("Unexpected real time processing failure");
+                //abort("Unexpected real time processing failure");
             }
         }
         if(!readCount.tryAcquire(periodSize)) {
             //log("Underflow", readCount, periodSize, writeCount);
             readCount.acquire(periodSize);
         }
-        //log("process");
+        //log("Acquired reads", readCount, periodSize, writeCount);
         periods++;
         frames++;
         assert(readIndex+periodSize<=signal.size);
         for(uint i: range(min<int>(N,signal.size-readIndex))) estimator.windowed[i] = estimator.window[i] * signal[readIndex+i];
         for(uint i: range(signal.size-readIndex, N)) estimator.windowed[i] = estimator.window[i] * signal[i+readIndex-signal.size];
+        readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
+        writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
+        //log("Released writes", writeCount, periodSize, readCount);
 
         float f = estimator.estimate();
         float confidence = estimator.periodEnergy ? estimator.harmonicEnergy  / estimator.periodEnergy : 0;
@@ -177,8 +182,5 @@ struct Tuner : Poll {
             }
             if(needUpdate) window.render();
         }
-
-        readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
-        writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
     }
 } app;
