@@ -74,7 +74,7 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<String> args;
         while(s && !s.match('E')) {
-            if(s.peek()=='Z') args<<(demangle(s)+"::"_+demangle(s));
+            if(s.wouldMatch('Z')) args<<(demangle(s)+"::"_+demangle(s));
             else args<<demangle(s,false);
         }
         r<<'<'<<join(args,", "_)<<'>';
@@ -92,7 +92,7 @@ String demangle(TextData& s, bool function=true) {
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
             list<< demangle(s);
-            if(s && (s.peek()=='I'||s.peek()=='J')) list.last()<< demangle(s);
+            if(s.wouldMatchAny("IJ"_)) list.last()<< demangle(s);
         }
         r<< join(list,"::"_);
         if(const_method) r<< " const"_;
@@ -100,7 +100,7 @@ String demangle(TextData& s, bool function=true) {
         l=s.mayInteger(-1);
         if(l<=s.available(l)) {
             r<<s.read(l); //struct
-            if(s && s.peek()=='I') r<< demangle(s);
+            if(s.wouldMatch('I')) r<< demangle(s);
         } else r<<s.untilEnd();
     }
     for(int i=0;i<pointer;i++) r<<'*';

@@ -56,7 +56,7 @@ struct Data {
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    void advance(uint step) {assert(index+step<=buffer.size,index,step,buffer.size); index+=step; }
+    virtual void advance(uint step) {assert(index+step<=buffer.size,index,step,buffer.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
@@ -138,14 +138,7 @@ struct TextData : Data {
     uint lineIndex = 1;
 
     using Data::Data;
-    /*//using Data::Data; Incompatible with Clang code model
-    TextData(){}
-    /// Creates a TextData interface to an \a array
-    TextData(::buffer<byte>&& buffer) : Data(move(buffer)) {}
-    /// Creates a TextData interface to a \a reference
-    explicit TextData(const ref<byte>& reference) : Data(reference) {}*/
-
-    void advance(uint step) /*override*/;
+    void advance(uint step) override;
 
     /// Returns whether input match \a key
     bool wouldMatch(char key);
