@@ -71,7 +71,7 @@ struct Tuner : Poll {
             writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow
         }
         assert(writeIndex+input.size<=signal.size);
-        for(uint i: range(input.size)) signal[writeIndex+i] = input[i][0] * 0x1p-24; // Left channel only
+        for(uint i: range(input.size)) signal[writeIndex+i] = (input[i][0] +  input[i][1]) * 0x1p-25; // Mix both channels (assumes no overflow)
         writeIndex = (writeIndex+input.size)%signal.size; // Updates ring buffer pointer
         readCount.release(input.size); // Releases new samples
         queue(); // Queues processing thread
