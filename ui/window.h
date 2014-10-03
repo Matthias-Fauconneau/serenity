@@ -13,7 +13,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
     /// Window size
-    int2 size=0;
+    int2 size = 0;
     /// Updates to be rendered
     struct Update { Graphics graphics; int2 origin, size; };
     array<Update> updates;
@@ -29,6 +29,11 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     enum State { Idle, Copy, Present } state = Idle;
 
 // Control
+    /// Whether a motion event is pending processing
+    bool motionPending = false;
+    /// Current cursor position & state
+    int2 cursorPosition = 0;
+    int cursorState = 0;
     /// Actions triggered when a key is pressed
     map<Key, function<void()>> actions;
     /// Current widget that has the keyboard input focus

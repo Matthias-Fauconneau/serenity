@@ -37,11 +37,18 @@ Window::~Window() {
 void Window::processEvent(const ref<byte>& ge) {
     const XEvent& e = *(XEvent*)ge.data;
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
-    /**/ if(type==MotionNotify) {
-        if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton, focus)) render();
-        else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
+    if(type==MotionNotify) {
+        cursorPosition = int2(e.x,e.y);
+        cursorState = e.state;
+        motionPending = true;
+        return;
     }
-    else if(type==ButtonPress) {
+    if(motionPending) {
+        motionPending = false;
+        if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton, focus)) render();
+        else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
+    }
+    /**/ if(type==ButtonPress) {
         Widget* focus=this->focus; this->focus=0;
         if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, focus) || this->focus!=focus) render();
         drag = focus;
@@ -105,8 +112,9 @@ void Window::setIcon(const Image& icon) {
 // Render
 #include "trace.h"
 void Window::setSize(int2 size) {
-    if(this->size) send(FreePixmap{.pixmap=id+Pixmap});
+    assert_(size);
     if(size == this->size) return;
+    if(this->size) send(FreePixmap{.pixmap=id+Pixmap});
     this->size = size;
     if(shm) {
         send(Shm::Detach{.seg=id+Segment});
