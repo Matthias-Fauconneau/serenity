@@ -1,7 +1,11 @@
 /// \file profile.cc Profiles executable when linked (need all sources to be compiled with -finstrument-functions)
 #include "trace.h"
 
+#if __clang__
 #define readCycleCounter  __builtin_readcyclecounter
+#else
+#define readCycleCounter __builtin_ia32_rdtsc
+#endif
 
 /// Traces functions to time their execution times and displays statistics on exit
 //static uint64 tsc = readCycleCounter();

@@ -22,7 +22,7 @@ struct Image {
     ::buffer<byte4> buffer; //FIXME: shared
     byte4* data=0; // First pixel
     union {
-        struct { uint width=0, height=0; };
+        struct { uint width, height; };
         int2 size;
     };
     uint stride=0;
