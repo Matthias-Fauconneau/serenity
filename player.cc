@@ -227,7 +227,7 @@ struct Player : Poll {
         if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*resampler.clear();*/ /*audio->cancel();*/ }
     }
     void update(uint position, uint duration) {
-        if(slider.value == (int)position) return;
+        if(slider.value == (int)position || position>duration) return;
         slider.value = position; slider.maximum=duration;
         elapsed    = Text(String(dec(                position/60,2,'0')+":"_+dec(                 position%60,2,'0')),
                           16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
