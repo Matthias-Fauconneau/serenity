@@ -8,7 +8,6 @@
 #include "layout.h"
 #include "window.h"
 #include "profile.h"
-#include "ffmpeg.h"
 
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
@@ -50,7 +49,7 @@ struct Tuner : Poll {
     HBox status {{&currentKeyText, &keyOffsetText, &worstKeyText}, HBox::Even};
     OffsetPlot profile;
     VBox layout {{&status, &profile}};
-    Window window{&layout, int2(1024,600), "Tuner"};
+    Window window{&layout, 0, "Tuner"};
 
     Tuner() {
         if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=fromInteger(arguments()[0]);

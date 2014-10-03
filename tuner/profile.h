@@ -19,7 +19,7 @@ struct OffsetPlot : Widget {
         writeFile("offsets.profile"_, s, config());
     }
     void reset() { mref<float>(offsets).clear(); mref<float>(variances).clear(); }
-    int2 sizeHint(int2) const override { return int2(keyCount*12, -236); }
+    int2 sizeHint(int2) const override { return int2(-keyCount*18, 768); }
     Graphics graphics(int2 size) const override {
         Graphics graphics;
         float minimumOffset = -1./4;
@@ -28,7 +28,7 @@ struct OffsetPlot : Widget {
             int x0 = key * size.x / keyCount;
             int x1 = (key+1) * size.x / keyCount;
 
-            float p0 = stretch(key)*12;
+            float p0 = stretch(key) * 12;
             int y0 = size.y * (maximumOffset-p0) / (maximumOffset-minimumOffset);
 
             float offset = offsets[key]-p0;
