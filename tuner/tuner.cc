@@ -28,7 +28,7 @@ struct Tuner : Poll {
 #if TEST
     const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
     AudioFile audio {"/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_};
-    Timer timer {thread};
+    Timer timer {{this, &Tuner::feed}, 1, thread};
 #endif
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
@@ -69,8 +69,6 @@ struct Tuner : Poll {
         window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
         window.show();
 #if TEST
-        timer.timeout.connect(this, &Tuner::feed);
-        timer.setRelative(1);
         assert(audio.rate == input.rate);
         //profile.reset();
 #endif
@@ -132,10 +130,10 @@ struct Tuner : Poll {
         if(confidence > 1./confidenceThreshold/2 && 1-ambiguity > 1./ambiguityThreshold/2 && confidence*(1-ambiguity) > 1./threshold/2
                 && abs(offset)<offsetThreshold ) {
 
-            currentKey.setText(strKey(key));
+            currentKey = Text(strKey(key), 64, white);
             if(key!=lastKey) keyOffset = offset; // Resets on key change
             keyOffset = (keyOffset+offset)/2; // Running average
-            fOffset.setText(dec(round(100*keyOffset)));
+            fOffset = Text(dec(round(100*keyOffset)), 64, white);
 
             if(record && confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
                     && key>=21 && key<21+keyCount) {
@@ -144,8 +142,8 @@ struct Tuner : Poll {
                 float& keyVariance = profile.variances[key-21]; keyVariance = (1-alpha)*keyVariance + alpha*sq(offset - keyOffset);
                 int k = -1;
                 for(uint i: range(minWorstKey, maxWorstKey)) if(k<0 || abs(profile.offsets[i] - stretch(i)*12) > abs(profile.offsets[k] - stretch(k)*12)) k = i;
-                worstKey.setText(strKey(21+k));
-                fOffset.setText(dec(round(100*keyOffset)));
+                worstKey = Text(strKey(21+k), 64, white);
+                fOffset = Text(dec(round(100*keyOffset)), 64, white);
             }
         }
 

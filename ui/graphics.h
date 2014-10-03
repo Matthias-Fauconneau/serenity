@@ -3,6 +3,12 @@
 #include "image.h"
 #include "font.h"
 
+/// Primary colors
+static constexpr vec3 red (0, 0, 1);
+static constexpr vec3 green (0, 1, 0);
+static constexpr vec3 blue (1, 0, 0);
+static constexpr vec3 white (1, 1, 1);
+
 /// Fill graphic element
 struct Fill {
     vec2 origin, size;
