@@ -25,6 +25,8 @@ core/time.cc
 core/time.h
 core/trace.cc
 core/trace.h
+core/profile.h
+core/profile.cc
 core/vector.h
 
 io/rle.h
@@ -59,11 +61,19 @@ ui/selection.cc
 ui/display.cc
 ui/x.h
 
+audio/audio.h
+audio/audio.cc
+audio/ffmpeg.h
+audio/ffmpeg.cc
+
 tuner/fft.h
+tuner/fft.cc
 tuner/list.h
 tuner/pitch.h
+tuner/pitch.cc
 tuner/profile.h
-tuner/benchmark.cc
+tuner/analysis.cc
 tuner/tuner.cc
 
 player.cc
+tuner/test.cc

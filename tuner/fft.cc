@@ -6,13 +6,11 @@
 void __attribute((constructor(1001))) initialize_FFTW() {
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
-    log("thread");
 }
 
 FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
 
 FFT::FFT(uint N) : N(N), fftw(fftwf_plan_r2r_1d(N, windowed.begin(), halfcomplex.begin(), FFTW_R2HC, FFTW_ESTIMATE)) {
-    log("plan");
     for(uint i: range(N)) { const real z = 2*PI*i/N; window[i] = 1 - 1.90796*cos(z) + 1.07349*cos(2*z) - 0.18199*cos(3*z); }
 }
 
