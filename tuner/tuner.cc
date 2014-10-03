@@ -8,10 +8,7 @@
 #include "layout.h"
 #include "window.h"
 #include "profile.h"
-#if __x86_64
-#define TEST 1
 #include "ffmpeg.h"
-#endif
 
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
@@ -23,13 +20,6 @@ struct Tuner : Poll {
     // Input
     Thread thread {-20}; // Audio thread to buffer periods (when kernel driver buffer was configured too low)
     AudioInput input{{this,&Tuner::write}, rate, periodSize, thread};
-
-
-#if TEST
-    const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
-    AudioFile audio {"/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_};
-    Timer timer {{this, &Tuner::feed}, 1, thread};
-#endif
 
     // A large buffer is preferred as overflows would miss most recent frames (and break the ring buffer time continuity)
     // Whereas explicitly skipping periods in processing thread skips the least recent frames and thus only misses the intermediate update
@@ -63,61 +53,45 @@ struct Tuner : Poll {
     Window window{&layout, int2(1024,600), "Tuner"};
 
     Tuner() {
-        log(input.sampleBits, input.rate, input.periodSize);
         if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=fromInteger(arguments()[0]);
         if(arguments().size>1 && isInteger(arguments()[1])) maxWorstKey=fromInteger(arguments()[1]);
+        log(input.sampleBits, input.rate, input.periodSize);
 
         window.background = Window::Black;
         window.actions[Escape] = []{exit();}; //FIXME: threads waiting on semaphores will be stuck
         window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
         window.show();
-#if TEST
-        assert(audio.rate == input.rate);
-        profile.reset();
-#endif
+
         thread.spawn();
         readCount.acquire(N-periodSize);
     }
-#if TEST
-    uint t = 0;
-    void feed() {
-        buffer<int2> period (periodSize);
-        if(audio.read(period) < period.size) { audio.close(); exit(); return; }
-        write(period);
-        t += period.size;
-        timer.setRelative(period.size*1000/rate); // real time
-    }
-#endif
+
     uint write(const ref<int2>& input) {
         if(!writeCount.tryAcquire(input.size)) {
             log("Overflow", writeCount, input.size, readCount);
             writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow
         }
-        //log("Acquired writes", writeCount, periodSize, readCount);
         assert(writeIndex+input.size<=signal.size);
         for(uint i: range(input.size)) signal[writeIndex+i] = input[i][0] * 0x1p-24; // Left channel only
         writeIndex = (writeIndex+input.size)%signal.size; // Updates ring buffer pointer
         readCount.release(input.size); // Releases new samples
-        //log("Released reads", readCount, periodSize, writeCount);
         queue(); // Queues processing thread
         return input.size;
     }
+
     void event() {
         if(readCount>int(2*periodSize)) { // Skips frames (reduces overlap) when lagging too far behind input
             readCount.acquire(periodSize); periods++; skipped++;
             readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
             writeCount.release(periodSize); // Releases free samples
-            /*if((float)lastReport > 1)*/ { // Limits report rate
+            if((float)lastReport > 1) { // Limits report rate
                 log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
                 lastReport.reset(); skipped=0;
-                //abort("Unexpected real time processing failure");
             }
         }
         if(!readCount.tryAcquire(periodSize)) {
-            //log("Underflow", readCount, periodSize, writeCount);
             readCount.acquire(periodSize);
         }
-        //log("Acquired reads", readCount, periodSize, writeCount);
         periods++;
         frames++;
         assert(readIndex+periodSize<=signal.size);
@@ -125,7 +99,6 @@ struct Tuner : Poll {
         for(uint i: range(signal.size-readIndex, N)) estimator.windowed[i] = estimator.window[i] * signal[i+readIndex-signal.size];
         readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
         writeCount.release(periodSize); // Releases free samples (only after having possibly recorded the whole ring buffer)
-        //log("Released writes", writeCount, periodSize, readCount);
 
         float f = estimator.estimate();
         float confidence = estimator.periodEnergy ? estimator.harmonicEnergy  / estimator.periodEnergy : 0;
@@ -154,12 +127,12 @@ struct Tuner : Poll {
             }
             if(key!=lastKey) keyOffset = offset; // Resets on key change
             keyOffset = (keyOffset+offset)/2; // Running average
-            /*int keyOffsetCents = round(100*keyOffset);
+            int keyOffsetCents = round(100*keyOffset);
             if(this->keyOffsetCents != keyOffsetCents) {
                 this->keyOffsetCents = keyOffsetCents;
                 keyOffsetText = Text(dec(keyOffsetCents), 64, white);
                 needUpdate = true;
-            }*/
+            }
 
             if(record && confidence >= 1./confidenceThreshold && 1-ambiguity > 1./ambiguityThreshold && confidence*(1-ambiguity) > 1./threshold
                     && key>=21 && key<21+keyCount) {
