@@ -118,18 +118,20 @@ array<Rect> GridLayout::layout(int2 size) const {
     }
 
     int extraWidth;
-    if(uniformX) {
+    /**/  if(uniformX) {
         const int requiredWidth = max(ref<int>(widths,w)) * w;
         const int availableWidth = size.x ?: requiredWidth;
         const int fixedWidth = availableWidth / w;
         for(int& v: widths) v = fixedWidth;
         extraWidth = availableWidth - w*fixedWidth;
-    } else if(size.x) {
+    }
+    else if(size.x) {
         const int requiredWidth = sum(ref<int>(widths,w));
         extraWidth = size.x ? size.x-requiredWidth: 0;
         const int extra = extraWidth / w; // Extra space per column (may be negative for missing space)
         for(int& v: widths) { v += extra; extraWidth -= extra; } // Distributes extra/missing space
     }
+    else extraWidth = 0;
 
     int extraHeight;
     if(uniformY) {
@@ -175,7 +177,7 @@ array<Rect> GridLayout::layout(int2 size) const {
             }
         }
         Y += heights[y];
-        assert_(size.y ==0 || int2(0) < int2(X,Y) && int2(X,Y) < size+int2(w,h), X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
+        assert_(size.y ==0 || (int2(0) < int2(X,Y) && int2(X,Y) < size+int2(w,h)), X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
     }
     return widgets;
 }
