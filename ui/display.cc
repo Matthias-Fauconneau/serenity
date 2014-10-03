@@ -87,7 +87,7 @@ void Display::event() {
                 if(!events) break;
                 e = events.take(0);
             }
-            onEvent(e);
+            event(e);
         }
         array<byte> o;
         if(!poll()) break;
@@ -97,8 +97,18 @@ void Display::event() {
             o = array<byte>(raw(e));
             if(e.type==GenericEvent) o << read(e.genericEvent.size*4);
         }
-        onEvent(o);
+        event(o);
     }
+}
+
+void Display::event(const ref<byte>& ge) {
+    const XEvent& e = *(XEvent*)ge.data;
+    uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
+    if(type==KeyPress) {
+        function<void()>* action = actions.find( keySym(e.key, e.state) );
+        if(action) { (*action)(); return; } // Global window action
+    }
+    onEvent(ge);
 }
 
 buffer<byte> Display::readReply(uint16 sequence, uint elementSize) {
@@ -140,7 +150,7 @@ uint8 Display::keyCode(uint sym) {
 
 function<void()>& Display::globalAction(uint key) {
     auto code = keyCode(key);
-    if(code) send(GrabKey{.window=root, .keycode=code});
+    if(code) { send(GrabKey{.window=root, .keycode=code}); }
     else error("No such key", key);
     return actions.insert(key, []{});
 }

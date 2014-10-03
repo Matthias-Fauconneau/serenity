@@ -38,6 +38,8 @@ struct Display : Socket, Poll {
     // Read
      /// Event handler
      void event() override;
+     /// Processes global events and dispatches signal
+     void event(const ref<byte>&);
     // Write
      template<Type Request> uint16 send(Request request, const ref<byte>& data=""_) {
          assert_(sizeof(request)%4==0 && sizeof(request) + align(4, data.size) == request.size*4, sizeof(request), data.size, request.size*4);
