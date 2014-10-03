@@ -64,7 +64,7 @@ Device getPlaybackDevice() {
 AudioOutput::AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 
 void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
-    if(!Device::fd) Device::fd = move(getPlaybackDevice().fd);
+    if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
         hparams.mask(Access).set(MMapInterleaved);
@@ -106,7 +106,7 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
         control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
         control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
     }
-    if(!thread.contains(this)) { Poll::fd = Device::fd; registerPoll(); }
+    registerPoll();
     if(status->state < Prepared) io<PREPARE>();
     event();
 }
