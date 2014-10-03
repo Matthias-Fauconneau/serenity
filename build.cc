@@ -1,7 +1,6 @@
 /// \file build.cc Builds C++ projects with automatic module dependency resolution
 #include "thread.h"
 #include "data.h"
-#include "string.h"
 
 struct Node {
     String name;
@@ -36,13 +35,21 @@ struct Build {
             string name = s.until('.');
             return name;
         } else { // library header
-            for(;s.peek()!='\n';s.advance(1)) if(s.match("//"_)) {
-                string library=s.identifier("_"_);
-                if(library) { assert(s.peek()=='\n',s.until('\n')); libraries += String(library); }
-                break;
+            s.skip('<');
+            s.whileNo(">\n"_);
+            s.skip('>');
+            s.whileAny(' ');
+            if(s.match("//"_)) {
+                for(;;) {
+                    s.whileAny(' ');
+                    string library=s.identifier("_"_);
+                    if(!library) break;
+                    libraries += String(library);
+                }
+                assert_(s.wouldMatch('\n'));
             }
-            return ""_;
         }
+        return ""_;
     }
     void tryParseDefines(TextData& s) {
         if(!s.match("#define "_)) return;
@@ -83,7 +90,8 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();
+            if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder))
+                error("Failed to embed");
             needLink = true;
         }
         files << move(object);
@@ -92,6 +100,7 @@ struct Build {
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
     int64 parse(const string& fileName, Node& parent) {
+        assert_(fileName);
         File file(fileName, folder);
         int64 lastEdit = file.modifiedTime();
         for(TextData s = file.read(file.size()); s; s.line()) {
@@ -140,7 +149,7 @@ struct Build {
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
             while(pids.size>=1) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
-                if(wait(pid)) fail();
+                if(wait(pid)) error("Failed to compile");
                 pids.remove(pid);
             }
             {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -o"_);
@@ -148,8 +157,6 @@ struct Build {
             needLink = true;
         }
     }
-
-    void fail() { log("Build failed"_); exit(-1); exit_thread(-1); }
 
     Build() {
         CXX = which(getenv("CC"_));
@@ -176,8 +183,8 @@ struct Build {
             args << apply(modules, [this](const unique<Node>& module){ return tmp+"/"_+join(flags,"-"_)+"/"_+module->name+".o"_; });
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
-            for(int pid: pids) if(wait(pid)) fail(); // Wait for each translation unit to finish compiling before final linking
-            if(execute(CXX, toRefs(args))) fail();
+            for(int pid: pids) if(wait(pid)) error("Failed to compile"); // Wait for each translation unit to finish compiling before final linking
+            if(execute(CXX, toRefs(args))) error("Failed to link", CXX, toRefs(args));
         }
         if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(root(), binary, install, target);
     }

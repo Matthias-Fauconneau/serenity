@@ -120,8 +120,12 @@ template<> void abort(const string& message) __attribute((noreturn));
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message
+#define warn(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 #else
 #define assert(expr, message...) ({})
+/// Warns if \a expr evaluates to false and logs \a expr and \a message
+#define warn(expr, message...) ({ if(!(expr)) log(#expr ""_, ##message); })
 #endif
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
