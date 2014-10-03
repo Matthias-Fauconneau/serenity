@@ -2,7 +2,6 @@
 #include "thread.h"
 #include "file.h"
 #include "ffmpeg.h"
-#include "resample.h"
 #include "audio.h"
 #include "interface.h"
 #include "selection.h"
@@ -224,7 +223,7 @@ struct Player : Poll {
         recordPosition();
     }
     void seek(int position) {
-        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*resampler.clear();*/ /*audio->cancel();*/ }
+        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*audio->cancel();*/ }
     }
     void update(uint position, uint duration) {
         if(slider.value == (int)position || position>duration) return;
