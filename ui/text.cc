@@ -97,8 +97,8 @@ struct TextLayout {
         words << move(word); // Adds to current line (might be first of a new line)
     }
 
-    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify, bool justifyExplicit, bool justifyLast)
-        : size(size), wrap(wrap), interline(interline) {
+    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify, bool justifyExplicit, bool justifyLast,
+               vec3 color) : size(size), wrap(wrap), interline(interline) {
         // Fraction lines
         struct Context {
             TextFormat format; Font* font; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
@@ -229,7 +229,7 @@ struct TextLayout {
                         vec2 offset = 0;
                         if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += font->size/3; // Fixes too high floor signs from FreeSerif
                         assert_(metrics.size, hex(c));
-                        word << Glyph(metrics,::Glyph{position+offset, *font, c});
+                        word << Glyph(metrics,::Glyph{position+offset, *font, c, color});
                     }
                     position.x += metrics.advance;
                 }
@@ -261,11 +261,11 @@ Text::Text(const string& text, float size, vec3 color, float opacity, float wrap
 
 TextLayout Text::layout(float wrap) const {
     if(center) {
-        TextLayout layout(text, size, wrap, font, hint, interline, false, false, false); // Layouts without justification
+        TextLayout layout(text, size, wrap, font, hint, interline, false, false, false, color); // Layouts without justification
         wrap = layout.bbMax.x;
         assert_(wrap >= 0, wrap);
     }
-    return TextLayout(text, size, wrap, font, hint, interline, true, true, true);
+    return TextLayout(text, size, wrap, font, hint, interline, true, true, true, color);
 }
 
 int2 Text::sizeHint(int2 size) const {

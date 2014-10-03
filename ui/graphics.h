@@ -26,6 +26,7 @@ struct Glyph {
     vec2 origin;
     Font& font;
     uint code;
+    vec3 color;
 };
 
 /// Line graphic element

@@ -9,7 +9,6 @@
 #include "display.h"
 #include "text.h"
 #include "profile.h"
-#include <fftw3.h> //fftw3f
 
 struct SpectrumPlot : Widget {
     static constexpr bool logx = false, logy = true; // Whether to use log scale on x/y axis

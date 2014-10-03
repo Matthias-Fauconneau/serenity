@@ -24,11 +24,12 @@ void fill(const Image& target, int2 origin, int2 size, vec3 color, float alpha) 
     if(max<=min) return;
 
     if(alpha==1) { // Solid fill
+        if(!(min < max)) return;
         int3 linear = int3(round(float(0xFFF)*color));
         byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
         fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
     } else {
-        for(int y: range(min.y,max.y)) for(int x: range(min.x,max.x)) blend(target, x, y, color, alpha);
+        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, alpha);
     }
 }
 
@@ -49,7 +50,7 @@ static void blit(const Image& target, int2 origin, const Image& source, vec3 col
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
     } else {
-        for(int y: range(min.y,max.y)) for(int x: range(min.x,max.x)) {
+        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);
             vec3 linear = source.sRGB ? vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : vec3(BGRA.bgr())/float(0xFF);
             blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
@@ -135,7 +136,7 @@ void render(const Image& target, const Graphics& graphics) {
     }
     for(const auto& e: graphics.glyphs) {
         Font::Glyph glyph = e.font.render(e.font.index(e.code));
-        blit(target, int2(round(e.origin))+glyph.offset, glyph.image, 0, 1);
+        blit(target, int2(round(e.origin))+glyph.offset, glyph.image, e.color, 1);
     }
     for(const auto& e: graphics.lines) line(target, e.a, e.b, 0, 1);
 }

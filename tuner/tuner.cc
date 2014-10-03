@@ -1,7 +1,6 @@
 #include "thread.h"
 #include "math.h"
 #include "time.h"
-#include <fftw3.h> //fftw3f
 #include "pitch.h"
 #include "audio.h"
 #include "graphics.h"
@@ -70,7 +69,7 @@ struct Tuner : Poll {
         window.show();
 #if TEST
         assert(audio.rate == input.rate);
-        //profile.reset();
+        profile.reset();
 #endif
         thread.spawn();
         readCount.acquire(N-periodSize);
@@ -82,7 +81,7 @@ struct Tuner : Poll {
         if(audio.read(period) < period.size) { audio.close(); exit(); return; }
         write(period);
         t += period.size;
-        timer.setRelative(period.size*1000/rate/8); // 8xRT
+        timer.setRelative(period.size*1000/rate); // RT
     }
 #endif
     uint write(const ref<int2>& input) {
@@ -111,7 +110,7 @@ struct Tuner : Poll {
         for(uint i: range(signal.size-readIndex, N)) estimator.windowed[i] = estimator.window[i] * signal[i+readIndex-signal.size];
 
         float f = estimator.estimate();
-        float confidence = estimator.harmonicEnergy  / estimator.periodEnergy;
+        float confidence = estimator.periodEnergy ? estimator.harmonicEnergy  / estimator.periodEnergy : 0;
         float ambiguity = estimator.candidates.size==2 && estimator.candidates[1].key
                 && estimator.candidates[0].f0*(1+estimator.candidates[0].B)!=f ?
                     estimator.candidates[0].key / estimator.candidates[1].key : 0;
