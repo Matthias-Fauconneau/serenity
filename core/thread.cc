@@ -31,7 +31,7 @@ void Poll::registerPoll() {
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {Locker lock(thread.lock); if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered<<this;}
-void Poll::queue() {Locker lock(thread.lock); thread.queue+=this; thread.post();}
+void Poll::queue() {Locker lock(thread.lock); bool wasEmpty = thread.queue.size == 0; thread.queue+=this; if(wasEmpty) thread.post();}
 
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
@@ -177,10 +177,11 @@ void exit(int status) {
     for(Thread* thread: threads) thread->post();
 }
 
+// Locates an executable
 String which(string name) {
     if(!name) return {};
     if(existsFile(name)) return String(name);
-    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFile(name, folder)) return folder+"/"_+name;
+    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+"/"_+name;
     return {};
 }
 

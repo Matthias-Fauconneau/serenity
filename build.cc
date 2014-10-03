@@ -12,11 +12,11 @@ bool operator ==(const Node& a, const string& b) { return a.name==b; }
 
 struct Build {
     const Folder folder {"."_};
-    const String base { section(folder.name(),'/',-2,-1) };
-    const String target = arguments().size>=1 ? String(arguments()[0]) : copy(base);
+    String tmp;
+    String target;
     array<String> defines;
     array<string> flags;
-    const String tmp {"/var/tmp/"_+base};
+    string arch;
     String CXX;
     String LD = which("ld"_);
     bool needLink = false;
@@ -80,7 +80,7 @@ struct Build {
         string name = s.identifier("_-"_);
         s.skip(')');
 
-        String filesPath = tmp+"/files"_+(flags.contains("arm"_)?".arm"_:flags.contains("atom"_)?".x32"_:".x64"_);
+        String filesPath = tmp+"/files."_+arch;
         Folder(filesPath, root(), true);
         String path = find(replace(name,"_"_,"/"_));
         assert(path, "No such file to embed", name);
@@ -90,8 +90,7 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            if(execute(LD, split((flags.contains("atom"_)?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder))
-                error("Failed to embed");
+            if(execute(LD, split((arch=="atom"_?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) error("Failed to embed");
             needLink = true;
         }
         files << move(object);
@@ -127,16 +126,15 @@ struct Build {
         assert(target);
         modules << unique<Node>(target);
         Node& module = modules.last();
-        log(target);
         int64 lastEdit = parse(target+".cc"_, module);
         String object = tmp+"/"_+join(flags,"-"_)+"/"_+target+".o"_;
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
             array<String> args;
             args << copy(object) << target+".cc"_;
-            if(flags.contains("arm"_)) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
+            if(arch=="arm"_) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
             else args << String("-I/usr/include/freetype2"_);
-            if(flags.contains("arm"_)) {}
-            else if(flags.contains("atom"_)) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
+            if(arch=="arm"_) {}
+            else if(arch=="atom"_) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
             else args << String("-march=native"_);
 
             if(!flags.contains("release"_)) args << String("-g"_);
@@ -147,45 +145,70 @@ struct Build {
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
             args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
+            /*static String version = ({
+                                         Stream stdout;
+                                         check_( execute(which("git"_), {"describe"_,"--long"_,"--tags"_,"--dirty"_,"--always"_}, true, currentWorkingDirectory(), &stdout) );
+                                         simplify( stdout.readUpTo(64) );
+                                     });
+            args << "-DVERSION=\""_+version+"\""_;*/
+            log(target);
             while(pids.size>=1) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
-                if(wait(pid)) error("Failed to compile");
+                if(wait(pid))  error("Failed to compile");
                 pids.remove(pid);
             }
+            Folder(tmp+"/"_+join(flags,"-"_)+"/"_+section(target,'/',0,-2), root(), true);
             {static const array<string> flags = split("-c -pipe -std=c++1y -Wall -Wextra -Wno-overloaded-virtual -o"_);
                 pids << execute(CXX, flags+toRefs(args), false);}
             needLink = true;
         }
+        files << tmp+"/"_+join(flags,"-"_)+"/"_+target+".o"_;
     }
 
     Build() {
+        // Configures
         CXX = which(getenv("CC"_));
         if(!CXX) CXX=which("clang++"_);
+        if(!CXX) CXX=which("g++4.9"_);
         if(!CXX) CXX=which("g++4.8"_);
         if(!CXX) CXX=which("g++"_);
 
         string install;
-        if(arguments().size>1) { for(string arg: arguments().slice(1)) if(startsWith(arg,"/"_)) install=arg; else flags << split(arg,'-'); }
-        //if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
-        if(flags.contains("arm"_)) {
-            CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_);
-            LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
+        for(string arg: arguments()) {
+            if(startsWith(arg,"/"_)) install=arg;
+            else if(find(arg+".cc"_)) {
+                if(target) log("Multiple targets unsupported, building last target:",arg);
+                target = String(arg);
+            } else flags << split(arg,'-');
         }
 
+        arch = flags.contains("arm"_) ? "arm"_ : flags.contains("atom"_) ? "atom"_ : "native"_;
+        if(arch=="arm"_) CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_), LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
+        //else if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
+        const String base (section(folder.name(),'/',-2,-1));
+        if(!target) target = copy(base);
+
+        tmp = "/var/tmp/"_+base+"."_+section(CXX,'/',-2,-1);
+        Folder(tmp, root(), true);
         Folder(tmp+"/"_+join(flags,"-"_), root(), true);
-        for(string subfolder: folder.list(Folders|Recursive)) Folder(tmp+"/"_+join(flags,"-"_)+"/"_+subfolder, root(), true);
+
+        // Compiles
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));
         compileModule( find(target+".cc"_) );
-        String binary = tmp+"/"_+join(flags,"-"_)+"/"_+target+(flags?"."_:""_)+join(flags,"-"_);
+
+        // Links
+        String binary = tmp+"/"_+join(flags,"-"_)+"/"_+target;
+        if(existsFolder(binary)) binary << '.' << arch;
         if(!existsFile(binary) || needLink) {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
-            args << apply(modules, [this](const unique<Node>& module){ return tmp+"/"_+join(flags,"-"_)+"/"_+module->name+".o"_; });
             args << copy(files);
             args << apply(libraries, [this](const String& library){ return "-l"_+library; });
-            for(int pid: pids) if(wait(pid)) error("Failed to compile"); // Wait for each translation unit to finish compiling before final linking
-            if(execute(CXX, toRefs(args))) error("Failed to link", CXX, toRefs(args));
+            for(int pid: pids) if(wait(pid)) error("Failed to compile"); // Waits for each translation unit to finish compiling before final linking
+            if(execute(CXX, toRefs(args))) error("Failed to link");
         }
+
+        // Installs
         if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(root(), binary, install, target);
     }
 } build;
