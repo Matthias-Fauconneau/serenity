@@ -77,7 +77,7 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 orig
     assert_(sourceMin<=min, "source min:", sourceMin, "crop min:", min, "crop max:", max, "source max:", sourceMax, args, origin, extra);
     assert_(min<max, "crop min:", min, "crop max:", max);
     assert_(max<=sourceMax, "crop max:", max, "source max:", sourceMax, args, origin, extra, sourceMin);
-    return {min, max, size, sampleCount, margin, origin + margin - min, !args.contains("box"_)};
+    return {min, max, size, sampleCount, margin, origin + margin - min, args.contains("cylinder"_)};
 }
 
 /// Crops a volume to remove boundary effects
