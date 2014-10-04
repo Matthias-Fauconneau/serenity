@@ -97,7 +97,7 @@ Image decodePNG(const ref<byte>& file) {
     }
     if(data.size < height*(1+width*depth)) { error("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
     Image image(width,height,alpha);
-    byte4* dst = image.data;
+    byte4* dst = image.pixels;
     int w=width,h=height;
     const byte* src=data.data;
     for(int i=0;i==0 || (interlace && i<7);i++) {
@@ -149,7 +149,7 @@ uint adler32(const ref<byte> data) {
 buffer<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
     buffer<byte> data(w*h*4+h);
-    byte* dst = data.begin(); const byte* src = (byte*)image.data;
+    byte* dst = data.begin(); const byte* src = (byte*)image.pixels.data;
     for(uint unused y: range(h)) {
         *dst++ = 0;
         for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],image.alpha?src[x*4+3]:0xFF);

@@ -197,7 +197,7 @@ struct Player : Poll {
             queueFile(folder, file, true);
             randomIndex++;
         }
-        while(titles.count() > 64 && titles.index > 0) { titles.removeAt(0); files.removeAt(0); titles.index--; } // Limits total size
+        while(titles.count() > 32 && titles.index > 0) { titles.removeAt(0); files.removeAt(0); titles.index--; } // Limits total size by removing oldest tracks
     }
     void togglePlay() { setPlaying(!playButton.enabled); }
     void setPlaying(bool play) {

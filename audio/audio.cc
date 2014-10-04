@@ -102,8 +102,8 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
         this->periodSize = hparams.interval(PeriodSize);
         bufferSize = hparams.interval(Periods) * this->periodSize;
         buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
-        status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
-        control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+        status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
+        control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;
         control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
     }
     registerPoll();
@@ -184,8 +184,8 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     assert(hparams.interval(Channels)==2);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
-    status = (Status*)((maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data.pointer);
-    control = (Control*)((maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data.pointer);
+    status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
+    control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;
     control->availableMinimum = periodSize; // Minimum available space to trigger POLLIN
     io<PREPARE>();
     io<START>();
