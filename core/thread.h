@@ -121,43 +121,6 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void event();
 };
 
-struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
-inline void* start_routine(thread* t) {
-    for(;;) {
-        uint64 i=__sync_fetch_and_add(t->counter,1);
-        if(i>=t->stop) break;
-        (*t->delegate)(t->id, i);
-    }
-    return 0;
-}
-
-/// Runs a loop in parallel
-template<class F> void parallel(uint64 start, uint64 stop, F f) {
-#if DEBUG || PROFILE
-    for(uint i : range(start, stop)) f(0, i);
-#else
-    function<void(uint, uint)> delegate = f;
-    thread threads[threadCount];
-    for(uint i: range(threadCount)) {
-        threads[i].id = i;
-        threads[i].counter = &start;
-        threads[i].stop = stop;
-        threads[i].delegate = &delegate;
-        pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
-    }
-    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert(status==0); }
-#endif
-}
-template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
-
-/// Runs a loop in parallel chunks
-template<class F> void chunk_parallel(uint64 totalSize, F f) {
-    constexpr uint64 chunkCount = threadCount;
-    assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
-    const uint64 chunkSize = totalSize/chunkCount;
-    parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
-}
-
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void exit(int status=0);
 /// Immediatly terminates the current thread
@@ -205,3 +168,42 @@ struct FileWatcher : File, Poll {
         }
     }
 };
+
+struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
+inline void* start_routine(thread* t) {
+    for(;;) {
+        uint64 i=__sync_fetch_and_add(t->counter,1);
+        if(i>=t->stop) break;
+        (*t->delegate)(t->id, i);
+    }
+    return 0;
+}
+
+
+// -> parallel.cc
+/// Runs a loop in parallel
+template<class F> void parallel(uint64 start, uint64 stop, F f) {
+#if DEBUG || PROFILE
+    for(uint i : range(start, stop)) f(0, i);
+#else
+    function<void(uint, uint)> delegate = f;
+    thread threads[threadCount];
+    for(uint i: range(threadCount)) {
+        threads[i].id = i;
+        threads[i].counter = &start;
+        threads[i].stop = stop;
+        threads[i].delegate = &delegate;
+        pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
+    }
+    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert(status==0); }
+#endif
+}
+template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
+
+/// Runs a loop in parallel chunks
+template<class F> void chunk_parallel(uint64 totalSize, F f) {
+    constexpr uint64 chunkCount = threadCount;
+    assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
+    const uint64 chunkSize = totalSize/chunkCount;
+    parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
+}

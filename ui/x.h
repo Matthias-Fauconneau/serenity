@@ -184,7 +184,6 @@ struct Pixmap { int8 ext=EXT,req=1; uint16 size=18; uint window, pixmap, serial=
                 uint waitFence=0, idleFence=0; uint options=0; uint64 targetMSC=0, divisor=0, remainder=0; };
 struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pad; uint64 targetMSC=0, divisor=0, remainder=0; };
 struct SelectInput { int8 ext=EXT, req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
-enum { ConfigureNotify, CompleteNotify /*, IdleNotify?*/ /*, RedirectNotify?*/ };
-//struct IdleNotify : XEvent::Generic { uint event_id, window, pixmap, idleFence; } packed;
+enum { ConfigureNotify, CompleteNotify };
 struct CompleteNotify : XEvent::Generic { uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } packed;
 }
