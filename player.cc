@@ -77,7 +77,6 @@ struct Player : Poll {
 
     Player() {
         albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
-        window.actions[Escape] = []{ exit(); };
         window.actions[Space] = {this, &Player::togglePlay};
 
         window.globalAction(Play) = {this, &Player::togglePlay};

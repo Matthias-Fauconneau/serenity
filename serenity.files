@@ -82,3 +82,4 @@ exif.cc
 exif.h
 dust.cc
 
+test.cc

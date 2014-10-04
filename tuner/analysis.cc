@@ -199,7 +199,6 @@ struct PitchEstimation : Poll {
                             Widget* box = new VBox ({spectrum, waveform});
                             Window& window = *(new Window(box, int2(0, 1680/2), strKey(spectrum->expectedKey)));
                             window.backgroundColor=window.backgroundCenter=0; additiveBlend = true;
-                            window.localShortcut(Escape).connect([]{exit();});
                             window.show();
                         }
                         fail++;

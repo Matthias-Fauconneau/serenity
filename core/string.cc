@@ -19,10 +19,6 @@ bool operator <=(const string& a, const string& b) {
     return a.size <= b.size;
 }
 
-uint count(const string& a, byte c) {
-    uint count=0; for(byte b: a) if(b==c) count++; return count;
-}
-
 string str(const char* s) {
     if(!s) return "null"_; int i=0; while(s[i]) i++; return string((byte*)s,i);
 }

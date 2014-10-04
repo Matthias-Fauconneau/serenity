@@ -56,6 +56,7 @@ struct ImageWidget : virtual Widget {
     /// Displayed image
     Image image;
 
+    ImageWidget() {}
     /// Creates a widget displaying \a image
     ImageWidget(Image&& image) : image(move(image)) {}
 

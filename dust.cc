@@ -84,7 +84,7 @@ struct Filter {
     ImageSource sourceImage(string imageName) const {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         string baseName = section(imageName,'.');
-        if(/*1 ||*/ !existsFile(baseName, cache)) {
+        if(/*1 ||*/ !existsFile(baseName, cache)) { //FIXME: automatic invalidation
             log_(imageName);
             Image source = decodeImage(Map(imageName, folder));
 
@@ -106,7 +106,7 @@ struct Filter {
     }
 
     /// Returns filtered image
-    virtual ImageTarget cleanImage(string imageName) const abstract;
+    virtual ImageSource cleanImage(string imageName) const abstract;
 };
 
 /// \file dust.cc Automatic dust removal
@@ -147,30 +147,42 @@ struct DustRemoval : Filter {
 
     ImageSource sum = evaluateSum();
 
-    ImageTarget cleanImage(string imageName) const override {
+    ImageSource cleanImage(string imageName) const override {
         ImageSource source = sourceImage(imageName);
-        ImageTarget target (imageName, targetFolder, source.ImageF::size);
-        // Removes dust from image
-        chunk_parallel(target.pixels.size, [&](uint, uint start, uint size) {
-            for(uint index: range(start, start+size)) target.pixels[index] = source.pixels[index] / sum.pixels[index];
-        });
-        return target;
+        if(/*1 ||*/ !existsFile("imageName"_, targetFolder)) { //FIXME: automatic invalidation
+            ImageTarget target (imageName, targetFolder, source.ImageF::size);
+            // Removes dust from image
+            chunk_parallel(target.pixels.size, [&](uint, uint start, uint size) {
+                for(uint index: range(start, start+size)) target.pixels[index] = source.pixels[index] / sum.pixels[index];
+            });
+        }
+        return  ImageSource(imageName, targetFolder, source.ImageF::size);
     }
 };
 
 struct FilterView : ImageWidget {
     const Filter& filter;
-    FilterView(const Filter& filter) : ImageWidget(sRGB(filter.cleanImage(filter.imageNames[0]))), filter(filter) {}
-    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) {
-        string imageName = filter.imageNames[filter.imageNames.size*cursor.x/size.x];
-        log(cursor.y, size.y/2);
-        image = sRGB(cursor.y > size.y/2 ? (ImageF)filter.cleanImage(imageName) : (ImageF)filter.sourceImage(imageName));
-        return true;
+    string imageName = filter.imageNames[0];
+    bool enabled = true;
+    Image image() const { return sRGB(enabled ? (ImageF)filter.cleanImage(imageName) : (ImageF)filter.sourceImage(imageName)); }
+
+    FilterView(const Filter& filter) : filter(filter) { ImageWidget::image = image(); }
+
+    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
+        string imageName = filter.imageNames[(filter.imageNames.size-1)*cursor.x/size.x];
+        bool enabled = cursor.y < size.y/2;
+        if(enabled != this->enabled || imageName != this->imageName) {
+            this->enabled = enabled;
+            this->imageName = imageName;
+            ImageWidget::image = image();
+            return true;
+        }
+        return false;
     }
 };
 
 struct DustRemover {
     DustRemoval filter;
     FilterView view {filter};
-    Window window {&view, filter.imageSize/4, "Dust Remover"_};
+    Window window {&view, filter.imageSize/4, str(view.imageName, view.enabled)};
 } application;

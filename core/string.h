@@ -9,9 +9,6 @@ generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(c
 bool operator <(const string& a, const string& b);
 bool operator <=(const string& a, const string& b);
 
-/// Counts number of occurence of a character in a String
-uint count(const string& a, byte c);
-
 /// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 string section(const string& str, byte separator, int begin=0, int end=1);

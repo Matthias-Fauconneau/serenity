@@ -57,7 +57,6 @@ struct Tuner : Poll {
         log(input.sampleBits, input.rate, input.periodSize);
 
         window.background = Window::Black;
-        window.actions[Escape] = []{exit();}; //FIXME: threads waiting on semaphores will be stuck
         window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
         window.show();
 
