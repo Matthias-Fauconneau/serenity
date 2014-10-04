@@ -42,6 +42,7 @@ void Window::processEvent(const ref<byte>& ge) {
         cursorPosition = int2(e.x,e.y);
         cursorState = e.state;
         motionPending = true;
+        queue();
         return;
     }
     if(motionPending) {
@@ -118,6 +119,11 @@ void Window::render() { assert_(size); updates.clear(); render({},int2(0),size);
 
 void Window::event() {
     Display::event();
+    if(motionPending) {
+        motionPending = false;
+        if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton, focus)) render();
+        else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
+    }
     if(updates && state==Idle) {
         assert_(size);
         if(target.size != size) {
