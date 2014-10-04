@@ -17,7 +17,6 @@ struct ImageF {
         int2 size;
     };
 };
-//inline ImageF share(const ImageF& o) { return ImageF(buffer<float>((ref<float>)o.data),o.size); }
 
 /// Converts a linear float image to sRGB
 Image sRGB(Image&& target, const ImageF& source);
@@ -35,17 +34,15 @@ inline ImageF scale(ImageF&& image, float factor) { scale(image.pixels, factor);
 
 /// \file .cc ImageF
 Image sRGB(Image&& target, const ImageF& source) {
-    float max = 0;
-    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) max=::max(max, abs(source(x,y)));
-    if(max) for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
-        float v = source(x,y)/max;
-        //assert_(abs(v) <= 1, source(x,y), max);
-        v = min(1.f, v);
-        uint linear12 = 0xFFF*abs(v);
+    //float max = ::max(source.pixels);
+    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
+        float v = source(x,y); // max;
+        assert_(v>0 && v <= 1, v);
+        uint linear12 = 0xFFF*v;
         extern uint8 sRGB_forward[0x1000];
         assert_(linear12 < 0x1000);
         uint8 sRGB = sRGB_forward[linear12];
-        target(x,y) = v > 0 ? byte4(sRGB, sRGB, sRGB, 0xFF) : byte4(sRGB, 0, 0, 0xFF);
+        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
     }
     return move(target);
 }
@@ -85,6 +82,7 @@ ImageF upsampleY(const ImageF& source) {
 #include "time.h"
 
 struct ImageTarget : Map, ImageF {
+    ImageTarget() {}
     ImageTarget(const string& path, const Folder& at, int2 size) :
         Map(File(path, at, ::Flags(ReadWrite|Create)).resize(size.x*size.y*sizeof(float)), Map::Write),
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
@@ -103,59 +101,94 @@ struct DustRemover {
     DustRemover() {
         Time totalTime; totalTime.start();
         Folder folder("Pictures/Paper"_, home());
-        Folder cache(".cache"_, folder, true);
         array<String> fileNames = folder.list(Files|Sorted);
-        Time decodeTime;
-        Time convertTime;
-        Time sumTime;
-        ImageF sum; // FIXME
+        const int2 imageSize (4000, 3000); //FIXME: = ::imageSize(readFile(fileNames.first()));
 
-        for(string fileName: fileNames) {
-            Map file = Map(fileName, folder);
-            if(imageFileFormat(file)!="JPEG"_) continue;
-            if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue;
-            int2 imageSize (4000, 3000); //FIXME: = ::imageSize(file);
-            if(sum) assert_(sum.size==imageSize); else sum = imageSize;
+        Folder cache(".cache"_, folder, true);
+        /// Sums all images
+        if(/*1 ||*/ !existsFile("sum"_, cache)) { //FIXME: automatic invalidation
+            Time decodeTime;
+            Time convertTime;
+            Time sumTime;
+            ImageTarget sum; // FIXME
+            assert_(!::sum(sum.pixels));
 
-            // Cache conversion from sRGB JPEGs to raw (mmap'able) linear float images
-            string baseName = section(fileName,'.');
-            if(!existsFile(baseName, cache)) {
-                decodeTime.start();
-                log_(fileName);
-                Image image = decodeImage(file);
-                decodeTime.stop();
-                if(image.size != imageSize) { log("Warning: inconsistent image size"); continue; }
+            size_t imageCount = 0;
+            for(string fileName: fileNames) {
+                Map file = Map(fileName, folder);
+                if(imageFileFormat(file)!="JPEG"_) continue; // Only JPEG images
+                if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture
+                if(sum.pixels) assert_(sum.ImageF::size==imageSize); else sum = ImageTarget("sum"_, cache, imageSize);
 
-                {convertTime.start();
-                    log(" ->",baseName);
-                    ImageTarget target (baseName, cache, image.size);
+                // Cache conversion from sRGB JPEGs to raw (mmap'able) linear float images
+                string baseName = section(fileName,'.');
+                if(/*1 ||*/ !existsFile(baseName, cache)) {
+                    decodeTime.start();
+                    log_(fileName);
+                    Image image = decodeImage(file);
+                    decodeTime.stop();
+                    if(image.size != imageSize) { log("Warning: inconsistent image size"); continue; }
+
+                    {convertTime.start();
+                        log(" ->",baseName);
+                        ImageTarget target (baseName, cache, image.size);
+                        chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
+                            for(uint index: range(start, start+size)) {
+                                byte4 sRGB = image.pixels[index];
+                                float b = sRGB_reverse[sRGB.b];
+                                float g = sRGB_reverse[sRGB.g];
+                                float r = sRGB_reverse[sRGB.r];
+                                float intensity = (b+g+r)/3; // Assumes dust affects all components equally
+                                target.pixels[index] = intensity;
+                            }
+                        });
+                        assert_(::sum(target.pixels));
+                    }convertTime.stop();
+                }
+
+                {sumTime.start(); // Sums intensities
+                    log(baseName);
+                    ImageSource image (baseName, cache, sum.ImageF::size);
+
                     chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
                         for(uint index: range(start, start+size)) {
-                            byte4 sRGB = image.pixels[index];
-                            float b = sRGB_reverse[sRGB.b];
-                            float g = sRGB_reverse[sRGB.g];
-                            float r = sRGB_reverse[sRGB.r];
-                            target.pixels[index] = b+g+r; // Assumes dust affects all components equally
+                            sum.pixels[index] += image.pixels[index];
                         }
                     });
-                    assert_(::sum(target.pixels));
-                }convertTime.stop();
+                }sumTime.stop();
+
+                imageCount++;
             }
 
-            {sumTime.start(); // Sums intensities
-                log(baseName);
-                ImageSource image (baseName, cache, sum.size);
+            /*// Scales sum to average
+            chunk_parallel(sum.pixels.size, [&](uint, uint start, uint size) {
+                float scaleFactor = 1./imageCount;
+                for(uint index: range(start, start+size)) {
+                    sum.pixels[index] *= scaleFactor;
+                }
+            });*/
 
-                chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
-                    for(uint index: range(start, start+size)) {
-                        sum.pixels[index] += image.pixels[index];
-                    }
-                });
-            }sumTime.stop();
+            // Normalizes sum by maximum (TODO: normalize by low frequency energy)
+            float maximums[threadCount];
+            chunk_parallel(sum.pixels.size, [&](uint id, uint start, uint size) {
+                float max=0;
+                for(uint index: range(start, start+size)) { float v=sum.pixels[index]; if(v>max) max = v; }
+                maximums[id] = max;
+            });
+            float maximum = max(maximums);
+            chunk_parallel(sum.pixels.size, [&](uint, uint start, uint size) {
+                float scaleFactor = 1./maximum;
+                for(uint index: range(start, start+size)) sum.pixels[index] *= scaleFactor;
+            });
+            // Band pass spot (low pass to filter texture and noise, high pass to filter lighting conditions)
+            log(sumTime);
         }
+
+        ImageSource sum("sum"_, cache, imageSize);
         Time viewTime; viewTime.start();
         view = sRGB(sum);
         viewTime.stop();
-        log(sumTime, viewTime, totalTime);
+        log(viewTime);
+        log(totalTime);
     }
 } application;

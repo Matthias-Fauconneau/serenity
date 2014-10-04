@@ -147,7 +147,7 @@ generic struct ref {
     template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
     explicit operator bool() const { assert_(!size || data); return size; }
-    /*explicit*/ operator const T*() const { return data; }
+    operator const T*() const { return data; }
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
@@ -236,7 +236,7 @@ generic struct mref : ref<T> {
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
     explicit operator bool() const { assert(!size || data, size); return size; }
-    /*explicit*/ operator T*() const { return (T*)data; }
+    operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
     T& at(size_t i) const { assert(i<size); return (T&)data[i]; }

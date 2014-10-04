@@ -12,7 +12,7 @@ enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflo
 void setExceptions(uint except);
 
 /// Logical cores count
-constexpr uint coreCount = 4;
+constexpr uint threadCount = 4;
 
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
@@ -137,8 +137,8 @@ template<class F> void parallel(uint64 start, uint64 stop, F f) {
     for(uint i : range(start, stop)) f(0, i);
 #else
     function<void(uint, uint)> delegate = f;
-    thread threads[coreCount];
-    for(uint i: range(coreCount)) {
+    thread threads[threadCount];
+    for(uint i: range(threadCount)) {
         threads[i].id = i;
         threads[i].counter = &start;
         threads[i].stop = stop;
@@ -152,7 +152,7 @@ template<class F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 
 /// Runs a loop in parallel chunks
 template<class F> void chunk_parallel(uint64 totalSize, F f) {
-    constexpr uint64 chunkCount = coreCount;
+    constexpr uint64 chunkCount = threadCount;
     assert(totalSize%chunkCount<chunkCount); //Last chunk will be smaller
     const uint64 chunkSize = totalSize/chunkCount;
     parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
