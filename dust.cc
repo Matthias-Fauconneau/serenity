@@ -22,15 +22,6 @@ struct ImageF {
 Image sRGB(Image&& target, const ImageF& source);
 Image sRGB(const ImageF& source) { return sRGB(source.size, source); }
 
-/// Downsamples by adding samples
-ImageF& downsample(ImageF& target, const ImageF& source);
-/// Upsamples an image by duplicating samples
-ImageF upsample(const ImageF& source);
-//ImageF clip(const ImageF& image, Rect r);
-
-inline void scale(mref<float>& A, float factor) { for(float& a: A) a *= factor; }
-inline ImageF scale(ImageF&& image, float factor) { scale(image.pixels, factor); return move(image); }
-
 
 /// \file .cc ImageF
 Image sRGB(Image&& target, const ImageF& source) {
@@ -46,30 +37,6 @@ Image sRGB(Image&& target, const ImageF& source) {
     }
     return move(target);
 }
-
-ImageF& downsample(ImageF& target, const ImageF& source) {
-    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) target(x,y) = 1.f/4 * (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1));
-    return target;
-}
-
-ImageF upsample(const ImageF& source) {
-    ImageF target(source.size*2);
-    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
-    return target;
-}
-
-ImageF upsampleY(const ImageF& source) {
-    ImageF target(source.size*int2(1,2));
-    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) target(x,y*2+0) = target(x,y*2+0) = target(x,y*2+1) = target(x,y*2+1) = source(x,y);
-    return target;
-}
-
-/*ImageF clip(const ImageF& image, Rect r) {
-    r = r & Rect(image.size);
-    assert_(r.size().x == image.size.x, r.size(), image.size);
-    return ImageF(buffer<float>(image.data.slice(r.position().y*image.size.x+r.position().x, r.size().y*r.size().x)), r.size());
-}*/
-
 
 /// \file dust.cc Automatic dust removal
 #include "thread.h"
@@ -93,9 +60,10 @@ struct ImageSource : Map, ImageF {
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
 };
 
-struct DustRemover {
+struct DustRemoval {
     Folder folder = Folder("Pictures/Paper"_, home());
     Folder cache = Folder(".cache"_, folder, true);
+    Folder targetFolder = Folder(".target"_, folder, true);
 
     /// Lists matching images
     array<String> listImages() {
@@ -105,7 +73,7 @@ struct DustRemover {
             Map file = Map(fileName, folder);
             if(imageFileFormat(file)!="JPEG"_) continue; // Only JPEG images
             if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture
-            //TODO: if(image.size != imageSize) { log("Warning: inconsistent image size"); continue; }
+            //TODO: if(source.size != imageSize) { log("Warning: inconsistent source image size"); continue; }
             imageNames << move(fileName);
         }
         return imageNames;
@@ -120,13 +88,13 @@ struct DustRemover {
         string baseName = section(imageName,'.');
         if(/*1 ||*/ !existsFile(baseName, cache)) {
             log_(imageName);
-            Image image = decodeImage(Map(imageName, folder));
+            Image source = decodeImage(Map(imageName, folder));
 
             log(" ->",baseName);
-            ImageTarget target (baseName, cache, image.size);
-            chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
+            ImageTarget target (baseName, cache, source.size);
+            chunk_parallel(source.pixels.size, [&](uint, uint start, uint size) {
                 for(uint index: range(start, start+size)) {
-                    byte4 sRGB = image.pixels[index];
+                    byte4 sRGB = source.pixels[index];
                     float b = sRGB_reverse[sRGB.b];
                     float g = sRGB_reverse[sRGB.g];
                     float r = sRGB_reverse[sRGB.r];
@@ -145,10 +113,10 @@ struct DustRemover {
             ImageTarget sum ("sum"_, cache, imageSize);
             assert_(!::sum(sum.pixels));
             for(string imageName: imageNames) {
-                ImageSource image = sourceImage(imageName);
-                chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
+                ImageSource source = sourceImage(imageName);
+                chunk_parallel(source.pixels.size, [&](uint, uint start, uint size) {
                     for(uint index: range(start, start+size)) {
-                        sum.pixels[index] += image.pixels[index];
+                        sum.pixels[index] += source.pixels[index];
                     }
                 });
             }
@@ -172,11 +140,28 @@ struct DustRemover {
 
     ImageSource sum = evaluateSum();
 
-    /// Removes dust from image
-    ImageSource removeDust(string imageName) {
-        return sourceImage(imageName);
+    ImageTarget cleanImage(string imageName) {
+        ImageSource source = sourceImage(imageName);
+        ImageTarget target (imageName, targetFolder, source.ImageF::size);
+        // Removes dust from image
+        chunk_parallel(target.pixels.size, [&](uint, uint start, uint size) {
+            for(uint index: range(start, start+size)) target.pixels[index] = source.pixels[index] / sum.pixels[index];
+        });
+        return target;
     }
+};
 
-    ImageWidget view {sRGB(removeDust(imageNames.first()))};
-    Window window {&view, int2(1000, 750), "Dust Remover"_};
+struct DustRemovalView : DustRemoval, ImageWidget {
+    DustRemovalView() : ImageWidget(sRGB(cleanImage(imageNames[0]))) {}
+    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) {
+        string imageName = imageNames[imageNames.size*cursor.x/size.x];
+        log(cursor.y, size.y/2);
+        image = sRGB(cursor.y > size.y/2 ? (ImageF)cleanImage(imageName) : (ImageF)sourceImage(imageName));
+        return true;
+    }
+};
+
+struct DustRemovalApplication {
+    DustRemovalView view;
+    Window window {&view, view.imageSize/4, "Dust Remover"_};
 } application;
