@@ -27,7 +27,7 @@ void fill(const Image& target, int2 origin, int2 size, vec3 color, float alpha) 
         if(!(min < max)) return;
         int3 linear = int3(round(float(0xFFF)*color));
         byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
-        fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
+        fill((uint*)target.pixels.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
     } else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, alpha);
     }

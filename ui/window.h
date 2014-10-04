@@ -13,7 +13,10 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
     bool mapped = false;
     /// Window size
-    int2 size = 0;
+    union {
+        struct { uint width, height; };
+        int2 size = 0;
+    };
     /// Updates to be rendered
     struct Update { Graphics graphics; int2 origin, size; };
     array<Update> updates;
