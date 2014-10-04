@@ -140,7 +140,7 @@ generic array<ref<T> > toRefs(const ref<array<T>>& o) {
 }
 
 /// String is an array of bytes
-typedef array<byte> String;
+typedef array<char> String;
 
 generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivotIndex) {
     swap(at[pivotIndex], at[right]);

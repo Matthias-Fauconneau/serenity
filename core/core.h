@@ -87,6 +87,7 @@ struct range {
     int start, stop;
 };
 
+#ifndef _INITIALIZER_LIST
 // std::initializer_list
 namespace std {
 generic struct initializer_list {
@@ -97,11 +98,12 @@ generic struct initializer_list {
     constexpr size_t size() const { return len; }
 };
 }
+#endif
 
 // string
 generic struct ref;
-/// Convenient typedef for ref<byte> holding UTF8 text strings
-typedef ref<byte> string;
+/// Convenient typedef for ref<char> holding UTF8 text strings
+typedef ref<char> string;
 inline constexpr string operator "" _(const char* data, size_t size);
 
 // Debugging
@@ -145,7 +147,7 @@ generic struct ref {
     template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
     explicit operator bool() const { assert_(!size || data); return size; }
-    explicit operator const T*() const { return data; }
+    /*explicit*/ operator const T*() const { return data; }
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
@@ -215,12 +217,12 @@ template<Type T> auto sum(const ref<T>& a) -> decltype(T()+T()) { decltype(T()+T
 
 template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
 template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
-/*template<Type T, size_t N> uint argmin(const T (&a)[N]) { return argmin(ref<T>(a)); }
-template<Type T, size_t N> uint argmax(const T (&a)[N]) { return argmax(ref<T>(a)); }*/
 template<Type T, size_t N> auto sum(const T (&a)[N]) -> decltype(T()+T()) { return sum(ref<T>(a)); }
 
+#ifndef _NEW
 /// Initializes memory using a constructor (placement new)
-inline void* operator new(size_t, void* p) throw() { return p; }
+inline void* operator new(size_t, void* p) noexcept { return p; }
+#endif
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
@@ -234,7 +236,7 @@ generic struct mref : ref<T> {
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
     explicit operator bool() const { assert(!size || data, size); return size; }
-    explicit operator T*() const { return (T*)data; }
+    /*explicit*/ operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
     T& at(size_t i) const { assert(i<size); return (T&)data[i]; }

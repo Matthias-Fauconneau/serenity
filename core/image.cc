@@ -27,8 +27,8 @@ static Image box(Image&& target, const Image& source) {
     assert_(source.width/target.width==source.height/target.height, source.size, target.size);
     assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height, source.width%target.width, source.height%target.height);
     //assert_(!source.alpha); FIXME: not alpha correct
-    byte4* dst = target.data;
-    const byte4* src = source.data;
+    byte4* dst (target.pixels);
+    const byte4* src = source.pixels;
     int scale = source.width/target.width;
     for(uint unused y: range(target.height)) {
         const byte4* line = src;
@@ -51,7 +51,7 @@ static Image box(Image&& target, const Image& source) {
 static Image bilinear(Image&& target, const Image& source) {
     const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
-    const uint8* src = (uint8*)source.data; byte4* dst = target.data;
+    const uint8* src = (const uint8*)source.pixels.data; byte4* dst (target.pixels);
     for(uint y: range(targetHeight)) {
         for(uint x: range(targetWidth)) {
             const uint fx = x*256*width/targetWidth, fy = y*256*height/targetHeight; //TODO: incremental

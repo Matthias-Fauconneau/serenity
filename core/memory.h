@@ -3,10 +3,10 @@
 #include "core.h"
 
 // C runtime memory allocation
-extern "C" void* malloc(size_t size) throw();
-extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) throw();
-extern "C" void* realloc(void* buffer, size_t size) throw();
-extern "C" void free(void* buffer) throw();
+extern "C" void* malloc(size_t size) noexcept;
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
+extern "C" void* realloc(void* buffer, size_t size) noexcept;
+extern "C" void free(void* buffer) noexcept;
 
 /// Managed fixed-capacity mutable reference to an array of elements
 /// \note either an heap allocation managed by this object or a reference to memory managed by another object
@@ -15,13 +15,11 @@ generic struct buffer : mref<T> {
     /// Default constructs an empty buffer
     buffer(){}
     /// References \a size elements from const \a data pointer
-    buffer(const T* data, size_t size) : mref<T>((T*)data, size) {}
-    /// References \a o.size elements from \a o.data pointer (use unsafeReference)
-    //explicit buffer(const ref<T>& o): mref<T>((T*)o.data, o.size) {}
+    buffer(T* data, size_t size) : mref<T>(data, size) {}
     /// Move constructor
-    buffer(buffer&& o) : mref<T>((T*)o.data, o.size), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
+    buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
-    buffer(size_t capacity, size_t size):mref<T>((T*)0,size),capacity(capacity){
+    buffer(size_t capacity, size_t size) : mref<T>((T*)0,size), capacity(capacity) {
      assert(capacity>=size && size>=0); if(!capacity) return;
      if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
     }
@@ -29,7 +27,7 @@ generic struct buffer : mref<T> {
     /// Allocates a buffer for \a capacity elements and fill with value
     template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
 
-    buffer& operator=(buffer&& o){ this->~buffer(); new (this) buffer(move(o)); return *this; }
+    buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
 
@@ -38,13 +36,13 @@ generic struct buffer : mref<T> {
     size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation
 };
 /// Initializes a new buffer with the content of \a o
-generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
+generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); copy(t, o); return t; }
 /// Initializes a new buffer with the content of \a o
 // Not named copy as it would be prevent "copying" references as references
 // TODO: rename to explicit buffer(const ref<T>& o)
-generic buffer<T> bufferCopy(const ref<T>& o){ buffer<T> t(o.size, o.size); for(uint i: range(o.size)) new (&t[i]) T(copy(o[i])); return t; }
+generic buffer<T> bufferCopy(const ref<T>& o){ buffer<T> t(o.size, o.size); copy(t, o); return t; }
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
-generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>(o.data, o.size); }
+generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>((T*)o.data, o.size); }
 
 /// Unique reference to an heap allocated value
 generic struct unique {

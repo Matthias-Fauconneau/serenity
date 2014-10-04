@@ -34,10 +34,10 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
     Data(){}
-    /// Creates a Data interface to an \a array
-    Data(::buffer<byte>&& array) : buffer(move(array)) {}
-    /// Creates a Data interface to a \a reference
-    explicit Data(const ref<byte>& reference) : buffer(reference.data,reference.size) {}
+    /// Creates a Data interface to a \a buffer
+    Data(::buffer<byte>&& data) : buffer(move(data)) {}
+    /// Creates a Data interface to a \a ref
+    explicit Data(const ref<byte>& data) : buffer(unsafeReference(data)) {}
     /// Slices a reference to the buffer from \a index to \a index + \a size
     ref<byte> slice(uint pos, uint size) const { return buffer.slice(pos,size); }
     /// Slices a reference to the buffer from \a index to the end of the buffer

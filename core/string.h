@@ -48,7 +48,7 @@ string str(const char* s);
 /// Returns boolean as "true"/"false"
 inline string str(const bool& b) { return b?"true"_:"false"_; }
 /// Returns a reference to the character
-inline string str(const char& c) { return string((byte*)&c,1); }
+inline string str(const char& c) { return string((char*)&c,1); }
 
 /// Forwards buffer<byte>
 inline const buffer<byte>& str(const buffer<byte>& s) { return s; }
