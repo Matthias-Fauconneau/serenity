@@ -211,8 +211,6 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 // ref<Arithmetic> operations
 generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
-generic uint argmin(const ref<T>& a) { uint min=0; for(uint i: range(a.size)) if(a[i] < a[min]) min=i; return min; }
-generic uint argmax(const ref<T>& a) { uint max=0; for(uint i: range(a.size)) if(a[i] > a[max]) max=i; return max; }
 template<Type T> auto sum(const ref<T>& a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
 
 template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
