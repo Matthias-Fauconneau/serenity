@@ -4,11 +4,12 @@
 #include "deflate.h" //DEBUG
 
 struct Variant {
-    enum { Empty, Boolean, Integer, Real, Data, List, Dict } type = Empty;
+    enum { Empty, Boolean, Integer, Real, Data, List, Dict, Rational } type = Empty;
     double number=0;
     String data;
     array<Variant> list;
     map<String,Variant> dict;
+    double denominator=1;
 
     Variant(bool boolean) : type(Boolean), number(boolean) {}
     Variant(int number) : type(Integer), number(number) {}
@@ -21,11 +22,17 @@ struct Variant {
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<String,Variant>&& dict) : type(Dict), dict(move(dict)) {}
     Variant(map<string,Variant>&& dict) : type(Dict) { for(auto e: dict) this->dict.insert(String(e.key), move(e.value)); }
+    Variant(int64 numerator, int64 denominator) : type(Rational), number(numerator), denominator(denominator) {}
+
     explicit operator bool() const { return type!=Empty; }
-    //operator int() const { assert(type==Integer, *this); return number; }
-    int integer() const { assert(type==Integer, *this); return number; }
-    double real() const { assert(type==Real||type==Integer); return number; }
+
+    int64 integer() const { assert(type==Integer, *this); return number; }
+    double real() const {
+        if(type==Rational) { assert_((number/denominator)*denominator==number); return number/denominator; }
+        assert(type==Real||type==Integer); return number;
+    }
     explicit operator string() const { assert(type==Data); return data; }
+    int64 numerator() {  assert(type==Rational, *this); return number; }
 };
 
 String str(const Variant& o);
@@ -61,6 +68,7 @@ inline String str(const Variant& o) {
     if(o.type==Variant::Data) return copy(o.data);
     if(o.type==Variant::List) return str(o.list);
     if(o.type==Variant::Dict) return str(o.dict);
+    if(o.type==Variant::Rational) return str(int(o.number),"/"_,int(o.denominator));
     error("Invalid Variant"_,int(o.type));
 }
 

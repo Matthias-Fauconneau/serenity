@@ -40,6 +40,7 @@ io/font.h
 io/pdf.h
 io/pdf.cc
 io/jpeg.cc
+io/jpeg.h
 
 ui/graphics.h
 ui/interface.h
@@ -76,4 +77,8 @@ tuner/analysis.cc
 tuner/tuner.cc
 
 player.cc
-tuner/test.cc
+
+exif.cc
+exif.h
+dust.cc
+
