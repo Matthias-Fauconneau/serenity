@@ -82,7 +82,6 @@ ImageF upsampleY(const ImageF& source) {
 #include "time.h"
 
 struct ImageTarget : Map, ImageF {
-    ImageTarget() {}
     ImageTarget(const string& path, const Folder& at, int2 size) :
         Map(File(path, at, ::Flags(ReadWrite|Create)).resize(size.x*size.y*sizeof(float)), Map::Write),
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
@@ -95,78 +94,64 @@ struct ImageSource : Map, ImageF {
 };
 
 struct DustRemover {
-    ImageWidget view {Image()};
-    Window window {&view, int2(1000, 750), "Dust Remover"_};
+    Folder folder = Folder("Pictures/Paper"_, home());
+    Folder cache = Folder(".cache"_, folder, true);
 
-    DustRemover() {
-        Time totalTime; totalTime.start();
-        Folder folder("Pictures/Paper"_, home());
+    /// Lists matching images
+    array<String> listImages() {
+        array<String> imageNames;
         array<String> fileNames = folder.list(Files|Sorted);
-        const int2 imageSize (4000, 3000); //FIXME: = ::imageSize(readFile(fileNames.first()));
+        for(String& fileName: fileNames) {
+            Map file = Map(fileName, folder);
+            if(imageFileFormat(file)!="JPEG"_) continue; // Only JPEG images
+            if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture
+            //TODO: if(image.size != imageSize) { log("Warning: inconsistent image size"); continue; }
+            imageNames << move(fileName);
+        }
+        return imageNames;
+    }
 
-        Folder cache(".cache"_, folder, true);
-        /// Sums all images
-        if(/*1 ||*/ !existsFile("sum"_, cache)) { //FIXME: automatic invalidation
-            Time decodeTime;
-            Time convertTime;
-            Time sumTime;
-            ImageTarget sum; // FIXME
-            assert_(!::sum(sum.pixels));
+    array<String> imageNames = listImages();
+    const int2 imageSize = int2(4000, 3000); //FIXME: = ::imageSize(readFile(imageNames.first()));
 
-            size_t imageCount = 0;
-            for(string fileName: fileNames) {
-                Map file = Map(fileName, folder);
-                if(imageFileFormat(file)!="JPEG"_) continue; // Only JPEG images
-                if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture
-                if(sum.pixels) assert_(sum.ImageF::size==imageSize); else sum = ImageTarget("sum"_, cache, imageSize);
+    /// Loads linear float image
+    ImageSource sourceImage(string imageName) {
+        // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
+        string baseName = section(imageName,'.');
+        if(/*1 ||*/ !existsFile(baseName, cache)) {
+            log_(imageName);
+            Image image = decodeImage(Map(imageName, folder));
 
-                // Cache conversion from sRGB JPEGs to raw (mmap'able) linear float images
-                string baseName = section(fileName,'.');
-                if(/*1 ||*/ !existsFile(baseName, cache)) {
-                    decodeTime.start();
-                    log_(fileName);
-                    Image image = decodeImage(file);
-                    decodeTime.stop();
-                    if(image.size != imageSize) { log("Warning: inconsistent image size"); continue; }
-
-                    {convertTime.start();
-                        log(" ->",baseName);
-                        ImageTarget target (baseName, cache, image.size);
-                        chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
-                            for(uint index: range(start, start+size)) {
-                                byte4 sRGB = image.pixels[index];
-                                float b = sRGB_reverse[sRGB.b];
-                                float g = sRGB_reverse[sRGB.g];
-                                float r = sRGB_reverse[sRGB.r];
-                                float intensity = (b+g+r)/3; // Assumes dust affects all components equally
-                                target.pixels[index] = intensity;
-                            }
-                        });
-                        assert_(::sum(target.pixels));
-                    }convertTime.stop();
-                }
-
-                {sumTime.start(); // Sums intensities
-                    log(baseName);
-                    ImageSource image (baseName, cache, sum.ImageF::size);
-
-                    chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
-                        for(uint index: range(start, start+size)) {
-                            sum.pixels[index] += image.pixels[index];
-                        }
-                    });
-                }sumTime.stop();
-
-                imageCount++;
-            }
-
-            /*// Scales sum to average
-            chunk_parallel(sum.pixels.size, [&](uint, uint start, uint size) {
-                float scaleFactor = 1./imageCount;
+            log(" ->",baseName);
+            ImageTarget target (baseName, cache, image.size);
+            chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
                 for(uint index: range(start, start+size)) {
-                    sum.pixels[index] *= scaleFactor;
+                    byte4 sRGB = image.pixels[index];
+                    float b = sRGB_reverse[sRGB.b];
+                    float g = sRGB_reverse[sRGB.g];
+                    float r = sRGB_reverse[sRGB.r];
+                    float intensity = (b+g+r)/3; // Assumes dust affects all components equally
+                    target.pixels[index] = intensity;
                 }
-            });*/
+            });
+            assert_(::sum(target.pixels));
+        }
+        return ImageSource(baseName, cache, sum.ImageF::size);
+    }
+
+    /// Sums all images
+    ImageSource evaluateSum() {
+        if(/*1 ||*/ !existsFile("sum"_, cache)) { //FIXME: automatic invalidation
+            ImageTarget sum ("sum"_, cache, imageSize);
+            assert_(!::sum(sum.pixels));
+            for(string imageName: imageNames) {
+                ImageSource image = sourceImage(imageName);
+                chunk_parallel(image.pixels.size, [&](uint, uint start, uint size) {
+                    for(uint index: range(start, start+size)) {
+                        sum.pixels[index] += image.pixels[index];
+                    }
+                });
+            }
 
             // Normalizes sum by maximum (TODO: normalize by low frequency energy)
             float maximums[threadCount];
@@ -180,15 +165,18 @@ struct DustRemover {
                 float scaleFactor = 1./maximum;
                 for(uint index: range(start, start+size)) sum.pixels[index] *= scaleFactor;
             });
-            // Band pass spot (low pass to filter texture and noise, high pass to filter lighting conditions)
-            log(sumTime);
+            // TODO: Band pass spot (low pass to filter texture and noise, high pass to filter lighting conditions)
         }
-
-        ImageSource sum("sum"_, cache, imageSize);
-        Time viewTime; viewTime.start();
-        view = sRGB(sum);
-        viewTime.stop();
-        log(viewTime);
-        log(totalTime);
+        return ImageSource("sum"_, cache, imageSize);
     }
+
+    ImageSource sum = evaluateSum();
+
+    /// Removes dust from image
+    ImageSource removeDust(string imageName) {
+        return sourceImage(imageName);
+    }
+
+    ImageWidget view {sRGB(removeDust(imageNames.first()))};
+    Window window {&view, int2(1000, 750), "Dust Remover"_};
 } application;
