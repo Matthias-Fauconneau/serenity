@@ -38,15 +38,12 @@ Image sRGB(Image&& target, const ImageF& source) {
     return move(target);
 }
 
-/// \file dust.cc Automatic dust removal
+
 #include "thread.h"
 #include "file.h"
-#include "interface.h"
-#include "window.h"
 #include "image.h"
 #include "exif.h"
 #include "jpeg.h"
-#include "time.h"
 
 struct ImageTarget : Map, ImageF {
     ImageTarget(const string& path, const Folder& at, int2 size) :
@@ -60,7 +57,8 @@ struct ImageSource : Map, ImageF {
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
 };
 
-struct DustRemoval {
+/// Collection of processed images
+struct Filter {
     Folder folder = Folder("Pictures/Paper"_, home());
     Folder cache = Folder(".cache"_, folder, true);
     Folder targetFolder = Folder(".target"_, folder, true);
@@ -72,7 +70,7 @@ struct DustRemoval {
         for(String& fileName: fileNames) {
             Map file = Map(fileName, folder);
             if(imageFileFormat(file)!="JPEG"_) continue; // Only JPEG images
-            if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture
+            if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture //FIXME: -> DustRemoval
             //TODO: if(source.size != imageSize) { log("Warning: inconsistent source image size"); continue; }
             imageNames << move(fileName);
         }
@@ -83,7 +81,7 @@ struct DustRemoval {
     const int2 imageSize = int2(4000, 3000); //FIXME: = ::imageSize(readFile(imageNames.first()));
 
     /// Loads linear float image
-    ImageSource sourceImage(string imageName) {
+    ImageSource sourceImage(string imageName) const {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         string baseName = section(imageName,'.');
         if(/*1 ||*/ !existsFile(baseName, cache)) {
@@ -104,9 +102,18 @@ struct DustRemoval {
             });
             assert_(::sum(target.pixels));
         }
-        return ImageSource(baseName, cache, sum.ImageF::size);
+        return ImageSource(baseName, cache, imageSize);
     }
 
+    /// Returns filtered image
+    virtual ImageTarget cleanImage(string imageName) const abstract;
+};
+
+/// \file dust.cc Automatic dust removal
+#include "interface.h"
+#include "window.h"
+
+struct DustRemoval : Filter {
     /// Sums all images
     ImageSource evaluateSum() {
         if(/*1 ||*/ !existsFile("sum"_, cache)) { //FIXME: automatic invalidation
@@ -140,7 +147,7 @@ struct DustRemoval {
 
     ImageSource sum = evaluateSum();
 
-    ImageTarget cleanImage(string imageName) {
+    ImageTarget cleanImage(string imageName) const override {
         ImageSource source = sourceImage(imageName);
         ImageTarget target (imageName, targetFolder, source.ImageF::size);
         // Removes dust from image
@@ -151,17 +158,19 @@ struct DustRemoval {
     }
 };
 
-struct DustRemovalView : DustRemoval, ImageWidget {
-    DustRemovalView() : ImageWidget(sRGB(cleanImage(imageNames[0]))) {}
+struct FilterView : ImageWidget {
+    const Filter& filter;
+    FilterView(const Filter& filter) : ImageWidget(sRGB(filter.cleanImage(filter.imageNames[0]))), filter(filter) {}
     bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) {
-        string imageName = imageNames[imageNames.size*cursor.x/size.x];
+        string imageName = filter.imageNames[filter.imageNames.size*cursor.x/size.x];
         log(cursor.y, size.y/2);
-        image = sRGB(cursor.y > size.y/2 ? (ImageF)cleanImage(imageName) : (ImageF)sourceImage(imageName));
+        image = sRGB(cursor.y > size.y/2 ? (ImageF)filter.cleanImage(imageName) : (ImageF)filter.sourceImage(imageName));
         return true;
     }
 };
 
-struct DustRemovalApplication {
-    DustRemovalView view;
-    Window window {&view, view.imageSize/4, "Dust Remover"_};
+struct DustRemover {
+    DustRemoval filter;
+    FilterView view {filter};
+    Window window {&view, filter.imageSize/4, "Dust Remover"_};
 } application;
