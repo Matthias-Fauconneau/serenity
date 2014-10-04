@@ -10,26 +10,31 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     Widget* widget;
 
 // Display
-    /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
-    bool mapped = false;
     /// Window size
     union {
         struct { uint width, height; };
         int2 size = 0;
     };
+
+    /// Associated window resource (relative to \a id)
+    enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };
+
+    /// System V shared memory
+    uint shm = 0;
+    /// Rendering target in shared memory
+    Image target;
+    /// Shared window buffer state
+    enum State { Idle, Copy, Present } state = Idle;
+
     /// Updates to be rendered
     struct Update { Graphics graphics; int2 origin, size; };
     array<Update> updates;
-    /// Rendering target in shared memory
-    Image target;
+
+    /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
+    bool mapped = false;
+
     /// Background style
     enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
-    /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };
-    /// System V shared memory
-    uint shm = 0;
-    /// Shared window buffer state
-    enum State { Idle, Copy, Present } state = Idle;
 
 // Control
     /// Whether a motion event is pending processing
@@ -67,8 +72,6 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void setIcon(const Image& icon);
 
 // Display
-    /// Resizes Shm pixmap
-    void setSize(int2 size);
     /// Schedules partial rendering after all events have been processed (\sa Poll::queue)
     void render(Graphics&& graphics, int2 origin, int2 size);
     /// Schedules window rendering after all events have been processed (\sa Poll::queue)

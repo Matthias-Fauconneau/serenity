@@ -3,17 +3,18 @@
 #include "x.h"
 #include <sys/shm.h>
 
-Window::Window(Widget* widget, int2 size, const string& title, const Image& icon) : widget(widget) {
+Window::Window(Widget* widget, int2 sizeHint, const string& title, const Image& icon) : widget(widget), size(sizeHint) {
     onEvent.connect(this, &Window::processEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
-    if((size.x<0||size.y<0) && widget) {
-        int2 hint=widget->sizeHint(0);
-        if(size.x<0) size.x=max(abs(hint.x),-size.x);
-        if(size.y<0) size.y=max(abs(hint.y),-size.y);
+    if((sizeHint.x<0||sizeHint.y<0) && widget) {
+        int2 hint = widget->sizeHint(0);
+        if(sizeHint.x<0) size.x=max(abs(hint.x),-size.x);
+        if(sizeHint.y<0) size.y=max(abs(hint.y),-size.y);
     }
     if(size.x==0) size.x=screenX;
     if(size.y==0) size.y=screenY;
+    assert_(size);
     send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});
     send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"_), .type=Atom("ATOM"_), .format=32,
                         .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW"_)));
@@ -75,11 +76,11 @@ void Window::processEvent(const ref<byte>& ge) {
     }
     else if(type==KeymapNotify) {}
     else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.y==0 && e.expose.w==1 && e.expose.h==1)) render(); }
-    else if(type==DestroyNotify) {}
+    //else if(type==DestroyNotify) {}
     else if(type==UnmapNotify) mapped=false;
     else if(type==MapNotify) mapped=true;
     else if(type==ReparentNotify) {}
-    else if(type==ConfigureNotify) setSize(int2(e.configure.w,e.configure.h));
+    else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(size!=this->size) { this->size=size; render(); } }
     else if(type==GravityNotify) {}
     else if(type==ClientMessage) {
         function<void()>* action = actions.find(Escape);
@@ -94,7 +95,6 @@ void Window::processEvent(const ref<byte>& ge) {
         state = Idle;
     }
     else log("Unhandled event", ref<string>(X11::events)[type]);
-    if(updates && mapped && state == Idle) queue();
 }
 
 void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
@@ -110,35 +110,34 @@ void Window::setIcon(const Image& icon) {
 }
 
 // Render
-#include "trace.h"
-void Window::setSize(int2 size) {
-    assert_(size);
-    if(size == this->size) return;
-    if(this->size) send(FreePixmap{.pixmap=id+Pixmap});
-    this->size = size;
-    if(shm) {
-        send(Shm::Detach{.seg=id+Segment});
-        shmdt(target.pixels);
-        shmctl(shm, IPC_RMID, 0);
-    }
-    uint stride = align(16, width);
-    shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-    target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride), size, stride);
-    target.pixels.clear(0xFF);
-    send(Shm::Attach{.seg=id+Segment, .shm=shm});
-    send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
-    render();
-}
-
 void Window::render(Graphics&& graphics, int2 origin, int2 size) {
     updates << Update{move(graphics),origin,size};
     if(updates && mapped && state == Idle) queue();
 }
-void Window::render() { updates.clear(); render({},int2(0),size); }
+void Window::render() { assert_(size); updates.clear(); render({},int2(0),size); }
 
 void Window::event() {
     Display::event();
     if(updates && state==Idle) {
+        assert_(size);
+        if(target.size != size) {
+            if(target) {
+                send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
+                assert_(shm);
+                send(Shm::Detach{.seg=id+Segment});
+                shmdt(target.pixels);
+                shmctl(shm, IPC_RMID, 0);
+                shm = 0;
+            } else assert_(!shm);
+
+            uint stride = align(16, width);
+            shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
+            target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride), size, stride);
+            target.pixels.clear(0xFF);
+            send(Shm::Attach{.seg=id+Segment, .shm=shm});
+            send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
+        }
+
         Update update = updates.take(0);
         if(!update.graphics) update.graphics = widget->graphics(size); // TODO: partial render
         assert_(update.graphics);
