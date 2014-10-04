@@ -80,6 +80,5 @@ player.cc
 
 exif.cc
 exif.h
+filter.h
 dust.cc
-
-test.cc

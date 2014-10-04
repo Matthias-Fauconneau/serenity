@@ -54,7 +54,26 @@ inline Image share(const Image& o) { return Image(unsafeReference(o.pixels),o.si
 /// \note Only supports integer box downsample
 Image resize(Image&& target, const Image& source);
 
-Image negate(Image&& target, const Image& source);
+/// 2D array of floating-point pixels
+struct ImageF {
+    ImageF(){}
+    ImageF(buffer<float>&& data, int2 size) : pixels(move(data)), size(size) { assert_(pixels.size==size_t(size.x*size.y)); }
+    ImageF(int width, int height) : width(width), height(height) { assert_(size>int2(0)); pixels=::buffer<float>(width*height); }
+    ImageF(int2 size) : ImageF(size.x, size.y) {}
+
+    explicit operator bool() const { return pixels && width && height; }
+    inline float& operator()(uint x, uint y) const {assert(x<uint(size.x) && y<uint(size.y)); return pixels[y*size.x+x]; }
+
+    buffer<float> pixels;
+    union {
+        struct { uint width, height; };
+        int2 size;
+    };
+};
+
+/// Converts a linear float image to sRGB
+Image sRGB(Image&& target, const ImageF& source);
+inline Image sRGB(const ImageF& source) { return sRGB(source.size, source); }
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);

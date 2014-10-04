@@ -76,13 +76,17 @@ Image resize(Image&& target, const Image& source) {
     else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
-Image negate(Image&& target, const Image& source) {
-    assert_(source.sRGB);
-    for(uint y: range(target.height)) for(uint x: range(target.width)) {
-        byte4 BGRA = source(x, y);
-        vec3 linear = source.sRGB ? vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : vec3(BGRA.bgr())/float(0xFF);
-        int3 negate = int3(round((float(0xFFF)*(vec3(1)-linear))));
-        target(x,y) = byte4(sRGB_forward[negate[0]], sRGB_forward[negate[1]], sRGB_forward[negate[2]], BGRA.a);
+
+Image sRGB(Image&& target, const ImageF& source) {
+    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
+        float v = source(x,y);
+        v = ::min(1.f, v); // Clip
+        assert_(v>=0, v);
+        uint linear12 = 0xFFF*v;
+        extern uint8 sRGB_forward[0x1000];
+        assert_(linear12 < 0x1000);
+        uint8 sRGB = sRGB_forward[linear12];
+        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
     }
     return move(target);
 }
