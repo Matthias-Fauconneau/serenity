@@ -134,16 +134,17 @@ struct Player : Poll {
         updatePlaylist();
         if(files) playTitle(0);
     }
-    void queueFile(const string& folder, const string& file, bool withAlbumName) {
+    void insertFile(int index, const string& folder, const string& file, bool withAlbumName) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(i<title.size && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
         title = replace(title.slice(i),"_"_," "_);
         if(withAlbumName) title = folder + " - "_ + title;
-        titles.append(title, 16);
-        files.append( folder+"/"_+file );
+        titles.insertAt(index, Text(title, 16));
+        files.insertAt(index, folder+"/"_+file );
     }
+    void queueFile(const string& folder, const string& file, bool withAlbumName) { insertFile(titles.size, folder, file, withAlbumName); }
     void playAlbum(const string& album) {
         assert(existsFolder(album,folder),album);
         array<String> files = Folder(album,folder).list(Recursive|Files|Sorted);
@@ -184,13 +185,19 @@ struct Player : Poll {
     }
     void updatePlaylist() {
         if(!randomSequence) return;
-        uint randomIndex = 0, listIndex = 0;
+        uint randomIndex = 0; // Index of active title in random sequence
         if(titles.index < files.size) {
-            listIndex=titles.index;
             for(uint i: range(randomSequence.size)) if(randomSequence[i]==files[titles.index]) { randomIndex=i; break; }
         }
-        randomIndex += files.size-listIndex; // Assumes already queued tracks are from randomSequence
-        while(titles.count() < listIndex + 16) { // Schedules at least 16 tracks drawing from random sequence as needed
+        while(titles.index < 16) { // Regenerates history of 16 previous random tracks
+            int index = randomIndex - titles.index - 1 + randomSequence.size;
+            string path = randomSequence[index%randomSequence.size];
+            string folder = section(path,'/',0,1), file = section(path,'/',1,-1);
+            insertFile(0, folder, file, true);
+            titles.index++;
+        }
+        randomIndex += files.size-titles.index; // Assumes already queued tracks are from randomSequence
+        while(titles.count() < titles.index + 16) { // Schedules at least 16 tracks drawing from random sequence as needed
             string path = randomSequence[randomIndex%randomSequence.size];
             string folder = section(path,'/',0,1), file = section(path,'/',1,-1);
             queueFile(folder, file, true);
