@@ -76,20 +76,32 @@ Image resize(Image&& target, const Image& source) {
     else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
+uint8 sRGB(float v) {
+    v = ::min(1.f, v); // Saturates
+    assert(v>=0, v);
+    uint linear12 = 0xFFF*v;
+    assert(linear12 < 0x1000);
+    return sRGB_forward[linear12];
+}
 
 Image sRGB(Image&& target, const ImageF& source) {
     for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
-        float v = source(x,y);
-        v = ::min(1.f, v); // Clip
-        assert_(v>=0, v);
-        uint linear12 = 0xFFF*v;
-        extern uint8 sRGB_forward[0x1000];
-        assert_(linear12 < 0x1000);
-        uint8 sRGB = sRGB_forward[linear12];
-        target(x,y) = byte4(sRGB, sRGB, sRGB, 0xFF);
+        uint8 v = sRGB(source(x,y));
+        target(x,y) = byte4(v, v, v, 0xFF);
     }
     return move(target);
 }
+
+Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red) {
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
+        float b = sRGB(blue(x,y));
+        float g = sRGB(green(x,y));
+        float r = sRGB(red(x,y));
+        target(x,y) = byte4(b, g, r, 0xFF);
+    }
+    return move(target);
+}
+
 
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;

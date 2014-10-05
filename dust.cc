@@ -16,27 +16,29 @@ float maximum(ref<float> values) {
 
 /// Convolves and transposes (with repeat border conditions)
 void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
-    int size = radius+1+radius;
-    for(int y: range(height)) {
-        const float* line = source + y * width;
-        float* targetColumn = target + y;
-        for(int x: range(-radius,0)) {
-            float sum = 0;
-            for(int dx: range(size)) sum += kernel[dx] * line[max(0, x+dx)];
-            targetColumn[(x+radius)*height] = sum;
+    int kernelSize = radius+1+radius;
+    chunk_parallel(height, [&](uint, uint start, uint size) {
+        for(int y: range(start, start+size)) {
+            const float* line = source + y * width;
+            float* targetColumn = target + y;
+            for(int x: range(-radius,0)) {
+                float sum = 0;
+                for(int dx: range(kernelSize)) sum += kernel[dx] * line[max(0, x+dx)];
+                targetColumn[(x+radius)*height] = sum;
+            }
+            for(int x: range(0,width-2*radius)) {
+                float sum = 0;
+                const float* span = line + x;
+                for(int dx: range(kernelSize)) sum += kernel[dx] * span[dx];
+                targetColumn[(x+radius)*height] = sum;
+            }
+            for(int x: range(width-2*radius,width-radius)){
+                float sum = 0;
+                for(int dx: range(kernelSize)) sum += kernel[dx] * line[min(width, x+dx)];
+                targetColumn[(x+radius)*height] = sum;
+            }
         }
-        for(int x: range(0,width-2*radius)) {
-            float sum = 0;
-            const float* span = line + x;
-            for(int dx: range(size)) sum += kernel[dx] * span[dx];
-            targetColumn[(x+radius)*height] = sum;
-        }
-        for(int x: range(width-2*radius,width-radius)){
-            float sum = 0;
-            for(int dx: range(size)) sum += kernel[dx] * line[min(width, x+dx)];
-            targetColumn[(x+radius)*height] = sum;
-        }
-    }
+    });
 }
 
 float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
@@ -71,7 +73,7 @@ struct InverseAttenuation : Filter {
             mref<float>& pixels = attenuationBias.pixels;
             pixels.clear();
             for(string imageName: calibration.imageNames) {
-                ImageSource source = calibration.image(imageName);
+                ImageSource source = calibration.image(imageName, Gray);
                 chunk_parallel(pixels.size, [&](uint, uint start, uint size) {
                     for(uint index: range(start, start+size)) {
                         pixels[index] += source.pixels[index];
@@ -86,17 +88,20 @@ struct InverseAttenuation : Filter {
         return ImageSource("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
     }
 
-    ImageSource image(const ImageFolder& imageFolder, string imageName) const override {
+    ImageSource image(const ImageFolder& imageFolder, string imageName, Component component) const override {
         Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
-        ImageSource source = imageFolder.image(imageName);
-        if(/*1 ||*/ !existsFile(imageName, targetFolder)) { //FIXME: automatic invalidation
-            ImageTarget target (imageName, targetFolder, source.ImageF::size);
-            // Removes dust from image
-            chunk_parallel(target.pixels.size, [&](uint, uint start, uint size) {
-                for(uint index: range(start, start+size)) target.pixels[index] = source.pixels[index] / attenuationBias.pixels[index];
-            });
+        String id = imageName+"."_+str(component);
+        if(/*1 ||*/ !existsFile(id, targetFolder)) { //FIXME: automatic invalidation
+            //for(Component component: {Blue, Green, Red}) {
+                ImageSource source = imageFolder.image(imageName, component);
+                ImageTarget target (id, targetFolder, source.ImageF::size);
+                // Removes dust from image
+                chunk_parallel(target.pixels.size, [&](uint, uint start, uint size) {
+                    for(uint index: range(start, start+size)) target.pixels[index] = source.pixels[index] / attenuationBias.pixels[index];
+                });
+            //}
         }
-        return  ImageSource(imageName, targetFolder, source.ImageF::size);
+        return ImageSource(id, targetFolder, imageFolder.imageSize);
     }
 };
 
@@ -108,7 +113,16 @@ struct FilterView : ImageWidget {
 
     string imageName = images.imageNames[0];
     bool enabled = true;
-    Image image() const { return sRGB(enabled ? (ImageF)filter.image(images, imageName) : (ImageF)images.image(imageName)); }
+    Image image() const {
+        if(enabled) return sRGB(
+                    filter.image(images, imageName, Blue),
+                    filter.image(images, imageName, Green),
+                    filter.image(images, imageName, Red) );
+        else return sRGB(
+                    images.image(imageName, Blue),
+                    images.image(imageName, Green),
+                    images.image(imageName, Red) );
+    }
 
     FilterView(const Filter& filter, const ImageFolder& images) : filter(filter), images(images) { ImageWidget::image = image(); }
 
@@ -130,7 +144,7 @@ struct FilterView : ImageWidget {
 struct DustRemovalPreview {
     InverseAttenuation filter {Folder("Pictures/Paper"_, home())};
     ImageFolder images {Folder("Pictures"_, home())};
-#if 0
+#if 1
     FilterView view {filter, images};
     Window window {&view, images.imageSize/4};
 #else

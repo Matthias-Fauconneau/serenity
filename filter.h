@@ -15,6 +15,9 @@ struct ImageSource : Map, ImageF {
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
 };
 
+enum Component { Blue, Green, Red, Gray };
+string str(Component o) { return (string[]){"blue"_,"green"_,"red"_,"gray"_}[o]; }
+
 /// Collection of images
 struct ImageFolder {
     Folder sourceFolder;
@@ -40,32 +43,37 @@ struct ImageFolder {
     const int2 imageSize = int2(4000, 3000); //FIXME: = ::imageSize(readFile(imageNames.first()));
 
     /// Loads linear float image
-    ImageSource image(string imageName) const {
+    ImageSource image(string imageName, Component component) const {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
-        string baseName = section(imageName,'.');
-        if(/*1 ||*/ !existsFile(baseName, cacheFolder)) { //FIXME: automatic invalidation
+        String id = section(imageName,'.')+"."_+str(component);
+        if(/*1 ||*/ !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
             log_(imageName);
             Image source = decodeImage(Map(imageName, sourceFolder));
 
-            log(" ->",baseName);
-            ImageTarget target (baseName, cacheFolder, source.size);
+            log(" ->", id);
+            ImageTarget target (id, cacheFolder, source.size);
             chunk_parallel(source.pixels.size, [&](uint, uint start, uint size) {
                 for(uint index: range(start, start+size)) {
                     byte4 sRGB = source.pixels[index];
                     float b = sRGB_reverse[sRGB.b];
                     float g = sRGB_reverse[sRGB.g];
                     float r = sRGB_reverse[sRGB.r];
-                    float intensity = (b+g+r)/3; // Assumes dust affects all components equally
-                    target.pixels[index] = intensity;
+                    float value;
+                    /**/  if(component==Blue) value = b;
+                    else if(component==Green) value = g;
+                    else if(component==Red) value = r;
+                    else if(component==Gray) value = (b+g+r)/3; // Assumes dust affects all components equally
+                    else error(component);
+                    target.pixels[index] = value;
                 }
             });
             assert_(::sum(target.pixels));
         }
-        return ImageSource(baseName, cacheFolder, imageSize);
+        return ImageSource(id, cacheFolder, imageSize);
     }
 };
 
 struct Filter {
     /// Returns filtered image
-    virtual ImageSource image(const ImageFolder& folder, string imageName) const abstract;
+    virtual ImageSource image(const ImageFolder& folder, string imageName, Component component) const abstract;
 };

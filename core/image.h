@@ -71,9 +71,13 @@ struct ImageF {
     };
 };
 
-/// Converts a linear float image to sRGB
+/// Converts a linear float image to grayscale sRGB
 Image sRGB(Image&& target, const ImageF& source);
 inline Image sRGB(const ImageF& source) { return sRGB(source.size, source); }
+
+/// Converts linear float image for each component to color sRGB
+Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red);
+inline Image sRGB(const ImageF& blue, const ImageF& green, const ImageF& red) { return sRGB(blue.size, blue, green, red); }
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);
