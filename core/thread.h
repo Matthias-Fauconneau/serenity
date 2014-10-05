@@ -204,7 +204,7 @@ template<Type F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 template<Type F/*, Type... Args*/> void chunk_parallel(uint64 totalSize, F f/*, Args... args*/) {
     constexpr uint64 chunkCount = threadCount;
     assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
-    const uint64 chunkSize = totalSize/chunkCount;
+    const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
     parallel(chunkCount, [&](uint id, uint64 chunkIndex) {
         uint64 chunkStart = chunkIndex*chunkSize;
         for(uint64 index: range(chunkStart, min(totalSize, chunkStart+chunkSize))) f(id, index/*, args...*/);

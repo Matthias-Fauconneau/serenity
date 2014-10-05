@@ -48,11 +48,13 @@ array<String> Folder::list(uint flags) const {
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
             //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
-            if((type==DT_DIR && flags&Folders) || ((type==DT_REG||type==DT_UNKNOWN/*NFS*/) && flags&Files) || (type==DT_CHR && flags&Devices)
-                    || (type==DT_BLK && flags&Drives)) {
+            if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN/*NFS*/))
+                    || (flags&Folders && type==DT_DIR)
+                    || (flags&Devices && type==DT_CHR)
+                    || (flags&Drives && type==DT_BLK) ) {
                 if(flags&Sorted) list.insertSorted(String(name)); else list << String(name);
             }
-            if(type==DT_DIR && flags&Recursive) {
+            if(flags&Recursive && type==DT_DIR) {
                 for(const String& file: Folder(name,*this).list(flags)) {
                     if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file;
                 }

@@ -14,10 +14,11 @@ float maximum(ref<float> values) {
 /// \file dust.cc Automatic dust removal
 #include "filter.h"
 
+#if BLUR
 /// Convolves and transposes (with repeat border conditions)
 void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
     int kernelSize = radius+1+radius;
-    /*chunk_*/parallel(height, [&](uint, uint y) {
+    chunk_parallel(height, [&](uint, uint y) {
         const float* line = source + y * width;
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {
@@ -48,9 +49,12 @@ void gaussianBlur(ImageF& image, float sigma) {
     convolve(transpose, kernel, radius, image.pixels, image.width, image.height);
     convolve(image.pixels, kernel, radius, transpose, image.height, image.width);
 }
+#endif
 
 void normalize(mref<float> values) {
-    float scaleFactor = 1./maximum(values);
+    float max = maximum(values);
+    assert_(max);
+    float scaleFactor = 1./max;
     parallel_apply(values, values, [&](float v) {  return scaleFactor*v; });
 }
 
@@ -62,10 +66,11 @@ struct InverseAttenuation : Filter {
 
     /// Calibrates attenuation bias image by summing images of a white subject
     ImageSource calibrateAttenuationBias(const ImageFolder& calibration) {
-        if(skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
+        if(1 || skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
             ImageTarget attenuationBias ("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
             if(existsFile("attenuationBias.lock"_)) remove("attenuationBias.lock"_);
             rename("attenuationBias"_, "attenuationBias.lock"_, calibration.cacheFolder);
+            log("Calibration");
 
             attenuationBias.pixels.clear();
             for(string imageName: calibration.imageNames) {
@@ -73,9 +78,10 @@ struct InverseAttenuation : Filter {
                 parallel_apply2(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
             }
             // Low pass to filter texture and noise
-            gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
+            //log("Blur"); gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
             // TODO: High pass to filter lighting conditions
             normalize(attenuationBias.pixels); // Normalizes sum by maximum (TODO: normalize by low frequency energy)
+            //assert_(min(attenuationBias.pixels));
             //assert_(min(attenuationBias.pixels)>0, min(attenuationBias.pixels));
             rename("attenuationBias.lock"_, "attenuationBias"_, calibration.cacheFolder);
         }
@@ -87,10 +93,8 @@ struct InverseAttenuation : Filter {
         String id = imageName+"."_+str(component);
         if(skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
-            assert_(max(source.pixels));
             ImageTarget target (id, targetFolder, source.ImageF::size);
             parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
-            assert_(max(target.pixels));
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }
