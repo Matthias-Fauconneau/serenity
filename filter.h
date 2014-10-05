@@ -41,14 +41,16 @@ struct ImageFolder {
     array<String> imageNames = listImages();
     const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(imageNames.first()));
 
+    Image sRGB(string imageName) const { return decodeImage(Map(imageName, sourceFolder)); }
+    Image scaledRGB(string imageName) const { return resize(imageSize, decodeImage(Map(imageName, sourceFolder))); }
+
     /// Loads linear float image
     ImageSource image(string imageName, Component component) const {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         String id = section(imageName,'.')+"."_+str(component);
         if(skipCache || !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
             log_(imageName);
-            Image source = decodeImage(Map(imageName, sourceFolder));
-
+            Image source = 0 ? sRGB(imageName) /*Slower but exact*/ : scaledRGB(imageName) /*Faster but slightly inaccurate*/;
             log(" ->", id);
             ImageTarget target (id, cacheFolder, imageSize);
             if(imageSize==source.size) linear(share(target), source, component);

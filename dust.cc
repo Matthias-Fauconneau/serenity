@@ -62,18 +62,19 @@ struct InverseAttenuation : Filter {
 
     /// Calibrates attenuation bias image by summing images of a white subject
     ImageSource calibrateAttenuationBias(const ImageFolder& calibration) {
-        if(!existsFile("attenuationBias"_, calibration.cacheFolder)) { //FIXME: automatic invalidation
+        if(skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
             ImageTarget attenuationBias ("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
 
             attenuationBias.pixels.clear();
             for(string imageName: calibration.imageNames) {
-                ImageSource source = calibration.image(imageName, Gray); // Assumes dust affects all components equally
+                ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
                 parallel_apply2(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
             }
             // Low pass to filter texture and noise
             gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
             // TODO: High pass to filter lighting conditions
             normalize(attenuationBias.pixels); // Normalizes sum by maximum (TODO: normalize by low frequency energy)
+            assert_(min(attenuationBias.pixels)>0);
         }
         return ImageSource("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
     }
@@ -81,15 +82,10 @@ struct InverseAttenuation : Filter {
     ImageSource image(const ImageFolder& imageFolder, string imageName, Component component) const override {
         Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
         String id = imageName+"."_+str(component);
-        if(skipCache || !existsFile(id, targetFolder)) { //FIXME: automatic invalidation
-            //for(Component component: {Blue, Green, Red}) {
-                ImageSource source = imageFolder.image(imageName, component);
-                ImageTarget target (id, targetFolder, source.ImageF::size);
-                // Removes dust from image
-                chunk_parallel(target.pixels.size, [&](uint, uint start, uint size) {
-                    for(uint index: range(start, start+size)) target.pixels[index] = source.pixels[index] / attenuationBias.pixels[index];
-                });
-            //}
+        if(skipCache || !existsFile(id, targetFolder)) {
+            ImageSource source = imageFolder.image(imageName, component);
+            ImageTarget target (id, targetFolder, source.ImageF::size);
+            parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }
@@ -132,13 +128,13 @@ struct FilterView : ImageWidget {
 #include "window.h"
 
 struct DustRemovalPreview {
-    InverseAttenuation filter {Folder("Pictures/Paper"_, home())};
+    //InverseAttenuation filter {Folder("Pictures/Paper"_, home())};
     ImageFolder images {Folder("Pictures"_, home())};
-#if 1
-    FilterView view {filter, images};
-    Window window {&view, images.imageSize};
-#else
-    ImageWidget attenuationBias {sRGB(filter.attenuationBias)};
-    Window window {&attenuationBias, attenuationBias.image.size/4};
-#endif
+    //FilterView view {filter, images};
+    //ImageWidget view {sRGB(filter.attenuationBias)};
+    ImageWidget view { sRGB(
+                linear(images.scaledRGB(images.imageNames[0]), Blue),
+                linear(images.scaledRGB(images.imageNames[0]), Green),
+                linear(images.scaledRGB(images.imageNames[0]), Red) ) };
+    Window window {&view};
 } application;

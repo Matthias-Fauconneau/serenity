@@ -56,10 +56,7 @@ Graphics Progress::graphics(int2 size) const {
 
 // ImageWidget
 
-int2 ImageWidget::sizeHint(int2 size) const {
-    int2 target = min(image.size*size.x/image.size.x, image.size/**size.y/image.size.y*/);
-    return min(image.size, target);
-}
+int2 ImageWidget::sizeHint(int2 size) const { return min(image.size, size.x ? image.size*size.x/image.size.x : image.size); }
 
 Graphics ImageWidget::graphics(int2 size) const {
     Graphics graphics;

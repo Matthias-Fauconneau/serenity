@@ -7,13 +7,13 @@ Window::Window(Widget* widget, int2 sizeHint, const string& title, const Image& 
     onEvent.connect(this, &Window::processEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
+    if(sizeHint.x<=0) size.x=screenX;
+    if(sizeHint.y<=0) size.y=screenY;
     if((sizeHint.x<0||sizeHint.y<0) && widget) {
-        int2 hint = widget->sizeHint(0);
-        if(sizeHint.x<0) size.x=max(abs(hint.x),-size.x);
-        if(sizeHint.y<0) size.y=max(abs(hint.y),-size.y);
+        int2 hint = widget->sizeHint(size);
+        if(sizeHint.x<0) size.x=max(abs(hint.x),-sizeHint.x);
+        if(sizeHint.y<0) size.y=max(abs(hint.y),-sizeHint.y);
     }
-    if(size.x==0) size.x=screenX;
-    if(size.y==0) size.y=screenY;
     assert_(size);
     send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});
     send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"_), .type=Atom("ATOM"_), .format=32,

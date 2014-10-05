@@ -80,8 +80,8 @@ inline ImageF downsample(const ImageF& source) { return downsample(source.size, 
 //ImageF resize(ImageF&& target, const ImageF& source)
 ImageF resize(ImageF&& target, ImageF&& source);
 
-enum Component { Blue, Green, Red, Gray };
-inline string str(Component o) { return (string[]){"blue"_,"green"_,"red"_,"gray"_}[o]; }
+enum Component { Blue, Green, Red, Mean };
+inline string str(Component o) { return (string[]){"blue"_,"green"_,"red"_,"mean"_}[o]; }
 
 /// Converts a sRGB image to linear float
 ImageF linear(ImageF&& target, const Image& source, Component component);

@@ -25,7 +25,8 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
 }
 
 static Image box(Image&& target, const Image& source) {
-    assert_(source.width*target.height==source.height*target.width, source.size, target.size);
+    //assert_(source.width*target.height==source.height*target.width, source.size, target.size); // Restricts to exact ratios
+    assert_(source.width/target.width==source.height/target.height, source.size, target.size); // Crops to nearest ratio
     assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height, source.width%target.width, source.height%target.height);
     //assert_(!source.alpha); FIXME: not alpha correct
     byte4* dst (target.pixels);
@@ -50,6 +51,7 @@ static Image box(Image&& target, const Image& source) {
 }
 
 static Image bilinear(Image&& target, const Image& source) {
+    error("Unused", target.size, source.size, source.width%target.width==0, source.height%target.height==0);
     const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
     const uint8* src = (const uint8*)source.pixels.data; byte4* dst (target.pixels);
@@ -77,14 +79,13 @@ Image resize(Image&& target, const Image& source) {
     else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
-static void linear(mref<float> target, ref<byte4> source, Component component) {
-    /**/  if(component==Blue)
+static void linear(mref<float> target, ref<byte4> source, Component component) { /**/  if(component==Blue)
         parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.b]; });
     else if(component==Green)
         parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.g]; });
     else if(component==Red)
         parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.r]; });
-    else if(component==Gray)
+    else if(component==Mean)
         parallel_apply(target, source, [](byte4 sRGB) { return (sRGB_reverse[sRGB.b]+sRGB_reverse[sRGB.g]+sRGB_reverse[sRGB.r])/3; });
     else error(component);
 }
@@ -119,10 +120,10 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 }
 
 static uint8 sRGB(float v) {
-    v = ::min(1.f, v); // Saturates
-    assert(v>=0, v);
+    //v = ::min(1.f, v); // Saturates
+    assert_(v>=0, v);
     uint linear12 = 0xFFF*v;
-    assert(linear12 < 0x1000);
+    assert_(linear12 < 0x1000);
     return sRGB_forward[linear12];
 }
 
@@ -135,7 +136,7 @@ Image sRGB(Image&& target, const ImageF& source) {
 static byte4 sRGB(float b, float g, float r) {  return byte4(sRGB(b), sRGB(g), sRGB(r), 0xFF); }
 
 static void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
-    apply(target, [&](uint index) { return sRGB(blue[index], red[index], green[index]); });
+    apply(target, [&](uint index) { return sRGB(blue[index], green[index], red[index]); });
 }
 Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red) {
     sRGB(target.pixels, blue.pixels, green.pixels, red.pixels);
