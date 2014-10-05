@@ -8,6 +8,9 @@ template<Type K, Type V> struct pair { K& key; V& value; };
 template<Type K, Type V> struct key_value { K key; V value; };
 /// Associates keys with values
 template<Type K, Type V> struct map {
+    array<K> keys;
+    array<V> values;
+
     map(){}
     map(const ref<key_value<K,V>>& pairs) {
         for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
@@ -87,7 +90,7 @@ template<Type K, Type V> struct map {
         return values.insertAt(keys.insertSorted(key),value);
     }
 
-    template<Type KK> V& operator [](KK key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insert(key); }
+    template<Type KK> V& operator [](KK&& key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
     template<Type KK> V& sorted(const KK& key) {
         size_t i = keys.indexOf(key); if(i!=invalid) return values[i];
@@ -123,8 +126,7 @@ template<Type K, Type V> struct map {
     iterator begin() { return iterator(keys.begin(),values.begin()); }
     iterator end() { return iterator(keys.end(),values.end()); }
 
-    array<K> keys;
-    array<V> values;
+    template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i], values[i])) { keys.removeAt(i), values.removeAt(i); } else i++; return *this; }
 };
 
 template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
@@ -134,18 +136,16 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
 template<Type K, Type V> String str(const map<K,V>& m) {
     String s; s<<'{';
     for(uint i: range(m.size())) {
-        s<<str(m.keys[i]);
-        s<<": "_<<str(m.values[i]);
+        s<<str(m.keys[i])<<": "_<<str(m.values[i]);
         if(i<m.size()-1) s<<", "_;
     }
     s<<'}'; return s;
 }
-template<Type K, Type V> String toASCII(const map<K,V>& m) {
+
+template<Type K, Type V> String strn(const map<K,V>& m) {
     String s;
     for(uint i: range(m.size())) {
-        assert(m.keys[i]); s<<str(m.keys[i]);
-        if(m.values[i]) s<<':'<<str(m.values[i]);
-        if(i<m.size()-1) s<<'|';
+        s<<str(m.keys[i])<<": "_<<str(m.values[i])<<'\n';
     }
-    return replace(move(s),'/','\\');
+    return s;
 }

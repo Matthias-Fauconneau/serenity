@@ -20,7 +20,7 @@ struct AudioOutput : Device, Poll {
     uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
 
-    AudioOutput(function<uint(const mref<short2>& output)> read, Thread& thread=mainThread);
+    AudioOutput(decltype(read16) read, Thread& thread=mainThread);
     virtual ~AudioOutput() { if(status) stop(); }
     explicit operator bool() const { return status; }
 

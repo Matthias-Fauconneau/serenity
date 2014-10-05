@@ -5,6 +5,7 @@
 /// 2D affine transformation
 struct mat3x2 {
     float data[3*2];
+
     mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
     mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
     mat3x2(float m00, float m01, float m10, float m11, float dx, float dy):data{m00,m10,m01,m11, dx,dy}{assert(m01==0 && m10==0);}
@@ -22,6 +23,7 @@ struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
 struct mat3 {
     float data[3*3];
+
     mat3(vec3 d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
     mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
@@ -65,6 +67,7 @@ struct mat4; inline mat4 operator*(float s, mat4 M);
 /// 3D projective transformation
 struct mat4 {
     float data[4*4];
+
     mat4(vec4 d=1) { for(int i=0;i<4*4;i++) data[i]=0; for(int i=0;i<4;i++) M(i,i)=d[i]; }
     mat4(mat3 m):mat4(1){for(int i=0;i<3;i++) for(int j=0;j<3;j++) M(i,j)=m(i,j); }
 

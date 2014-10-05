@@ -76,6 +76,17 @@ void parallel_apply(mref<T> target, const ref<S>& source, Function function/*, A
 /// Minimum number of values to trigger parallel arithmetic operations
 static constexpr size_t parallelMinimum = 1<<15;
 
+inline float parallel_sum(ref<float> values) {
+    if(values.size < parallelMinimum) return ::sum(values);
+    float sums[threadCount];
+    parallel_chunk(values.size, [&](uint id, uint start, uint size) {
+        float sum = 0;
+        for(uint index: range(start, start+size)) sum += values[index];
+        sums[id] = sum;
+    });
+    return sum(sums);
+}
+
 inline float minimum(ref<float> values) {
     if(values.size < parallelMinimum) return ::min(values);
     float maximums[threadCount];
@@ -113,6 +124,11 @@ inline void normalize(mref<float> values) {
     assert_(max);
     float scaleFactor = 1./max;
     values *= scaleFactor;
+}
+
+inline void add(mref<float> Y, ref<float> A, ref<float> B) {
+    if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a+b; });
+    else parallel_apply(Y, A, B, [&](float a, float b) {  return a+b; });
 }
 
 inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {

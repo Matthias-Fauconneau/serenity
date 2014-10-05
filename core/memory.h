@@ -12,6 +12,10 @@ extern "C" void free(void* buffer) noexcept;
 /// \note either an heap allocation managed by this object or a reference to memory managed by another object
 /// \note Use array for objects with move constructors as buffer elements are not initialized on allocation
 generic struct buffer : mref<T> {
+    using mref<T>::data;
+    using mref<T>::size;
+    size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation
+
     /// Default constructs an empty buffer
     buffer(){}
     /// References \a size elements from const \a data pointer
@@ -30,10 +34,6 @@ generic struct buffer : mref<T> {
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
-
-    using mref<T>::data;
-    using mref<T>::size;
-    size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); copy(t, o); return t; }

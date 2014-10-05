@@ -31,28 +31,41 @@ struct ImageSourceRGB : Map, Image {
 };
 
 /// Collection of images
-struct ImageFolder {
+struct ImageFolder : map<String, map<String, String>> {
     Folder sourceFolder;
     Folder cacheFolder {".cache"_, sourceFolder, true};
+    const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(keys.at(0));
 
-    ImageFolder(Folder&& sourceFolder) : sourceFolder(move(sourceFolder)) {}
-
-    /// Lists matching images
-    array<String> listImages() {
-        array<String> imageNames;
+    ImageFolder(Folder&& folder) : sourceFolder(move(folder)) {
         array<String> fileNames = sourceFolder.list(Files|Sorted);
+        //map<String, array<String>> occurences;
         for(String& fileName: fileNames) {
             Map file = Map(fileName, sourceFolder);
             if(imageFileFormat(file)!="JPEG"_) continue; // Only JPEG images
-            if(parseExifTags(file).at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture //FIXME: -> DustRemoval
+            auto tags = parseExifTags(file);
+            //if(tags.at("Exif.Photo.FNumber"_).real() != 6.3) continue; // Only same aperture //FIXME: -> DustRemoval
             //TODO: if(source.size != imageSize) { log("Warning: inconsistent source image size"); continue; }
-            imageNames << move(fileName);
+            //for(auto tag: tags) occurences[tag.key] += str(tag.value); // Aggregates occurences for each tag
+            insert(move(fileName), {tags.keys, apply(tags.values, [](const Variant& o){return str(o);})});
         }
-        return imageNames;
+        //occurences.filter( [this](const string&, const ref<String>& values) { return values.size == 1 || values.size == size(); } );
+        //log(strn(occurences));
+        for(auto& tags: values) {
+            tags.filter([this](const string& key, const string&) { return !ref<string>{
+                            "Exif.Photo.FocalLength"_,
+                            "Exif.Photo.FNumber"_,
+                            "Exif.Photo.ExposureBiasValue"_,
+                            "Exif.Photo.ISOSpeedRatings"_,
+                            "Exif.Photo.ExposureTime"_ }.contains(key);
+            });
+            replace(tags.keys, "Exif.Photo.FocalLength"_, "Focal"_);
+            replace(tags.keys, "Exif.Photo.FNumber"_, "Aperture"_);
+            replace(tags.keys, "Exif.Photo.ExposureBiasValue"_, "Bias"_);
+            replace(tags.keys, "Exif.Photo.ISOSpeedRatings"_, "Gain"_);
+            replace(tags.keys, "Exif.Photo.ExposureTime"_, "Time"_);
+        }
+        //log(strn(*this));
     }
-
-    array<String> imageNames = listImages();
-    const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(imageNames[0]));
 
     //Image sRGB(string imageName) const { return decodeImage(Map(imageName, sourceFolder)); }
     ImageSourceRGB scaledRGB(string imageName) const {

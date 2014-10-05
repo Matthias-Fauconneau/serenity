@@ -17,6 +17,7 @@ extern "C" int* __errno_location() noexcept __attribute((const));
 /// Unix file descriptor
 struct Handle {
     handle<int> fd;
+
     Handle():fd(0){}
     Handle(int fd):fd(fd){}
     default_move(Handle);

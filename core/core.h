@@ -23,6 +23,8 @@ generic T copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
+    T pointer;
+
     handle(T pointer=T()):pointer(pointer){}
     handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
     handle(handle&& o):pointer(o.pointer){o.pointer=T();}
@@ -32,8 +34,6 @@ generic struct handle {
     T* operator &() { return &pointer; }
     T operator ->() { return pointer; }
     const T operator ->() const { return pointer; }
-
-    T pointer;
 };
 
 // Forward
@@ -135,6 +135,9 @@ template<> void abort(const string& message) __attribute((noreturn));
 // ref
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct ref {
+    const T* data = 0;
+    size_t size = 0;
+
     /// Default constructs an empty reference
     constexpr ref() {}
     /// References \a size elements from const \a data pointer
@@ -186,9 +189,6 @@ generic struct ref {
     size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)!=invalid; }
-
-    const T* data = 0;
-    size_t size = 0;
 };
 
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
@@ -223,6 +223,9 @@ inline void* operator new(size_t, void* p) noexcept { return p; }
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
+    using ref<T>::data;
+    using ref<T>::size;
+
     /// Default constructs an empty reference
     mref(){}
     /// References \a size elements from \a data pointer
@@ -250,9 +253,6 @@ generic struct mref : ref<T> {
 
     /// Initializes reference using the same constructor for all elements
     template<Type... Args> void clear(Args... args) const { for(size_t i: range(size)) new (&at(i)) T(args...); }
-
-    using ref<T>::data;
-    using ref<T>::size;
 };
 /// Returns mutable reference to memory used by \a t
 generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }

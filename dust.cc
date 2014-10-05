@@ -1,7 +1,5 @@
 #include "parallel.h"
 
-
-
 // -> image.cc
 #include "image.h"
 /// Convolves and transposes (with repeat border conditions)
@@ -23,7 +21,7 @@ void convolve(float* target, const float* kernel, int radius, const float* sourc
         }
         for(int x: range(width-2*radius,width-radius)){
             float sum = 0;
-            for(int dx: range(N)) sum += kernel[dx] * line[min(width, x+dx)];
+            for(int dx: range(N)) sum += kernel[dx] * line[min(width-1, x+dx)];
             targetColumn[(x+radius)*height] = sum;
         }
     });
@@ -60,7 +58,7 @@ struct InverseAttenuation : Filter {
             log("Calibration");
 
             attenuationBias.pixels.clear();
-            for(string imageName: calibration.imageNames) {
+            for(string imageName: calibration.keys) {
                 ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
                 parallel_apply(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
             }
@@ -78,11 +76,42 @@ struct InverseAttenuation : Filter {
         String id = imageName+"."_+str(component);
         if(1 || skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
-            ImageTarget target (id, targetFolder, source.ImageF::size);
-            //parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
-            subtract(target.pixels, source.pixels, gaussianBlur(source, 1).pixels);
-            target.pixels += -minimum(target.pixels);
-            normalize(target.pixels);
+            int2 size = source.ImageF::size;
+
+            // TODO: reuse buffers
+            ImageF low_spot = gaussianBlur(source, 1);
+            ImageF high (size);
+            subtract(high.pixels, source.pixels, low_spot.pixels);
+            ImageF low = gaussianBlur(low_spot, 64); // 128 is too slow ... (TODO: fast large radius blur)
+            ImageF spot (size);
+            subtract(spot.pixels, low_spot.pixels, low.pixels);
+
+            ImageF correction_unweighted (size);
+            float DC = parallel_sum(source.pixels) / source.pixels.size;
+            parallel_apply(correction_unweighted.pixels, spot.pixels, attenuationBias.pixels, [&](float source, float bias) { return (DC + source) / bias - DC; });
+
+            copy(correction_unweighted.pixels, spot.pixels);
+            ImageF correction_low_spot = gaussianBlur(correction_unweighted, 8);
+            ImageF correction_high (size);
+            subtract(correction_high.pixels, correction_unweighted.pixels, correction_low_spot.pixels);
+            ImageF correction_low = gaussianBlur(low_spot, 16);
+            ImageF correction_spot (size);
+            subtract(correction_spot.pixels, correction_low_spot.pixels, correction_low.pixels);
+
+            ImageF correction (size);
+            copy(correction.pixels, correction_spot.pixels); //TODO: weight
+            add(correction.pixels, correction.pixels, correction_low.pixels);
+            add(correction.pixels, correction.pixels, correction_high.pixels);
+
+            ImageTarget target (id, targetFolder, size);
+            copy(target.pixels, correction.pixels);
+            add(target.pixels, target.pixels, low.pixels);
+            add(target.pixels, target.pixels, high.pixels);
+
+            //copy(target.pixels, spot.pixels);
+            //target.pixels += DC;
+            //target.pixels += -minimum(target.pixels);
+            //normalize(target.pixels);
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }
@@ -92,54 +121,48 @@ struct InverseAttenuation : Filter {
 
 struct ImageView : ImageWidget {
     const ImageFolder& images;
-    string imageName = images.imageNames[0];
+    string imageName = images.keys[0];
     ImageSourceRGB source; // Holds memory map reference
+    function<void(string, const map<String, String>&)> contentChanged;
 
-    void update() {
-        source = images.scaledRGB(imageName);
-        ImageWidget::image = share(source);
-    }
+    ImageView(const ImageFolder& images, decltype(contentChanged) contentChanged)
+        : images(images), contentChanged(contentChanged) { update(); }
 
-    ImageView(const ImageFolder& images) : images(images) { update(); }
     bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
-        string imageName = images.imageNames[(images.imageNames.size-1)*cursor.x/size.x];
-        if(imageName != this->imageName) { this->imageName = imageName; update(); return true; }
-        return false;
-    }
-};
-
-struct FilterView : ImageWidget {
-    const Filter& filter;
-    const ImageFolder& images;
-
-    string imageName = images.imageNames[0];
-    bool enabled = true;
-
-    ImageSourceRGB source; // Holds memory map reference
-
-    void update() {
-        if(enabled) {
-            ImageWidget::image = sRGB(
-                        filter.image(images, imageName, Blue),
-                        filter.image(images, imageName, Green),
-                        filter.image(images, imageName, Red) );
-        } else {
-            source = images.scaledRGB(imageName);
-            ImageWidget::image = share(source);
-        }
-    }
-
-    FilterView(const Filter& filter, const ImageFolder& images) : filter(filter), images(images) { update(); }
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*&) override {
-        string imageName = images.imageNames[(images.imageNames.size-1)*cursor.x/size.x];
-        bool enabled = button != NoButton && event != Release;
-        if(enabled != this->enabled || imageName != this->imageName) {
-            this->enabled = enabled;
-            this->imageName = imageName;
-            update();
+        string imageName = images.keys[images.size()*min(size.x-1,cursor.x)/size.x];
+        if(imageName != this->imageName) {
+            this->imageName = imageName; update();
+            contentChanged(imageName, images.at(imageName));
             return true;
         }
         return false;
+    }
+
+    virtual void update() {
+        source = images.scaledRGB(imageName);
+        ImageWidget::image = share(source);
+    }
+};
+
+struct FilterView : ImageView {
+    const Filter& filter;
+    bool enabled = false;
+
+    FilterView(const ImageFolder& images, decltype(contentChanged) contentChanged, const Filter& filter)
+        : ImageView(images, contentChanged), filter(filter) { update(); }
+
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
+        bool enabled = button != NoButton && event != Release;
+        if(enabled != this->enabled) { this->enabled = enabled, imageName=""_;/*Forces update*/ }
+        return ImageView::mouseEvent(cursor, size, event, button, focus);
+    }
+
+    void update() override {
+        if(enabled) ImageWidget::image = sRGB(
+                    filter.image(images, imageName, Blue),
+                    filter.image(images, imageName, Green),
+                    filter.image(images, imageName, Red) );
+        else ImageView::update();
     }
 };
 
@@ -151,6 +174,6 @@ struct DustRemovalPreview {
     InverseAttenuation filter {calibrationImages};
     //ImageWidget view {sRGB(filter.attenuationBias)};
     ImageFolder images {Folder("Pictures"_, home())};
-    FilterView view {filter, images};
+    FilterView view {calibrationImages, [&](string name, const map<String, String>& tags){ window.setTitle(str(name, tags)); }, filter};
     Window window {&view};
 } application;

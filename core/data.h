@@ -33,6 +33,9 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
+    ::buffer<byte> buffer;
+    uint index=0;
+
     Data(){}
     /// Creates a Data interface to a \a buffer
     Data(::buffer<byte>&& data) : buffer(move(data)) {}
@@ -64,13 +67,12 @@ struct Data {
 
     /// Reads until the end of input
     ref<byte> untilEnd() { uint size=available(-1); return read(size); }
-
-    ::buffer<byte> buffer;
-    uint index=0;
 };
 
 /// Provides a convenient interface to parse binary inputs
 struct BinaryData : Data {
+    bool isBigEndian = false;
+
     BinaryData(){}
     /// Creates a BinaryData interface to an \a array
     BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
@@ -128,8 +130,6 @@ struct BinaryData : Data {
 
    /// Reads \a size \a T elements (swap as needed)
    generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
-
-   bool isBigEndian = false;
 };
 
 /// Provides a convenient interface to parse text streams

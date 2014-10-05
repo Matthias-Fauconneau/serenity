@@ -5,6 +5,10 @@
 /// Managed initialized dynamic mutable reference to an array of elements (either an heap allocation managed by this object or a reference to memory managed by another object)
 /// \note Adds resize/insert/remove using T constructor/destructor
 generic struct array : buffer<T> {
+    using buffer<T>::data;
+    using buffer<T>::size;
+    using buffer<T>::capacity;
+
     default_move(array);
     /// Default constructs an empty array
     array() {}
@@ -19,8 +23,12 @@ generic struct array : buffer<T> {
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
 
+    using buffer<T>::end;
+    using buffer<T>::at;
+    using buffer<T>::slice;
+
     /// Compares all elements
-    bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
+    //bool operator ==(const ref<T>& b) const { return (ref<T>)*this==b; }
 
     /// Allocates enough memory for \a capacity elements
     void reserve(size_t nextCapacity) {
@@ -100,13 +108,6 @@ generic struct array : buffer<T> {
         assert(min == max);
         return min;
     }
-
-    using buffer<T>::data;
-    using buffer<T>::size;
-    using buffer<T>::capacity;
-    using buffer<T>::end;
-    using buffer<T>::at;
-    using buffer<T>::slice;
 };
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
@@ -166,8 +167,8 @@ auto apply(const ref<T>& source, Function function, Args... args) -> buffer<decl
 }
 
 /// Replaces in \a array every occurence of \a before with \a after
-generic array<T> replace(array<T>&& a, const T& before, const T& after) {
-    for(T& e : a) if(e==before) e=after; return move(a);
+template<Type T, Type B, Type A> void replace(array<T>& a, const B& before, const A& after) {
+    for(T& e : a) if(e==before) e=T(after);
 }
 
 /// Converts arrays to references

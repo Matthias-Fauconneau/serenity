@@ -122,7 +122,8 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 
 static uint8 sRGB(float v) {
     v = ::min(1.f, v); // Saturates
-    assert_(v>=0, v);
+    v = ::max(0.f, v); // Clips
+    //assert_(v>=0, v);
     uint linear12 = 0xFFF*v;
     assert_(linear12 < 0x1000);
     return sRGB_forward[linear12];

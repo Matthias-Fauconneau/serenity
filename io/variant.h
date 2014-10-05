@@ -68,7 +68,12 @@ inline String str(const Variant& o) {
     if(o.type==Variant::Data) return copy(o.data);
     if(o.type==Variant::List) return str(o.list);
     if(o.type==Variant::Dict) return str(o.dict);
-    if(o.type==Variant::Rational) return str(int(o.number),"/"_,int(o.denominator));
+    if(o.type==Variant::Rational) {
+        return str(o.real());
+        //assert_((o.number/o.denominator)*o.denominator==o.number);
+        //return str(o.number/o.denominator);
+        return str(int(o.number),"/"_,int(o.denominator));
+    }
     error("Invalid Variant"_,int(o.type));
 }
 
