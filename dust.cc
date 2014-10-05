@@ -17,26 +17,24 @@ float maximum(ref<float> values) {
 /// Convolves and transposes (with repeat border conditions)
 void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
     int kernelSize = radius+1+radius;
-    chunk_parallel(height, [&](uint, uint start, uint size) {
-        for(int y: range(start, start+size)) {
-            const float* line = source + y * width;
-            float* targetColumn = target + y;
-            for(int x: range(-radius,0)) {
-                float sum = 0;
-                for(int dx: range(kernelSize)) sum += kernel[dx] * line[max(0, x+dx)];
-                targetColumn[(x+radius)*height] = sum;
-            }
-            for(int x: range(0,width-2*radius)) {
-                float sum = 0;
-                const float* span = line + x;
-                for(int dx: range(kernelSize)) sum += kernel[dx] * span[dx];
-                targetColumn[(x+radius)*height] = sum;
-            }
-            for(int x: range(width-2*radius,width-radius)){
-                float sum = 0;
-                for(int dx: range(kernelSize)) sum += kernel[dx] * line[min(width, x+dx)];
-                targetColumn[(x+radius)*height] = sum;
-            }
+    /*chunk_*/parallel(height, [&](uint, uint y) {
+        const float* line = source + y * width;
+        float* targetColumn = target + y;
+        for(int x: range(-radius,0)) {
+            float sum = 0;
+            for(int dx: range(kernelSize)) sum += kernel[dx] * line[max(0, x+dx)];
+            targetColumn[(x+radius)*height] = sum;
+        }
+        for(int x: range(0,width-2*radius)) {
+            float sum = 0;
+            const float* span = line + x;
+            for(int dx: range(kernelSize)) sum += kernel[dx] * span[dx];
+            targetColumn[(x+radius)*height] = sum;
+        }
+        for(int x: range(width-2*radius,width-radius)){
+            float sum = 0;
+            for(int dx: range(kernelSize)) sum += kernel[dx] * line[min(width, x+dx)];
+            targetColumn[(x+radius)*height] = sum;
         }
     });
 }
@@ -53,10 +51,7 @@ void gaussianBlur(ImageF& image, float sigma) {
 
 void normalize(mref<float> values) {
     float max = maximum(values);
-    chunk_parallel(values.size, [&](uint, uint start, uint size) {
-        float scaleFactor = 1./max;
-        for(uint index: range(start, start+size)) values[index] *= scaleFactor;
-    });
+    parallel_apply(values, values, [](float v, float scaleFactor) {  return scaleFactor*v; }, 1./max);
 }
 
 /// Inverts attenuation bias
@@ -67,18 +62,13 @@ struct InverseAttenuation : Filter {
 
     /// Calibrates attenuation bias image by summing images of a white subject
     ImageSource calibrateAttenuationBias(const ImageFolder& calibration) {
-        if(1 || !existsFile("attenuationBias"_, calibration.cacheFolder)) { //FIXME: automatic invalidation
+        if(!existsFile("attenuationBias"_, calibration.cacheFolder)) { //FIXME: automatic invalidation
             ImageTarget attenuationBias ("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
 
-            mref<float>& pixels = attenuationBias.pixels;
-            pixels.clear();
+            attenuationBias.pixels.clear();
             for(string imageName: calibration.imageNames) {
-                ImageSource source = calibration.image(imageName, Gray);
-                chunk_parallel(pixels.size, [&](uint, uint start, uint size) {
-                    for(uint index: range(start, start+size)) {
-                        pixels[index] += source.pixels[index];
-                    }
-                });
+                ImageSource source = calibration.image(imageName, Gray); // Assumes dust affects all components equally
+                parallel_apply2(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
             }
             // Low pass to filter texture and noise
             gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
@@ -91,7 +81,7 @@ struct InverseAttenuation : Filter {
     ImageSource image(const ImageFolder& imageFolder, string imageName, Component component) const override {
         Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
         String id = imageName+"."_+str(component);
-        if(/*1 ||*/ !existsFile(id, targetFolder)) { //FIXME: automatic invalidation
+        if(skipCache || !existsFile(id, targetFolder)) { //FIXME: automatic invalidation
             //for(Component component: {Blue, Green, Red}) {
                 ImageSource source = imageFolder.image(imageName, component);
                 ImageTarget target (id, targetFolder, source.ImageF::size);
@@ -146,7 +136,7 @@ struct DustRemovalPreview {
     ImageFolder images {Folder("Pictures"_, home())};
 #if 1
     FilterView view {filter, images};
-    Window window {&view, images.imageSize/4};
+    Window window {&view, images.imageSize};
 #else
     ImageWidget attenuationBias {sRGB(filter.attenuationBias)};
     Window window {&attenuationBias, attenuationBias.image.size/4};

@@ -62,7 +62,7 @@ struct ImageF {
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 
     explicit operator bool() const { return pixels && width && height; }
-    inline float& operator()(uint x, uint y) const {assert(x<uint(size.x) && y<uint(size.y)); return pixels[y*size.x+x]; }
+    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return pixels[y*size.x+x]; }
 
     buffer<float> pixels;
     union {
@@ -70,6 +70,22 @@ struct ImageF {
         int2 size;
     };
 };
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.pixels),o.size); }
+
+/*/// Downsamples linear float image by a factor 2
+ImageF downsample(ImageF&& target, const ImageF& source);
+inline ImageF downsample(const ImageF& source) { return downsample(source.size, source); }*/
+
+//ImageF resize(ImageF&& target, const ImageF& source)
+ImageF resize(ImageF&& target, ImageF&& source);
+
+enum Component { Blue, Green, Red, Gray };
+inline string str(Component o) { return (string[]){"blue"_,"green"_,"red"_,"gray"_}[o]; }
+
+/// Converts a sRGB image to linear float
+ImageF linear(ImageF&& target, const Image& source, Component component);
+inline ImageF linear(const Image& source, Component component) { return linear(source.size, source, component); }
 
 /// Converts a linear float image to grayscale sRGB
 Image sRGB(Image&& target, const ImageF& source);
@@ -78,6 +94,7 @@ inline Image sRGB(const ImageF& source) { return sRGB(source.size, source); }
 /// Converts linear float image for each component to color sRGB
 Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red);
 inline Image sRGB(const ImageF& blue, const ImageF& green, const ImageF& red) { return sRGB(blue.size, blue, green, red); }
+
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);

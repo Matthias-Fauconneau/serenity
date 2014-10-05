@@ -114,25 +114,41 @@ generic array<T> copy(const array<T>& o) { return copy((const buffer<T>&)o); }
 /// Concatenates two arrays
 generic inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r; r<<a; r<<b; return r; }
 
+/// Filters elements matching predicate
+template<Type T, Type F> array<T> filter(const ref<T>& a, F f) { array<T> r(a.size); for(const T& e: a) if(!f(e)) r << copy(e); return r; }
+
+/// Stores the application of a function to every index up to a size in a mref
+template<Type T, Type Function, Type... Args> void apply(mref<T> target, Function function, Args... args) {
+    for(size_t index: range(target.size)) new (&target[index]) T(function(index, args...));
+}
+
+/// Stores the application of a function to every elements of a ref in a mref
+template<Type T, Type S, Type Function, Type... Args> void apply(mref<T> target, const ref<S>& source, Function function, Args... args) {
+    for(size_t index: range(target.size)) new (&target[index]) T(function(source[index], args...));
+}
+
+/// Stores the application of a function to every elements of two refs in a mref
+template<Type T, Type S0, Type S1, Type Function, Type... Args>
+void apply(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Function function, Args... args) {
+    for(size_t index: range(target.size)) new (&target[index]) T(function(source0[index], source1[index], args...));
+}
+
+/// Returns an array of the application of a function to every index up to a size
+template<Type Function, Type... Args>
+auto apply(size_t size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
+    buffer<decltype(function(0, args...))> target(size); apply(size, function, args..., target); return target;
+}
+
+/// Returns an array of the application of a function to every elements of a reference
+template<Type T, Type Function, Type... Args>
+auto apply(const ref<T>& source, Function function, Args... args) -> buffer<decltype(function(source[0], args...))> {
+    buffer<decltype(function(source[0], args...))> target(source.size); apply(source, function, args..., target); return target;
+}
+
 /// Replaces in \a array every occurence of \a before with \a after
 generic array<T> replace(array<T>&& a, const T& before, const T& after) {
     for(T& e : a) if(e==before) e=after; return move(a);
 }
-
-/// Returns an array of the application of a function to every index up to a size
-template<Type Function, class... Args> auto apply(uint size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
-    buffer<decltype(function(0, args...))> r(size); for(uint i: range(size)) new (&r[i]) decltype(function(0, args...))(function(i, args...)); return r;
-}
-
-/// Returns an array of the application of a function to every elements of a reference
-template<Type T, class Function, class... Args> auto apply(const ref<T>& a, Function function, Args... args) -> buffer<decltype(function(a[0], args...))> {
-    buffer<decltype(function(a[0], args...))> r(a.size);
-    for(uint i: range(a.size)) new (&r[i]) decltype(function(a[0], args...))(function(a[i], args...));
-    return r;
-}
-
-/// Filters elements matching predicate
-template<Type T, Type F> array<T> filter(const ref<T>& a, F f) { array<T> r(a.size); for(const T& e: a) if(!f(e)) r << copy(e); return r; }
 
 /// Converts arrays to references
 generic array<ref<T> > toRefs(const ref<array<T>>& o) {

@@ -1,6 +1,7 @@
 #include "image.h"
 #include "data.h"
 #include "vector.h"
+#include "thread.h" // parallel
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
 void __attribute((constructor(1001))) generate_sRGB_forward() {
@@ -24,7 +25,7 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
 }
 
 static Image box(Image&& target, const Image& source) {
-    assert_(source.width/target.width==source.height/target.height, source.size, target.size);
+    assert_(source.width*target.height==source.height*target.width, source.size, target.size);
     assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height, source.width%target.width, source.height%target.height);
     //assert_(!source.alpha); FIXME: not alpha correct
     byte4* dst (target.pixels);
@@ -76,7 +77,48 @@ Image resize(Image&& target, const Image& source) {
     else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
-uint8 sRGB(float v) {
+static void linear(mref<float> target, ref<byte4> source, Component component) {
+    /**/  if(component==Blue)
+        parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.b]; });
+    else if(component==Green)
+        parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.g]; });
+    else if(component==Red)
+        parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.r]; });
+    else if(component==Gray)
+        parallel_apply(target, source, [](byte4 sRGB) { return (sRGB_reverse[sRGB.b]+sRGB_reverse[sRGB.g]+sRGB_reverse[sRGB.r])/3; });
+    else error(component);
+}
+ImageF linear(ImageF&& target, const Image& source, Component component) {
+    linear(target.pixels, source.pixels, component);
+    return move(target);
+}
+
+static ImageF downsample(ImageF&& target, const ImageF& source) {
+    assert_(target.size == source.size/2, target.size, source.size);
+    for(uint y: range(target.height)) for(uint x: range(target.width))
+        target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / 4;
+    return move(target);
+}
+
+static bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
+static uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+//ImageF resize(ImageF&& target, const ImageF& source) {
+ImageF resize(ImageF&& target, ImageF&& source) {
+    assert_(source.width*target.height==source.height*target.width); // Uniform scale
+    assert_(source.size > target.size, target.size, source.size); // Downsample
+    assert_(source.size.x%target.size.x == 0, target.size, source.size); // Integer ratio
+    assert_(isPowerOfTwo(source.size.x/target.size.x)); // Mipmap downsample
+    int times = log2(uint(source.size.x/target.size.x));
+    ImageF inplaceSource = share(source);
+    for(uint unused iteration: range(times-1)) {
+        ImageF inplaceTarget = share(inplaceSource); inplaceTarget.size = inplaceSource.size/2;
+        inplaceTarget = downsample(move(inplaceTarget), inplaceSource);
+        inplaceSource = move(inplaceTarget);
+    }
+    return downsample(move(target), inplaceSource);
+}
+
+static uint8 sRGB(float v) {
     v = ::min(1.f, v); // Saturates
     assert(v>=0, v);
     uint linear12 = 0xFFF*v;
@@ -84,24 +126,21 @@ uint8 sRGB(float v) {
     return sRGB_forward[linear12];
 }
 
+static void sRGB(mref<byte4> target, ref<float> source) { apply(target, source, [](float s) { uint8 v = sRGB(s); return byte4(v, v, v, 0xFF); }); }
 Image sRGB(Image&& target, const ImageF& source) {
-    for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
-        uint8 v = sRGB(source(x,y));
-        target(x,y) = byte4(v, v, v, 0xFF);
-    }
+    sRGB(target.pixels, source.pixels);
     return move(target);
 }
 
+static byte4 sRGB(float b, float g, float r) {  return byte4(sRGB(b), sRGB(g), sRGB(r), 0xFF); }
+
+static void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
+    apply(target, [&](uint index) { return sRGB(blue[index], red[index], green[index]); });
+}
 Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red) {
-    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
-        float b = sRGB(blue(x,y));
-        float g = sRGB(green(x,y));
-        float r = sRGB(red(x,y));
-        target(x,y) = byte4(b, g, r, 0xFF);
-    }
+    sRGB(target.pixels, blue.pixels, green.pixels, red.pixels);
     return move(target);
 }
-
 
 string imageFileFormat(const ref<byte>& file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;

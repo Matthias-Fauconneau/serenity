@@ -3,6 +3,8 @@
 #include "exif.h"
 #include "jpeg.h"
 
+static constexpr bool skipCache = true;
+
 struct ImageTarget : Map, ImageF {
     ImageTarget(const string& path, const Folder& at, int2 size) :
         Map(File(path, at, ::Flags(ReadWrite|Create)).resize(size.x*size.y*sizeof(float)), Map::Write),
@@ -14,9 +16,6 @@ struct ImageSource : Map, ImageF {
         Map (path, at),
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
 };
-
-enum Component { Blue, Green, Red, Gray };
-string str(Component o) { return (string[]){"blue"_,"green"_,"red"_,"gray"_}[o]; }
 
 /// Collection of images
 struct ImageFolder {
@@ -40,34 +39,20 @@ struct ImageFolder {
     }
 
     array<String> imageNames = listImages();
-    const int2 imageSize = int2(4000, 3000); //FIXME: = ::imageSize(readFile(imageNames.first()));
+    const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(imageNames.first()));
 
     /// Loads linear float image
     ImageSource image(string imageName, Component component) const {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         String id = section(imageName,'.')+"."_+str(component);
-        if(/*1 ||*/ !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
+        if(skipCache || !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
             log_(imageName);
             Image source = decodeImage(Map(imageName, sourceFolder));
 
             log(" ->", id);
-            ImageTarget target (id, cacheFolder, source.size);
-            chunk_parallel(source.pixels.size, [&](uint, uint start, uint size) {
-                for(uint index: range(start, start+size)) {
-                    byte4 sRGB = source.pixels[index];
-                    float b = sRGB_reverse[sRGB.b];
-                    float g = sRGB_reverse[sRGB.g];
-                    float r = sRGB_reverse[sRGB.r];
-                    float value;
-                    /**/  if(component==Blue) value = b;
-                    else if(component==Green) value = g;
-                    else if(component==Red) value = r;
-                    else if(component==Gray) value = (b+g+r)/3; // Assumes dust affects all components equally
-                    else error(component);
-                    target.pixels[index] = value;
-                }
-            });
-            assert_(::sum(target.pixels));
+            ImageTarget target (id, cacheFolder, imageSize);
+            if(imageSize==source.size) linear(share(target), source, component);
+            else resize(share(target), linear(source, component));
         }
         return ImageSource(id, cacheFolder, imageSize);
     }
