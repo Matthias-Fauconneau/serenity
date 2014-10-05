@@ -135,3 +135,8 @@ inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
     if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a-b; });
     else parallel_apply(Y, A, B, [&](float a, float b) {  return a-b; });
 }
+
+inline void multiply(mref<float> Y, ref<float> A, ref<float> B) {
+    if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a*b; });
+    else parallel_apply(Y, A, B, [&](float a, float b) {  return a*b; });
+}

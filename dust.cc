@@ -77,38 +77,48 @@ struct InverseAttenuation : Filter {
         if(1 || skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
             int2 size = source.ImageF::size;
-
+            ImageTarget target (id, targetFolder, size);
             // TODO: reuse buffers
-            ImageF low_spot = gaussianBlur(source, 1);
+
+            /*//ImageF low_spot = gaussianBlur(source, 1);
+            const ImageF& low_spot = source;
             ImageF high (size);
             subtract(high.pixels, source.pixels, low_spot.pixels);
-            ImageF low = gaussianBlur(low_spot, 64); // 128 is too slow ... (TODO: fast large radius blur)
-            ImageF spot (size);
-            subtract(spot.pixels, low_spot.pixels, low.pixels);
+            //ImageF low = gaussianBlur(low_spot, 64); // 128 is too slow ... (TODO: fast large radius blur)
+            //float DC = parallel_sum(source.pixels) / source.pixels.size;
+            ImageF low (size); low.pixels.clear(DC);
+            ImageF large_spot_band (size);
+            subtract(large_spot_band.pixels, low_spot.pixels, low.pixels);*/
 
-            ImageF correction_unweighted (size);
-            float DC = parallel_sum(source.pixels) / source.pixels.size;
-            parallel_apply(correction_unweighted.pixels, spot.pixels, attenuationBias.pixels, [&](float source, float bias) { return (DC + source) / bias - DC; });
+            /*ImageF corrected_spot_band (size);
+            parallel_apply(corrected_spot_band.pixels, large_spot_band.pixels, attenuationBias.pixels,
+                           [&](float source, float bias) { return (DC + source) / bias - DC; });
+            //const ImageF& corrected_spot_band = large_spot_band;*/
 
-            copy(correction_unweighted.pixels, spot.pixels);
-            ImageF correction_low_spot = gaussianBlur(correction_unweighted, 8);
-            ImageF correction_high (size);
-            subtract(correction_high.pixels, correction_unweighted.pixels, correction_low_spot.pixels);
-            ImageF correction_low = gaussianBlur(low_spot, 16);
-            ImageF correction_spot (size);
-            subtract(correction_spot.pixels, correction_low_spot.pixels, correction_low.pixels);
+            ImageF corrected_spot_band (size);
+            parallel_apply(corrected_spot_band.pixels, source.pixels, attenuationBias.pixels,
+                           [&](float source, float bias) { return source / bias; });
 
-            ImageF correction (size);
-            copy(correction.pixels, correction_spot.pixels); //TODO: weight
-            add(correction.pixels, correction.pixels, correction_low.pixels);
-            add(correction.pixels, correction.pixels, correction_high.pixels);
+            ImageF corrected_low_spot = gaussianBlur(corrected_spot_band, 1);
+            ImageF corrected_high (size);
+            subtract(corrected_high.pixels, corrected_spot_band.pixels, corrected_low_spot.pixels);
+            ImageF corrected_low = gaussianBlur(corrected_low_spot, 2);
+            ImageF narrow_corrected_spot_band (size);
+            subtract(narrow_corrected_spot_band.pixels, corrected_low_spot.pixels, corrected_low.pixels);
 
-            ImageTarget target (id, targetFolder, size);
-            copy(target.pixels, correction.pixels);
-            add(target.pixels, target.pixels, low.pixels);
-            add(target.pixels, target.pixels, high.pixels);
+            //ImageF weighted_corrected (size);
+            // Merges full spectrum outside spot
+            const ImageF& weighted_corrected = target;
+            multiply(weighted_corrected.pixels, attenuationBias.pixels, narrow_corrected_spot_band.pixels); // Fades out narrow band near spot
+            add(weighted_corrected.pixels, weighted_corrected.pixels, corrected_low.pixels);
+            add(weighted_corrected.pixels, weighted_corrected.pixels, corrected_high.pixels);
+            // Merges narrow correct band inside spot
 
-            //copy(target.pixels, spot.pixels);
+            //copy(target.pixels, weighted_corrected.pixels);
+            //add(target.pixels, target.pixels, low.pixels);
+            //add(target.pixels, target.pixels, high.pixels);
+
+            //copy(target.pixels, narrow_corrected_spot_band.pixels);
             //target.pixels += DC;
             //target.pixels += -minimum(target.pixels);
             //normalize(target.pixels);
@@ -123,16 +133,13 @@ struct ImageView : ImageWidget {
     const ImageFolder& images;
     string imageName = images.keys[0];
     ImageSourceRGB source; // Holds memory map reference
-    function<void(string, const map<String, String>&)> contentChanged;
 
-    ImageView(const ImageFolder& images, decltype(contentChanged) contentChanged)
-        : images(images), contentChanged(contentChanged) { update(); }
+    ImageView(const ImageFolder& images) : images(images) { update(); }
 
     bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
         string imageName = images.keys[images.size()*min(size.x-1,cursor.x)/size.x];
         if(imageName != this->imageName) {
             this->imageName = imageName; update();
-            contentChanged(imageName, images.at(imageName));
             return true;
         }
         return false;
@@ -148,8 +155,7 @@ struct FilterView : ImageView {
     const Filter& filter;
     bool enabled = false;
 
-    FilterView(const ImageFolder& images, decltype(contentChanged) contentChanged, const Filter& filter)
-        : ImageView(images, contentChanged), filter(filter) { update(); }
+    FilterView(const ImageFolder& images, const Filter& filter) : ImageView(images), filter(filter) { update(); }
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
         bool enabled = button != NoButton && event != Release;
@@ -168,12 +174,23 @@ struct FilterView : ImageView {
 
 #include "window.h"
 
+struct FilterWindow : FilterView {
+    Window window {this};
+    FilterWindow(const ImageFolder& images, const Filter& filter) : FilterView(images, filter) {}
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
+        if(FilterView::mouseEvent(cursor, size, event, button, focus)) {
+            window.setTitle(str(imageName, images.at(imageName), enabled));
+            return true;
+        }
+        return false;
+    }
+};
+
 struct DustRemovalPreview {
     ImageFolder calibrationImages = Folder("Pictures/Paper"_, home());
     //ImageView view {calibrationImages};
     InverseAttenuation filter {calibrationImages};
     //ImageWidget view {sRGB(filter.attenuationBias)};
     ImageFolder images {Folder("Pictures"_, home())};
-    FilterView view {calibrationImages, [&](string name, const map<String, String>& tags){ window.setTitle(str(name, tags)); }, filter};
-    Window window {&view};
+    FilterWindow view {images, filter};
 } application;
