@@ -25,8 +25,8 @@ Window::Window(Widget* widget, int2 sizeHint, const string& title, const Image& 
     send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     show();
-
     actions[Escape] = []{exit();};
+    render();
 }
 
 Window::~Window() {

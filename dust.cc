@@ -3,7 +3,7 @@
 
 float maximum(ref<float> values) {
     float maximums[threadCount];
-    chunk_parallel(values.size, [&](uint id, uint start, uint size) {
+    parallel_chunk(values.size, [&](uint id, uint start, uint size) {
         float max=0;
         for(uint index: range(start, start+size)) { float v=values[index]; if(v>max) max = v; }
         maximums[id] = max;
@@ -50,8 +50,8 @@ void gaussianBlur(ImageF& image, float sigma) {
 }
 
 void normalize(mref<float> values) {
-    float max = maximum(values);
-    parallel_apply(values, values, [](float v, float scaleFactor) {  return scaleFactor*v; }, 1./max);
+    float scaleFactor = 1./maximum(values);
+    parallel_apply(values, values, [&](float v) {  return scaleFactor*v; });
 }
 
 /// Inverts attenuation bias
@@ -64,6 +64,8 @@ struct InverseAttenuation : Filter {
     ImageSource calibrateAttenuationBias(const ImageFolder& calibration) {
         if(skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
             ImageTarget attenuationBias ("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
+            if(existsFile("attenuationBias.lock"_)) remove("attenuationBias.lock"_);
+            rename("attenuationBias"_, "attenuationBias.lock"_, calibration.cacheFolder);
 
             attenuationBias.pixels.clear();
             for(string imageName: calibration.imageNames) {
@@ -74,7 +76,8 @@ struct InverseAttenuation : Filter {
             gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
             // TODO: High pass to filter lighting conditions
             normalize(attenuationBias.pixels); // Normalizes sum by maximum (TODO: normalize by low frequency energy)
-            assert_(min(attenuationBias.pixels)>0);
+            //assert_(min(attenuationBias.pixels)>0, min(attenuationBias.pixels));
+            rename("attenuationBias.lock"_, "attenuationBias"_, calibration.cacheFolder);
         }
         return ImageSource("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
     }
@@ -84,8 +87,10 @@ struct InverseAttenuation : Filter {
         String id = imageName+"."_+str(component);
         if(skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
+            assert_(max(source.pixels));
             ImageTarget target (id, targetFolder, source.ImageF::size);
             parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
+            assert_(max(target.pixels));
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }
@@ -93,32 +98,53 @@ struct InverseAttenuation : Filter {
 
 #include "interface.h"
 
+struct ImageView : ImageWidget {
+    const ImageFolder& images;
+    string imageName = images.imageNames[0];
+    ImageSourceRGB source; // Holds memory map reference
+
+    void update() {
+        source = images.scaledRGB(imageName);
+        ImageWidget::image = share(source);
+    }
+
+    ImageView(const ImageFolder& images) : images(images) { update(); }
+    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
+        string imageName = images.imageNames[(images.imageNames.size-1)*cursor.x/size.x];
+        if(imageName != this->imageName) { this->imageName = imageName; update(); return true; }
+        return false;
+    }
+};
+
 struct FilterView : ImageWidget {
     const Filter& filter;
     const ImageFolder& images;
 
     string imageName = images.imageNames[0];
     bool enabled = true;
-    Image image() const {
-        if(enabled) return sRGB(
-                    filter.image(images, imageName, Blue),
-                    filter.image(images, imageName, Green),
-                    filter.image(images, imageName, Red) );
-        else return sRGB(
-                    images.image(imageName, Blue),
-                    images.image(imageName, Green),
-                    images.image(imageName, Red) );
+
+    ImageSourceRGB source; // Holds memory map reference
+
+    void update() {
+        if(enabled) {
+            ImageWidget::image = sRGB(
+                        filter.image(images, imageName, Blue),
+                        filter.image(images, imageName, Green),
+                        filter.image(images, imageName, Red) );
+        } else {
+            source = images.scaledRGB(imageName);
+            ImageWidget::image = share(source);
+        }
     }
 
-    FilterView(const Filter& filter, const ImageFolder& images) : filter(filter), images(images) { ImageWidget::image = image(); }
-
-    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
+    FilterView(const Filter& filter, const ImageFolder& images) : filter(filter), images(images) { update(); }
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*&) override {
         string imageName = images.imageNames[(images.imageNames.size-1)*cursor.x/size.x];
-        bool enabled = cursor.y < size.y/2;
+        bool enabled = button != NoButton && event != Release;
         if(enabled != this->enabled || imageName != this->imageName) {
             this->enabled = enabled;
             this->imageName = imageName;
-            ImageWidget::image = image();
+            update();
             return true;
         }
         return false;
@@ -128,13 +154,11 @@ struct FilterView : ImageWidget {
 #include "window.h"
 
 struct DustRemovalPreview {
-    //InverseAttenuation filter {Folder("Pictures/Paper"_, home())};
-    ImageFolder images {Folder("Pictures"_, home())};
-    //FilterView view {filter, images};
+    ImageFolder calibrationImages = Folder("Pictures/Paper"_, home());
+    //ImageView view {calibrationImages};
+    InverseAttenuation filter {calibrationImages};
     //ImageWidget view {sRGB(filter.attenuationBias)};
-    ImageWidget view { sRGB(
-                linear(images.scaledRGB(images.imageNames[0]), Blue),
-                linear(images.scaledRGB(images.imageNames[0]), Green),
-                linear(images.scaledRGB(images.imageNames[0]), Red) ) };
+    ImageFolder images {Folder("Pictures"_, home())};
+    FilterView view {filter, images};
     Window window {&view};
 } application;

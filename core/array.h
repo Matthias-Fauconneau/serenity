@@ -117,6 +117,7 @@ generic inline array<T> operator+(const ref<T>& a, const ref<T>& b) { array<T> r
 /// Filters elements matching predicate
 template<Type T, Type F> array<T> filter(const ref<T>& a, F f) { array<T> r(a.size); for(const T& e: a) if(!f(e)) r << copy(e); return r; }
 
+#if 0
 /// Stores the application of a function to every index up to a size in a mref
 template<Type T, Type Function, Type... Args> void apply(mref<T> target, Function function, Args... args) {
     for(size_t index: range(target.size)) new (&target[index]) T(function(index, args...));
@@ -126,6 +127,25 @@ template<Type T, Type Function, Type... Args> void apply(mref<T> target, Functio
 template<Type T, Type S, Type Function, Type... Args> void apply(mref<T> target, const ref<S>& source, Function function, Args... args) {
     for(size_t index: range(target.size)) new (&target[index]) T(function(source[index], args...));
 }
+#else
+template<bool B, class T = void> struct enable_if {};
+template<class T> struct enable_if<true, T> { typedef T type; };
+
+template<class T, class U> struct is_same { static constexpr bool value = false; };
+template<class T> struct is_same<T, T> { static constexpr bool value = true; };
+
+/// Stores the application of a function to every index up to a size in a mref
+template<Type T, Type Function, Type... Args> auto apply(mref<T> target, Function function, Args... args)
+-> typename enable_if<is_same<decltype(function(0, args...)), T>::value, void>::type {
+    for(size_t index: range(target.size)) new (&target[index]) T(function(index, args...));
+}
+
+/// Stores the application of a function to every elements of a ref in a mref
+template<Type T, Type S, Type Function, Type... Args> auto apply(mref<T> target, const ref<S>& source, Function function, Args... args)
+-> typename enable_if<is_same<decltype(function(source[0], args...)), T>::value, void>::type {
+    for(size_t index: range(target.size)) new (&target[index]) T(function(source[index], args...));
+}
+#endif
 
 /// Stores the application of a function to every elements of two refs in a mref
 template<Type T, Type S0, Type S1, Type Function, Type... Args>
@@ -136,13 +156,13 @@ void apply(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Funct
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function, Type... Args>
 auto apply(size_t size, Function function, Args... args) -> buffer<decltype(function(0, args...))> {
-    buffer<decltype(function(0, args...))> target(size); apply(size, function, args..., target); return target;
+    buffer<decltype(function(0, args...))> target(size); apply(target, size, function, args...); return target;
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type T, Type Function, Type... Args>
 auto apply(const ref<T>& source, Function function, Args... args) -> buffer<decltype(function(source[0], args...))> {
-    buffer<decltype(function(source[0], args...))> target(source.size); apply(source, function, args..., target); return target;
+    buffer<decltype(function(source[0], args...))> target(source.size); apply(target, source, function, args...); return target;
 }
 
 /// Replaces in \a array every occurence of \a before with \a after

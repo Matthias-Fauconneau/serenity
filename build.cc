@@ -203,7 +203,7 @@ struct Build {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
             args << copy(files);
-            args << apply(libraries, [this](const String& library){ return "-l"_+library; });
+            args << apply(ref<String>(libraries), [this](const String& library){ return "-l"_+library; });
             for(int pid: pids) if(wait(pid)) error("Failed to compile"); // Waits for each translation unit to finish compiling before final linking
             if(execute(CXX, toRefs(args))) error("Failed to link");
         }

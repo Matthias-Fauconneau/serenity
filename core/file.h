@@ -164,18 +164,18 @@ struct Map : mref<byte> {
     using mref::size;
 };
 
-/// Renames a file replacing any existing files or links
+/// Renames a file
 void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName);
-/// Renames a file replacing any existing files or links
+/// Renames a file
 void rename(const string& oldName, const string& newName, const Folder& at=currentWorkingDirectory());
 /// Removes file
 void remove(const string& name, const Folder& at=currentWorkingDirectory());
 /// Removes folder
-void remove(const Folder& folder);
+//void remove(const Folder& folder);
 /// Removes folder
-void removeFolder(const string& name, const Folder& at=currentWorkingDirectory());
+//void removeFolder(const string& name, const Folder& at=currentWorkingDirectory());
 /// Removes file or folder
-void removeFileOrFolder(const string& name, const Folder& at);
+//void removeFileOrFolder(const string& name, const Folder& at);
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const string& target,const string& name, const Folder& at=currentWorkingDirectory());
 /// Sets the last modified time for \a path to current time

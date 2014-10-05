@@ -40,8 +40,14 @@ static void blit(const Image& target, int2 origin, const Image& source, vec3 col
 
     int2 min = ::max(int2(0), origin);
     int2 max = ::min(target.size, origin+source.size);
-    if(color==vec3(0) && opacity==1 && !source.sRGB) { // Alpha multiply (e.g. glyphs)
-        for(int y: range(min.y,max.y)) for(int x: range(min.x,max.x)) {
+    /**/  if(color==vec3(1) && opacity==1 && source.sRGB && !source.alpha) { // Copy
+        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
+            byte4 s = source(x-origin.x, y-origin.y);
+            target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
+        }
+    }
+    else if(color==vec3(0) && opacity==1 && !source.sRGB) { // Alpha multiply (e.g. glyphs)
+        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             int opacity = source(x-origin.x,y-origin.y).a; // FIXME: single channel images
             byte4& target_sRGB = target(x,y);
             vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
@@ -49,7 +55,8 @@ static void blit(const Image& target, int2 origin, const Image& source, vec3 col
             target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
-    } else {
+    }
+    else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);
             vec3 linear = source.sRGB ? vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : vec3(BGRA.bgr())/float(0xFF);

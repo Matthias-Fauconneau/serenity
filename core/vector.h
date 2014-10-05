@@ -141,3 +141,5 @@ generic struct bgra {
 typedef vec<bgra,uint8,4> byte4;
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;
+/// Unsigned integer b,g,r,a vector (32bit)
+typedef vec<bgra,uint,4> uint4;

@@ -120,14 +120,14 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { assert(oldName!=newName); rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
-void removeFolder(const string& name, const Folder& at) { check__( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
-void remove(const Folder& folder) { int fd=check(openat(folder.fd, strz("."_), O_WRONLY|O_DIRECTORY, 0), folder.name()); check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); close(fd); }
-void removeFileOrFolder(const string& name, const Folder& at) {
+//void removeFolder(const string& name, const Folder& at) { check__( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
+//void remove(const Folder& folder) { check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); }
+/*void removeFileOrFolder(const string& name, const Folder& at) {
     if(existsFolder(name,at)) {
         for(const string& file: Folder(name,at).list(Files)) ::remove(file,Folder(name,at));
         ::removeFolder(name, at);
     } else ::remove(name, at);
-}
+}*/
 void symlink(const string& from,const string& to, const Folder& at) {
     assert(from!=to);
     remove(from,at);

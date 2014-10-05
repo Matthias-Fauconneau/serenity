@@ -18,9 +18,9 @@ struct Image {
     bool alpha=false, sRGB=true;
 
     Image():size(0){}
-    Image(buffer<byte4>&& pixels, int2 size, uint stride, bool alpha=false, bool sRGB=true)
-        : pixels(move(pixels)), size(size), stride(stride), alpha(alpha), sRGB(sRGB) {
-        assert_(this->pixels.size == height*stride, this->pixels.size, size, stride);
+    Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false, bool sRGB=true)
+        : pixels(move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
+        assert_(this->pixels.size == height*this->stride, this->pixels.size, size, this->stride);
     }
     Image(uint width, uint height, bool alpha=false, bool sRGB=true) : width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
         assert(width); assert(height);
@@ -62,7 +62,7 @@ struct ImageF {
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 
     explicit operator bool() const { return pixels && width && height; }
-    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return pixels[y*size.x+x]; }
+    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return pixels[y*width+x]; }
 
     buffer<float> pixels;
     union {

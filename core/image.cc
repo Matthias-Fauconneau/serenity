@@ -27,30 +27,29 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
 static Image box(Image&& target, const Image& source) {
     //assert_(source.width*target.height==source.height*target.width, source.size, target.size); // Restricts to exact ratios
     assert_(source.width/target.width==source.height/target.height, source.size, target.size); // Crops to nearest ratio
-    assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height, source.width%target.width, source.height%target.height);
-    //assert_(!source.alpha); FIXME: not alpha correct
-    byte4* dst (target.pixels);
-    const byte4* src = source.pixels;
-    int scale = source.width/target.width;
-    for(uint unused y: range(target.height)) {
-        const byte4* line = src;
+    assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height);
+    assert_(!source.alpha); //FIXME: not alpha correct
+    uint scale = source.width/target.width;
+    assert_(scale <= 16);
+    chunk_parallel(target.height, [&](uint, uint y) {
+        const byte4* sourceLine = source.pixels.data + y * scale * source.stride;
+        byte4* targetLine = target.pixels.begin() + y * target.stride;
         for(uint unused x: range(target.width)) {
-            int4 s = 0;
+            const byte4* sourceSpanOrigin = sourceLine + x* scale;
+            uint4 s = 0;
             for(uint i: range(scale)) {
-                for(uint j: range(scale)) {
-                    s += int4(line[i*source.stride+j]);
-                }
+                const byte4* sourceSpan = sourceSpanOrigin + i * source.stride;
+                for(uint j: range(scale)) s += uint4(sourceSpan[j]);
             }
             s /= scale*scale;
-            *dst = byte4(s);
-            line += scale, dst++;
+            targetLine[x] = byte4(s[0], s[1], s[2], 0xFF);
         }
-        src += scale * source.stride;
-    }
+    });
     return move(target);
 }
 
 static Image bilinear(Image&& target, const Image& source) {
+    assert_(!source.alpha);
     error("Unused", target.size, source.size, source.width%target.width==0, source.height%target.height==0);
     const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
@@ -62,10 +61,11 @@ static Image bilinear(Image&& target, const Image& source) {
             uint u = fx%256, v = fy%256;
             const uint8* s = src+iy*stride+ix*4;
             byte4 d;
-            for(int i=0; i<4; i++) { // Interpolates values as if in linear space (not sRGB)
+            for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
                 d[i] = ((uint(s[           i]) * (256-u) + uint(s[           4+i]) * u) * (256-v)
                        + (uint(s[stride+i]) * (256-u) + uint(s[stride+4+i]) * u) * (       v) ) / (256*256);
             }
+            d[3] = 0xFF;
             dst[y*targetStride+x] = d;
         }
     }
@@ -88,6 +88,7 @@ static void linear(mref<float> target, ref<byte4> source, Component component) {
     else if(component==Mean)
         parallel_apply(target, source, [](byte4 sRGB) { return (sRGB_reverse[sRGB.b]+sRGB_reverse[sRGB.g]+sRGB_reverse[sRGB.r])/3; });
     else error(component);
+    assert_(max(target), component);
 }
 ImageF linear(ImageF&& target, const Image& source, Component component) {
     linear(target.pixels, source.pixels, component);
@@ -120,7 +121,7 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 }
 
 static uint8 sRGB(float v) {
-    //v = ::min(1.f, v); // Saturates
+    v = ::min(1.f, v); // Saturates
     assert_(v>=0, v);
     uint linear12 = 0xFFF*v;
     assert_(linear12 < 0x1000);

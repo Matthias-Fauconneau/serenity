@@ -120,7 +120,7 @@
 
     // Returns the next scan line.
     // For grayscale images, pScan_line will point to a buffer containing 8-bit pixels (get_bytes_per_pixel() will return 1).
-    // Otherwise, it will always point to a buffer containing 32-bit RGBA pixels (A will always be 255, and get_bytes_per_pixel() will return 4).
+    // Otherwise, it will always point to a buffer containing 32-bit RGBA pixels (A will always be 0xFF, and get_bytes_per_pixel() will return 4).
     // Returns JPGD_SUCCESS if a scan line has been returned.
     // Returns JPGD_DONE if all scan lines have been returned.
     // Returns JPGD_FAILED if an error occurred. Call get_error_code() for a more info.
@@ -357,7 +357,7 @@ enum JPEG_SUBSAMPLING { JPGD_GRAYSCALE = 0, JPGD_YH1V1, JPGD_YH2V1, JPGD_YH1V2, 
 
 #define MULTIPLY(var, cnst)  ((var) * (cnst))
 
-#define CLAMP(i) ((static_cast<uint>(i) > 255) ? (((~i) >> 31) & 0xFF) : (i))
+#define CLAMP(i) ((static_cast<uint>(i) > 0xFF) ? (((~i) >> 31) & 0xFF) : (i))
 
 // Compiler creates a fast path 1D IDCT for X non-zero columns
 template <int NONZERO_COLS>
@@ -821,7 +821,7 @@ inline int jpeg_decoder::huff_decode(huff_tables *pH, int& extra_bits)
   }
   else
   {
-    JPGD_ASSERT(((symbol >> 8) & 31) == pH->code_size[symbol & 255] + ((symbol & 0x8000) ? (symbol & 15) : 0));
+    JPGD_ASSERT(((symbol >> 8) & 31) == pH->code_size[symbol & 0xFF] + ((symbol & 0x8000) ? (symbol & 15) : 0));
 
     if (symbol & 0x8000)
     {
@@ -854,10 +854,10 @@ static const int s_extend_offset[16] = { 0, ((-1)<<1) + 1, ((-1)<<2) + 1, ((-1)<
 // The logical AND's in this macro are to shut up static code analysis (aren't really necessary - couldn't find another way to do this)
 #define JPGD_HUFF_EXTEND(x, s) (((x) < s_extend_test[s & 15]) ? ((x) + s_extend_offset[s & 15]) : (x))
 
-// Clamps a value between 0-255.
+// Clamps a value between 0-0xFF.
 inline uint8 jpeg_decoder::clamp(int i)
 {
-  if (static_cast<uint>(i) > 255)
+  if (static_cast<uint>(i) > 0xFF)
     i = (((~i) >> 31) & 0xFF);
 
   return static_cast<uint8>(i);
@@ -1238,7 +1238,7 @@ void jpeg_decoder::read_dht_marker()
       count += huff_num[i];
     }
 
-    if (count > 255)
+    if (count > 0xFF)
       stop_decoding(JPGD_BAD_DHT_COUNTS);
 
     for (i = 0; i < count; i++)
@@ -1747,7 +1747,7 @@ void jpeg_decoder::init(jpeg_decoder_stream *pStream)
 // Create a few tables that allow us to quickly convert YCbCr to RGB.
 void jpeg_decoder::create_look_ups()
 {
-  for (int i = 0; i <= 255; i++)
+  for (int i = 0; i <= 0xFF; i++)
   {
     int k = i - 128;
     m_crr[i] = ( FIX(1.40200f)  * k + ONE_HALF) >> SCALEBITS;
@@ -2168,7 +2168,7 @@ void jpeg_decoder::H1V1Convert()
       d[2] = clamp(y + m_crr[cr]);
       d[1] = clamp(y + ((m_crg[cr] + m_cbg[cb]) >> 16));
       d[0] = clamp(y + m_cbb[cb]);
-      d[3] = 255;
+      d[3] = 0xFF;
 
       d += 4;
     }
@@ -2202,13 +2202,13 @@ void jpeg_decoder::H2V1Convert()
         d0[2] = clamp(yy+rc);
         d0[1] = clamp(yy+gc);
         d0[0] = clamp(yy+bc);
-        d0[3] = 255;
+        d0[3] = 0xFF;
 
         yy = y[(j<<1)+1];
         d0[6] = clamp(yy+rc);
         d0[5] = clamp(yy+gc);
         d0[4] = clamp(yy+bc);
-        d0[7] = 255;
+        d0[7] = 0xFF;
 
         d0 += 8;
 
@@ -2253,13 +2253,13 @@ void jpeg_decoder::H1V2Convert()
       d0[2] = clamp(yy+rc);
       d0[1] = clamp(yy+gc);
       d0[0] = clamp(yy+bc);
-      d0[3] = 255;
+      d0[3] = 0xFF;
 
       yy = y[8+j];
       d1[2] = clamp(yy+rc);
       d1[1] = clamp(yy+gc);
       d1[0] = clamp(yy+bc);
-      d1[3] = 255;
+      d1[3] = 0xFF;
 
       d0 += 4;
       d1 += 4;
@@ -2303,25 +2303,25 @@ void jpeg_decoder::H2V2Convert()
 				d0[2] = clamp(yy+rc);
 				d0[1] = clamp(yy+gc);
 				d0[0] = clamp(yy+bc);
-				d0[3] = 255;
+                d0[3] = 0xFF;
 
 				yy = y[j+1];
 				d0[6] = clamp(yy+rc);
 				d0[5] = clamp(yy+gc);
 				d0[4] = clamp(yy+bc);
-				d0[7] = 255;
+                d0[7] = 0xFF;
 
 				yy = y[j+8];
 				d1[2] = clamp(yy+rc);
 				d1[1] = clamp(yy+gc);
 				d1[0] = clamp(yy+bc);
-				d1[3] = 255;
+                d1[3] = 0xFF;
 
 				yy = y[j+8+1];
 				d1[6] = clamp(yy+rc);
 				d1[5] = clamp(yy+gc);
 				d1[4] = clamp(yy+bc);
-				d1[7] = 255;
+                d1[7] = 0xFF;
 
 				d0 += 8;
 				d1 += 8;
@@ -2377,7 +2377,7 @@ void jpeg_decoder::expanded_convert()
         d[2] = clamp(y + m_crr[cr]);
         d[1] = clamp(y + ((m_crg[cr] + m_cbg[cb]) >> 16));
         d[0] = clamp(y + m_cbb[cb]);
-        d[3] = 255;
+        d[3] = 0xFF;
 
         d += 4;
       }
@@ -3407,7 +3407,7 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
           pDst[0] = luma;
           pDst[1] = luma;
           pDst[2] = luma;
-          pDst[3] = 255;
+          pDst[3] = 0xFF;
           pDst += 4;
         }
       }

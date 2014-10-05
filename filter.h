@@ -3,7 +3,7 @@
 #include "exif.h"
 #include "jpeg.h"
 
-static constexpr bool skipCache = true;
+static constexpr bool skipCache = false;
 
 struct ImageTarget : Map, ImageF {
     ImageTarget(const string& path, const Folder& at, int2 size) :
@@ -15,6 +15,19 @@ struct ImageSource : Map, ImageF {
     ImageSource(const string& path, const Folder& at, int2 size) :
         Map (path, at),
         ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
+};
+
+struct ImageTargetRGB : Map, Image {
+    ImageTargetRGB(const string& path, const Folder& at, int2 size) :
+        Map(File(path, at, ::Flags(ReadWrite|Create)).resize(size.x*size.y*sizeof(byte4)), Map::Write),
+        Image(unsafeReference(cast<byte4>((Map&)*this)), size) {}
+};
+
+struct ImageSourceRGB : Map, Image {
+    ImageSourceRGB() {}
+    ImageSourceRGB(const string& path, const Folder& at, int2 size) :
+        Map (path, at),
+        Image(unsafeReference(cast<byte4>((Map&)*this)), size) {}
 };
 
 /// Collection of images
@@ -41,20 +54,36 @@ struct ImageFolder {
     array<String> imageNames = listImages();
     const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(imageNames.first()));
 
-    Image sRGB(string imageName) const { return decodeImage(Map(imageName, sourceFolder)); }
-    Image scaledRGB(string imageName) const { return resize(imageSize, decodeImage(Map(imageName, sourceFolder))); }
+    //Image sRGB(string imageName) const { return decodeImage(Map(imageName, sourceFolder)); }
+    ImageSourceRGB scaledRGB(string imageName) const {
+        // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
+        String id = section(imageName,'.')+".rgb"_;
+        if(skipCache || !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
+            log_("("_+imageName+" "_);
+            Image source = decodeImage(Map(imageName, sourceFolder));
+            log_("->"_+id+") "_);
+            ImageTargetRGB target (id, cacheFolder, imageSize);
+            target.pixels.clear();
+            resize(share(target), source);
+            assert_(max(target.pixels));
+        }
+        return ImageSourceRGB(id, cacheFolder, imageSize);
+    }
 
     /// Loads linear float image
     ImageSource image(string imageName, Component component) const {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         String id = section(imageName,'.')+"."_+str(component);
         if(skipCache || !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
-            log_(imageName);
-            Image source = 0 ? sRGB(imageName) /*Slower but exact*/ : scaledRGB(imageName) /*Faster but slightly inaccurate*/;
-            log(" ->", id);
+            log_("("_+section(imageName,'.')+" "_);
+            //Image source = sRGB(imageName) //Slower but exact
+            ImageSourceRGB source = scaledRGB(imageName); // Faster but slightly inaccurate
+            assert_(max(source.pixels), component);
+            log_("->"_+id+") "_);
             ImageTarget target (id, cacheFolder, imageSize);
-            if(imageSize==source.size) linear(share(target), source, component);
-            else resize(share(target), linear(source, component));
+            if(imageSize==source.Image::size) linear(share(target), source, component);
+            else error("Slow"); //resize(share(target), linear(source, component));
+            assert_(max(target.pixels), component);
         }
         return ImageSource(id, cacheFolder, imageSize);
     }

@@ -200,45 +200,48 @@ template<Type F> void parallel(uint64 start, uint64 stop, F f) {
 }
 template<Type F> void parallel(uint stop, F f) { parallel(0,stop,f); }
 
-/// Runs a loop in parallel chunks
-template<Type F> void chunk_parallel(uint64 totalSize, F f) {
+/// Runs a loop in parallel chunks with element-wise functor
+template<Type F/*, Type... Args*/> void chunk_parallel(uint64 totalSize, F f/*, Args... args*/) {
+    constexpr uint64 chunkCount = threadCount;
+    assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
+    const uint64 chunkSize = totalSize/chunkCount;
+    parallel(chunkCount, [&](uint id, uint64 chunkIndex) {
+        uint64 chunkStart = chunkIndex*chunkSize;
+        for(uint64 index: range(chunkStart, min(totalSize, chunkStart+chunkSize))) f(id, index/*, args...*/);
+    });
+}
+
+/// Runs a loop in parallel chunks with chunk-wise functor
+template<Type F> void parallel_chunk(uint64 totalSize, F f) {
     constexpr uint64 chunkCount = threadCount;
     assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
     const uint64 chunkSize = totalSize/chunkCount;
     parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }
 
-/// Runs a loop in parallel chunks
-template<Type F, Type... Args> void chunk_parallel(uint64 totalSize, F f, Args... args) {
-    constexpr uint64 chunkCount = threadCount;
-    assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
-    const uint64 chunkSize = totalSize/chunkCount;
-    parallel(chunkCount, [&](uint id, uint64 chunkIndex) {
-        uint64 chunkStart = chunkIndex*chunkSize;
-        for(uint64 index: range(chunkStart, min(totalSize, chunkStart+chunkSize))) f(id, index, args...);
-    });
-}
-
 /// Stores the application of a function to every index up to a size in a mref
 template<Type T, Type Function, Type... Args>
-auto parallel_apply(mref<T> target, size_t size, Function function, Args... args) {
-    chunk_parallel(size, [&](uint, uint start, uint size) {
+void parallel_apply(mref<T> target, size_t size, Function function, Args... args) {
+    /*parallel_chunk(size, [&](uint, uint start, uint size) {
         for(size_t index: range(start, start+size)) new (&target[index]) T(function(index, args...));
-    });
+    });*/
+    chunk_parallel(size, [&](uint, uint index) { new (&target[index]) T(function(index, args...)); });
 }
 
 /// Stores the application of a function to every elements of a ref in a mref
 template<Type T, Type S, Type Function, Type... Args>
 void parallel_apply(mref<T> target, const ref<S>& source, Function function, Args... args) {
-    chunk_parallel(target.size, [&](uint, uint start, uint size) {
+    /*parallel_chunk(target.size, [&](uint, uint start, uint size) {
         for(size_t index: range(start, start+size)) new (&target[index]) T(function(source[index], args...));
-    });
+    });*/
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source[index], args...)); });
 }
 
 /// Stores the application of a function to every elements of two refs in a mref
 template<Type T, Type S0, Type S1, Type Function, Type... Args>
 void parallel_apply2(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Function function, Args... args) {
-    chunk_parallel(target.size, [&](uint, uint start, uint size) {
+    /*parallel_chunk(target.size, [&](uint, uint start, uint size) {
         for(size_t index: range(start, start+size)) new (&target[index]) T(function(source0[index], source1[index], args...));
-    });
+    });*/
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], source1[index], args...)); });
 }
