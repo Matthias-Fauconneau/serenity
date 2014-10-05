@@ -154,7 +154,6 @@ generic struct ref {
     const T& at(size_t i) const { assert(i<size); return data[i]; }
     T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
     const T& operator [](size_t i) const { return at(i); }
-    const T& first() const { return at(0); }
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
@@ -209,8 +208,8 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 }
 
 // ref<Arithmetic> operations
-generic const T& min(const ref<T>& a) { const T* min=&a.first(); for(const T& e: a) if(e < *min) min=&e; return *min; }
-generic const T& max(const ref<T>& a) { const T* max=&a.first(); for(const T& e: a) if(*max < e) max=&e; return *max; }
+generic const T& min(const ref<T>& a) { const T* min=&a[0]; for(const T& e: a) if(e < *min) min=&e; return *min; }
+generic const T& max(const ref<T>& a) { const T* max=&a[0]; for(const T& e: a) if(*max < e) max=&e; return *max; }
 template<Type T> auto sum(const ref<T>& a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
 
 template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }

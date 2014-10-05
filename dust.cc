@@ -81,6 +81,8 @@ struct InverseAttenuation : Filter {
             ImageTarget target (id, targetFolder, source.ImageF::size);
             //parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
             subtract(target.pixels, source.pixels, gaussianBlur(source, 1).pixels);
+            target.pixels += -minimum(target.pixels);
+            normalize(target.pixels);
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }

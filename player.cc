@@ -91,7 +91,7 @@ struct Player : Poll {
         albums.activeChanged = {this, &Player::playAlbum};
         titles.activeChanged = {this, &Player::playTitle};
 
-        if(arguments()) setFolder(arguments().first());
+        if(arguments()) setFolder(arguments()[0]);
         else if(!folder) setFolder("/Music"_);
         window.show();
         mainThread.setPriority(-20);

@@ -52,7 +52,7 @@ struct ImageFolder {
     }
 
     array<String> imageNames = listImages();
-    const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(imageNames.first()));
+    const int2 imageSize = int2(4000, 3000)/4; //FIXME: = ::imageSize(readFile(imageNames[0]));
 
     //Image sRGB(string imageName) const { return decodeImage(Map(imageName, sourceFolder)); }
     ImageSourceRGB scaledRGB(string imageName) const {

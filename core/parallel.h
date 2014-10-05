@@ -60,15 +60,15 @@ void parallel_apply(mref<T> target, size_t size, Function function, Args... args
 }
 
 /// Stores the application of a function to every elements of two refs in a mref
-template<Type T, Type S0, Type S1, Type Function, Type... Args>
-void parallel_apply(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Function function, Args... args) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], source1[index], args...)); });
+template<Type T, Type S0, Type S1, Type Function/*, Type... Args*/>
+void parallel_apply(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Function function/*, Args... args*/) {
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], source1[index]/*, args...*/)); });
 }
 
 /// Stores the application of a function to every elements of a ref in a mref
-template<Type T, Type S, Type Function, Type... Args>
-void parallel_apply(mref<T> target, const ref<S>& source, Function function, Args... args) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source[index], args...)); });
+template<Type T, Type S, Type Function/*, Type... Args*/>
+void parallel_apply(mref<T> target, const ref<S>& source, Function function/*, Args... args*/) {
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source[index]/*, args...*/)); });
 }
 
 // \file arithmetic.cc Parallel arithmetic operations
@@ -76,30 +76,46 @@ void parallel_apply(mref<T> target, const ref<S>& source, Function function, Arg
 /// Minimum number of values to trigger parallel arithmetic operations
 static constexpr size_t parallelMinimum = 1<<15;
 
-float maximum(ref<float> values) {
+inline float minimum(ref<float> values) {
+    if(values.size < parallelMinimum) return ::min(values);
+    float maximums[threadCount];
+    parallel_chunk(values.size, [&](uint id, uint start, uint size) {
+        float min = values[0];
+        for(uint index: range(start, start+size)) { float v=values[index]; if(v<min) min = v; }
+        maximums[id] = min;
+    });
+    return min(maximums);
+}
+
+inline float maximum(ref<float> values) {
     if(values.size < parallelMinimum) return ::max(values);
     float maximums[threadCount];
     parallel_chunk(values.size, [&](uint id, uint start, uint size) {
-        float max=0;
+        float max= -values[0];
         for(uint index: range(start, start+size)) { float v=values[index]; if(v>max) max = v; }
         maximums[id] = max;
     });
     return max(maximums);
 }
 
-void operator*=(mref<float> values, float factor) {
+inline void operator+=(mref<float> values, float offset) {
+    if(values.size < parallelMinimum) apply(values, values, [&](float v) {  return v + offset; });
+    else parallel_apply(values, values, [&](float v) {  return v + offset; });
+}
+
+inline void operator*=(mref<float> values, float factor) {
     if(values.size < parallelMinimum) apply(values, values, [&](float v) {  return factor*v; });
     else parallel_apply(values, values, [&](float v) {  return factor*v; });
 }
 
-void normalize(mref<float> values) {
+inline void normalize(mref<float> values) {
     float max = maximum(values);
     assert_(max);
     float scaleFactor = 1./max;
     values *= scaleFactor;
 }
 
-void subtract(mref<float> Y, ref<float> A, ref<float> B) {
+inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
     if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a-b; });
     else parallel_apply(Y, A, B, [&](float a, float b) {  return a-b; });
 }
