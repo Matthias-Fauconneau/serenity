@@ -9,6 +9,45 @@
 #include "window.h"
 #include "profile.h"
 
+// -> concurrency.h
+struct Condition : handle<pthread_cond_t> {
+    Condition() { pthread_cond_init(&pointer,0); }
+    ~Condition(){ pthread_cond_destroy(&pointer); }
+};
+
+/// A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter
+struct Semaphore {
+    Lock mutex;
+    Condition condition;
+    int64 counter;
+    /// Creates a semaphore with \a count initial ressources
+    explicit Semaphore(int64 count=0) : counter(count) {}
+    /// Acquires \a count ressources
+    void acquire(int64 count) {
+        mutex.lock();
+        while(counter<count) pthread_cond_wait(&condition,&mutex);
+        __sync_sub_and_fetch(&counter,count); assert(counter>=0);
+        mutex.unlock();
+    }
+    /// Atomically tries to acquires \a count ressources only if available
+    bool tryAcquire(int64 count) {
+        mutex.lock();
+        if(counter<count) { mutex.unlock(); return false; }
+        assert(count>0);
+        __sync_sub_and_fetch(&counter,count);
+        mutex.unlock();
+        return true;
+    }
+    /// Releases \a count ressources
+    void release(int64 count) {
+        __sync_add_and_fetch(&counter,count);
+        pthread_cond_signal(&condition);
+    }
+    /// Returns available ressources \a count
+    operator int() const { return counter; }
+};
+inline String str(const Semaphore& o) { return str(o.counter); }
+
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
     // Static parameters

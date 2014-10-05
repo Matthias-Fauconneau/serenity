@@ -126,5 +126,3 @@ template<Type A, Type... Args> String str(const A& a, const Args&... args) { ret
 template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }
-/// Logs to standard output using str(...) serialization and terminate all threads
-template<Type... Args> void __attribute((noreturn)) abort(const Args&... args) { abort<string>(str(args...)); }

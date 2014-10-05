@@ -1,5 +1,6 @@
 /// \file build.cc Builds C++ projects with automatic module dependency resolution
 #include "thread.h"
+#include "string.h"
 #include "data.h"
 
 struct Node {

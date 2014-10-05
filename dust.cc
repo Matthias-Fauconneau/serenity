@@ -1,62 +1,49 @@
-/// \file parallel.cc Parallel operations
-#include "thread.h"
+#include "parallel.h"
 
-float maximum(ref<float> values) {
-    float maximums[threadCount];
-    parallel_chunk(values.size, [&](uint id, uint start, uint size) {
-        float max=0;
-        for(uint index: range(start, start+size)) { float v=values[index]; if(v>max) max = v; }
-        maximums[id] = max;
-    });
-    return max(maximums);
-}
 
-/// \file dust.cc Automatic dust removal
-#include "filter.h"
 
-#if BLUR
+// -> image.cc
+#include "image.h"
 /// Convolves and transposes (with repeat border conditions)
 void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
-    int kernelSize = radius+1+radius;
+    int N = radius+1+radius;
     chunk_parallel(height, [&](uint, uint y) {
         const float* line = source + y * width;
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {
             float sum = 0;
-            for(int dx: range(kernelSize)) sum += kernel[dx] * line[max(0, x+dx)];
+            for(int dx: range(N)) sum += kernel[dx] * line[max(0, x+dx)];
             targetColumn[(x+radius)*height] = sum;
         }
         for(int x: range(0,width-2*radius)) {
             float sum = 0;
             const float* span = line + x;
-            for(int dx: range(kernelSize)) sum += kernel[dx] * span[dx];
+            for(int dx: range(N)) sum += kernel[dx] * span[dx];
             targetColumn[(x+radius)*height] = sum;
         }
         for(int x: range(width-2*radius,width-radius)){
             float sum = 0;
-            for(int dx: range(kernelSize)) sum += kernel[dx] * line[min(width, x+dx)];
+            for(int dx: range(N)) sum += kernel[dx] * line[min(width, x+dx)];
             targetColumn[(x+radius)*height] = sum;
         }
     });
 }
 
 float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
-void gaussianBlur(ImageF& image, float sigma) {
-    int radius = ceil(3*sigma);
-    float kernel[radius+1+radius];
-    for(int dx: range(radius+1+radius)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
-    buffer<float> transpose (image.height*image.width);
-    convolve(transpose, kernel, radius, image.pixels, image.width, image.height);
-    convolve(image.pixels, kernel, radius, transpose, image.height, image.width);
+ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
+    int radius = ceil(3*sigma), N = radius+1+radius;
+    float kernel[N];
+    for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
+    float energy = sum(ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/energy;
+    buffer<float> transpose (target.height*target.width);
+    convolve(transpose, kernel, radius, source.pixels, source.width, source.height);
+    convolve(target.pixels, kernel, radius, transpose, target.height, target.width);
+    return move(target);
 }
-#endif
+ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
 
-void normalize(mref<float> values) {
-    float max = maximum(values);
-    assert_(max);
-    float scaleFactor = 1./max;
-    parallel_apply(values, values, [&](float v) {  return scaleFactor*v; });
-}
+/// \file dust.cc Automatic dust removal
+#include "filter.h"
 
 /// Inverts attenuation bias
 struct InverseAttenuation : Filter {
@@ -75,14 +62,12 @@ struct InverseAttenuation : Filter {
             attenuationBias.pixels.clear();
             for(string imageName: calibration.imageNames) {
                 ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
-                parallel_apply2(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
+                parallel_apply(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
             }
             // Low pass to filter texture and noise
-            //log("Blur"); gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
+            // gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
             // TODO: High pass to filter lighting conditions
             normalize(attenuationBias.pixels); // Normalizes sum by maximum (TODO: normalize by low frequency energy)
-            //assert_(min(attenuationBias.pixels));
-            //assert_(min(attenuationBias.pixels)>0, min(attenuationBias.pixels));
             rename("attenuationBias.lock"_, "attenuationBias"_, calibration.cacheFolder);
         }
         return ImageSource("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
@@ -91,10 +76,11 @@ struct InverseAttenuation : Filter {
     ImageSource image(const ImageFolder& imageFolder, string imageName, Component component) const override {
         Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
         String id = imageName+"."_+str(component);
-        if(skipCache || !existsFile(id, targetFolder)) {
+        if(1 || skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
             ImageTarget target (id, targetFolder, source.ImageF::size);
-            parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
+            //parallel_apply2(target.pixels, source.pixels, attenuationBias.pixels, [&](float source, float bias) { return source / bias; });
+            subtract(target.pixels, source.pixels, gaussianBlur(source, 1).pixels);
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }

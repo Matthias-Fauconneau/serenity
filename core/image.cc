@@ -1,7 +1,7 @@
 #include "image.h"
 #include "data.h"
 #include "vector.h"
-#include "thread.h" // parallel
+#include "parallel.h"
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
 void __attribute((constructor(1001))) generate_sRGB_forward() {

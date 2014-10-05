@@ -82,3 +82,4 @@ exif.cc
 exif.h
 filter.h
 dust.cc
+core/parallel.h

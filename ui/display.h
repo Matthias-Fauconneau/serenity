@@ -1,8 +1,9 @@
 #pragma once
 /// \file display.h
 #include "thread.h"
-#include "map.h"
-#include "data.h"
+#include "data.h" // cast
+#include "function.h" // onEvent
+#include "map.h" // actions
 inline buffer<byte> pad(array<byte>&& o, uint width=4){ o.grow(align(width,o.size)); return move(o); }
 
 /// Connection to an X display server

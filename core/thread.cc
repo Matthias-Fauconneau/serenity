@@ -13,10 +13,10 @@
 #include <pwd.h>
 #include <sys/syscall.h>
 
-void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
-int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
-int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
-int gettid() { return syscall(SYS_gettid); }
+
+
+
+static int gettid() { return syscall(SYS_gettid); }
 
 // Log
 void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
@@ -93,37 +93,30 @@ void Thread::event() {
 }
 
 // Debugger
-String trace(int skip, void* ip);
-void traceAllThreads() {
+
+static int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
+static void traceAllThreads() {
     Locker lock(threadsLock);
     for(Thread* thread: threads) if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
 }
-static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
-                                      "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
 static void handler(int sig, siginfo_t* info, void* ctx) {
-#if __x86_64
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
-#elif __arm__
-    void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.arm_pc;
-#elif __i386
-    void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP];
-#endif
     if(sig==SIGSEGV) log("Segmentation fault"_);
     String s = trace(1,ip);
     if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
-#if !__arm
+    static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
+                                          "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
     if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->si_code],")", *(float*)info->si_addr);
-#endif
     if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
     pthread_exit((void*)-1);
 }
-#if __x86_64
+
 // Configures floating-point exceptions
 void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
-#endif
+
 void __attribute((constructor(102))) setup_signals() {
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
@@ -132,10 +125,10 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
-#if __x86_64
     setExceptions(Invalid | /*Denormal |*/ DivisionByZero | Overflow/* | Underflow*/);
-#endif
 }
+
+static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
 
 template<> void __attribute((noreturn)) error(const string& message) {
     //log(message); // In case, tracing crashes
@@ -157,10 +150,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
     exit_thread(-1); // Exits this thread
 }
 
-template<> void __attribute((noreturn)) abort(const string& message) {
-    log(message);
-    exit_group(-1);
-}
+static int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
 
 // Entry point
 int main() {
@@ -231,7 +221,4 @@ array<string> arguments() {
     return split(section(cmdline,0,1,-1),0);
 }
 
-string homePath() { return getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir)); }
-const Folder& home() { static Folder home(homePath()); return home; }
-const Folder& config() { static Folder config(".config"_,home(),true); return config; }
-const Folder& cache() { static Folder cache(".cache"_,home(),true); return cache; }
+const Folder& home() { static Folder home(getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir))); return home; }
