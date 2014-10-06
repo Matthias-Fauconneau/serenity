@@ -143,6 +143,7 @@ struct Device : File {
 
 /// Managed memory mapping
 struct Map : mref<byte> {
+    String name;
     enum Prot {Read=1, Write=2};
     enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
@@ -151,7 +152,7 @@ struct Map : mref<byte> {
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read):Map(File(path,at),prot){}
+    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at),prot) { name=String(path); }
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 
@@ -170,6 +171,8 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
 void rename(const string& oldName, const string& newName, const Folder& at=currentWorkingDirectory());
 /// Removes file
 void remove(const string& name, const Folder& at=currentWorkingDirectory());
+/// Removes file if it exists
+void removeIfExisting(const string& name, const Folder& at=currentWorkingDirectory());
 /// Removes folder
 //void remove(const Folder& folder);
 /// Removes folder

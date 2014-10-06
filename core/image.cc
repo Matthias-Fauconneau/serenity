@@ -32,8 +32,8 @@ static Image box(Image&& target, const Image& source) {
     uint scale = source.width/target.width;
     assert_(scale <= 16);
     chunk_parallel(target.height, [&](uint, uint y) {
-        const byte4* sourceLine = source.pixels.data + y * scale * source.stride;
-        byte4* targetLine = target.pixels.begin() + y * target.stride;
+        const byte4* sourceLine = source.data + y * scale * source.stride;
+        byte4* targetLine = target.begin() + y * target.stride;
         for(uint unused x: range(target.width)) {
             const byte4* sourceSpanOrigin = sourceLine + x* scale;
             uint4 s = 0;
@@ -52,7 +52,7 @@ static Image bilinear(Image&& target, const Image& source) {
     assert_(!source.alpha);
     const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
-    const uint8* src = (const uint8*)source.pixels.data; byte4* dst (target.pixels);
+    const uint8* src = (const uint8*)source.data; byte4* dst = target;
     for(uint y: range(targetHeight)) {
         for(uint x: range(targetWidth)) {
             const uint fx = x*256*width/targetWidth, fy = y*256*height/targetHeight; //TODO: incremental
@@ -90,7 +90,7 @@ static void linear(mref<float> target, ref<byte4> source, Component component) {
     else error(component);
 }
 ImageF linear(ImageF&& target, const Image& source, Component component) {
-    linear(target.pixels, source.pixels, component);
+    linear(target, source, component);
     return move(target);
 }
 
@@ -129,7 +129,7 @@ static uint8 sRGB(float v) {
 
 static void sRGB(mref<byte4> target, ref<float> source) { apply(target, source, [](float s) { uint8 v = sRGB(s); return byte4(v, v, v, 0xFF); }); }
 Image sRGB(Image&& target, const ImageF& source) {
-    sRGB(target.pixels, source.pixels);
+    sRGB(target, source);
     return move(target);
 }
 
@@ -139,7 +139,7 @@ static void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<floa
     apply(target, [&](uint index) { return sRGB(blue[index], green[index], red[index]); });
 }
 Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red) {
-    sRGB(target.pixels, blue.pixels, green.pixels, red.pixels);
+    sRGB(target, blue, green, red);
     return move(target);
 }
 

@@ -122,6 +122,7 @@ void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, con
 }
 void rename(const string& oldName,const string& newName, const Folder& at) { assert(oldName!=newName); rename(at, oldName, at, newName); }
 void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd,strz(name),0), name); }
+void removeIfExisting(const string& name, const Folder& at) { if(existsFile(name, at)) check_( unlinkat(at.fd,strz(name),0), name); }
 //void removeFolder(const string& name, const Folder& at) { check__( unlinkat(at.fd,strz(name),AT_REMOVEDIR), name); }
 //void remove(const Folder& folder) { check_( unlinkat(fd,".",AT_REMOVEDIR), folder.name()); }
 /*void removeFileOrFolder(const string& name, const Folder& at) {

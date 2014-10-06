@@ -7,9 +7,7 @@ extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
 
 /// 2D array of BGRA 8-bit unsigned integer pixels
-struct Image {
-    buffer<byte4> pixels; //buffer; //FIXME: shared
-    //byte4* data=0; // First pixel
+struct Image : buffer<byte4> {
     union {
         struct { uint width, height; };
         int2 size;
@@ -19,18 +17,17 @@ struct Image {
 
     Image():size(0){}
     Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false, bool sRGB=true)
-        : pixels(move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
-        assert_(this->pixels.size == height*this->stride, this->pixels.size, size, this->stride);
+        : buffer<byte4>(move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
+        assert_(buffer::size == height*this->stride, size, buffer::size);
     }
-    Image(uint width, uint height, bool alpha=false, bool sRGB=true) : width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
+    Image(uint width, uint height, bool alpha=false, bool sRGB=true)
+        : buffer(height*width), width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
         assert(width); assert(height);
-        pixels = ::buffer<byte4>(height*(stride?:width)); //data=buffer.begin();
     }
     Image(int2 size, bool alpha=false, bool sRGB=true) : Image(size.x, size.y, alpha, sRGB) {}
 
-    explicit operator bool() const { return pixels && width && height; }
-    explicit operator ref<byte>() const { assert(width==stride); return cast<byte>(pixels); }
-    inline byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return pixels[y*stride+x]; }
+    explicit operator bool() const { return data && width && height; }
+    inline byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*stride+x); }
 };
 inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
@@ -48,30 +45,29 @@ inline Image copy(const Image& source) {
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline Image share(const Image& o) { return Image(unsafeReference(o.pixels),o.size,o.stride,o.alpha,o.sRGB); }
+inline Image share(const Image& o) { return Image(unsafeReference(o),o.size,o.stride,o.alpha,o.sRGB); }
 
 /// Resizes \a source into \a target
 /// \note Only supports integer box downsample
 Image resize(Image&& target, const Image& source);
 
 /// 2D array of floating-point pixels
-struct ImageF {
+struct ImageF : buffer<float> {
     ImageF(){}
-    ImageF(buffer<float>&& data, int2 size) : pixels(move(data)), size(size) { assert_(pixels.size==size_t(size.x*size.y)); }
-    ImageF(int width, int height) : width(width), height(height) { assert_(size>int2(0)); pixels=::buffer<float>(width*height); }
+    ImageF(buffer<float>&& data, int2 size) : buffer(move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y)); }
+    ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0)); }
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 
-    explicit operator bool() const { return pixels && width && height; }
-    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return pixels[y*width+x]; }
+    explicit operator bool() const { return data && width && height; }
+    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*width+x); }
 
-    buffer<float> pixels;
     union {
         struct { uint width, height; };
         int2 size;
     };
 };
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.pixels),o.size); }
+inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
 
 ImageF resize(ImageF&& target, ImageF&& source);
 

@@ -135,6 +135,7 @@ template<> void abort(const string& message) __attribute((noreturn));
 // ref
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct ref {
+    typedef T type;
     const T* data = 0;
     size_t size = 0;
 

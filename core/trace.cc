@@ -134,10 +134,10 @@ Symbol findSymbol(void* find) {
         struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
-        while(s.next()) s.whileNot(0);
+        while(s.next()) { s.whileNot(0); s.skip('\0'); }
         array<string> files;
         while(s.peek()) {
-            files << cast<char>(s.whileNot(0));
+            files << cast<char>(s.whileNot(0)); s.skip('\0');
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
         }
         s.advance(1);
