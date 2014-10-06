@@ -80,13 +80,13 @@ Image resize(Image&& target, const Image& source) {
 }
 
 static void linear(mref<float> target, ref<byte4> source, Component component) { /**/  if(component==Blue)
-        parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.b]; });
+        parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB.b]; }, source);
     else if(component==Green)
-        parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.g]; });
+        parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB.g]; }, source);
     else if(component==Red)
-        parallel_apply(target, source, [](byte4 sRGB) { return sRGB_reverse[sRGB.r]; });
+        parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB.r]; }, source);
     else if(component==Mean)
-        parallel_apply(target, source, [](byte4 sRGB) { return (sRGB_reverse[sRGB.b]+sRGB_reverse[sRGB.g]+sRGB_reverse[sRGB.r])/3; });
+        parallel_apply(target, [](byte4 sRGB) { return (sRGB_reverse[sRGB.b]+sRGB_reverse[sRGB.g]+sRGB_reverse[sRGB.r])/3; }, source);
     else error(component);
     assert_(max(target), component);
 }

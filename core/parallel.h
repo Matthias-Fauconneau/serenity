@@ -53,23 +53,23 @@ template<Type F> void parallel_chunk(uint64 totalSize, F f) {
     parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }
 
-/// Stores the application of a function to every index up to a size in a mref
-template<Type T, Type Function, Type... Args>
-void parallel_apply(mref<T> target, size_t size, Function function, Args... args) {
-    chunk_parallel(size, [&](uint, uint index) { new (&target[index]) T(function(index, args...)); });
-}
-
-/// Stores the application of a function to every elements of two refs in a mref
-template<Type T, Type S0, Type S1, Type Function/*, Type... Args*/>
-void parallel_apply(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Function function/*, Args... args*/) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], source1[index]/*, args...*/)); });
-}
+/*/// Stores the application of a function to every index up to a size in a mref
+template<Type T, Type Function>
+void parallel_apply(mref<T> target, size_t size, Function function) {
+    chunk_parallel(size, [&](uint, uint index) { new (&target[index]) T(function(index)); });
+}*/
 
 /// Stores the application of a function to every elements of a ref in a mref
-template<Type T, Type S, Type Function/*, Type... Args*/>
-void parallel_apply(mref<T> target, const ref<S>& source, Function function/*, Args... args*/) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source[index]/*, args...*/)); });
+template<Type T, Type Function, Type... S>
+void parallel_apply(mref<T> target, Function function, ref<S>... sources) {
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(sources[index]...)); });
 }
+
+/*/// Stores the application of a function to every elements of two refs in a mref
+template<Type T, Type S0, Type S1, Type Function>
+void parallel_apply(mref<T> target, const ref<S0>& source0, const ref<S1>& source1, Function function) {
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], source1[index])); });
+}*/
 
 // \file arithmetic.cc Parallel arithmetic operations
 
@@ -87,7 +87,7 @@ inline float parallel_sum(ref<float> values) {
     return sum(sums);
 }
 
-inline float minimum(ref<float> values) {
+/*inline float minimum(ref<float> values) {
     if(values.size < parallelMinimum) return ::min(values);
     float maximums[threadCount];
     parallel_chunk(values.size, [&](uint id, uint start, uint size) {
@@ -107,36 +107,31 @@ inline float maximum(ref<float> values) {
         maximums[id] = max;
     });
     return max(maximums);
-}
+}*/
 
-inline void operator+=(mref<float> values, float offset) {
+/*inline void operator+=(mref<float> values, float offset) {
     if(values.size < parallelMinimum) apply(values, values, [&](float v) {  return v + offset; });
     else parallel_apply(values, values, [&](float v) {  return v + offset; });
-}
+}*/
 
 inline void operator*=(mref<float> values, float factor) {
     if(values.size < parallelMinimum) apply(values, values, [&](float v) {  return factor*v; });
-    else parallel_apply(values, values, [&](float v) {  return factor*v; });
+    else parallel_apply(values, [&](float v) {  return factor*v; }, values);
 }
 
-inline void normalize(mref<float> values) {
-    float max = maximum(values);
-    assert_(max);
-    float scaleFactor = 1./max;
-    values *= scaleFactor;
-}
-
-inline void add(mref<float> Y, ref<float> A, ref<float> B) {
+/*inline void add(mref<float> Y, ref<float> A, ref<float> B) {
     if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a+b; });
     else parallel_apply(Y, A, B, [&](float a, float b) {  return a+b; });
-}
+}*/
 
 inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
     if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a-b; });
-    else parallel_apply(Y, A, B, [&](float a, float b) {  return a-b; });
+    else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
 }
 
-inline void multiply(mref<float> Y, ref<float> A, ref<float> B) {
+/*inline void multiply(mref<float> Y, ref<float> A, ref<float> B) {
     if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a*b; });
     else parallel_apply(Y, A, B, [&](float a, float b) {  return a*b; });
-}
+}*/
+
+inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }

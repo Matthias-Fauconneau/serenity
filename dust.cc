@@ -2,6 +2,10 @@
 
 // -> image.cc
 #include "image.h"
+
+//void operator-=(ImageF& target, const ImageF& source) { target.pixels -= source.pixels; }
+ImageF operator-(const ImageF& A, const ImageF& B) { ImageF Y(A.size); subtract(Y.pixels, A.pixels, B.pixels); return Y; }
+
 /// Convolves and transposes (with repeat border conditions)
 void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
     int N = radius+1+radius;
@@ -29,16 +33,25 @@ void convolve(float* target, const float* kernel, int radius, const float* sourc
 
 float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
 ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
+    assert_(sigma > 0);
     int radius = ceil(3*sigma), N = radius+1+radius;
     float kernel[N];
     for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
-    float energy = sum(ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/energy;
+    float sum = ::sum(ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
     buffer<float> transpose (target.height*target.width);
     convolve(transpose, kernel, radius, source.pixels, source.width, source.height);
     convolve(target.pixels, kernel, radius, transpose, target.height, target.width);
     return move(target);
 }
 ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
+
+ImageF bandPass(const ImageF& source, float lowPass, float highPass) {
+    ImageF low_band = lowPass ? gaussianBlur(source, lowPass) : share(source);
+    if(!highPass) return low_band;
+    ImageF low = gaussianBlur(low_band, highPass);
+    subtract(low.pixels, low_band.pixels, low.pixels);
+    return low;
+}
 
 /// \file dust.cc Automatic dust removal
 #include "filter.h"
@@ -60,12 +73,16 @@ struct InverseAttenuation : Filter {
             attenuationBias.pixels.clear();
             for(string imageName: calibration.keys) {
                 ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
-                parallel_apply(attenuationBias.pixels, attenuationBias.pixels, source.pixels, [](float sum, float source) { return sum + source; });
+                parallel_apply(attenuationBias.pixels, [](float sum, float source) { return sum + source; }, attenuationBias.pixels, source.pixels);
             }
             // Low pass to filter texture and noise
-            // gaussianBlur(attenuationBias, 16); // TODO: weaken near spot, strengthen outside
+            gaussianBlur(attenuationBias, 8); // TODO: weaken near spot, strengthen outside
             // TODO: High pass to filter lighting conditions
-            normalize(attenuationBias.pixels); // Normalizes sum by maximum (TODO: normalize by low frequency energy)
+            // Normalizes sum by mean (DC)
+            float sum = parallel_sum(attenuationBias.pixels);
+            float mean = sum/attenuationBias.pixels.size;
+            float factor = 1/mean;
+            parallel_apply(attenuationBias.pixels, [&](float v) {  return min(1.f, factor*v); }, attenuationBias.pixels);
             rename("attenuationBias.lock"_, "attenuationBias"_, calibration.cacheFolder);
         }
         return ImageSource("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
@@ -77,51 +94,23 @@ struct InverseAttenuation : Filter {
         if(1 || skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
             int2 size = source.ImageF::size;
+
             ImageTarget target (id, targetFolder, size);
-            // TODO: reuse buffers
+            parallel_apply(target.pixels, [&](float source, float bias) { return source / bias; }, source.pixels, attenuationBias.pixels);
 
-            /*//ImageF low_spot = gaussianBlur(source, 1);
-            const ImageF& low_spot = source;
-            ImageF high (size);
-            subtract(high.pixels, source.pixels, low_spot.pixels);
-            //ImageF low = gaussianBlur(low_spot, 64); // 128 is too slow ... (TODO: fast large radius blur)
-            //float DC = parallel_sum(source.pixels) / source.pixels.size;
-            ImageF low (size); low.pixels.clear(DC);
-            ImageF large_spot_band (size);
-            subtract(large_spot_band.pixels, low_spot.pixels, low.pixels);*/
+            if(1) {
+                // Cuts band to correct
+                const float lowPass = 8, highPass = 32;
+                ImageF reference = bandPass(source, lowPass, highPass);
+                ImageF corrected = bandPass(target, lowPass, highPass);
 
-            /*ImageF corrected_spot_band (size);
-            parallel_apply(corrected_spot_band.pixels, large_spot_band.pixels, attenuationBias.pixels,
-                           [&](float source, float bias) { return (DC + source) / bias - DC; });
-            //const ImageF& corrected_spot_band = large_spot_band;*/
-
-            ImageF corrected_spot_band (size);
-            parallel_apply(corrected_spot_band.pixels, source.pixels, attenuationBias.pixels,
-                           [&](float source, float bias) { return source / bias; });
-
-            ImageF corrected_low_spot = gaussianBlur(corrected_spot_band, 1);
-            ImageF corrected_high (size);
-            subtract(corrected_high.pixels, corrected_spot_band.pixels, corrected_low_spot.pixels);
-            ImageF corrected_low = gaussianBlur(corrected_low_spot, 2);
-            ImageF narrow_corrected_spot_band (size);
-            subtract(narrow_corrected_spot_band.pixels, corrected_low_spot.pixels, corrected_low.pixels);
-
-            //ImageF weighted_corrected (size);
-            // Merges full spectrum outside spot
-            const ImageF& weighted_corrected = target;
-            multiply(weighted_corrected.pixels, attenuationBias.pixels, narrow_corrected_spot_band.pixels); // Fades out narrow band near spot
-            add(weighted_corrected.pixels, weighted_corrected.pixels, corrected_low.pixels);
-            add(weighted_corrected.pixels, weighted_corrected.pixels, corrected_high.pixels);
-            // Merges narrow correct band inside spot
-
-            //copy(target.pixels, weighted_corrected.pixels);
-            //add(target.pixels, target.pixels, low.pixels);
-            //add(target.pixels, target.pixels, high.pixels);
-
-            //copy(target.pixels, narrow_corrected_spot_band.pixels);
-            //target.pixels += DC;
-            //target.pixels += -minimum(target.pixels);
-            //normalize(target.pixels);
+                // Saturates correction below max(0, source) (prevents introduction of a light feature at spot frequency)
+                parallel_apply(target.pixels, [&](float source, float reference, float corrected) {
+                    float saturated_corrected = min(corrected, max(reference, 0.f));
+                    float correction = saturated_corrected - reference;
+                    return source + correction;
+                }, source.pixels, reference.pixels, corrected.pixels);
+            }
         }
         return ImageSource(id, targetFolder, imageFolder.imageSize);
     }
