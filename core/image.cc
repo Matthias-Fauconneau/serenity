@@ -50,7 +50,6 @@ static Image box(Image&& target, const Image& source) {
 
 static Image bilinear(Image&& target, const Image& source) {
     assert_(!source.alpha);
-    error("Unused", target.size, source.size, source.width%target.width==0, source.height%target.height==0);
     const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
     const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
     const uint8* src = (const uint8*)source.pixels.data; byte4* dst (target.pixels);
@@ -79,7 +78,8 @@ Image resize(Image&& target, const Image& source) {
     else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
 }
 
-static void linear(mref<float> target, ref<byte4> source, Component component) { /**/  if(component==Blue)
+static void linear(mref<float> target, ref<byte4> source, Component component) {
+    /**/  if(component==Blue)
         parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB.b]; }, source);
     else if(component==Green)
         parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB.g]; }, source);
@@ -88,7 +88,6 @@ static void linear(mref<float> target, ref<byte4> source, Component component) {
     else if(component==Mean)
         parallel_apply(target, [](byte4 sRGB) { return (sRGB_reverse[sRGB.b]+sRGB_reverse[sRGB.g]+sRGB_reverse[sRGB.r])/3; }, source);
     else error(component);
-    assert_(max(target), component);
 }
 ImageF linear(ImageF&& target, const Image& source, Component component) {
     linear(target.pixels, source.pixels, component);
@@ -104,7 +103,6 @@ static ImageF downsample(ImageF&& target, const ImageF& source) {
 
 static bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 static uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
-//ImageF resize(ImageF&& target, const ImageF& source) {
 ImageF resize(ImageF&& target, ImageF&& source) {
     assert_(source.width*target.height==source.height*target.width); // Uniform scale
     assert_(source.size > target.size, target.size, source.size); // Downsample

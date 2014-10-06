@@ -73,11 +73,6 @@ struct ImageF {
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o.pixels),o.size); }
 
-/*/// Downsamples linear float image by a factor 2
-ImageF downsample(ImageF&& target, const ImageF& source);
-inline ImageF downsample(const ImageF& source) { return downsample(source.size, source); }*/
-
-//ImageF resize(ImageF&& target, const ImageF& source)
 ImageF resize(ImageF&& target, ImageF&& source);
 
 enum Component { Blue, Green, Red, Mean };
