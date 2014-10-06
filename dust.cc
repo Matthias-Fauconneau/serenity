@@ -2,9 +2,7 @@
 
 // -> image.cc
 #include "image.h"
-
-//void operator-=(ImageF& target, const ImageF& source) { target.pixels -= source.pixels; }
-ImageF operator-(const ImageF& A, const ImageF& B) { ImageF Y(A.size); subtract(Y.pixels, A.pixels, B.pixels); return Y; }
+//ImageF operator-(const ImageF& A, const ImageF& B) { ImageF Y(A.size); subtract(Y.pixels, A.pixels, B.pixels); return Y; }
 
 /// Convolves and transposes (with repeat border conditions)
 void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
@@ -64,11 +62,10 @@ struct InverseAttenuation : Filter {
 
     /// Calibrates attenuation bias image by summing images of a white subject
     ImageSource calibrateAttenuationBias(ImageFolder& calibration) {
-        if(1 || skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
+        if(skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
             ImageTarget attenuationBias ("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
             if(existsFile("attenuationBias.lock"_)) remove("attenuationBias.lock"_);
             {rename("attenuationBias"_, "attenuationBias.lock"_, calibration.cacheFolder);
-                log("Calibration");
 
                 // Sums all images
                 attenuationBias.pixels.clear();
@@ -94,11 +91,12 @@ struct InverseAttenuation : Filter {
     }
 
     ImageSource image(ImageFolder& imageFolder, string imageName, Component component) const override {
+        //if(fromDecimal(imageFolder.at(imageName).at("Aperture"_)) < 6.3) return imageFolder.image(imageName, component);
         Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
         String id = imageName+"."_+str(component);
-        if(1 || skipCache || !existsFile(id, targetFolder)) {
+        if(skipCache || !existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
-            int2 size = source.ImageF::size;
+            int2 size = source.size;
 
             ImageTarget target (id, targetFolder, size);
             parallel_apply(target.pixels, [&](float source, float bias) { return source / bias; }, source.pixels, attenuationBias.pixels);
@@ -130,19 +128,23 @@ struct ImageView : ImageWidget {
 
     ImageView(ImageFolder& images) : images(images) { update(); }
 
+    virtual void update() {
+        source = images.scaledRGB(imageName);
+        ImageWidget::image = share(source);
+    }
+
+    /// Browses images by moving mouse horizontally over image view (like an hidden slider)
     bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
         string imageName = images.keys[images.size()*min(size.x-1,cursor.x)/size.x];
         if(imageName != this->imageName) {
-            this->imageName = imageName; update();
+            this->imageName = imageName;
+            update();
             return true;
         }
         return false;
     }
 
-    virtual void update() {
-        source = images.scaledRGB(imageName);
-        ImageWidget::image = share(source);
-    }
+    virtual String title() { return str(images.keys.indexOf(imageName),'/',images.size(), imageName, images.at(imageName)); }
 };
 
 struct FilterView : ImageView {
@@ -151,12 +153,6 @@ struct FilterView : ImageView {
 
     FilterView(ImageFolder& images, const Filter& filter) : ImageView(images), filter(filter) { update(); }
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
-        bool enabled = button != NoButton && event != Release;
-        if(enabled != this->enabled) { this->enabled = enabled, imageName=""_;/*Forces update*/ }
-        return ImageView::mouseEvent(cursor, size, event, button, focus);
-    }
-
     void update() override {
         if(enabled) ImageWidget::image = sRGB(
                     filter.image(images, imageName, Blue),
@@ -164,20 +160,23 @@ struct FilterView : ImageView {
                     filter.image(images, imageName, Red) );
         else ImageView::update();
     }
+
+    /// Enables filter while a mouse button is pressed
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
+        bool enabled = button != NoButton && event != Release;
+        if(enabled != this->enabled) { this->enabled = enabled, imageName=""_;/*Forces update*/ }
+        return ImageView::mouseEvent(cursor, size, event, button, focus);
+    }
+
+    String title() override { return str(ImageView::title(), enabled); }
 };
 
 #include "window.h"
 
 struct FilterWindow : FilterView {
-    Window window {this};
+    Window window {this, -1, title()};
     FilterWindow(ImageFolder& images, const Filter& filter) : FilterView(images, filter) {}
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
-        if(FilterView::mouseEvent(cursor, size, event, button, focus)) {
-            window.setTitle(str(imageName, images.at(imageName), enabled));
-            return true;
-        }
-        return false;
-    }
+    void update() override { FilterView::update(); if(window)/*called in constructor while window is not initialized yet*/ window.setTitle(title()); }
 };
 
 struct DustRemovalPreview {
@@ -185,6 +184,7 @@ struct DustRemovalPreview {
     //ImageView view {calibrationImages};
     InverseAttenuation filter {calibrationImages};
     //ImageWidget view {sRGB(filter.attenuationBias)};
-    ImageFolder images {Folder("Pictures"_, home())};
+    ImageFolder images { Folder("Pictures"_, home()),
+                [](const String&, const map<String, String>& tags){ return fromDecimal(tags.at("Aperture"_)) > 4; } };
     FilterWindow view {images, filter};
 } application;

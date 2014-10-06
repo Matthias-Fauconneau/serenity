@@ -141,11 +141,3 @@ template<Type K, Type V> String str(const map<K,V>& m) {
     }
     s<<'}'; return s;
 }
-
-template<Type K, Type V> String strn(const map<K,V>& m) {
-    String s;
-    for(uint i: range(m.size())) {
-        s<<str(m.keys[i])<<": "_<<str(m.values[i])<<'\n';
-    }
-    return s;
-}

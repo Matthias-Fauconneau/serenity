@@ -1,31 +1,66 @@
 #include "data.h"
 #include "string.h"
 
-ref<byte> BinaryData::untilNull() {
-    uint start=index;
-    while(available(1) && next()){} assert(index>start);
-    return Data::slice(start,index-1-start);
+bool Data::wouldMatch(uint8 key) {
+    if(available(1) && (uint8)peek() == key) return true;
+    else return false;
 }
-
-bool BinaryData::seekLast(const ref<byte>& key) {
-    peek(-1); //try to completely read source
-    for(index=buffer.size-key.size;index>0;index--) { if(peek(key.size) == key) return true; }
-    return false;
-}
-
-void TextData::advance(uint step) {
-    assert(index<buffer.size, index, buffer.size);
-    for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
-}
-
-bool TextData::wouldMatch(char key) {
+bool Data::wouldMatch(char key) {
     if(available(1) && peek() == key) return true;
     else return false;
 }
 
-bool TextData::wouldMatch(const string& key) {
+bool Data::match(uint8 key) {
+    if(wouldMatch(key)) { advance(1); return true; }
+    else return false;
+}
+bool Data::match(char key) {
+    if(wouldMatch(key)) { advance(1); return true; }
+    else return false;
+}
+
+bool Data::wouldMatch(const ref<uint8>& key) {
+    if(available(key.size)>=key.size && peek(key.size) == cast<byte>(key)) return true;
+    else return false;
+}
+bool Data::wouldMatch(const string& key) {
     if(available(key.size)>=key.size && peek(key.size) == key) return true;
     else return false;
+}
+
+bool Data::match(const ref<uint8>& key) {
+    if(wouldMatch(key)) { advance(key.size); return true; }
+    else return false;
+}
+bool Data::match(const string& key) {
+    if(wouldMatch(key)) { advance(key.size); return true; }
+    else return false;
+}
+
+void Data::skip(const uint8 key) {
+    if(!match(key)) error("Expected '"_+hex(key)+"', got '"_+hex((uint8)peek())+"'"_);
+}
+void Data::skip(const char key) {
+    if(!match(key)) error("Expected '"_+string{key}+"', got '"_+peek(1)+"'"_);
+}
+
+void Data::skip(const ref<uint8>& key) {
+    if(!match(key)) error("Expected '"_+hex(key)+"', got '"_+hex(peek(key.size))+"'"_);
+}
+void Data::skip(const string& key) {
+    if(!match(key)) error("Expected '"_+key+"', got '"_+peek(key.size)+"'"_);
+}
+
+ref<uint8> BinaryData::whileNot(uint8 key) {
+    uint start=index;
+    while(available(1) && (uint8)peek() != key) advance(1);
+    return cast<uint8>(slice(start, index-start));
+}
+
+
+void TextData::advance(uint step) {
+    assert(index<buffer.size, index, buffer.size);
+    for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
 }
 
 char TextData::wouldMatchAny(const string& any) {
@@ -40,15 +75,6 @@ string TextData::wouldMatchAny(const ref<string>& keys) {
     return ""_;
 }
 
-bool TextData::match(char key) {
-    if(wouldMatch(key)) { advance(1); return true; }
-    else return false;
-}
-
-bool TextData::match(const string& key) {
-    if(wouldMatch(key)) { advance(key.size); return true; }
-    else return false;
-}
 
 char TextData::matchAny(const string& any) {
     char c = wouldMatchAny(any);
@@ -65,13 +91,6 @@ bool TextData::matchNo(const string& any) {
     byte c=peek();
     for(const byte& e: any) if(c == e) return false;
     advance(1); return true;
-}
-
-void TextData::skip(const char key) {
-    if(!match(key)) error("Expected '"_+string{key}+"', got '"_+line()+"'"_);
-}
-void TextData::skip(const string& key) {
-    if(!match(key)) error("Expected '"_+key+"', got '"_+line()+"'"_);
 }
 
 string TextData::whileAny(char key) {

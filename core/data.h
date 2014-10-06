@@ -67,6 +67,35 @@ struct Data {
 
     /// Reads until the end of input
     ref<byte> untilEnd() { uint size=available(-1); return read(size); }
+
+    /// Returns whether input match \a key
+    bool wouldMatch(uint8 key);
+    /// Returns whether input match \a key
+    bool wouldMatch(char key);
+
+    /// If input match \a key, advances \a index by \a key size
+    bool match(uint8 key);
+    /// If input match \a key, advances \a index by \a key size
+    bool match(char key);
+
+    /// Returns whether input match \a key
+    bool wouldMatch(const ref<uint8>& key);
+    /// Returns whether input match \a key
+    bool wouldMatch(const string& key);
+
+    /// If input match \a key, advances \a index by \a key size
+    bool match(const ref<uint8>& key);
+    /// If input match \a key, advances \a index by \a key size
+    bool match(const string& key);
+
+    /// Asserts stream matches \a key and advances \a key length bytes
+    void skip(uint8 key);
+    /// Asserts stream matches \a key and advances \a key length bytes
+    void skip(char key);
+    /// Asserts stream matches \a key and advances \a key length bytes
+    void skip(const ref<uint8>& key);
+    /// Asserts stream matches \a key and advances \a key length bytes
+    void skip(const string& key);
 };
 
 /// Provides a convenient interface to parse binary inputs
@@ -79,20 +108,15 @@ struct BinaryData : Data {
     /// Creates a BinaryData interface to a \a reference
     explicit BinaryData(const ref<byte>& reference, bool isBigEndian=false):Data(reference),isBigEndian(isBigEndian){}
 
-    /// Slices a reference to the buffer from \a index to \a index + \a size
+    /*/// Slices a reference to the buffer from \a index to \a index + \a size
     BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
     /// Slices a reference to the buffer from \a index to \a index + \a size
-    BinaryData slice(uint pos) { return BinaryData(Data::slice(pos),isBigEndian); }
+    BinaryData slice(uint pos) { return BinaryData(Data::slice(pos),isBigEndian); }*/
 
     /// Seeks to /a index
     void seek(uint index) { assert(index<buffer.size); this->index=index; }
-    /// Seeks last match for \a key.
-    bool seekLast(const ref<byte>& key);
     /// Seeks to next aligned position
     void align(uint width) { index=::align(width,index); }
-
-    /// Reads until next null byte
-    ref<byte> untilNull();
 
     /// Reads one raw \a T element
     generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
@@ -130,6 +154,9 @@ struct BinaryData : Data {
 
    /// Reads \a size \a T elements (swap as needed)
    generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+
+   /// Advances while input doesn't match \a key.
+   ref<uint8> whileNot(uint8 key);
 };
 
 /// Provides a convenient interface to parse text streams
@@ -140,30 +167,18 @@ struct TextData : Data {
     using Data::Data;
     void advance(uint step) override;
 
-    /// Returns whether input match \a key
-    bool wouldMatch(char key);
-    /// Returns whether input match \a key
-    bool wouldMatch(const string& key);
     /// Returns whether input match any of \a keys
     char wouldMatchAny(const string& any);
-    /// Returns whether input match any of \a keys
-    string wouldMatchAny(const ref<string>& keys);
-
-    /// If input match \a key, advances \a index by \a key size
-    bool match(char key);
-    /// If input match \a key, advances \a index by \a key size
-    bool match(const string& key);
     /// If input match any of \a key, advances \a index
     char matchAny(const string& any);
+
+    /// Returns whether input match any of \a keys
+    string wouldMatchAny(const ref<string>& keys);
     /// If input match any of \a keys, advances \a index
     string matchAny(const ref<string>& keys);
+
     /// If input match none of \a key, advances \a index
     bool matchNo(const string& any);
-
-    /// Asserts stream matches \a key and advances \a key length bytes
-    void skip(char key);
-    /// Asserts stream matches \a key and advances \a key length bytes
-    void skip(const string& key);
 
     /// Advances while input match \a key.
     string whileAny(char key);

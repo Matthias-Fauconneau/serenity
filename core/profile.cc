@@ -22,7 +22,7 @@ bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
 void __attribute((destructor(101))) logProfile() notrace;
 void __attribute((destructor(101))) logProfile() {
     uint64 total = readCycleCounter() - stack[0].tsc; //readCycleCounter()-tsc;
-    quicksort(mref<Entry>(entries, size));
+    sort(mref<Entry>(entries, size));
     for(uint i=0; i<size; i++) {
         if(100*entries[i].time/total==0) continue;
         Symbol s = findSymbol(entries[i].function);
