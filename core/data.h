@@ -197,8 +197,6 @@ struct TextData : Data {
     string until(const string& key);
     /// Reads until input match any character of \a key
     string untilAny(const string& any);
-    /// Skips whitespaces
-    void skip();
     /// Reads until end of line
     string line();
     /// Reads one possibly escaped character

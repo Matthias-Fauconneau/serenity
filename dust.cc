@@ -58,43 +58,40 @@ ImageF bandPass(const ImageF& source, float lowPass, float highPass) {
 struct InverseAttenuation : Filter {
     ImageSource attenuationBias;
 
-    InverseAttenuation(ImageFolder& calibrationImages) : attenuationBias(calibrateAttenuationBias(calibrationImages)) {}
+    InverseAttenuation(const Folder& calibrationFolder) : attenuationBias(calibrateAttenuationBias(move(calibrationFolder))) {}
 
     /// Calibrates attenuation bias image by summing images of a white subject
-    ImageSource calibrateAttenuationBias(ImageFolder& calibration) {
-        if(skipCache || !existsFile("attenuationBias"_, calibration.cacheFolder)) {
+    ImageSource calibrateAttenuationBias(const Folder& calibrationFolder) {
+        if(!existsFile("attenuationBias"_, Folder(".cache"_,calibrationFolder, true))) {
+            ImageFolder calibration (Folder("."_,calibrationFolder)); // Lists images and evaluates target image size
             ImageTarget attenuationBias ("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
-            if(existsFile("attenuationBias.lock"_)) remove("attenuationBias.lock"_);
-            {rename("attenuationBias"_, "attenuationBias.lock"_, calibration.cacheFolder);
 
-                // Sums all images
-                attenuationBias.pixels.clear();
-                for(string imageName: calibration.keys) {
-                    ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
-                    parallel_apply(attenuationBias.pixels, [](float sum, float source) { return sum + source; }, attenuationBias.pixels, source.pixels);
-                }
+            // Sums all images
+            attenuationBias.pixels.clear();
+            for(string imageName: calibration.keys) {
+                ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
+                parallel_apply(attenuationBias.pixels, [](float sum, float source) { return sum + source; }, attenuationBias.pixels, source.pixels);
+            }
 
-                // Low pass to filter texture and noise
-                gaussianBlur(attenuationBias, 8); // Useful?, TODO?: weaken near spot, strengthen outside
+            // Low pass to filter texture and noise
+            gaussianBlur(attenuationBias, 8); // Useful?, TODO?: weaken near spot, strengthen outside
 
-                // TODO: High pass to filter lighting conditions
+            // TODO: High pass to filter lighting conditions
 
-                // Normalizes sum by mean (DC) (and clips values over average to 1)
-                float sum = parallel_sum(attenuationBias.pixels);
-                float mean = sum/attenuationBias.pixels.size;
-                float factor = 1/mean;
-                parallel_apply(attenuationBias.pixels, [&](float v) {  return min(1.f, factor*v); }, attenuationBias.pixels);
-
-            }rename("attenuationBias.lock"_, "attenuationBias"_, calibration.cacheFolder);
+            // Normalizes sum by mean (DC) (and clips values over average to 1)
+            float sum = parallel_sum(attenuationBias.pixels);
+            float mean = sum/attenuationBias.pixels.size;
+            float factor = 1/mean;
+            parallel_apply(attenuationBias.pixels, [&](float v) {  return min(1.f, factor*v); }, attenuationBias.pixels);
         }
-        return ImageSource("attenuationBias"_, calibration.cacheFolder, calibration.imageSize);
+        return ImageSource("attenuationBias"_, Folder(".cache"_,calibrationFolder));
     }
 
     ImageSource image(ImageFolder& imageFolder, string imageName, Component component) const override {
         //if(fromDecimal(imageFolder.at(imageName).at("Aperture"_)) < 6.3) return imageFolder.image(imageName, component);
         Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
         String id = imageName+"."_+str(component);
-        if(skipCache || !existsFile(id, targetFolder)) {
+        if(!existsFile(id, targetFolder)) {
             ImageSource source = imageFolder.image(imageName, component);
             int2 size = source.size;
 
@@ -115,7 +112,7 @@ struct InverseAttenuation : Filter {
                 }, source.pixels, reference.pixels, corrected.pixels);
             }
         }
-        return ImageSource(id, targetFolder, imageFolder.imageSize);
+        return ImageSource(id, targetFolder);
     }
 };
 
@@ -180,9 +177,7 @@ struct FilterWindow : FilterView {
 };
 
 struct DustRemovalPreview {
-    ImageFolder calibrationImages = Folder("Pictures/Paper"_, home());
-    //ImageView view {calibrationImages};
-    InverseAttenuation filter {calibrationImages};
+    InverseAttenuation filter { Folder("Pictures/Paper"_, home()) };
     //ImageWidget view {sRGB(filter.attenuationBias)};
     ImageFolder images { Folder("Pictures"_, home()),
                 [](const String&, const map<String, String>& tags){ return fromDecimal(tags.at("Aperture"_)) > 4; } };

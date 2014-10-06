@@ -3,20 +3,36 @@
 #include "exif.h"
 #include "jpeg.h"
 
-static constexpr bool skipCache = false;
-
 struct ImageTarget : Map, ImageF {
     using ImageF::size;
-    ImageTarget(const string& path, const Folder& at, int2 size) :
-        Map(File(path, at, ::Flags(ReadWrite|Create)).resize(size.x*size.y*sizeof(float)), Map::Write),
-        ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
+    Folder folder;
+    String name;
+    ImageTarget(string name, const Folder& folder, int2 size) :
+        Map(File(name, folder, ::Flags(ReadWrite|Create)).resize(size.x*size.y*sizeof(float)), Map::Write),
+        ImageF(unsafeReference(cast<float>((Map&)*this)), size),
+        folder("."_, folder), name(name) {}
+    ~ImageTarget() { rename(name, name+"."_+strx(size), folder);/*FIXME: asserts unique ImageTarget instance for this 'folder/name'*/ }
 };
 
-struct ImageSource : Map, ImageF {
-    using ImageF::size;
-    ImageSource(const string& path, const Folder& at, int2 size) :
-        Map (path, at),
-        ImageF(unsafeReference(cast<float>((Map&)*this)), size) {}
+// -> variant.h
+/// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
+int2 fromInt2(TextData& s) {
+    int x=s.integer(); // Assigns a single value to all components
+    if(!s) return int2(x);
+    s.whileAny("x, "_); int y=s.integer();
+    assert_(!s); return int2(x,y);
+}
+/// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
+inline int2 fromInt2(string str) { TextData s(str); return fromInt2(s); }
+
+struct ImageSource : ImageF {
+    Map map;
+    ImageSource(const string& name, const Folder& folder) {
+        auto match = filter(folder.list(Files), [&](string fileName){ return !startsWith(fileName, name); });
+        assert_(match.size == 1);
+        map = Map(match[0], folder);
+        (ImageF&)*this = ImageF(unsafeReference(cast<float>(map)), fromInt2(section(match[0],'.',-2,-1)));
+    }
 };
 
 struct ImageTargetRGB : Map, Image {
@@ -89,7 +105,7 @@ struct ImageFolder : map<String, map<String, String>> {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         String id = section(imageName,'.')+".rgb"_;
 
-        if(skipCache || !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
+        if(!existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
             log_(section(imageName,'.'));
             Image source = decodeImage(Map(imageName, sourceFolder));
             ImageTargetRGB target (id, cacheFolder, imageSize);
@@ -103,13 +119,13 @@ struct ImageFolder : map<String, map<String, String>> {
     ImageSource image(string imageName, Component component) {
         // Caches conversion from sRGB JPEGs to raw (mmap'able) linear float images
         String id = section(imageName,'.')+"."_+str(component);
-        if(skipCache || !existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
+        if(!existsFile(id, cacheFolder)) { //FIXME: automatic invalidation
             ImageSourceRGB source = scaledRGB(imageName); // Faster but slightly inaccurate
             ImageTarget target (id, cacheFolder, imageSize);
             assert_(imageSize==source.Image::size);
             linear(share(target), source, component);
         }
-        return ImageSource(id, cacheFolder, imageSize);
+        return ImageSource(id, cacheFolder);
     }
 };
 

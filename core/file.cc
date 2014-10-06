@@ -29,7 +29,7 @@ const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; retur
 const Folder& root() { static const Folder root("/"_,currentWorkingDirectory()); return root; }
 Folder::Folder(const string& folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) {
-        assert(isASCII(folder));
+        assert(isASCII(folder) && at);
         check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
     }
     fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);

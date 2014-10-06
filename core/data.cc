@@ -148,8 +148,6 @@ string TextData::untilAny(const string& any) {
     return slice(start,end-start);
 }
 
-void TextData::skip() { whileAny(" \t\n\r"_); }
-
 string TextData::line() { return until('\n'); }
 
 string TextData::word(const string& special) {

@@ -92,11 +92,11 @@ generic struct xy { T x,y; };
 typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
+inline String strx(int2 N) { return str(N.x)+"x"_+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2;
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
-inline float cross(int2 a, int2 b) { return a.y*b.x - a.x*b.y; }
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 
 generic struct xyz {
