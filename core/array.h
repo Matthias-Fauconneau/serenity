@@ -23,15 +23,12 @@ generic struct array : buffer<T> {
     using buffer<T>::at;
     using buffer<T>::slice;
 
-    /// Compares all elements
-    //bool operator ==(const ref<T> b) const { return (ref<T>)*this==b; }
-
     /// Allocates enough memory for \a capacity elements
     void reserve(size_t nextCapacity) {
         if(nextCapacity>capacity) {
             assert(nextCapacity>=size);
             if(capacity) {
-                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); //reallocate heap buffer (copy is done by allocator if necessary)
+                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); // Reallocates heap buffer (copy is done by allocator if necessary)
                 assert(size_t(data)%alignof(T)==0);
             } else if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("");
             capacity=nextCapacity;
@@ -43,12 +40,6 @@ generic struct array : buffer<T> {
     void shrink(size_t nextSize) { assert(capacity && nextSize<=size); for(size_t i: range(nextSize,size)) data[i].~T(); size=nextSize; }
     /// Removes all elements
     void clear() { if(size) shrink(0); }
-
-    /// Appends a new element constructing it directly into the array (avoids using a move operations)
-    //template<Type Arg, Type... Args> array& emplace(Arg&& arg, Args&&... args) { size_t s=size+1; reserve(s); new (end()) T(forward<Arg>(arg), forward<Args>(args)...); size=s; return *this;}
-
-    /// Appends a default constructed elements and returns a reference to it
-    //T& append() { size_t s=size+1; reserve(s); new (end()) T(); size=s; return mref<T>::last(); }
 
     /// Appends an implicitly copiable value
     array& append(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }

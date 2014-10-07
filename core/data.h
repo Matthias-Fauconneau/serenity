@@ -206,15 +206,11 @@ struct TextData : Data {
     /// Reads a identifier [a-zA-Z0-9/special/]*
     string identifier(const string special=""_);
     /// Matches [-+]?[0-9]*
-    string whileInteger(bool sign=false);
+    string whileInteger(bool sign=false, int base=10);
     /// Reads an integer
-    int integer(bool sign=false);
+    int integer(bool sign=false, int base=10);
     /// Reads a signed integer, return defaultValue if fails
     int mayInteger(int defaultValue=-1);
-    /// Matches [0-9a-fA-F]*
-    string whileHexadecimal();
-    /// Reads an hexadecimal integer
-    uint hexadecimal();
     /// Matches [-+]?[0-9]*\.[0-9]*
     string whileDecimal();
     /// Reads a decimal number

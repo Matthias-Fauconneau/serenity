@@ -4,6 +4,8 @@
 
 /// string
 
+string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
+
 bool operator <(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
@@ -20,24 +22,18 @@ bool operator <=(const string a, const string b) {
     return a.size <= b.size;
 }
 
-string str(const char* s) {
-    if(!s) return "null"_; int i=0; while(s[i]) i++; return string((byte*)s,i);
-}
-
 bool startsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data,a.size)==a;
 }
 
-bool find(const string s, const string a) {
-    if(a.size>s.size) return false;
-    for(uint i=0;i<=s.size-a.size;i++) {
-        if(string(s.data+i,a.size)==a) return true;
-    }
-    return false;
-}
-
 bool endsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data+s.size-a.size,a.size)==a;
+}
+
+bool find(const string s, const string a) {
+    if(a.size>s.size) return false;
+    for(uint i=0;i<=s.size-a.size;i++) if(string(s.data+i,a.size)==a) return true;
+    return false;
 }
 
 string section(const string s, byte separator, int begin, int end) {
@@ -51,13 +47,7 @@ string section(const string s, byte separator, int begin, int end) {
     return string(s.data+b,e-b);
 }
 
-string trim(const string s) {
-    int begin=0,end=s.size;
-    for(;begin<end;begin++) { byte c=s[(uint)begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
-    for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
-    return s.slice(begin, end-begin);
-}
-
+#if 0
 bool isASCII(const string s) {
     for(uint8 c : s) if(c<32 || c>126) return false;
     return true;
@@ -79,65 +69,16 @@ bool isInteger(const string s) {
 }
 
 int64 fromInteger(const string number, int base) {
-    assert(base>=2 && base<=16);
-    assert(number);
-    int sign=1;
-    const byte* i = number.begin();
-    if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
-    long value=0;
-    for(;i!=number.end();++i) {
-        int n;
-        if(*i>='0' && *i<='9') n = *i-'0';
-        else if(*i>='a' && *i<='f') n = *i+10-'a';
-        else if(*i>='A' && *i<='F') n = *i+10-'A';
-        else if(*i == '.') { error("Unexpected decimal"); break; }
-        else break;
-        value *= base;
-        value += n;
-    }
-    return sign*value;
+
 }
 
-bool isDecimal(const string number) {
-    if(!number) return false;
-    const byte* i = number.begin();
-    if(*i == '-' || *i == '+') ++i;
-    for(bool gotDot=false, gotE=false;i!=number.end();++i) {
-        /**/  if(!gotDot && *i == '.') gotDot=true;
-        else if(!gotE && (*i == 'e' || *i == 'E')) gotE=true;
-        else if(*i<'0' || *i>'9') return false;
-    }
-    return true;
-}
-
-double fromDecimal(const string number) {
-    if(!number) return __builtin_nan("");
-    if(number == "∞"_) return __builtin_inf();
-    double sign=1, eSign=1;
-    const byte* i = number.begin();
-    if(*i == '-' ) ++i, sign=-1; else if(*i == '+') ++i;
-    double significand=0, decimal=0, exponent=0;
-    for(bool gotDot=false, gotE=false;i!=number.end();) {
-        if(!gotDot && *i == '.') { ++i; gotDot=true; continue; }
-        if(!gotE && (*i == 'e' || *i=='E')) { ++i; gotE=true; if(*i == '-' ) ++i, eSign=-1; else if(*i == '+') ++i; continue; }
-        if(*i<'0' || *i>'9') { error("fromDecimal('"_+number+"'') Unexpected '"_+str(*i)+"'"_); break; }
-        int n = *i-'0';
-        if(gotE) {
-            exponent *= 10;
-            exponent += n;
-        } else {
-            significand *= 10;
-            significand += n;
-            if(gotDot) decimal++;
-        }
-        ++i;
-    }
-    return sign*significand*exp10(eSign*exponent-decimal);
-}
+bool isDecimal(const string string) { return TextData(number).whileDecimal() == string.size; }
+double fromDecimal(const string number) { return TextData(number).decimal(); }
+#endif
 
 /// String
 
-String strz(const string source) { String target(source.size+1); target.append(source); target.append('\0'); return target; }
+String strz(const string source) { String target(source.size+1); target.slice(0, source.size).copy(source); target.last()='\0'; return target; }
 
 String join(const ref<string> list, const string separator) {
     String target;

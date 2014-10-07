@@ -20,7 +20,9 @@ enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK =
 void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 String Handle::name() const {
     if(fd==AT_FDCWD) return String("."_);
-    String s(256); s.size=check(readlink(strz("/proc/self/fd/"_+str((int)fd)), s.begin(), s.capacity), (int)fd);
+    static Folder procSelfFD("/proc/self/fd/"_);
+    log(str((int)fd));
+    String s(256); s.size=check(readlinkat(procSelfFD.fd, str((int)fd), s, s.capacity), (int)fd);
     return s;
 }
 
@@ -42,7 +44,7 @@ array<String> Folder::list(uint flags) const {
     array<String> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
-            string name = str(entry.name);
+            string name = strz(entry.name);
             assert(name);
             if(!(flags&Hidden) && name[0u]=='.') continue;
             if(name=="."_||name==".."_) continue;

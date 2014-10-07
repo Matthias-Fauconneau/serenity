@@ -177,38 +177,40 @@ char TextData::character() {
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
-string TextData::whileInteger(bool sign) {
+string TextData::whileInteger(bool sign, int base) {
+    assert(==10 || base==16);
     uint start=index;
     if(sign) matchAny("-+"_);
     for(;available(1);) {
         byte c=peek();
-        if(c>='0'&&c<='9') advance(1); else break;
+        if((c>='0'&&c<='9')||(base==16 && ((c>='a'&&c<='f')||(c>='A'&&c<='F')))) advance(1); else break;
     }
     return slice(start,index-start);
 }
 
-int TextData::integer(bool sign) {
-    string s = whileInteger(sign);
-    if(!s) error("Expected integer", line(), lineIndex);
-    return fromInteger(s, 10);
+int TextData::integer(bool maySign, int base) {
+    assert(base==10 || base==16);
+    int sign=1;
+    if(maySign) { if(match('-')) sign=-1; else match('+'); }
+    long value=0;
+    do {
+        char c = next();
+        int n;
+        /**/  if(c>='0' && c<='9') n = c-'0';
+        else if(c == '.') { error("Unexpected decimal"); break; }
+        else if(base!=16) break;
+        else if(c>='a' && c<='f') n = c+10-'a';
+        else if(c>='A' && c<='F') n = c+10-'A';
+        else break;
+        value *= base;
+        value += n;
+    } while(available(1));
+    return sign*value;
 }
 
 int TextData::mayInteger(int defaultValue) {
     string s = whileInteger(true);
-    return s ? fromInteger(s, 10): defaultValue;
-}
-
-string TextData::whileHexadecimal() {
-    uint start=index;
-    for(;available(1);) {
-        byte c=peek();
-        if((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')) advance(1); else break;
-    }
-    return slice(start,index-start);
-}
-
-uint TextData::hexadecimal() {
-    return fromInteger(whileHexadecimal(), 16);
+    return s ? TextData(s).integer() : defaultValue;
 }
 
 string TextData::whileDecimal() {
@@ -224,4 +226,29 @@ string TextData::whileDecimal() {
     return slice(start,index-start);
 }
 
-double TextData::decimal() { return fromDecimal(whileDecimal()); }
+double TextData::decimal() {
+    if(!available(1)) return __builtin_nan("");
+    double sign=1;
+    if(match('-')) sign=-1; else match('+');
+    double significand=0, decimal=0, eSign=1, exponent=0;
+    if(match("∞"_)) significand = __builtin_inf();
+    else for(bool gotDot=false, gotE=false; available(1);) {
+        /**/  if(!gotDot && match('.')) gotDot=true;
+        else if(!gotE && matchAny("eE"_)) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
+        else {
+            char c = next();
+            if(c>='0' && c<='9') {
+                int n = c-'0';
+                /*if(gotE) {
+                    exponent *= 10;
+                    exponent += n;
+                } else*/ {
+                    significand *= 10;
+                    significand += n;
+                    if(gotDot) decimal++;
+                }
+            } else break;
+        }
+    }
+    return sign*significand/**exp10(eSign*exponent-decimal)*/;
+}

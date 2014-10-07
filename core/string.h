@@ -2,9 +2,6 @@
 /// \file string.h String manipulations (using lightweight string when possible)
 #include "array.h"
 
-// Enforces exact match for overload resolution
-generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
-
 /// Lexically compare strings
 bool operator <(const string a, const string b);
 bool operator <=(const string a, const string b);
@@ -12,8 +9,6 @@ bool operator <=(const string a, const string b);
 /// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 string section(const string str, byte separator, int begin=0, int end=1);
-/// Returns a reference with heading and trailing whitespace removed
-string trim(const string s);
 
 /// Returns true if \a str starts with \a sub
 bool startsWith(const string str, const string sub);
@@ -22,6 +17,7 @@ bool endsWith(const string str, const string sub);
 /// Returns true if \a str contains the \a substring
 bool find(const string str, const string substring);
 
+#if 0
 /// Returns true if a string is a displayable unextended ASCII string
 bool isASCII(const string s);
 /// Returns true if a string is a valid UTF8 string
@@ -34,21 +30,34 @@ int64 fromInteger(const string str, int base=10);
 bool isDecimal(const string s);
 /// Parses a decimal value
 double fromDecimal(const string str);
+#endif
+
+// str()
+
+// Enforces exact match for overload resolution
+generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
 
 /// Forwards string
-inline const string str(const string s) { return s; }
-/// Forwards mref<byte>
-//inline const mref<byte>& str(const mref<byte>& s) { return s; }
+inline const string& str(const string& s) { return s; }
+/// Forwards buffer<byte>
+inline const buffer<char>& str(const buffer<char>& s) { return s; }
+/// Forwards array<byte>
+inline const array<char>& str(const array<char>& s) { return s; }
+/// Forwards char[]
+template<size_t N> string str(const char (&source)[N], char separator=' ') { return string(source,N); }
 
-/// Returns a bounded reference to the null-terminated String pointer
-string str(const char* s);
 /// Returns boolean as "true"/"false"
 inline string str(const bool& b) { return b?"true"_:"false"_; }
 /// Returns a reference to the character
 inline string str(const char& c) { return string((char*)&c,1); }
 
-/// Forwards buffer<byte>
-inline const buffer<byte>& str(const buffer<byte>& s) { return s; }
+/// Returns a bounded reference to the null-terminated String pointer
+string strz(const char* s);
+
+// String
+
+/// Copies the reference and appends a null byte
+String strz(const string s);
 
 /// Joins \a list into a single String with each element separated by \a separator
 String join(const ref<string> list, const string separator);
@@ -67,12 +76,6 @@ String simplify(String&& s);
 String left(const string s, size_t size, const char pad=' ');
 /// Pads a string to the right
 String right(const string s, size_t size, const char pad=' ');
-
-/*/// Forwards string
-inline const String& str(const String& s) { return s; }*/
-
-/// Copies the reference and appends a null byte
-String strz(const string s);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array<string> split(const string str, byte separator=' ');
@@ -119,7 +122,7 @@ generic String str(const array<T>& source, char separator=' ') { return str((con
 inline String hex(const ref<uint8> source, char separator=' ') { return str(apply(source, [](const uint8& c) { return hex(c,2); }), separator); }
 
 /// Converts static arrays
-template<Type T, size_t N> String str(const T (&a)[N], char separator=' ') { return str(ref<T>(a,N), separator); }
+template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') { return str(ref<T>(source, N), separator); }
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
