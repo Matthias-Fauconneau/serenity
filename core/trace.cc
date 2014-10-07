@@ -5,11 +5,7 @@
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
-#if __x86_64
 struct Sym { uint	name; byte info,other; uint16 shndx; byte* value; long size; };
-#else
-struct Sym { uint	name; byte* value; uint size; byte info,other; uint16 shndx; };
-#endif
 
 /// Reads a little endian variable size integer
 static int readLEV(BinaryData& s, bool sign=false) {
@@ -25,65 +21,65 @@ String demangle(TextData& s, bool function=true) {
     for(;;) {
         /**/  if(s.match('O')) rvalue=true;
         else if(s.match('R')) ref=true;
-        else if(s.match('K')) r<<"const "_;
-        else if(function && s.match('L')) r<<"static "_;
+        else if(s.match('K')) r.append("const "_);
+        else if(function && s.match('L')) r.append("static "_);
         else if(s.match('P')) pointer++;
         else break;
     }
     uint l;
-    /**/  if(s.match('v')) { if(pointer) r<<"void"_; }
-    else if(s.match("C1"_)) r<< "this"_;
-    else if(s.match("C2"_)) r<< "this"_;
-    else if(s.match("D1"_)) r<< "~this"_;
-    else if(s.match("D2"_)) r<< "~this"_;
-    else if(s.match("Dv"_)){int size=s.integer(); s.match('_'); r<<demangle(s)+dec(size);}
-    else if(s.match("eq"_)) r<<"operator =="_;
-    else if(s.match("ix"_)) r<<"operator []"_;
-    else if(s.match("cl"_)) r<<"operator ()"_;
-    else if(s.match("ls"_)) r<<"operator <<"_;
-    else if(s.match("rs"_)) r<<"operator >>"_;
-    else if(s.match("cv"_)) r<<"operator "_ + demangle(s);
-    else if(s.match("pl"_)) r<<"operator +"_;
-    else if(s.match("mi"_)) r<<"operator -"_;
-    else if(s.match("ml"_)) r<<"operator *"_;
-    else if(s.match("dv"_)) r<<"operator /"_;
-    else if(s.match('a')) r<<"byte"_;
-    else if(s.match('b')) r<<"bool"_;
-    else if(s.match('c')) r<<"char"_;
-    else if(s.match('f')) r<<"float"_;
-    else if(s.match('h')) r<<"byte"_;
-    else if(s.match('i')) r<<"int"_;
-    else if(s.match('j')) r<<"uint"_;
-    else if(s.match('l')) r<<"long"_;
-    else if(s.match('m')) r<<"ulong"_;
-    else if(s.match('s')) r<<"short"_;
-    else if(s.match('t')) r<<"ushort"_;
-    else if(s.match('x')) r<<"int64"_;
-    else if(s.match('y')) r<<"uint64"_;
-    else if(s.match('A')) { r<<"[]"_; s.whileInteger(); s.match('_'); }
-    else if(s.match('M')) { r<<demangle(s)<<"::"_<<demangle(s); }
-    else if(s.match("Tv"_)) { r<<"thunk "_; s.whileInteger(); s.match('_'); if(s.match("n"_)) { s.whileInteger(); s.match('_'); r<<demangle(s); } }
-    else if(s.match('T')) { r<<'T'; s.whileInteger(); s.match('_'); }
-    else if(s.match("St"_)) r<<"std"_;
-    else if(s.match('S')) { r<<'S'; s.whileInteger(); s.match('_'); }
-    else if(s.match('F')||s.match("Dp"_)) r << demangle(s);
-    else if(s.match("Li"_)) r<<dec(s.integer());
-    else if(s.match("Lj"_)) r<<dec(s.integer());
-    else if(s.match("Lb"_)) r<<str((bool)s.integer());
-    else if(s.match('L')) r<<"extern "_<<demangle(s);
+    /**/  if(s.match('v')) { if(pointer) r.append("void"_); }
+    else if(s.match("C1"_)) r.append( "this"_);
+    else if(s.match("C2"_)) r.append( "this"_);
+    else if(s.match("D1"_)) r.append( "~this"_);
+    else if(s.match("D2"_)) r.append( "~this"_);
+    else if(s.match("Dv"_)){int size=s.integer(); s.match('_'); r.append(demangle(s)+dec(size));}
+    else if(s.match("eq"_)) r.append("operator =="_);
+    else if(s.match("ix"_)) r.append("operator []"_);
+    else if(s.match("cl"_)) r.append("operator ()"_);
+    else if(s.match("ls"_)) r.append("operator <<"_);
+    else if(s.match("rs"_)) r.append("operator >>"_);
+    else if(s.match("cv"_)) r.append("operator "_ + demangle(s));
+    else if(s.match("pl"_)) r.append("operator +"_);
+    else if(s.match("mi"_)) r.append("operator -"_);
+    else if(s.match("ml"_)) r.append("operator *"_);
+    else if(s.match("dv"_)) r.append("operator /"_);
+    else if(s.match('a')) r.append("byte"_);
+    else if(s.match('b')) r.append("bool"_);
+    else if(s.match('c')) r.append("char"_);
+    else if(s.match('f')) r.append("float"_);
+    else if(s.match('h')) r.append("byte"_);
+    else if(s.match('i')) r.append("int"_);
+    else if(s.match('j')) r.append("uint"_);
+    else if(s.match('l')) r.append("long"_);
+    else if(s.match('m')) r.append("ulong"_);
+    else if(s.match('s')) r.append("short"_);
+    else if(s.match('t')) r.append("ushort"_);
+    else if(s.match('x')) r.append("int64"_);
+    else if(s.match('y')) r.append("uint64"_);
+    else if(s.match('A')) { r.append("[]"_); s.whileInteger(); s.match('_'); }
+    else if(s.match('M')) { r.append(demangle(s)); r.append("::"_); r.append(demangle(s)); }
+    else if(s.match("Tv"_)) { r.append("thunk "_); s.whileInteger(); s.match('_'); if(s.match("n"_)) { s.whileInteger(); s.match('_'); r.append(demangle(s)); } }
+    else if(s.match('T')) { r.append('T'); s.whileInteger(); s.match('_'); }
+    else if(s.match("St"_)) r.append("std"_);
+    else if(s.match('S')) { r.append('S'); s.whileInteger(); s.match('_'); }
+    else if(s.match('F')||s.match("Dp"_)) r.append(demangle(s));
+    else if(s.match("Li"_)) r.append(dec(s.integer()));
+    else if(s.match("Lj"_)) r.append(dec(s.integer()));
+    else if(s.match("Lb"_)) r.append(str((bool)s.integer()));
+    else if(s.match('L')) { r.append("extern "_); r.append(demangle(s)); }
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<String> args;
         while(s && !s.match('E')) {
-            if(s.wouldMatch('Z')) args<<(demangle(s)+"::"_+demangle(s));
-            else args<<demangle(s,false);
+            if(s.wouldMatch('Z')) args.append(demangle(s)+"::"_+demangle(s));
+            else args.append(demangle(s,false));
         }
-        r<<'<'<<join(args,", "_)<<'>';
+        r.append('<'); r.append(join(args,", "_)); r.append('>');
     }
     else if(s.match('Z')) {
-        r<< demangle(s);
+        r.append( demangle(s));
         array<String> args;
-        while(s && !s.match('E')) args << demangle(s);
-        r<< '(' << join(args,", "_) << ')';
+        while(s && !s.match('E')) args.append(demangle(s));
+        r.append('('); r.append(join(args,", "_)); r.append(')');
     }
     else if(s.match("_0"_)) {}
     else if(s.match('N')) {
@@ -91,24 +87,24 @@ String demangle(TextData& s, bool function=true) {
         bool const_method =false;
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
-            list<< demangle(s);
-            if(s.wouldMatchAny("IJ"_)) list.last()<< demangle(s);
+            list.append( demangle(s) );
+            if(s.wouldMatchAny("IJ"_)) list.last().append( demangle(s) );
         }
-        r<< join(list,"::"_);
-        if(const_method) r<< " const"_;
+        r.append( join(list,"::"_) );
+        if(const_method) r.append(" const"_);
     } else {
         l=s.mayInteger(-1);
         if(l<=s.available(l)) {
-            r<<s.read(l); //struct
-            if(s.wouldMatch('I')) r<< demangle(s);
-        } else r<<s.untilEnd();
+            r.append(s.read(l)); //struct
+            if(s.wouldMatch('I')) r.append(demangle(s));
+        } else r.append(s.untilEnd());
     }
-    for(int i=0;i<pointer;i++) r<<'*';
-    if(rvalue) r<<"&&"_;
-    if(ref) r<<'&';
+    for(int i=0;i<pointer;i++) r.append('*');
+    if(rvalue) r.append("&&"_);
+    if(ref) r.append('&');
     return r;
 }
-String demangle(const string& symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
+String demangle(const string symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findSymbol(void* find) {
 #if 0 // qemu-user only fakes /proc/self/exe for readlink
@@ -137,7 +133,7 @@ Symbol findSymbol(void* find) {
         while(s.next()) { s.whileNot(0); s.skip('\0'); }
         array<string> files;
         while(s.peek()) {
-            files << cast<char>(s.whileNot(0)); s.skip('\0');
+            files.append( cast<char>(s.whileNot(0)) ); s.skip('\0');
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
         }
         s.advance(1);
@@ -195,40 +191,28 @@ Symbol findSymbol(void* find) {
     return symbol;
 }
 
-#if __x86_64 || __i386
 void* caller_frame(void* fp) { return *(void**)fp; }
 void* return_address(void* fp) { return *((void**)fp+1); }
-#else
-#include <execinfo.h>
-#endif
 
 String trace(int skip, void* ip) {
     String log;
     void* stack[32];
-#if __arm__
-    int i = backtrace(stack, 32);
-#else
     int i=0;
     void* frame = __builtin_frame_address(0);
     for(;i<32;i++) {
-#if __x86_64
         if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
-#else
-        if(ptr(frame)<0x1000) break;
-#endif
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }
-#endif
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
-        if(s.function||s.file||s.line) log<<(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
-        else log<<"0x"_+hex(ptr(stack[i]))<<"\n"_;
+        if(s.function||s.file||s.line) log.append(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
+        else log.append("0x"_+hex(ptr(stack[i]))+"\n"_);
     }
     if(ip) {
         Symbol s = findSymbol(ip);
-        if(s.function||s.file||s.line) log<<(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
-        else log<<"0x"_+hex(ptr(ip))<<"\n"_;
+        if(s.function||s.file||s.line) log.append(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
+        else log.append("0x"_+hex(ptr(ip))+"\n"_);
     }
     return log;
 }

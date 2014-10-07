@@ -54,13 +54,13 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 // Methods
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const string& name=""_, const Image& icon=Image());
+    Window(Widget* widget, int2 size=int2(-1,-1), const string name=""_, const Image& icon=Image());
     /// Frees the graphics context and destroys the window
     virtual ~Window();
 
 // Connection
     /// Processes an event
-    void processEvent(const ref<byte>& ge);
+    void processEvent(const ref<byte> ge);
 
  // Window
     /// Shows window.
@@ -69,7 +69,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void hide();
 
     /// Sets window title to \a title
-    void setTitle(const string& title);
+    void setTitle(const string title);
     /// Sets window icon to \a icon
     void setIcon(const Image& icon);
 

@@ -30,19 +30,33 @@ generic struct buffer : mref<T> {
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
     template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
+    /// Initializes a new buffer with the content of \a o
+    explicit buffer(const ref<T> o) : buffer(o.size) { copy(o); }
 
-    buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(move(o)); return *this; }
+    buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
 };
 /// Initializes a new buffer with the content of \a o
-generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); copy(t, o); return t; }
-/// Initializes a new buffer with the content of \a o
-// Not named copy as it would be prevent "copying" references as references
-// TODO: rename to explicit buffer(const ref<T>& o)
-generic buffer<T> bufferCopy(const ref<T>& o){ buffer<T> t(o.size, o.size); copy(t, o); return t; }
+generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
+
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
-generic buffer<T> unsafeReference(const ref<T>& o) { return buffer<T>((T*)o.data, o.size); }
+generic buffer<T> unsafeReference(const ref<T> o) { return buffer<T>((T*)o.data, o.size); }
+
+/// Concatenates two buffers by copying
+generic inline buffer<T> operator+(const ref<T> a, const ref<T> b) {
+    buffer<T> target(a.size+b.size); target.slice(0, a.size).copy(a); target.slice(a.size).copy(b); return target;
+}
+
+/// Returns an array of the application of a function to every index up to a size
+template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {
+    buffer<decltype(function(0))> target(size); apply(target, function); return target;
+}
+
+/// Returns an array of the application of a function to every elements of a reference
+template<Type Function, Type T> auto apply(ref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
+    buffer<decltype(function(source[0]))> target(source.size); target.apply(source, function); return target;
+}
 
 /// Unique reference to an heap allocated value
 generic struct unique {

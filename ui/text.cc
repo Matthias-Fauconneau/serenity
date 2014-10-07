@@ -25,25 +25,25 @@ struct TextLayout {
         Glyph(const Font::Metrics& metrics, const ::Glyph& glyph) : Font::Metrics(metrics), ::Glyph(glyph) {}
     };
     // Bounding box for stacking
-    vec2 min(const ref<Glyph>& word) {
+    vec2 min(const ref<Glyph> word) {
         assert_(word);
         vec2 min=inf;
         for(const Glyph& g : word) min=::min(min, g.origin - g.bearing);
         return min;
     }
-    vec2 max(const ref<Glyph>& word) {
+    vec2 max(const ref<Glyph> word) {
         assert_(word);
         vec2 max=-inf;
         for(const Glyph& g : word) max=::max(max, g.origin - g.bearing + g.size);
         return max;
     }
     // Length for justification
-    float width(const ref<Glyph>& word) {
+    float width(const ref<Glyph> word) {
         float max=0;
         for(const Glyph& g : word) if(g.code!=',' && g.code!='.') max=::max(max, g.origin.x - g.bearing.x + g.width);
         return max;
     }
-    float advance(const ref<Glyph>& word) {
+    float advance(const ref<Glyph> word) {
         assert_(word);
         float max=-inf; for(const Glyph& g : word) max=::max(max, g.origin.x + g.advance); return max;
     }
@@ -65,14 +65,14 @@ struct TextLayout {
 
     void nextLine(bool justify) {
         if(words) {
-            float length=0; for(const ref<Glyph>& word: words) length += advance(word); // Sums word lengths
+            float length=0; for(const ref<Glyph> word: words) length += advance(word); // Sums word lengths
             if(words.last()) length += -advance(words.last()) + width(words.last()); // For last word of line, use last glyph width instead of advance
             float space = (justify && words.size>1) ? (wrap-length)/(words.size-1) : spaceAdvance;
 
             // Layouts
             float x=0; // Line pen
             auto& line = glyphs.append();
-            for(const ref<Glyph>& word: words) {
+            for(const ref<Glyph> word: words) {
                 auto& wordOut = line.append();
                 for(Glyph glyph: word) {
                     glyph.origin += vec2(x, lineOriginY);
@@ -90,14 +90,14 @@ struct TextLayout {
 
     void nextWord(array<Glyph>&& word, bool justify) {
         float length = 0;
-        for(const ref<Glyph>& word: words) length += advance(word) + spaceAdvance;
+        for(const ref<Glyph> word: words) length += advance(word) + spaceAdvance;
         length += width(word); // Last word
         if(wrap && length > wrap && words) nextLine(justify); // Would not fit
         assert_(word);
         words << move(word); // Adds to current line (might be first of a new line)
     }
 
-    TextLayout(const ref<uint>& text, float size, float wrap, string fontName, bool hint, float interline, bool justify, bool justifyExplicit, bool justifyLast,
+    TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, bool justify, bool justifyExplicit, bool justifyLast,
                vec3 color) : size(size), wrap(wrap), interline(interline) {
         // Fraction lines
         struct Context {
@@ -255,7 +255,7 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string& text, float size, vec3 color, float opacity, float wrap, string font, bool hint, float interline, bool center, int2 minimalSizeHint)
+Text::Text(const string text, float size, vec3 color, float opacity, float wrap, string font, bool hint, float interline, bool center, int2 minimalSizeHint)
     : text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center),
       minimalSizeHint(minimalSizeHint) {}
 

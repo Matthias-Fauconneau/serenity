@@ -27,7 +27,7 @@ String Handle::name() const {
 // Folder
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
 const Folder& root() { static const Folder root("/"_,currentWorkingDirectory()); return root; }
-Folder::Folder(const string& folder, const Folder& at, bool create):Handle(0){
+Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) {
         assert(isASCII(folder) && at);
         check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
@@ -52,18 +52,18 @@ array<String> Folder::list(uint flags) const {
                     || (flags&Folders && type==DT_DIR)
                     || (flags&Devices && type==DT_CHR)
                     || (flags&Drives && type==DT_BLK) ) {
-                if(flags&Sorted) list.insertSorted(String(name)); else list << String(name);
+                if(flags&Sorted) list.insertSorted(String(name)); else list.append( String(name) );
             }
             if(flags&Recursive && type==DT_DIR) {
                 for(const String& file: Folder(name,*this).list(flags)) {
-                    if(flags&Sorted) list.insertSorted(name+"/"_+file); else list << name+"/"_+file;
+                    if(flags&Sorted) list.insertSorted(name+"/"_+file); else list.append( name+"/"_+file );
                 }
             }
         }
     }
     return list;
 }
-bool existsFolder(const string& folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
+bool existsFolder(const string folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }
 
 // Stream
 void Stream::read(byte* buffer, size_t size) { int unused read=check( ::read(fd,buffer,size) ); assert(read==(int)size,"Expected", size, "got", read); }
@@ -81,11 +81,11 @@ buffer<byte> Stream::readUpTo(size_t capacity) {
 }
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 void Stream::write(const byte* data, size_t size) { assert(data); for(size_t offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), name()); }
-void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
+void Stream::write(const ref<byte> buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXEC,0))){}
 
 // File
-File::File(const string& path, const Folder& at, Flags flags) : Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, int(flags))) {}
+File::File(const string path, const Folder& at, Flags flags) : Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, int(flags))) {}
 struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
 FileType File::type() const { return FileType(stat().st_mode&__S_IFMT); }
 int64 File::size() const { return stat().st_size; }
@@ -94,10 +94,10 @@ int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.
 const File& File::resize(int64 size) const { check_(ftruncate(fd, size), fd.pointer, size); return *this; }
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 
-bool existsFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_PATH, 0); if(fd>0) close(fd); return fd>0; }
-bool writableFile(const string& path, const Folder& at) { int fd = openat(at.fd, strz(path), O_WRONLY, 0); if(fd>0) close(fd); return fd>0; }
-buffer<byte> readFile(const string& path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
-void writeFile(const string& path, const ref<byte>& content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
+bool existsFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), O_PATH, 0); if(fd>0) close(fd); return fd>0; }
+bool writableFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), O_WRONLY, 0); if(fd>0) close(fd); return fd>0; }
+buffer<byte> readFile(const string path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
+void writeFile(const string path, const ref<byte> content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
 
 // Device
 int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments)); }
@@ -110,30 +110,30 @@ void Map::lock(uint size) const { /*check_(*/ mlock(data, min<size_t>(this->size
 void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 
 // File system
-void rename(const Folder& oldFolder, const string& oldName, const Folder& newFolder, const string& newName) {
+void rename(const Folder& oldFolder, const string oldName, const Folder& newFolder, const string newName) {
     assert(existsFile(oldName,oldFolder), oldName, newName);
     assert(!existsFile(newName,newFolder), oldName, newName);
     assert(newName.size<0x100);
     check_(renameat(oldFolder.fd, strz(oldName), newFolder.fd, strz(newName)));
 }
-void rename(const string& oldName,const string& newName, const Folder& at) {
+void rename(const string oldName,const string newName, const Folder& at) {
     assert(oldName!=newName);
     rename(at, oldName, at, newName);
 }
 
-void remove(const string& name, const Folder& at) { check_( unlinkat(at.fd, strz(name), 0), name); }
-void removeIfExisting(const string& name, const Folder& at) { if(existsFile(name, at)) remove(name, at); }
+void remove(const string name, const Folder& at) { check_( unlinkat(at.fd, strz(name), 0), name); }
+void removeIfExisting(const string name, const Folder& at) { if(existsFile(name, at)) remove(name, at); }
 
-void symlink(const string& from,const string& to, const Folder& at) {
+void symlink(const string from,const string to, const Folder& at) {
     assert(from!=to);
     remove(from, at);
     check_(symlinkat(strz(from), at.fd, strz(to)), from,"->",to);
 }
-void touchFile(const string& path, const Folder& at, bool setModified) {
+void touchFile(const string path, const Folder& at, bool setModified) {
     timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}};
     check_(utimensat(at.fd, strz(path), times, 0), path);
 }
-void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName) {
+void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName) {
     File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate)); //FIXME: preserve executable flag
     for(size_t offset=0, size=oldFile.size(); offset<size;)
         offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
@@ -141,7 +141,7 @@ void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const
 }
 
 int64 available(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
-int64 available(const string& path, const Folder& at) { return available(File(path,at)); }
+int64 available(const string path, const Folder& at) { return available(File(path,at)); }
 
 int64 capacity(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_blocks*statvfs.f_frsize; }
-int64 capacity(const string& path, const Folder& at) { return capacity(File(path,at)); }
+int64 capacity(const string path, const Folder& at) { return capacity(File(path,at)); }

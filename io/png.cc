@@ -39,7 +39,7 @@ template void unfilter<ia,2>(byte4* dst, const byte* raw, uint width, uint heigh
 template void unfilter<rgb,3>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
 template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
 
-Image decodePNG(const ref<byte>& file) {
+Image decodePNG(const ref<byte> file) {
     BinaryData s(file, true);
     if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { error("Invalid PNG"); return Image(); }
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
@@ -126,7 +126,7 @@ Image decodePNG(const ref<byte>& file) {
     return image;
 }
 
-uint32 crc32(const ref<byte>& data) {
+uint32 crc32(const ref<byte> data) {
     static uint crc_table[256];
     static int unused once = ({ for(uint n: range(256)) {
                                      uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});

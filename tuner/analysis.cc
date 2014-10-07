@@ -97,8 +97,8 @@ struct SpectrumPlot : Widget {
     }
 };
 
-float maxabs(const ref<float>& v) { float y=0; for(float x: v) if(abs(x)>y) y=abs(x); return y; }
-float mean(const ref<float>& v) { return sum(v)/v.size; }
+float maxabs(const ref<float> v) { float y=0; for(float x: v) if(abs(x)>y) y=abs(x); return y; }
+float mean(const ref<float> v) { return sum(v)/v.size; }
 struct WaveformPlot : Widget {
     const buffer<float> signal;
     const float maximum;

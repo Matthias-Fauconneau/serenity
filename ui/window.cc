@@ -3,7 +3,7 @@
 #include "x.h"
 #include <sys/shm.h>
 
-Window::Window(Widget* widget, int2 sizeHint, const string& title, const Image& icon) : widget(widget), size(sizeHint), title(title) {
+Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& icon) : widget(widget), size(sizeHint), title(title) {
     onEvent.connect(this, &Window::processEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
@@ -35,7 +35,7 @@ Window::~Window() {
 }
 
 // Events
-void Window::processEvent(const ref<byte>& ge) {
+void Window::processEvent(const ref<byte> ge) {
     const XEvent& e = *(XEvent*)ge.data;
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     if(type==MotionNotify) {
@@ -101,7 +101,7 @@ void Window::processEvent(const ref<byte>& ge) {
 void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
 void Window::hide() { send(UnmapWindow{.id=id}); }
 
-void Window::setTitle(const string& title) {
+void Window::setTitle(const string title) {
     if(title != this->title) {
         this->title = String(title);
         send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"_), .type=Atom("UTF8_STRING"_), .format=8,

@@ -25,7 +25,7 @@ generic struct Target : T {
 generic struct Source : Map, T {
     using T::size;
     Source(){}
-    Source(const string& name, const Folder& folder) :
+    Source(const string name, const Folder& folder) :
         Map(name, folder),
         T(unsafeReference(cast<typename T::type>((Map&)*this)), fromInt2(section(name,'.',-2,-1))) {}
 };

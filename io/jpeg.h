@@ -3,4 +3,4 @@
 #include "image.h"
 
 /// Encodes image using the Portable Network Graphics standard
-Image decodeJPEG(const ref<byte>& file);
+Image decodeJPEG(const ref<byte> file);

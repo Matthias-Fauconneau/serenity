@@ -65,4 +65,4 @@ inline int parseKey(TextData& s) {
     key += 12*s.mayInteger(4);
     return key;
 }
-inline int parseKey(const string& name) { TextData s(name); return parseKey(s); }
+inline int parseKey(const string name) { TextData s(name); return parseKey(s); }

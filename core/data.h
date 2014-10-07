@@ -7,7 +7,7 @@
 #define big64 __builtin_bswap64
 
 /// Reinterpret cast a const reference to another type
-template<Type T, Type O> ref<T> cast(const ref<O>& o) {
+template<Type T, Type O> ref<T> cast(const ref<O> o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
     return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
 }
@@ -40,7 +40,7 @@ struct Data {
     /// Creates a Data interface to a \a buffer
     Data(::buffer<byte>&& data) : buffer(move(data)) {}
     /// Creates a Data interface to a \a ref
-    explicit Data(const ref<byte>& data) : buffer(unsafeReference(data)) {}
+    explicit Data(const ref<byte> data) : buffer(unsafeReference(data)) {}
     /// Slices a reference to the buffer from \a index to \a index + \a size
     ref<byte> slice(uint pos, uint size) const { return buffer.slice(pos,size); }
     /// Slices a reference to the buffer from \a index to the end of the buffer
@@ -79,23 +79,23 @@ struct Data {
     bool match(char key);
 
     /// Returns whether input match \a key
-    bool wouldMatch(const ref<uint8>& key);
+    bool wouldMatch(const ref<uint8> key);
     /// Returns whether input match \a key
-    bool wouldMatch(const string& key);
+    bool wouldMatch(const string key);
 
     /// If input match \a key, advances \a index by \a key size
-    bool match(const ref<uint8>& key);
+    bool match(const ref<uint8> key);
     /// If input match \a key, advances \a index by \a key size
-    bool match(const string& key);
+    bool match(const string key);
 
     /// Asserts stream matches \a key and advances \a key length bytes
     void skip(uint8 key);
     /// Asserts stream matches \a key and advances \a key length bytes
     void skip(char key);
     /// Asserts stream matches \a key and advances \a key length bytes
-    void skip(const ref<uint8>& key);
+    void skip(const ref<uint8> key);
     /// Asserts stream matches \a key and advances \a key length bytes
-    void skip(const string& key);
+    void skip(const string key);
 };
 
 /// Provides a convenient interface to parse binary inputs
@@ -106,7 +106,7 @@ struct BinaryData : Data {
     /// Creates a BinaryData interface to an \a array
     BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to a \a reference
-    explicit BinaryData(const ref<byte>& reference, bool isBigEndian=false):Data(reference),isBigEndian(isBigEndian){}
+    explicit BinaryData(const ref<byte> reference, bool isBigEndian=false):Data(reference),isBigEndian(isBigEndian){}
 
     /*/// Slices a reference to the buffer from \a index to \a index + \a size
     BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
@@ -168,43 +168,43 @@ struct TextData : Data {
     void advance(uint step) override;
 
     /// Returns whether input match any of \a keys
-    char wouldMatchAny(const string& any);
+    char wouldMatchAny(const string any);
     /// If input match any of \a key, advances \a index
-    char matchAny(const string& any);
+    char matchAny(const string any);
 
     /// Returns whether input match any of \a keys
-    string wouldMatchAny(const ref<string>& keys);
+    string wouldMatchAny(const ref<string> keys);
     /// If input match any of \a keys, advances \a index
-    string matchAny(const ref<string>& keys);
+    string matchAny(const ref<string> keys);
 
     /// If input match none of \a key, advances \a index
-    bool matchNo(const string& any);
+    bool matchNo(const string any);
 
     /// Advances while input match \a key.
     string whileAny(char key);
     /// Advances while input doesn't match \a key. \sa until
     string whileNot(char key);
     /// Advances while input match any of \a any
-    string whileAny(const string& any);
+    string whileAny(const string any);
     /// Advances while input match none of \a any
-    string whileNo(const string& any);
+    string whileNo(const string any);
     /// Advances while input match none of \a any or \a right (which may be nested using \a left)
-    string whileNo(const string& any, char left, char right);
+    string whileNo(const string any, char left, char right);
 
     /// Reads until input match \a key. \sa whileNot
     string until(char key);
     /// Reads until input match \a key
-    string until(const string& key);
+    string until(const string key);
     /// Reads until input match any character of \a key
-    string untilAny(const string& any);
+    string untilAny(const string any);
     /// Reads until end of line
     string line();
     /// Reads one possibly escaped character
     char character();
     /// Reads a word [a-zA-Z/special/]+
-    string word(const string& special=""_);
+    string word(const string special=""_);
     /// Reads a identifier [a-zA-Z0-9/special/]*
-    string identifier(const string& special=""_);
+    string identifier(const string special=""_);
     /// Matches [-+]?[0-9]*
     string whileInteger(bool sign=false);
     /// Reads an integer

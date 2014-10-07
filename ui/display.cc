@@ -101,7 +101,7 @@ void Display::event() {
     }
 }
 
-void Display::event(const ref<byte>& ge) {
+void Display::event(const ref<byte> ge) {
     const XEvent& e = *(XEvent*)ge.data;
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     if(type==KeyPress) {
@@ -155,6 +155,6 @@ function<void()>& Display::globalAction(uint key) {
     return actions.insert(key, []{});
 }
 
-uint Display::Atom(const string& name) {
+uint Display::Atom(const string name) {
     return request(InternAtom{.size=uint16(2+align(4,name.size)/4),  .length=uint16(name.size)}, name).atom;
 }

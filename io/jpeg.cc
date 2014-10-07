@@ -3441,7 +3441,7 @@ unsigned char *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, i
   return pImage_data;
 }
 
-Image decodeJPEG(const ref<byte>& file) {
+Image decodeJPEG(const ref<byte> file) {
     jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
     int width=0, height=0, depth;
     byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4); // mallocated

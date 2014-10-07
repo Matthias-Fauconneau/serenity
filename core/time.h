@@ -13,13 +13,12 @@ long currentTime();
 /// Returns Unix real-time in nanoseconds
 int64 realTime();
 
-#if __x86_64__ || __i386__
 #define USE_TSC 1
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
 struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){if(!tsc) tsc=rdtsc();} void stop(){if(tsc) total+=rdtsc()-tsc; tsc=0;} operator uint64(){return total + (tsc?rdtsc()-tsc:0);} };
-#endif
+
 /// Logs the time spent executing a scope
 struct Time {
     uint64 startTime=realTime(), stopTime=startTime;
@@ -62,12 +61,12 @@ constexpr string months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"
 int daysInMonth(int month, int year);
 
 /// Returns current date formatted using \a format String
-String str(Date date, const string& format="dddd, dd MMMM yyyy hh:mm:ss"_);
+String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss"_);
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy
 Date parseDate(TextData& s);
-inline Date parseDate(const string& s) { TextData t(s); return parseDate(t); }
+inline Date parseDate(const string s) { TextData t(s); return parseDate(t); }
 
 struct Timer : Stream, Poll {
     Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);
@@ -83,9 +82,7 @@ struct Random {
     uint sz=1,sw=1;
     uint z,w;
     Random() { /*seed();*/ reset(); }
-#if USE_TSC
     void seed() { sz=rdtsc(); sw=rdtsc(); }
-#endif
     void reset() { z=sz; w=sw; }
     uint64 next() {
         z = 36969 * (z & 0xFFFF) + (z >> 16);

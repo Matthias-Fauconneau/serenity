@@ -489,7 +489,7 @@ void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
   return pBuf;
 }
 
-buffer<byte> inflate(const ref<byte>& source, bool zlib) {
+buffer<byte> inflate(const ref<byte> source, bool zlib) {
     buffer<byte> data; size_t size;
     data.data = (byte*)decompress_mem_to_heap(source.data, source.size, &size, zlib?FLAG_PARSE_ZLIB_HEADER:0);
     data.capacity=data.size=size;
@@ -1222,7 +1222,7 @@ void *compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOu
   *pOut_len = out_buf.m_size; return out_buf.m_pBuf;
 }
 
-buffer<byte> deflate(const ref<byte>& source, bool zlib) {
+buffer<byte> deflate(const ref<byte> source, bool zlib) {
     buffer<byte> data; size_t size=0;
     assert(source.data && source.size);
     data.data = (byte*)compress_mem_to_heap(source.data, source.size, &size, zlib?WRITE_ZLIB_HEADER:0);

@@ -19,20 +19,20 @@ bool Data::match(char key) {
     else return false;
 }
 
-bool Data::wouldMatch(const ref<uint8>& key) {
+bool Data::wouldMatch(const ref<uint8> key) {
     if(available(key.size)>=key.size && peek(key.size) == cast<byte>(key)) return true;
     else return false;
 }
-bool Data::wouldMatch(const string& key) {
+bool Data::wouldMatch(const string key) {
     if(available(key.size)>=key.size && peek(key.size) == key) return true;
     else return false;
 }
 
-bool Data::match(const ref<uint8>& key) {
+bool Data::match(const ref<uint8> key) {
     if(wouldMatch(key)) { advance(key.size); return true; }
     else return false;
 }
-bool Data::match(const string& key) {
+bool Data::match(const string key) {
     if(wouldMatch(key)) { advance(key.size); return true; }
     else return false;
 }
@@ -44,10 +44,10 @@ void Data::skip(const char key) {
     if(!match(key)) error("Expected '"_+string{key}+"', got '"_+peek(1)+"'"_);
 }
 
-void Data::skip(const ref<uint8>& key) {
-    if(!match(key)) error("Expected '"_+hex(key)+"', got '"_+hex(peek(key.size))+"'"_);
+void Data::skip(const ref<uint8> key) {
+    if(!match(key)) error("Expected '"_+hex(key)+"', got '"_+hex(cast<uint8>(peek(key.size)))+"'"_);
 }
-void Data::skip(const string& key) {
+void Data::skip(const string key) {
     if(!match(key)) error("Expected '"_+key+"', got '"_+peek(key.size)+"'"_);
 }
 
@@ -63,31 +63,31 @@ void TextData::advance(uint step) {
     for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
 }
 
-char TextData::wouldMatchAny(const string& any) {
+char TextData::wouldMatchAny(const string any) {
     if(!available(1)) return false;
     byte c=peek();
     for(const byte& e: any) if(c == e) return c;
     return 0;
 }
 
-string TextData::wouldMatchAny(const ref<string>& keys) {
+string TextData::wouldMatchAny(const ref<string> keys) {
     for(string key: keys) if(wouldMatch(key)) return key;
     return ""_;
 }
 
 
-char TextData::matchAny(const string& any) {
+char TextData::matchAny(const string any) {
     char c = wouldMatchAny(any);
     if(c) advance(1);
     return c;
 }
 
-string TextData::matchAny(const ref<string>& keys) {
+string TextData::matchAny(const ref<string> keys) {
     for(string key: keys) if(match(key)) return key;
     return ""_;
 }
 
-bool TextData::matchNo(const string& any) {
+bool TextData::matchNo(const string any) {
     byte c=peek();
     for(const byte& e: any) if(c == e) return false;
     advance(1); return true;
@@ -96,7 +96,7 @@ bool TextData::matchNo(const string& any) {
 string TextData::whileAny(char key) {
     uint start=index; while(match(key)) {} return slice(start, index-start);
 }
-string TextData::whileAny(const string& any) {
+string TextData::whileAny(const string any) {
     uint start=index; while(matchAny(any)){} return slice(start,index-start);
 }
 
@@ -108,10 +108,10 @@ string TextData::whileNot(char key) {
     }
     return slice(start, end-start);
 }
-string TextData::whileNo(const string& any) {
+string TextData::whileNo(const string any) {
     uint start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);
 }
-string TextData::whileNo(const string& any, char left, char right) {
+string TextData::whileNo(const string any, char left, char right) {
     uint start=index; int nest=0;
     while(available(1)) {
         /***/ if(match(left)) nest++;
@@ -130,7 +130,7 @@ string TextData::until(char key) {
     return slice(start, end-start);
 }
 
-string TextData::until(const string& key) {
+string TextData::until(const string key) {
     uint start=index, end;
     for(;;advance(1)) {
         if(available(key.size)<key.size) { end=index; break; }
@@ -139,7 +139,7 @@ string TextData::until(const string& key) {
     return slice(start, end-start);
 }
 
-string TextData::untilAny(const string& any) {
+string TextData::untilAny(const string any) {
     uint start=index, end;
     for(;;advance(1)) {
         if(!available(1)) { end=index; break; }
@@ -150,14 +150,14 @@ string TextData::untilAny(const string& any) {
 
 string TextData::line() { return until('\n'); }
 
-string TextData::word(const string& special) {
+string TextData::word(const string special) {
     uint start=index;
     for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
     assert(index>=start, line());
     return slice(start,index-start);
 }
 
-string TextData::identifier(const string& special) {
+string TextData::identifier(const string special) {
     uint start=index;
     for(;available(1);) {
         byte c=peek();

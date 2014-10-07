@@ -134,7 +134,7 @@ struct Player : Poll {
         updatePlaylist();
         if(files) playTitle(0);
     }
-    void insertFile(int index, const string& folder, const string& file, bool withAlbumName) {
+    void insertFile(int index, const string folder, const string file, bool withAlbumName) {
         String title = String(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
@@ -144,8 +144,8 @@ struct Player : Poll {
         titles.insertAt(index, Text(title, 16));
         files.insertAt(index, folder+"/"_+file );
     }
-    void queueFile(const string& folder, const string& file, bool withAlbumName) { insertFile(titles.size, folder, file, withAlbumName); }
-    void playAlbum(const string& album) {
+    void queueFile(const string folder, const string file, bool withAlbumName) { insertFile(titles.size, folder, file, withAlbumName); }
+    void playAlbum(const string album) {
         assert(existsFolder(album,folder),album);
         array<String> files = Folder(album,folder).list(Recursive|Files|Sorted);
         for(const String& file: files) queueFile(album, file, false);

@@ -103,7 +103,7 @@ struct Tuner : Poll {
         readCount.acquire(N-periodSize);
     }
 
-    uint write(const ref<int2>& input) {
+    uint write(const ref<int2> input) {
         if(!writeCount.tryAcquire(input.size)) {
             log("Overflow", writeCount, input.size, readCount);
             writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow

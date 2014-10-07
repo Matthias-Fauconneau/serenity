@@ -39,7 +39,7 @@ enum { Drives=1<<0, Devices=1<<1, Folders=1<<2, Files=1<<3, Recursive=1<<4, Sort
 struct Folder : Handle {
     Folder() : Handle(0) {}
     /// Opens \a folderPath
-    Folder(const string& folderPath, const Folder& at=currentWorkingDirectory(), bool create=false);
+    Folder(const string folderPath, const Folder& at=currentWorkingDirectory(), bool create=false);
     /// Returns folder properties
     struct stat stat() const;
     /// Returns the last access Unix timestamp (in nanoseconds)
@@ -50,7 +50,7 @@ struct Folder : Handle {
     array<String> list(uint flags) const;
 };
 /// Returns whether this \a folder exists (as a folder)
-bool existsFolder(const string& folder, const Folder& at=currentWorkingDirectory());
+bool existsFolder(const string folder, const Folder& at=currentWorkingDirectory());
 
 /// Handle to an Unix I/O stream
 struct Stream : Handle {
@@ -78,7 +78,7 @@ struct Stream : Handle {
     /// Writes \a buffer of \a size bytes
     void write(const byte* data, size_t size);
     /// Writes \a buffer
-    void write(const ref<byte>& buffer);
+    void write(const ref<byte> buffer);
 };
 
 /// Handle to a socket
@@ -95,7 +95,7 @@ struct File : Stream {
     File(){}
     File(int fd):Stream(fd){}
     /// Opens \a path
-    File(const string& path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadOnly);
+    File(const string path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadOnly);
     /// Returns file properties
     struct stat stat() const;
     /// Returns file type
@@ -113,13 +113,13 @@ struct File : Stream {
     void seek(int index);
 };
 /// Returns whether \a path exists (as a file or a folder)
-bool existsFile(const string& path, const Folder& at=currentWorkingDirectory());
+bool existsFile(const string path, const Folder& at=currentWorkingDirectory());
 /// Returns whether \a path is writable (as a file or a folder)
-bool writableFile(const string& path, const Folder& at);
+bool writableFile(const string path, const Folder& at);
 /// Reads whole \a file content
-buffer<byte> readFile(const string& path, const Folder& at=currentWorkingDirectory());
+buffer<byte> readFile(const string path, const Folder& at=currentWorkingDirectory());
 /// Writes \a content into \a file (overwrites any existing file)
-void writeFile(const string& path, const ref<byte>& content, const Folder& at=currentWorkingDirectory());
+void writeFile(const string path, const ref<byte> content, const Folder& at=currentWorkingDirectory());
 
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
@@ -128,7 +128,7 @@ template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static co
 /// Handle to a device
 struct Device : File {
     Device(){}
-    Device(const string& path, const Folder& at=root(), Flags flags=ReadWrite):File(path, at, flags){}
+    Device(const string path, const Folder& at=root(), Flags flags=ReadWrite):File(path, at, flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments);
     /// Sends ioctl request with neither input/outputs arguments
@@ -148,10 +148,10 @@ struct Map : mref<byte> {
 
     Map(){}
     Map(Map&& o) : mref(o) { o.data=0, o.size=0; }
-    Map& operator=(Map&& o) { this->~Map(); new (this) Map(move(o)); return *this; }
+    Map& operator=(Map&& o) { this->~Map(); new (this) Map(::move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at),prot) {}
+    explicit Map(const string path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at),prot) {}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 
@@ -165,32 +165,27 @@ struct Map : mref<byte> {
 };
 
 /// Renames a file
-void rename(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName);
+void rename(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 /// Renames a file
-void rename(const string& oldName, const string& newName, const Folder& at=currentWorkingDirectory());
+void rename(const string oldName, const string newName, const Folder& at=currentWorkingDirectory());
 /// Removes file
-void remove(const string& name, const Folder& at=currentWorkingDirectory());
+void remove(const string name, const Folder& at=currentWorkingDirectory());
 /// Removes file if it exists
-void removeIfExisting(const string& name, const Folder& at=currentWorkingDirectory());
-/// Removes folder
-//void remove(const Folder& folder);
-/// Removes folder
-//void removeFolder(const string& name, const Folder& at=currentWorkingDirectory());
-/// Removes file or folder
-//void removeFileOrFolder(const string& name, const Folder& at);
+void removeIfExisting(const string name, const Folder& at=currentWorkingDirectory());
+
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
-void symlink(const string& target,const string& name, const Folder& at=currentWorkingDirectory());
+void symlink(const string target,const string name, const Folder& at=currentWorkingDirectory());
 /// Sets the last modified time for \a path to current time
-void touchFile(const string& path, const Folder& at=currentWorkingDirectory(), bool setModified=false);
+void touchFile(const string path, const Folder& at=currentWorkingDirectory(), bool setModified=false);
 /// Copies a file replacing any existing files or links
-void copy(const Folder& oldAt, const string& oldName, const Folder& newAt, const string& newName);
+void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 
 /// Returns available free space in bytes for the file system containing \a file
 int64 available(const Handle& file);
 /// Returns available free space in bytes for the file system containing \a path
-int64 available(const string& path, const Folder& at=root());
+int64 available(const string path, const Folder& at=root());
 
 /// Returns capacity in bytes for the file system containing \a file
 int64 capacity(const Handle& file);
 /// Returns capacity in bytes for the file system containing \a path
-int64 capacity(const string& path, const Folder& at=root());
+int64 capacity(const string path, const Folder& at=root());

@@ -29,7 +29,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
         {// Filters useless tags and renames to short names
             map<string, array<string>> occurences;
             for(auto& properties: values) {
-                properties.filter([this](const string& key, const string&) { return !ref<string>{
+                properties.filter([this](const string key, const string) { return !ref<string>{
                         "Exif.Photo.FocalLength"_,
                                 "Exif.Photo.FNumber"_,
                                 "Exif.Photo.ExposureBiasValue"_,

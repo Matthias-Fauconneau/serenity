@@ -98,7 +98,7 @@ bool operator <(const Date& a, const Date& b) {
 bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && a.minutes==b.minutes && a.hours==b.hours
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
-String str(Date date, const string& format) {
+String str(Date date, const string format) {
     String r;
     for(TextData s(format);s;) {
         /**/ if(s.match("ss"_)){ if(date.seconds>=0) r << dec(date.seconds,2); else s.until(' '); }

@@ -14,7 +14,7 @@ struct Display : Socket, Poll {
     /// Event queue
     array<buffer<byte>> events;
     /// Signals events
-    signal<const ref<byte>&> onEvent;
+    signal<const ref<byte>> onEvent;
     // Write
      uint16 sequence = 0;
 
@@ -40,9 +40,9 @@ struct Display : Socket, Poll {
      /// Event handler
      void event() override;
      /// Processes global events and dispatches signal
-     void event(const ref<byte>&);
+     void event(const ref<byte>);
     // Write
-     template<Type Request> uint16 send(Request request, const ref<byte>& data=""_) {
+     template<Type Request> uint16 send(Request request, const ref<byte> data=""_) {
          assert_(sizeof(request)%4==0 && sizeof(request) + align(4, data.size) == request.size*4, sizeof(request), data.size, request.size*4);
          write(string(raw(request)+pad(array<byte>(data))));
          sequence++;
@@ -52,18 +52,18 @@ struct Display : Socket, Poll {
      /// Reads reply checking for errors and queueing events
      buffer<byte> readReply(uint16 sequence, uint elementSize);
 
-     template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, const ref<byte>& data=""_) {
+     template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, const ref<byte> data=""_) {
          static_assert(sizeof(typename Request::Reply)==31,"");
          Locker lock(this->lock); // Prevents a concurrent thread from reading the reply and lock event queue
          uint16 sequence = send(request, data);
          buffer<byte> r = readReply(sequence, sizeof(T));
          auto reply = *(typename Request::Reply*)r.data;
          assert_(r.size == sizeof(typename Request::Reply)+reply.size*sizeof(T), r.size, reply.size);
-         output = cast<T>(bufferCopy(r.slice(sizeof(reply),reply.size*sizeof(T))));
+         output = cast<T>(buffer<T>(r.slice(sizeof(reply),reply.size*sizeof(T))));
          return reply;
      }
 
-     template<Type Request> typename Request::Reply request(Request request, const ref<byte>& data=""_) {
+     template<Type Request> typename Request::Reply request(Request request, const ref<byte> data=""_) {
          buffer<byte> output;
          auto reply = this->request(request, output, data);
          assert_(reply.size == 0 && output.size ==0, reply.size, output.size);
@@ -83,5 +83,5 @@ struct Display : Socket, Poll {
 
 // Window
      /// Returns Atom for \a name
-     uint Atom(const string& name);
+     uint Atom(const string name);
 };

@@ -1,7 +1,7 @@
 #pragma once
 #include "memory.h"
 
-static buffer<byte> decodeRunLength(const ref<byte>& source) {
+static buffer<byte> decodeRunLength(const ref<byte> source) {
     array<byte> buffer (source.size);
     Data s (source);
     for(;;) {

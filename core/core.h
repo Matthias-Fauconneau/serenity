@@ -108,16 +108,13 @@ inline constexpr string operator "" _(const char* data, size_t size);
 
 // Debugging
 /// Logs a message to standard output without newline
-void log_(const string& message);
+void log_(const string message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
 template<> void log(const string& message);
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const string& message) __attribute((noreturn));
-/// Logs a message to standard output and abort immediatly without logging stack traces
-template<Type... Args> void abort(const Args&... args)  __attribute((noreturn));
-template<> void abort(const string& message) __attribute((noreturn));
 
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
@@ -181,7 +178,7 @@ generic struct ref {
     reverse_ref reverse() { return {end()-1, begin()}; }
 
     /// Compares all elements
-    bool operator ==(const ref<T>& o) const {
+    bool operator ==(const ref<T> o) const {
         if(size != o.size) return false;
         for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
         return true;
@@ -209,9 +206,9 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 }
 
 // ref<Arithmetic> operations
-generic const T& min(const ref<T>& a) { const T* min=&a[0]; for(const T& e: a) if(e < *min) min=&e; return *min; }
-generic const T& max(const ref<T>& a) { const T* max=&a[0]; for(const T& e: a) if(*max < e) max=&e; return *max; }
-template<Type T> auto sum(const ref<T>& a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
+generic const T& min(const ref<T> a) { const T* min=&a[0]; for(const T& e: a) if(e < *min) min=&e; return *min; }
+generic const T& max(const ref<T> a) { const T* max=&a[0]; for(const T& e: a) if(*max < e) max=&e; return *max; }
+template<Type T> auto sum(const ref<T> a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
 
 template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
 template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
@@ -254,12 +251,24 @@ generic struct mref : ref<T> {
 
     /// Initializes reference using the same constructor for all elements
     template<Type... Args> void clear(Args... args) const { for(size_t i: range(size)) new (&at(i)) T(args...); }
+    /// Initializes reference from \a source using move constructor
+    void move(const mref<T>& source) { assert(size==source.size); for(size_t i: range(size)) new(&at(i)) T(::move(source[i])); }
+    /// Initializes reference from \a source using copy constructor
+    void copy(const ref<T> source) const { assert(size==source.size); for(size_t i: range(size)) new(&at(i)) T(::copy(source[i])); }
+
+    /// Stores the application of a function to every index up to a size in a mref
+    template<Type Function> void apply(Function function) const { for(size_t index: range(size)) new (&at(index)) T(function(index)); }
+    /// Stores the application of a function to every elements of a ref in a mref
+    template<Type Function, Type S> void apply(ref<S> source, Function function) const {
+        for(size_t index: range(size)) new (&at(index)) T(function(source[index]));
+    }
+    /*/// Stores the application of a function to every elements of a ref in a mref
+    template<Type Function, Type S0, Type S1> void apply(ref<S0> source0, ref<S1> source1, Function function) const {
+        for(size_t index: range(size)) new (&at(index)) T(function(source0[index], source1[index]));
+    }*/
+
+    /// Replaces in \a array every occurence of \a before with \a after
+    template<Type B, Type A> mref& replace(const B& before, const A& after) { for(T& e : *this) if(e==before) e=T(after); return *this; }
 };
 /// Returns mutable reference to memory used by \a t
 generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }
-
-// Memory operations
-/// Initializes \a dst from \a src using move constructor
-generic void move(const mref<T>& dst, const mref<T>& src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(move(src[i])); }
-/// Initializes \a dst from \a src using copy constructor
-generic void copy(const mref<T>& dst, const ref<T> src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(copy(src[i])); }

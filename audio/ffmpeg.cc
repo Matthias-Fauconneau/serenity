@@ -14,7 +14,7 @@ extern "C" {
 
 void __attribute((constructor(1001))) initialize_FFmpeg() { av_register_all(); }
 
-bool AudioFile::open(const string& path) {
+bool AudioFile::open(const string path) {
     close();
     if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return false; }
     return open();
@@ -128,13 +128,9 @@ uint AudioFile::read(const mref<float2>& output) {
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
                 if(!frame) frame = av_frame_alloc(); int gotFrame=0;
-#if __x86_64
                 setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormals and underflows in FFmpeg AAC decoder
-#endif
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
-#if __x86_64
                 setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); // Restores previous flags
-#endif
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 floatBuffer = buffer<float2>(bufferSize);
@@ -184,7 +180,7 @@ void AudioFile::close() {
     if(file) avformat_close_input(&file);
 }
 
-Audio decodeAudio(const string& path, uint duration) {
+Audio decodeAudio(const string path, uint duration) {
     AudioFile file(path);
     duration = min(duration, file.duration);
     Audio audio {buffer<int2>(duration), file.rate};

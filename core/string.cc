@@ -1,9 +1,10 @@
 #include "string.h"
 #include "math.h"
+#include "data.h"
 
 /// string
 
-bool operator <(const string& a, const string& b) {
+bool operator <(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
         if(a[i] > b[i]) return false;
@@ -11,7 +12,7 @@ bool operator <(const string& a, const string& b) {
     return a.size < b.size;
 }
 
-bool operator <=(const string& a, const string& b) {
+bool operator <=(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
         if(a[i] > b[i]) return false;
@@ -23,11 +24,11 @@ string str(const char* s) {
     if(!s) return "null"_; int i=0; while(s[i]) i++; return string((byte*)s,i);
 }
 
-bool startsWith(const string& s, const string& a) {
+bool startsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data,a.size)==a;
 }
 
-bool find(const string& s, const string& a) {
+bool find(const string s, const string a) {
     if(a.size>s.size) return false;
     for(uint i=0;i<=s.size-a.size;i++) {
         if(string(s.data+i,a.size)==a) return true;
@@ -35,11 +36,11 @@ bool find(const string& s, const string& a) {
     return false;
 }
 
-bool endsWith(const string& s, const string& a) {
+bool endsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data+s.size-a.size,a.size)==a;
 }
 
-string section(const string& s, byte separator, int begin, int end) {
+string section(const string s, byte separator, int begin, int end) {
     if(!s) return ""_;
     uint b,e;
     if(begin>=0) { b=0; for(uint i=0;i<(uint)begin && b<s.size;b++) if(s[b]==separator) i++; }
@@ -50,19 +51,19 @@ string section(const string& s, byte separator, int begin, int end) {
     return string(s.data+b,e-b);
 }
 
-string trim(const string& s) {
+string trim(const string s) {
     int begin=0,end=s.size;
     for(;begin<end;begin++) { byte c=s[(uint)begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
     for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
     return s.slice(begin, end-begin);
 }
 
-bool isASCII(const string& s) {
+bool isASCII(const string s) {
     for(uint8 c : s) if(c<32 || c>126) return false;
     return true;
 }
 
-bool isUTF8(const string& s) {
+bool isUTF8(const string s) {
     for(uint i=0; i<s.size;i++) {
         /**/  if((s[i]&0b10000000)==0b00000000) {}
         else if((s[i]&0b11100000)==0b11000000) { for(uint j unused: range(1)) if((s[++i]&0b11000000) != 0b10000000) return false; }
@@ -73,11 +74,11 @@ bool isUTF8(const string& s) {
     return true;
 }
 
-bool isInteger(const string& s) {
+bool isInteger(const string s) {
     if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
 }
 
-int64 fromInteger(const string& number, int base) {
+int64 fromInteger(const string number, int base) {
     assert(base>=2 && base<=16);
     assert(number);
     int sign=1;
@@ -97,7 +98,7 @@ int64 fromInteger(const string& number, int base) {
     return sign*value;
 }
 
-bool isDecimal(const string& number) {
+bool isDecimal(const string number) {
     if(!number) return false;
     const byte* i = number.begin();
     if(*i == '-' || *i == '+') ++i;
@@ -109,7 +110,7 @@ bool isDecimal(const string& number) {
     return true;
 }
 
-double fromDecimal(const string& number) {
+double fromDecimal(const string number) {
     if(!number) return __builtin_nan("");
     if(number == "∞"_) return __builtin_inf();
     double sign=1, eSign=1;
@@ -136,27 +137,20 @@ double fromDecimal(const string& number) {
 
 /// String
 
-String join(const ref<string>& list, const string& separator) {
-    String str;
-    for(uint i: range(list.size)) { str<< list[i]; if(i<list.size-1) str<<separator; }
-    return str;
+String strz(const string source) { String target(source.size+1); target.append(source); target.append('\0'); return target; }
+
+String join(const ref<string> list, const string separator) {
+    String target;
+    for(uint i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
+    return target;
 }
-String join(const ref<String>& list, const string& separator) { return join(toRefs(list),separator); }
+String join(const ref<String> list, const string separator) { return join(toRefs(list),separator); }
 
-String replace(const string& s, const string& before, const string& after) {
-    String r(s.size);
-    for(uint i=0; i<s.size;) {
-        if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r<<after; i+=before.size; }
-        else { r << s[i]; i++; }
-    }
-    return r;
-}
+char lowerCase(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
+String toLower(const string source) { return apply(source, lowerCase); }
 
-char toLower(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
-String toLower(const string& s) { String lower(s.size); for(char c: s) lower<<toLower(c); return lower; }
-
-char toUpper(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
-String toUpper(const string& s) { String upper(s.size); for(char c: s) upper<<toUpper(c); return upper; }
+char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
+String toUpper(const string source) { return apply(source, upperCase); }
 
 String simplify(String&& s) {
     for(uint i=0; i<s.size;) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
@@ -170,30 +164,25 @@ String simplify(String&& s) {
     return move(s);
 }
 
-String repeat(const string& s, uint times) {
-    String r (times*s.size); for(uint unused i: range(times)) r<<s; return r;
+String left(const string source, size_t size, const char pad) {
+    String target(max(size, source.size));
+    target.slice(0, source.size).copy(source);
+    target.slice(source.size).clear(pad);
+    return target;
 }
-
-String left(const string& s, uint length, const string& pad) { return s+repeat(pad, max<int>(0,length-s.size/pad.size)); }
-String right(const string& s, uint length, const string& pad) { return repeat(pad, max<int>(0,length-s.size/pad.size))+s; }
-
-stringz strz(const string& s) { stringz r; r.reserve(s.size+1); r << s; r << '\0'; return r; }
+String right(const string source, size_t size, const char pad) {
+    String target(max(size, source.size));
+    target.slice(0, source.size).clear(pad);
+    target.slice(source.size).copy(source);
+    return target;
+}
 
 /// array<string>
 
-array<string> split(const string& str, byte separator) {
+array<string> split(const string source, byte separator) {
     array<string> list;
-    const byte* b=str.begin();
-    const byte* end=str.end();
-    for(;;) {
-        const byte* e = b;
-        while(e!=end && *e!=separator) ++e;
-        if(b==end) break;
-        list << string(b,e-b);
-        if(e==end) break;
-        b = e;
-        if(b!=end && *b==separator) ++b;
-    }
+    TextData s (source);
+    while(s) list.append( s.until(separator) );
     return list;
 }
 
@@ -234,19 +223,21 @@ String ftoa(double n, int precision, uint pad, int exponent) {
     if(n==-::inf) return ::right("-∞"_, pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
-    if(sign) s<<'-';
+    if(sign) s.append('-');
     if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);
         uint decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
-        s<<utoa(integer)<<'.'<< utoa<10>(decimal,precision,'0');
-    } else s<<utoa(round(n));
-    if(exponent==3 && e==3) s<<'K';
-    else if(exponent==3 && e==6) s<<'M';
-    else if(exponent==3 && e==9) s<<'G';
-    else if(e) s<<'e'<<itoa<10>(e);
-    return pad>s.size ? repeat(" "_,pad-s.size)+s : move(s);
+        s.append( utoa(integer) );
+        s.append('.');
+        s.append( utoa<10>(decimal,precision,'0') );
+    } else s.append( utoa(round(n)) );
+    if(exponent==3 && e==3) s.append('K');
+    else if(exponent==3 && e==6) s.append('M');
+    else if(exponent==3 && e==9) s.append('G');
+    else if(e) { s.append('e'); s.append(itoa<10>(e)); }
+    return pad > s.size ? right(s, pad) : move(s);
 }
 
 String str(float n) { return (isNumber(n) && n==round(n)) ? dec(int(n)) : ftoa(n); }

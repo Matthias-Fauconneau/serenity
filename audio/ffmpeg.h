@@ -20,12 +20,12 @@ struct AudioFile {
     size_t bufferIndex=0, bufferSize=0;
 
     AudioFile(){}
-    AudioFile(const string& path) { open(path); }
+    AudioFile(const string path) { open(path); }
     default_move(AudioFile);
     ~AudioFile() { close(); }
 
     operator bool() { return file; }
-    bool open(const string& path);
+    bool open(const string path);
     bool open();
     void close();
 
@@ -40,4 +40,4 @@ struct Audio : buffer<int2> {
     Audio(buffer&& data, uint rate):buffer(move(data)),rate(rate){}
     uint rate;
 };
-Audio decodeAudio(const string& path, uint duration=-1);
+Audio decodeAudio(const string path, uint duration=-1);

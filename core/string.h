@@ -3,40 +3,40 @@
 #include "array.h"
 
 // Enforces exact match for overload resolution
-generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return String(); }
+generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
 
 /// Lexically compare strings
-bool operator <(const string& a, const string& b);
-bool operator <=(const string& a, const string& b);
+bool operator <(const string a, const string b);
+bool operator <=(const string a, const string b);
 
 /// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
-string section(const string& str, byte separator, int begin=0, int end=1);
+string section(const string str, byte separator, int begin=0, int end=1);
 /// Returns a reference with heading and trailing whitespace removed
-string trim(const string& s);
+string trim(const string s);
 
 /// Returns true if \a str starts with \a sub
-bool startsWith(const string& str, const string& sub);
+bool startsWith(const string str, const string sub);
 /// Returns true if \a str ends with \a sub
-bool endsWith(const string& str, const string& sub);
+bool endsWith(const string str, const string sub);
 /// Returns true if \a str contains the \a substring
-bool find(const string& str, const string& substring);
+bool find(const string str, const string substring);
 
 /// Returns true if a string is a displayable unextended ASCII string
-bool isASCII(const string& s);
+bool isASCII(const string s);
 /// Returns true if a string is a valid UTF8 string
-bool isUTF8(const string& s);
+bool isUTF8(const string s);
 /// Returns true if s contains only [0-9]
-bool isInteger(const string& s);
+bool isInteger(const string s);
 /// Parses an integer value
-int64 fromInteger(const string& str, int base=10);
+int64 fromInteger(const string str, int base=10);
 /// Returns true if s matches [0-9]*.?[0-9]*
-bool isDecimal(const string& s);
+bool isDecimal(const string s);
 /// Parses a decimal value
-double fromDecimal(const string& str);
+double fromDecimal(const string str);
 
 /// Forwards string
-inline const string& str(const string& s) { return s; }
+inline const string str(const string s) { return s; }
 /// Forwards mref<byte>
 //inline const mref<byte>& str(const mref<byte>& s) { return s; }
 
@@ -51,34 +51,31 @@ inline string str(const char& c) { return string((char*)&c,1); }
 inline const buffer<byte>& str(const buffer<byte>& s) { return s; }
 
 /// Joins \a list into a single String with each element separated by \a separator
-String join(const ref<string>& list, const string& separator);
-String join(const ref<String>& list, const string& separator);
+String join(const ref<string> list, const string separator);
+String join(const ref<String> list, const string separator);
 /// Replaces every occurrence of the String \a before with the String \a after
-String replace(const string& s, const string& before, const string& after);
+String replace(const string s, const string before, const string after);
 /// Lowers case
 char toLower(char c);
 /// Lowers case
-String toLower(const string& s);
+String toLower(const string s);
 /// Uppers case
-String toUpper(const string& s);
+String toUpper(const string s);
 /// Removes duplicate whitespace
 String simplify(String&& s);
-/// Repeats a string
-String repeat(const string& s, uint times);
 /// Pads a string to the left
-String left(const string& s, uint length, const string& pad=" "_);
+String left(const string s, size_t size, const char pad=' ');
 /// Pads a string to the right
-String right(const string& s, uint length, const string& pad=" "_);
+String right(const string s, size_t size, const char pad=' ');
 
-/// Forwards string
-inline const String& str(const String& s) { return s; }
+/*/// Forwards string
+inline const String& str(const String& s) { return s; }*/
 
-struct stringz : String { operator const char*(){ return data; }};
 /// Copies the reference and appends a null byte
-stringz strz(const string& s);
+String strz(const string s);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array<string> split(const string& str, byte separator=' ');
+array<string> split(const string str, byte separator=' ');
 
 /// Converts integers
 template<uint base=10> String utoa(uint64 number, int pad=0, char padChar='0');
@@ -108,12 +105,18 @@ String str(double n);
 String binaryPrefix(size_t value, string unit="B"_);
 
 /// Converts arrays
-generic String str(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-generic String str(const mref<T>& a, char separator=' ') { return str((const ref<T>&)a, separator); }
-generic String str(const buffer<T>& a, char separator=' ') { return str((const ref<T>&)a, separator); }
-generic String str(const array<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<str(a[i]); if(i<a.size-1) s<<separator;} return s; }
-generic String dec(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<dec(a[i]); if(i<a.size-1) s<<separator;} return s; }
-generic String hex(const ref<T>& a, char separator=' ') { String s; for(uint i: range(a.size)) { s<<hex(a[i],2); if(i<a.size-1) s<<separator;} return s; }
+generic String str(const ref<T> source, char separator=' ') {
+    String target;
+    for(uint i: range(source.size)) {
+        target.append( str(source[i]) );
+        if(i<source.size-1) target.append(separator);
+    }
+    return target;
+}
+generic String str(const mref<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
+generic String str(const buffer<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
+generic String str(const array<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
+inline String hex(const ref<uint8> source, char separator=' ') { return str(apply(source, [](const uint8& c) { return hex(c,2); }), separator); }
 
 /// Converts static arrays
 template<Type T, size_t N> String str(const T (&a)[N], char separator=' ') { return str(ref<T>(a,N), separator); }

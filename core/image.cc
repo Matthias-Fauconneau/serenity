@@ -6,7 +6,7 @@
 
 // -- Decoding --
 
-string imageFileFormat(const ref<byte>& file) {
+string imageFileFormat(const ref<byte> file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
     else if(startsWith(file,"\x89PNG\r\n\x1A\n"_)) return "PNG"_;
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return "ICO"_;
@@ -15,7 +15,7 @@ string imageFileFormat(const ref<byte>& file) {
     else return ""_;
 }
 
-int2 imageSize(const ref<byte>& file) {
+int2 imageSize(const ref<byte> file) {
     BinaryData s(file, true);
     if(s.match(ref<uint8>{0b10001001,'P','N','G','\r','\n',0x1A,'\n'})) {
         for(;;) {
@@ -52,14 +52,14 @@ int2 imageSize(const ref<byte>& file) {
     error("Unknown image format", file.size<16?file:s.peek(16));
 }
 
-Image  __attribute((weak)) decodePNG(const ref<byte>&) { error("PNG support not linked"_); }
-Image  __attribute((weak)) decodeJPEG(const ref<byte>&) { error("JPEG support not linked"_); }
-Image  __attribute((weak)) decodeICO(const ref<byte>&) { error("ICO support not linked"_); }
-Image  __attribute((weak)) decodeTIFF(const ref<byte>&) { error("TIFF support not linked"_); }
-Image  __attribute((weak)) decodeBMP(const ref<byte>&) { error("BMP support not linked"_); }
-Image  __attribute((weak)) decodeTGA(const ref<byte>&) { error("TGA support not linked"_); }
+Image  __attribute((weak)) decodePNG(const ref<byte>) { error("PNG support not linked"_); }
+Image  __attribute((weak)) decodeJPEG(const ref<byte>) { error("JPEG support not linked"_); }
+Image  __attribute((weak)) decodeICO(const ref<byte>) { error("ICO support not linked"_); }
+Image  __attribute((weak)) decodeTIFF(const ref<byte>) { error("TIFF support not linked"_); }
+Image  __attribute((weak)) decodeBMP(const ref<byte>) { error("BMP support not linked"_); }
+Image  __attribute((weak)) decodeTGA(const ref<byte>) { error("TGA support not linked"_); }
 
-Image decodeImage(const ref<byte>& file) {
+Image decodeImage(const ref<byte> file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
     else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);

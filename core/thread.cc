@@ -13,13 +13,8 @@
 #include <pwd.h>
 #include <sys/syscall.h>
 
-
-
-
-static int gettid() { return syscall(SYS_gettid); }
-
 // Log
-void log_(const string& buffer) { check_(write(2,buffer.data,buffer.size)); }
+void log_(const string buffer) { check_(write(2,buffer.data,buffer.size)); }
 template<> void log(const string& buffer) { log_(buffer+"\n"_); }
 
 // Poll
@@ -27,11 +22,14 @@ void Poll::registerPoll() {
     Locker lock(thread.lock);
     if(thread.contains(this)) { thread.unregistered.remove(this); return; }
     assert_(!thread.unregistered.contains(this));
-    thread << this;
+    thread.append( this );
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
-void Poll::unregisterPoll() {Locker lock(thread.lock); if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered<<this;}
-void Poll::queue() {Locker lock(thread.lock); /*bool wasEmpty = thread.queue.size == 0;*/ thread.queue+=this; /*if(wasEmpty)*/ thread.post();}
+void Poll::unregisterPoll() {
+    Locker lock(thread.lock);
+    if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered.append(this);
+}
+void Poll::queue() {Locker lock(thread.lock); if(!thread.queue.contains(this)) thread.queue.append(this); thread.post();}
 
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
@@ -49,11 +47,13 @@ static bool terminate = false;
 static int exitStatus = 0;
 
 Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
-    Locker lock(threadsLock); threads<<this; // Adds this thread to global thread list
+    Locker lock(threadsLock); threads.append(this); // Adds this thread to global thread list
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
+
+static int gettid() { return syscall(SYS_gettid); }
 
 void Thread::run() {
     tid=gettid();
@@ -103,7 +103,7 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
     void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
     if(sig==SIGSEGV) log("Segmentation fault"_);
     String s = trace(1,ip);
-    if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+    if(threads.size>1) log_("Thread #"_+dec(gettid())+":\n"_+s); else log_(s);
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
     static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
@@ -175,19 +175,19 @@ String which(string name) {
     return {};
 }
 
-int execute(const string& path, const ref<string>& args, bool wait, const Folder& workingDirectory) {
+int execute(const string path, const ref<string> args, bool wait, const Folder& workingDirectory) {
     if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
     array<String> args0(1+args.size);
-    args0 << strz(path);
-    for(const auto& arg: args) args0 << strz(arg);
+    args0.append( strz(path) );
+    for(const auto& arg: args) args0.append( strz(arg) );
     const char* argv[args0.size+1];
     for(uint i: range(args0.size)) argv[i] = args0[i].data;
     argv[args0.size]=0;
 
     array<string> env0;
     static String environ = File("/proc/self/environ"_).readUpTo(4096);
-    for(TextData s(environ);s;) env0 << s.until('\0');
+    for(TextData s(environ);s;) env0.append( s.until('\0') );
 
     const char* envp[env0.size+1];
     for(uint i: range(env0.size)) envp[i]=env0[i].data;
@@ -206,7 +206,7 @@ int execute(const string& path, const ref<string>& args, bool wait, const Folder
 int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
-string getenv(const string& name, string value) {
+string getenv(const string name, string value) {
     static String environ = File("/proc/self/environ"_).readUpTo(8192);
     for(TextData s(environ);s;) {
         string key=s.until('='); string value=s.until('\0');
