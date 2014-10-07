@@ -87,21 +87,25 @@ struct range {
     int start, stop;
 };
 
+/*
 #ifndef _INITIALIZER_LIST
 // std::initializer_list
 namespace std {
 generic struct initializer_list {
-    const T* data; size_t len;
-    constexpr initializer_list(const T* data, size_t len) : data(data), len(len) {}
+    const T* data; size_t size;
+    constexpr initializer_list(const T* data, size_t len) : data(data), size(size) {}
     constexpr const T* begin() const { return data; }
-    constexpr const T* end() const { return data+len; }
-    constexpr size_t size() const { return len; }
+    constexpr const T* end() const { return data+size; }
+    //constexpr size_t size() const { return len; }
 };
 }
 #endif
+*/
 
 // string
-generic struct ref;
+namespace std { generic struct initializer_list; }
+generic using ref = std::initializer_list<T>;
+//generic struct ref;
 /// Convenient typedef for ref<char> holding UTF8 text strings
 typedef ref<char> string;
 inline constexpr string operator "" _(const char* data, size_t size);
@@ -131,21 +135,22 @@ template<> void error(const string& message) __attribute((noreturn));
 
 // ref
 /// Unmanaged fixed-size const reference to an array of elements
-generic struct ref {
+namespace std {generic struct initializer_list {
+//generic struct ref {
     typedef T type;
     const T* data = 0;
     size_t size = 0;
 
     /// Default constructs an empty reference
-    constexpr ref() {}
+    constexpr initializer_list() {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* data, size_t size) : data(data), size(size) {}
+    constexpr initializer_list(const T* data, size_t size) : data(data), size(size) {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
+    constexpr initializer_list(const T* begin, const T* end) : data(begin), size(end-begin) {}
     /// Converts an std::initializer_list to ref
-    constexpr ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
+    //constexpr ref(const std::initializer_list<T>& list) : data(list.data/*.begin()*/), size(list.size/*.size()*/) {}
     /// Converts a static array to ref
-    template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
+    template<size_t N> constexpr initializer_list(const T (&a)[N]) : initializer_list(a,N) {}
 
     explicit operator bool() const { assert_(!size || data); return size; }
     operator const T*() const { return data; }
@@ -188,6 +193,7 @@ generic struct ref {
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)!=invalid; }
 };
+}
 
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
 inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
@@ -272,3 +278,6 @@ generic struct mref : ref<T> {
 };
 /// Returns mutable reference to memory used by \a t
 generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }
+
+/// Initializes \a dst from \a src using copy constructor
+generic void copy(const mref<T>& dst, const ref<T> src) { assert(dst.size==src.size); for(size_t i: range(src.size)) new(&dst[i]) T(copy(src[i])); }

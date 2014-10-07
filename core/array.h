@@ -12,9 +12,14 @@ generic struct array : buffer<T> {
     default_move(array);
     /// Default constructs an empty array
     array() {}
-    using buffer<T>::buffer;
     /// Converts a buffer to an array
     array(buffer<T>&& o) : buffer<T>(move(o)) {}
+    /// Allocates an uninitialized buffer for \a capacity elements
+    explicit array(size_t capacity) : buffer<T>(capacity, 0) {}
+    /// Moves elements from a reference
+    explicit array(const mref<T> ref) : buffer<T>(ref.size) { mref<T>::move(ref); }
+    /// Copies elements from a reference
+    explicit array(const ref<T> ref) : buffer<T>(ref.size) { /*mref<T>::*/copy(*this, ref); }
 
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
@@ -43,15 +48,12 @@ generic struct array : buffer<T> {
 
     /// Appends an implicitly copiable value
     array& append(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
-
     /// Appends a movable value
     array& append(T&& e) { size_t nextSize=size+1; reserve(nextSize); new (end()) T(move(e)); size=nextSize; return *this; }
-
     /// Appends another list of elements to this array
     array& append(const ref<T> source) {
         size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).copy(source); return *this;
     }
-
     /// Appends another list of elements to this array
     array& append(const mref<T> source) {
         size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).move(source); return *this;

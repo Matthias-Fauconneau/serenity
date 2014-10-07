@@ -31,7 +31,7 @@ generic struct buffer : mref<T> {
     /// Allocates a buffer for \a capacity elements and fill with value
     template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
     /// Initializes a new buffer with the content of \a o
-    explicit buffer(const ref<T> o) : buffer(o.size) { copy(o); }
+    explicit buffer(const ref<T> o) : buffer(o.size) { mref<T>::copy(o); }
 
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
