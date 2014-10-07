@@ -52,13 +52,13 @@ struct Progress : Widget {
 };
 
 /// Displays an image
-struct ImageWidget : virtual Widget {
+struct ImageView : virtual Widget {
     /// Displayed image
     Image image;
 
-    ImageWidget() {}
+    ImageView() {}
     /// Creates a widget displaying \a image
-    ImageWidget(Image&& image) : image(move(image)) {}
+    ImageView(Image&& image) : image(move(image)) {}
 
     int2 sizeHint(int2) const override;
     Graphics graphics(int2 size) const override;
@@ -77,11 +77,11 @@ struct Slider : Progress {
 };
 
 /// Displays an icon. When clicked, calls \a triggered
-struct ImageLink : ImageWidget {
+struct ImageLink : ImageView {
     /// User clicked on the image
     function<void()> triggered;
 
-    ImageLink(Image&& image) : ImageWidget(move(image)) {}
+    ImageLink(Image&& image) : ImageView(move(image)) {}
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
 };
 /// \typedef ImageLink TriggerButton
@@ -89,9 +89,9 @@ struct ImageLink : ImageWidget {
 typedef ImageLink TriggerButton;
 
 /// Displays an icon corresponding to state. When clicked, switches state and calls \a toggled
-struct ToggleButton : ImageWidget {
+struct ToggleButton : ImageView {
     /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(Image&& enable, Image&& disable) : ImageWidget(share(enable)), enableIcon(move(enable)), disableIcon(move(disable)) {}
+    ToggleButton(Image&& enable, Image&& disable) : ImageView(share(enable)), enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
     function<void(bool state)> toggled;
@@ -103,4 +103,19 @@ struct ToggleButton : ImageWidget {
 
     Image enableIcon;
     Image disableIcon;
+};
+
+/// Two widgets in one spot, toggled by user
+struct WidgetToggle : Widget {
+    Widget* widgets[2];
+    size_t index = 0;
+
+    WidgetToggle(Widget* first, Widget* second) : widgets{first, second} {}
+
+    String title() const { return widgets[index]->title(); }
+    int2 sizeHint(int2 size) const override { return widgets[index]->sizeHint(size); }
+    Graphics graphics(int2 size) const override { return widgets[index]->graphics(size); }
+
+    /// Enables filter while a mouse button is pressed
+    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
 };

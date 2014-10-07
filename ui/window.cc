@@ -3,7 +3,7 @@
 #include "x.h"
 #include <sys/shm.h>
 
-Window::Window(Widget* widget, int2 sizeHint, const string& title, const Image& icon) : widget(widget), size(sizeHint) {
+Window::Window(Widget* widget, int2 sizeHint, const string& title, const Image& icon) : widget(widget), size(sizeHint), title(title) {
     onEvent.connect(this, &Window::processEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
@@ -102,8 +102,11 @@ void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
 void Window::hide() { send(UnmapWindow{.id=id}); }
 
 void Window::setTitle(const string& title) {
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"_), .type=Atom("UTF8_STRING"_), .format=8,
-                        .length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
+    if(title != this->title) {
+        this->title = String(title);
+        send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"_), .type=Atom("UTF8_STRING"_), .format=8,
+                            .length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
+    }
 }
 void Window::setIcon(const Image& icon) {
     send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"_), .type=Atom("CARDINAL"_), .format=32,
@@ -124,6 +127,7 @@ void Window::event() {
         if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton, focus)) render();
         else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
     }
+    if(!title) setTitle(widget->title());
     if(updates && state==Idle) {
         assert_(size);
         if(target.size != size) {

@@ -108,7 +108,7 @@ struct File : Stream {
     int64 modifiedTime() const;
 
     /// Resizes file
-    File& resize(int64 size);
+    const File& resize(int64 size) const;
     /// Seeks to \a index
     void seek(int index);
 };
@@ -143,7 +143,6 @@ struct Device : File {
 
 /// Managed memory mapping
 struct Map : mref<byte> {
-    String name;
     enum Prot {Read=1, Write=2};
     enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
@@ -152,7 +151,7 @@ struct Map : mref<byte> {
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at),prot) { name=String(path); }
+    explicit Map(const string& path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at),prot) {}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 

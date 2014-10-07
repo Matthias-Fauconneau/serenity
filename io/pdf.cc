@@ -2,6 +2,30 @@
 #include "variant.h"
 #include "data.h"
 #include "matrix.h"
+
+typedef map<string,Variant> Dict;
+
+struct Object : Dict {
+    buffer<byte> data;
+
+    void operator =(buffer<byte>&& data) {
+        this->data = move(data);
+        insert("Length"_, this->data.size);
+    }
+};
+
+inline String str(const Object& o) {
+    String s = str((const Dict&)o);
+    if(o.data) {
+        assert_(o.at("Length"_).integer() == int(o.data.size), (const Dict&)o);
+        s << "\nstream\n"_;
+        assert_(o.data.size <= 30 || o.value("Filter"_,""_)=="/FlateDecode"_, o.data.size, deflate(o.data).size, o.value("Filter"_,""_));
+        s << o.data;
+        s << "\nendstream"_;
+    }
+    return s;
+}
+
 buffer<byte> toPDF(int2 pageSize, const ref<Graphics>& pages, float px) {
     array<unique<Object>> objects;
     auto ref = [&](const Object& object) { return dec(objects.indexOf(&object))+" 0 R"_; };

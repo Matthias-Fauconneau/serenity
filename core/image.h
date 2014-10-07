@@ -3,9 +3,6 @@
 #include "vector.h"
 #include "data.h"
 
-extern uint8 sRGB_forward[0x1000];
-extern float sRGB_reverse[0x100];
-
 /// 2D array of BGRA 8-bit unsigned integer pixels
 struct Image : buffer<byte4> {
     union {
@@ -31,61 +28,10 @@ struct Image : buffer<byte4> {
 };
 inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
 
-/// Copies an image
-inline void copy(const Image& target, const Image& source) {
-    assert_(target.size == source.size, target.size, source.size);
-    for(uint y: range(source.height)) for(uint x: range(source.width)) target(x,y) = source(x,y);
-}
-
-/// Copies an image
-inline Image copy(const Image& source) {
-    Image target(source.width, source.height, source.alpha, source.sRGB);
-    copy(target, source);
-    return target;
-}
-
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o),o.size,o.stride,o.alpha,o.sRGB); }
 
-/// Resizes \a source into \a target
-/// \note Only supports integer box downsample
-Image resize(Image&& target, const Image& source);
-
-/// 2D array of floating-point pixels
-struct ImageF : buffer<float> {
-    ImageF(){}
-    ImageF(buffer<float>&& data, int2 size) : buffer(move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y)); }
-    ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0)); }
-    ImageF(int2 size) : ImageF(size.x, size.y) {}
-
-    explicit operator bool() const { return data && width && height; }
-    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*width+x); }
-
-    union {
-        struct { uint width, height; };
-        int2 size;
-    };
-};
-/// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
-
-ImageF resize(ImageF&& target, ImageF&& source);
-
-enum Component { Blue, Green, Red, Mean };
-inline string str(Component o) { return (string[]){"blue"_,"green"_,"red"_,"mean"_}[o]; }
-
-/// Converts a sRGB image to linear float
-ImageF linear(ImageF&& target, const Image& source, Component component);
-inline ImageF linear(const Image& source, Component component) { return linear(source.size, source, component); }
-
-/// Converts a linear float image to grayscale sRGB
-Image sRGB(Image&& target, const ImageF& source);
-inline Image sRGB(const ImageF& source) { return sRGB(source.size, source); }
-
-/// Converts linear float image for each component to color sRGB
-Image sRGB(Image&& target, const ImageF& blue, const ImageF& green, const ImageF& red);
-inline Image sRGB(const ImageF& blue, const ImageF& green, const ImageF& red) { return sRGB(blue.size, blue, green, red); }
-
+// -- Decoding --
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte>& file);
@@ -103,3 +49,54 @@ static Image name ## Icon() { \
     static Image icon = decodeImage(ref<byte>(_binary_## name ##_start, _binary_## name ##_end)); \
     return share(icon); \
 }
+
+// -- Resampling (3x8bit) --
+
+/// Resizes \a source into \a target
+/// \note Only supports integer box downsample
+Image resize(Image&& target, const Image& source);
+
+// -- ImageF --
+
+/// 2D array of floating-point pixels
+struct ImageF : buffer<float> {
+    ImageF(){}
+    ImageF(buffer<float>&& data, int2 size) : buffer(move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y)); }
+    ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0)); }
+    ImageF(int2 size) : ImageF(size.x, size.y) {}
+
+    explicit operator bool() const { return data && width && height; }
+    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*width+x); }
+
+    union {
+        struct { uint width, height; };
+        int2 size;
+    };
+};
+
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
+
+// -- sRGB --
+
+extern uint8 sRGB_forward[0x1000];
+extern float sRGB_reverse[0x100];
+
+/// Converts an sRGB component to linear float
+void linear(mref<float> target, ref<byte4> source, uint component);
+
+/// Converts linear float pixels for each component to color sRGB pixels
+void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red);
+
+// -- Resampling (float) --
+
+ImageF resize(ImageF&& target, ImageF&& source);
+
+// -- Convolution --
+
+/// Applies a gaussian blur
+ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma);
+inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
+
+/// Selects frequency near a band
+ImageF bandPass(const ImageF& source, float lowPass, float highPass);

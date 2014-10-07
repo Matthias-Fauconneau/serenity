@@ -4,6 +4,7 @@
 
 #include "font.h"
 #include "file.h"
+#include "math.h"
 
 const Folder& fontFolder() { static Folder folder("/usr/share/fonts"_); return folder; }
 String findFont(string fontName, ref<string> fontTypes) {

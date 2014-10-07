@@ -80,6 +80,9 @@ player.cc
 
 exif.cc
 exif.h
-filter.h
+image-operation.h
 dust.cc
 core/parallel.h
+inverse-attenuation.h
+image-source.h
+image-folder.h

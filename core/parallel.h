@@ -53,10 +53,16 @@ template<Type F> void parallel_chunk(uint64 totalSize, F f) {
     parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(totalSize-chunkIndex*chunkSize, chunkSize)); });
 }
 
+/// Stores the application of a function to every index in a mref
+template<Type T, Type Function>
+void parallel_apply(mref<T> target, Function function) {
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(index)); });
+}
+
 /// Stores the application of a function to every elements of a ref in a mref
-template<Type T, Type Function, Type... S>
-void parallel_apply(mref<T> target, Function function, ref<S>... sources) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(sources[index]...)); });
+template<Type T, Type Function, Type S0, Type... Ss>
+void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>... sources) {
+    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], sources[index]...)); });
 }
 
 // \file arithmetic.cc Parallel arithmetic operations
@@ -76,12 +82,12 @@ inline float parallel_sum(ref<float> values) {
 }
 
 inline void operator*=(mref<float> values, float factor) {
-    if(values.size < parallelMinimum) apply(values, values, [&](float v) {  return factor*v; });
+    if(values.size < parallelMinimum) apply(values, [&](float v) {  return factor*v; }, values);
     else parallel_apply(values, [&](float v) {  return factor*v; }, values);
 }
 
 inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
-    if(Y.size < parallelMinimum) apply(Y, A, B, [&](float a, float b) {  return a-b; });
+    if(Y.size < parallelMinimum) apply(Y, [&](float a, float b) {  return a-b; }, A, B);
     else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
 }
 

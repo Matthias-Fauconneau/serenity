@@ -15,6 +15,8 @@ struct Window : Display /*should reference but inherits for convenience*/ {
         struct { uint width, height; };
         int2 size = 0;
     };
+    /// Window title
+    String title;
 
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };

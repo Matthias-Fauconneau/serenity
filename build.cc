@@ -145,7 +145,7 @@ struct Build {
                 if(!endsWith(CXX,"clang++"_)) args << String("-finstrument-functions-exclude-file-list=core,array,string,time,map,trace,profile"_);
             }
             for(string flag: flags) args << "-D"_+toUpper(flag)+"=1"_;
-            args << apply(folder.list(Folders), [this](const String& subfolder){ return "-iquote"_+subfolder; });
+            args << apply([this](const String& subfolder){ return "-iquote"_+subfolder; }, folder.list(Folders));
             /*static String version = ({
                                          Stream stdout;
                                          check_( execute(which("git"_), {"describe"_,"--long"_,"--tags"_,"--dirty"_,"--always"_}, true, currentWorkingDirectory(), &stdout) );
@@ -204,7 +204,7 @@ struct Build {
             array<String> args; args<<String("-o"_)<<copy(binary);
             if(flags.contains("atom"_)) args<<String("-m32"_);
             args << copy(files);
-            args << apply(ref<String>(libraries), [this](const String& library){ return "-l"_+library; });
+            args << apply([this](const String& library){ return "-l"_+library; }, ref<String>(libraries));
             for(int pid: pids) if(wait(pid)) error("Failed to compile"); // Waits for each translation unit to finish compiling before final linking
             if(execute(CXX, toRefs(args))) error("Failed to link");
         }

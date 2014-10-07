@@ -36,12 +36,6 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
     return false;
 }
 
-/*bool ScrollArea::keyPress(Key key, Modifiers) {
-    int2 hint = abs(widget().sizeHint(size));
-    if(key==PageUp || key==PageDown) { offset.y += (key==PageUp?1:-1) * size.y; offset = min(int2(0,0), max(size-hint, offset)); return true; }
-    return false;
-}*/
-
 // Progress
 
 int2 Progress::sizeHint(int2) const { return int2(-height,height); }
@@ -54,11 +48,11 @@ Graphics Progress::graphics(int2 size) const {
     return graphics;
 }
 
-// ImageWidget
+// ImageView
 
-int2 ImageWidget::sizeHint(int2 size) const { return min(image.size, size.x ? image.size*size.x/image.size.x : image.size); }
+int2 ImageView::sizeHint(int2 size) const { return min(image.size, size.x ? image.size*size.x/image.size.x : image.size); }
 
-Graphics ImageWidget::graphics(int2 size) const {
+Graphics ImageView::graphics(int2 size) const {
     Graphics graphics;
     if(image) {
         int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
@@ -89,4 +83,11 @@ bool ImageLink::mouseEvent(int2, int2, Event event, Button, Widget*&) {
 bool ToggleButton::mouseEvent(int2, int2, Event event, Button button, Widget*&) {
     if(event==Press && button==LeftButton) { enabled = !enabled; image = enabled?share(disableIcon):share(enableIcon); toggled(enabled); return true; }
     return false;
+}
+
+// WidgetToggle
+bool WidgetToggle::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+    size_t previousIndex = index;
+    index = button != NoButton && event != Release;
+    return widgets[index]->mouseEvent(cursor, size, event, button, focus) || previousIndex != index;
 }

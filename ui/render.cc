@@ -1,3 +1,4 @@
+#include "math.h"
 #include "graphics.h"
 
 static void blend(const Image& target, uint x, uint y, vec3 source_linear, float opacity) {

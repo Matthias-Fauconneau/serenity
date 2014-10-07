@@ -1,7 +1,6 @@
 #pragma once
 /// \file vector.h Vector definitions and operations
 #include "string.h"
-#include "math.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
@@ -96,8 +95,6 @@ inline String strx(int2 N) { return str(N.x)+"x"_+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2;
-inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
-inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 
 generic struct xyz {
     T x,y,z;
@@ -109,13 +106,6 @@ typedef vec<xyz,int,3> int3;
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
-inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
-inline vec3 normal(vec3 v) {
-    int index=0; float min=v[0];
-    for(int i: range(3)) if(abs(v[i]) < min) index=i, min=abs(v[i]);
-    vec3 t=0; t[index]=1;
-    return normalize(cross(v, t));
-}
 
 generic struct xyzw {
     T x,y,z,w;

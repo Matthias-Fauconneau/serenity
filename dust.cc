@@ -1,187 +1,67 @@
-#include "parallel.h"
-
-// -> image.cc
-#include "image.h"
-//ImageF operator-(const ImageF& A, const ImageF& B) { ImageF Y(A.size); subtract(Y.pixels, A.pixels, B.pixels); return Y; }
-
-/// Convolves and transposes (with repeat border conditions)
-void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
-    int N = radius+1+radius;
-    chunk_parallel(height, [&](uint, uint y) {
-        const float* line = source + y * width;
-        float* targetColumn = target + y;
-        for(int x: range(-radius,0)) {
-            float sum = 0;
-            for(int dx: range(N)) sum += kernel[dx] * line[max(0, x+dx)];
-            targetColumn[(x+radius)*height] = sum;
-        }
-        for(int x: range(0,width-2*radius)) {
-            float sum = 0;
-            const float* span = line + x;
-            for(int dx: range(N)) sum += kernel[dx] * span[dx];
-            targetColumn[(x+radius)*height] = sum;
-        }
-        for(int x: range(width-2*radius,width-radius)){
-            float sum = 0;
-            for(int dx: range(N)) sum += kernel[dx] * line[min(width-1, x+dx)];
-            targetColumn[(x+radius)*height] = sum;
-        }
-    });
-}
-
-float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
-ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
-    assert_(sigma > 0);
-    int radius = ceil(3*sigma), N = radius+1+radius;
-    float kernel[N];
-    for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
-    float sum = ::sum(ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
-    buffer<float> transpose (target.height*target.width);
-    convolve(transpose, kernel, radius, source, source.width, source.height);
-    convolve(target, kernel, radius, transpose, target.height, target.width);
-    return move(target);
-}
-ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
-
-ImageF bandPass(const ImageF& source, float lowPass, float highPass) {
-    ImageF low_band = lowPass ? gaussianBlur(source, lowPass) : share(source);
-    if(!highPass) return low_band;
-    ImageF low = gaussianBlur(low_band, highPass);
-    subtract(low, low_band, low);
-    return low;
-}
-
 /// \file dust.cc Automatic dust removal
-#include "filter.h"
+#include "inverse-attenuation.h"
+#include "interface.h"
+#include "window.h"
 
-/// Inverts attenuation bias
-struct InverseAttenuation : Filter {
-    ImageSource attenuationBias;
+struct ProcessedSource : ImageSource {
+    ImageSource& source;
+    ImageOperation& operation;
+    ProcessedSource(ImageSource& source, ImageOperation& operation) :
+        ImageSource(Folder("."_,source.folder)), source(source), operation(operation) {}
 
-    InverseAttenuation(Folder&& calibrationFolder) : attenuationBias(calibrateAttenuationBias(move(calibrationFolder))) {}
+    size_t size() const override { return source.size(); }
+    String name(size_t index) const override { return source.name(index); }
+    int64 time(size_t index) const override { return max(source.time(index), operation.version()); }
+    const map<String, String>& properties(size_t index) const override { return source.properties(index); }
+    int2 size(size_t index) const override { return source.size(index); }
 
-    /// Calibrates attenuation bias image by summing images of a white subject
-    ImageSource calibrateAttenuationBias(Folder&& calibrationFolder) {
-        string id = "attenuationBias"_;
-        Folder cacheFolder(".cache"_,calibrationFolder, true);
-        removeIfExisting(id, cacheFolder);
-        if(!existsFileStartingWith(id, cacheFolder)) {
-            ImageFolder calibration (move(calibrationFolder)); // Lists images and evaluates target image size
-            ImageTarget attenuationBias (id, cacheFolder, calibration.imageSize);
-
-            // Sums all images
-            attenuationBias.buffer::clear();
-            for(string imageName: calibration.keys) {
-                ImageSource source = calibration.image(imageName, Mean); // Assumes dust affects all components equally
-                parallel_apply(attenuationBias, [](float sum, float source) { return sum + source; }, attenuationBias, source);
-            }
-
-            // Low pass to filter texture and noise
-            gaussianBlur(attenuationBias, 8); // Useful?, TODO?: weaken near spot, strengthen outside
-
-            // TODO: High pass to filter lighting conditions
-
-            // Normalizes sum by mean (DC) (and clips values over average to 1)
-            float sum = parallel_sum(attenuationBias);
-            float mean = sum/attenuationBias.buffer::size;
-            float factor = 1/mean;
-            parallel_apply(attenuationBias, [&](float v) {  return min(1.f, factor*v); }, attenuationBias);
-        }
-        return ImageSource(id, cacheFolder);
+    /// Returns processed linear image
+    virtual SourceImage image(size_t index, uint component) const override {
+        return cache<ImageF>(source.name(index), operation.name()+"."_+str(component), source.folder, [&](TargetImage&& target) {
+            SourceImage sourceImage = source.image(index, component);
+            operation.apply(target.resize(sourceImage.size), sourceImage, component);
+        }, time(index));
     }
 
-    ImageSource image(ImageFolder& imageFolder, string imageName, Component component) const override {
-        //if(fromDecimal(imageFolder.at(imageName).at("Aperture"_)) < 6.3) return imageFolder.image(imageName, component);
-        Folder targetFolder = Folder(".target"_, imageFolder.cacheFolder, true);
-        String id = imageName+"."_+str(component);
-        if(!existsFileStartingWith(id, targetFolder)) {
-            ImageSource source = imageFolder.image(imageName, component);
-            int2 size = source.size;
-
-            ImageTarget target (id, targetFolder, size);
-            parallel_apply(target, [&](float source, float bias) { return source / bias; }, source, attenuationBias);
-
-            if(1) {
-                // Restricts correction to a frequency band
-                const float lowPass = 8, highPass = 32; //TODO: automatic determination from spectrum of correction (difference) image
-                ImageF reference = bandPass(source, lowPass, highPass);
-                ImageF corrected = bandPass(target, lowPass, highPass);
-
-                // Saturates correction below max(0, source) (prevents introduction of a light feature at spot frequency)
-                parallel_apply(target, [&](float source, float reference, float corrected) {
-                    float saturated_corrected = min(corrected, max(reference, 0.f));
-                    float correction = saturated_corrected - reference;
-                    return source + correction;
-                }, source, reference, corrected);
-            }
-        }
-        return ImageSource(id, targetFolder);
+    /// Returns processed sRGB image
+    virtual SourceImageRGB image(size_t index) const override {
+        return cache<Image>(source.name(index), operation.name()+".sRGB"_, source.folder, [&](TargetImageRGB&& target) {
+            sRGB(target.resize(size(index)), image(index, 0), image(index, 1), image(index, 2));
+        }, time(index));
     }
 };
 
-#include "interface.h"
+/// Displays an image collection
+struct ImageSourceView : ImageView {
+    ImageSource& source;
+    size_t index = -1;
+    SourceImageRGB image; // Holds memory map reference
 
-struct ImageView : ImageWidget {
-    ImageFolder& images;
-    string imageName = images.keys[0];
-    ImageSourceRGB source; // Holds memory map reference
-
-    ImageView(ImageFolder& images) : images(images) { update(); }
-
-    virtual void update() {
-        source = images.scaledRGB(imageName);
-        ImageWidget::image = share(source);
-    }
-
-    /// Browses images by moving mouse horizontally over image view (like an hidden slider)
-    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override {
-        string imageName = images.keys[images.size()*min(size.x-1,cursor.x)/size.x];
-        if(imageName != this->imageName) {
-            this->imageName = imageName;
-            update();
+    bool setIndex(size_t index) {
+        if(index != this->index) {
+            this->index = index;
+            image = source.image(index);
+            ImageView::image = share(image);
             return true;
         }
         return false;
     }
 
-    virtual String title() { return str(images.keys.indexOf(imageName),'/',images.size(), imageName, images.at(imageName)); }
-};
+    ImageSourceView(ImageSource& source) : source(source) { setIndex(0); }
 
-struct FilterView : ImageView {
-    const Filter& filter;
-    bool enabled = false;
+    String title() const override { return str(index,'/',source.size(), source.name(index), source.properties(index)); }
 
-    FilterView(ImageFolder& images, const Filter& filter) : ImageView(images), filter(filter) { update(); }
-
-    void update() override {
-        if(enabled) ImageWidget::image = sRGB(
-                    filter.image(images, imageName, Blue),
-                    filter.image(images, imageName, Green),
-                    filter.image(images, imageName, Red) );
-        else ImageView::update();
-    }
-
-    /// Enables filter while a mouse button is pressed
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
-        bool enabled = button != NoButton && event != Release;
-        if(enabled != this->enabled) { this->enabled = enabled, imageName=""_;/*Forces update*/ }
-        return ImageView::mouseEvent(cursor, size, event, button, focus);
-    }
-
-    String title() override { return str(ImageView::title(), enabled); }
-};
-
-#include "window.h"
-
-struct FilterWindow : FilterView {
-    Window window {this, -1, title()};
-    FilterWindow(ImageFolder& images, const Filter& filter) : FilterView(images, filter) {}
-    void update() override { FilterView::update(); if(window)/*called in constructor while window is not initialized yet*/ window.setTitle(title()); }
+    /// Browses source by moving mouse horizontally over image view (like an hidden slider)
+    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override { return setIndex(source.size()*min(size.x-1,cursor.x)/size.x); }
 };
 
 struct DustRemovalPreview {
-    InverseAttenuation filter { Folder("Pictures/Paper"_, home()) };
-    ImageFolder images { Folder("Pictures"_, home()),
-                [](const String&, const map<String, String>& tags){ return fromDecimal(tags.at("Aperture"_)) > 4; } };
-    FilterWindow view {images, filter};
+    InverseAttenuation correction { Folder("Pictures/Paper"_, home()) };
+    ImageFolder source { Folder("Pictures"_, home()),
+                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) > 4; } };
+    ImageSourceView sourceView {source};
+    ProcessedSource corrected {source, correction};
+    ImageSourceView correctedView {corrected};
+    WidgetToggle toggleView {&sourceView, &correctedView};
+    Window window {&toggleView};
 } application;

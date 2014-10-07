@@ -1,7 +1,8 @@
 #pragma once
 #include "string.h"
 #include "map.h"
-#include "deflate.h" //DEBUG
+#include "data.h"
+#include "vector.h"
 
 struct Variant {
     enum { Empty, Boolean, Integer, Real, Data, List, Dict, Rational } type = Empty;
@@ -77,25 +78,12 @@ inline String str(const Variant& o) {
     error("Invalid Variant"_,int(o.type));
 }
 
-typedef map<string,Variant> Dict;
-
-struct Object : Dict {
-    buffer<byte> data;
-
-    void operator =(buffer<byte>&& data) {
-        this->data = move(data);
-        insert("Length"_, this->data.size);
-    }
-};
-
-inline String str(const Object& o) {
-    String s = str((const Dict&)o);
-    if(o.data) {
-        assert_(o.at("Length"_).integer() == int(o.data.size), (const Dict&)o);
-        s << "\nstream\n"_;
-        assert_(o.data.size <= 30 || o.value("Filter"_,""_)=="/FlateDecode"_, o.data.size, deflate(o.data).size, o.value("Filter"_,""_));
-        s << o.data;
-        s << "\nendstream"_;
-    }
-    return s;
+/// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
+inline int2 fromInt2(TextData& s) {
+    int x = s.integer(); // Assigns a single value to all components
+    if(!s) return int2(x);
+    s.whileAny("x, "_); int y=s.integer();
+    assert_(!s); return int2(x,y);
 }
+/// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
+inline int2 fromInt2(string str) { TextData s(str); return fromInt2(s); }
