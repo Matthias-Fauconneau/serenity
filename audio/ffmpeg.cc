@@ -22,7 +22,7 @@ bool AudioFile::open(const string path) {
 
 bool AudioFile::open() {
     avformat_find_stream_info(file, 0);
-    if(file->duration <= 0) { file=0; log("Invalid file"_); return false; }
+    if(file->duration <= 0) { file=0; log("Invalid file"); return false; }
     for(uint i=0; i<file->nb_streams; i++) {
         if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
             audioStream = file->streams[i];

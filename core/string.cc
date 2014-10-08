@@ -4,7 +4,7 @@
 
 // -- string
 
-string str(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
+//string str(const char* s) { int i=0; while(s[i]) i++; return string(s,i); }
 
 bool operator <(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
@@ -36,6 +36,10 @@ bool find(const string s, const string a) {
     return false;
 }
 
+bool isInteger(const string s) {
+    if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
+}
+
 string section(const string s, byte separator, int begin, int end) {
     if(!s) return ""_;
     uint b,e;
@@ -48,10 +52,6 @@ string section(const string s, byte separator, int begin, int end) {
 }
 
 // -- String
-
-String strz(const string source) {
-    buffer<char> target(source.size+1); target.slice(0, source.size).copy(source); target.last()='\0'; return move(target);
-}
 
 char lowerCase(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
 String toLower(const string source) { return apply(source, lowerCase); }

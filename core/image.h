@@ -14,8 +14,8 @@ struct Image : buffer<byte4> {
 
     Image():size(0){}
     Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false, bool sRGB=true)
-        : buffer<byte4>(move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
-        assert_(buffer::size == height*this->stride, size, buffer::size);
+        : buffer<byte4>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
+        assert_(buffer::size == height*this->stride);
     }
     Image(uint width, uint height, bool alpha=false, bool sRGB=true)
         : buffer(height*width), width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
@@ -61,7 +61,7 @@ Image resize(Image&& target, const Image& source);
 /// 2D array of floating-point pixels
 struct ImageF : buffer<float> {
     ImageF(){}
-    ImageF(buffer<float>&& data, int2 size) : buffer(move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y)); }
+    ImageF(buffer<float>&& data, int2 size) : buffer(::move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y)); }
     ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0)); }
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 

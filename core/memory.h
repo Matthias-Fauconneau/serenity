@@ -43,6 +43,16 @@ generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.si
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
 generic buffer<T> unsafeReference(const ref<T> o) { return buffer<T>((T*)o.data, o.size); }
 
+/// Concatenates a single element and a buffer by copying
+generic inline buffer<T> operator+(const T a, const ref<T> b) {
+    buffer<T> target(1+b.size); target.set(0, a); target.slice(1).copy(b); return target;
+}
+
+/// Concatenates a buffer and a single element by copying
+generic inline buffer<T> operator+(const ref<T> a, T b) {
+    buffer<T> target(a.size+1); target.slice(0, a.size).copy(a); target.set(a.size, b); return target;
+}
+
 /// Concatenates two buffers by copying
 generic inline buffer<T> operator+(const ref<T> a, const ref<T> b) {
     buffer<T> target(a.size+b.size); target.slice(0, a.size).copy(a); target.slice(a.size).copy(b); return target;

@@ -21,77 +21,77 @@ String demangle(TextData& s, bool function=true) {
     for(;;) {
         /**/  if(s.match('O')) rvalue=true;
         else if(s.match('R')) ref=true;
-        else if(s.match('K')) r.append("const "_);
-        else if(function && s.match('L')) r.append("static "_);
+        else if(s.match('K')) r.append("const ");
+        else if(function && s.match('L')) r.append("static ");
         else if(s.match('P')) pointer++;
         else break;
     }
     uint l;
-    /**/  if(s.match('v')) { if(pointer) r.append("void"_); }
-    else if(s.match("C1"_)) r.append( "this"_);
-    else if(s.match("C2"_)) r.append( "this"_);
-    else if(s.match("D1"_)) r.append( "~this"_);
-    else if(s.match("D2"_)) r.append( "~this"_);
-    else if(s.match("Dv"_)){int size=s.integer(); s.match('_'); r.append(demangle(s)+dec(size));}
-    else if(s.match("eq"_)) r.append("operator =="_);
-    else if(s.match("ix"_)) r.append("operator []"_);
-    else if(s.match("cl"_)) r.append("operator ()"_);
-    else if(s.match("ls"_)) r.append("operator <<"_);
-    else if(s.match("rs"_)) r.append("operator >>"_);
-    else if(s.match("cv"_)) r.append("operator "_ + demangle(s));
-    else if(s.match("pl"_)) r.append("operator +"_);
-    else if(s.match("mi"_)) r.append("operator -"_);
-    else if(s.match("ml"_)) r.append("operator *"_);
-    else if(s.match("dv"_)) r.append("operator /"_);
-    else if(s.match('a')) r.append("byte"_);
-    else if(s.match('b')) r.append("bool"_);
-    else if(s.match('c')) r.append("char"_);
-    else if(s.match('f')) r.append("float"_);
-    else if(s.match('h')) r.append("byte"_);
-    else if(s.match('i')) r.append("int"_);
-    else if(s.match('j')) r.append("uint"_);
-    else if(s.match('l')) r.append("long"_);
-    else if(s.match('m')) r.append("ulong"_);
-    else if(s.match('s')) r.append("short"_);
-    else if(s.match('t')) r.append("ushort"_);
-    else if(s.match('x')) r.append("int64"_);
-    else if(s.match('y')) r.append("uint64"_);
-    else if(s.match('A')) { r.append("[]"_); s.whileInteger(); s.match('_'); }
-    else if(s.match('M')) { r.append(demangle(s)); r.append("::"_); r.append(demangle(s)); }
-    else if(s.match("Tv"_)) { r.append("thunk "_); s.whileInteger(); s.match('_'); if(s.match("n"_)) { s.whileInteger(); s.match('_'); r.append(demangle(s)); } }
+    /**/  if(s.match('v')) { if(pointer) r.append("void"); }
+    else if(s.match("C1")) r.append( "this");
+    else if(s.match("C2")) r.append( "this");
+    else if(s.match("D1")) r.append( "~this");
+    else if(s.match("D2")) r.append( "~this");
+    else if(s.match("Dv")){int size=s.integer(); s.match('_'); r.append(demangle(s)+dec(size));}
+    else if(s.match("eq")) r.append("operator ==");
+    else if(s.match("ix")) r.append("operator []");
+    else if(s.match("cl")) r.append("operator ()");
+    else if(s.match("ls")) r.append("operator <<");
+    else if(s.match("rs")) r.append("operator >>");
+    else if(s.match("cv")) r.append("operator " + demangle(s));
+    else if(s.match("pl")) r.append("operator +");
+    else if(s.match("mi")) r.append("operator -");
+    else if(s.match("ml")) r.append("operator *");
+    else if(s.match("dv")) r.append("operator /");
+    else if(s.match('a')) r.append("byte");
+    else if(s.match('b')) r.append("bool");
+    else if(s.match('c')) r.append("char");
+    else if(s.match('f')) r.append("float");
+    else if(s.match('h')) r.append("byte");
+    else if(s.match('i')) r.append("int");
+    else if(s.match('j')) r.append("uint");
+    else if(s.match('l')) r.append("long");
+    else if(s.match('m')) r.append("ulong");
+    else if(s.match('s')) r.append("short");
+    else if(s.match('t')) r.append("ushort");
+    else if(s.match('x')) r.append("int64");
+    else if(s.match('y')) r.append("uint64");
+    else if(s.match('A')) { r.append("[]"); s.whileInteger(); s.match('_'); }
+    else if(s.match('M')) { r.append(demangle(s)); r.append("::"); r.append(demangle(s)); }
+    else if(s.match("Tv")) { r.append("thunk "); s.whileInteger(); s.match('_'); if(s.match("n")) { s.whileInteger(); s.match('_'); r.append(demangle(s)); } }
     else if(s.match('T')) { r.append('T'); s.whileInteger(); s.match('_'); }
-    else if(s.match("St"_)) r.append("std"_);
+    else if(s.match("St")) r.append("std");
     else if(s.match('S')) { r.append('S'); s.whileInteger(); s.match('_'); }
-    else if(s.match('F')||s.match("Dp"_)) r.append(demangle(s));
-    else if(s.match("Li"_)) r.append(dec(s.integer()));
-    else if(s.match("Lj"_)) r.append(dec(s.integer()));
-    else if(s.match("Lb"_)) r.append(str((bool)s.integer()));
-    else if(s.match('L')) { r.append("extern "_); r.append(demangle(s)); }
+    else if(s.match('F')||s.match("Dp")) r.append(demangle(s));
+    else if(s.match("Li")) r.append(dec(s.integer()));
+    else if(s.match("Lj")) r.append(dec(s.integer()));
+    else if(s.match("Lb")) r.append(str((bool)s.integer()));
+    else if(s.match('L')) { r.append("extern "); r.append(demangle(s)); }
     else if(s.match('I')||s.match('J')) { //template | argument pack
         array<String> args;
         while(s && !s.match('E')) {
-            if(s.wouldMatch('Z')) args.append(demangle(s)+"::"_+demangle(s));
+            if(s.wouldMatch('Z')) args.append(demangle(s)+"::"+demangle(s));
             else args.append(demangle(s,false));
         }
-        r.append('<'); r.append(join(args,", "_)); r.append('>');
+        r.append('<'); r.append(join(args,", ")); r.append('>');
     }
     else if(s.match('Z')) {
         r.append( demangle(s));
         array<String> args;
         while(s && !s.match('E')) args.append(demangle(s));
-        r.append('('); r.append(join(args,", "_)); r.append(')');
+        r.append('('); r.append(join(args,", ")); r.append(')');
     }
-    else if(s.match("_0"_)) {}
+    else if(s.match("_0")) {}
     else if(s.match('N')) {
         array<String> list;
         bool const_method =false;
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
             list.append( demangle(s) );
-            if(s.wouldMatchAny("IJ"_)) list.last().append( demangle(s) );
+            if(s.wouldMatchAny("IJ")) list.last().append( demangle(s) );
         }
-        r.append( join(list,"::"_) );
-        if(const_method) r.append(" const"_);
+        r.append( join(list,"::") );
+        if(const_method) r.append(" const");
     } else {
         l=s.mayInteger(-1);
         if(l<=s.available(l)) {
@@ -100,26 +100,27 @@ String demangle(TextData& s, bool function=true) {
         } else r.append(s.untilEnd());
     }
     for(int i=0;i<pointer;i++) r.append('*');
-    if(rvalue) r.append("&&"_);
+    if(rvalue) r.append("&&");
     if(ref) r.append('&');
     return r;
 }
 String demangle(const string symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findSymbol(void* find) {
-    static Map exe("/proc/self/exe"_);
+    static Map exe("/proc/self/exe");
     const byte* elf = exe.data;
     const Ehdr& hdr = *(const Ehdr*)elf;
     ref<Shdr> sections = ref<Shdr>((const Shdr*)(elf+hdr.shoff),hdr.shnum);
     const char* shstrtab = elf+sections[(uint)hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; BinaryData debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line"_) new (&debug_line) BinaryData(ref<byte>(elf+s.offset,s.size));
-        else if(str(shstrtab+s.name)==".strtab"_) strtab=(const char*)elf+s.offset;
-        else if(str(shstrtab+s.name)==".symtab"_) symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
+        if(str(shstrtab+s.name)==".debug_line") new (&debug_line) BinaryData(ref<byte>(elf+s.offset,s.size));
+        else if(str(shstrtab+s.name)==".strtab") strtab=(const char*)elf+s.offset;
+        else if(str(shstrtab+s.name)==".symtab") symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
-    for(const Sym& sym: symtab) if(find >= sym.value && find < sym.value+sym.size) { symbol.function = demangle(str(strtab+sym.name)); break; }
+    for(const Sym& sym: symtab)
+        if(find >= sym.value && find < sym.value+sym.size) { symbol.function = demangle(str(strtab+sym.name)); break; }
     for(BinaryData& s = debug_line;s.index<s.buffer.size;) {
         uint begin = s.index;
         struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
@@ -154,7 +155,7 @@ Symbol findSymbol(void* find) {
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else { error("unknown opcode"_,opcode); s.advance(size); }
+                else { error("unknown opcode",opcode); s.advance(size); }
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
@@ -180,7 +181,7 @@ Symbol findSymbol(void* find) {
             else if(opcode == set_prologue_end) {}
             else if(opcode == set_epilogue_begin) {}
             else if(opcode == set_isa) readLEV(s);
-            else error("Unsupported"_,opcode);
+            else error("Unsupported",opcode);
         }
     }
     return symbol;
@@ -201,13 +202,13 @@ String trace(int skip, void* ip) {
     }
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
-        if(s.function||s.file||s.line) log.append(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
-        else log.append("0x"_+hex(ptr(stack[i]))+"\n"_);
+        if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+' '+s.function+'\n');
+        else log.append("0x"+hex(ptr(stack[i]))+'\n');
     }
     if(ip) {
         Symbol s = findSymbol(ip);
-        if(s.function||s.file||s.line) log.append(left(s.file+":"_+str(s.line),16)+" "_+s.function+"\n"_);
-        else log.append("0x"_+hex(ptr(ip))+"\n"_);
+        if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+' '+s.function+'\n');
+        else log.append("0x"+hex(ptr(ip))+'\n');
     }
     return log;
 }

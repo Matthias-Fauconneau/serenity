@@ -82,7 +82,7 @@ void setExceptions(uint except);
 array<string> arguments();
 
 /// Returns value for environment variable \a name
-string getenv(const string name, string value=""_);
+string getenv(const string name, string value="");
 
 /// Returns standard folders
 const Folder& home(); //$HOME ?: pwuid->pw_dir

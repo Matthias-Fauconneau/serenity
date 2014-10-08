@@ -61,7 +61,7 @@ constexpr string months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"
 int daysInMonth(int month, int year);
 
 /// Returns current date formatted using \a format String
-String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss"_);
+String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 
 /// Parses a date from s
 /// \note dates are parsed as dddd, dd mmmm yyyy

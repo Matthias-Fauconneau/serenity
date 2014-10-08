@@ -53,11 +53,11 @@ typedef IO<'A', 0x44> DRAIN;
 /// Playback
 
 Device getPlaybackDevice() {
-    Folder snd("/dev/snd"_);
+    Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm"_) && endsWith(device,"D0p"_)) return Device(device, snd, ReadWrite);
+        if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, ReadWrite);
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm"_) && endsWith(device,"p"_)) return Device(device, snd, ReadWrite);
+        if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, ReadWrite);
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
@@ -143,9 +143,9 @@ void AudioOutput::event() {
 Device getCaptureDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm"_) && endsWith(device,"D0c"_)) return Device(device, snd, ReadWrite);
+        if(startsWith(device, "pcm") && endsWith(device,"D0c")) return Device(device, snd, ReadWrite);
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm"_) && endsWith(device,"c"_)) return Device(device, snd, ReadWrite);
+        if(startsWith(device, "pcm") && endsWith(device,"c")) return Device(device, snd, ReadWrite);
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
@@ -229,7 +229,7 @@ typedef IOWR<'U', 0x11, Info> ELEM_INFO;
 typedef IOWR<'U', 0x12, Value> ELEM_READ;
 typedef IOWR<'U', 0x13, Value> ELEM_WRITE;
 
-AudioControl::AudioControl() : Device("/dev/snd/controlC1"_) {
+AudioControl::AudioControl() : Device("/dev/snd/controlC1") {
     List list = {};
     iowr<ELEM_LIST>(list);
     ID ids[list.count];
@@ -240,7 +240,7 @@ AudioControl::AudioControl() : Device("/dev/snd/controlC1"_) {
         Info info;
         info.id.numid = ids[i].numid;
         iowr<ELEM_INFO>(info);
-        if(startsWith(string(info.id.name),"Master Playback Volume"_)) { id=info.id.numid; min=info.min, max=info.max; break; }
+        if(startsWith(string(info.id.name),"Master Playback Volume")) { id=info.id.numid; min=info.min, max=info.max; break; }
     }
 }
 

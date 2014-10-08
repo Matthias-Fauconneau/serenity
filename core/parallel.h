@@ -82,12 +82,12 @@ inline float parallel_sum(ref<float> values) {
 }
 
 inline void operator*=(mref<float> values, float factor) {
-    if(values.size < parallelMinimum) apply(values, [&](float v) {  return factor*v; }, values);
+    if(values.size < parallelMinimum) values.apply(values, [&](float v) {  return factor*v; });
     else parallel_apply(values, [&](float v) {  return factor*v; }, values);
 }
 
 inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
-    if(Y.size < parallelMinimum) apply(Y, [&](float a, float b) {  return a-b; }, A, B);
+    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a-b; });
     else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
 }
 

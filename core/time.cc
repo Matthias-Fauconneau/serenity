@@ -101,38 +101,38 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
 String str(Date date, const string format) {
     String r;
     for(TextData s(format);s;) {
-        /**/ if(s.match("ss"_)){ if(date.seconds>=0) r << dec(date.seconds,2); else s.until(' '); }
-        else if(s.match("mm"_)){ if(date.minutes>=0) r << dec(date.minutes,2); else s.until(' '); }
-        else if(s.match("hh"_)){ if(date.hours>=0) r << dec(date.hours,2); else s.until(' '); }
-        else if(s.match("dddd"_)){ if(date.weekDay>=0) r << days[date.weekDay]; else s.until(' '); }
-        else if(s.match("ddd"_)){ if(date.weekDay>=0) r << days[date.weekDay].slice(0,3); else s.until(' '); }
-        else if(s.match("dd"_)){ if(date.day>=0) r << dec(date.day+1,2); else s.until(' '); }
-        else if(s.match("MMMM"_)){ if(date.month>=0) r << months[date.month]; else s.until(' '); }
-        else if(s.match("MMM"_)){ if(date.month>=0) r << months[date.month].slice(0,3); else s.until(' '); }
-        else if(s.match("MM"_)){ if(date.month>=0) r << dec(date.month+1,2); else s.until(' '); }
-        else if(s.match("yyyy"_)){ if(date.year>=0) r << dec(date.year); else s.until(' '); }
-        else if(s.match("TZD"_)) r << "GMT"_; //FIXME
-        else r << s.next();
+        /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( dec(date.seconds,2) ); else s.until(' '); }
+        else if(s.match("mm")){ if(date.minutes>=0) r.append( dec(date.minutes,2) ); else s.until(' '); }
+        else if(s.match("hh")){ if(date.hours>=0) r.append( dec(date.hours,2) ); else s.until(' '); }
+        else if(s.match("dddd")){ if(date.weekDay>=0) r.append( days[date.weekDay] ); else s.until(' '); }
+        else if(s.match("ddd")){ if(date.weekDay>=0) r.append( days[date.weekDay].slice(0,3) ); else s.until(' '); }
+        else if(s.match("dd")){ if(date.day>=0) r.append( dec(date.day+1,2) ); else s.until(' '); }
+        else if(s.match("MMMM")){ if(date.month>=0) r.append( months[date.month] ); else s.until(' '); }
+        else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
+        else if(s.match("MM")){ if(date.month>=0) r.append( dec(date.month+1,2) ); else s.until(' '); }
+        else if(s.match("yyyy")){ if(date.year>=0) r.append( dec(date.year) ); else s.until(' '); }
+        else if(s.match("TZD")) r.append( "GMT"_ ); //FIXME
+        else r.append( s.next() );
     }
-    if(endsWith(r,","_) || endsWith(r,":"_)) r.pop(); //prevent dangling separator when last valid part is week day or seconds
+    if(endsWith(r,",") || endsWith(r,":")) r.pop(); //prevent dangling separator when last valid part is week day or seconds
     return r;
 }
 
 Date parseDate(TextData& s) {
     Date date;
     {
-        if(s.match("Today"_)) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
+        if(s.match("Today")) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
         else for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; goto break_; }
         /*else*/ for(int i=0;i<7;i++) if(s.match(days[i].slice(0,3))) { date.weekDay=i; break; }
         break_:;
     }
     for(;;) {
-        s.whileAny(" ,\t"_);
+        s.whileAny(" ,\t");
         for(int i=0;i<12;i++) if(s.match(months[i])) { date.month=i; goto continue2_; }
         /*else*/ for(int i=0;i<12;i++) if(s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
         /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
-            if(s.match(":"_)) { date.hours=number; date.minutes=s.integer(); if(s.match(":"_)) date.seconds=s.integer(); }
+            if(s.match(":")) { date.hours=number; date.minutes=s.integer(); if(s.match(":")) date.seconds=s.integer(); }
             else if(s.match('h')) { date.hours=number; date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0; }
             else if(date.day==-1) date.day=number-1;
             else if(date.month==-1) date.year=number-1;

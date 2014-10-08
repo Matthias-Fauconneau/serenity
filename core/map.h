@@ -28,12 +28,12 @@ template<Type K, Type V> struct map {
 
     template<Type KK> const V& at(const KK& key) const {
         size_t i = keys.indexOf(key);
-        if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}");
         return values[i];
     }
     template<Type KK> V& at(const KK& key) {
         size_t i = keys.indexOf(key);
-        if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}");
         return values[i];
     }
 
@@ -49,25 +49,25 @@ template<Type K, Type V> struct map {
     template<Type KK> const V* find(const KK& key) const { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V* find(const KK& key) { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V& insert(KK&& key) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         keys << K(move(key)), values << V();
         return values.last();
     }
 
     V& insert(K&& key, V&& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         keys << move(key); values << move(value); return values.last();
     }
     V& insert(K&& key, const V& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         keys << move(key); values << value; return values.last();
     }
     V& insert(const K& key, V&& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         keys << key; values << move(value); return values.last();
     }
     V& insert(const K& key, const V& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         keys << key; values << value; return values.last();
     }
     template<Type KK> V& insertMulti(KK&& key, V&& value) {
@@ -79,11 +79,11 @@ template<Type K, Type V> struct map {
         return values.last();
     }
     template<Type KK> V& insertSorted(const KK& key, const V& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         return values.insertAt(keys.insertSorted(key),value);
     }
     template<Type KK> V& insertSorted(const KK& key, V&& value) {
-        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}"_);
+        if(contains(key)) error("'"_+str(key)+"' already in {"_,keys,"}");
         return values.insertAt(keys.insertSorted(key),move(value));
     }
     template<Type KK> V& insertSortedMulti(const KK& key, const V& value) {
@@ -98,11 +98,11 @@ template<Type K, Type V> struct map {
     }
 
     template<Type KK> V take(const KK& key) {
-        size_t i=keys.indexOf(key); if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i=keys.indexOf(key); if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}");
         keys.removeAt(i); return values.take(i);
     }
     template<Type KK> void remove(const KK& key) {
-        size_t i=keys.indexOf(key); if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}"_);
+        size_t i=keys.indexOf(key); if(i==invalid) error("'"_+str(key)+"' not in {"_,keys,"}");
         keys.removeAt(i); values.removeAt(i);
     }
 
@@ -134,10 +134,10 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
 }
 
 template<Type K, Type V> String str(const map<K,V>& m) {
-    String s; s<<'{';
+    String s; s.append('{');
     for(uint i: range(m.size())) {
-        s<<str(m.keys[i])<<": "_<<str(m.values[i]);
-        if(i<m.size()-1) s<<", "_;
+        s.append(str(m.keys[i])+": "_+str(m.values[i]));
+        if(i<m.size()-1) s.append(", ");
     }
-    s<<'}'; return s;
+    s.append('}'); return s;
 }

@@ -17,9 +17,9 @@
 void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 
 String Handle::name() const {
-    if(fd==AT_FDCWD) return String("."_);
-    static Folder procSelfFD("/proc/self/fd/"_);
-    String s(256); s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s, s.capacity), (int)fd);
+    if(fd==AT_FDCWD) return String(".");
+    static Folder procSelfFD("/proc/self/fd/");
+    String s(256); s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s.begin(), s.capacity), (int)fd);
     return s;
 }
 
@@ -31,7 +31,7 @@ const Folder& root() { static const Folder root("/"_,currentWorkingDirectory());
 
 Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
-    fd = check( openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);
+    fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'');
 }
 
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
@@ -48,9 +48,9 @@ array<String> Folder::list(uint flags) const {
     array<String> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
-            string name = str(entry.name);
+            string name (entry.name, 0ul); while(entry.name[name.size]) name.size++;
             if(!(flags&Hidden) && name[0]=='.') continue;
-            if(name=="."_||name==".."_) continue;
+            if(name=="." || name=="..") continue;
             int type = *((byte*)&entry + entry.len - 1);
             if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN/*NFS*/))
                     || (flags&Folders && type==DT_DIR)
@@ -60,7 +60,7 @@ array<String> Folder::list(uint flags) const {
             }
             if(flags&Recursive && type==DT_DIR) {
                 for(const String& file: Folder(name,*this).list(flags)) {
-                    if(flags&Sorted) list.insertSorted(name+"/"_+file); else list.append( name+"/"_+file );
+                    if(flags&Sorted) list.insertSorted(name+'/'+file); else list.append( name+'/'+file );
                 }
             }
         }

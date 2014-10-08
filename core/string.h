@@ -5,34 +5,32 @@
 // -- str()
 
 // Enforces exact match for overload resolution
-generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
+generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
 
 /// Forwards string
-inline const string& str(const string& s) { return s; }
+inline string str(string s) { return s; }
 /// Forwards buffer<byte>
-inline const buffer<char>& str(const buffer<char>& s) { return s; }
+//inline const buffer<char>& str(const buffer<char>& s) { return s; }
 /// Forwards array<byte>
-inline const array<char>& str(const array<char>& s) { return s; }
+//inline const array<char>& str(const array<char>& s) { return s; }
+/// Forwards String
+inline string str(const String& s) { return s; }
 /// Forwards char[]
 template<size_t N> string str(const char (&source)[N]) { return string(source,N); }
 
 /// Returns boolean as "true"/"false"
-inline string str(const bool& b) { return b?"true"_:"false"_; }
+inline string str(bool value) { return value ? "true"_ : "false"_; }
 /// Returns a reference to the character
-inline string str(const char& c) { return string((char*)&c,1); }
+inline string str(const char& character) { return string((char*)&character,1); }
 
 /// Returns a bounded reference to the null-terminated String pointer
-string str(const char* s);
+//string str(const char* s);
 
 // -- string
 
 /// Lexically compare strings
 bool operator <(const string a, const string b);
 bool operator <=(const string a, const string b);
-
-/// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
-/// \note You can use a negative \a begin or \a end to count from the right (-1=last)
-string section(const string str, byte separator, int begin=0, int end=1);
 
 /// Returns true if \a str starts with \a sub
 bool startsWith(const string str, const string sub);
@@ -41,10 +39,23 @@ bool endsWith(const string str, const string sub);
 /// Returns true if \a str contains the \a substring
 bool find(const string str, const string substring);
 
+/// Returns true if s contains only [0-9]
+bool isInteger(const string s);
+
+/// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
+/// \note You can use a negative \a begin or \a end to count from the right (-1=last)
+string section(const string str, byte separator, int begin=0, int end=1);
+
+// -- strz
+
+/// Copies the reference, appends a null byte and allows implicit conversion to const char*
+struct strz : String {
+    strz(const string s) : String(s+'\0') {}
+    operator const char*() { return data; }
+};
+
 // -- String
 
-/// Copies the reference and appends a null byte
-String strz(const string s);
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string s, const string before, const string after);
 /// Lowers case
@@ -85,7 +96,7 @@ inline String str(int64 n) { return dec(n); }
 
 String utoa(uint64 number, uint base=10, int pad=0, char padChar='0');
 inline String hex(uint64 n, int pad=0) { return utoa(n, 16, pad); }
-generic inline String str(T* const& p) { return "0x"_+hex(ptr(p)); }
+generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 generic String str(const unique<T>& t) { return str(*t.pointer); }
 generic String str(const shared<T>& t) { return str(*t.pointer); }
 
@@ -95,7 +106,7 @@ String str(float n);
 String str(double n);
 
 /// Formats value using best binary prefix
-String binaryPrefix(size_t value, string unit="B"_);
+String binaryPrefix(size_t value, string unit="B");
 
 /// Converts arrays
 generic String str(const ref<T> source, char separator=' ') {

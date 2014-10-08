@@ -58,7 +58,7 @@ struct ImageSourceView : ImageView {
 struct DustRemovalPreview {
     InverseAttenuation correction { Folder("Pictures/Paper"_, home()) };
     ImageFolder source { Folder("Pictures"_, home()),
-                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) > 4; } };
+                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture")) > 4; } };
     ImageSourceView sourceView {source};
     ProcessedSource corrected {source, correction};
     ImageSourceView correctedView {corrected};

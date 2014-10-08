@@ -14,8 +14,8 @@
 #include <sys/syscall.h>
 
 // Log
-void log_(const string buffer) { check_(write(2,buffer.data,buffer.size)); }
-template<> void log(const string& buffer) { log_(buffer+"\n"_); }
+void log_(const string buffer) { check_(write(2, buffer.data, buffer.size)); }
+template<> void log(const string& buffer) { log_(buffer+'\n'); }
 
 // Poll
 void Poll::registerPoll() {
@@ -100,16 +100,15 @@ static void traceAllThreads() {
     for(Thread* thread: threads) if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
 }
 static void handler(int sig, siginfo_t* info, void* ctx) {
-    void* ip = (void*)((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP];
-    if(sig==SIGSEGV) log("Segmentation fault"_);
-    String s = trace(1,ip);
-    if(threads.size>1) log_("Thread #"_+dec(gettid())+":\n"_+s); else log_(s);
+    if(sig==SIGSEGV) log("Segmentation fault");
+    if(threads.size>1) log("Thread #"+dec(gettid())+':');
+    log_(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
-    static constexpr string fpErrors[] = {""_, "Integer division"_, "Integer overflow"_, "Division by zero"_, "Overflow"_,
-                                          "Underflow"_, "Precision"_, "Invalid"_, "Denormal"_};
+    static constexpr string fpErrors[] = {"", "Integer division", "Integer overflow", "Division by zero", "Overflow",
+                                          "Underflow", "Precision", "Invalid", "Denormal"};
     if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->si_code],")", *(float*)info->si_addr);
-    if(sig==SIGSEGV) log("Segmentation fault at "_+str(info->si_addr));
+    if(sig==SIGSEGV) log("Segmentation fault at "+str(info->si_addr));
     if(sig==SIGTERM) log("Terminated");
     pthread_exit((void*)-1);
 }
@@ -136,8 +135,8 @@ template<> void __attribute((noreturn)) error(const string& message) {
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
         traceAllThreads();
-        String s = trace(1,0);
-        if(threads.size>1) log_(String("Thread #"_+dec(gettid())+":\n"_+s)); else log_(s);
+        if(threads.size>1) log(String("Thread #"+dec(gettid())+':'));
+        log_(trace(1,0));
         reentrant = false;
     }
     log(message);
@@ -171,7 +170,7 @@ void exit(int status) {
 String which(string name) {
     if(!name) return {};
     if(existsFile(name)) return String(name);
-    for(string folder: split(getenv("PATH"_,"/usr/bin"_),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+"/"_+name;
+    for(string folder: split(getenv("PATH"_,"/usr/bin"),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+"/"_+name;
     return {};
 }
 
@@ -179,14 +178,14 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
     if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
     array<String> args0(1+args.size);
-    args0.append( strz(path) );
-    for(const auto& arg: args) args0.append( strz(arg) );
+    args0.append( path+'\0' );
+    for(const auto& arg: args) args0.append( arg+'\0' );
     const char* argv[args0.size+1];
     for(uint i: range(args0.size)) argv[i] = args0[i].data;
     argv[args0.size]=0;
 
     array<string> env0;
-    static String environ = File("/proc/self/environ"_).readUpTo(4096);
+    static String environ = File("/proc/self/environ").readUpTo(4096);
     for(TextData s(environ);s;) env0.append( s.until('\0') );
 
     const char* envp[env0.size+1];
@@ -197,7 +196,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
     int pid = fork();
     if(pid==0) {
         if(cwd!=AT_FDCWD) check_(fchdir(cwd));
-        if(!execve(strz(path).data, (char*const*)argv, (char*const*)envp)) exit_group(-1);
+        if(!execve(strz(path), (char*const*)argv, (char*const*)envp)) exit_group(-1);
         __builtin_unreachable();
     }
     else if(wait) return ::wait(pid);
@@ -207,7 +206,7 @@ int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
 string getenv(const string name, string value) {
-    static String environ = File("/proc/self/environ"_).readUpTo(8192);
+    static String environ = File("/proc/self/environ").readUpTo(8192);
     for(TextData s(environ);s;) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
@@ -216,7 +215,7 @@ string getenv(const string name, string value) {
 }
 
 array<string> arguments() {
-    static String cmdline = File("/proc/self/cmdline"_).readUpTo(4096);
+    static String cmdline = File("/proc/self/cmdline").readUpTo(4096);
     assert(cmdline.size<4096);
     return split(section(cmdline,0,1,-1),0);
 }

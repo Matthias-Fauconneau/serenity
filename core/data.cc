@@ -38,17 +38,17 @@ bool Data::match(const string key) {
 }
 
 void Data::skip(const uint8 key) {
-    if(!match(key)) error("Expected '"_+hex(key)+"', got '"_+hex((uint8)peek())+"'"_);
+    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex((uint8)peek())+'\'');
 }
 void Data::skip(const char key) {
-    if(!match(key)) error("Expected '"_+string{key}+"', got '"_+peek(1)+"'"_);
+    if(!match(key)) error("Expected '"_+key+"', got '"+peek()+'\'');
 }
 
 void Data::skip(const ref<uint8> key) {
-    if(!match(key)) error("Expected '"_+hex(key)+"', got '"_+hex(cast<uint8>(peek(key.size)))+"'"_);
+    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(cast<uint8>(peek(key.size)))+'\'');
 }
 void Data::skip(const string key) {
-    if(!match(key)) error("Expected '"_+key+"', got '"_+peek(key.size)+"'"_);
+    if(!match(key)) error("Expected '"+key+"', got '"+(string)peek(key.size)+'\'');
 }
 
 ref<uint8> BinaryData::whileNot(uint8 key) {
@@ -172,7 +172,7 @@ char TextData::character() {
     if(c!='\\') return c;
     c = peek();
     int i="\'\"nrtbf()\\"_.indexOf(c);
-    if(i<0) { /*error("Invalid escape sequence '\\"_+str(c)+"'"_);*/ return '/'; }
+    if(i<0) { /*error("Invalid escape sequence '\\"+str(c)+'\'');*/ return '/'; }
     advance(1);
     return "\'\"\n\r\t\b\f()\\"[i];
 }
@@ -180,7 +180,7 @@ char TextData::character() {
 string TextData::whileInteger(bool sign, int base) {
     assert(==10 || base==16);
     uint start=index;
-    if(sign) matchAny("-+"_);
+    if(sign) matchAny("-+");
     for(;available(1);) {
         byte c=peek();
         if((c>='0'&&c<='9')||(base==16 && ((c>='a'&&c<='f')||(c>='A'&&c<='F')))) advance(1); else break;
@@ -215,8 +215,8 @@ int TextData::mayInteger(int defaultValue) {
 
 string TextData::whileDecimal() {
     uint start=index;
-    matchAny("-+"_);
-    if(!match("∞"_)) for(bool gotDot=false, gotE=false;available(1);) {
+    matchAny("-+");
+    if(!match("∞")) for(bool gotDot=false, gotE=false;available(1);) {
         byte c=peek();
         /**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
         else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
@@ -231,10 +231,10 @@ double TextData::decimal() {
     double sign=1;
     if(match('-')) sign=-1; else match('+');
     double significand=0, decimal=0;//, eSign=1, exponent=0;
-    if(match("∞"_)) significand = __builtin_inf();
+    if(match("∞")) significand = __builtin_inf();
     else for(bool gotDot=false/*, gotE=false*/; available(1);) {
         /**/  if(!gotDot && match('.')) gotDot=true;
-        //else if(!gotE && matchAny("eE"_)) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
+        //else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
         else {
             char c = next();
             if(c>='0' && c<='9') {

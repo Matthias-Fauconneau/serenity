@@ -19,7 +19,7 @@ generic struct array : buffer<T> {
     /// Moves elements from a reference
     explicit array(const mref<T> ref) : buffer<T>(ref.size) { mref<T>::move(ref); }
     /// Copies elements from a reference
-    explicit array(const ref<T> ref) : buffer<T>(ref.size) { /*mref<T>::*/copy(*this, ref); }
+    explicit array(const ref<T> ref) : buffer<T>(ref.size) { mref<T>::copy(ref); }
 
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
@@ -150,15 +150,25 @@ generic const mref<T>& sort(const mref<T>& at) { if(at.size) quicksort(at, 0, at
 
 // -- Miscellaneous --
 
-/// Converts arrays to references
-generic array<ref<T> > toRefs(const ref<array<T>>& source) {
-    array<ref<T>> target; for(const array<T>& e: source) target.append( e ); return target;
-}
-
 /// Creates a new array containing only elements where filter \a predicate does not match
 template<Type T, Type Function> array<T> filter(const ref<T> source, Function predicate) {
     array<T> target(source.size); for(const T& e: source) if(!predicate(e)) target << copy(e); return target;
 }
 
-/// String is an array of bytes
-typedef array<char> String;
+// -- String --
+
+/// array<char> holding UTF8 text strings
+struct String : array<char> {
+    using array::array;
+    operator const string() const { return *this; }
+};
+inline String copy(const String& o) { return copy((const array<char>&)o); }
+// Resolves ambiguities
+inline String operator+(const string a, char b) { return operator+<char>(a, b); }
+inline String operator+(const string a, const string b) { return operator+<char>(a, b); }
+inline String operator+(String&& a, const string b) { return operator+<char>(move(a), b); }
+inline String operator+(String&& a, const String& b) { return operator+<char>(move(a), b); }
+inline String operator+(buffer<char>&& a, const String& b) { return operator+<char>(move(a), b); }
+
+/// Converts Strings to strings
+inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return  e; }); }

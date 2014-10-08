@@ -81,43 +81,29 @@ struct range {
 
 // -- Debugging
 
+#if REF_INITIALIZER_LIST
 #ifndef _INITIALIZER_LIST
 #define ref initializer_list
 #endif
 namespace std { generic struct ref; }
 using std::ref;
-/// Convenient typedef for ref<char> holding UTF8 text strings
-typedef ref<char> string;
-/// Returns const reference to a static string literal
-inline constexpr string operator "" _(const char* data, size_t size);
-
-/// Logs a message to standard output without newline
-void log_(const string message);
-/// Logs a message to standard output
-template<Type... Args> void log(const Args&... args);
-template<> void log(const string& message);
-/// Logs a message to standard output and signals all threads to log their stack trace and abort
-template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
-template<> void error(const string& message) __attribute((noreturn));
-
-#if DEBUG
-/// Aborts if \a expr evaluates to false and logs \a expr and \a message
-#define assert(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
-/// Aborts if \a expr evaluates to false and logs \a expr and \a message
-#define warn(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 #else
-#define assert(expr, message...) ({})
-/// Warns if \a expr evaluates to false and logs \a expr and \a message
-#define warn(expr, message...) ({ if(!(expr)) log(#expr ""_, ##message); })
+#ifndef _INITIALIZER_LIST
+namespace std { generic struct initializer_list {
+    const T* data; size_t size;
+    constexpr initializer_list(const T* data, size_t size) : data(data), size(size) {}
+}; }
+generic struct ref;
 #endif
-/// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
-#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
+#endif
 
 // -- ref
 
 /// Unmanaged fixed-size const reference to an array of elements
-namespace std {generic struct ref {
-//generic struct ref {
+#if REF_INITIALIZER_LIST
+namespace std {
+#endif
+generic struct ref {
     typedef T type;
     const T* data = 0;
     size_t size = 0;
@@ -128,25 +114,25 @@ namespace std {generic struct ref {
     constexpr ref(const T* data, size_t size) : data(data), size(size) {}
     /// References \a size elements from const \a data pointer
     constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
-#ifdef _INITIALIZER_LIST
+#if _INITIALIZER_LIST || !REF_INITIALIZER_LIST
     /// Converts a real std::initializer_list to ref
-    constexpr ref(const std::ref<T>& list) : data(list..begin()), size(list.size()) {}
+    constexpr ref(const std::initializer_list<T>& list) : data(list.data), size(list.size) {}
 #endif
     /// Converts a static array to ref
     template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
-    explicit operator bool() const { assert_(!size || data); return size; }
-    operator const T*() const { return data; }
+    explicit operator bool() const { return size; }
+    explicit operator const T*() const { return data; }
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(size_t i) const { assert(i<size); return data[i]; }
+    const T& at(size_t i) const;
     T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
     const T& operator [](size_t i) const { return at(i); }
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+    ref<T> slice(size_t pos, size_t size) const;
     /// Slices a reference to elements from \a pos to the end of the reference
     ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
     /// Slices a reference to elements from \a start to \a stop
@@ -176,13 +162,55 @@ namespace std {generic struct ref {
     /// Returns true if the array contains an occurrence of \a value
     bool contains(const T& key) const { return indexOf(key)!=invalid; }
 };
+#if REF_INITIALIZER_LIST
 }
+#endif
 /// Returns const reference to memory used by \a t
 generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
-// -- string operator ""_
+// -- string
 
+/// ref<char> holding UTF8 text strings
+struct string : ref<char> {
+    using ref::ref;
+    string() {}
+    string(ref<char> o) : ref<char>(o) {}
+    /// Converts a string literal to string
+    template<size_t N> constexpr string(const char (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
+};
+/// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
+
+// -- Log
+
+/// Logs a message to standard output without newline
+void log_(const string message);
+/// Logs a message to standard output
+template<Type... Args> void log(const Args&... args);
+template<> void log(const string& message);
+
+// -- Debug
+
+/// Logs a message to standard output and signals all threads to log their stack trace and abort
+template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
+template<> void error(const string& message) __attribute((noreturn));
+
+#if DEBUG
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message
+#define assert(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message
+#define warn(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
+#else
+#define assert(expr, message...) ({})
+/// Warns if \a expr evaluates to false and logs \a expr and \a message
+#define warn(expr, message...) ({ if(!(expr)) log(#expr ""_, ##message); })
+#endif
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
+#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
+
+// -- ref
+generic const T& ref<T>::at(size_t i) const { assert(i<size); return data[i]; }
+generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
 
 // -- FILE
 
@@ -234,13 +262,13 @@ generic struct mref : ref<T> {
     mref(){}
     /// References \a size elements from \a data pointer
     mref(T* data, size_t size) : ref<T>(data,size) {}
-    /// Converts an std::initializer_list to mref
-    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
+    /*/// Converts an std::initializer_list to mref
+    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}*/
     /// Converts a static array to ref
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
     explicit operator bool() const { assert(!size || data, size); return size; }
-    operator T*() const { return (T*)data; }
+    explicit operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
     T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
@@ -253,10 +281,12 @@ generic struct mref : ref<T> {
     /// Slices a reference to elements from to the end of the reference
     mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
     /// Slices a reference to elements from \a start to \a stop
-    mref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
+    //mref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
+    /// Initializes the element at index
+    template<Type... Args> void set(size_t index, Args... args) const { new (&at(index)) T(args...); }
     /// Initializes reference using the same constructor for all elements
-    template<Type... Args> void clear(Args... args) const { for(size_t i: range(size)) new (&at(i)) T(args...); }
+    template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
     /// Initializes reference from \a source using move constructor
     void move(const mref<T>& source) { assert(size==source.size); for(size_t i: range(size)) new(&at(i)) T(::move(source[i])); }
     /// Initializes reference from \a source using copy constructor
@@ -268,10 +298,10 @@ generic struct mref : ref<T> {
     template<Type Function, Type S> void apply(ref<S> source, Function function) const {
         for(size_t index: range(size)) new (&at(index)) T(function(source[index]));
     }
-    /*/// Stores the application of a function to every elements of a ref in a mref
+    /// Stores the application of a function to every elements of a ref in a mref
     template<Type Function, Type S0, Type S1> void apply(ref<S0> source0, ref<S1> source1, Function function) const {
         for(size_t index: range(size)) new (&at(index)) T(function(source0[index], source1[index]));
-    }*/
+    }
 
     /// Replaces in \a array every occurence of \a before with \a after
     template<Type B, Type A> mref& replace(const B& before, const A& after) { for(T& e : *this) if(e==before) e=T(after); return *this; }

@@ -202,9 +202,9 @@ struct TextData : Data {
     /// Reads one possibly escaped character
     char character();
     /// Reads a word [a-zA-Z/special/]+
-    string word(const string special=""_);
+    string word(const string special="");
     /// Reads a identifier [a-zA-Z0-9/special/]*
-    string identifier(const string special=""_);
+    string identifier(const string special="");
     /// Matches [-+]?[0-9]*
     string whileInteger(bool sign=false, int base=10);
     /// Reads an integer
