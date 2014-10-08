@@ -6,30 +6,6 @@
 #define big32 __builtin_bswap32
 #define big64 __builtin_bswap64
 
-/// Reinterpret cast a const reference to another type
-template<Type T, Type O> ref<T> cast(const ref<O> o) {
-    assert((o.size*sizeof(O))%sizeof(T) == 0);
-    return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
-}
-
-/// Reinterpret cast a mutable reference to another type
-template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
-    assert((o.size*sizeof(O))%sizeof(T) == 0);
-    return mref<T>((T*)o.data,o.size*sizeof(O)/sizeof(T));
-}
-
-/// Reinterpret cast a buffer to another type
-template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
-    buffer<T> buffer;
-    buffer.data = (const T*)o.data;
-    assert((o.size*sizeof(O))%sizeof(T) == 0);
-    buffer.size = o.size*sizeof(O)/sizeof(T);
-    assert((o.capacity*sizeof(O))%sizeof(T) == 0);
-    buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
-    o.capacity = 0;
-    return buffer;
-}
-
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
@@ -116,7 +92,7 @@ struct BinaryData : Data {
     /// Seeks to /a index
     void seek(uint index) { assert(index<buffer.size); this->index=index; }
     /// Seeks to next aligned position
-    void align(uint width) { index=::align(width,index); }
+    //void align(uint width) { index=::align(width,index); }
 
     /// Reads one raw \a T element
     generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }

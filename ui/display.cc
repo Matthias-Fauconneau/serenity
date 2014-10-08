@@ -37,7 +37,7 @@ namespace Present { int EXT, event, errorBase; }
 
 Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
     String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
-    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
+    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
         if(existsFile(".Xauthority",home()) && File(".Xauthority",home()).size()) {
@@ -95,7 +95,7 @@ void Display::event() {
             XEvent e = read<XEvent>();
             if(e.type==Error) { log(e); continue; }
             o = array<byte>(raw(e));
-            if(e.type==GenericEvent) o << read(e.genericEvent.size*4);
+            if(e.type==GenericEvent) o.append( read(e.genericEvent.size*4) );
         }
         event(o);
     }
@@ -117,13 +117,13 @@ buffer<byte> Display::readReply(uint16 sequence, uint elementSize) {
         if(e.type==Reply) {
             assert_(e.seq==sequence);
             array<byte> r (raw(e.reply));
-            if(e.reply.size) { assert_(elementSize); r << read(e.reply.size*elementSize); }
+            if(e.reply.size) { assert_(elementSize); r.append(read(e.reply.size*elementSize)); }
             return move(r);
         }
         if(e.type==Error) { log(e); assert_(e.seq!=sequence); continue; }
         array<byte> o (raw(e));
-        if(e.type==GenericEvent) o << read(e.genericEvent.size*4);
-        events << move(o);
+        if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
+        events.append(move(o));
         queue(); // Queue event to process after unwinding back to event loop
     }
 }

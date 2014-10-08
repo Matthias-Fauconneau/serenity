@@ -2,8 +2,7 @@
 /// \file math.h Floating-point builtins
 #include "core.h"
 
-// Arithmetic functions
-generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
+// -- Generic arithmetic
 generic inline constexpr T sq(const T& x) { return x*x; }
 generic inline constexpr T cb(const T& x) { return x*x*x; }
 

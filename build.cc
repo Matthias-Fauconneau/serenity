@@ -151,7 +151,7 @@ struct Build {
             pids.append( execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual",
                                                   "-march=native", "-o" , object, fileName, "-I/usr/include/freetype2"}+toRefs(args), false) );
             needLink = true;
-        } else log("~",target, Date(lastEdit), Date(File(object).modifiedTime()));
+        } else log("~",target/*, Date(lastEdit), Date(File(object).modifiedTime())*/);
         files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );
     }
 

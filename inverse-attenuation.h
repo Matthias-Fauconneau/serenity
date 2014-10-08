@@ -9,7 +9,7 @@ struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
 
     /// Calibrates attenuation bias image by summing images of a white subject
     InverseAttenuation(ImageFolder&& calibration) {
-        int64 calibrationTime = max(::apply([&](size_t index) { return calibration.time(index); }, calibration.size()));
+        int64 calibrationTime = max(::apply(calibration.size(), [&](size_t index) { return calibration.time(index); }));
         for(uint component : range(3)) {
             attenuation[component] = cache<ImageF>("attenuation", name()+'.'+str(component), calibration.folder, [&](TargetImage&& target) {
                 target.resize(calibration.imageSize);

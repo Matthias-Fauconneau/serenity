@@ -78,7 +78,7 @@ static Image box(Image&& target, const Image& source) {
     assert_(!source.alpha); //FIXME: not alpha correct
     uint scale = source.width/target.width;
     assert_(scale <= 16);
-    chunk_parallel(target.height, [&](uint, uint y) {
+    chunk_parallel(target.height, [&](uint, size_t y) {
         const byte4* sourceLine = source.data + y * scale * source.stride;
         byte4* targetLine = target.begin() + y * target.stride;
         for(uint unused x: range(target.width)) {
@@ -97,24 +97,22 @@ static Image box(Image&& target, const Image& source) {
 
 static Image bilinear(Image&& target, const Image& source) {
     assert_(!source.alpha);
-    const uint stride = source.stride*4, width=source.width-1, height=source.height-1;
-    const uint targetStride=target.stride, targetWidth=target.width, targetHeight=target.height;
-    const uint8* src = (const uint8*)source.data; byte4* dst = target;
-    for(uint y: range(targetHeight)) {
-        for(uint x: range(targetWidth)) {
-            const uint fx = x*256*width/targetWidth, fy = y*256*height/targetHeight; //TODO: incremental
+    const uint stride = source.stride;
+    chunk_parallel(target.height, [&](uint, size_t y) {
+        for(uint x: range(target.width)) {
+            const uint fx = x*256*(source.width-1)/target.width, fy = y*256*(source.height-1)/target.height; //TODO: incremental
             uint ix = fx/256, iy = fy/256;
             uint u = fx%256, v = fy%256;
-            const uint8* s = src+iy*stride+ix*4;
+            const ref<byte4> span = source.slice(iy*stride+ix);
             byte4 d;
             for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
-                d[i] = ((uint(s[           i]) * (256-u) + uint(s[           4+i]) * u) * (256-v)
-                       + (uint(s[stride+i]) * (256-u) + uint(s[stride+4+i]) * u) * (       v) ) / (256*256);
+                d[i] = ((uint(span[      0][i]) * (256-u) + uint(span[           1][i]) * u) * (256-v)
+                       + (uint(span[stride][i]) * (256-u) + uint(span[stride+1][i]) * u) * (       v) ) / (256*256);
             }
             d[3] = 0xFF;
-            dst[y*targetStride+x] = d;
+            target(x, y) = d;
         }
-    }
+    });
     return move(target);
 }
 
@@ -196,9 +194,9 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 // -- Convolution --
 
 /// Convolves and transposes (with repeat border conditions)
-static void convolve(float* target, const float* kernel, int radius, const float* source, int width, int height) {
+static void convolve(float* target, const float* source, const float* kernel, int radius,  int width, int height) {
     int N = radius+1+radius;
-    chunk_parallel(height, [&](uint, uint y) {
+    chunk_parallel(height, [&](uint, size_t y) {
         const float* line = source + y * width;
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {
@@ -228,8 +226,8 @@ ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
     for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
     float sum = ::sum(ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
     buffer<float> transpose (target.height*target.width);
-    convolve(transpose, kernel, radius, source, source.width, source.height);
-    convolve(target, kernel, radius, transpose, target.height, target.width);
+    convolve(transpose.begin(), source.begin(), kernel, radius, source.width, source.height);
+    convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width);
     return move(target);
 }
 

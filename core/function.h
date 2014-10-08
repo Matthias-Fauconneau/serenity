@@ -34,14 +34,21 @@ template<Type R, Type... Args> struct function;
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
     long any[22]; //always store functor inline
     function():any{0}{} // Invalid function (segfaults)
+    /*/// Wraps a function pointer
+    void function(void (*f)(Args...)) {
+        new (any) function_pointer<R(Args...)>(f);
+    }*/
+    /// Wraps an anonymous function
     template<Type F> function(F f) {
         static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");
         new (any) anonymous_function<F,R(Args...)>(f);
     }
+    /// Wraps a method
     template<Type O> function(O* object, R (O::*pmf)(Args...)) {
         static_assert(sizeof(method<O,R(Args...)>)<=sizeof(any),"");
         new (any) method<O,R(Args...)>(object, pmf);
     }
+    /// Wraps a const method
     template<Type O> function(const O* object, R (O::*pmf)(Args...) const) {
         static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
         new (any) const_method<O,R(Args...)>(object, pmf);
@@ -54,23 +61,12 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
 /// Helps modularization by binding unrelated objects through persistent connections
 template<Type... Args> struct signal {
     array<function<void(Args...)>> delegates;
+
+    /// Connects a delegate
+    template<Type... A> void connect(A&&... args) { delegates.append( forward<A>(args)... ); }
+    /// Returns the emit operator as an anonymous function
+    operator function<void(Args...)>() { return {this,&signal<Args...>::operator()}; }
     /// Emits the signal to all registered delegates
     void operator()(Args... args) const { for(const function<void(Args...)>& delegate: delegates) delegate(args...); }
-    /// Connects an anonymous function
-    template<Type F> void connect(F f) { delegates<< f; }
-    /// Connects a function
-    void connect(void (*pf)(Args...)) { delegates<< function<void(Args...)>(pf); }
-    /// Connects a method
-    template<class C, class B>
-    void connect(C* object, void (B::*pmf)(Args...)) { delegates<< function<void(Args...)>(static_cast<B*>(object),pmf); }
-    /// Connects a const method
-    template<class C, class B>
-    void connect(const C* object, void (B::*pmf)(Args...) const) { delegates<< function<void(Args...)>(static_cast<const B*>(object),pmf); }
-    /// Returns whether this signal is connected to any delegate
-    explicit operator bool() { return delegates.size; }
-    /// Returns the emit operator as an anonymous function
-    operator function<void(Args...)>(){ return {this,&signal<Args...>::operator()}; }
-    /// Clears all connections
-    void clear() { delegates.clear(); }
 };
 template<Type... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.delegates=copy(b.delegates); return a; }

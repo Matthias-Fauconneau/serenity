@@ -115,7 +115,7 @@ void Window::setIcon(const Image& icon) {
 
 // Render
 void Window::render(Graphics&& graphics, int2 origin, int2 size) {
-    updates << Update{move(graphics),origin,size};
+    updates.append( Update{move(graphics),origin,size} );
     if(updates && mapped && state == Idle) queue();
 }
 void Window::render() { assert_(size); updates.clear(); render({},int2(0),size); }
@@ -135,7 +135,7 @@ void Window::event() {
                 send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
                 assert_(shm);
                 send(Shm::Detach{.seg=id+Segment});
-                shmdt(target);
+                shmdt(target.data);
                 shmctl(shm, IPC_RMID, 0);
                 shm = 0;
             } else assert_(!shm);

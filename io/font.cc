@@ -6,25 +6,16 @@
 #include "file.h"
 #include "math.h"
 
-const Folder& fontFolder() { static Folder folder("/usr/share/fonts"); return folder; }
 String findFont(string fontName, ref<string> fontTypes) {
-    array<String> fonts = filter(fontFolder().list(Files|Recursive), [&](string path) {
-        if(!endsWith(path,".ttf")) return true;
-        for(string fontType: fontTypes) {
-            if(fontType) {
-                if(find(path, fontName+fontType+'.') ||
-                   find(path, fontName+'-'+fontType+'.') ||
-                   find(path, fontName+'_'+fontType+'.') ||
-                   find(path, fontName+' '+fontType+'.'))
-                    return false;
-            } else if(find(path,fontName+'.')) {
-                return false;
-            }
+    for(String& path: Folder("/usr/share/fonts").list(Files|Recursive)) {
+        if(endsWith(path,".ttf")) for(string fontType: fontTypes) {
+            if( find(path, fontName+     fontType+'.') ||
+                find(path, fontName+'-'+fontType+'.') ||
+                find(path, fontName+'_'+fontType+'.') ||
+                find(path, fontName+' ' +fontType+'.') ) return move(path);
         }
-        return true;
-    });
-    assert_(fonts.size==1, fontName, fontTypes, fonts);
-    return move(fonts[0]);
+    }
+    error("No such font", fontName, fontTypes);
 }
 
 static FT_Library ft; static int fontCount=0;

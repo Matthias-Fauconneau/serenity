@@ -9,22 +9,15 @@ generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(c
 
 /// Forwards string
 inline string str(string s) { return s; }
-/// Forwards buffer<byte>
-//inline const buffer<char>& str(const buffer<char>& s) { return s; }
-/// Forwards array<byte>
-//inline const array<char>& str(const array<char>& s) { return s; }
 /// Forwards String
 inline string str(const String& s) { return s; }
 /// Forwards char[]
-template<size_t N> string str(const char (&source)[N]) { return string(source,N); }
+template<size_t N> string str(const char (&source)[N]) { return string(source); }
 
 /// Returns boolean as "true"/"false"
 inline string str(bool value) { return value ? "true"_ : "false"_; }
 /// Returns a reference to the character
 inline string str(const char& character) { return string((char*)&character,1); }
-
-/// Returns a bounded reference to the null-terminated String pointer
-//string str(const char* s);
 
 // -- string
 
@@ -39,12 +32,14 @@ bool endsWith(const string str, const string sub);
 /// Returns true if \a str contains the \a substring
 bool find(const string str, const string substring);
 
-/// Returns true if s contains only [0-9]
-bool isInteger(const string s);
-
 /// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 string section(const string str, byte separator, int begin=0, int end=1);
+
+/// Returns true if s contains only [0-9]
+bool isInteger(const string s);
+/// Parses a decimal value
+double fromDecimal(const string str);
 
 // -- strz
 
@@ -73,8 +68,8 @@ String right(const string s, size_t size, const char pad=' ');
 // -- string[]
 
 /// Joins \a list into a single String with each element separated by \a separator
-String join(const ref<string> list, const string separator);
-String join(const ref<String> list, const string separator);
+String join(const ref<string> list, const string separator="");
+//String join(const ref<String> list, const string separator="");
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array<string> split(const string str, byte separator=' ');
@@ -111,10 +106,12 @@ String binaryPrefix(size_t value, string unit="B");
 /// Converts arrays
 generic String str(const ref<T> source, char separator=' ') {
     String target;
+    target.append('[');
     for(uint i: range(source.size)) {
         target.append( str(source[i]) );
         if(i<source.size-1) target.append(separator);
     }
+    target.append(']');
     return target;
 }
 generic String str(const mref<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
@@ -126,8 +123,8 @@ inline String hex(const ref<uint8> source, char separator=' ') { return str(appl
 template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') { return str(ref<T>(source, N), separator); }
 
 /// Converts and concatenates all arguments separating with spaces
-/// \note Use str(a)+str(b)+... to convert and concatenate without spaces
-template<Type A, Type... Args> String str(const A& a, const Args&... args) { return str(a)+' '+str(args...); }
+/// \note Use join({str(args)...}) to convert and concatenate without spaces
+template<Type Arg, Type... Args> String str(const Arg& arg, const Args&... args) { return join({str(arg), str(args)...}," "); }
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }

@@ -68,6 +68,41 @@ template<Type Function, Type T> auto apply(ref<T> source, Function function) -> 
     buffer<decltype(function(source[0]))> target(source.size); target.apply(source, function); return target;
 }
 
+// -- Index operations: floor / align
+
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
+// -- Reinterpret casts
+
+/// Reinterpret casts a const reference to another type
+template<Type T, Type O> ref<T> cast(const ref<O> o) {
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
+}
+
+/// Reinterpret casts a mutable reference to another type
+template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    return mref<T>((T*)o.data,o.size*sizeof(O)/sizeof(T));
+}
+
+/// Reinterpret casts a buffer to another type
+template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
+    buffer<T> buffer;
+    buffer.data = (const T*)o.data;
+    assert((o.size*sizeof(O))%sizeof(T) == 0);
+    buffer.size = o.size*sizeof(O)/sizeof(T);
+    assert((o.capacity*sizeof(O))%sizeof(T) == 0);
+    buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
+    o.capacity = 0;
+    return buffer;
+}
+
+// -- unique
+
 /// Unique reference to an heap allocated value
 generic struct unique {
     unique(decltype(nullptr)):pointer(0){}
@@ -88,6 +123,8 @@ generic struct unique {
     T* pointer;
 };
 generic unique<T> copy(const unique<T>& o) { return unique<T>(copy(*o.pointer)); }
+
+// -- shared / shareable
 
 /// Reference to a shared heap allocated value managed using a reference counter
 /// \note the shared type must implement a reference counter (e.g. by inheriting shareable)

@@ -36,7 +36,7 @@ struct Widgets : virtual Layout, array<Widget*> {
 
 /// Implements Layout storage using array<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
-template<class T> struct Array : virtual Layout, array<T> {
+generic struct Array : virtual Layout, array<T> {
     Array(){}
     Array(const mref<T>& items) : array<T>(items){}
     Array(array<T>&& items) : array<T>(move(items)){}
@@ -110,13 +110,13 @@ struct VBox : Vertical, Widgets {
 };
 
 /// Horizontal layout of homogenous items. \sa Array
-template<class T> struct HList : Horizontal, Array<T> {
+generic struct HList : Horizontal, Array<T> {
     HList(array<T>&& widgets):Array<T>(move(widgets)){}
     HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
 /// Vertical layout of homogenous items. \sa Array
-template<class T> struct VList : Vertical, Array<T> {
+generic struct VList : Vertical, Array<T> {
     VList(array<T>&& widgets):Array<T>(move(widgets)){}
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
@@ -142,6 +142,6 @@ struct WidgetGrid : GridLayout, Widgets {
         : GridLayout(uniformX, uniformY, width), Widgets(move(widgets)) {}
 };
 
-template<class T> struct UniformGrid : GridLayout,  Array<T> {
+generic struct UniformGrid : GridLayout,  Array<T> {
     UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
 };

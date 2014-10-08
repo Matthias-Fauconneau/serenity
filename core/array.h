@@ -2,6 +2,34 @@
 /// \file array.h Contiguous collection of elements
 #include "memory.h"
 
+generic struct remove_const { typedef T type; };
+generic struct remove_const<T const> { typedef T type; };
+generic struct decay { typedef typename remove_const<typename remove_reference<T>::type>::type type; };
+
+struct true_type { static constexpr bool value = true; };
+struct false_type{ static constexpr bool value = false; };
+template<Type A, Type B> struct is_same : false_type {};
+generic struct is_same<T, T> : true_type {};
+
+generic struct declval_protector {
+    static const bool stop = false;
+    static T&& delegate();
+};
+generic inline T&& declval() noexcept {
+    static_assert(declval_protector<T>::__stop, "declval() must not be used!");
+    return declval_protector<T>::__delegate();
+}
+
+template<Type From, Type To> struct is_convertible {
+    template<Type T> static void test(T);
+    template<Type F, Type T, Type = decltype(test<T>(declval<F>()))> static true_type test(int);
+    template<Type, Type> static false_type test(...);
+    static constexpr bool value = decltype(test<From, To>(0))::value;
+};
+
+template<bool B, Type T = void> struct enable_if {};
+generic struct enable_if<true, T> { typedef T type; };
+
 /// Managed initialized dynamic mutable reference to an array of elements (either an heap allocation managed by this object or a reference to memory managed by another object)
 /// \note Adds resize/insert/remove using T constructor/destructor
 generic struct array : buffer<T> {
@@ -26,6 +54,7 @@ generic struct array : buffer<T> {
 
     using buffer<T>::end;
     using buffer<T>::at;
+    using buffer<T>::last;
     using buffer<T>::slice;
 
     /// Allocates enough memory for \a capacity elements
@@ -46,18 +75,38 @@ generic struct array : buffer<T> {
     /// Removes all elements
     void clear() { if(size) shrink(0); }
 
+    /// Appends a default element
+    T& append() {
+        size_t s=size+1; reserve(s); new (end()) T; size=s; return last();
+    }
     /// Appends an implicitly copiable value
-    array& append(const T& v) { size_t s=size+1; reserve(s); new (end()) T(v); size=s; return *this; }
+    T& append(const T& e) {
+        size_t nextSize=size+1; reserve(nextSize); new (end()) T(             e); size=nextSize; return last();
+    }
     /// Appends a movable value
-    array& append(T&& e) { size_t nextSize=size+1; reserve(nextSize); new (end()) T(move(e)); size=nextSize; return *this; }
-    /// Appends another list of elements to this array
-    array& append(const ref<T> source) {
-        size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).copy(source); return *this;
+    T& append(T&& e) {
+        size_t nextSize=size+1; reserve(nextSize); new (end()) T(::move(e)); size=nextSize; return last();
     }
-    /// Appends another list of elements to this array
-    array& append(const mref<T> source) {
-        size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).move(source); return *this;
+    /// Appends another list of elements to this array by moving
+    T& append(const mref<T> source) {
+        size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).move(source); return last();
     }
+    /// Appends another list of elements to this array by copying
+    T& append(const ref<T> source) {
+        size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).copy(source); return last();
+    }
+    /// Appends a new element
+    template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
+    T& append(Arg&& arg) {
+        size_t s=size+1; reserve(s); new (end()) T{forward<Arg>(arg)}; size=s; return last();
+    }
+    /// Appends a new element
+    template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
+        size_t s=size+1; reserve(s); new (end()) T{forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...}; size=s; return last();
+    }
+
+    /// Appends the element, if it is not present already
+    template<Type F> T& add(F&& e) { size_t i = indexOf(e); if(i!=invalid) return at(i); else return append(forward<F>(e)); }
 
     /// Inserts an element at \a index
     template<Type V> T& insertAt(int index, V&& e) {
@@ -68,7 +117,7 @@ generic struct array : buffer<T> {
         return at(index);
     }
     /// Inserts immediately before the first element greater than the argument
-    template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i,move(e)); return i; }
+    template<Type V> int insertSorted(V&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::move(e)); return i; }
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) raw(at(i)).copy(raw(at(i+1))); size--; }
@@ -152,7 +201,7 @@ generic const mref<T>& sort(const mref<T>& at) { if(at.size) quicksort(at, 0, at
 
 /// Creates a new array containing only elements where filter \a predicate does not match
 template<Type T, Type Function> array<T> filter(const ref<T> source, Function predicate) {
-    array<T> target(source.size); for(const T& e: source) if(!predicate(e)) target << copy(e); return target;
+    array<T> target(source.size); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
 }
 
 // -- String --
@@ -160,10 +209,11 @@ template<Type T, Type Function> array<T> filter(const ref<T> source, Function pr
 /// array<char> holding UTF8 text strings
 struct String : array<char> {
     using array::array;
-    operator const string() const { return *this; }
+    //operator const string() const { return string(*this); }
 };
-inline String copy(const String& o) { return copy((const array<char>&)o); }
+template<> inline String copy(const String& o) { return copy((const array<char>&)o); }
 // Resolves ambiguities
+inline String operator+(const char a, const string b) { return operator+<char>(a, b); }
 inline String operator+(const string a, char b) { return operator+<char>(a, b); }
 inline String operator+(const string a, const string b) { return operator+<char>(a, b); }
 inline String operator+(String&& a, const string b) { return operator+<char>(move(a), b); }

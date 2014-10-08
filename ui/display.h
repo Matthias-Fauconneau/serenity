@@ -1,7 +1,6 @@
 #pragma once
 /// \file display.h
 #include "thread.h"
-#include "data.h" // cast
 #include "function.h" // onEvent
 #include "map.h" // actions
 inline buffer<byte> pad(array<byte>&& o, uint width=4){ o.grow(align(width,o.size)); return move(o); }
@@ -59,7 +58,7 @@ struct Display : Socket, Poll {
          buffer<byte> r = readReply(sequence, sizeof(T));
          auto reply = *(typename Request::Reply*)r.data;
          assert_(r.size == sizeof(typename Request::Reply)+reply.size*sizeof(T), r.size, reply.size);
-         output = cast<T>(buffer<T>(r.slice(sizeof(reply),reply.size*sizeof(T))));
+         output = buffer<T>(cast<T>(r.slice(sizeof(reply),reply.size*sizeof(T))));
          return reply;
      }
 

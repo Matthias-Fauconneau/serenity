@@ -9,7 +9,7 @@ Graphics ScrollArea::graphics(int2 size) const {
     if(view <= size) return widget().graphics(size);
     else graphics.append(widget().graphics(view), vec2(offset));
     if(scrollbar && size.y<view.y)
-        graphics.fills << Fill{vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(size.x,(-offset.y+size.y)*size.y/view.y), 1./2, 1./2};
+        graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(size.x,(-offset.y+size.y)*size.y/view.y), 1./2, 1.f/2 );
     return graphics;
 }
 
@@ -43,8 +43,8 @@ Graphics Progress::graphics(int2 size) const {
     Graphics graphics;
     warn(minimum <= value && value <= maximum, minimum, value, maximum);
     int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-    graphics.fills << Fill{vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1};
-    graphics.fills << Fill{vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1};
+    graphics.fills.append(vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1.f);
+    graphics.fills.append(vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1.f);
     return graphics;
 }
 
@@ -56,7 +56,7 @@ Graphics ImageView::graphics(int2 size) const {
     Graphics graphics;
     if(image) {
         int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
-        graphics.blits.append(Blit{vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image)});
+        graphics.blits.append(vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image));
     }
     return graphics;
 }

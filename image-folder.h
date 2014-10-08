@@ -20,7 +20,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
                 auto properties = parseExifTags(file);
                 properties.insert(String("Size"), str(imageSize));
                 properties.insert(String("Path"), copy(fileName));
-                insert(String(section(fileName,'.')), {properties.keys, apply([](const Variant& o){return str(o);}, properties.values)});
+                insert(String(section(fileName,'.')), {properties.keys, apply(properties.values, [](const Variant& o){return str(o);})});
             }
             // Sets target image size
             imageSize = maximumImageSize / 4;
@@ -36,13 +36,13 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
                                 "Exif.Photo.ISOSpeedRatings",
                                 "Exif.Photo.ExposureTime" }.contains(key);
                 });
-                replace(properties.keys, "Exif.Photo.FocalLength", "Focal");
-                replace(properties.keys, "Exif.Photo.FNumber", "Aperture");
-                replace(properties.keys, "Exif.Photo.ExposureBiasValue", "Bias");
-                replace(properties.keys, "Exif.Photo.ISOSpeedRatings", "Gain");
-                replace(properties.keys, "Exif.Photo.ExposureTime", "Time");
+                properties.keys.replace("Exif.Photo.FocalLength", "Focal");
+                properties.keys.replace("Exif.Photo.FNumber", "Aperture");
+                properties.keys.replace("Exif.Photo.ExposureBiasValue", "Bias");
+                properties.keys.replace("Exif.Photo.ISOSpeedRatings", "Gain");
+                properties.keys.replace("Exif.Photo.ExposureTime", "Time");
 
-                for(auto property: properties) occurences[property.key] += property.value; // Aggregates occuring values for each property
+                for(auto property: properties) occurences[property.key].add( property.value ); // Aggregates occuring values for each property
             }
             for(auto property: occurences) log(property.key,':', sort(property.value));
         }

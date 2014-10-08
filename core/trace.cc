@@ -68,29 +68,30 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match("Lb")) r.append(str((bool)s.integer()));
     else if(s.match('L')) { r.append("extern "); r.append(demangle(s)); }
     else if(s.match('I')||s.match('J')) { //template | argument pack
-        array<String> args;
+        r.append('<');
         while(s && !s.match('E')) {
-            if(s.wouldMatch('Z')) args.append(demangle(s)+"::"+demangle(s));
-            else args.append(demangle(s,false));
+            if(s.wouldMatch('Z')) r.append(demangle(s)+"::"+demangle(s));
+            else r.append(demangle(s,false));
+            r.append(", ");
         }
-        r.append('<'); r.append(join(args,", ")); r.append('>');
+        if(r.size>=3) r.shrink(r.size-2); r.append('>');
     }
     else if(s.match('Z')) {
-        r.append( demangle(s));
-        array<String> args;
-        while(s && !s.match('E')) args.append(demangle(s));
-        r.append('('); r.append(join(args,", ")); r.append(')');
+        r.append(demangle(s));
+        r.append('(');
+        while(s && !s.match('E')) { r.append(demangle(s)); r.append(", "); }
+        if(r.size>=3) r.shrink(r.size-2); r.append(')');
     }
     else if(s.match("_0")) {}
     else if(s.match('N')) {
-        array<String> list;
         bool const_method =false;
         if(s.match('K')) const_method=true;
         while(s && !s.match('E')) {
-            list.append( demangle(s) );
-            if(s.wouldMatchAny("IJ")) list.last().append( demangle(s) );
+            r.append( demangle(s) );
+            if(s.wouldMatchAny("IJ")) r.append( demangle(s) );
+            r.append("::");
         }
-        r.append( join(list,"::") );
+        if(r.size>=3) r.shrink(r.size-2);
         if(const_method) r.append(" const");
     } else {
         l=s.mayInteger(-1);

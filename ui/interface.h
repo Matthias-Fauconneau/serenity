@@ -25,7 +25,7 @@ struct ScrollArea : Widget {
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
-template<class T> struct Scroll : ScrollArea, T {
+generic struct Scroll : ScrollArea, T {
     using T::T;
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
     Widget& widget() const override { return (T&)*this; }

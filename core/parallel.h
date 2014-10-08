@@ -56,14 +56,19 @@ template<Type F> void parallel_chunk(uint64 totalSize, F f) {
 /// Stores the application of a function to every index in a mref
 template<Type T, Type Function>
 void parallel_apply(mref<T> target, Function function) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(index)); });
+    chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(index)); });
 }
 
 /// Stores the application of a function to every elements of a ref in a mref
 template<Type T, Type Function, Type S0, Type... Ss>
 void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>... sources) {
-    chunk_parallel(target.size, [&](uint, uint index) { new (&target[index]) T(function(source0[index], sources[index]...)); });
+    chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(source0[index], sources[index]...)); });
 }
+
+// \file ?
+
+generic auto sum(const ref<T> a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
+template<Type T, size_t N> auto sum(const T (&a)[N]) -> decltype(T()+T()) { return sum(ref<T>(a)); }
 
 // \file arithmetic.cc Parallel arithmetic operations
 
@@ -73,7 +78,7 @@ static constexpr size_t parallelMinimum = 1<<15;
 inline float parallel_sum(ref<float> values) {
     if(values.size < parallelMinimum) return ::sum(values);
     float sums[threadCount];
-    parallel_chunk(values.size, [&](uint id, uint start, uint size) {
+    parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
         float sum = 0;
         for(uint index: range(start, start+size)) sum += values[index];
         sums[id] = sum;

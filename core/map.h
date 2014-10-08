@@ -25,10 +25,11 @@ template<Type K, Type V> struct map {
     bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
+    template<Type KK> void assertNo(const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in {",keys,"}"); }
 
     template<Type KK> const V& at(const KK& key) const {
         size_t i = keys.indexOf(key);
-        if(i==invalid) error('\''_+str(key)+"' not in {",keys,"}");
+        if(i==invalid) error('\''+str(key)+"' not in {",keys,"}");
         return values[i];
     }
     template<Type KK> V& at(const KK& key) {
@@ -48,35 +49,17 @@ template<Type K, Type V> struct map {
 
     template<Type KK> const V* find(const KK& key) const { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V* find(const KK& key) { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
-    template<Type KK> V& insert(KK&& key) {
-        if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");
-        keys << K(move(key)), values << V();
-        return values.last();
-    }
 
-    V& insert(K&& key, V&& value) {
-        if(contains(key)) error(\'''+str(key)+"' already in {",keys,"}");
-        keys << move(key); values << move(value); return values.last();
+
+    template<Type KK> V& insert(KK&& key) { assertNo(key); keys.append(move(key)); return values.append(); }
+    template<Type KK, Type VV> V& insert(KK&& key, VV&& value) {
+        assertNo(key);
+        keys.append(forward<KK>(key));
+        return values.append(forward<VV>(value));
     }
-    V& insert(K&& key, const V& value) {
-        if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");
-        keys << move(key); values << value; return values.last();
-    }
-    V& insert(const K& key, V&& value) {
-        if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");
-        keys << key; values << move(value); return values.last();
-    }
-    V& insert(const K& key, const V& value) {
-        if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");
-        keys << key; values << value; return values.last();
-    }
-    template<Type KK> V& insertMulti(KK&& key, V&& value) {
-        keys << forward<KK>(key), values << move(value);
-        return values.last();
-    }
-    template<Type KK> V& insertMulti(KK&& key, const V& value) {
-        keys << forward<KK>(key), values << value;
-        return values.last();
+    template<Type KK> V& insert(KK&& key, V&& value) { return insert<KK,V>(forward<KK>(key), move(value)); }
+    template<Type KK, Type VV> V& insertMulti(KK&& key, VV&& value) {
+        keys.append(forward<KK>(key)); return values.append(forward<VV>(value));
     }
     template<Type KK> V& insertSorted(const KK& key, const V& value) {
         if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");

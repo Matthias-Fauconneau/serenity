@@ -22,7 +22,7 @@ struct Variant {
     Variant(String&& data) : type(Data), data(move(data)) {}
     Variant(array<Variant>&& list) : type(List), list(move(list)) {}
     Variant(map<String,Variant>&& dict) : type(Dict), dict(move(dict)) {}
-    Variant(map<string,Variant>&& dict) : type(Dict) { for(auto e: dict) this->dict.insert(String(e.key), move(e.value)); }
+    //Variant(map<string,Variant>&& dict) : type(Dict) { for(auto e: dict) this->dict.insert(String(e.key), move(e.value)); }
     Variant(int64 numerator, int64 denominator) : type(Rational), number(numerator), denominator(denominator) {}
 
     explicit operator bool() const { return type!=Empty; }
@@ -38,43 +38,19 @@ struct Variant {
 
 String str(const Variant& o);
 
-inline String str(const array<Variant>& array) {
+generic String str(const map<T,Variant>& dict) {
     String s;
-    s << '[';
-    for(const Variant& element: array) s << str(element) << ' ';
-    if(array) s.last() = ']'; else s << ']';
-    return s;
-}
-
-inline String str(const map<string,Variant>& dict) {
-    String s;
-    s << "<<";
-    for(const const_pair<string,Variant>& entry: dict) s << '/'+entry.key+' '<<str(entry.value)<<' ';
-    s << ">>";
-    return s;
-}
-
-inline String str(const map<String,Variant>& dict) {
-    String s;
-    s << "<<";
-    for(const const_pair<String,Variant>& entry: dict) s << '/'+entry.key+' '<<str(entry.value)<<' ';
-    s << ">>";
+    s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
     return s;
 }
 
 inline String str(const Variant& o) {
     if(o.type==Variant::Boolean) return String(str(bool(o.number)));
     if(o.type==Variant::Integer) return str(int(o.number));
-    if(o.type==Variant::Real) return str(float(o.number));
+    if(o.type==Variant::Real || o.type==Variant::Rational) return str(o.real());
     if(o.type==Variant::Data) return copy(o.data);
     if(o.type==Variant::List) return str(o.list);
     if(o.type==Variant::Dict) return str(o.dict);
-    if(o.type==Variant::Rational) {
-        return str(o.real());
-        //assert_((o.number/o.denominator)*o.denominator==o.number);
-        //return str(o.number/o.denominator);
-        return str(int(o.number),'/',int(o.denominator));
-    }
     error("Invalid Variant",int(o.type));
 }
 

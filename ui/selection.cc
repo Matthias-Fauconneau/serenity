@@ -7,11 +7,7 @@ bool Selection::mouseEvent(int2 cursor, int2 size, Event event, Button button, W
     for(uint i: range(widgets.size)) {
         if(widgets[i].contains(cursor)) {
             if(at(i).mouseEvent(cursor-widgets[i].origin,widgets[i].size,event,button,focus)) return true;
-            if(event==Press && button == LeftButton) {
-                setActive(i);
-                itemPressed(index);
-                return true;
-            }
+            if(event==Press && button == LeftButton) { setActive(i); return true; }
         }
     }
     if(button == WheelUp && index>0 && index<count()) { setActive(index-1); return true; }

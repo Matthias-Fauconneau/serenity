@@ -9,8 +9,6 @@ struct Selection : virtual Layout {
     size_t index = -1;
     /// Set active index and emit activeChanged
     void setActive(uint index);
-    /// User clicked on an item.
-    signal<uint /*index*/> itemPressed;
 
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
     bool keyPress(Key key, Modifiers modifiers) override;
@@ -22,7 +20,7 @@ struct HighlightSelection : virtual Selection {
 };
 
 /// Array with Selection
-template<class T> struct ArraySelection : Array<T>, virtual Selection {
+generic struct ArraySelection : Array<T>, virtual Selection {
     ArraySelection(){}
     ArraySelection(array<T>&& items) : Array<T>(move(items)){}
     /// Return active item (last selection)
@@ -32,7 +30,7 @@ template<class T> struct ArraySelection : Array<T>, virtual Selection {
 };
 
 /// Vertical layout of selectable items. \sa ArraySelection
-template<class T> struct List : Vertical, ArraySelection<T>, HighlightSelection {
+generic struct List : Vertical, ArraySelection<T>, HighlightSelection {
     List(){}
     List(array<T>&& items) : ArraySelection<T>(move(items)){}
 };

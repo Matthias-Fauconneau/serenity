@@ -4,8 +4,6 @@
 
 // -- string
 
-//string str(const char* s) { int i=0; while(s[i]) i++; return string(s,i); }
-
 bool operator <(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
@@ -22,6 +20,7 @@ bool operator <=(const string a, const string b) {
     return a.size <= b.size;
 }
 
+
 bool startsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data,a.size)==a;
 }
@@ -36,9 +35,6 @@ bool find(const string s, const string a) {
     return false;
 }
 
-bool isInteger(const string s) {
-    if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
-}
 
 string section(const string s, byte separator, int begin, int end) {
     if(!s) return "";
@@ -49,6 +45,15 @@ string section(const string s, byte separator, int begin, int end) {
     else { e=s.size; if(end!=-1) { e--; for(uint i=0;e>0;e--) { if(s[e]==separator) { i++; if(i>=uint(-end-1)) break; } } } }
     assert(e>=b,s,separator,begin,end);
     return string(s.data+b,e-b);
+}
+
+
+bool isInteger(const string s) {
+    if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
+}
+
+double fromDecimal(const string s) {
+    return TextData(s).decimal();
 }
 
 // -- String

@@ -9,7 +9,7 @@ generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } }
 
 typedef vec<rgb,uint8,3> rgb3;
 
-template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
+template<template<typename> Type T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
     typedef vec<T,uint8,N> S;
     typedef vec<T,int,N> V;
     buffer<S> prior(width); prior.clear(0);
