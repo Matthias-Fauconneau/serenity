@@ -4,8 +4,8 @@
 
 # Sources
 # Defaults: synthetic=false, if synthetic: source.size = 64
-if !synthetic: source name resolution voxelSize physicalSize = Source                                        # Concatenates image slice files in a volume
-if  synthetic: source voxelSize = Synthetic                                                                                   # Generates a synthetic pore network
+if !synthetic: source name resolution sourceSize physicalSize = Source                                        # Concatenates image slice files in a volume
+if  synthetic: source sourceSize = Synthetic                                                                                   # Generates a synthetic pore network
 
 # Denoises
     denoise = '1'
@@ -85,7 +85,7 @@ if  minimalSqRadius: pruned = ThresholdClip surface-skeleton minimalSqRadius
 if !minimalSqRadius: pruned = surface-skeleton
 
 # Crops processed volume to remove boundary bias effects (before floodfill to avoid hidden connections)
-crop = Crop pruned
+crop cropSize = Crop pruned
 
 # Floodfills skeleton
 unconnected      = Binary crop threshold=1
@@ -175,8 +175,8 @@ pore-curve-skeleton-extremum-list = LocalExtremumList curve-skeleton-distance
 throat-curve-skeleton-extremum-list = LocalExtremumList curve-skeleton-distance minimum=1
 
 # Writes indices (into the pores/throats list) at each pore/throat position
-pore-root-index-untiled = RasterizeIndex pore-curve-skeleton-extremum-list voxelSize
-throat-root-index-untiled = RasterizeIndex throat-curve-skeleton-extremum-list voxelSize
+pore-root-index-untiled = RasterizeIndex pore-curve-skeleton-extremum-list cropSize
+throat-root-index-untiled = RasterizeIndex throat-curve-skeleton-extremum-list cropSize
 
 pore-root-index = ZOrder pore-root-index-untiled
 throat-root-index = ZOrder throat-root-index-untiled
@@ -199,15 +199,15 @@ maximum-balls-lists = List maximum
 # Generates a list of pores from the pore space
 if method == 'cluster': last-root-index pore-list throat-list = Cluster maximum maximum-balls-lists                # Correct inefficient method
 # Writes indices (into the pores/throats list) at each pore/throat position
-if method == 'cluster': pore-index = RootIndex pore-list voxelSize
-if method == 'cluster': throat-index = RootIndex throat-list voxelSize
+if method == 'cluster': pore-index = RootIndex pore-list cropSize
+if method == 'cluster': throat-index = RootIndex throat-list cropSize
 
 # - Incorrect efficient maximum balls cluster method processing from surface skeleton - #
 skeleton-balls-lists = List connected-skeleton
 last-root-index-skeleton pore-list-skeleton throat-list-skeleton = Cluster maximum skeleton-balls-lists
 # Writes root index of each skeleton voxel
-pore-skeleton = RootIndex pore-list-skeleton voxelSize
-throat-skeleton = RootIndex throat-list-skeleton voxelSize
+pore-skeleton = RootIndex pore-list-skeleton cropSize
+throat-skeleton = RootIndex throat-list-skeleton cropSize
 # Rasterizes skeleton voxel as maximum balls (with family index attribute)
 pore-skeleton-bins = Bin connected-skeleton pore-skeleton
 throat-skeleton-bins = Bin connected-skeleton throat-skeleton
@@ -255,8 +255,8 @@ pore-nearest-distance-distribution = KernelDensityEstimation pore-nearest-distan
 throat-nearest-distance-distribution = KernelDensityEstimation throat-nearest-distance-list bandwidth=0.5
 
 # Rasterizes boxes in a volume
-pore-box-indices = RasterizeBox pore-box-list voxelSize
-throat-box-indices = RasterizeBox throat-box-list voxelSize
+pore-box-indices = RasterizeBox pore-box-list cropSize
+throat-box-indices = RasterizeBox throat-box-list cropSize
 
 # Colorizes each box in a different color
 pore-colored-boxes = ColorizeIndex pore-box-volume

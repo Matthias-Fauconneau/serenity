@@ -3,6 +3,7 @@
 #include "thread.h"
 #include "matrix.h"
 #include "time.h"
+#include "crop.h"
 
 struct Ball { uint64 index; uint16 sqRadius; };
 typedef array<Ball> Family;
@@ -24,16 +25,16 @@ array<Family> parseFamilies(const string& data) {
     return families;
 }
 
-void rootIndex(Volume16& target, const ref<Family>& families) {
-    const mref<uint16> targetData = target;
+void rootIndex(Volume32& target, const ref<Family>& families) {
+    const mref<uint32> targetData = target;
     targetData.clear();
     interleavedLookup(target);
     target.maximum = families.size; // 0 = background
     target.maximum++; // maximum = Multiple family index (e.g throats)
     uint i=0; for(const Family& family: families) {
         i++;
-        assert(i<1<<16);
         for(Ball ball: family) {
+            assert_(ball.index < targetData.size, ball.index, target.size(), target.sampleCount, i, families.size, ball.sqRadius);
             if(!targetData[ball.index]) targetData[ball.index] = i;
             else targetData[ball.index] = target.maximum; // Multiple family
         }
@@ -42,16 +43,16 @@ void rootIndex(Volume16& target, const ref<Family>& families) {
 
 /// Writes root index of each voxel
 struct RootIndex : VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(uint16); }
+    uint outputSampleSize(uint) override { return sizeof(uint32); }
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint index) override {
-        int3 size = nextPowerOfTwo(parse3(inputs[1]->data)); assert_(size);
-        return (uint64)size.x*size.y*size.z*outputSampleSize(index);
+        int3 sampleCount = sampleCountForSize(parse3(inputs[1]->data)); assert_(sampleCount);
+        return (uint64)sampleCount.x*sampleCount.y*sampleCount.z*outputSampleSize(index);
     }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>&, const ref<const Result*>& inputs) override {
-        int3 size = parse3(inputs[1]->data);
-        outputs[0].sampleCount = nextPowerOfTwo(size);
-        outputs[0].margin = (outputs[0].sampleCount-size)/2;
-        rootIndex(outputs[0],parseFamilies(inputs[0]->data));
+        int3 sampleCOunt = sampleCountForSize(parse3(inputs[1]->data));
+        outputs[0].sampleCount = nextPowerOfTwo(sampleCOunt);
+        outputs[0].margin = (outputs[0].sampleCount - sampleCOunt) / 2;
+        rootIndex(outputs[0], parseFamilies(inputs[0]->data));
     }
 };
 template struct Interface<Operation>::Factory<RootIndex>;

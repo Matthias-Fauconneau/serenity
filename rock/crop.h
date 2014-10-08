@@ -2,6 +2,8 @@
 #include "operation.h"
 #include "vector.h"
 
+int3 sampleCountForSize(int3 size);
+
 struct CropVolume {
     int3 min,max; // Crop bounds (coordinates includes margins, first valid voxel at margin)
     int3 size; // Valid crop volume size (max-min)

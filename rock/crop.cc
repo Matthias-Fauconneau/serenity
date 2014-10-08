@@ -4,6 +4,16 @@
 
 String str(const CropVolume& crop) { return "("_+str(crop.min, crop.max)+")"_; }
 
+int3 sampleCountForSize(int3 size) {
+    int3 sampleCount = nextPowerOfTwo(size);
+    while(sampleCount.y < sampleCount.z   ) sampleCount.y*=2; // Z-order: [Z Y] X z y x
+    while(sampleCount.x < sampleCount.y   ) sampleCount.x*=2; // Z-order: Z [Y X] z y x
+    while(sampleCount.z < sampleCount.x/2) sampleCount.z*=2; // Z-order: Z Y [X z] y x
+    while(sampleCount.y < sampleCount.z/2) sampleCount.y*=2; // Z-order: Z Y X [z y] x
+    while(sampleCount.x < sampleCount.y/2) sampleCount.x*=2; // Z-order: Z Y X z [y x]
+    return sampleCount;
+}
+
 /// Parses volume to crop from user arguments
 CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 origin, int3 extra) {
     int3 min=sourceMin, max=sourceMax, center=(min+max)/2;
@@ -62,16 +72,8 @@ CropVolume parseCrop(const Dict& args, int3 sourceMin, int3 sourceMax, int3 orig
     assert_( size.x%2 == 0 && size.y%2 == 0 && size.z%2 == 0); // Margins are currently always symmetric (i.e even volume size)
     assert_(size.x == size.y);
     // Align sampleCount for correct tiled indexing
-    int3 sampleCount = nextPowerOfTwo(size);
+    int3 sampleCount = sampleCountForSize(size);
     int3 margin = (sampleCount - size)/2;
-    assert_(sampleCount == int3(nextPowerOfTwo(size.x+2*margin.x), nextPowerOfTwo(size.y+2*margin.y), nextPowerOfTwo(size.z+2*margin.z)));
-    assert_(sampleCount>int3(1), sampleCount);
-    while(sampleCount.y < sampleCount.z   ) sampleCount.y*=2; // Z-order: [Z Y] X z y x
-    while(sampleCount.x < sampleCount.y   ) sampleCount.x*=2; // Z-order: Z [Y X] z y x
-    while(sampleCount.z < sampleCount.x/2) sampleCount.z*=2; // Z-order: Z Y [X z] y x
-    while(sampleCount.y < sampleCount.z/2) sampleCount.y*=2; // Z-order: Z Y X [z y] x
-    while(sampleCount.x < sampleCount.y/2) sampleCount.x*=2; // Z-order: Z Y X z [y x]
-    margin = (sampleCount - size)/2;
     assert_( size+2*margin == sampleCount );
     assert_(int3(0)<=sourceMin, "source min:", sourceMin);
     assert_(sourceMin<=min, "source min:", sourceMin, "crop min:", min, "crop max:", max, "source max:", sourceMax, args, origin, extra);
@@ -113,11 +115,23 @@ void crop(Volume16& target, const Volume16& source, CropVolume crop) {
     for(uint z=Z-marginZ; z<Z; z++) for(uint y=0; y<Y; y++) for(uint x=0; x<X; x++) targetData[offsetZ[z]+offsetY[y]+offsetX[x]]=0;
 }
 
-struct Crop : VolumePass<uint16> {
+struct Crop : VolumeOperation {
     string parameters() const override { return "cylinder box downsample"_; }
-    void execute(const Dict& args, Volume16& target, const Volume& source) override {
+    uint outputSampleSize(const Dict&, const ref<const Result*>&, uint index) override { return index ? 0 : sizeof(uint16); }
+    size_t outputSize(const Dict& args, const ref<const Result*>& inputs, uint index) override {
+        if(index) return 0;
+        const Volume& source = toVolume(*inputs[0]);
         CropVolume crop = parseCrop(args, source.margin, source.sampleCount-source.margin, source.origin);
+        return (uint64)crop.sampleCount.z * crop.sampleCount.y * crop.sampleCount.x * outputSampleSize(args, inputs, index);
+    }
+    void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs) override {
+        const Volume& source = inputs[0];
+        CropVolume crop = parseCrop(args, source.margin, source.sampleCount-source.margin, source.origin);
+        outputs[0].sampleCount = crop.sampleCount;
+        Volume16& target = outputs[0];
         ::crop(target, source, crop);
+        int3 size = target.sampleCount-2*target.margin;
+        output(otherOutputs, "cropSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z);});
     }
 };
 template struct Interface<Operation>::Factory<Crop>;

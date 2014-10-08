@@ -25,9 +25,9 @@ template struct Interface<Operation>::Factory<ZOrder>;
 
 constexpr int tileSide = 16, tileSize=tileSide*tileSide*tileSide; //~ most frequent radius -> 16³ = 4³ blocks of 4³ voxels = 8kB. Fits L1 but many tiles (1024³ = 256K tiles)
 const int blockSide = 4, blockSize=blockSide*blockSide*blockSide, blockCount=tileSide/blockSide; //~ coherency size -> Skips processing 4³ voxel whenever possible
-struct Ball { uint16 x,y,z,sqRadius, attribute; };
+generic struct Ball { uint16 x,y,z,sqRadius; T attribute; };
 const int overcommit = 16; // Allows more spheres intersections than voxels inside a tile (only virtual memory is reserved and committed only as needed when filling tile's sphere lists)
-struct Tile { uint64 ballCount=0; Ball balls[tileSize*overcommit-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
+generic struct Tile { uint64 ballCount=0; Ball<T> balls[tileSize*overcommit-1]; }; // 16³ tiles -> 64KB/tile ~ 16GiB (virtual) for 1K³
 
 /// Tests box-ball intersection
 inline uint dmin(int size, int vx, int vy, int vz) {
@@ -39,24 +39,24 @@ inline uint dmin(int size, int vx, int vy, int vz) {
 }
 
 /// Bins each skeleton voxel as a ball to tiles of 16³ voxels
-void bin(Volume& target, const Volume16& radius, const Volume16& attribute) {
+generic void bin(Volume& target, const Volume16& radius, const VolumeT<T>& attribute) {
     const uint16* const radiusData = radius;
-    const uint16* const attributeData = attribute;
+    const T* const attributeData = attribute;
     const int64 X=radius.sampleCount.x, Y=radius.sampleCount.y, Z=radius.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     const int marginX=radius.margin.x, marginY=radius.margin.y, marginZ=radius.margin.z;
     assert_(radius.tiled() && attribute.tiled(), "Bin");
     const ref<uint64> offsetX = radius.offsetX, offsetY = radius.offsetY, offsetZ = radius.offsetZ;
 
-    Tile* const targetData = reinterpret_cast<Tile*>(target.data.begin());
-    assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile));
+    Tile<T>* const targetData = reinterpret_cast<Tile<T>*>(target.data.begin());
+    assert_(uint(X/tileSide*Y/tileSide*Z/tileSide) == target.size()*target.sampleSize/sizeof(Tile<T>));
     for(uint i: range(X/tileSide*Y/tileSide*Z/tileSide)) targetData[i].ballCount=0;
 
     parallel(marginZ,Z-marginZ, [&](uint, uint z) { //TODO: Z-order
         for(int y=marginY; y<Y-marginY; y++) {
             for(int x=marginX; x<X-marginX; x++) {
                 uint64 offset = offsetZ[z]+offsetY[y]+offsetX[x];
-                uint16 attribute = attributeData[offset];
+                T attribute = attributeData[offset];
                 if(!attribute) continue;
                 uint16 sqRadius = radiusData[offset];
                 if(!sqRadius) continue;
@@ -65,10 +65,10 @@ void bin(Volume& target, const Volume16& radius, const Volume16& attribute) {
                 for(int dz=max(0,(int(z)-radius))/tileSide; dz<=min<int>(Z-1,(int(z)+radius))/tileSide; dz++) {
                     for(int dy=max(0,(y-radius))/tileSide; dy<=min<int>(Y-1,(y+radius))/tileSide; dy++) {
                         for(int dx=max(0,(x-radius))/tileSide; dx<=min<int>(X-1,(x+radius))/tileSide; dx++) {
-                            Tile* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
+                            Tile<T>* const tile = targetData + dz * (X/tileSide*Y/tileSide) + dy * (X/tileSide) + dx;
                             int tileX = dx*tileSide, tileY = dy*tileSide, tileZ = dz*tileSide;
                             if(dmin(tileSide,x-tileX,y-tileY,int(z)-tileZ) < sqRadius) { // Intersects tile
-                                assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball), dx, X/tileSide, dy, Y/tileSide, dz, Z/tileSide,  tile->ballCount);
+                                assert_(tile->ballCount<sizeof(tile->balls)/sizeof(Ball<T>), dx, X/tileSide, dy, Y/tileSide, dz, Z/tileSide,  tile->ballCount);
                                 uint index = __sync_fetch_and_add(&tile->ballCount,1); // Thread-safe lock-free add
                                 tile->balls[index] = {uint16(x),uint16(y),uint16(z),sqRadius,attribute}; // Appends the ball to intersecting tiles
                             }
@@ -85,14 +85,23 @@ void bin(Volume& target, const Volume16& radius, const Volume16& attribute) {
     target.field = copy(attribute.field);
 }
 struct Bin : VolumeOperation {
-    uint outputSampleSize(uint) override { return sizeof(Tile)/tileSide/tileSide/tileSide; }
-    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override { bin(outputs[0], inputs[0], inputs[1]); }
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override {
+        uint sourceSampleSize = toVolume(*inputs[1]).sampleSize;
+        /**/ if(sourceSampleSize==sizeof(uint16)) return sizeof(Tile<uint16>)/tileSide/tileSide/tileSide;
+        else if(sourceSampleSize==sizeof(uint32)) return sizeof(Tile<uint32>)/tileSide/tileSide/tileSide;
+        else error(sourceSampleSize);
+    }
+    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        if(inputs[1].sampleSize==sizeof(uint16)) return bin<uint16>(outputs[0], inputs[0], inputs[1]);
+        else if(inputs[1].sampleSize==sizeof(uint32)) return bin<uint32>(outputs[0], inputs[0], inputs[1]);
+        else error(inputs[1].sampleSize);
+    }
 };
 template struct Interface<Operation>::Factory<Bin>;
 
 /// Rasterizes each skeleton voxel as a ball (with maximum blending)
-void rasterize(Volume16& target, const Volume& source) {
-    const Tile* const sourceData = (Tile*)source.data.data;
+generic void rasterize(Volume16& target, const Volume& source) {
+    const Tile<T>* const sourceData = (Tile<T>*)source.data.data;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     uint tileCount = X/tileSide*Y/tileSide*Z/tileSide;
 
@@ -105,11 +114,11 @@ void rasterize(Volume16& target, const Volume& source) {
         if(id==0 && report/1000>=7) log(i,"/", tileCount, (i*tileSize/1024./1024.)/(time/1000.), "MS/s"), report.reset();
         int z = (i/(X/tileSide*Y/tileSide))%(Z/tileSide), y=(i/(X/tileSide))%(Y/tileSide), x=i%(X/tileSide); // Extracts tile coordinates back from index
         int tileX = x*tileSide, tileY = y*tileSide, tileZ = z*tileSide; // first voxel coordinates
-        const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
+        const Tile<T>& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         struct Block { uint16 min=0, max=0; } blocks[blockCount*blockCount*blockCount]; // min/max values for each block (for hierarchical culling) (ala Hi-Z) [256B]
         uint16 tileR[tileSize] = {}; // Half-tiled 'R'-buffer (using 4³ bricks instead of 2³ (Z-curve)) to access without lookup tables [8K]
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
-            const Ball& ball = balls.balls[i];
+            const Ball<T>& ball = balls.balls[i];
             int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
             // Recursive 12s (TODO: SIMD)
             for(int dz=0; dz<blockCount; dz++) for(int dy=0; dy<blockCount; dy++) for(int dx=0; dx<blockCount; dx++) {
@@ -154,15 +163,28 @@ void rasterize(Volume16& target, const Volume& source) {
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }
-defineVolumePass(Rasterize, uint16, rasterize);
+struct Rasterize : VolumeOperation {
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override {
+        uint sourceSampleSize = toVolume(*inputs[0]).sampleSize;
+        /**/  if(sourceSampleSize==sizeof(Tile<uint16>)/tileSide/tileSide/tileSide) return sizeof(uint16);
+        else if(sourceSampleSize==sizeof(Tile<uint32>)/tileSide/tileSide/tileSide) return sizeof(uint32);
+        else error(sourceSampleSize);
+    }
+    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        /**/  if(outputs[0].sampleSize==sizeof(uint16)) rasterize<uint16>(outputs[0], inputs[0]);
+        else if(outputs[0].sampleSize==sizeof(uint32)) rasterize<uint32>(outputs[0], inputs[0]);
+        else error(outputs[0].sampleSize);
+    }
+};
+template struct Interface<Operation>::Factory<Rasterize>;
 
 /// Rasterizes each skeleton voxel as a ball (with maximum blending and maximum attribute override)
-void rasterizeAttribute(Volume16& target, const Volume& source) {
-    const Tile* const sourceData = (Tile*)source.data.data;
+generic void rasterizeAttribute(VolumeT<T>& target, const Volume& source) {
+    const Tile<T>* const sourceData = (Tile<T>*)source.data.data;
     const int64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     uint tileCount = X/tileSide*Y/tileSide*Z/tileSide;
 
-    const mref<uint16> targetData = target;
+    const mref<T> targetData = target;
     assert_(target.tiled());
     const ref<uint64> offsetX = target.offsetX, offsetY = target.offsetY, offsetZ = target.offsetZ;
 
@@ -171,13 +193,13 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
         if(id==0 && report/1000>=7) log(i,"/", tileCount, (i*tileSize/1024./1024.)/(time/1000.), "MS/s"), report.reset();
         int z = (i/(X/tileSide*Y/tileSide))%(Z/tileSide), y=(i/(X/tileSide))%(Y/tileSide), x=i%(X/tileSide); // Extracts tile coordinates back from index
         int tileX = x*tileSide, tileY = y*tileSide, tileZ = z*tileSide; // first voxel coordinates
-        const Tile& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
+        const Tile<T>& balls = sourceData[i]; // Tile primitives, i.e. balls list [seq]
         uint16 tileR[tileSize] = {}; // Untiled 'R'-buffer
         int3 tileP[tileSize] = {}; // Untiled 'P'-buffer
-        const mref<uint16> targetTile = targetData.slice(offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ], tileSize);
+        const mref<T> targetTile = targetData.slice(offsetX[tileX] + offsetY[tileY] + offsetZ[tileZ], tileSize);
         targetTile.clear();
         for(uint i=0; i<balls.ballCount; i++) { // Rasterizes each ball intersecting this tile
-            const Ball& ball = balls.balls[i];
+            const Ball<T>& ball = balls.balls[i];
             int tileBallX=ball.x-tileX, tileBallY=ball.y-tileY, tileBallZ=ball.z-tileZ, sqRadius=ball.sqRadius;
             int3 tileBall = int3(tileBallX, tileBallY, tileBallZ);
             uint attribute=ball.attribute;
@@ -189,7 +211,7 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
                         if(sq(tileBallX-dx)+sq(tileBallY-dy)+sq(tileBallZ-dz)<sqRadius) {
                             uint tileIndex = dz*tileSide*tileSide + dy*tileSide + dx;
                             uint16& R = tileR[tileIndex];
-                            uint16& A =  targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]]; // Might be faster to use an untiled buffer here
+                            T& A =  targetTile[offsetZ[dz] + offsetY[dy] + offsetX[dx]]; // Might be faster to use an untiled buffer here
                             int3 voxelPosition = int3(dx,dy,dz);
                             int3& center = tileP[tileIndex];
                             if(attribute==target.maximum) {
@@ -226,4 +248,17 @@ void rasterizeAttribute(Volume16& target, const Volume& source) {
     target.squared = true;
     assert_(target.maximum == source.maximum);
 }
-defineVolumePass(RasterizeAttribute, uint16, rasterizeAttribute);
+struct RasterizeAttribute : VolumeOperation {
+    uint outputSampleSize(const Dict&, const ref<const Result*>& inputs, uint) override {
+        uint sourceSampleSize = toVolume(*inputs[0]).sampleSize;
+        /**/  if(sourceSampleSize==sizeof(Tile<uint16>)/tileSide/tileSide/tileSide) return sizeof(uint16);
+        else if(sourceSampleSize==sizeof(Tile<uint32>)/tileSide/tileSide/tileSide) return sizeof(uint32);
+        else error(sourceSampleSize);
+    }
+    virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
+        /**/  if(outputs[0].sampleSize==sizeof(uint16)) rasterizeAttribute<uint16>(outputs[0], inputs[0]);
+        else if(outputs[0].sampleSize==sizeof(uint32)) rasterizeAttribute<uint32>(outputs[0], inputs[0]);
+        else error(outputs[0].sampleSize);
+    }
+};
+template struct Interface<Operation>::Factory<RasterizeAttribute>;

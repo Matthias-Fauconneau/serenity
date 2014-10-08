@@ -166,7 +166,7 @@ struct Colorize : VolumeOperation {
 };
 template struct Interface<Operation>::Factory<Colorize>;
 
-void colorizeIndex(Volume24& target, const Volume16& source) {
+generic void colorizeIndex(Volume24& target, const VolumeT<T>& source) {
     const mref<byte3> targetData = target;
     targetData.clear(0);
     buffer<byte3> colors(target.maximum+1);
@@ -177,7 +177,7 @@ void colorizeIndex(Volume24& target, const Volume16& source) {
     colors[0] = 0;
     colors[target.maximum] = 0xFF;
     chunk_parallel(source.size(), [&](uint, uint offset, uint size) {
-        const uint16* const sourceData = source + offset;
+        const T* const sourceData = source + offset;
         byte3* const targetData = target + offset;
         for(uint i : range(size)) targetData[i] = colors[sourceData[i]];
     });
@@ -187,7 +187,9 @@ void colorizeIndex(Volume24& target, const Volume16& source) {
 struct ColorizeIndex : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(byte3); }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>& inputs) override {
-        colorizeIndex(outputs[0], inputs[0]);
+        if(inputs[0].sampleSize == sizeof(uint16)) colorizeIndex<uint16>(outputs[0], inputs[0]);
+        else if(inputs[0].sampleSize == sizeof(uint32)) colorizeIndex<uint32>(outputs[0], inputs[0]);
+        else error(inputs[0].sampleSize);
     }
 };
 template struct Interface<Operation>::Factory<ColorizeIndex>;

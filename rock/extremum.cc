@@ -86,11 +86,11 @@ void rasterizeIndex(Volume16& target, const ref<short3>& list) {
 struct RasterizeIndex : VolumeOperation {
     uint outputSampleSize(uint) override { return sizeof(uint16); }
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint index) override {
-        int3 size = nextPowerOfTwo(parse3(inputs[1]->data)); assert_(size);
+        int3 size = sampleCountForSize(parse3(inputs[1]->data)); assert_(size);
         return (uint64)size.x*size.y*size.z*outputSampleSize(index);
     }
     virtual void execute(const Dict&, const mref<Volume>& outputs, const ref<Volume>&, const ref<Result*>&, const ref<const Result*>& inputs) override {
-        int3 size = parse3(inputs[1]->data);
+        int3 size = sampleCountForSize(parse3(inputs[1]->data));
         outputs[0].sampleCount = nextPowerOfTwo(size);
         outputs[0].margin = (outputs[0].sampleCount-size)/2;
         rasterizeIndex(outputs[0],parseList(inputs[0]->data));
