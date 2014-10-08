@@ -14,7 +14,7 @@ extern "C" void free(void* buffer) noexcept;
 generic struct buffer : mref<T> {
     using mref<T>::data;
     using mref<T>::size;
-    size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation
+    size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
 
     /// Default constructs an empty buffer
     buffer(){}

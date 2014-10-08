@@ -19,8 +19,7 @@ void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 String Handle::name() const {
     if(fd==AT_FDCWD) return String("."_);
     static Folder procSelfFD("/proc/self/fd/"_);
-    log(str((int)fd));
-    String s(256); s.size=check(readlinkat(procSelfFD.fd, str((int)fd), s, s.capacity), (int)fd);
+    String s(256); s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s, s.capacity), (int)fd);
     return s;
 }
 
@@ -31,11 +30,8 @@ const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; retur
 const Folder& root() { static const Folder root("/"_,currentWorkingDirectory()); return root; }
 
 Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
-    if(create && !existsFolder(folder,at)) {
-        assert(isASCII(folder) && at);
-        check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
-    }
-    fd=check(openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);
+    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+    fd = check( openat(at.fd, strz(folder?:"."_), O_RDONLY|O_DIRECTORY, 0), "'"_+folder+"'"_);
 }
 
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
@@ -48,16 +44,14 @@ static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdent
 struct dirent { long ino, off; short len; char name[]; };
 enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK = 10, DT_SOCK = 12, DT_WHT = 14 };
 array<String> Folder::list(uint flags) const {
-    Folder fd(""_,*this);
+    Folder fd("."_,*this);
     array<String> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
-            string name = strz(entry.name);
-            assert(name);
-            if(!(flags&Hidden) && name[0u]=='.') continue;
+            string name = str(entry.name);
+            if(!(flags&Hidden) && name[0]=='.') continue;
             if(name=="."_||name==".."_) continue;
             int type = *((byte*)&entry + entry.len - 1);
-            //FIXME: stat to force NFS attribute fetch S_ISREG(File(name, fd).stat().st_mode)
             if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN/*NFS*/))
                     || (flags&Folders && type==DT_DIR)
                     || (flags&Devices && type==DT_CHR)

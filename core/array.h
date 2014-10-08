@@ -136,7 +136,7 @@ generic T quickselect(const mref<T>& at, size_t left, size_t right, size_t k) {
     }
 }
 /// Quickselects the median in-place
-generic T median(const mref<T>& at) { if(at.size==1) return at[0u]; return quickselect(at, 0, at.size-1, at.size/2); }
+generic T median(const mref<T>& at) { if(at.size==1) return at[0]; return quickselect(at, 0, at.size-1, at.size/2); }
 
 generic void quicksort(const mref<T>& at, int left, int right) {
     if(left < right) { // If the list has 2 or more items

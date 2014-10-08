@@ -45,14 +45,8 @@ generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t
 generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 
 template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
-// Comparison functions
-template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
-generic bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
-generic T min(T a, T b) { return a<b ? a : b; }
-generic T max(T a, T b) { return a<b ? b : a; }
-generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
 
-// Integer types
+// -- Integer types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;
@@ -67,9 +61,6 @@ typedef unsigned long long uint64;
 typedef __INTPTR_TYPE__  intptr_t;
 typedef __SIZE_TYPE__ 	size_t;
 constexpr size_t invalid = -1; // Invalid index
-
-// Integer operations
-generic T abs(T x) { return x>=0 ? x : -x; }
 
 /// Numeric range
 struct range {
@@ -87,30 +78,19 @@ struct range {
     int start, stop;
 };
 
-/*
-#ifndef _INITIALIZER_LIST
-// std::initializer_list
-namespace std {
-generic struct initializer_list {
-    const T* data; size_t size;
-    constexpr initializer_list(const T* data, size_t len) : data(data), size(size) {}
-    constexpr const T* begin() const { return data; }
-    constexpr const T* end() const { return data+size; }
-    //constexpr size_t size() const { return len; }
-};
-}
-#endif
-*/
 
-// string
-namespace std { generic struct initializer_list; }
-generic using ref = std::initializer_list<T>;
-//generic struct ref;
+// -- Debugging
+
+#ifndef _INITIALIZER_LIST
+#define ref initializer_list
+#endif
+namespace std { generic struct ref; }
+using std::ref;
 /// Convenient typedef for ref<char> holding UTF8 text strings
 typedef ref<char> string;
+/// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size);
 
-// Debugging
 /// Logs a message to standard output without newline
 void log_(const string message);
 /// Logs a message to standard output
@@ -133,24 +113,27 @@ template<> void error(const string& message) __attribute((noreturn));
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ##message); })
 
-// ref
+// -- ref
+
 /// Unmanaged fixed-size const reference to an array of elements
-namespace std {generic struct initializer_list {
+namespace std {generic struct ref {
 //generic struct ref {
     typedef T type;
     const T* data = 0;
     size_t size = 0;
 
     /// Default constructs an empty reference
-    constexpr initializer_list() {}
+    constexpr ref() {}
     /// References \a size elements from const \a data pointer
-    constexpr initializer_list(const T* data, size_t size) : data(data), size(size) {}
+    constexpr ref(const T* data, size_t size) : data(data), size(size) {}
     /// References \a size elements from const \a data pointer
-    constexpr initializer_list(const T* begin, const T* end) : data(begin), size(end-begin) {}
-    /// Converts an std::initializer_list to ref
-    //constexpr ref(const std::initializer_list<T>& list) : data(list.data/*.begin()*/), size(list.size/*.size()*/) {}
+    constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
+#ifdef _INITIALIZER_LIST
+    /// Converts a real std::initializer_list to ref
+    constexpr ref(const std::ref<T>& list) : data(list..begin()), size(list.size()) {}
+#endif
     /// Converts a static array to ref
-    template<size_t N> constexpr initializer_list(const T (&a)[N]) : initializer_list(a,N) {}
+    template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
     explicit operator bool() const { assert_(!size || data); return size; }
     operator const T*() const { return data; }
@@ -194,16 +177,14 @@ namespace std {generic struct initializer_list {
     bool contains(const T& key) const { return indexOf(key)!=invalid; }
 };
 }
-
-/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
-inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
-
-/// Returns const reference to a static string literal
-inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 /// Returns const reference to memory used by \a t
 generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+
+// -- string operator ""_
+
+inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
+
+// -- FILE
 
 /// Declares a file to be embedded in the binary
 #define FILE(name) static ref<byte> name() { \
@@ -211,7 +192,24 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
     return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end); \
 }
 
-// ref<Arithmetic> operations
+// -- Generic arithmetic
+
+template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
+generic bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
+generic T min(T a, T b) { return a<b ? a : b; }
+generic T max(T a, T b) { return a<b ? b : a; }
+generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+generic T abs(T x) { return x>=0 ? x : -x; }
+
+// -- Integer arithmetic
+
+/// Aligns \a offset down to previous \a width wide step (only for power of two \a width)
+inline uint floor(uint width, uint offset) { assert((width&(width-1))==0); return offset & ~(width-1); }
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
+// -- Generic ref arithmetic
+
 generic const T& min(const ref<T> a) { const T* min=&a[0]; for(const T& e: a) if(e < *min) min=&e; return *min; }
 generic const T& max(const ref<T> a) { const T* max=&a[0]; for(const T& e: a) if(*max < e) max=&e; return *max; }
 template<Type T> auto sum(const ref<T> a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
@@ -219,6 +217,8 @@ template<Type T> auto sum(const ref<T> a) -> decltype(T()+T()) { decltype(T()+T(
 template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
 template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
 template<Type T, size_t N> auto sum(const T (&a)[N]) -> decltype(T()+T()) { return sum(ref<T>(a)); }
+
+// -- mref
 
 #ifndef _NEW
 /// Initializes memory using a constructor (placement new)

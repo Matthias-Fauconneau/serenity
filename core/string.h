@@ -2,10 +2,29 @@
 /// \file string.h String manipulations (using lightweight string when possible)
 #include "array.h"
 
-// -- string
+// -- str()
+
+// Enforces exact match for overload resolution
+generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
+
+/// Forwards string
+inline const string& str(const string& s) { return s; }
+/// Forwards buffer<byte>
+inline const buffer<char>& str(const buffer<char>& s) { return s; }
+/// Forwards array<byte>
+inline const array<char>& str(const array<char>& s) { return s; }
+/// Forwards char[]
+template<size_t N> string str(const char (&source)[N]) { return string(source,N); }
+
+/// Returns boolean as "true"/"false"
+inline string str(const bool& b) { return b?"true"_:"false"_; }
+/// Returns a reference to the character
+inline string str(const char& c) { return string((char*)&c,1); }
 
 /// Returns a bounded reference to the null-terminated String pointer
-string strz(const char* s);
+string str(const char* s);
+
+// -- string
 
 /// Lexically compare strings
 bool operator <(const string a, const string b);
@@ -21,25 +40,6 @@ bool startsWith(const string str, const string sub);
 bool endsWith(const string str, const string sub);
 /// Returns true if \a str contains the \a substring
 bool find(const string str, const string substring);
-
-// -- str()
-
-// Enforces exact match for overload resolution
-generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
-
-/// Forwards string
-inline const string& str(const string& s) { return s; }
-/// Forwards buffer<byte>
-inline const buffer<char>& str(const buffer<char>& s) { return s; }
-/// Forwards array<byte>
-inline const array<char>& str(const array<char>& s) { return s; }
-/// Forwards char[]
-template<size_t N> string str(const char (&source)[N], char separator=' ') { return string(source,N); }
-
-/// Returns boolean as "true"/"false"
-inline string str(const bool& b) { return b?"true"_:"false"_; }
-/// Returns a reference to the character
-inline string str(const char& c) { return string((char*)&c,1); }
 
 // -- String
 

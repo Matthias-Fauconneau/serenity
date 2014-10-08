@@ -230,11 +230,11 @@ double TextData::decimal() {
     if(!available(1)) return __builtin_nan("");
     double sign=1;
     if(match('-')) sign=-1; else match('+');
-    double significand=0, decimal=0, eSign=1, exponent=0;
+    double significand=0, decimal=0;//, eSign=1, exponent=0;
     if(match("∞"_)) significand = __builtin_inf();
-    else for(bool gotDot=false, gotE=false; available(1);) {
+    else for(bool gotDot=false/*, gotE=false*/; available(1);) {
         /**/  if(!gotDot && match('.')) gotDot=true;
-        else if(!gotE && matchAny("eE"_)) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
+        //else if(!gotE && matchAny("eE"_)) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
         else {
             char c = next();
             if(c>='0' && c<='9') {

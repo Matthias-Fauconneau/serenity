@@ -4,7 +4,7 @@
 
 // -- string
 
-string strz(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
+string str(const char* s) { if(!s) return "null"_; int i=0; while(s[i]) i++; return string(s,i); }
 
 bool operator <(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
@@ -49,7 +49,9 @@ string section(const string s, byte separator, int begin, int end) {
 
 // -- String
 
-String strz(const string source) { String target(source.size+1); target.slice(0, source.size).copy(source); target.last()='\0'; return target; }
+String strz(const string source) {
+    buffer<char> target(source.size+1); target.slice(0, source.size).copy(source); target.last()='\0'; return move(target);
+}
 
 char lowerCase(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
 String toLower(const string source) { return apply(source, lowerCase); }

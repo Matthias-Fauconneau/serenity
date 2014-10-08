@@ -107,12 +107,7 @@ String demangle(TextData& s, bool function=true) {
 String demangle(const string symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
 Symbol findSymbol(void* find) {
-#if 0 // qemu-user only fakes /proc/self/exe for readlink
-    String s(256); s.size=readlink(strz("/proc/self/exe"_), s.begin(), s.capacity);
-    static Map exe(s);
-#else
     static Map exe("/proc/self/exe"_);
-#endif
     const byte* elf = exe.data;
     const Ehdr& hdr = *(const Ehdr*)elf;
     ref<Shdr> sections = ref<Shdr>((const Shdr*)(elf+hdr.shoff),hdr.shnum);
