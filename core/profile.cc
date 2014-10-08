@@ -26,7 +26,7 @@ void __attribute((destructor(101))) logProfile() {
     for(uint i=0; i<size; i++) {
         if(100*entries[i].time/total==0) continue;
         Symbol s = findSymbol(entries[i].function);
-        log(str(100*entries[i].time/total)+"%"_+"\t"_+str(entries[i].count)+"\t"_+s.file+":"_+str(s.line)+"     \t"_+s.function);
+        log(str(100*entries[i].time/total)+"%\t"+str(entries[i].count)+'\t'+s.file+':'+str(s.line)+"     \t"+s.function);
     }
 }
 

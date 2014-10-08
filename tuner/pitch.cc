@@ -43,7 +43,7 @@ float PitchEstimator::estimate() {
     if(highPeak && highPeak/medianF0>=minHighPeakRank) {
         medianF0 = highPeak;
         for(const auto& peak: peaks.slice(max<int>(0,peaks.size-5))) {
-            //log_(str(peak.f)+"  "_);
+            //log_(str(peak.f)+' ');
             if(peak.f >= highPeak*minHighPeakNum/minHighPeakDen && peak.f >= minHighPeakNum && peak.f<medianF0) medianF0=peak.f;
         }
         //log("\thighPeak ->", F1, medianF0, highPeak, highPeak*minHighPeakNum/minHighPeakDen);

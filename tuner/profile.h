@@ -5,20 +5,20 @@
 static constexpr int keyCount = 85;
 float stretch(int m) { return -exp((-54 - m)/12.) + exp((m - 129)/12.); }
 
-static Folder config(".config"_, home(), true);
+static Folder config(".config", home(), true);
 
 struct OffsetPlot : Widget {
     float offsets[keyCount] = {};
     float variances[keyCount] = {};
     OffsetPlot() {
-      if(!existsFile("offsets.profile"_,config)) return;
-      TextData s = readFile("offsets.profile"_,config);
-      for(uint i: range(keyCount)) { offsets[i] = clip(-1./2, s.decimal()/100, 1./2); s.skip(" "_); variances[i] = sq(s.decimal()/100); s.skip("\n"_); }
+      if(!existsFile("offsets.profile",config)) return;
+      TextData s = readFile("offsets.profile",config);
+      for(uint i: range(keyCount)) { offsets[i] = clip(-1./2, s.decimal()/100, 1./2); s.skip(' '); variances[i] = sq(s.decimal()/100); s.skip('\n'); }
     }
     ~OffsetPlot() {
         String s;
-        for(uint i: range(keyCount)) s << str(offsets[i]*100) << " "_ << str(sqrt(variances[i])*100) << "\n"_;
-        writeFile("offsets.profile"_, s, config);
+        for(uint i: range(keyCount)) s << str(offsets[i]*100) << ' ' << str(sqrt(variances[i])*100) << '\n';
+        writeFile("offsets.profile", s, config);
     }
     void reset() { mref<float>(offsets).clear(); mref<float>(variances).clear(); }
     int2 sizeHint(int2) const override { return int2(-keyCount*18, 768); }

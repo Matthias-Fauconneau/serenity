@@ -7,7 +7,7 @@ struct ProcessedSource : ImageSource {
     ImageSource& source;
     ImageOperation& operation;
     ProcessedSource(ImageSource& source, ImageOperation& operation) :
-        ImageSource(Folder("."_,source.folder)), source(source), operation(operation) {}
+        ImageSource(Folder(".",source.folder)), source(source), operation(operation) {}
 
     size_t size() const override { return source.size(); }
     String name(size_t index) const override { return source.name(index); }
@@ -17,7 +17,7 @@ struct ProcessedSource : ImageSource {
 
     /// Returns processed linear image
     virtual SourceImage image(size_t index, uint component) const override {
-        return cache<ImageF>(source.name(index), operation.name()+"."_+str(component), source.folder, [&](TargetImage&& target) {
+        return cache<ImageF>(source.name(index), operation.name()+'.'+str(component), source.folder, [&](TargetImage&& target) {
             SourceImage sourceImage = source.image(index, component);
             operation.apply(target.resize(sourceImage.size), sourceImage, component);
         }, time(index));
@@ -25,7 +25,7 @@ struct ProcessedSource : ImageSource {
 
     /// Returns processed sRGB image
     virtual SourceImageRGB image(size_t index) const override {
-        return cache<Image>(source.name(index), operation.name()+".sRGB"_, source.folder, [&](TargetImageRGB&& target) {
+        return cache<Image>(source.name(index), operation.name()+".sRGB", source.folder, [&](TargetImageRGB&& target) {
             sRGB(target.resize(size(index)), image(index, 0), image(index, 1), image(index, 2));
         }, time(index));
     }
@@ -56,8 +56,8 @@ struct ImageSourceView : ImageView {
 };
 
 struct DustRemovalPreview {
-    InverseAttenuation correction { Folder("Pictures/Paper"_, home()) };
-    ImageFolder source { Folder("Pictures"_, home()),
+    InverseAttenuation correction { Folder("Pictures/Paper", home()) };
+    ImageFolder source { Folder("Pictures", home()),
                 [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture")) > 4; } };
     ImageSourceView sourceView {source};
     ProcessedSource corrected {source, correction};

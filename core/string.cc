@@ -41,7 +41,7 @@ bool isInteger(const string s) {
 }
 
 string section(const string s, byte separator, int begin, int end) {
-    if(!s) return ""_;
+    if(!s) return "";
     uint b,e;
     if(begin>=0) { b=0; for(uint i=0;i<(uint)begin && b<s.size;b++) if(s[b]==separator) i++; }
     else { b=s.size; if(begin!=-1) { b--; for(uint i=0;b>0;b--) if(s[b]==separator) { i++; if(i>=uint(-begin-1)) { b++; break; } } } }
@@ -116,9 +116,9 @@ String itoa(int64 number, uint base, int pad, char padChar) {
 
 String ftoa(double n, int precision, uint pad, int exponent) {
     bool sign = n<0; n=abs(n);
-    if(__builtin_isnan(n)) return ::right("NaN"_, pad);
-    if(n==::inf) return ::right("∞"_, pad+2);
-    if(n==-::inf) return ::right("-∞"_, pad+2);
+    if(__builtin_isnan(n)) return ::right("NaN", pad);
+    if(n==::inf) return ::right("∞", pad+2);
+    if(n==-::inf) return ::right("-∞", pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
     String s;
     if(sign) s.append('-');

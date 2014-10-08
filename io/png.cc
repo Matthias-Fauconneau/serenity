@@ -41,14 +41,14 @@ template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint hei
 
 Image decodePNG(const ref<byte> file) {
     BinaryData s(file, true);
-    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n"_) { error("Invalid PNG"); return Image(); }
+    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n") { error("Invalid PNG"); return Image(); }
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
     uint palette[256]; bool alpha=false;
     array<byte> buffer;
     for(;;) {
         uint32 size = s.read();
         string tag = s.read<byte>(4);
-        if(tag == "IHDR"_) {
+        if(tag == "IHDR") {
             width = s.read(), height = s.read();
             bitDepth = s.read(); assert(bitDepth==8 || bitDepth == 4 || bitDepth == 1);
             type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
@@ -56,18 +56,18 @@ Image decodePNG(const ref<byte> file) {
             uint8 unused compression = s.read(); assert(compression==0);
             uint8 unused filter = s.read(); assert(filter==0);
             interlace = s.read();
-        } else if(tag == "IDAT"_) {
+        } else if(tag == "IDAT") {
             /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
             else*/ buffer << s.read<byte>(size); // Explicitly concatenates chunks (FIXME: stream inflate)
-        } else if(tag == "IEND"_) {
+        } else if(tag == "IEND") {
             assert(size==0);
             s.advance(4); //CRC
             break;
-        } else if(tag == "PLTE"_) {
+        } else if(tag == "PLTE") {
             ref<rgb3> plte = s.read<rgb3>(size/3);
             assert(plte.size<=256);
             for(uint i: range(plte.size)) (byte4&)palette[i]=plte[i];
-        }  else if(tag == "tRNS"_) {
+        }  else if(tag == "tRNS") {
             ref<byte> trns = s.read<byte>(size);
             assert(trns.size<=256);
             for(uint i: range(trns.size)) ((byte4&)palette[i]).a=trns[i];
@@ -159,14 +159,14 @@ buffer<byte> filter(const Image& image) {
 }
 
 buffer<byte> encodePNG(const Image& image) {
-    array<byte> file = String("\x89PNG\r\n\x1A\n"_);
+    array<byte> file = String("\x89PNG\r\n\x1A\n");
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
-    array<byte> IHDR = "IHDR"_+raw(ihdr);
+    array<byte> IHDR = "IHDR"+raw(ihdr);
     file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
 
-    array<byte> IDAT = "IDAT"_+deflate(filter(image),true);
+    array<byte> IDAT = "IDAT"+deflate(filter(image),true);
     file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
 
-    file<<raw(big32(0))<<"IEND"_<<raw(big32(crc32("IEND"_)));
+    file<<raw(big32(0))<<"IEND"<<raw(big32(crc32("IEND")));
     return move(file);
 }

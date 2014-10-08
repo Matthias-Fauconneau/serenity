@@ -75,7 +75,7 @@ struct SpectrumPlot : Widget {
             bool best = i==candidates.size-1;
             vec3 color(!best,best,0);
 
-            Text label(dec(candidate.f0)+" "_+dec(round(1000*12*2*log2(1+3*(candidate.B>-1?candidate.B:0))))+" m\t"_, 16,  color);
+            Text label(dec(candidate.f0)+' '+dec(round(1000*12*2*log2(1+3*(candidate.B>-1?candidate.B:0))))+" m\t", 16,  color);
             label.render(int2(position.x+size.x-label.sizeHint().x,position.y+16+(i)*48+32));
             for(uint n: range(candidate.peaks.size)) {
                 uint f = candidate.peaks[n];
@@ -124,8 +124,8 @@ struct WaveformPlot : Widget {
 /// Estimates fundamental frequencies (~pitches) of notes in a single file
 struct PitchEstimation : Poll {
         // Input
-        const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"_))-12;
-        AudioFile audio {"/Samples/"_+strKey(lowKey+12)+"-"_+strKey(highKey+12)+".flac"_};
+        const uint lowKey=parseKey(arguments().value(0,"A0"))-12, highKey=parseKey(arguments().value(1,"A7"))-12;
+        AudioFile audio {"/Samples/"+strKey(lowKey+12)+'-'+strKey(highKey+12)+".flac"};
         const uint rate = audio.rate;
         uint t=0;
 
@@ -144,7 +144,7 @@ struct PitchEstimation : Poll {
             // Prepares new period
             buffer<int2> period (periodSize);
             if(t>(highKey-lowKey)*2*rate || audio.read(period) < period.size) {
-                log(fail, "/"_, tries, dec(round(100.*fail/tries))+"%"_);
+                log(fail, '/', tries, dec(round(100.*fail/tries))+'%');
                 return;
             }
             for(uint i: range(N-periodSize)) signal[i]=signal[i+periodSize];
@@ -177,13 +177,13 @@ struct PitchEstimation : Poll {
                 const float f2 = estimator.F0*(2+estimator.B*cb(2));
                 bool confident = confidence > confidenceThreshold && 1-ambiguity > ambiguityThreshold && confidence*(1-ambiguity) > threshold
                         && abs(offsetF0)<offsetThreshold;
-                log(dec(t/rate,2,'0')+"."_+dec((t*10/rate)%10)+"\t"_+strKey(expectedKey)+"\t"_+strKey(key)+"\t"_+dec(round(f*rate/N),4)+" Hz\t"_
-                    +dec(round(100*offsetF0),2) +" c\t"_
-                    +dec(round(confidence?1./confidence:0),2)+"\t"_+dec(round(1-ambiguity?1./(1-ambiguity):0),2)+"\t"_
-                    +dec(round((confidence*(1-ambiguity))?1./(confidence*(1-ambiguity)):0),2)+"\t"_
-                    +dec(round(100*12*log2(f2/(2*f1))))+" c\t"_
-                    +dec(estimator.medianF0)+"\t"_
-                    +(expectedKey == key ? (confident ? "O"_ : "o"_) : (confident ? "X"_ : "x"_)));
+                log(dec(t/rate,2,'0')+'.'+dec((t*10/rate)%10)+"\t"+strKey(expectedKey)+"\t"+strKey(key)+"\t"+dec(round(f*rate/N),4)+" Hz\t"
+                    +dec(round(100*offsetF0),2) +" c\t"
+                    +dec(round(confidence?1./confidence:0),2)+"\t"+dec(round(1-ambiguity?1./(1-ambiguity):0),2)+"\t"
+                    +dec(round((confidence*(1-ambiguity))?1./(confidence*(1-ambiguity)):0),2)+"\t"
+                    +dec(round(100*12*log2(f2/(2*f1))))+" c\t"
+                    +dec(estimator.medianF0)+"\t"
+                    +(expectedKey == key ? (confident ? 'O' : 'o') : (confident ? 'X' : 'x')));
 
                 if(confident) {
                     if(expectedKey==key) success++;

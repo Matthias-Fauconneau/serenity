@@ -11,7 +11,7 @@ struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
     InverseAttenuation(ImageFolder&& calibration) {
         int64 calibrationTime = max(::apply([&](size_t index) { return calibration.time(index); }, calibration.size()));
         for(uint component : range(3)) {
-            attenuation[component] = cache<ImageF>("attenuation"_, name()+"."_+str(component), calibration.folder, [&](TargetImage&& target) {
+            attenuation[component] = cache<ImageF>("attenuation", name()+'.'+str(component), calibration.folder, [&](TargetImage&& target) {
                 target.resize(calibration.imageSize);
 
                 // Sums all images

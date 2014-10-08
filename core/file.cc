@@ -27,10 +27,11 @@ String Handle::name() const {
 
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
 
-const Folder& root() { static const Folder root("/"_,currentWorkingDirectory()); return root; }
+const Folder& root() { static const Folder root("/",currentWorkingDirectory()); return root; }
 
 Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+    assert_(folder);
     fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'');
 }
 
@@ -44,7 +45,7 @@ static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdent
 struct dirent { long ino, off; short len; char name[]; };
 enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK = 10, DT_SOCK = 12, DT_WHT = 14 };
 array<String> Folder::list(uint flags) const {
-    Folder fd("."_,*this);
+    Folder fd(".",*this);
     array<String> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;

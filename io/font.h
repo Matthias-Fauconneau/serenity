@@ -6,7 +6,7 @@
 struct  FT_FaceRec_;
 
 const Folder& fontFolder();
-String findFont(string fontName, ref<string> fontTypes={""_});
+String findFont(string fontName, ref<string> fontTypes={""});
 
 /// Freetype wrapper
 struct Font {

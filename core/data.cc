@@ -72,7 +72,7 @@ char TextData::wouldMatchAny(const string any) {
 
 string TextData::wouldMatchAny(const ref<string> keys) {
     for(string key: keys) if(wouldMatch(key)) return key;
-    return ""_;
+    return "";
 }
 
 
@@ -84,7 +84,7 @@ char TextData::matchAny(const string any) {
 
 string TextData::matchAny(const ref<string> keys) {
     for(string key: keys) if(match(key)) return key;
-    return ""_;
+    return "";
 }
 
 bool TextData::matchNo(const string any) {

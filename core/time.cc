@@ -111,7 +111,7 @@ String str(Date date, const string format) {
         else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
         else if(s.match("MM")){ if(date.month>=0) r.append( dec(date.month+1,2) ); else s.until(' '); }
         else if(s.match("yyyy")){ if(date.year>=0) r.append( dec(date.year) ); else s.until(' '); }
-        else if(s.match("TZD")) r.append( "GMT"_ ); //FIXME
+        else if(s.match("TZD")) r.append("GMT"); //FIXME
         else r.append( s.next() );
     }
     if(endsWith(r,",") || endsWith(r,":")) r.pop(); //prevent dangling separator when last valid part is week day or seconds

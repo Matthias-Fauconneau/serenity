@@ -57,16 +57,16 @@ struct Player : Poll {
     ICON(random) ICON(random2) ToggleButton randomButton {randomIcon(), random2Icon()};
     ICON(next) TriggerButton nextButton{nextIcon()};
     ICON(play) ICON(pause) ToggleButton playButton{playIcon(), pauseIcon()};
-    Text elapsed {"00:00"_};
+    Text elapsed {"00:00"};
     Slider slider;
-    Text remaining {"00:00"_};
+    Text remaining {"00:00"};
     HBox status {{&elapsed, &slider, &remaining}};
     HBox toolbar {{&randomButton, &playButton, &nextButton, &status}};
     Scroll<List<Text>> albums;
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
     VBox layout {{ &toolbar, &main },VBox::Spread};
-    Window window {&layout, -int2(600,1024), "Player"_, pauseIcon()};
+    Window window {&layout, -int2(600,1024), "Player", pauseIcon()};
 
 // Content
     String device; // Device underlying folder
@@ -92,15 +92,15 @@ struct Player : Poll {
         titles.activeChanged = {this, &Player::playTitle};
 
         if(arguments()) setFolder(arguments()[0]);
-        else if(!folder) setFolder("/Music"_);
+        else if(!folder) setFolder("/Music");
         window.show();
         mainThread.setPriority(-20);
     }
     ~Player() { recordPosition(); /*Records current position*/ }
     void recordPosition() {
         assert_(titles.index<files.size && file);
-        if(/*writableFile(".last"_, folder) &&*/ titles.index<files.size && file)
-            writeFile(".last"_,files[titles.index]+"\0"_+dec(file->position/file->rate)+(randomSequence?"\0random"_:""_), folder);
+        if(/*writableFile(".last", folder) &&*/ titles.index<files.size && file)
+            writeFile(".last",files[titles.index]+'\0'+dec(file->position/file->rate)+(randomSequence?"\0random":""), folder);
     }
     void setFolder(string path) {
         assert(folder.name() != path);
@@ -109,8 +109,8 @@ struct Player : Poll {
         folder = path;
         folders = folder.list(Folders|Sorted);
         for(string folder: folders) albums.append( section(folder,'/',-2,-1) );
-        if(existsFile(".last"_, folder)) {
-            String mark = readFile(".last"_, folder);
+        if(existsFile(".last", folder)) {
+            String mark = readFile(".last", folder);
             string last = section(mark, '\0');
             string album = section(last, '/', 0, 1);
             string file = section(last, '/', 1, -1);
@@ -139,10 +139,10 @@ struct Player : Poll {
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(i<title.size && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
-        title = replace(title.slice(i),"_"_," "_);
-        if(withAlbumName) title = folder + " - "_ + title;
+        title = replace(title.slice(i),"_"," ");
+        if(withAlbumName) title = folder + " - " + title;
         titles.insertAt(index, Text(title, 16));
-        files.insertAt(index, folder+"/"_+file );
+        files.insertAt(index, folder+'/'+file );
     }
     void queueFile(const string folder, const string file, bool withAlbumName) { insertFile(titles.size, folder, file, withAlbumName); }
     void playAlbum(const string album) {
@@ -159,8 +159,8 @@ struct Player : Poll {
     void playTitle(uint index) {
         titles.index = index;
         window.setTitle(toUTF8(titles[index].text));
-        file = unique<AudioFile>(folder.name()+"/"_+files[index]);
-        if(!file->file) { file=0; log("Error reading", folder.name()+"/"_+files[index]); return; }
+        file = unique<AudioFile>(folder.name()+'/'+files[index]);
+        if(!file->file) { file=0; log("Error reading", folder.name()+'/'+files[index]); return; }
         assert(file->channels==AudioOutput::channels);
         setPlaying(true);
     }
@@ -234,10 +234,10 @@ struct Player : Poll {
     void update(uint position, uint duration) {
         if(slider.value == (int)position || position>duration) return;
         slider.value = position; slider.maximum=duration;
-        elapsed    = Text(String(dec(                position/60,2,'0')+":"_+dec(                 position%60,2,'0')),
-                          16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
-        remaining = Text(String(dec((duration-position)/60,2,'0')+":"_+dec((duration-position)%60,2,'0')),
-                          16, 0, 1, 0, "DejaVuSans"_, true, 1, true, int2(64,32));
+        elapsed    = Text(String(dec(                position/60,2,'0')+':'+dec(                 position%60,2,'0')),
+                          16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
+        remaining = Text(String(dec((duration-position)/60,2,'0')+':'+dec((duration-position)%60,2,'0')),
+                          16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
         {Rect toolbarRect = layout.layout(window.size)[0];
             Graphics update;
             update.append(toolbar.graphics(toolbarRect.size), vec2(toolbarRect.origin));

@@ -127,7 +127,7 @@ template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') 
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use str(a)+str(b)+... to convert and concatenate without spaces
-template<Type A, Type... Args> String str(const A& a, const Args&... args) { return str(a)+" "_+str(args...); }
+template<Type A, Type... Args> String str(const A& a, const Args&... args) { return str(a)+' '+str(args...); }
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }

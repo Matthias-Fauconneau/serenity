@@ -21,7 +21,7 @@ inline String fraction(const string s) { return string{TextFormat::Fraction} + s
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string text=""_, float size=16, vec3 color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true, float interline=1, bool center=true, int2 minimalSizeHint=0);
+    Text(const string text="", float size=16, vec3 color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true, float interline=1, bool center=true, int2 minimalSizeHint=0);
 
     // Parameters
     /// Displayed text in UTF32

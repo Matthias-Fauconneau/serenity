@@ -80,11 +80,11 @@ struct Tuner : Poll {
 
     // UI
     int currentKey = 0;
-    Text currentKeyText {""_, 64, white};
+    Text currentKeyText {"", 64, white};
     int keyOffsetCents = 0;
-    Text keyOffsetText {""_, 64, white};
+    Text keyOffsetText {"", 64, white};
     int worstKey = 0;
-    Text worstKeyText {""_, 64, white};
+    Text worstKeyText {"", 64, white};
     HBox status {{&currentKeyText, &keyOffsetText, &worstKeyText}, HBox::Even};
     OffsetPlot profile;
     VBox layout {{&status, &profile}};

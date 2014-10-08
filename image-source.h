@@ -12,8 +12,8 @@ generic struct Target : T {
     File file; // Keeps file descriptor open for file locking
     Map map;
 
-    Target(string name, const Folder& folder) : folder("."_, folder), name(name), file(name, folder, ::Flags(ReadWrite|Create)) {}
-    ~Target() { rename(name, name+"."_+strx(T::size), folder);/*FIXME: asserts unique TargetImage instance for this 'folder/name'*/ }
+    Target(string name, const Folder& folder) : folder(".", folder), name(name), file(name, folder, ::Flags(ReadWrite|Create)) {}
+    ~Target() { rename(name, name+'.'+strx(T::size), folder);/*FIXME: asserts unique TargetImage instance for this 'folder/name'*/ }
     const Target& resize(int2 size) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         map = Map(file, Map::Write);
@@ -31,7 +31,7 @@ generic struct Source : Map, T {
 };
 
 generic Source<T> cache(string name, string operation, const Folder& folder, function<void(Target<T>&&)> generate,
-                int64 sourceTime, string version = __TIMESTAMP__ ""_) {
+                int64 sourceTime, string version = __TIMESTAMP__) {
     Folder cache(operation, folder);
     removeIfExisting(name, cache);
     File target;

@@ -9,7 +9,7 @@ string str(const NameSize& x) { return str(x.name, x.size); }
 
 /// Returns a font, loading from disk and caching as needed
 Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
-    String key = fontName+(hint?"H"_:""_)+fontTypes[0];
+    String key = fontName+(hint?"H":"")+fontTypes[0];
     assert_(!key.contains(' '));
     static map<NameSize,unique<Font>> fonts; // Font cache
     unique<Font>* font = fonts.find(NameSize{copy(key), size});
@@ -112,7 +112,7 @@ struct TextLayout {
         struct Line { size_t line, word; size_t start, split, end; };
         array<Line> lines;
         {
-            Font* font = getFont(fontName, size, {""_,"R"_,"Regular"_}, hint);
+            Font* font = getFont(fontName, size, {"","R","Regular"}, hint);
             uint16 spaceIndex = font->index(' ');
             spaceAdvance = font->metrics(spaceIndex).advance;
             //float xHeight = font->metrics(font->index('x')).height;
@@ -149,7 +149,7 @@ struct TextLayout {
                     }
                     else if(c==' ') position.x += spaceAdvance;
                     else if(c=='\t') position.x += 4*spaceAdvance; //FIXME: align
-                    else error("Unexpected code"_, hex(c), toUTF8(text));
+                    else error("Unexpected code", hex(c), toUTF8(text));
                 }
                 // Push format context
                 else if(c<End) {
@@ -159,8 +159,8 @@ struct TextLayout {
                     String fontName = copy(font->name);
                     float fontSize = font->size;
                     format = TextFormat(c);
-                    if(format==Bold) { assert_(!find(fontName,"Bold"_), toUTF8(text)); font = getFont(fontName, fontSize, {"Bold"_,"RB"_}, hint); }
-                    if(format==Italic) { assert_(!find(fontName,"Italic"_)); font = getFont(fontName, fontSize, {"Italic"_,"I"_,"Oblique"_}, hint); }
+                    if(format==Bold) { assert_(!find(fontName,"Bold"), toUTF8(text)); font = getFont(fontName, fontSize, {"Bold","RB"}, hint); }
+                    if(format==Italic) { assert_(!find(fontName,"Italic")); font = getFont(fontName, fontSize, {"Italic","I","Oblique"}, hint); }
                     if(format==Subscript || format==Superscript) fontSize *= 2./3;
                     if(format==Superscript) position.y -= fontSize/2;
                     if(format==Subscript) position.y += font->ascender/2;
@@ -227,7 +227,7 @@ struct TextLayout {
                     }
                     if(c != 0xA0) {
                         vec2 offset = 0;
-                        if(c==toUCS4("⌊"_)[0] || c==toUCS4("⌋"_)[0]) offset.y += font->size/3; // Fixes too high floor signs from FreeSerif
+                        if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += font->size/3; // Fixes too high floor signs from FreeSerif
                         assert_(metrics.size, hex(c));
                         word << Glyph(metrics,::Glyph{position+offset, *font, c, color});
                     }

@@ -36,12 +36,12 @@ namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 namespace Present { int EXT, event, errorBase; }
 
 Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
-    String path = "/tmp/.X11-unix/X"_+getenv("DISPLAY"_,":0"_).slice(1,1);
+    String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
     struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; copy(mref<char>(addr.path,path.size),path);
     if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
     {ConnectionSetup r;
-        if(existsFile(".Xauthority"_,home()) && File(".Xauthority"_,home()).size()) {
-            BinaryData s (readFile(".Xauthority"_,home()), true);
+        if(existsFile(".Xauthority",home()) && File(".Xauthority",home()).size()) {
+            BinaryData s (readFile(".Xauthority",home()), true);
             string name, data;
             uint16 family unused = s.read();
             {uint16 length = s.read(); string host unused = s.read<byte>(length); }
@@ -71,11 +71,11 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
     }
     assert(visual);
 
-    {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
+    {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM");
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
-    {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
+    {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER");
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
-    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
+    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present");
         Present::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
 }
 

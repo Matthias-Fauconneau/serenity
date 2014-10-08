@@ -40,30 +40,30 @@ String str(const Variant& o);
 
 inline String str(const array<Variant>& array) {
     String s;
-    s << "["_;
-    for(const Variant& element: array) s << str(element) << " "_;
+    s << '[';
+    for(const Variant& element: array) s << str(element) << ' ';
     if(array) s.last() = ']'; else s << ']';
     return s;
 }
 
 inline String str(const map<string,Variant>& dict) {
     String s;
-    s << "<<"_;
-    for(const const_pair<string,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
-    s << ">>"_;
+    s << "<<";
+    for(const const_pair<string,Variant>& entry: dict) s << '/'+entry.key+' '<<str(entry.value)<<' ';
+    s << ">>";
     return s;
 }
 
 inline String str(const map<String,Variant>& dict) {
     String s;
-    s << "<<"_;
-    for(const const_pair<String,Variant>& entry: dict) s << "/"_+entry.key+" "_<<str(entry.value)<<" "_;
-    s << ">>"_;
+    s << "<<";
+    for(const const_pair<String,Variant>& entry: dict) s << '/'+entry.key+' '<<str(entry.value)<<' ';
+    s << ">>";
     return s;
 }
 
 inline String str(const Variant& o) {
-    if(o.type==Variant::Boolean) return String(o.number?"true"_:"false"_);
+    if(o.type==Variant::Boolean) return String(str(bool(o.number)));
     if(o.type==Variant::Integer) return str(int(o.number));
     if(o.type==Variant::Real) return str(float(o.number));
     if(o.type==Variant::Data) return copy(o.data);
@@ -73,16 +73,16 @@ inline String str(const Variant& o) {
         return str(o.real());
         //assert_((o.number/o.denominator)*o.denominator==o.number);
         //return str(o.number/o.denominator);
-        return str(int(o.number),"/"_,int(o.denominator));
+        return str(int(o.number),'/',int(o.denominator));
     }
-    error("Invalid Variant"_,int(o.type));
+    error("Invalid Variant",int(o.type));
 }
 
 /// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
 inline int2 fromInt2(TextData& s) {
     int x = s.integer(); // Assigns a single value to all components
     if(!s) return int2(x);
-    s.whileAny("x, "_); int y=s.integer();
+    s.whileAny("x, "); int y=s.integer();
     assert_(!s); return int2(x,y);
 }
 /// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2

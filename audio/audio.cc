@@ -198,7 +198,7 @@ AudioInput::~AudioInput(){
 void AudioInput::event() {
     if(status->state == XRun) {
         overruns++;
-        log("Overrun"_,overruns,"/",periods,"~ 1/",(float)periods/overruns);
+        log("Overrun",overruns,"/",periods,"~ 1/",(float)periods/overruns);
         io<PREPARE>();
         io<START>();
     }

@@ -6,18 +6,18 @@
 #include "file.h"
 #include "math.h"
 
-const Folder& fontFolder() { static Folder folder("/usr/share/fonts"_); return folder; }
+const Folder& fontFolder() { static Folder folder("/usr/share/fonts"); return folder; }
 String findFont(string fontName, ref<string> fontTypes) {
     array<String> fonts = filter(fontFolder().list(Files|Recursive), [&](string path) {
-        if(!endsWith(path,".ttf"_)) return true;
+        if(!endsWith(path,".ttf")) return true;
         for(string fontType: fontTypes) {
             if(fontType) {
-                if(find(path, fontName+fontType+"."_) ||
-                   find(path, fontName+"-"_+fontType+"."_) ||
-                   find(path, fontName+"_"_+fontType+"."_) ||
-                   find(path, fontName+" "_+fontType+"."_))
+                if(find(path, fontName+fontType+'.') ||
+                   find(path, fontName+'-'+fontType+'.') ||
+                   find(path, fontName+'_'+fontType+'.') ||
+                   find(path, fontName+' '+fontType+'.'))
                     return false;
-            } else if(find(path,fontName+"."_)) {
+            } else if(find(path,fontName+'.')) {
                 return false;
             }
         }

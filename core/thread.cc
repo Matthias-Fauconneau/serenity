@@ -170,7 +170,7 @@ void exit(int status) {
 String which(string name) {
     if(!name) return {};
     if(existsFile(name)) return String(name);
-    for(string folder: split(getenv("PATH"_,"/usr/bin"),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+"/"_+name;
+    for(string folder: split(getenv("PATH","/usr/bin"),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+'/'+name;
     return {};
 }
 
@@ -220,4 +220,4 @@ array<string> arguments() {
     return split(section(cmdline,0,1,-1),0);
 }
 
-const Folder& home() { static Folder home(getenv("HOME"_,str((const char*)getpwuid(geteuid())->pw_dir))); return home; }
+const Folder& home() { static Folder home(getenv("HOME",str((const char*)getpwuid(geteuid())->pw_dir))); return home; }

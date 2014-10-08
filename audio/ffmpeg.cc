@@ -16,7 +16,7 @@ void __attribute((constructor(1001))) initialize_FFmpeg() { av_register_all(); }
 
 bool AudioFile::open(const string path) {
     close();
-    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return false; }
+    if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file", path); return false; }
     return open();
 }
 

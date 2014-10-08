@@ -93,7 +93,7 @@ generic struct xy { T x,y; };
 typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
-inline String strx(int2 N) { return str(N.x)+"x"_+str(N.y); }
+inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2;

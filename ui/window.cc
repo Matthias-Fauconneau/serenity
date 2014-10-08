@@ -16,9 +16,9 @@ Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& i
     }
     assert_(size);
     send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"_), .type=Atom("ATOM"_), .format=32,
-                        .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW"_)));
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"_), .type=Atom("CARDINAL"_), .format=32,
+    send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"), .type=Atom("ATOM"), .format=32,
+                        .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
+    send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"), .format=32,
                         .length=1, .size=6+1}, raw(1));
     setTitle(title);
     setIcon(icon);
@@ -104,12 +104,12 @@ void Window::hide() { send(UnmapWindow{.id=id}); }
 void Window::setTitle(const string title) {
     if(title != this->title) {
         this->title = String(title);
-        send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"_), .type=Atom("UTF8_STRING"_), .format=8,
+        send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"), .type=Atom("UTF8_STRING"), .format=8,
                             .length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
     }
 }
 void Window::setIcon(const Image& icon) {
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"_), .type=Atom("CARDINAL"_), .format=32,
+    send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
                         .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)}, raw(icon.width)+raw(icon.height)+cast<byte>(icon));
 }
 

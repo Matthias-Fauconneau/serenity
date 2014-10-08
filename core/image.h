@@ -26,7 +26,7 @@ struct Image : buffer<byte4> {
     explicit operator bool() const { return data && width && height; }
     inline byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*stride+x); }
 };
-inline String str(const Image& o) { return str(o.width,"x"_,o.height); }
+inline String str(const Image& o) { return strx(o.size); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o),o.size,o.stride,o.alpha,o.sRGB); }

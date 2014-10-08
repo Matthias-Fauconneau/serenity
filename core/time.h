@@ -24,11 +24,11 @@ struct Time {
     uint64 startTime=realTime(), stopTime=startTime;
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+"s"_; startTime=stopTime; stopTime=0; return s; }
+    String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     float toFloat() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
 };
-inline String str(const Time& t) { return str(t.toFloat())+"s"_; }
+inline String str(const Time& t) { return str(t.toFloat())+'s'; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
@@ -55,9 +55,9 @@ bool operator <(const Date& a, const Date& b);
 bool operator ==(const Date& a, const Date& b);
 
 enum WeekDay { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday };
-constexpr string days[7] = {"Monday"_,"Tuesday"_,"Wednesday"_,"Thursday"_,"Friday"_,"Saturday"_,"Sunday"_};
+constexpr string days[7] = {"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
 enum Month { January, February, March, April, May, June, July, August, September, October, November, December };
-constexpr string months[12] = {"January"_,"February"_,"March"_,"April"_,"May"_,"June"_,"July"_,"August"_,"September"_,"October"_,"November"_,"December"_};
+constexpr string months[12] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
 int daysInMonth(int month, int year);
 
 /// Returns current date formatted using \a format String

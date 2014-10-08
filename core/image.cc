@@ -7,12 +7,12 @@
 // -- Decoding --
 
 string imageFileFormat(const ref<byte> file) {
-    if(startsWith(file,"\xFF\xD8")) return "JPEG"_;
-    else if(startsWith(file,"\x89PNG\r\n\x1A\n")) return "PNG"_;
-    else if(startsWith(file,"\x00\x00\x01\x00")) return "ICO"_;
-    else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return "TIFF"_;
-    else if(startsWith(file,"BM")) return "BMP"_;
-    else return ""_;
+    if(startsWith(file,"\xFF\xD8")) return "JPEG";
+    else if(startsWith(file,"\x89PNG\r\n\x1A\n")) return "PNG";
+    else if(startsWith(file,"\x00\x00\x01\x00")) return "ICO";
+    else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return "TIFF";
+    else if(startsWith(file,"BM")) return "BMP";
+    else return "";
 }
 
 int2 imageSize(const ref<byte> file) {
@@ -66,7 +66,7 @@ Image decodeImage(const ref<byte> file) {
     else if(startsWith(file,"\x00\x00\x02\x00")||startsWith(file,"\x00\x00\x0A\x00")) return decodeTGA(file);
     else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return decodeTIFF(file);
     else if(startsWith(file,"BM")) return decodeBMP(file);
-    else { if(file.size) error("Unknown image format"_,hex(cast<uint8>(file.slice(0,min<int>(file.size,4))))); return Image(); }
+    else { if(file.size) error("Unknown image format",hex(cast<uint8>(file.slice(0,min<int>(file.size,4))))); return Image(); }
 }
 
 // -- Resampling (3x8bit) --

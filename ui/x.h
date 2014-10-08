@@ -123,14 +123,14 @@ struct GetKeyboardMapping {
 };
 
 namespace X11 {
-constexpr string requests[] = {"0"_,"CreateWindow"_,"ChangeWindowAttributes"_,"GetWindowAttributes"_,"DestroyWindow"_,"DestroySubwindows"_,"ChangeSaveSet"_,"ReparentWindow"_,"MapWindow"_,"MapSubwindows"_,"UnmapWindow"_,"UnmapSubwindows"_,"ConfigureWindow"_,"CirculateWindow"_,"GetGeometry"_,"QueryTree"_,"InternAtom"_,"GetAtomName"_,"ChangeProperty"_,"DeleteProperty"_,"GetProperty"_,"ListProperties"_,"SetSelectionOwner"_,"GetSelectionOwner"_,"ConvertSelection"_,"SendEvents"_,"GrabPointer"_,"UngrabPointer"_,"GrabButton"_,"UngrabButton"_,"ChangeActivePointerGrab"_,"GrabKeyboard"_,"UngrabKeyboard"_,"GrabKey"_,"UngrabKey"_,"AllowEvents"_,"GrabServer"_,"UngrabServer"_,"QueryPointer"_,"GetMotionEvents"_,"TranslateCoordinates"_,"WarpPointer"_,"SetInputFocus"_,"GetInputFocus"_,"QueryKeymap"_,"OpenFont"_,"CloseFont"_,"QueryFont"_,"QueryTextElements"_,"ListFonts"_,"ListFontsWithInfo"_,"SetFontPath"_,"GetFontPath"_,"CreatePixmap"_,"FreePixmap"_,"CreateGC"_,"ChangeGC"_,"CopyGC"_,"SetDashes"_,"SetClipRectangles"_,"FreeGC"_,"ClearArea"_,"CopyArea"_,"CopyPlane"_,"PolyPoint"_,"PolyLine"_,"PolySegment"_,"PolyRectange"_,"PolyArc"_,"FillPoly"_,"PolyFillRectangle"_,"PolyFillArc"_,"PutImage"_};
-constexpr string events[] = {"Error"_,"Reply"_,"KeyPress"_,"KeyRelease"_,"ButtonPress"_,"ButtonRelease"_,"MotionNotify"_,"EnterNotify"_,
-                              "LeaveNotify"_,"FocusIn"_,"FocusOut"_,"KeymapNotify"_,"Expose"_,"GraphicsExpose"_,"NoExpose"_,"VisibilityNotify"_,
-                              "CreateNotify"_,"DestroyNotify"_,"UnmapNotify"_,"MapNotify"_,"MapRequest"_,"ReparentNotify"_,"ConfigureNotify"_,
-                              "ConfigureRequest"_,"GravityNotify"_,"ResizeRequest"_,"CirculateNotify"_,"CirculateRequest"_,"PropertyNotify"_,
-                              "SelectionClear"_,"SelectionRequest"_,"SelectionNotify"_,"ColormapNotify "_,"ClientMessage"_,"MappingNotify"_};
-constexpr string errors[] = {""_,"Request"_,"Value"_,"Window"_,"Pixmap"_,"Atom"_,"Cursor"_,"Font"_,"Match"_,"Drawable"_,"Access"_,"Alloc"_,
-                              "Colormap"_,"GContext"_,"IDChoice"_,"Name"_,"Length"_,"Implementation"_};
+constexpr string requests[] = {"0","CreateWindow","ChangeWindowAttributes","GetWindowAttributes","DestroyWindow","DestroySubwindows","ChangeSaveSet","ReparentWindow","MapWindow","MapSubwindows","UnmapWindow","UnmapSubwindows","ConfigureWindow","CirculateWindow","GetGeometry","QueryTree","InternAtom","GetAtomName","ChangeProperty","DeleteProperty","GetProperty","ListProperties","SetSelectionOwner","GetSelectionOwner","ConvertSelection","SendEvents","GrabPointer","UngrabPointer","GrabButton","UngrabButton","ChangeActivePointerGrab","GrabKeyboard","UngrabKeyboard","GrabKey","UngrabKey","AllowEvents","GrabServer","UngrabServer","QueryPointer","GetMotionEvents","TranslateCoordinates","WarpPointer","SetInputFocus","GetInputFocus","QueryKeymap","OpenFont","CloseFont","QueryFont","QueryTextElements","ListFonts","ListFontsWithInfo","SetFontPath","GetFontPath","CreatePixmap","FreePixmap","CreateGC","ChangeGC","CopyGC","SetDashes","SetClipRectangles","FreeGC","ClearArea","CopyArea","CopyPlane","PolyPoint","PolyLine","PolySegment","PolyRectange","PolyArc","FillPoly","PolyFillRectangle","PolyFillArc","PutImage"};
+constexpr string events[] = {"Error","Reply","KeyPress","KeyRelease","ButtonPress","ButtonRelease","MotionNotify","EnterNotify",
+                              "LeaveNotify","FocusIn","FocusOut","KeymapNotify","Expose","GraphicsExpose","NoExpose","VisibilityNotify",
+                              "CreateNotify","DestroyNotify","UnmapNotify","MapNotify","MapRequest","ReparentNotify","ConfigureNotify",
+                              "ConfigureRequest","GravityNotify","ResizeRequest","CirculateNotify","CirculateRequest","PropertyNotify",
+                              "SelectionClear","SelectionRequest","SelectionNotify","ColormapNotify ","ClientMessage","MappingNotify"};
+constexpr string errors[] = {"","Request","Value","Window","Pixmap","Atom","Cursor","Font","Match","Drawable","Access","Alloc",
+                              "Colormap","GContext","IDChoice","Name","Length","Implementation"};
 }
 
 namespace Shm {
@@ -148,8 +148,8 @@ struct GetImage {
     struct Reply { uint8 depth; uint16 seq; uint size; uint visual, length, pad[4]; } packed;
 };
 enum { Completion };
-constexpr string requests[] = {"QueryVersion"_,"Attach"_,"Detach"_,"PutImage"_,"GetImage"_};
-constexpr string errors[] = {"BadSeg"_};
+constexpr string requests[] = {"QueryVersion","Attach","Detach","PutImage","GetImage"};
+constexpr string errors[] = {"BadSeg"};
 }
 
 namespace XRender {
@@ -172,9 +172,9 @@ struct CreatePicture { int8 ext=EXT,req=4; uint16 size=5; uint picture,drawable,
 struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
 struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
 struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
-constexpr string requests[] = {"QueryVersion"_, "QueryPictFormats"_, "QueryPictIndexValues"_, "QueryFilters"_, "CreatePicture"_, "ChangePicture"_,
-                               "SetPictureClipRectangles"_, "SetPictureTransform"_, "SetPictureFilter"_, "FreePicture"_, "Composite"_};
-constexpr string errors[] = {"PictFormat"_, "Picture"_, "PictOp"_, "GlyphSet"_, "Glyph"_};
+constexpr string requests[] = {"QueryVersion", "QueryPictFormats", "QueryPictIndexValues", "QueryFilters", "CreatePicture", "ChangePicture",
+                               "SetPictureClipRectangles", "SetPictureTransform", "SetPictureFilter", "FreePicture", "Composite"};
+constexpr string errors[] = {"PictFormat", "Picture", "PictOp", "GlyphSet", "Glyph"};
 }
 
 namespace Present {
