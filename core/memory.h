@@ -76,6 +76,8 @@ generic struct buffer : mref<T> {
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
 
+    void operator<<(const ref<T>& a) { size_t s=size; assert_((size=s+a.size) <= capacity); copy(mref<T>::slice(s,a.size), a); }
+
     using mref<T>::data;
     using mref<T>::size;
     size_t capacity=0; /// 0: reference, >0: size of the owned heap allocation

@@ -213,7 +213,7 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
     for(const string& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
         if(!sameSince(input, queryTime, arguments)) return false;
     }
-    if(rule.operation && parseDate(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
+    //if(rule.operation && parseDate(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
     return true;
 }
 
@@ -464,7 +464,7 @@ void PersistentProcess::compute(const string& operationName, const ref<shared<Re
                 //else only open file to map read-only
             } else { // Copies data from anonymous memory to file
                 file = File(result->dataFile(), result->folder, Flags(ReadWrite|Truncate|Create));
-                assert(result->data);
+                assert(result->data, result->data.size, result->name, result->id);
                 file.write(result->data);
             }
             if(result->data.size>=(1<<16)) { // Remaps file read-only (will be remapped Read|Write whenever used as output again)

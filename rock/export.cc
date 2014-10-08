@@ -281,7 +281,7 @@ template struct Interface<Operation>::Factory<ToASCII>;
 
 FILE(CDL)
 /// Exports volume to unidata netCDF CDL (network Common data form Description Language) (can be converted to a binary netCDF dataset using ncgen)
-static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
+static void toCDL(buffer<byte>& data, const Volume& source) {
     uint64 X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z, XY=X*Y;
     const uint marginX=source.margin.x, marginY=source.margin.y, marginZ=source.margin.z;
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
@@ -315,10 +315,14 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
     positions.size = positionIndex-positions.begin(); assert_(positions.size <= positions.capacity);
     values.size = valueIndex-values.begin(); assert_(values.size <= values.capacity);
     uint64 valueCount = values.size / (valueSize+1);
-    string header = CDL();
-    String data; data.data = outputBuffer.data, data.size=0, data.capacity=outputBuffer.size;
-    assert_(header.size + 3*valueCount*"0,"_.size + positions.size + values.size <= data.capacity);
-    for(TextData s(header);;) {
+    uint64 size = CDL().size + 3*valueCount*"0,"_.size + positions.size + values.size;
+    // Sets fields for correct append operation (capacity=0 when buffer is a reference to a memory map allocation)
+    size_t capacity = data.capacity;
+    if(!data.capacity) { data.capacity = data.size; data.size=0; }
+    // Allocates anonymous memory (was too small to be allocated by process manager as a memory map backed by a persistent file)
+    else { assert(data); data=buffer<byte>(size, 0); }
+    assert_(size <= data.capacity?:data.size);
+    for(TextData s(CDL());;) {
         data << s.until('$'); // Copies header until next substitution
         /***/ if(s.match('#')) data << str(valueCount); // Substitutes non-zero values count
         else if(s.match('0')) { data << repeat("0,"_, valueCount), data.last()=';'; } // Substitutes zeroes
@@ -328,15 +332,13 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
         else if(!s) break;
         else error("Unknown substitution",s.until(';'));
     }
-    assert_(data.size < outputBuffer.size);
-    data.capacity = 0; // Actually not heap allocated
-    outputBuffer.size = data.size;
+    data.capacity = capacity;
 }
 struct ToCDL : VolumeOperation {
     size_t outputSize(const Dict&, const ref<const Result*>& inputs, uint) override {
         assert_(inputs);
         assert_(toVolume(*inputs[0]), inputs[0]->name, inputs[0]->metadata, inputs[0]->data.size);
-        return toVolume(*inputs[0]).size() * 32;
+        return CDL().size + toVolume(*inputs[0]).size()*(3*(2+5)+6);
     }
     void execute(const Dict&, const mref<Volume>&, const ref<Volume>& inputs, const ref<Result*>& outputs) override {
         outputs[0]->metadata = String("cdl"_);
