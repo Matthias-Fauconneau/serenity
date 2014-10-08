@@ -45,7 +45,7 @@ generic void bin(Volume& target, const Volume16& radius, const VolumeT<T>& attri
     const int64 X=radius.sampleCount.x, Y=radius.sampleCount.y, Z=radius.sampleCount.z;
     assert_(X%tileSide==0 && Y%tileSide==0 && Z%tileSide==0);
     const int marginX=radius.margin.x, marginY=radius.margin.y, marginZ=radius.margin.z;
-    assert_(radius.tiled() && attribute.tiled(), "Bin");
+    assert_(radius.tiled() && attribute.tiled());
     const ref<uint64> offsetX = radius.offsetX, offsetY = radius.offsetY, offsetZ = radius.offsetZ;
 
     Tile<T>* const targetData = reinterpret_cast<Tile<T>*>(target.data.begin());

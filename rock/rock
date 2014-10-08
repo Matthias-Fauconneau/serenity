@@ -169,6 +169,7 @@ connectivity-histogram = Slice connectivity-histogram-zero begin=1 # Excluding b
 
 # Distance restricted to curve skeleton voxels
 curve-skeleton-distance = Mask curve-skeleton distance invert=1 value=0
+curve-skeleton-distance-tiled = ZOrder curve-skeleton-distance
 
 # Local extremum of distance curve
 pore-curve-skeleton-extremum-list = LocalExtremumList curve-skeleton-distance
@@ -182,8 +183,8 @@ pore-root-index = ZOrder pore-root-index-untiled
 throat-root-index = ZOrder throat-root-index-untiled
 
 # Rasterizes curve extremum roots as maximum balls (with index attribute) #FIXME TODO: Walk edges to next overlap
-pore-root-bins = Bin curve-skeleton-distance pore-root-index
-throat-root-bins = Bin curve-skeleton-distance throat-root-index
+pore-root-bins = Bin curve-skeleton-distance-tiled pore-root-index
+throat-root-bins = Bin curve-skeleton-distance-tiled throat-root-index
 if method == 'curve': pore-index = RasterizeAttribute pore-root-bins
 if method == 'curve': throat-index = RasterizeAttribute throat-root-bins
 # Lists rasterized voxels for each pore

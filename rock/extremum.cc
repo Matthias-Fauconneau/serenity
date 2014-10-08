@@ -93,7 +93,7 @@ struct RasterizeIndex : VolumeOperation {
         int3 size = sampleCountForSize(parse3(inputs[1]->data));
         outputs[0].sampleCount = nextPowerOfTwo(size);
         outputs[0].margin = (outputs[0].sampleCount-size)/2;
-        rasterizeIndex(outputs[0],parseList(inputs[0]->data));
+        rasterizeIndex(outputs[0], parseList(inputs[0]->data));
     }
 };
 template struct Interface<Operation>::Factory<RasterizeIndex>;

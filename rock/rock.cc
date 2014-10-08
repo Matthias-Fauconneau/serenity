@@ -80,14 +80,13 @@ struct Rock : PersistentProcess, Poll {
                     Folder folder(path, cwd, true);
                     for(const_pair<String,buffer<byte>> element: (const map<String,buffer<byte>>&)result->elements) writeFile(element.key+"."_+result->metadata, element.value, folder);
                 } else {
-                    String data = unsafeReference(result->data);
+                    const ref<byte> data = result->data;
                     if(existsFolder(path, cwd)) {
                         Time time;
                         writeFile(fileName, data, Folder(path, cwd));
                         log(path+"/"_+fileName, "["_+binaryPrefix(data.size)+"]"_, time);
                     } else {
                         Time time;
-                        //assert_(!(existsFile(path, cwd) && File(path, cwd).size() >= 4<<30 && data.size <= 1<<20), "Would override large existing result, need to be removed manually", path);
                         writeFile(path, data, cwd);
                         log(fileName,"->",path, "["_+binaryPrefix(data.size)+"]"_, time);
                     }

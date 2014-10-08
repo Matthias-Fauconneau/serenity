@@ -302,7 +302,7 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
                 else if(source.sampleSize==4 && !source.floatingPoint) value = ((uint32*)source.data.data)[index];
                 else if(source.sampleSize==4 && source.floatingPoint) value = round(((float*)source.data.data)[index]); //FIXME: converts to ASCII with decimals
                 else error(source.sampleSize);
-                assert(value <= source.maximum, value, source.maximum);
+                assert_(value <= source.maximum, value, source.maximum);
                 if(value) {
                     itoa<positionSize>(positionIndex, x-source.origin.x);
                     itoa<positionSize>(positionIndex, y-source.origin.y);
@@ -312,8 +312,8 @@ static void toCDL(buffer<byte>& outputBuffer, const Volume& source) {
             }
         }
     }
-    positions.size = positionIndex-positions.begin(); assert(positions.size <= positions.capacity);
-    values.size = valueIndex-values.begin(); assert(values.size <= values.capacity);
+    positions.size = positionIndex-positions.begin(); assert_(positions.size <= positions.capacity);
+    values.size = valueIndex-values.begin(); assert_(values.size <= values.capacity);
     uint64 valueCount = values.size / (valueSize+1);
     string header = CDL();
     String data; data.data = outputBuffer.data, data.size=0, data.capacity=outputBuffer.size;

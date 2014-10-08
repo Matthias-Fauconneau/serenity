@@ -74,7 +74,7 @@ buffer<byte> Stream::readUpTo(size_t capacity) {
     return buffer;
 }
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
-void Stream::write(const byte* data, size_t size) { assert(data); for(size_t offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), name()); }
+void Stream::write(const byte* data, size_t size) { assert(data); for(size_t offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), name(), (int)fd, (void*)data, offset, size); }
 void Stream::write(const ref<byte>& buffer) { write(buffer.data, buffer.size); }
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXEC,0))){}
 
