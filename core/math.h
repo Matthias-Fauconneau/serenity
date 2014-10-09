@@ -32,8 +32,8 @@ inline real pow(real x, real y) { return __builtin_pow(x,y); }
 
 inline real ln(real x) { return __builtin_log(x); }
 inline real exp2(real x) { return __builtin_exp2(x); }
-const real expUnderflow = ln(exp2(-1022));
-const real expOverflow = ln(exp2(1023));
+const real unused expUnderflow = ln(exp2(-1022));
+const real unused expOverflow = ln(exp2(1023));
 inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 
 inline real cos(real t) { return __builtin_cos(t); }

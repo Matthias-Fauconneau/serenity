@@ -136,7 +136,7 @@ struct Build {
             args << copy(object) << target+".cc"_;
             args << String("-I/usr/include/freetype2"_);
             if(arch=="i386"_) args << String("-m32"_) << String("-march=i386"_) << String("-mfpmath=sse"_);
-            else if(arch=="x86_64"_) {} // System defaults (usually -march=x86_64)
+            else if(arch=="x86_64"_) args << String("-msse3"_);
             else args << String("-march=native"_);
 
             if(!flags.contains("release"_)) args << String("-g"_);
@@ -186,14 +186,15 @@ struct Build {
             } else flags << split(arg,'-');
         }
 
-        arch = flags.contains("i386"_) ? "i386"_ : flags.contains("x86_64"_) ? "x86_64"_  : "native"_;
-
         const String base (section(folder.name(),'/',-2,-1));
         if(!target) target = copy(base);
 
         tmp = "/var/tmp/"_+base+"."_+section(CXX,'/',-2,-1);
         Folder(tmp, root(), true);
         Folder(tmp+"/"_+join(flags,"-"_), root(), true);
+
+        arch = flags.contains("i386"_) ? "i386"_ : flags.contains("x86_64"_) ? "x86_64"_  : "native"_;
+        log("Building", target, " target for", arch, "architecture");
 
         // Compiles
         if(flags.contains("profile"_)) compileModule(find("profile.cc"_));

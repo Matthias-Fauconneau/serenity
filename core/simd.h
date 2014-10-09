@@ -7,7 +7,6 @@ typedef int v4si __attribute((__vector_size__ (16)));
 unused const v4si _1i = {1,1,1,1};
 inline v4si set1(int i) { return (v4si){i,i,i,i}; }
 inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
-inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v8hi
@@ -15,7 +14,6 @@ typedef short v8hi __attribute((__vector_size__ (16)));
 unused const v8hi _0h = {0,0,0,0};
 inline v8hi short8(int16 i) { return (v8hi){i,i,i,i,i,i,i,i}; }
 inline v8hi loada(const uint16* const ptr) { return *(v8hi*)ptr; }
-inline v8hi loadu(const uint16* const ptr) { return (v8hi)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(uint16* const ptr, v8hi a) { *(v8hi*)ptr = a; }
 inline v8hi packss(v4si a, v4si b) { return __builtin_ia32_packssdw128(a,b); }
 inline v8hi shiftRight(v8hi a, uint imm) { return __builtin_ia32_psrlwi128(a, imm); }
@@ -25,7 +23,6 @@ inline v8hi max(v8hi a, v8hi b) { return select(a, b, b>a); }
 
 // v16qi
 typedef byte v16qi  __attribute((__vector_size__ (16)));
-inline v16qi loadu(const byte* const ptr) { return __builtin_ia32_lddqu(ptr); }
 inline void storeu(byte* const ptr, v16qi a) { __builtin_ia32_storedqu(ptr, a); }
 
 // v4sf
@@ -35,7 +32,6 @@ unused const v4sf _1f = float4( 1 );
 unused const v4sf _0f = float4( 0 );
 
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
-inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 //inline v4sf bitOr(v4sf a, v4sf b) { return __builtin_ia32_orps(a, b); }
