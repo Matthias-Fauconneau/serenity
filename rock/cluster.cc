@@ -16,7 +16,13 @@ struct FamilySet {
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
-// Adds relative complement of set A in the set B (B \ A) to A's relative complements map
+/// Returns A and B intersects
+bool intersects(const FamilySet& A, const FamilySet& B) { for(Family* family: A.families) if(B.families.contains(family)) return true; return false; }
+
+/// Returns whether A includes B
+bool includes(const FamilySet& A, const FamilySet& B) { for(Family* family: B.families) if(!A.families.contains(family)) return false; return true; }
+
+/// Adds relative complement of set A in the set B (B \ A) to A's relative complements map
 void relativeComplement(array<unique<FamilySet>>& familySets, size_t a, size_t b) {
     FamilySet& A = familySets[a];
     FamilySet& B = familySets[b];
@@ -54,7 +60,6 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
     familySets << unique<FamilySet>(); // index 0 is no families (background or yet unassigned)
     for(int R2=lists.size-1; R2>=0; R2--) { // Process balls from largest to smallest (minimum R2 is not necessarily zero, depends on List.minimum)
         const array<short3>& balls = lists[R2];
-        if(familySets.size + balls.size >= 1<<24) { log("Too many family sets to merge efficiently at sqRadius=",R2); break; }
         int D2 = 4*R2;
         int D = ceil(sqrt((float)D2));
         float R = sqrt((float)R2);
@@ -102,32 +107,35 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
                         }
                         else {
                             int i = parentFamilySet.unions.keys.indexOf(candidateFamilySetIndex);
-                            uint unionIndex;
-                            if(i>=0) unionIndex = parentFamilySet.unions.values[i]; // In a family for which an union set with the parent's set exists
-                            else { // In a family for which no union set with the parent's set exists yet
-                                FamilySet& candidateFamilySet = familySets[candidateFamilySetIndex];
-                                unionIndex = parentFamilySetIndex;
-                                for(Family* family: candidateFamilySet.families) {
-                                    if(!parentFamilySet.families.contains(family)) { // Creates a new set only if candidate is not included in this
+                            {uint unionIndex;
+                                if(i>=0) { // Candidate belongs to a family for which an union set with the parent's set exists already
+                                    unionIndex = parentFamilySet.unions.values[i];
+                                } else { // Candidate belongs to a family for which no union set with the parent's set exists yet
+                                    FamilySet& candidateFamilySet = familySets[candidateFamilySetIndex];
+
+                                    if(includes(parentFamilySet, candidateFamilySet)) {
+                                        unionIndex = parentFamilySetIndex;  // As the candidate's set is a subset of the parent's set, the union is the superset
+                                    } else { // Otherwise creates a new union set
                                         unique<FamilySet> unionSet;
                                         unionSet->families << parentFamilySet.families; // Copies the parent's set
                                         unionSet->families += candidateFamilySet.families; // Adds (without duplicates) the candidate's set
-                                        unionIndex = familySets.size; // New lookup index to the union family set
+                                        unionIndex = familySets.size; // New index to the union set
                                         familySets << move(unionSet);
-                                        break;
                                     }
-                                } //else No-op union as the candidate's set is included in parent's set
-                                parentFamilySet.unions.insert(candidateFamilySetIndex, unionIndex);
-                                candidateFamilySet.unions.insert(parentFamilySetIndex, unionIndex);
 
-                                // Creates both relative complements sets (not commutative) to lookup the set of families to append new elements to
-                                relativeComplement(familySets, parentFamilySetIndex, candidateFamilySetIndex);
-                                relativeComplement(familySets, candidateFamilySetIndex, parentFamilySetIndex);
+                                    // Registers the union set for later lookups
+                                    parentFamilySet.unions.insert(candidateFamilySetIndex, unionIndex);
+                                    candidateFamilySet.unions.insert(parentFamilySetIndex, unionIndex);
+
+                                    // Creates both relative complements sets (not commutative) to lookup the set of families to append new elements to
+                                    relativeComplement(familySets, parentFamilySetIndex, candidateFamilySetIndex);
+                                    relativeComplement(familySets, candidateFamilySetIndex, parentFamilySetIndex);
+                                }
+                                familySets[unionIndex]->points.append( candidate );
+                                candidateFamilySetIndex = unionIndex; // Updates to the union set index
                             }
                             int complementIndex = parentFamilySet.complements.at(candidateFamilySetIndex);
                             for(Family* family: familySets[complementIndex]->families) family->append( candidate ); // Appends to the complement
-                            familySets[unionIndex]->points.append( candidate );
-                            candidateFamilySetIndex = unionIndex; // Updates to the union set index
                         }
                     }
                 }
@@ -155,42 +163,43 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
     return target;
 }
 
-/// Merges intersecting sets of intersections and converts sets to a text file formatted as ((x y z r2)+\n)*
-String toASCII(array<unique<FamilySet>>&& familySets, const Volume16& source) {
+/// Union merges intersecting sets of union sets
+array<unique<FamilySet>> mergeIntersectingSetsOfUnionSets(array<unique<FamilySet>>&& familySets) {
     array<unique<FamilySet>> mergedSets;
-    {Time time; log_(str("Merging ",familySets.size,"family sets..."_));
-        //assert_(familySets.size < 1<<16, "Too many family sets to merge efficiently");
-        while(familySets) {
-            //log(familySets.size);
-            unique<FamilySet> set = familySets.pop();
-            if(set->families.size<=1) continue; // Only intersections
-            for(uint i=0; i<familySets.size;) {
-                const FamilySet& other = familySets[i];
-                if(other.families.size<=1) { i++; continue; } // Only intersections
-                for(Family* family: set->families) if(other.families.contains(family)) { goto break_; }
-                /*else*/ { i++; continue; }
-                break_:
-                set->points << other.points;
+    Time time;
+    log_(str("Merging ",familySets.size,"family sets..."_));
+    while(familySets) {
+        unique<FamilySet> A = familySets.pop();
+        if(A->families.size<=1) continue; // Only union sets
+        for(uint i=0; i<familySets.size;) {
+            const FamilySet& B = familySets[i];
+            if(B.families.size>1 && intersects(A, B)) {
+                A->points += B.points; // Union merges
                 familySets.removeAt(i);
-            }
-            mergedSets << move(set);
+            } else i++;
         }
-        log(time);}
-    {
-        // Estimates text size to avoid reallocations
-        String target ( sum(apply(mergedSets,[](const FamilySet& family){ return family.points.size*4*5;})) );
-        byte* targetPtr = target.begin();
-        Time time; log_(str("toASCII",mergedSets.size,"familySets..."_));
-        for(const FamilySet& set: mergedSets) {
-            for(uint64 index: set.points) {
-                int3 p = zOrder(index);
-                itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
-            }
-            targetPtr[-1] = '\n';
+        mergedSets << move(A);
+    }
+    log(time);
+    return mergedSets;
+}
+
+/// Converts sets to a text file formatted as ((x y z r2)+\n)*
+String toASCII(const array<unique<FamilySet>>& familySets, const Volume16& source) {
+    // Estimates text size to avoid reallocations
+    String target ( sum(apply(familySets,[](const FamilySet& family){ return family.points.size*4*5;})) );
+    byte* targetPtr = target.begin();
+    Time time; log_(str("toASCII",familySets.size,"familySets..."_));
+    for(const FamilySet& set: familySets) {
+        for(uint64 index: set.points) {
+            int3 p = zOrder(index);
+            itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
         }
-        log(time);
-        target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
-        return target;}
+        targetPtr[-1] = '\n';
+    }
+    log(time);
+    target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
+    return target;
 }
 
 /// Computes trees of overlapping balls
@@ -199,11 +208,14 @@ struct Cluster : VolumeOperation {
     uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint32) : 0; }
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs,
                          const ref<const Result*>& otherInputs) override {
-        auto multipleReturnValues = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
+        const auto multipleReturnValues = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
+        const auto& families = multipleReturnValues.families;
+        const auto& familySets = multipleReturnValues.familySets;
         otherOutputs[0]->metadata = String("families"_);
-        otherOutputs[0]->data = toASCII(multipleReturnValues.families, inputs[0]);
-        otherOutputs[1]->metadata = String("intersections"_);
-        otherOutputs[1]->data = toASCII(move(multipleReturnValues.familySets), inputs[0]);
+        otherOutputs[0]->data = toASCII(families, inputs[0]);
+        otherOutputs[1]->metadata = String("familysets"_);
+        //familySets = mergeIntersectingSetsOfUnionSets(move(familySets));
+        otherOutputs[1]->data = toASCII(familySets, inputs[0]);
     }
 };
 template struct Interface<Operation>::Factory<Cluster>;
