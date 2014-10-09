@@ -163,27 +163,6 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
     return target;
 }
 
-/// Union merges intersecting sets of union sets
-array<unique<FamilySet>> mergeIntersectingSetsOfUnionSets(array<unique<FamilySet>>&& familySets) {
-    array<unique<FamilySet>> mergedSets;
-    Time time;
-    log_(str("Merging ",familySets.size,"family sets..."_));
-    while(familySets) {
-        unique<FamilySet> A = familySets.pop();
-        if(A->families.size<=1) continue; // Only union sets
-        for(uint i=0; i<familySets.size;) {
-            const FamilySet& B = familySets[i];
-            if(B.families.size>1 && intersects(A, B)) {
-                A->points += B.points; // Union merges
-                familySets.removeAt(i);
-            } else i++;
-        }
-        mergedSets << move(A);
-    }
-    log(time);
-    return mergedSets;
-}
-
 /// Converts sets to a text file formatted as ((x y z r2)+\n)*
 String toASCII(const array<unique<FamilySet>>& familySets, const Volume16& source) {
     // Estimates text size to avoid reallocations
@@ -214,7 +193,6 @@ struct Cluster : VolumeOperation {
         otherOutputs[0]->metadata = String("families"_);
         otherOutputs[0]->data = toASCII(families, inputs[0]);
         otherOutputs[1]->metadata = String("familysets"_);
-        //familySets = mergeIntersectingSetsOfUnionSets(move(familySets));
         otherOutputs[1]->data = toASCII(familySets, inputs[0]);
     }
 };
