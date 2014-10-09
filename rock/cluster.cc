@@ -16,6 +16,26 @@ struct FamilySet {
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
+// Adds relative complement of set A in the set B (B \ A) to A's relative complements map
+void relativeComplement(array<unique<FamilySet>>& familySets, size_t a, size_t b) {
+    FamilySet& A = familySets[a];
+    FamilySet& B = familySets[b];
+    uint complementIndex = 0;
+    for(Family* family: B.families) {
+        if(!A.families.contains(family)) { // Creates a new set only if other is not included in the parent's set
+             // Relative complement of the parent's set in the candidate's set (candidate \ parent)
+            unique<FamilySet> complementSet;
+            complementSet->families << B.families; // Copies the candidate's set
+             // Removes the parent set
+            complementSet->families.filter([&A](const Family* f){ return A.families.contains(f); });
+            complementIndex = familySets.size; // New lookup index to the union family set
+            familySets << move(complementSet);
+            break;
+        }
+    } //else Empty complement as other set is included in parent's set
+    A.complements.insert(b, complementIndex);
+}
+
 // Workaround lack of multiple return values
 struct MultipleReturnValues {
     array<unique<Family>> families;
@@ -36,7 +56,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
         const array<short3>& balls = lists[R2];
         if(familySets.size + balls.size >= 1<<24) { log("Too many family sets to merge efficiently at sqRadius=",R2); break; }
         int D2 = 4*R2;
-        int D = ceil(sqrt(D2));
+        int D = ceil(sqrt((float)D2));
         float R = sqrt((float)R2);
         log(R, families.size, familySets.size);
         Time time; Time report;
@@ -101,38 +121,8 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
                                 candidateFamilySet.unions.insert(parentFamilySetIndex, unionIndex);
 
                                 // Creates both relative complements sets (not commutative) to lookup the set of families to append new elements to
-                                { // Relative complement of the parent's set in the candidate's set (candidate \ parent)
-                                    uint complementIndex = 0;
-                                    for(Family* family: candidateFamilySet.families) {
-                                        if(!parentFamilySet.families.contains(family)) { // Creates a new set only if other is not included in the parent's set
-                                             // Relative complement of the parent's set in the candidate's set (candidate \ parent)
-                                            unique<FamilySet> complementSet;
-                                            complementSet->families << candidateFamilySet.families; // Copies the candidate's set
-                                             // Removes the parent set
-                                            complementSet->families.filter([&parentFamilySet](const Family* f){ return parentFamilySet.families.contains(f); });
-                                            complementIndex = familySets.size; // New lookup index to the union family set
-                                            familySets << move(complementSet);
-                                            break;
-                                        }
-                                    } //else Empty complement as other set is included in parent's set
-                                    parentFamilySet.complements.insert(candidateFamilySetIndex, complementIndex);
-                                }
-                                { // Relative complement of the candidate's in parent's (parent \ candidate)
-                                    uint complementIndex = 0;
-                                    for(Family* family: parentFamilySet.families) {
-                                        // Creates a new set only if the parent's set is not included in the candidate's set
-                                        if(!candidateFamilySet.families.contains(family)) {
-                                            unique<FamilySet> complementSet; // Relative complement of the parent's in the candidate's (candidate \ parent)
-                                            complementSet->families << parentFamilySet.families; // Copies the parent's set
-                                             // Removes the other set
-                                            complementSet->families.filter([&candidateFamilySet](const Family* f){ return candidateFamilySet.families.contains(f); });
-                                            complementIndex = familySets.size; // New lookup index to the union family set
-                                            familySets << move(complementSet);
-                                            break;
-                                        }
-                                    } //else Empty complement as the candidate's set is included in the parent's set
-                                    candidateFamilySet.complements.insert(parentFamilySetIndex, complementIndex);
-                                }
+                                relativeComplement(familySets, parentFamilySetIndex, candidateFamilySetIndex);
+                                relativeComplement(familySets, candidateFamilySetIndex, parentFamilySetIndex);
                             }
                             int complementIndex = parentFamilySet.complements.at(candidateFamilySetIndex);
                             for(Family* family: familySets[complementIndex]->families) family->append( candidate ); // Appends to the complement
