@@ -5,59 +5,56 @@
 #include "crop.h"
 #include "time.h"
 
-/// Set of points belonging together (clustered by maximum ball)
+/// Set of balls belonging together (clustered by maximum ball)
 typedef array<uint64> Family;
 /// Set of families
 struct FamilySet {
-    array<Family*> families; // Family set
-    map<uint,uint> unions; // Maps another family set index to the index of the union of this family set and the other family set
-    map<uint,uint> complements; // Maps another family set index to the index of the relative complement of this family set in the other family set
-    array<uint64> points; // Points belonging to this family set (i.e to all families in the set (i.e intersection))
+    array<uint> families; // Family set
+    map<uint, uint> unions; // Maps another family set index to the index of the union of this family set and the other family set
+    map<uint, array<uint>> complements; // Maps another family set index to the relative complement of this family set in the other family set
+    array<uint64> elements; // Elements belonging to this family set (i.e to all families in the set (i.e intersection))
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
-/// Returns A and B intersects
-bool intersects(const FamilySet& A, const FamilySet& B) { for(Family* family: A.families) if(B.families.contains(family)) return true; return false; }
+/// Returns A families and B families intersects
+bool intersects(const FamilySet& A, const FamilySet& B) { for(uint family: A.families) if(B.families.contains(family)) return true; return false; }
 
-/// Returns whether A includes B
-bool includes(const FamilySet& A, const FamilySet& B) { for(Family* family: B.families) if(!A.families.contains(family)) return false; return true; }
+/// Returns whether A families includes B families
+bool includes(const FamilySet& A, const FamilySet& B) { for(uint family: B.families) if(!A.families.contains(family)) return false; return true; }
 
-/// Adds relative complement of set A in the set B (B \ A) to A's relative complements map
-void relativeComplement(array<unique<FamilySet>>& familySets, size_t a, size_t b) {
+/// Returns relative complement of set A in B (B \ A)
+array<uint> relativeComplement(const array<uint>& A, const array<uint>& B) {
+    array<uint> complementSet (B.size);
+    for(uint family: B) if(!A.contains(family)) complementSet.append(family);
+    return complementSet;
+}
+
+/// Adds A and B relative family complements to their relative family complements associative arrays
+void relativeComplements(array<FamilySet>& familySets, size_t a, size_t b) {
     FamilySet& A = familySets[a];
     FamilySet& B = familySets[b];
-    uint complementIndex = 0;
-    for(Family* family: B.families) {
-        if(!A.families.contains(family)) { // Creates a new set only if other is not included in the parent's set
-             // Relative complement of the parent's set in the candidate's set (candidate \ parent)
-            unique<FamilySet> complementSet;
-            complementSet->families << B.families; // Copies the candidate's set
-             // Removes the parent set
-            complementSet->families.filter([&A](const Family* f){ return A.families.contains(f); });
-            complementIndex = familySets.size; // New lookup index to the union family set
-            familySets << move(complementSet);
-            break;
-        }
-    } //else Empty complement as other set is included in parent's set
-    A.complements.insert(b, complementIndex);
+    A.complements.insert(b, relativeComplement(A.families, B.families));
+    B.complements.insert(a, relativeComplement(B.families, A.families));
 }
 
 // Workaround lack of multiple return values
 struct MultipleReturnValues {
-    array<unique<Family>> families;
-    array<unique<FamilySet>> familySets;
+    array<Family> families;
+    array<FamilySet> familySets;
 };
 MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
+    assert_(source.tiled() && target.tiled());
+
     const mref<uint32> targetData = target;
     targetData.clear();
-
-    assert_(source.tiled() && target.tiled());
     const uint16* const sourceData = source;
     const int X=source.sampleCount.x, Y=source.sampleCount.y, Z=source.sampleCount.z;
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
-    array<unique<Family>> families;
-    array<unique<FamilySet>> familySets;
-    familySets << unique<FamilySet>(); // index 0 is no families (background or yet unassigned)
+
+    array<Family> families (16);
+    array<FamilySet> familySets (sq(16));
+    familySets.append(); // family set index 0 is the empty set
+
     for(int R2=lists.size-1; R2>=0; R2--) { // Process balls from largest to smallest (minimum R2 is not necessarily zero, depends on List.minimum)
         const array<short3>& balls = lists[R2];
         int D2 = 4*R2;
@@ -65,18 +62,17 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
         float R = sqrt((float)R2);
         log(R, families.size, familySets.size);
         Time time; Time report;
-        for(size_t i: range(balls.size)) {
-            if(report/1000>=1) { log(i,"/",balls.size, i/(time/1000), "balls/s"); report.reset(); }
-            short3 P = balls[i];
+        for(size_t ballIndex: range(balls.size)) {
+            if(report/1000>=1) { log(ballIndex,"/",balls.size, ballIndex/(time/1000), "balls/s"); report.reset(); }
+            short3 P = balls[ballIndex];
             uint64 parent = offsetZ[P.z] + offsetY[P.y] + offsetX[P.x];
             uint32& parentFamilySetIndex = targetData[parent];
             if(!parentFamilySetIndex) { // parent is a new root
-                families << unique<Family>(ref<uint64>({parent}));
-                unique<FamilySet> set; set->families << families.last().pointer;
-                parentFamilySetIndex = familySets.size; // New family set lookup index
-                familySets << move(set);
+                FamilySet set;
+                if(families.size == families.capacity) families.reserve(2*families.size); // Amortizes reallocations
+                set.families << families.size; families << Family(ref<uint64>({parent}));
+                parentFamilySetIndex = familySets.size; familySets << move(set); // Updates with a new family set lookup index
             }
-            FamilySet& parentFamilySet = familySets[parentFamilySetIndex];
             for(int z: range(max(0,P.z-D),min(Z,P.z+D+1))) {
                 uint64 iZ = offsetZ[z];
                 for(int y: range(max(0,P.y-D),min(Y,P.y+D+1))) {
@@ -85,57 +81,55 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
                         int d2 = sq(x-P.x)+sq(y-P.y)+sq(z-P.z);
                         if(d2 > D2) continue; // By processing from large to small, no overlapping ball can be outside a 2R radius
 
-                        uint64 candidate = iZY + offsetX[x];
-                        uint16 r2 = sourceData[candidate];
+                        uint64 candidateVertexIndex = iZY + offsetX[x];
+                        uint16 r2 = sourceData[candidateVertexIndex];
                         if(r2<=minimum) continue; // Background voxel (or under processing threshold)
                         if(r2>R2) continue; // Only adds smaller (or equal) balls
 
-                        uint32& candidateFamilySetIndex = targetData[candidate]; // Previously assigned index (0 if unprocessed)
+                        uint32& candidateFamilySetIndex = targetData[candidateVertexIndex]; // Previously assigned index (0 if unprocessed)
                         if(candidateFamilySetIndex==parentFamilySetIndex) continue; // Already assigned to the same family
 
                         float d = sqrt((float)d2); // Distance between parent and candidate
                         float r = sqrt((float)r2); // Maximal ball radius (0 if background (not a maximal ball))
                         if(d>R+r) continue; // Overlaps when d<=R+r
 
-                        if(!candidateFamilySetIndex) { // Appends to family
-                            for(Family* family: parentFamilySet.families) family->append( candidate );
-                            parentFamilySet.points.append( candidate );
+                        if(!candidateFamilySetIndex) { // Appends candidate vertex index to family
+                            for(uint family: familySets[parentFamilySetIndex].families) families[family].append( candidateVertexIndex );
+                            familySets[parentFamilySetIndex].elements.append( candidateVertexIndex );
                             candidateFamilySetIndex = parentFamilySetIndex; // Updates last assigned root
                         }
-                        else if(parentFamilySet.unions.values.contains(candidateFamilySetIndex)) {
+                        else if(familySets[parentFamilySetIndex].unions .values .contains(candidateFamilySetIndex)) {
                             // Already in an union set containing the parent family set
                         }
                         else {
-                            int i = parentFamilySet.unions.keys.indexOf(candidateFamilySetIndex);
-                            {uint unionIndex;
-                                if(i>=0) { // Candidate belongs to a family for which an union set with the parent's set exists already
-                                    unionIndex = parentFamilySet.unions.values[i];
-                                } else { // Candidate belongs to a family for which no union set with the parent's set exists yet
-                                    FamilySet& candidateFamilySet = familySets[candidateFamilySetIndex];
+                            uint unionIndex = familySets[parentFamilySetIndex].unions.value(candidateFamilySetIndex, -1);
+                            if(unionIndex==uint(-1)) { // Candidate belongs to a family for which no union set with the parent's set exists yet
 
-                                    if(includes(parentFamilySet, candidateFamilySet)) {
-                                        unionIndex = parentFamilySetIndex;  // As the candidate's set is a subset of the parent's set, the union is the superset
-                                    } else { // Otherwise creates a new union set
-                                        unique<FamilySet> unionSet;
-                                        unionSet->families << parentFamilySet.families; // Copies the parent's set
-                                        unionSet->families += candidateFamilySet.families; // Adds (without duplicates) the candidate's set
-                                        unionIndex = familySets.size; // New index to the union set
-                                        familySets << move(unionSet);
-                                    }
-
-                                    // Registers the union set for later lookups
-                                    parentFamilySet.unions.insert(candidateFamilySetIndex, unionIndex);
-                                    candidateFamilySet.unions.insert(parentFamilySetIndex, unionIndex);
-
-                                    // Creates both relative complements sets (not commutative) to lookup the set of families to append new elements to
-                                    relativeComplement(familySets, parentFamilySetIndex, candidateFamilySetIndex);
-                                    relativeComplement(familySets, candidateFamilySetIndex, parentFamilySetIndex);
+                                if(includes(familySets[parentFamilySetIndex], familySets[candidateFamilySetIndex])) {
+                                    unionIndex = parentFamilySetIndex;  // As the candidate's set is a subset of the parent's set, the union is the superset
+                                } else { // Otherwise creates a new union set
+                                    FamilySet unionSet;
+                                    unionSet.families << familySets[parentFamilySetIndex].families; // Copies the parent's set
+                                    unionSet.families += familySets[candidateFamilySetIndex].families; // Adds (without duplicates) the candidate's set
+                                    unionIndex = familySets.size; // New index to the union set
+                                    if(familySets.size == familySets.capacity) familySets.reserve(2*familySets.size); // Amortizes reallocations
+                                    familySets << move(unionSet);
                                 }
-                                familySets[unionIndex]->points.append( candidate );
-                                candidateFamilySetIndex = unionIndex; // Updates to the union set index
+
+                                // Registers the union set for later lookups
+                                familySets[parentFamilySetIndex].unions.insert(candidateFamilySetIndex, unionIndex);
+                                familySets[candidateFamilySetIndex].unions.insert(parentFamilySetIndex, unionIndex);
+
+                                // Creates both relative complements sets (not symmetric) to lookup the set of families to append new elements to
+                                relativeComplements(familySets, parentFamilySetIndex, candidateFamilySetIndex);
                             }
-                            int complementIndex = parentFamilySet.complements.at(candidateFamilySetIndex);
-                            for(Family* family: familySets[complementIndex]->families) family->append( candidate ); // Appends to the complement
+                            familySets[unionIndex].elements.append( candidateVertexIndex );
+                            // Appends the candidate vertex index to the relative complement of the candidate's families in the parent's families
+                            for(uint family: familySets[parentFamilySetIndex].complements.at(candidateFamilySetIndex))
+                                families[family].append( candidateVertexIndex );
+                            // But not the parent vertex index in the candidate's families as this is an asymetric inclusion relation
+                            // Sets the candidate family set index to the union set index
+                            candidateFamilySetIndex = unionIndex;
                         }
                     }
                 }
@@ -146,7 +140,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
 }
 
 /// Converts sets to a text file formatted as ((x y z r2)+\n)*
-String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
+String toASCII(const ref<Family>& families, const Volume16& source) {
     // Estimates text size to avoid unnecessary reallocations
     String target ( sum(apply(families,[](const Family& family){ return family.size*4*5;})) );
     byte* targetPtr = target.begin();
@@ -164,13 +158,13 @@ String toASCII(const ref<unique<Family>>& families, const Volume16& source) {
 }
 
 /// Converts sets to a text file formatted as ((x y z r2)+\n)*
-String toASCII(const array<unique<FamilySet>>& familySets, const Volume16& source) {
+String toASCII(const array<FamilySet>& familySets, const Volume16& source) {
     // Estimates text size to avoid reallocations
-    String target ( sum(apply(familySets,[](const FamilySet& family){ return family.points.size*4*5;})) );
+    String target ( sum(apply(familySets,[](const FamilySet& family){ return family.elements.size*4*5;})) );
     byte* targetPtr = target.begin();
     Time time; log_(str("toASCII",familySets.size,"familySets..."_));
     for(const FamilySet& set: familySets) {
-        for(uint64 index: set.points) {
+        for(uint64 index: set.elements) {
             int3 p = zOrder(index);
             itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
         }
