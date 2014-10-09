@@ -64,9 +64,8 @@ struct Build {
         string id = s.identifier("_"_);
         bool value = false;
         if(id=="1"_) value=true;
-        else if(id=="__arm__"_ && arch=="arm"_) value=true;
-        else if(id=="__i386"_ && arch=="atom"_) value=true;
-        else if(id=="__x86_64"_ && arch=="x64"_) value=true;
+        else if(id=="__i386"_ && arch=="i386"_) value=true;
+        else if(id=="__x86_64"_ && arch=="x86_64"_) value=true;
         else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
         else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
         else if(arch=="native"_) {
@@ -75,9 +74,6 @@ struct Build {
 #endif
 #if __x86_64
             if(id=="__x86_64"_) value = true;
-#endif
-#if __arm__
-            if(id=="__arm__"_) value = true;
 #endif
         }
         if(value != condition) {
@@ -99,7 +95,7 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            if(execute(LD, split((arch=="atom"_?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();
+            if(execute(LD, split((arch=="i386"_?"--oformat elf32-i386 "_:""_)+"-r -b binary -o"_)<<object<<file, true, subfolder)) fail();
             needLink = true;
         }
         files << move(object);
@@ -138,10 +134,9 @@ struct Build {
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
             array<String> args;
             args << copy(object) << target+".cc"_;
-            if(arch=="arm"_) args << String("-I/buildroot/output/host/usr/arm-buildroot-linux-uclibcgnueabihf/sysroot/usr/include/freetype2"_);
-            else args << String("-I/usr/include/freetype2"_);
-            if(arch=="arm"_) {}
-            else if(arch=="atom"_) args << String("-m32"_) << String("-march=atom"_) << String("-mfpmath=sse"_);
+            args << String("-I/usr/include/freetype2"_);
+            if(arch=="i386"_) args << String("-m32"_) << String("-march=i386"_) << String("-mfpmath=sse"_);
+            else if(arch=="x86_64"_) {} // System defaults (usually -march=x86_64)
             else args << String("-march=native"_);
 
             if(!flags.contains("release"_)) args << String("-g"_);
@@ -191,9 +186,8 @@ struct Build {
             } else flags << split(arg,'-');
         }
 
-        arch = flags.contains("arm"_) ? "arm"_ : flags.contains("atom"_) ? "atom"_ : "native"_;
-        if(arch=="arm"_) CXX = which("arm-buildroot-linux-uclibcgnueabihf-g++"_), LD = which("arm-buildroot-linux-uclibcgnueabihf-ld"_);
-        //else if(flags.contains("profile"_)) CXX=which("g++"_); //FIXME: Clang does not support instrument-functions-exclude-file-list
+        arch = flags.contains("i386"_) ? "i386"_ : flags.contains("x86_64"_) ? "x86_64"_  : "native"_;
+
         const String base (section(folder.name(),'/',-2,-1));
         if(!target) target = copy(base);
 
