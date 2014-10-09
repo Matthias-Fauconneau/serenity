@@ -34,7 +34,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
     familySets << unique<FamilySet>(); // index 0 is no families (background or yet unassigned)
     for(int R2=lists.size-1; R2>=0; R2--) { // Process balls from largest to smallest
         const array<short3>& balls = lists[R2];
-        if(familySets.size + balls.size >= 1<<16) { log("Too many family sets to merge efficiently at sqRadius=",R2); break; }
+        if(familySets.size + balls.size >= 1<<24) { log("Too many family sets to merge efficiently at sqRadius=",R2); break; }
         float R = sqrt((float)R2);
         int D = ceil(2*R);
         log(R, families.size, familySets.size);
