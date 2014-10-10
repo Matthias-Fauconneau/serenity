@@ -104,6 +104,9 @@ template<> void error(const string& message) __attribute((noreturn));
 
 /// Numeric range
 struct range {
+    int start;
+    int stop;
+
     range(int start, int stop) : start(start), stop(stop){}
     range(uint size) : range(0, size){}
     struct iterator {
@@ -115,7 +118,6 @@ struct range {
     iterator begin() const { return {start}; }
     iterator end() const { return {stop}; }
     explicit operator bool() const { return start < stop; }
-    int start, stop;
 };
 
 /// Unmanaged fixed-size const reference to an array of elements
@@ -136,7 +138,7 @@ generic struct ref {
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(size_t i) const { assert(i<size); return data[i]; }
+    const T& at(size_t i) const { assert(i <size, i , size); return data[i]; }
     T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
     const T& operator [](size_t i) const { return at(i); }
     const T& first() const { return at(0); }

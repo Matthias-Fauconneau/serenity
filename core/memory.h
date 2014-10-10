@@ -20,7 +20,7 @@ generic struct mref : ref<T> {
     explicit operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
-    T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
+    T& at(size_t i) const { return (T&)ref<T>::at(i); }
     T& operator [](size_t i) const { return at(i); }
     T& first() const { return at(0); }
     T& last() const { return at(size-1); }
@@ -66,7 +66,7 @@ generic struct buffer : mref<T> {
     /// Allocates an uninitialized buffer for \a capacity elements
     buffer(size_t capacity, size_t size):mref<T>((T*)0,size),capacity(capacity){
      assert(capacity>=size && size>=0); if(!capacity) return;
-     if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("");
+     if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory");
     }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
