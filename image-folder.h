@@ -46,7 +46,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
                 for(auto property: properties) occurences[property.key].add( property.value ); // Aggregates occuring values for each property
             }
-            //for(auto property: occurences) log(property.key,':', sort(property.value));
+            for(auto property: occurences) if(property.value.size!=size()) log(property.key,':', sort(property.value));
         }
 
         // Applies application specific filter

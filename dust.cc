@@ -37,7 +37,8 @@ struct ImageSourceView : ImageView {
     size_t index = -1;
     SourceImageRGB image; // Holds memory map reference
 
-    bool setIndex(size_t index) {
+    bool setIndex(int value) {
+        size_t index = clip(0, value, (int)source.size()-1);
         if(index != this->index) {
             this->index = index;
             image = source.image(index);
@@ -49,10 +50,19 @@ struct ImageSourceView : ImageView {
 
     ImageSourceView(ImageSource& source) : source(source) { setIndex(0); }
 
-    String title() const override { return str(index,'/',source.size(), source.name(index), source.properties(index)); }
+    String title() const override { return str(index+1,'/',source.size(), source.name(index), source.properties(index)); }
 
     /// Browses source by moving mouse horizontally over image view (like an hidden slider)
     bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override { return setIndex(source.size()*min(size.x-1,cursor.x)/size.x); }
+
+    /// Browses source with keys
+    bool keyPress(Key key, Modifiers) override {
+        if(key==Home) return setIndex(0);
+        if(ref<Key>{Backspace,LeftArrow}.contains(key)) return setIndex(index-1);
+        if(ref<Key>{Return,RightArrow}.contains(key)) return setIndex(index+1);
+        if(key==End) return setIndex(source.size());
+        return false;
+    }
 };
 
 struct DustRemovalPreview {

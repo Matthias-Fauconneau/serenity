@@ -91,3 +91,13 @@ bool WidgetToggle::mouseEvent(int2 cursor, int2 size, Event event, Button button
     index = button != NoButton && event != Release;
     return widgets[index]->mouseEvent(cursor, size, event, button, focus) || previousIndex != index;
 }
+bool WidgetToggle::keyPress(Key key, Modifiers modifiers) {
+    size_t previousIndex = index;
+    if(key == Space) index = 1;
+    return widgets[index]->keyPress(key, modifiers) || previousIndex != index;
+}
+bool WidgetToggle::keyRelease(Key key, Modifiers modifiers) {
+    size_t previousIndex = index;
+    if(key == Space) index = 0;
+    return widgets[index]->keyRelease(key, modifiers) || previousIndex != index;
+}

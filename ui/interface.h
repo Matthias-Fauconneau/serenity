@@ -112,10 +112,14 @@ struct WidgetToggle : Widget {
 
     WidgetToggle(Widget* first, Widget* second) : widgets{first, second} {}
 
+    // Forwards content
     String title() const { return widgets[index]->title(); }
     int2 sizeHint(int2 size) const override { return widgets[index]->sizeHint(size); }
     Graphics graphics(int2 size) const override { return widgets[index]->graphics(size); }
 
-    /// Enables filter while a mouse button is pressed
+    // Forwards events and enables filter while a mouse button is pressed
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    // Forwards events and enables filter while a key is pressed
+    bool keyPress(Key key, Modifiers modifiers) override;
+    bool keyRelease(Key key, Modifiers modifiers) override;
 };

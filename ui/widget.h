@@ -10,7 +10,7 @@ static constexpr vec3 gray (3./4, 3./4, 3./4);
 enum Key {
     Space=' ',
     Escape=0xff1b, Backspace=0xff08, Tab, Return=0xff0d,
-    Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, PageUp, PageDown, /*End,*/ PrintScreen=0xff61,
+    Home=0xff50, LeftArrow, UpArrow, RightArrow, DownArrow, PageUp, PageDown, End, PrintScreen=0xff61,
     Execute, Insert,
     KP_Enter=0xff8d, KP_Asterisk=0xffaa, KP_Plus, KP_Separator, KP_Minus, KP_Decimal, KP_Slash, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
     F1=0xffbe,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11,
@@ -26,16 +26,15 @@ struct Widget {
     Widget(){}
     default_move(Widget);
     virtual ~Widget() {}
-// Content
+// Contents
     virtual String title() const { return {}; }
-// Graphics
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint(int2) const = 0;
     /// Returns graphic elements representing this widget at the given \a size.
     virtual Graphics graphics(int2 size) const = 0;
 
-// Control
+// Events
     /// Mouse event type
     enum Event { Press, Release, Motion, Enter, Leave };
     /// Mouse buttons
