@@ -24,27 +24,29 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
             }
             // Sets target image size
             imageSize = maximumImageSize / 4;
+            assert_(imageSize);
         }
 
         {// Filters useless tags and renames to short names
             map<string, array<string>> occurences;
             for(auto& properties: values) {
                 properties.filter([this](const string key, const string) { return !ref<string>{
+                        "Size", "Path",
                         "Exif.Photo.FocalLength",
-                                "Exif.Photo.FNumber",
-                                "Exif.Photo.ExposureBiasValue",
-                                "Exif.Photo.ISOSpeedRatings",
-                                "Exif.Photo.ExposureTime" }.contains(key);
+                        "Exif.Photo.FNumber",
+                        "Exif.Photo.ExposureBiasValue",
+                        "Exif.Photo.ISOSpeedRatings",
+                        "Exif.Photo.ExposureTime" }.contains(key);
                 });
-                properties.keys.replace("Exif.Photo.FocalLength", "Focal");
-                properties.keys.replace("Exif.Photo.FNumber", "Aperture");
-                properties.keys.replace("Exif.Photo.ExposureBiasValue", "Bias");
-                properties.keys.replace("Exif.Photo.ISOSpeedRatings", "Gain");
-                properties.keys.replace("Exif.Photo.ExposureTime", "Time");
+                properties.keys.replace("Exif.Photo.FocalLength"_, "Focal"_);
+                properties.keys.replace("Exif.Photo.FNumber"_, "Aperture"_);
+                properties.keys.replace("Exif.Photo.ExposureBiasValue"_, "Bias"_);
+                properties.keys.replace("Exif.Photo.ISOSpeedRatings"_, "Gain"_);
+                properties.keys.replace("Exif.Photo.ExposureTime"_, "Time"_);
 
                 for(auto property: properties) occurences[property.key].add( property.value ); // Aggregates occuring values for each property
             }
-            for(auto property: occurences) log(property.key,':', sort(property.value));
+            //for(auto property: occurences) log(property.key,':', sort(property.value));
         }
 
         // Applies application specific filter
@@ -53,14 +55,14 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
     size_t size() const override { return map::size(); }
     String name(size_t index) const override { return copy(keys[index]); }
-    int64 time(size_t index) const override { return File(values[index].at("Path"), folder).modifiedTime(); }
+    int64 time(size_t index) const override { return File(values[index].at("Path"_), folder).modifiedTime(); }
     const map<String, String>& properties(size_t index) const override { return values[index]; }
     int2 size(size_t) const override { return imageSize; }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
     SourceImageRGB image(size_t index) const override {
-        File sourceFile (values[index].at("Path"), folder);
-        return cache<Image>(name(index), ".sRGB", folder, [&](TargetImageRGB&& target){
+        File sourceFile (values[index].at("Path"_), folder);
+        return cache<Image>(name(index), ".sRGB", folder, [&](TargetImageRGB& target){
             Image source = decodeImage(Map(sourceFile));
             target.resize(imageSize);
             target.buffer::clear();
@@ -71,7 +73,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component) const override {
-        return cache<ImageF>(name(index), '.'+str(component), folder, [&](TargetImage&& target) {
+        return cache<ImageF>(name(index), '.'+str(component), folder, [&](TargetImage& target) {
             SourceImageRGB source = image(index); // Faster but slightly inaccurate
             target.resize(source.size);
             linear(share(target), source, component);

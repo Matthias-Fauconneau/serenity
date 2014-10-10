@@ -19,6 +19,9 @@ inline string str(bool value) { return value ? "true"_ : "false"_; }
 /// Returns a reference to the character
 inline string str(const char& character) { return string((char*)&character,1); }
 
+/// Returns a bounded reference to the null-terminated String pointer
+string str(const char* source);
+
 // -- string
 
 /// Lexically compare strings
@@ -104,7 +107,8 @@ String str(double n);
 String binaryPrefix(size_t value, string unit="B");
 
 /// Converts arrays
-generic String str(const ref<T> source, char separator=' ') {
+template<Type T, typename enable_if<!is_same<char, T>::value>::type* = nullptr>
+String str(const ref<T> source, char separator=' ') {
     String target;
     target.append('[');
     for(uint i: range(source.size)) {
@@ -118,6 +122,7 @@ generic String str(const mref<T>& source, char separator=' ') { return str((cons
 generic String str(const buffer<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
 generic String str(const array<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
 inline String hex(const ref<uint8> source, char separator=' ') { return str(apply(source, [](const uint8& c) { return hex(c,2); }), separator); }
+inline String hex(const ref<byte> source, char separator=' ') { return hex(cast<uint8>(source), separator); }
 
 /// Converts static arrays
 template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') { return str(ref<T>(source, N), separator); }

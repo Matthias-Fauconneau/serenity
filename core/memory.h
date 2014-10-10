@@ -60,7 +60,7 @@ generic inline buffer<T> operator+(const ref<T> a, const ref<T> b) {
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {
-    buffer<decltype(function(0))> target(size); apply(target, function); return target;
+    buffer<decltype(function(0))> target(size); target.apply(function); return target;
 }
 
 /// Returns an array of the application of a function to every elements of a reference

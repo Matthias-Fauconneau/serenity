@@ -115,7 +115,7 @@ generic struct ref {
     /// Converts a real std::initializer_list to ref
     constexpr ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
     /// Converts a static array to ref
-    template<size_t N> constexpr ref(const T (&a)[N]) : ref(a,N) {}
+    template<size_t N> explicit constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
     explicit operator bool() const { return size; }
     explicit operator const T*() const { return data; }
@@ -161,12 +161,6 @@ generic struct ref {
 /// Returns const reference to memory used by \a t
 generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
-generic const T& min(const ref<T> a) { const T* min=&a[0]; for(const T& e: a) if(e < *min) min=&e; return *min; }
-generic const T& max(const ref<T> a) { const T* max=&a[0]; for(const T& e: a) if(*max < e) max=&e; return *max; }
-
-template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
-template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
-
 // -- string
 
 /// ref<char> holding UTF8 text strings
@@ -176,6 +170,7 @@ struct string : ref<char> {
     string(ref<char> o) : ref<char>(o) {}
     /// Converts a string literal to string
     template<size_t N> constexpr string(const char (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
+    bool operator ==(const string o) const { return ref<char>::operator==(o); }
 };
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
@@ -208,9 +203,18 @@ template<> void error(const string& message) __attribute((noreturn));
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr, ##message); })
 
 // -- ref
-generic const T& ref<T>::at(size_t i) const { assert(i<size); return data[i]; }
+generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
 
+generic const T& min(const ref<T> source) {
+    assert_(source, "min"); const T* min=&source[0]; for(const T& e: source) if(e < *min) min=&e; return *min;
+}
+generic const T& max(const ref<T> source) {
+    assert_(source, "max"); const T* max=&source[0]; for(const T& e: source) if(*max < e) max=&e; return *max;
+}
+
+template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
+template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
 // -- FILE
 
 /// Declares a file to be embedded in the binary
@@ -244,7 +248,7 @@ generic struct mref : ref<T> {
     explicit operator T*() const { return (T*)data; }
     T* begin() const { return (T*)data; }
     T* end() const { return (T*)data+size; }
-    T& at(size_t i) const { assert(i<size); return (T&)data[i]; }
+    T& at(size_t i) const { return (T&)ref<T>::at(i); }
     T& operator [](size_t i) const { return at(i); }
     T& first() const { return at(0); }
     T& last() const { return at(size-1); }

@@ -115,9 +115,10 @@ Symbol findSymbol(void* find) {
     const char* shstrtab = elf+sections[(uint)hdr.shstrndx].offset;
     const char* strtab = 0; ref<Sym> symtab; BinaryData debug_line;
     for(const Shdr& s: sections)  {
-        if(str(shstrtab+s.name)==".debug_line") new (&debug_line) BinaryData(ref<byte>(elf+s.offset,s.size));
-        else if(str(shstrtab+s.name)==".strtab") strtab=(const char*)elf+s.offset;
-        else if(str(shstrtab+s.name)==".symtab") symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
+        string name = str(shstrtab+s.name);
+        /**/  if(name==".debug_line") new (&debug_line) BinaryData(ref<byte>(elf+s.offset,s.size));
+        else if(name==".strtab") strtab=(const char*)elf+s.offset;
+        else if(name==".symtab") symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
     for(const Sym& sym: symtab)
@@ -190,25 +191,31 @@ Symbol findSymbol(void* find) {
 
 void* caller_frame(void* fp) { return *(void**)fp; }
 void* return_address(void* fp) { return *((void**)fp+1); }
+#include <execinfo.h>
 
 String trace(int skip, void* ip) {
     String log;
     void* stack[32];
+#if 1
+    int i = backtrace(stack, 32);
+#else
     int i=0;
     void* frame = __builtin_frame_address(0);
     for(;i<32;i++) {
+        ::log(frame);
         if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
         stack[i]=return_address(frame);
         frame=caller_frame(frame);
     }
+#endif
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
-        if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+' '+s.function+'\n');
+        if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         else log.append("0x"+hex(ptr(stack[i]))+'\n');
     }
     if(ip) {
         Symbol s = findSymbol(ip);
-        if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+' '+s.function+'\n');
+        if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         else log.append("0x"+hex(ptr(ip))+'\n');
     }
     return log;

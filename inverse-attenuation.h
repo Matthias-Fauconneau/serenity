@@ -3,6 +3,28 @@
 #include "image-operation.h"
 #include "image-folder.h"
 
+void calibrate(const ImageF& target, ImageFolder& calibration, uint component) {
+    assert_(target);
+
+    // Sums all images
+    target.buffer::clear();
+    for(size_t index: range(calibration.size())) {
+        SourceImage source = calibration.image(index, component);
+        parallel_apply(target, [](float sum, float source) { return sum + source; }, target, source);
+    }
+
+    // Low pass to filter texture and noise
+    gaussianBlur(target, 8); // Useful?, TODO?: weaken near spot, strengthen outside
+
+    // TODO: High pass to filter lighting conditions
+
+    // Normalizes sum by mean (DC) (and clips values over average to 1)
+    float sum = parallel_sum(target);
+    float mean = sum/target.buffer::size;
+    float factor = 1/mean;
+    parallel_apply(target, [&](float v) {  return min(1.f, factor*v); }, target);
+}
+
 /// Inverts attenuation bias
 struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
     SourceImage attenuation[3];
@@ -11,26 +33,9 @@ struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
     InverseAttenuation(ImageFolder&& calibration) {
         int64 calibrationTime = max(::apply(calibration.size(), [&](size_t index) { return calibration.time(index); }));
         for(uint component : range(3)) {
-            attenuation[component] = cache<ImageF>("attenuation", name()+'.'+str(component), calibration.folder, [&](TargetImage&& target) {
-                target.resize(calibration.imageSize);
-
-                // Sums all images
-                target.buffer::clear();
-                for(size_t index: range(calibration.size())) {
-                    SourceImage source = calibration.image(index, component);
-                    parallel_apply(target, [](float sum, float source) { return sum + source; }, target, source);
-                }
-
-                // Low pass to filter texture and noise
-                gaussianBlur(target, 8); // Useful?, TODO?: weaken near spot, strengthen outside
-
-                // TODO: High pass to filter lighting conditions
-
-                // Normalizes sum by mean (DC) (and clips values over average to 1)
-                float sum = parallel_sum(target);
-                float mean = sum/target.buffer::size;
-                float factor = 1/mean;
-                parallel_apply(target, [&](float v) {  return min(1.f, factor*v); }, target);
+            attenuation[component] = cache<ImageF>("attenuation", name()+'.'+str(component), calibration.folder, [&](TargetImage& target) {
+                    target.resize(calibration.imageSize);
+                    calibrate(target, calibration, component);
             }, calibrationTime);
         }
     }

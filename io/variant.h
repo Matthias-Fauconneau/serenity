@@ -38,12 +38,6 @@ struct Variant {
 
 String str(const Variant& o);
 
-generic String str(const map<T,Variant>& dict) {
-    String s;
-    s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
-    return s;
-}
-
 inline String str(const Variant& o) {
     if(o.type==Variant::Boolean) return String(str(bool(o.number)));
     if(o.type==Variant::Integer) return str(int(o.number));

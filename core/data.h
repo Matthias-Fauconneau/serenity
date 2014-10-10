@@ -192,3 +192,4 @@ struct TextData : Data {
     /// Reads a decimal number
     double decimal();
 };
+inline string str(const TextData& o) { return cast<char>(o.buffer); }

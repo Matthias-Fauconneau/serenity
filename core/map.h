@@ -25,18 +25,16 @@ template<Type K, Type V> struct map {
     bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
-    template<Type KK> void assertNo(const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in {",keys,"}"); }
+    template<Type KK> void assertNo(const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in",keys); }
 
-    template<Type KK> const V& at(const KK& key) const {
+    template<Type KK> size_t indexOf(const KK& key) const {
         size_t i = keys.indexOf(key);
-        if(i==invalid) error('\''+str(key)+"' not in {",keys,"}");
-        return values[i];
+        if(i==invalid) error('\''+str(key)+'\'',"not in",keys);
+        return i;
     }
-    template<Type KK> V& at(const KK& key) {
-        size_t i = keys.indexOf(key);
-        if(i==invalid) error('\''+str(key)+"' not in {",keys,"}");
-        return values[i];
-    }
+
+    template<Type KK> const V& at(const KK& key) const { return values[indexOf(key)]; }
+    template<Type KK> V& at(const KK& key) { return values[indexOf(key)]; }
 
     template<Type KK, Type VV> VV value(const KK& key, VV&& value) const {
         size_t i = keys.indexOf(key);
@@ -61,17 +59,12 @@ template<Type K, Type V> struct map {
     template<Type KK, Type VV> V& insertMulti(KK&& key, VV&& value) {
         keys.append(forward<KK>(key)); return values.append(forward<VV>(value));
     }
-    template<Type KK> V& insertSorted(const KK& key, const V& value) {
-        if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");
-        return values.insertAt(keys.insertSorted(key),value);
-    }
+    template<Type KK> V& insertSorted(const KK& key, const V& value) { assertNo(key); return values.insertAt(keys.insertSorted(key),value); }
     template<Type KK> V& insertSorted(const KK& key, V&& value) {
-        if(contains(key)) error('\''+str(key)+"' already in {",keys,"}");
+        assertNo(key);
         return values.insertAt(keys.insertSorted(key),move(value));
     }
-    template<Type KK> V& insertSortedMulti(const KK& key, const V& value) {
-        return values.insertAt(keys.insertSorted(key),value);
-    }
+    template<Type KK> V& insertSortedMulti(const KK& key, const V& value) { return values.insertAt(keys.insertSorted(key),value); }
 
     template<Type KK> V& operator [](KK&& key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
@@ -80,14 +73,8 @@ template<Type K, Type V> struct map {
         return values.insertAt(keys.insertSorted(key),V());
     }
 
-    template<Type KK> V take(const KK& key) {
-        size_t i=keys.indexOf(key); if(i==invalid) error('\''+str(key)+"' not in {",keys,"}");
-        keys.removeAt(i); return values.take(i);
-    }
-    template<Type KK> void remove(const KK& key) {
-        size_t i=keys.indexOf(key); if(i==invalid) error('\''+str(key)+"' not in {",keys,"}");
-        keys.removeAt(i); values.removeAt(i);
-    }
+    template<Type KK> V take(const KK& key) { size_t i=indexOf(key); keys.removeAt(i); return values.take(i); }
+    template<Type KK> void remove(const KK& key) { size_t i=indexOf(key); keys.removeAt(i); values.removeAt(i); }
 
     struct const_iterator {
         const K* k; const V* v;

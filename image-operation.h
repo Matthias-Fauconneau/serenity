@@ -11,6 +11,6 @@ struct ImageOperation {
 };
 
 generic struct ImageOperationT : ImageOperation {
-    string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.integer(); s.identifier(); }); return name; }
+    string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
     int64 version() const override { return parseDate(__TIMESTAMP__)*1000000000l;; }
 };

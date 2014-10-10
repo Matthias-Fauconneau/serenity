@@ -88,12 +88,12 @@ generic struct array : buffer<T> {
         size_t nextSize=size+1; reserve(nextSize); new (end()) T(::move(e)); size=nextSize; return last();
     }
     /// Appends another list of elements to this array by moving
-    T& append(const mref<T> source) {
-        size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).move(source); return last();
+    void append(const mref<T> source) {
+        if(source) { size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).move(source); }
     }
     /// Appends another list of elements to this array by copying
-    T& append(const ref<T> source) {
-        size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).copy(source); return last();
+    void append(const ref<T> source) {
+        if(source) { size_t oldSize=size; reserve(size=oldSize+source.size); slice(oldSize,source.size).copy(source); }
     }
     /// Appends a new element
     template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
@@ -209,16 +209,26 @@ template<Type T, Type Function> array<T> filter(const ref<T> source, Function pr
 /// array<char> holding UTF8 text strings
 struct String : array<char> {
     using array::array;
+    String() {}
+    //String(buffer<byte>&& o) : array<char>(cast<char>(move(o))) {}
+    explicit String(string source) : array<char>(source) {}
+    template<size_t N> explicit constexpr String(const char (&a)[N]) : array<char>(string(a, N-1)) {}
     //operator const string() const { return string(*this); }
+    using array::append;
+    void append(const string source) { return array::append(source); }
+    template<size_t N> void append(const char (&source)[N]) { return array::append(string(source, N-1)); }
 };
 template<> inline String copy(const String& o) { return copy((const array<char>&)o); }
 // Resolves ambiguities
 inline String operator+(const char a, const string b) { return operator+<char>(a, b); }
+inline String operator+(const char a, const String& b) { return operator+<char>(a, b); }
 inline String operator+(const string a, char b) { return operator+<char>(a, b); }
 inline String operator+(const string a, const string b) { return operator+<char>(a, b); }
+inline String operator+(const String& a, const char b) { return operator+<char>(a, b); }
+inline String operator+(String&& a, const char b) { return operator+<char>(move(a), b); }
 inline String operator+(String&& a, const string b) { return operator+<char>(move(a), b); }
 inline String operator+(String&& a, const String& b) { return operator+<char>(move(a), b); }
-inline String operator+(buffer<char>&& a, const String& b) { return operator+<char>(move(a), b); }
+//inline String operator+(buffer<char>&& a, const String& b) { return operator+<char>(move(a), b); }
 
 /// Converts Strings to strings
 inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return  e; }); }

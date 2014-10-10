@@ -38,14 +38,14 @@ bool Data::match(const string key) {
 }
 
 void Data::skip(const uint8 key) {
-    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex((uint8)peek())+'\'');
+    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
     if(!match(key)) error("Expected '"_+key+"', got '"+peek()+'\'');
 }
 
 void Data::skip(const ref<uint8> key) {
-    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(cast<uint8>(peek(key.size)))+'\'');
+    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
 }
 void Data::skip(const string key) {
     if(!match(key)) error("Expected '"+key+"', got '"+(string)peek(key.size)+'\'');
@@ -178,7 +178,7 @@ char TextData::character() {
 }
 
 string TextData::whileInteger(bool sign, int base) {
-    assert(==10 || base==16);
+    assert(base==10 || base==16);
     uint start=index;
     if(sign) matchAny("-+");
     for(;available(1);) {
@@ -194,7 +194,7 @@ int TextData::integer(bool maySign, int base) {
     if(maySign) { if(match('-')) sign=-1; else match('+'); }
     long value=0;
     do {
-        char c = next();
+        char c = peek();
         int n;
         /**/  if(c>='0' && c<='9') n = c-'0';
         else if(c == '.') { error("Unexpected decimal"); break; }
@@ -202,6 +202,7 @@ int TextData::integer(bool maySign, int base) {
         else if(c>='a' && c<='f') n = c+10-'a';
         else if(c>='A' && c<='F') n = c+10-'A';
         else break;
+        advance(1);
         value *= base;
         value += n;
     } while(available(1));

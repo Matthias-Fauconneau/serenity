@@ -3,6 +3,12 @@
 #include "data.h"
 #include "matrix.h"
 
+generic String str(const map<T,Variant>& dict) {
+    String s;
+    s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
+    return s;
+}
+
 typedef map<string,Variant> Dict;
 
 struct Object : Dict {

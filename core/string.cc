@@ -4,6 +4,8 @@
 
 // -- string
 
+string str(const char* source) { size_t size=0; while(source[size]) size++; return string(source,size); }
+
 bool operator <(const string a, const string b) {
     for(uint i: range(min(a.size,b.size))) {
         if(a[i] < b[i]) return true;
@@ -65,26 +67,28 @@ char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
 String toUpper(const string source) { return apply(source, upperCase); }
 
 String left(const string source, size_t size, const char pad) {
-    String target(max(size, source.size));
+    buffer<char> target(max(size, source.size));
     target.slice(0, source.size).copy(source);
     target.slice(source.size).clear(pad);
-    return target;
+    return move(target);
 }
 String right(const string source, size_t size, const char pad) {
-    String target(max(size, source.size));
+    buffer<char> target(max(size, source.size));
     target.slice(0, source.size).clear(pad);
     target.slice(source.size).copy(source);
-    return target;
+    return move(target);
 }
 
 // -- string[]
 
 String join(const ref<string> list, const string separator) {
-    String target;
-    for(uint i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
+    if(!list) return {};
+    size_t size = 0; for(auto e: list) size += e.size;
+    String target ( size + (list.size-1)*separator.size );
+    for(size_t i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
     return target;
 }
-String join(const ref<String> list, const string separator) { return join(toRefs(list),separator); }
+String join(const ref<String> list, const string separator) { return join(toRefs(list), separator); }
 
 array<string> split(const string source, byte separator) {
     array<string> list;

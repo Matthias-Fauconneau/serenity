@@ -12,12 +12,12 @@ generic struct Target : T {
     File file; // Keeps file descriptor open for file locking
     Map map;
 
-    Target(string name, const Folder& folder) : folder(".", folder), name(name), file(name, folder, ::Flags(ReadWrite|Create)) {}
-    ~Target() { rename(name, name+'.'+strx(T::size), folder);/*FIXME: asserts unique TargetImage instance for this 'folder/name'*/ }
+    Target(string name, const Folder& folder) : folder(".", folder), name(name), file(fileName(), folder, ::Flags(ReadWrite|Create)) {}
+    String fileName() const { return name+'.'+strx(T::size); }
     const Target& resize(int2 size) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         map = Map(file, Map::Write);
-        (T&)*this = T(unsafeReference(cast<typename T::type>((Map&)*this)), size);
+        (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size);
         return *this;
     }
 };
@@ -30,21 +30,30 @@ generic struct Source : Map, T {
         T(unsafeReference(cast<typename T::type>((Map&)*this)), fromInt2(section(name,'.',-2,-1))) {}
 };
 
-generic Source<T> cache(string name, string operation, const Folder& folder, function<void(Target<T>&&)> generate,
-                int64 sourceTime, string version = __TIMESTAMP__) {
-    Folder cache(operation, folder);
+generic Source<T> cache(string name, string operation, const Folder& folder, function<void(Target<T>&)> generate,
+                int64 unused sourceTime, string unused version = __TIMESTAMP__) {
+    Folder cache(operation, folder, true);
     removeIfExisting(name, cache);
-    File target;
     auto files = filter(cache.list(Files), [&](string fileName){ return !startsWith(fileName, name); });
     if(files) {
         assert_(files.size == 1);
-        target = File(files[0], cache, ::Flags(ReadWrite));
-        int64 cacheTime = target.modifiedTime();
-        if(sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime) return Source<T>(name, cache);
+        //int64 cacheTime = File(files[0], cache, ::Flags(ReadWrite)).modifiedTime();
+        int2 size = fromInt2(section(files[0],'.',-2,-1));
+        if(size>int2(0) /*&& sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime*/) return Source<T>(files[0], cache);
+        else {
+            // Safeguards
+            assert_(find(cache.name(),"/Pictures/"_));
+            assert_(find(cache.name(),".0"_) || find(cache.name(),".1"_) || find(cache.name(),".2"_) || find(cache.name(),".sRGB"_));
+            assert_(!files[0].contains('/'));
+            remove(files[0], cache);
+        }
     }
-    log(name);
-    generate(Target<T>(name, cache));
-    return Source<T>(name, cache);
+    Target<T> target(name, cache);
+    String oldName = target.fileName();
+    generate(target);
+    assert_(target.size>int2(0));
+    rename(oldName, target.fileName(), cache);
+    return Source<T>(target.fileName(), cache);
 }
 
 typedef Target<ImageF> TargetImage;

@@ -36,7 +36,7 @@ struct Build {
     array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
     String find(const string file) {
-        for(String& path: sources) {
+        for(string path: sources) {
             if(section(path,'/',-2,-1) == file) return String( path.contains('.') ? section(path,'.',0,-2) : path );
         }
         return {};

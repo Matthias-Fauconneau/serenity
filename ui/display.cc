@@ -5,24 +5,23 @@
 
 String str(XEvent::Error e) {
     uint8 code = e.code;
-    ref<string> requests = X11::requests;
-    ref<string> errors = X11::errors;
+    ref<string> requests (X11::requests);
+    ref<string> errors (X11::errors);
     uint16 request = e.minor;
     /***/  if(e.major==Shm::EXT) {
-        requests = Shm::requests;
+        requests = ref<string>(Shm::requests);
         if(code >= Shm::errorBase && code <= ref<string>(Shm::errors).size) {
             code -= Shm::errorBase;
-            errors = Shm::errors;
+            errors = ref<string>(Shm::errors);
         }
     } else if(e.major==XRender::EXT) {
-        requests = XRender::requests;
+        requests = ref<string>(XRender::requests);
         if(code >= XRender::errorBase && code <= ref<string>(XRender::errors).size) {
             code -= XRender::errorBase;
-            errors = XRender::errors;
+            errors = ref<string>(XRender::errors);
         }
     } else request = e.major;
-    return str(code<errors.size?errors[code]:str(code), "error for request", request<requests.size?requests[request]:str(request),
-               e.code, e.seq, e.id, e.major, e.minor);
+    return str(errors[code], requests[request]);
 }
 
 String str(XEvent e) {
@@ -71,11 +70,11 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
     }
     assert(visual);
 
-    {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM");
+    {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
-    {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER");
+    {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
-    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present");
+    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
         Present::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
 }
 

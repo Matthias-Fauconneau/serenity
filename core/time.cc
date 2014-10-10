@@ -5,6 +5,9 @@
 #include <sys/timerfd.h>
 #include <time.h> //rt
 
+// \file core.cc
+generic bool inRange(T min, T x, T max) { return !(x<min) && x<max; }
+
 long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec; }
 int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 
@@ -137,7 +140,7 @@ Date parseDate(TextData& s) {
             else if(date.day==-1) date.day=number-1;
             else if(date.month==-1) date.year=number-1;
             else if(date.year==-1) date.year=number;
-            else error("Invalid date", s.buffer);
+            else error("Invalid date", s);
         } else break;
         continue2_:;
     }

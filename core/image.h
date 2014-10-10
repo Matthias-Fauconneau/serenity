@@ -6,8 +6,8 @@
 /// 2D array of BGRA 8-bit unsigned integer pixels
 struct Image : buffer<byte4> {
     union {
+        int2 size = 0;
         struct { uint width, height; };
-        int2 size;
     };
     uint stride=0;
     bool alpha=false, sRGB=true;
@@ -61,16 +61,16 @@ Image resize(Image&& target, const Image& source);
 /// 2D array of floating-point pixels
 struct ImageF : buffer<float> {
     ImageF(){}
-    ImageF(buffer<float>&& data, int2 size) : buffer(::move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y)); }
-    ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0)); }
+    ImageF(buffer<float>&& data, int2 size) : buffer(::move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y), size,  width, height, buffer::size); }
+    ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0), size, width, height); }
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 
     explicit operator bool() const { return data && width && height; }
     inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*width+x); }
 
     union {
+        int2 size = 0;
         struct { uint width, height; };
-        int2 size;
     };
 };
 

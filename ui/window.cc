@@ -127,7 +127,7 @@ void Window::event() {
         if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton, focus)) render();
         else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
     }
-    if(!title) setTitle(widget->title());
+    if(title!=widget->title()) setTitle(widget->title());
     if(updates && state==Idle) {
         assert_(size);
         if(target.size != size) {

@@ -49,7 +49,7 @@ array<String> Folder::list(uint flags) const {
     array<String> list; byte buffer[0x1000];
     for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
         for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
-            string name (entry.name, 0ul); while(entry.name[name.size]) name.size++;
+            string name = str(entry.name);
             if(!(flags&Hidden) && name[0]=='.') continue;
             if(name=="." || name=="..") continue;
             int type = *((byte*)&entry + entry.len - 1);
@@ -148,9 +148,9 @@ void Map::unmap() { if(data) munmap((void*)data,size); data=0, size=0; }
 // -- File system
 
 void rename(const Folder& oldFolder, const string oldName, const Folder& newFolder, const string newName) {
-    assert(existsFile(oldName,oldFolder), oldName, newName);
-    assert(!existsFile(newName,newFolder), oldName, newName);
-    assert(newName.size<0x100);
+    assert_(existsFile(oldName,oldFolder), oldName, newName);
+    assert_(!existsFile(newName,newFolder), oldName, newName);
+    assert_(newName.size<0x100);
     check_(renameat(oldFolder.fd, strz(oldName), newFolder.fd, strz(newName)));
 }
 
