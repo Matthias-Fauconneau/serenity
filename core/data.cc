@@ -1,5 +1,6 @@
 #include "data.h"
 #include "string.h"
+#include "math.h"
 
 bool Data::wouldMatch(uint8 key) {
     if(available(1) && (uint8)peek() == key) return true;
@@ -231,25 +232,26 @@ double TextData::decimal() {
     if(!available(1)) return __builtin_nan("");
     double sign=1;
     if(match('-')) sign=-1; else match('+');
-    double significand=0, decimal=0;//, eSign=1, exponent=0;
+    double significand=0, decimal=0, eSign=1, exponent=0;
     if(match("∞")) significand = __builtin_inf();
-    else for(bool gotDot=false/*, gotE=false*/; available(1);) {
+    else for(bool gotDot=false, gotE=false; available(1);) {
         /**/  if(!gotDot && match('.')) gotDot=true;
-        //else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
+        else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
         else {
-            char c = next();
+            char c = peek();
             if(c>='0' && c<='9') {
                 int n = c-'0';
-                /*if(gotE) {
+                if(gotE) {
                     exponent *= 10;
                     exponent += n;
-                } else*/ {
+                } else {
                     significand *= 10;
                     significand += n;
                     if(gotDot) decimal++;
                 }
             } else break;
+            advance(1);
         }
     }
-    return sign*significand/**exp10(eSign*exponent-decimal)*/;
+    return sign*significand*exp10(eSign*exponent-decimal);
 }

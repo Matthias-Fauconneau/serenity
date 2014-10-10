@@ -125,9 +125,10 @@ void oxygen(const Image& target, int2 min, int2 max) {
     for(int y: range(::max(min.y, y0+splitY), max.y)) for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
     // Draws upper radial gradient (600x64)
     const int w = ::min(600, target.size.x), h = 64;
+    const float cx = target.size.x/2.f, cy = y0+h/2.f;
+    const float sx = 2.f/w, sy = 2.f/h;
     for(int y: range(0, ::min(max.y, y0+h))) for(int x: range(::max(min.x,(target.size.x-w)/2), ::min(max.x,(target.size.x+w)/2))) {
-        const float cx = target.size.x/2, cy = y0+h/2;
-        float r = sqrt(sq((x-cx)/(w/2)) + sq((y-cy)/(h/2)));
+        float r = sqrt( sq( sx * (x - cx) ) + sq( sy * (y - cy) ) );
         const float r0 = 0./4, r1 = 2./4, r2 = 3./4, r3 = 4./4;
         const float a0 = 255./255, a1 = 101./255, a2 = 37./255, a3 = 0./255;
         /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }

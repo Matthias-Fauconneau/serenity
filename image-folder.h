@@ -61,6 +61,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
     SourceImageRGB image(size_t index) const override {
+        assert_(index  < size());
         File sourceFile (values[index].at("Path"_), folder);
         return cache<Image>(name(index), ".sRGB", folder, [&](TargetImageRGB& target){
             Image source = decodeImage(Map(sourceFile));
@@ -73,6 +74,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component) const override {
+        assert_(index  < size());
         return cache<ImageF>(name(index), '.'+str(component), folder, [&](TargetImage& target) {
             SourceImageRGB source = image(index); // Faster but slightly inaccurate
             target.resize(source.size);

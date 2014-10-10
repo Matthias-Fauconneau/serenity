@@ -18,10 +18,10 @@ struct ScrollArea : Widget {
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() const abstract;
 
-    int2 sizeHint(int2 size) const override { return widget().sizeHint(size); }
+    int2 sizeHint(int2 size) override { return widget().sizeHint(size); }
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
     //bool keyPress(Key key, Modifiers modifiers) override;
-    Graphics graphics(int2 size) const override;
+    Graphics graphics(int2 size) override;
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
@@ -45,8 +45,8 @@ struct Progress : Widget {
 
     Progress(int minimum=0, int maximum=0, int value=-1):minimum(minimum),maximum(maximum),value(value){}
 
-    int2 sizeHint(int2) const override;
-    Graphics graphics(int2 size) const override;
+    int2 sizeHint(int2) override;
+    Graphics graphics(int2 size) override;
 
     static constexpr int height = 32;
 };
@@ -60,8 +60,8 @@ struct ImageView : virtual Widget {
     /// Creates a widget displaying \a image
     ImageView(Image&& image) : image(move(image)) {}
 
-    int2 sizeHint(int2) const override;
-    Graphics graphics(int2 size) const override;
+    int2 sizeHint(int2) override;
+    Graphics graphics(int2 size) override;
 };
 
 // Control
@@ -114,8 +114,8 @@ struct WidgetToggle : Widget {
 
     // Forwards content
     String title() const { return widgets[index]->title(); }
-    int2 sizeHint(int2 size) const override { return widgets[index]->sizeHint(size); }
-    Graphics graphics(int2 size) const override { return widgets[index]->graphics(size); }
+    int2 sizeHint(int2 size) override { return widgets[index]->sizeHint(size); }
+    Graphics graphics(int2 size) override { return widgets[index]->graphics(size); }
 
     // Forwards events and enables filter while a mouse button is pressed
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;

@@ -30,9 +30,9 @@ struct Widget {
     virtual String title() const { return {}; }
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint(int2) const = 0;
+    virtual int2 sizeHint(int2) = 0;
     /// Returns graphic elements representing this widget at the given \a size.
-    virtual Graphics graphics(int2 size) const = 0;
+    virtual Graphics graphics(int2 size) = 0;
 
 // Events
     /// Mouse event type

@@ -150,7 +150,7 @@ void Window::event() {
 
         Update update = updates.take(0);
         if(!update.graphics) update.graphics = widget->graphics(size); // TODO: partial render
-        assert_(update.graphics);
+        //assert_(update.graphics);
 
         // Render background
         /***/ if(background==NoBackground) {}

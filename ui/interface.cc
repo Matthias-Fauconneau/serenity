@@ -2,7 +2,7 @@
 
 // ScrollArea
 
-Graphics ScrollArea::graphics(int2 size) const {
+Graphics ScrollArea::graphics(int2 size) {
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     Graphics graphics;
@@ -38,8 +38,8 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 
 // Progress
 
-int2 Progress::sizeHint(int2) const { return int2(-height,height); }
-Graphics Progress::graphics(int2 size) const {
+int2 Progress::sizeHint(int2) { return int2(-height,height); }
+Graphics Progress::graphics(int2 size) {
     Graphics graphics;
     warn(minimum <= value && value <= maximum, minimum, value, maximum);
     int x = size.x*uint(value-minimum)/uint(maximum-minimum);
@@ -50,9 +50,9 @@ Graphics Progress::graphics(int2 size) const {
 
 // ImageView
 
-int2 ImageView::sizeHint(int2 size) const { return min(image.size, size.x ? image.size*size.x/image.size.x : image.size); }
+int2 ImageView::sizeHint(int2 size) { return min(image.size, size.x && image.size.x ? image.size*size.x/image.size.x : image.size); }
 
-Graphics ImageView::graphics(int2 size) const {
+Graphics ImageView::graphics(int2 size) {
     Graphics graphics;
     if(image) {
         int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
@@ -87,6 +87,7 @@ bool ToggleButton::mouseEvent(int2, int2, Event event, Button button, Widget*&) 
 
 // WidgetToggle
 bool WidgetToggle::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+    focus = this;
     size_t previousIndex = index;
     index = button != NoButton && event != Release;
     return widgets[index]->mouseEvent(cursor, size, event, button, focus) || previousIndex != index;

@@ -31,26 +31,39 @@ struct ProcessedSource : ImageSource {
     }
 };
 
+struct Index {
+    size_t* pointer;
+    void operator=(size_t value) { *pointer = value; }
+    operator size_t() const { return *pointer; }
+    operator size_t&() { return *pointer; }
+};
+
 /// Displays an image collection
 struct ImageSourceView : ImageView {
     ImageSource& source;
-    size_t index = -1;
+    Index index;
+    size_t imageIndex = -1;
     SourceImageRGB image; // Holds memory map reference
 
     bool setIndex(int value) {
         size_t index = clip(0, value, (int)source.size()-1);
-        if(index != this->index) {
-            this->index = index;
-            image = source.image(index);
-            ImageView::image = share(image);
-            return true;
-        }
+        if(index != this->index) { this->index = index; return true; }
         return false;
     }
 
-    ImageSourceView(ImageSource& source) : source(source) { setIndex(0); }
+    ImageSourceView(ImageSource& source, size_t* index) : source(source), index{index} {}
 
-    String title() const override { return str(index+1,'/',source.size(), source.name(index), source.properties(index)); }
+    String title() const override { return source.size() ? str(index+1,'/',source.size(), source.name(index), source.properties(index)) : String(); }
+
+    void update() {
+        if(imageIndex != index && source.size()) {
+            image = source.image(index);
+            ImageView::image = share(image);
+        }
+    }
+
+    int2 sizeHint(int2 size) override { update(); return ImageView::sizeHint(size); }
+    Graphics graphics(int2 size) override { update(); return ImageView::graphics(size); }
 
     /// Browses source by moving mouse horizontally over image view (like an hidden slider)
     bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override { return setIndex(source.size()*min(size.x-1,cursor.x)/size.x); }
@@ -68,10 +81,12 @@ struct ImageSourceView : ImageView {
 struct DustRemovalPreview {
     InverseAttenuation correction { Folder("Pictures/Paper", home()) };
     ImageFolder source { Folder("Pictures", home()),
-                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) > 4; } };
-    ImageSourceView sourceView {source};
+                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) <= 6.3; } };
     ProcessedSource corrected {source, correction};
-    ImageSourceView correctedView {corrected};
+
+    size_t index = 0;
+    ImageSourceView sourceView {source, &index};
+    ImageSourceView correctedView {corrected, &index};
     WidgetToggle toggleView {&sourceView, &correctedView};
     Window window {&toggleView};
 } application;
