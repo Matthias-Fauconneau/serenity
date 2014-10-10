@@ -72,6 +72,7 @@ struct Synthetic : VolumeOperation {
         /// Links each ellipsoid to its nearest neighbour (TODO: all non-intersecting links)
         struct Tube { vec3 A, B; float radius; };
         array<Tube> tubes;
+        Random random;
         for(const mat4& ellipsoid: ellipsoids) {
             vec3 center = ellipsoid[3].xyz();
             mat4 nearest; float distance=inf;
@@ -80,7 +81,7 @@ struct Synthetic : VolumeOperation {
             //vec4 b = nearest*vec4(1,1,1,0); float vVolume = b.x*b.y*b.z;
             // Rasterizes tubes (throats)
             vec3 A = center, B = nearest[3].xyz();
-            float tubeRadius = 1; //max(1., pow(min(aVolume,vVolume), 1./3));
+            float tubeRadius = max(1.f, random() * maximumRadius);
             int3 min=clip(int3(0),int3(::min(A,B))-int3(tubeRadius),target.sampleCount);
             int3 max=clip(int3(0),int3(ceil(::max(A,B)))+int3(tubeRadius),target.sampleCount);
             for(int z: range(min.z, max.z)) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
@@ -92,7 +93,7 @@ struct Synthetic : VolumeOperation {
             }
             tubes << Tube{A, B, tubeRadius};
         }
-        output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z) + " voxels"_;});
+        output(otherOutputs, "sourceSize"_, "size"_, [&]{return str(size.x)+"x"_+str(size.y)+"x"_+str(size.z) + " voxels"_;});
     }
 };
 template struct Interface<Operation>::Factory<Synthetic>;

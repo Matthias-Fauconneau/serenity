@@ -213,7 +213,7 @@ bool Process::sameSince(const string& target, int64 queryTime, const Dict& argum
     for(const string& input: rule.inputs) { // Inputs changed since result (or query if result was discarded) was last generated
         if(!sameSince(input, queryTime, arguments)) return false;
     }
-    //if(rule.operation && parseDate(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
+    if(rule.operation && parseDate(Interface<Operation>::version(rule.operation))*1000000000l > queryTime) return false; // Implementation changed since query
     return true;
 }
 

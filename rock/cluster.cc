@@ -12,7 +12,6 @@ struct FamilySet {
     array<uint> families; // Family set
     map<uint, uint> unions; // Maps another family set index to the index of the union of this family set and the other family set
     map<uint, array<uint>> complements; // Maps another family set index to the relative complement of this family set in the other family set
-    array<uint64> elements; // Elements belonging to this family set (i.e to all families in the set (i.e intersection))
 };
 String str(const FamilySet& o) { return str(o.families,o.unions); }
 
@@ -37,12 +36,7 @@ void relativeComplements(array<FamilySet>& familySets, size_t a, size_t b) {
     B.complements.insert(a, relativeComplement(B.families, A.families));
 }
 
-// Workaround lack of multiple return values
-struct MultipleReturnValues {
-    array<Family> families;
-    array<FamilySet> familySets;
-};
-MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
+array<Family> cluster(Volume32& target, const Volume16& source, buffer<array<short3>> lists, uint minimum) {
     assert_(source.tiled() && target.tiled());
 
     const mref<uint32> targetData = target;
@@ -95,7 +89,6 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
 
                         if(!candidateFamilySetIndex) { // Appends candidate vertex index to family
                             for(uint family: familySets[parentFamilySetIndex].families) families[family].append( candidateVertexIndex );
-                            familySets[parentFamilySetIndex].elements.append( candidateVertexIndex );
                             candidateFamilySetIndex = parentFamilySetIndex; // Updates last assigned root
                         }
                         else if(familySets[parentFamilySetIndex].unions .values .contains(candidateFamilySetIndex)) {
@@ -123,7 +116,6 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
                                 // Creates both relative complements sets (not symmetric) to lookup the set of families to append new elements to
                                 relativeComplements(familySets, parentFamilySetIndex, candidateFamilySetIndex);
                             }
-                            familySets[unionIndex].elements.append( candidateVertexIndex );
                             // Appends the candidate vertex index to the relative complement of the candidate's families in the parent's families
                             for(uint family: familySets[parentFamilySetIndex].complements.at(candidateFamilySetIndex))
                                 families[family].append( candidateVertexIndex );
@@ -136,7 +128,7 @@ MultipleReturnValues cluster(Volume32& target, const Volume16& source, buffer<ar
             }
         }
     }
-    return {move(families), move(familySets)};
+    return move(families);
 }
 
 /// Converts sets to a text file formatted as ((x y z r2)+\n)*
@@ -146,29 +138,13 @@ String toASCII(const ref<Family>& families, const Volume16& source) {
     byte* targetPtr = target.begin();
     Time time; log_(str("toASCII",families.size,"families... "_));
     for(const Family& family: families) {
-        for(uint64 index: family) {
-            int3 p = zOrder(index);
-            itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
+        if(family) {
+            for(uint64 index: family) {
+                int3 p = zOrder(index);
+                itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
+            }
+            targetPtr[-1] = '\n';
         }
-        targetPtr[-1] = '\n';
-    }
-    log(time);
-    target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
-    return target;
-}
-
-/// Converts sets to a text file formatted as ((x y z r2)+\n)*
-String toASCII(const array<FamilySet>& familySets, const Volume16& source) {
-    // Estimates text size to avoid reallocations
-    String target ( sum(apply(familySets,[](const FamilySet& family){ return family.elements.size*4*5;})) );
-    byte* targetPtr = target.begin();
-    Time time; log_(str("toASCII",familySets.size,"familySets..."_));
-    for(const FamilySet& set: familySets) {
-        for(uint64 index: set.elements) {
-            int3 p = zOrder(index);
-            itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
-        }
-        targetPtr[-1] = '\n';
     }
     log(time);
     target.size = targetPtr-target.begin(); assert(target.size <= target.capacity);
@@ -181,13 +157,8 @@ struct Cluster : VolumeOperation {
     uint outputSampleSize(uint index) override { return index==0 ? sizeof(uint32) : 0; }
     virtual void execute(const Dict& args, const mref<Volume>& outputs, const ref<Volume>& inputs, const ref<Result*>& otherOutputs,
                          const ref<const Result*>& otherInputs) override {
-        const auto multipleReturnValues = cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0));
-        const auto& families = multipleReturnValues.families;
-        const auto& familySets = multipleReturnValues.familySets;
-        otherOutputs[0]->metadata = String("families"_);
-        otherOutputs[0]->data = toASCII(families, inputs[0]);
-        otherOutputs[1]->metadata = String("familysets"_);
-        otherOutputs[1]->data = toASCII(familySets, inputs[0]);
+        otherOutputs[0]->metadata = String("sets"_);
+        otherOutputs[0]->data = toASCII(cluster(outputs[0], inputs[0], parseLists(otherInputs[0]->data), args.value("minimum"_,0)), inputs[0]);
     }
 };
 template struct Interface<Operation>::Factory<Cluster>;

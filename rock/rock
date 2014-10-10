@@ -198,25 +198,20 @@ if method == 'curve': throat-list = List throat-index
 # Generates lists of balls for each radius
 maximum-balls-lists = List maximum
 # Generates a list of pores from the pore space
-if method == 'cluster': last-root-index pore-list throat-list = Cluster maximum maximum-balls-lists                # Correct inefficient method
-# Writes indices (into the pores/throats list) at each pore/throat position
+if method == 'cluster': last-root-index pore-list = Cluster maximum maximum-balls-lists                # Correct inefficient method
+# Writes indices (into the pores list) at each pore position
 if method == 'cluster': pore-index = RootIndex pore-list cropSize
-if method == 'cluster': throat-index = RootIndex throat-list cropSize
 
 # - Incorrect efficient maximum balls cluster method processing from surface skeleton - #
 skeleton-balls-lists = List connected-skeleton
-last-root-index-skeleton pore-list-skeleton throat-list-skeleton = Cluster maximum skeleton-balls-lists
+last-root-index-skeleton pore-list-skeleton = Cluster maximum skeleton-balls-lists
 # Writes root index of each skeleton voxel
 pore-skeleton = RootIndex pore-list-skeleton cropSize
-throat-skeleton = RootIndex throat-list-skeleton cropSize
 # Rasterizes skeleton voxel as maximum balls (with family index attribute)
 pore-skeleton-bins = Bin connected-skeleton pore-skeleton
-throat-skeleton-bins = Bin connected-skeleton throat-skeleton
 if method == 'cluster-skeleton': pore-index = RasterizeAttribute pore-skeleton-bins
-if method == 'cluster-skeleton': throat-index = RasterizeAttribute throat-skeleton-bins
 # Lists rasterized voxels for each pore
 if method == 'cluster-skeleton': pore-list = List pore-index
-if method == 'cluster-skeleton': throat-list = List throat-index
 
 # --- Pores/throats analysis --- #
 

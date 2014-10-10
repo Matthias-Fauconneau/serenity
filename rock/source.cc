@@ -211,7 +211,7 @@ struct Source : VolumeOperation {
             float resolution = s ? s.decimal()/1000.0 : args.contains("resolution"_) ? fromDecimal(args.at("resolution"_)) : 1; if(args.contains("downsample"_)) resolution *= 2;
             output(otherOutputs, "resolution"_, "scalar"_, [&]{return str(resolution)+" μm\n"_;});
             int3 voxelSize = target.sampleCount-2*target.margin;
-            output(otherOutputs, "voxelSize"_, "size"_, [&]{return str(voxelSize.x)+"x"_+str(voxelSize.y)+"x"_+str(voxelSize.z) + " voxels"_;});
+            output(otherOutputs, "sourceSize"_, "size"_, [&]{return str(voxelSize.x)+"x"_+str(voxelSize.y)+"x"_+str(voxelSize.z) + " voxels"_;});
             int3 physicalSize = int3(round(resolution*vec3(voxelSize)));
             output(otherOutputs, "physicalSize"_, "size"_, [&]{return str(physicalSize.x)+"x"_+str(physicalSize.y)+"x"_+str(physicalSize.z)+" μm³"_;});
         }
