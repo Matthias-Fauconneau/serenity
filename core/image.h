@@ -79,9 +79,11 @@ struct ImageF : buffer<float> {
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
 
 inline ImageF operator-(const ImageF& a, float b) { ImageF y(a.size); subtract(y, a, b); return y; }
-//inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
+inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
 inline ImageF operator-(const ImageF& a, ImageF&& b) { subtract(b, a, b); return move(b); }
 inline ImageF min(ImageF&& a, const ImageF& b) { parallel_apply(a, [](float a, float b) { return min(a, b); }, a, b); return move(a); }
+
+inline ImageF operator/(const ImageF& a, const ImageF& b) { ImageF y(a.size); div(y, a, b); return y; }
 
 // -- sRGB --
 
@@ -113,7 +115,7 @@ ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma);
 inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
 
 /// Selects image (signal) components of scale (frequency) below threshold
-inline ImageF lowPass(const ImageF& source, float threshold) { assert_(threshold>0); return gaussianBlur(source, threshold); }
+inline ImageF lowPass(const ImageF& source, float threshold) { return gaussianBlur(source, threshold); }
 
 /// Selects image (signal) components of scale (frequency) above threshold
 inline ImageF highPass(const ImageF& source, float threshold) { return source - gaussianBlur(source, threshold); }

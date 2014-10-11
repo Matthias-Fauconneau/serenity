@@ -105,6 +105,10 @@ inline float mean(ref<float> values) {
     return sum/values.size;
 }
 
+inline float energy(ref<float> values) {
+    return parallel_reduce(values, [](float accumulator, float value) { return accumulator + value*value; }, 0.f);
+}
+
 inline void abs(mref<float> target, ref<float> source) { parallel_apply(target, [&](float v) {  return abs(v); }, source); }
 
 inline void operator*=(mref<float> values, float factor) {
@@ -124,3 +128,8 @@ inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
 
 inline void operator-=(mref<float> target, float DC) { subtract(target, target, DC); }
 inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }
+
+inline void div(mref<float> Y, ref<float> A, ref<float> B) {
+    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a/b; });
+    else parallel_apply(Y, [&](float a, float b) {  return a/b; }, A, B);
+}

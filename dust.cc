@@ -1,37 +1,8 @@
 /// \file dust.cc Automatic dust removal
+#include "processed-source.h"
 #include "inverse-attenuation.h"
 #include "interface.h"
 #include "window.h"
-
-struct ProcessedSource : ImageSource {
-    ImageSource& source;
-    ImageOperation& operation;
-    ProcessedSource(ImageSource& source, ImageOperation& operation) :
-        ImageSource(Folder(".",source.folder)), source(source), operation(operation) {}
-
-    String name() const override { return str(operation.name(), source.name()); }
-    size_t size() const override { return source.size(); }
-    String name(size_t index) const override { return source.name(index); }
-    int64 time(size_t index) const override { return max(operation.time(), source.time(index)); }
-    const map<String, String>& properties(size_t index) const override { return source.properties(index); }
-    int2 size(size_t index) const override { return source.size(index); }
-
-    /// Returns processed linear image
-    virtual SourceImage image(size_t index, uint component) const override {
-        return cache<ImageF>(source.name(index), operation.name()+'.'+str(component), source.folder, [&](TargetImage& target) {
-            SourceImage sourceImage = source.image(index, component);
-            operation.apply(target.resize(sourceImage.size), sourceImage);
-        }, time(index));
-    }
-
-    /// Returns processed sRGB image
-    virtual SourceImageRGB image(size_t index) const override {
-        return cache<Image>(source.name(index), operation.name()+".sRGB", source.folder, [&](TargetImageRGB& target) {
-            log(source.name(index));
-            sRGB(target.resize(size(index)), image(index, 0), image(index, 1), image(index, 2));
-        }, time(index));
-    }
-};
 
 struct Index {
     size_t* pointer;
@@ -60,6 +31,7 @@ struct ImageSourceView : ImageView {
     }
 
     void update() {
+        index = clip(0ul, (size_t)index, source.size()-1);
         if(imageIndex != index && source.size()) {
             image = source.image(index);
             ImageView::image = share(image);
@@ -89,7 +61,9 @@ struct DustRemovalPreview {
     InverseAttenuation correction { Folder("Paper", folder) };
 #if 1
     ImageFolder source { folder, [](const String&, const map<String, String>& properties){ return
-                    !(fromDecimal(properties.at("Aperture"_)) >= 5 || fromDecimal(properties.at("Focal"_)) <= 7.3); } };
+                    fromDecimal(properties.at("Aperture"_)) <= 5 ||
+                    ( fromDecimal(properties.at("Focal"_)) < 4.1 ||
+                      (fromDecimal(properties.at("Focal"_)) <= 4.3 && fromDecimal(properties.at("Bias"_)) != 0)); } };
     ProcessedSource corrected {source, correction};
 
     File last {".last", folder, Flags(ReadWrite|Create)};

@@ -88,3 +88,6 @@ image-source.h
 image-folder.h
 calibration.cc
 calibration.h
+inverse-attenuation.cc
+processed-source.cc
+processed-source.h
