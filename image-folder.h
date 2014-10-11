@@ -1,3 +1,4 @@
+#pragma once
 #include "image-source.h"
 #include "exif.h"
 #include "jpeg.h"

@@ -7,7 +7,8 @@
 struct ImageOperation {
     virtual string name() const abstract;
     virtual string version() const abstract;
-    virtual void apply(const ImageF& target, const ImageF& source, uint component) const abstract;
+    virtual int64 time() const { return  0; }
+    virtual void apply(ImageF& target, const ImageF& source, uint component) const abstract;
 };
 
 generic struct ImageOperationT : ImageOperation {

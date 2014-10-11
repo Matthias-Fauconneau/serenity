@@ -14,7 +14,7 @@ generic struct Target : T {
 
     Target(string name, const Folder& folder) : folder(".", folder), name(name), file(fileName(), folder, ::Flags(ReadWrite|Create)) {}
     String fileName() const { return name+'.'+strx(T::size); }
-    const Target& resize(int2 size) {
+    Target& resize(int2 size) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         map = Map(file, Map::Write);
         (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size);
@@ -31,7 +31,7 @@ generic struct Source : Map, T {
 };
 
 generic Source<T> cache(string name, string operation, const Folder& folder, function<void(Target<T>&)> generate,
-                int64 unused sourceTime, string unused version = __TIMESTAMP__) {
+                int64 unused sourceTime, string unused version = __DATE__ " " __TIME__) {
     Folder cache(operation, folder, true);
     removeIfExisting(name, cache);
     auto files = filter(cache.list(Files), [&](string fileName){ return !startsWith(fileName, name); });

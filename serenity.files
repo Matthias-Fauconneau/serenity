@@ -86,3 +86,5 @@ core/parallel.h
 inverse-attenuation.h
 image-source.h
 image-folder.h
+calibration.cc
+calibration.h

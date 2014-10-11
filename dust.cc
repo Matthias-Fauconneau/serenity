@@ -21,12 +21,13 @@ struct ProcessedSource : ImageSource {
         return cache<ImageF>(source.name(index), operation.name()+'.'+str(component), source.folder, [&](TargetImage& target) {
             SourceImage sourceImage = source.image(index, component);
             operation.apply(target.resize(sourceImage.size), sourceImage, component);
-        }, time(index), operation.version());
+        }, max(operation.time(), time(index)), operation.version());
     }
 
     /// Returns processed sRGB image
     virtual SourceImageRGB image(size_t index) const override {
         return cache<Image>(source.name(index), operation.name()+".sRGB", source.folder, [&](TargetImageRGB& target) {
+            log(source.name(index));
             sRGB(target.resize(size(index)), image(index, 0), image(index, 1), image(index, 2));
         }, time(index), operation.version());
     }
@@ -86,6 +87,7 @@ struct ImageSourceView : ImageView {
 struct DustRemovalPreview {
     Folder folder {"Pictures", home()};
     InverseAttenuation correction { Folder("Paper", folder) };
+#if 1
     ImageFolder source { folder, [](const String&, const map<String, String>& properties){ return
                     !(fromDecimal(properties.at("Aperture"_)) >= 5 || fromDecimal(properties.at("Focal"_)) <= 7.3); } };
     ProcessedSource corrected {source, correction};
@@ -98,4 +100,8 @@ struct DustRemovalPreview {
     ImageSourceView correctedView {corrected, &index};
     WidgetToggle toggleView {&sourceView, &correctedView};
     Window window {&toggleView};
+#else
+    ImageView imageView {correction.calibrationImage()};
+    Window window {&imageView};
+#endif
 } application;

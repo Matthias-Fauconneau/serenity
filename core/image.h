@@ -2,6 +2,7 @@
 /// \file image.h Image container and operations
 #include "vector.h"
 #include "data.h"
+#include "parallel.h"
 
 /// 2D array of BGRA 8-bit unsigned integer pixels
 struct Image : buffer<byte4> {
@@ -77,6 +78,9 @@ struct ImageF : buffer<float> {
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
 
+inline ImageF operator-(const ImageF& a, float b) { ImageF y(a.size); subtract(y, a, b); return y; }
+inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
+
 // -- sRGB --
 
 extern uint8 sRGB_forward[0x1000];
@@ -87,6 +91,9 @@ void linear(mref<float> target, ref<byte4> source, uint component);
 
 /// Converts linear float pixels for each component to color sRGB pixels
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red);
+inline Image sRGB(const ImageF& blue, const ImageF& green, const ImageF& red) {
+    Image sRGB (blue.size); ::sRGB(sRGB, blue, green, red); return sRGB;
+}
 
 // -- Resampling (float) --
 
@@ -98,5 +105,13 @@ ImageF resize(ImageF&& target, ImageF&& source);
 ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma);
 inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
 
-/// Selects frequency near a band
-ImageF bandPass(const ImageF& source, float lowPass, float highPass);
+/// Selects image (signal) components of scale (frequency) below threshold
+inline ImageF lowPass(const ImageF& source, float threshold) { assert_(threshold>0); return gaussianBlur(source, threshold); }
+
+/// Selects image (signal) components of scale (frequency) above threshold
+inline ImageF highPass(const ImageF& source, float threshold) { return source - gaussianBlur(source, threshold); }
+
+/// Selects image (signal) components of scales (frequencies) within a band
+inline ImageF bandPass(const ImageF& source, float lowThreshold, float highThreshold) {
+    return highPass(lowPass(source, lowThreshold), highThreshold);
+}

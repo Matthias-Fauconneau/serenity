@@ -230,11 +230,3 @@ ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
     convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width);
     return move(target);
 }
-
-ImageF bandPass(const ImageF& source, float lowBound, float highBound) {
-    ImageF low_band = lowBound ? gaussianBlur(source, lowBound) : share(source);
-    if(!highBound) return low_band;
-    ImageF low = gaussianBlur(low_band, highBound);
-    subtract(low, low_band, low);
-    return low;
-}

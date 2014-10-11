@@ -2,67 +2,81 @@
 #include "parallel.h"
 #include "image-operation.h"
 #include "image-folder.h"
-
-// Spot frequency bounds
-const float lowBound = 8, highBound = 32; //TODO: automatic determination
-
-void calibrate(const ImageF& target, ImageFolder& calibration, uint component) {
-    assert_(target);
-
-    // Sums all images
-    target.buffer::clear();
-    for(size_t index: range(calibration.size())) {
-        SourceImage source = calibration.image(index, component);
-        // Low pass to filter texture, noise and lighting conditions
-        //bandPass(target, lowBound, highBound);
-        parallel_apply(target, [](float sum, float source) { return sum + source; }, target, source);
-    }
-
-#if 1
-    // Normalizes sum by maximum
-    float max = parallel_maximum(target);
-    float factor = 1/max;
-    parallel_apply(target, [&](float v) {  return factor*v; }, target);
-#else
-    // Normalizes sum by mean (DC) (and clips values over average to 1)
-    float sum = parallel_sum(target);
-    float mean = sum/target.buffer::size;
-    float factor = 1/mean;
-    parallel_apply(target, [&](float v) {  return min(1.f, factor*v); }, target);
-#endif
-}
+#include "math.h"
+#include "calibration.h"
 
 /// Inverts attenuation bias
-struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
-    SourceImage attenuation[3];
+struct InverseAttenuation : Calibration, ImageOperationT<InverseAttenuation> {
+    InverseAttenuation(ImageFolder&& calibration) : Calibration(move(calibration), name()) {}
 
-    /// Calibrates attenuation bias image by summing images of a white subject
-    InverseAttenuation(ImageFolder&& calibration) {
-        int64 calibrationTime = max(::apply(calibration.size(), [&](size_t index) { return calibration.time(index); }));
-        for(uint component : range(3)) {
-            attenuation[component] = cache<ImageF>("attenuation", name()+'.'+str(component), calibration.folder, [&](TargetImage& target) {
-                    target.resize(calibration.imageSize);
-                    calibrate(target, calibration, component);
-            }, calibrationTime);
-        }
-    }
+    int64 time() const override { return Calibration::time(); }
 
-    void apply(const ImageF& target, const ImageF& source, uint component) const override {
+    void apply(ImageF& target, const ImageF& source, uint component) const override {
         // Inverses attenuation using attenuation factors calibrated for each pixel
-        parallel_apply(target, [&](float source, float bias) { return source / bias; }, source, attenuation[component]);
+        parallel_apply(target, [&](float source, float bias) { return bias ? source / bias : 0; }, source, attenuation[component]);
 
-#if 1
-        // Restricts correction to a frequency band
-        ImageF reference = bandPass(source, lowBound, highBound);
-        ImageF corrected = bandPass(target, lowBound, highBound);
+        if(1) {
+#if 0
+            ImageF reference, corrected;
+            if(0) { // Filters DC
+                reference = source-mean(source);
+                corrected = target-mean(target);
+            } else if(1) { // Selects high frequencies
 
-        // Saturates correction below max(0, source) (prevents introduction of a light feature at spot frequency)
-        parallel_apply(target, [&](float source, float reference, float corrected) {
-            float saturated_corrected = min(corrected, max(reference, 0.f));
-            float correction = saturated_corrected - reference;
-            return source + correction;
-        }, source, reference, corrected);
+                reference = highPass(source, 64);
+                corrected = highPass(target, 64);
+                //target.copy(reference); return;
+            } else { // Selects frequencies within a band
+                reference = bandPass(source, 1, 128/*highThreshold*/);
+                corrected = bandPass(target, 1, 128/*highThreshold*/);
+            }
+            // Saturates correction below max(0, source) (May flatten but not lighten the signal above surroundings) (TODO: in each band)
+            parallel_apply(target, [&](float source, float referenceLow, float referenceHigh, float corrected) {
+                float saturated_corrected = min(corrected, max(referenceHigh, 0.f) + max(referenceLow, 0.f));
+                float correction = saturated_corrected - reference;
+                return source + correction;
+            }, source, reference, corrected);
+#elif 0
+            // Splits source in bands (scales)
+            ImageF low = lowPass(source, 16);
+            ImageF high = source - low;
+
+            // Saturates correction to flattening (TODO: at every scale)
+            parallel_apply(target, [&](float target, float low, float high) {
+                return min(target, max(low, 0.f) + max(high, 0.f));
+            }, target, low, high);
+#elif 0
+            // Splits source in bands (scales) from high to low
+            array<ImageF> bands;
+            ImageF remainder = share(source);
+            for(float split=4; split<=64; split+=4) {
+                ImageF low = lowPass(remainder, split);
+                bands.append( remainder - low ); // Scales between previous split and current split
+                remainder = move(low);
+            }
+            bands.append(move(remainder)); // Lowest band (DC to last (coarsest) split)
+
+            // Saturates brightness increase to flattening at every scale
+            parallel_apply(target, [&](size_t index) {
+                float flat = 0;
+                for(const ImageF& image: bands) flat += max(0.f, image[index]);
+                return flat; //min(target, flat);
+            });
+
+            // TODO: continuous version in spectral space ?
+#elif 1
+            target = gaussianBlur(move(target), target, 32 ); // 32 is enough
+            // Low pass near spot
+
+            parallel_apply(target, [&](float low, float source, float a) {
+                return low; //(1-a) * low + a * source; //min(target, flat);
+            }, target, source, attenuation[component]);
+
+#else
+            //target = gaussianBlur(move(target), source, 1); return;
+            //abs(target, lowPass(source, 64)); return; // 4
 #endif
+        }
 
         // Never darkens
         parallel_apply(target, [&](float target, float source) { return max(target, source); }, target, source);
