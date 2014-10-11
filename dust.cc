@@ -12,7 +12,7 @@ struct ProcessedSource : ImageSource {
     String name() const override { return str(operation.name(), source.name()); }
     size_t size() const override { return source.size(); }
     String name(size_t index) const override { return source.name(index); }
-    int64 time(size_t index) const override { return source.time(index); }
+    int64 time(size_t index) const override { return max(operation.time(), source.time(index)); }
     const map<String, String>& properties(size_t index) const override { return source.properties(index); }
     int2 size(size_t index) const override { return source.size(index); }
 
@@ -20,8 +20,8 @@ struct ProcessedSource : ImageSource {
     virtual SourceImage image(size_t index, uint component) const override {
         return cache<ImageF>(source.name(index), operation.name()+'.'+str(component), source.folder, [&](TargetImage& target) {
             SourceImage sourceImage = source.image(index, component);
-            operation.apply(target.resize(sourceImage.size), sourceImage, component);
-        }, max(operation.time(), time(index)), operation.version());
+            operation.apply(target.resize(sourceImage.size), sourceImage);
+        }, time(index));
     }
 
     /// Returns processed sRGB image
@@ -29,7 +29,7 @@ struct ProcessedSource : ImageSource {
         return cache<Image>(source.name(index), operation.name()+".sRGB", source.folder, [&](TargetImageRGB& target) {
             log(source.name(index));
             sRGB(target.resize(size(index)), image(index, 0), image(index, 1), image(index, 2));
-        }, time(index), operation.version());
+        }, time(index));
     }
 };
 
@@ -99,9 +99,9 @@ struct DustRemovalPreview {
     ImageSourceView sourceView {source, &index};
     ImageSourceView correctedView {corrected, &index};
     WidgetToggle toggleView {&sourceView, &correctedView};
-    Window window {&toggleView};
 #else
-    ImageView imageView {correction.calibrationImage()};
-    Window window {&imageView};
+    ImageView views[2]  = {correction.attenuationImage(), correction.blendFactorImage()};
+    WidgetToggle toggleView {&views[0], &views[1]};
 #endif
+    Window window {&toggleView};
 } application;

@@ -79,7 +79,9 @@ struct ImageF : buffer<float> {
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
 
 inline ImageF operator-(const ImageF& a, float b) { ImageF y(a.size); subtract(y, a, b); return y; }
-inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
+//inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
+inline ImageF operator-(const ImageF& a, ImageF&& b) { subtract(b, a, b); return move(b); }
+inline ImageF min(ImageF&& a, const ImageF& b) { parallel_apply(a, [](float a, float b) { return min(a, b); }, a, b); return move(a); }
 
 // -- sRGB --
 
@@ -88,6 +90,11 @@ extern float sRGB_reverse[0x100];
 
 /// Converts an sRGB component to linear float
 void linear(mref<float> target, ref<byte4> source, uint component);
+
+void sRGB(mref<byte4> target, ref<float> value);
+inline Image sRGB(const ImageF& value) {
+    Image sRGB (value.size); ::sRGB(sRGB, value); return sRGB;
+}
 
 /// Converts linear float pixels for each component to color sRGB pixels
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red);

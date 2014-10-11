@@ -43,7 +43,6 @@ generic Source<T> cache(string name, string operation, const Folder& folder, fun
         else {
             // Safeguards
             assert_(find(cache.name(),"/Pictures/"_));
-            assert_(find(cache.name(),".0"_) || find(cache.name(),".1"_) || find(cache.name(),".2"_) || find(cache.name(),".sRGB"_));
             assert_(!files[0].contains('/'));
             remove(files[0], cache);
         }

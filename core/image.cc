@@ -161,6 +161,9 @@ static uint8 sRGB(float v) {
     assert_(linear12 < 0x1000);
     return sRGB_forward[linear12];
 }
+void sRGB(mref<byte4> target, ref<float> value) {
+    parallel_apply(target, [&](size_t index) { uint8 v=sRGB(value[index]); return byte4(v,v,v, 0xFF); });
+}
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
     parallel_apply(target, [&](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
 }

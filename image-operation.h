@@ -6,12 +6,11 @@
 /// Operation on an image
 struct ImageOperation {
     virtual string name() const abstract;
-    virtual string version() const abstract;
-    virtual int64 time() const { return  0; }
-    virtual void apply(ImageF& target, const ImageF& source, uint component) const abstract;
+    virtual int64 time() const abstract;
+    virtual void apply(ImageF& target, const ImageF& source) const abstract;
 };
 
 generic struct ImageOperationT : ImageOperation {
     string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
-    string version() const override { return __DATE__ " " __TIME__; }
+    int64 time() const override { return parseDate(__DATE__ " " __TIME__)*1000000000l; }
 };
