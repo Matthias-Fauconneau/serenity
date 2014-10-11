@@ -22,7 +22,6 @@ bool operator <=(const string a, const string b) {
     return a.size <= b.size;
 }
 
-
 bool startsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data,a.size)==a;
 }
@@ -37,7 +36,6 @@ bool find(const string s, const string a) {
     return false;
 }
 
-
 string section(const string s, byte separator, int begin, int end) {
     if(!s) return "";
     uint b,e;
@@ -49,12 +47,9 @@ string section(const string s, byte separator, int begin, int end) {
     return string(s.data+b,e-b);
 }
 
-
-bool isInteger(const string s) {
-    if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true;
-}
-
-double fromDecimal(const string s) { return TextData(s).decimal(); }
+bool isInteger(const string s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
+int64 fromInteger(const string number, int base) { return TextData(number).integer(true, base); }
+double fromDecimal(const string number) { return TextData(number).decimal(); }
 
 // -- String
 

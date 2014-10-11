@@ -4,7 +4,7 @@
 #include <sys/shm.h>
 
 Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& icon) : widget(widget), size(sizeHint), title(title) {
-    onEvent.connect(this, &Window::processEvent);
+    Display::onEvent.connect(this, &Window::onEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
     if(sizeHint.x<=0) size.x=screenX;
@@ -35,21 +35,26 @@ Window::~Window() {
 }
 
 // Events
-void Window::processEvent(const ref<byte> ge) {
-    const XEvent& e = *(XEvent*)ge.data;
+void Window::onEvent(const ref<byte> ge) {
+    const XEvent& event = *(XEvent*)ge.data;
+    uint8 type = event.type&0b01111111; //msb set if sent by SendEvent
+    if(type==MotionNotify) { heldEvent = unique<XEvent>(event); queue(); }
+    else {
+        // Ignores autorepeat
+        if(heldEvent && heldEvent->type==KeyRelease && heldEvent->time==event.time && type==KeyPress) heldEvent=nullptr;
+        if(heldEvent) { processEvent(heldEvent); heldEvent=nullptr; }
+        if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
+        else if(processEvent(event)) {}
+        else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
+            assert_(state == Present);
+            state = Idle;
+        }
+        else log("Unhandled event", ref<string>(X11::events)[type]);
+    }
+}
+
+bool Window::processEvent(const XEvent& e) {
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
-    if(type==MotionNotify) {
-        cursorPosition = int2(e.x,e.y);
-        cursorState = e.state;
-        motionPending = true;
-        queue();
-        return;
-    }
-    if(motionPending) {
-        motionPending = false;
-        if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton, focus)) render();
-        else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
-    }
     /**/ if(type==ButtonPress) {
         Widget* focus=this->focus; this->focus=0;
         if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, focus) || this->focus!=focus) render();
@@ -71,6 +76,12 @@ void Window::processEvent(const ref<byte> ge) {
         Key key = (Key)keySym(e.key, e.state); Modifiers modifiers = (Modifiers)e.state;
         if(focus && focus->keyRelease(key, modifiers)) render();
     }
+    else if(type==MotionNotify) {
+        if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton, focus))
+            render();
+        else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus))
+            render();
+    }
     else if(type==EnterNotify || type==LeaveNotify) {
         if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
                                e.state&Button1Mask?Widget::LeftButton:Widget::NoButton, focus) ) render();
@@ -91,11 +102,8 @@ void Window::processEvent(const ref<byte> ge) {
     }
     else if(type==MappingNotify) {}
     else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); state = Present; }
-    else if(type==GenericEvent && e.genericEvent.ext == Present::EXT && e.genericEvent.type==Present::CompleteNotify) {
-        assert_(state == Present);
-        state = Idle;
-    }
-    else log("Unhandled event", ref<string>(X11::events)[type]);
+    else return false;
+    return true;
 }
 
 void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
@@ -122,11 +130,7 @@ void Window::render() { assert_(size); updates.clear(); render({},int2(0),size);
 
 void Window::event() {
     Display::event();
-    if(motionPending) {
-        motionPending = false;
-        if(drag && cursorState&Button1Mask && drag->mouseEvent(cursorPosition, size, Widget::Motion, Widget::LeftButton, focus)) render();
-        else if(widget->mouseEvent(cursorPosition, size, Widget::Motion, (cursorState&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus)) render();
-    }
+    if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
     if(title!=widget->title()) setTitle(widget->title());
     if(updates && state==Idle) {
         assert_(size);

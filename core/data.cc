@@ -153,14 +153,14 @@ string TextData::line() { return until('\n'); }
 
 string TextData::word(const string special) {
     uint start=index;
-    for(;available(1);) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
+    while(available(1)) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
     assert(index>=start, line());
     return slice(start,index-start);
 }
 
 string TextData::identifier(const string special) {
     uint start=index;
-    for(;available(1);) {
+    while(available(1)) {
         byte c=peek();
         if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||special.contains(c))) break;
         advance(1);
@@ -182,7 +182,7 @@ string TextData::whileInteger(bool sign, int base) {
     assert(base==10 || base==16);
     uint start=index;
     if(sign) matchAny("-+");
-    for(;available(1);) {
+    while(available(1)) {
         byte c=peek();
         if((c>='0'&&c<='9')||(base==16 && ((c>='a'&&c<='f')||(c>='A'&&c<='F')))) advance(1); else break;
     }

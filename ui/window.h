@@ -39,11 +39,8 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
 
 // Control
-    /// Whether a motion event is pending processing
-    bool motionPending = false;
-    /// Current cursor position & state
-    int2 cursorPosition = 0;
-    int cursorState = 0;
+    /// An event held to implement motion compression and ignore autorepeats
+    unique<XEvent> heldEvent;
     /// Actions triggered when a key is pressed
     map<Key, function<void()>> actions;
     /// Current widget that has the keyboard input focus
@@ -59,8 +56,10 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     virtual ~Window();
 
 // Connection
+    /// Processes or holds an event
+    void onEvent(const ref<byte> ge);
     /// Processes an event
-    void processEvent(const ref<byte> ge);
+    bool processEvent(const XEvent& ge);
 
  // Window
     /// Shows window.

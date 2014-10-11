@@ -76,9 +76,9 @@ struct Stream : Handle {
     /// Polls whether reading would block
     bool poll(int timeout=0);
     /// Writes \a buffer of \a size bytes
-    void write(const byte* data, size_t size);
+    size_t write(const byte* data, size_t size);
     /// Writes \a buffer
-    void write(const ref<byte> buffer);
+    size_t write(const ref<byte> buffer);
 };
 
 /// Handle to a socket

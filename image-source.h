@@ -37,9 +37,9 @@ generic Source<T> cache(string name, string operation, const Folder& folder, fun
     auto files = filter(cache.list(Files), [&](string fileName){ return !startsWith(fileName, name); });
     if(files) {
         assert_(files.size == 1);
-        //int64 cacheTime = File(files[0], cache, ::Flags(ReadWrite)).modifiedTime();
+        int64 cacheTime = File(files[0], cache, ::Flags(ReadWrite)).modifiedTime();
         int2 size = fromInt2(section(files[0],'.',-2,-1));
-        if(size>int2(0) /*&& sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime*/) return Source<T>(files[0], cache);
+        if(size>int2(0) && sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime) return Source<T>(files[0], cache);
         else {
             // Safeguards
             assert_(find(cache.name(),"/Pictures/"_));
@@ -65,6 +65,7 @@ typedef Source<Image> SourceImageRGB;
 struct ImageSource {
     Folder folder;
     ImageSource(Folder&& folder) : folder(move(folder)) {}
+    virtual String name() const abstract;
     virtual size_t size() const abstract;
     virtual String name(size_t index) const abstract;
     virtual int64 time(size_t index) const abstract;

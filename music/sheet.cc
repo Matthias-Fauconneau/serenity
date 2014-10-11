@@ -315,7 +315,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
     array<uint> chordExtra;
     array<Blit> debug;
     uint chordIndex = 0;
-    for(;chordIndex<notes.size();) {
+    while(chordIndex<notes.size()) {
         if(!notes.values[chordIndex]) {
             chordIndex++; chordToNote << midiToBlit.size;
             if(chordIndex==notes.size()) break;

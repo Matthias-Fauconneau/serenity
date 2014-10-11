@@ -27,7 +27,7 @@ void DBus::readMessage(uint32 serial, function<void(BinaryData&)> readOutputs) {
         uint32 replySerial=0;
         String name;
         BinaryData s = read(align(8,header.fieldsSize)+header.length);
-        for(;s.index<header.fieldsSize;){
+        while(s.index<header.fieldsSize) {
             uint8 field = s.read();
             uint8 size = s.read(); s.advance(size+1);
             if(field==Path||field==Interface||field==Member||field==ErrorName||field==Destination||field==Sender) {

@@ -3,6 +3,9 @@
 #include "image-operation.h"
 #include "image-folder.h"
 
+// Spot frequency bounds
+const float lowBound = 8, highBound = 32; //TODO: automatic determination
+
 void calibrate(const ImageF& target, ImageFolder& calibration, uint component) {
     assert_(target);
 
@@ -10,19 +13,23 @@ void calibrate(const ImageF& target, ImageFolder& calibration, uint component) {
     target.buffer::clear();
     for(size_t index: range(calibration.size())) {
         SourceImage source = calibration.image(index, component);
+        // Low pass to filter texture, noise and lighting conditions
+        //bandPass(target, lowBound, highBound);
         parallel_apply(target, [](float sum, float source) { return sum + source; }, target, source);
     }
 
-    // Low pass to filter texture and noise
-    gaussianBlur(target, 8); // Useful?, TODO?: weaken near spot, strengthen outside
-
-    // TODO: High pass to filter lighting conditions
-
+#if 1
+    // Normalizes sum by maximum
+    float max = parallel_maximum(target);
+    float factor = 1/max;
+    parallel_apply(target, [&](float v) {  return factor*v; }, target);
+#else
     // Normalizes sum by mean (DC) (and clips values over average to 1)
     float sum = parallel_sum(target);
     float mean = sum/target.buffer::size;
     float factor = 1/mean;
     parallel_apply(target, [&](float v) {  return min(1.f, factor*v); }, target);
+#endif
 }
 
 /// Inverts attenuation bias
@@ -44,10 +51,10 @@ struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
         // Inverses attenuation using attenuation factors calibrated for each pixel
         parallel_apply(target, [&](float source, float bias) { return source / bias; }, source, attenuation[component]);
 
+#if 1
         // Restricts correction to a frequency band
-        const float lowPass = 8, highPass = 32; //TODO: automatic determination from spectrum of correction (difference) image
-        ImageF reference = bandPass(source, lowPass, highPass);
-        ImageF corrected = bandPass(target, lowPass, highPass);
+        ImageF reference = bandPass(source, lowBound, highBound);
+        ImageF corrected = bandPass(target, lowBound, highBound);
 
         // Saturates correction below max(0, source) (prevents introduction of a light feature at spot frequency)
         parallel_apply(target, [&](float source, float reference, float corrected) {
@@ -55,5 +62,9 @@ struct InverseAttenuation : ImageOperationT<InverseAttenuation> {
             float correction = saturated_corrected - reference;
             return source + correction;
         }, source, reference, corrected);
+#endif
+
+        // Never darkens
+        parallel_apply(target, [&](float target, float source) { return max(target, source); }, target, source);
     }
 };

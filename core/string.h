@@ -41,6 +41,8 @@ string section(const string str, byte separator, int begin=0, int end=1);
 
 /// Returns true if s contains only [0-9]
 bool isInteger(const string s);
+/// Parses an integer value
+int64 fromInteger(const string str, int base=10);
 /// Parses a decimal value
 double fromDecimal(const string str);
 

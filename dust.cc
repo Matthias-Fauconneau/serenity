@@ -9,9 +9,10 @@ struct ProcessedSource : ImageSource {
     ProcessedSource(ImageSource& source, ImageOperation& operation) :
         ImageSource(Folder(".",source.folder)), source(source), operation(operation) {}
 
+    String name() const override { return str(operation.name(), source.name()); }
     size_t size() const override { return source.size(); }
     String name(size_t index) const override { return source.name(index); }
-    int64 time(size_t index) const override { return max(source.time(index), operation.version()); }
+    int64 time(size_t index) const override { return source.time(index); }
     const map<String, String>& properties(size_t index) const override { return source.properties(index); }
     int2 size(size_t index) const override { return source.size(index); }
 
@@ -20,14 +21,14 @@ struct ProcessedSource : ImageSource {
         return cache<ImageF>(source.name(index), operation.name()+'.'+str(component), source.folder, [&](TargetImage& target) {
             SourceImage sourceImage = source.image(index, component);
             operation.apply(target.resize(sourceImage.size), sourceImage, component);
-        }, time(index));
+        }, time(index), operation.version());
     }
 
     /// Returns processed sRGB image
     virtual SourceImageRGB image(size_t index) const override {
         return cache<Image>(source.name(index), operation.name()+".sRGB", source.folder, [&](TargetImageRGB& target) {
             sRGB(target.resize(size(index)), image(index, 0), image(index, 1), image(index, 2));
-        }, time(index));
+        }, time(index), operation.version());
     }
 };
 
@@ -53,7 +54,9 @@ struct ImageSourceView : ImageView {
 
     ImageSourceView(ImageSource& source, size_t* index) : source(source), index{index} {}
 
-    String title() const override { return source.size() ? str(index+1,'/',source.size(), source.name(index), source.properties(index)) : String(); }
+    String title() const override {
+        return str(source.name(), source.size() ? str(index+1,'/',source.size(), source.name(index), source.properties(index)) : String());
+    }
 
     void update() {
         if(imageIndex != index && source.size()) {
@@ -66,7 +69,9 @@ struct ImageSourceView : ImageView {
     Graphics graphics(int2 size) override { update(); return ImageView::graphics(size); }
 
     /// Browses source by moving mouse horizontally over image view (like an hidden slider)
-    bool mouseEvent(int2 cursor, int2 size, Event, Button, Widget*&) override { return setIndex(source.size()*min(size.x-1,cursor.x)/size.x); }
+    bool mouseEvent(int2 cursor, int2 size, Event, Button button, Widget*&) override {
+        return button ? setIndex(source.size()*min(size.x-1,cursor.x)/size.x) : false;
+    }
 
     /// Browses source with keys
     bool keyPress(Key key, Modifiers) override {
@@ -79,12 +84,16 @@ struct ImageSourceView : ImageView {
 };
 
 struct DustRemovalPreview {
-    InverseAttenuation correction { Folder("Pictures/Paper", home()) };
-    ImageFolder source { Folder("Pictures", home()),
-                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) <= 6.3; } };
+    Folder folder {"Pictures", home()};
+    InverseAttenuation correction { Folder("Paper", folder) };
+    ImageFolder source { folder, [](const String&, const map<String, String>& properties){ return
+                    !(fromDecimal(properties.at("Aperture"_)) >= 5 || fromDecimal(properties.at("Focal"_)) <= 7.3); } };
     ProcessedSource corrected {source, correction};
 
-    size_t index = 0;
+    File last {".last", folder, Flags(ReadWrite|Create)};
+    size_t index = last.size() ? fromInteger(last.read(last.size())) : 0;
+    ~DustRemovalPreview() { last.seek(0); last.resize(last.write(str(index))); }
+
     ImageSourceView sourceView {source, &index};
     ImageSourceView correctedView {corrected, &index};
     WidgetToggle toggleView {&sourceView, &correctedView};

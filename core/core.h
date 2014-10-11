@@ -206,15 +206,6 @@ template<> void error(const string& message) __attribute((noreturn));
 generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
 
-generic const T& min(const ref<T> source) {
-    assert_(source, "min"); const T* min=&source[0]; for(const T& e: source) if(e < *min) min=&e; return *min;
-}
-generic const T& max(const ref<T> source) {
-    assert_(source, "max"); const T* max=&source[0]; for(const T& e: source) if(*max < e) max=&e; return *max;
-}
-
-template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
-template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
 // -- FILE
 
 /// Declares a file to be embedded in the binary

@@ -6,8 +6,8 @@
 struct ImageFolder : ImageSource, map<String, map<String, String>> {
     int2 imageSize = 0;
 
-    ImageFolder(Folder&& source, function<bool(const String& name, const map<String, String>& properties)> predicate={})
-        : ImageSource(move(source)) {
+    ImageFolder(const Folder& source, function<bool(const String& name, const map<String, String>& properties)> predicate={})
+        : ImageSource(Folder(".",source)) {
         {// Lists images, evaluates target image size and load properties
             int2 maximumImageSize = 0;
 
@@ -18,8 +18,9 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
                 maximumImageSize = max(maximumImageSize, imageSize);
 
                 auto properties = parseExifTags(file);
-                properties.insert(String("Size"), str(imageSize));
-                properties.insert(String("Path"), copy(fileName));
+                properties.insert("Size"_, str(imageSize));
+                properties.insert("Path"_, copy(fileName));
+                properties.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
                 insert(String(section(fileName,'.')), {properties.keys, apply(properties.values, [](const Variant& o){return str(o);})});
             }
             // Sets target image size
@@ -42,7 +43,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
                 properties.keys.replace("Exif.Photo.FNumber"_, "Aperture"_);
                 properties.keys.replace("Exif.Photo.ExposureBiasValue"_, "Bias"_);
                 properties.keys.replace("Exif.Photo.ISOSpeedRatings"_, "Gain"_);
-                properties.keys.replace("Exif.Photo.ExposureTime"_, "Time"_);
+                properties.keys.replace("Exif.Photo.ExposureTime"_, "Time (ms)"_);
 
                 for(auto property: properties) occurences[property.key].add( property.value ); // Aggregates occuring values for each property
             }
@@ -53,6 +54,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
        if(predicate) filter(predicate);
     }
 
+    String name() const override { return String(section(folder.name(),'/',-2,-1)); }
     size_t size() const override { return map::size(); }
     String name(size_t index) const override { return copy(keys[index]); }
     int64 time(size_t index) const override { return File(values[index].at("Path"_), folder).modifiedTime(); }

@@ -2,7 +2,33 @@
 #include <pthread.h> //pthread
 #include "function.h"
 
-/// Logical cores count
+// -> \file algorithm.h
+
+template<Type T, Type F> auto reduce(ref<T> values, F fold, T accumulator) {
+    for(const T& e: values) accumulator = fold(accumulator, e);
+    return accumulator;
+}
+template<Type T, Type F, size_t N> auto reduce(const T (&values)[N], F fold, T initialValue) {
+    return reduce(ref<T>(values), fold, initialValue);
+}
+
+generic auto sum(ref<T> values) { return reduce(values, [](T accumulator, T value) { return accumulator + value; }, T()); }
+template<Type T, size_t N> auto sum(const T (&values)[N]) { return sum(ref<T>(values)); }
+
+generic auto min(ref<T> values) {
+    assert_(values);
+    return reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]);
+}
+template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
+
+generic auto max(ref<T> values) {
+    assert_(values);
+    return reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]);
+}
+template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
+
+// \file parallel.h
+
 static constexpr uint threadCount = 4;
 
 struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
@@ -65,25 +91,31 @@ void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>.
     chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(source0[index], sources[index]...)); });
 }
 
-// \file ?
+/// Minimum number of values to trigger parallel operations
+static constexpr size_t parallelMinimum = 1<<15;
 
-generic auto sum(const ref<T> a) -> decltype(T()+T()) { decltype(T()+T()) sum=0; for(const T& e: a) sum += e; return sum; }
-template<Type T, size_t N> auto sum(const T (&a)[N]) -> decltype(T()+T()) { return sum(ref<T>(a)); }
+template<Type T, Type F> auto parallel_reduce(ref<float> values, F fold, T initial_value) {
+    float accumulators[threadCount];
+    parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
+        float accumulator = initial_value;
+        for(T value: values.slice(start, start+size)) fold(accumulator, value);
+        accumulators[id] = accumulator;
+    });
+    return reduce(accumulators, fold, initial_value);
+}
 
 // \file arithmetic.cc Parallel arithmetic operations
 
-/// Minimum number of values to trigger parallel arithmetic operations
-static constexpr size_t parallelMinimum = 1<<15;
+generic T parallel_minimum(ref<T> values) {
+    assert_(values);
+    if(values.size < parallelMinimum) reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]);
+    else return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]);
+}
 
-inline float parallel_sum(ref<float> values) {
-    if(values.size < parallelMinimum) return ::sum(values);
-    float sums[threadCount];
-    parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-        float sum = 0;
-        for(uint index: range(start, start+size)) sum += values[index];
-        sums[id] = sum;
-    });
-    return sum(sums);
+generic T parallel_maximum(ref<T> values) {
+    assert_(values);
+    if(values.size < parallelMinimum) reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]);
+    return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]);
 }
 
 inline void operator*=(mref<float> values, float factor) {

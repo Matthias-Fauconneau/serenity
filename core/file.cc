@@ -81,7 +81,7 @@ int64 Stream::readUpTo(byte* buffer, size_t size) { return check( ::read(fd, buf
 
 buffer<byte> Stream::read(size_t size) {
     buffer<byte> buffer(size);
-    size_t offset=0; for(; offset<size;) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
+    size_t offset=0; while(offset<size) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
     assert(offset==size);
     return buffer;
 }
@@ -94,11 +94,11 @@ buffer<byte> Stream::readUpTo(size_t capacity) {
 
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 
-void Stream::write(const byte* data, size_t size) {
-    assert(data); for(size_t offset=0; offset<size;) offset+=check(::write(fd, data+offset, size-offset), name());
+size_t Stream::write(const byte* data, size_t size) {
+    assert(data); size_t offset=0; while(offset<size) offset+=check(::write(fd, data+offset, size-offset), name()); return offset;
 }
 
-void Stream::write(const ref<byte> buffer) { write(buffer.data, buffer.size); }
+size_t Stream::write(const ref<byte> buffer) { return write(buffer.data, buffer.size); }
 
 Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXEC,0))){}
 

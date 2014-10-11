@@ -224,17 +224,17 @@ ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
     int radius = ceil(3*sigma), N = radius+1+radius;
     float kernel[N];
     for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
-    float sum = ::sum(ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
+    float sum = ::sum(ref<float>(kernel,N)); assert_(sum, ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
     buffer<float> transpose (target.height*target.width);
     convolve(transpose.begin(), source.begin(), kernel, radius, source.width, source.height);
     convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width);
     return move(target);
 }
 
-ImageF bandPass(const ImageF& source, float lowPass, float highPass) {
-    ImageF low_band = lowPass ? gaussianBlur(source, lowPass) : share(source);
-    if(!highPass) return low_band;
-    ImageF low = gaussianBlur(low_band, highPass);
+ImageF bandPass(const ImageF& source, float lowBound, float highBound) {
+    ImageF low_band = lowBound ? gaussianBlur(source, lowBound) : share(source);
+    if(!highBound) return low_band;
+    ImageF low = gaussianBlur(low_band, highBound);
     subtract(low, low_band, low);
     return low;
 }
