@@ -360,7 +360,7 @@ enum JPEG_SUBSAMPLING { JPGD_GRAYSCALE = 0, JPGD_YH1V1, JPGD_YH2V1, JPGD_YH1V2, 
 #define CLAMP(i) ((static_cast<uint>(i) > 0xFF) ? (((~i) >> 31) & 0xFF) : (i))
 
 // Compiler creates a fast path 1D IDCT for X non-zero columns
-template <int NONZERO_COLS>
+template<int NONZERO_COLS>
 struct Row
 {
   static void idct(int* pTemp, const jpgd_block_t* pSrc)
@@ -405,7 +405,7 @@ struct Row
   }
 };
 
-template <>
+template<>
 struct Row<0>
 {
   static void idct(int*, const jpgd_block_t*)
@@ -416,7 +416,7 @@ struct Row<0>
   }
 };
 
-template <>
+template<>
 struct Row<1>
 {
   static void idct(int* pTemp, const jpgd_block_t* pSrc)
@@ -435,7 +435,7 @@ struct Row<1>
 };
 
 // Compiler creates a fast path 1D IDCT for X non-zero rows
-template <int NONZERO_ROWS>
+template<int NONZERO_ROWS>
 struct Col
 {
   static void idct(uint8* pDst_ptr, const int* pTemp)
@@ -496,7 +496,7 @@ struct Col
   }
 };
 
-template <>
+template<>
 struct Col<1>
 {
   static void idct(uint8* pDst_ptr, const int* pTemp)

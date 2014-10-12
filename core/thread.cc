@@ -153,6 +153,14 @@ static int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_gro
 
 // Entry point
 int main() {
+    unique<Application> application;
+    if(arguments()) {
+        Interface<Application>::AbstractFactory* factory = Interface<Application>::factories().value(arguments()[0]);
+        if(factory) application = factory->constructNewInstance();
+    } else {
+        Interface<Application>::AbstractFactory* factory = Interface<Application>::factories().value("");
+        if(factory) application = factory->constructNewInstance();
+    }
     if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
     for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
     return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group

@@ -42,7 +42,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 };
 
 #undef generic
-#define generic template <template <typename> class V, Type T, uint N>
+#define generic template<template<typename> class V, Type T, uint N>
 #define vec vec<V,T,N>
 
 generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[i+1]); return r; }

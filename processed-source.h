@@ -17,5 +17,6 @@ struct ProcessedSource : ImageSource {
     int2 size(size_t index) const override { return source.size(index); }
 
     /// Returns processed sRGB image
-    virtual SourceImageRGB image(size_t index, int2 size) const override;
+    virtual SourceImageRGB image(size_t index, int2 size, bool ignoreCache) const;
+    virtual SourceImageRGB image(size_t index, int2 size) const override { return image(index, size, false); }
 };

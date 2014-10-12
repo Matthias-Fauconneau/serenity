@@ -3,12 +3,25 @@
 #include "inverse-attenuation.h"
 #include "image-source-view.h"
 
-struct DustRemovalPreview {
+struct DustRemoval {
     Folder folder {"Pictures", home()};
     ImageFolder calibration {Folder("Paper", folder)};
     InverseAttenuation correction { calibration };
     ImageFolder source { folder,
                 [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) <= 5; } };
+};
+
+struct DustRemovalTest : DustRemoval, Application {
+    ProcessedSource corrected {source, correction};
+    DustRemovalTest() {
+        Time time;
+        SourceImageRGB image = corrected.image(0, source.size(0)/4, true);
+        log(image.size, time);
+    }
+};
+registerApplication(DustRemovalTest, test);
+
+struct DustRemovalPreview : DustRemoval, Application {
     ProcessedSource corrected {source, correction};
 
     File last {".last", folder, Flags(ReadWrite|Create)};
@@ -20,4 +33,5 @@ struct DustRemovalPreview {
     ImageSourceView correctedView {corrected, &index, window};
     WidgetToggle toggleView {&sourceView, &correctedView};
     Window window {&toggleView};
-} application;
+};
+registerApplication(DustRemovalPreview);
