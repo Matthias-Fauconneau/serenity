@@ -134,7 +134,7 @@ string TextData::until(char key) {
 string TextData::until(const string key) {
     uint start=index, end;
     for(;;advance(1)) {
-        if(available(key.size)<key.size) { end=index; break; }
+        if(available(key.size)<key.size) { advance(key.size-1); end=index; break; }
          if(peek(key.size) == key) { end=index; advance(key.size); break; }
     }
     return slice(start, end-start);

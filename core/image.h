@@ -111,7 +111,8 @@ ImageF resize(ImageF&& target, ImageF&& source);
 // -- Convolution --
 
 /// Applies a gaussian blur
-ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma);
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma);
+inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) { gaussianBlur(target, source, sigma); return move(target); }
 inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
 
 /// Selects image (signal) components of scale (frequency) below threshold

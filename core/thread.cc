@@ -124,7 +124,7 @@ void __attribute((constructor(102))) setup_signals() {
     check_(sigaction(SIGTERM, &sa, 0));
     check_(sigaction(SIGTRAP, &sa, 0));
     check_(sigaction(SIGFPE, &sa, 0));
-    setExceptions(Invalid | /*Denormal |*/ DivisionByZero | Overflow/* | Underflow*/);
+    setExceptions(Invalid /*| Denormal*/ | DivisionByZero | Overflow /*| Underflow *//*| Precision*/);
 }
 
 static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
@@ -144,7 +144,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
     {Locker lock(threadsLock);
         for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
 #if !__arm__
-    __builtin_trap(); //TODO: detect if running under debugger
+      __builtin_trap(); //TODO: detect if running under debugger
 #endif
     exit_thread(-1); // Exits this thread
 }
@@ -170,7 +170,7 @@ void exit(int status) {
 String which(string name) {
     if(!name) return {};
     if(existsFile(name)) return String(name);
-    for(string folder: split(getenv("PATH","/usr/bin"),':')) if(existsFolder(folder) && existsFile(name, folder)) return folder+'/'+name;
+    for(string folder: split(getenv("PATH","/usr/bin"),":")) if(existsFolder(folder) && existsFile(name, folder)) return folder+'/'+name;
     return {};
 }
 
@@ -217,7 +217,7 @@ string getenv(const string name, string value) {
 array<string> arguments() {
     static String cmdline = File("/proc/self/cmdline").readUpTo(4096);
     assert(cmdline.size<4096);
-    return split(section(cmdline,0,1,-1),0);
+    return split(section(cmdline,0,1,-1),"\0");
 }
 
 const Folder& home() { static Folder home(getenv("HOME",str((const char*)getpwuid(geteuid())->pw_dir))); return home; }

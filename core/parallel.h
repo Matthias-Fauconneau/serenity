@@ -1,10 +1,11 @@
 #pragma once
 #include <pthread.h> //pthread
 #include "function.h"
+#include "math.h"
 
 // -> \file algorithm.h
 
-template<Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, T accumulator, ref<Ss>... sources) {
+template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A accumulator, ref<Ss>... sources) {
     assert_(values);
     for(size_t index: range(values.size)) accumulator = fold(accumulator, values[index], sources[index]...);
     return accumulator;
@@ -83,11 +84,11 @@ void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>.
 /// Minimum number of values to trigger parallel operations
 static constexpr size_t parallelMinimum = 1<<15;
 
-template<Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, T initial_value) {
+template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, A initial_value) {
     assert_(values);
     if(values.size < parallelMinimum) return reduce(values, fold, initial_value);
     else {
-        float accumulators[threadCount];
+        A accumulators[threadCount];
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
             accumulators[id] = reduce(values.slice(start, size), fold, initial_value);
         });
@@ -111,11 +112,11 @@ template<Type T, Type F, Type... Ss> T parallel_sum(ref<T> values, F apply, T in
 }
 
 /// Multiple accumulator reduction
-template<Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F0 fold0, F1 fold1, T& accumulator0, T& accumulator1) {
+template<Type A, Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F0 fold0, F1 fold1, A& accumulator0, A& accumulator1) {
     float accumulators[2][threadCount];
     parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-        float a0 = accumulator0, a1 = accumulator1;
-        for(float v: values.slice(start, size)) a0=fold0(a0, v), a1=fold1(a1, v);
+        A a0 = accumulator0, a1 = accumulator1;
+        for(T v: values.slice(start, size)) a0=fold0(a0, v), a1=fold1(a1, v);
         accumulators[0][id] = a0;
         accumulators[1][id] = a1;
     });
@@ -126,12 +127,13 @@ template<Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F0 fold0,
 
 generic T parallel_minimum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
 generic T parallel_maximum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
-generic T parallel_sum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return accumulator + value; }, 0.f); }
 generic void parallel_minmax(ref<T> values, T& minimum, T& maximum) {
     return parallel_reduce(values, [](T a, T v) { return min(a, v); }, [](T a, T v) { return max(a, v); }, minimum, maximum);
 }
 
-inline float mean(ref<float> values) {
+inline real parallel_sum(ref<float> values) { return parallel_reduce(values, [](real accumulator, float value) { return accumulator + value; }, 0.); }
+
+inline real mean(ref<float> values) {
     float sum = parallel_sum(values);
     return sum/values.size;
 }

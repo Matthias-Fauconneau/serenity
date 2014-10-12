@@ -74,10 +74,9 @@ String right(const string s, size_t size, const char pad=' ');
 
 /// Joins \a list into a single String with each element separated by \a separator
 String join(const ref<string> list, const string separator="");
-//String join(const ref<String> list, const string separator="");
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array<string> split(const string str, byte separator=' ');
+array<string> split(const string str, string separator=", ");
 
 // -- Number conversions
 

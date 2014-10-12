@@ -17,11 +17,12 @@ static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
         log(time);
         assert_(sourceImage.size == size, sourceImage.size, size);
         parallel_apply(target, [](float sum, byte4 source) { return sum + float(int(source.b)+int(source.g)+int(source.r)); }, target, sourceImage);
+        debug(break;)
     }
 
     // Normalizes sum by mean (DC)
     float factor = 1/mean(target);
-    parallel_apply(target, [=](float v) {  return min(1.f, factor*v); }, target);
+    parallel_apply(target, [=](float v) { return min(1.f, factor*v); }, target);
 
     // Low pass to filter texture and noise and high pass to filter lighting conditions
     ImageF image = bandPass(target, textureFrequency, lightingFrequency);
@@ -31,15 +32,14 @@ static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
 }
 
 void blurNormalize(ImageF& target, const ImageF& source) {
-    // Parameter scaling
+    // Hardcoded parameters
     int2 size = source.size;
     const float scale = float(size.x)/1000;
-    // Hardcoded parameters
     const float spotLowThreshold = 32*scale; // Low threshold of spot frequency
     assert_(spotLowThreshold > 0);
 
     // Image processing
-    target = gaussianBlur(move(target), source, spotLowThreshold);
+    gaussianBlur(target, source, spotLowThreshold);
     float min=inf, max=-inf;
     parallel_minmax(target, min, max);
     assert_(min < max, min, max);

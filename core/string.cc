@@ -67,8 +67,8 @@ String left(const string source, size_t size, const char pad) {
 }
 String right(const string source, size_t size, const char pad) {
     buffer<char> target(max(size, source.size));
-    target.slice(0, size-source.size).clear(pad);
-    target.slice(size-source.size).copy(source);
+    target.slice(0, target.size-source.size).clear(pad);
+    target.slice(target.size-source.size).copy(source);
     return move(target);
 }
 
@@ -84,6 +84,13 @@ String join(const ref<string> list, const string separator) {
 String join(const ref<String> list, const string separator) { return join(toRefs(list), separator); }
 
 array<string> split(const string source, byte separator) {
+    array<string> list;
+    TextData s (source);
+    while(s) list.append( s.until(separator) );
+    return list;
+}
+
+array<string> split(const string source, string separator) {
     array<string> list;
     TextData s (source);
     while(s) list.append( s.until(separator) );

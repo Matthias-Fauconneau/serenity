@@ -163,7 +163,7 @@ struct Build {
             else if(find(arg+".cc")) {
                 if(target) log("Multiple targets unsupported, building last target:",arg);
                 target = String(arg);
-            } else flags.append( arg );
+            } else flags.append( split(arg,"-") );
         }
 
         if(!target) target = copy(base);

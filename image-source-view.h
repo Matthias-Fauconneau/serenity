@@ -22,6 +22,7 @@ struct ImageSourceView : ImageView, Poll {
     void event() override {
         if(imageIndex != index) { image=SourceImageRGB();  ImageView::image=Image(); }
         if(image.size*2 > size) return;
+        debug(if(image.size) return;)
 
         int downscaleFactor = image.size ? (source.size(index).x/image.size.x)/2 : 16; // Doubles resolution at every step
         while(source.maximumSize().x/(source.size(index).x/downscaleFactor) > 16) downscaleFactor /= 2; // Limits calibration downscale (FIXME)

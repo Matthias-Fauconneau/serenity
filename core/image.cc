@@ -222,7 +222,7 @@ static void convolve(float* target, const float* source, const float* kernel, in
 }
 
 static float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
-ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma) {
     assert_(sigma > 0);
     int radius = ceil(3*sigma);
     size_t N = radius+1+radius;
@@ -233,5 +233,4 @@ ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
     buffer<float> transpose (target.height*target.width);
     convolve(transpose.begin(), source.begin(), kernel, radius, source.width, source.height);
     convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width);
-    return move(target);
 }
