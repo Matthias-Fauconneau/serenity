@@ -15,15 +15,14 @@ struct Calibration {
 
     int64 time() const;
 
-    /// Returns calibration image
-    SourceImage attenuation(int2 hint) const;
-    /// Returns blend factor image
+    /// Returns calibration sum image
+    SourceImage sum(int2 hint) const;
+    /// Returns spot position (argmin sum)
+    int2 spotPosition(int2 size) const;
+    /// Returns spot size
+    int2 spotSize(int2 size) const { return size/4; }
+    /// Returns attenuation image (crop filter sum)
+    SourceImage attenuation(int2 size) const;
+    /// Returns blend factor image (lowpass attenuation)
     SourceImage blendFactor(int2 size) const;
-    /// Returns region of interest
-    Region regionOfInterest(int2 size) const;
-
-    /*/// Returns calibration image as sRGB visualization
-    Image attenuationRGB() const;
-    /// Returns blend factor image as sRGB visualization
-    Image blendFactorRGB() const;*/
 };

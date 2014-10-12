@@ -12,8 +12,8 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
     // Calibration parameter
     SourceImage attenuation = Calibration::attenuation(size);
     SourceImage blendFactor = Calibration::blendFactor(size);
-    Region regionOfInterest = Calibration::regionOfInterest(size);
-    log(regionOfInterest);
+    /*Region regionOfInterest = Calibration::regionOfInterest(size);
+    log(regionOfInterest);*/
 
     // Parameter scaling
     const float scale = float(size.x)/1000;
@@ -23,7 +23,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
     // Estimated parameters
     float blurRadius, correctionFactor;
 
-    // Parameter estimation
+    // Parameter estimation (FIXME: separate (cached) pass to switch back to component-wise)
     {ImageF source (size);
         parallel_apply(source, [](float red, float green, float blue) { return red + green + blue; }, red, green, blue);
 
@@ -51,10 +51,10 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         ImageF spot = low_spot - low;
 
         // Inverses attenuation using attenuation factors calibrated for each pixel
-        ImageF target = low_spot / attenuation;
+        ImageF target = move(low_spot) / attenuation;
 
         // Blurs correction to attenuate miscalibration
-        target = gaussianBlur(target, blurRadius); // Low pass correction to better correct uniform gradient
+        gaussianBlur(target, target, blurRadius); // Low pass correction to better correct uniform gradient
         // High pass to match source spot band
         ImageF low_corrected = gaussianBlur(target, spotLowThreshold);
         target -= low_corrected;

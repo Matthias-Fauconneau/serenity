@@ -133,7 +133,7 @@ generic struct ref {
     /// Slices a reference to elements from \a pos to the end of the reference
     ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
     /// Slices a reference to elements from \a start to \a stop
-    ref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
+    //ref<T> operator()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
     struct reverse_ref {
         const T* start; const T* stop;
@@ -252,7 +252,7 @@ generic struct mref : ref<T> {
     /// Slices a reference to elements from to the end of the reference
     mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
     /// Slices a reference to elements from \a start to \a stop
-    //mref<T> operator ()(size_t start, size_t stop) const { return slice(start, stop-start); }
+    //mref<T> operator()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
     /// Initializes the element at index
     template<Type... Args> void set(size_t index, Args... args) const { new (&at(index)) T(args...); }

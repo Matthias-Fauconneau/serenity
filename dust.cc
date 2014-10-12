@@ -11,6 +11,13 @@ struct DustRemoval {
                 [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) <= 5; } };
 };
 
+struct CalibrationView : DustRemoval, Application {
+    ImageView views[2]  = {sRGB(correction.attenuation(source.maximumSize()/4)), sRGB(correction.blendFactor(source.maximumSize()/4))};
+    WidgetToggle toggleView {&views[0], &views[1]};
+    Window window {&toggleView};
+};
+registerApplication(CalibrationView, calibration);
+
 struct DustRemovalTest : DustRemoval, Application {
     ProcessedSource corrected {source, correction};
     DustRemovalTest() {

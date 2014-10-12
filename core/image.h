@@ -78,12 +78,11 @@ struct ImageF : buffer<float> {
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
 
-inline ImageF operator-(const ImageF& a, float b) { ImageF y(a.size); subtract(y, a, b); return y; }
+//inline ImageF operator-(const ImageF& a, float b) { ImageF y(a.size); subtract(y, a, b); return y; }
 inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
-inline ImageF operator-(const ImageF& a, ImageF&& b) { subtract(b, a, b); return move(b); }
-inline ImageF min(ImageF&& a, const ImageF& b) { parallel_apply(a, [](float a, float b) { return min(a, b); }, a, b); return move(a); }
-
-inline ImageF operator/(const ImageF& a, const ImageF& b) { ImageF y(a.size); div(y, a, b); return y; }
+//inline ImageF operator-(const ImageF& a, ImageF&& b) { subtract(b, a, b); return move(b); }
+//inline ImageF min(ImageF&& a, const ImageF& b) { parallel_apply(a, [](float a, float b) { return min(a, b); }, a, b); return move(a); }
+inline ImageF operator/(ImageF&& a, const ImageF& b) { div(a, a, b); return move(a); }
 
 // -- sRGB --
 
@@ -110,18 +109,23 @@ ImageF resize(ImageF&& target, ImageF&& source);
 
 // -- Convolution --
 
+/// Selects image (signal) components of scale (frequency) below threshold
 /// Applies a gaussian blur
 void gaussianBlur(const ImageF& target, const ImageF& source, float sigma);
 inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) { gaussianBlur(target, source, sigma); return move(target); }
 inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
 
-/// Selects image (signal) components of scale (frequency) below threshold
-inline ImageF lowPass(const ImageF& source, float threshold) { return gaussianBlur(source, threshold); }
-
 /// Selects image (signal) components of scale (frequency) above threshold
-inline ImageF highPass(const ImageF& source, float threshold) { return source - gaussianBlur(source, threshold); }
+inline void highPass(const ImageF& target, const ImageF& source, float threshold) { subtract(target, source, gaussianBlur(source, threshold)); }
+//inline ImageF highPass(ImageF&& target, const ImageF& source, float threshold) { highPass(target, source, threshold); return move(target); }
+//inline ImageF highPass(const ImageF& source, float threshold) { return highPass(source.size, threshold); }
 
 /// Selects image (signal) components of scales (frequencies) within a band
-inline ImageF bandPass(const ImageF& source, float lowThreshold, float highThreshold) {
+/*inline ImageF bandPass(const ImageF& source, float lowThreshold, float highThreshold) {
     return highPass(lowPass(source, lowThreshold), highThreshold);
+}*/
+
+/// Selects image (signal) components of scales (frequencies) within a band
+inline void bandPass(const ImageF& target, const ImageF& source, float lowThreshold, float highThreshold) {
+    highPass(target, gaussianBlur(source, lowThreshold), highThreshold);
 }

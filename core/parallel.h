@@ -131,8 +131,8 @@ template<Type A, Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F
 
 // \file arithmetic.cc Parallel arithmetic operations
 
-generic T parallel_minimum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
-generic T parallel_maximum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
+generic T parallel_min(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
+generic T parallel_max(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
 generic void parallel_minmax(ref<T> values, T& minimum, T& maximum) {
     return parallel_reduce(values, [](T a, T v) { return min(a, v); }, [](T a, T v) { return max(a, v); }, minimum, maximum);
 }

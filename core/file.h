@@ -79,6 +79,8 @@ struct Stream : Handle {
     size_t write(const byte* data, size_t size);
     /// Writes \a buffer
     size_t write(const ref<byte> buffer);
+    /// Writes a raw value
+    generic size_t writeRaw(T t) { return write((byte*)&t,sizeof(T)); }
 };
 
 /// Handle to a socket
@@ -108,7 +110,7 @@ struct File : Stream {
     int64 modifiedTime() const;
 
     /// Resizes file
-    const File& resize(int64 size) const;
+    const File& resize(int64 size);
     /// Seeks to \a index
     void seek(int index);
 };

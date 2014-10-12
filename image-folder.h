@@ -45,7 +45,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
                 for(auto property: properties) occurences[property.key].add( property.value ); // Aggregates occuring values for each property
             }
-            for(auto property: occurences) if(property.value.size!=count()) log(property.key,':', sort(property.value));
+            //for(auto property: occurences) if(property.value.size!=count()) log(property.key,':', sort(property.value));
         }
 
         // Applies application specific filter
@@ -64,35 +64,29 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     SourceImageRGB image(size_t index) const {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
-        return cache<Image>(folder, "Source.sRGB", name(index), size(index), sourceFile.modifiedTime(), [&](TargetImageRGB& target){
-            Time time; log_(str("source.decode", size(index), ""));
-            Image source = decodeImage(Map(sourceFile));
-            log(time);
-            target.resize(source.size);
-            target.copy(source);
+        return cache<Image>(folder, "Source.sRGB", name(index), size(index), sourceFile.modifiedTime(), [&](const Image& target){
+            target.copy(decodeImage(Map(sourceFile)));
         }, "" /*Disable version invalidation to avoid redecoding on header changes*/);
     }
 
     /// Resizes sRGB images
+    /// \note Resizing after linear float conversion would be more accurate but less efficient
     SourceImageRGB image(size_t index, int2 size) const override {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
         if(size==this->size(index)) return image(index);
-        return cache<Image>(folder, "Resize.sRGB", name(index), size, sourceFile.modifiedTime(), [&](TargetImageRGB& target){
+        return cache<Image>(folder, "Resize.sRGB", name(index), size, sourceFile.modifiedTime(), [&](const Image& target){
             SourceImageRGB source = image(index);
-            target.resize(size);
             assert_(target.size <= source.size, target.size, source.size);
-            resize(share(target), source);
+            resize(target, source);
         });
     }
 
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component, int2 size) const override {
         assert_(index  < count());
-        return cache<ImageF>(folder, "Linear."+str(component), name(index), size, time(index), [&](TargetImage& target) {
-            SourceImageRGB source = image(index, size); // Faster but slightly inaccurate
-            target.resize(size);
-            linear(share(target), source, component);
+        return cache<ImageF>(folder, "Linear."+str(component), name(index), size, time(index), [&](const ImageF& target) {
+            linear(target, image(index, size), component);
         });
     }
 };

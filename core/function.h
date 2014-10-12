@@ -18,7 +18,7 @@ template<Type O, Type R, Type... Args> struct method<O, R(Args...)> : functor<R(
     O* object;
     R (O::*pmf)(Args...);
     method(O* object, R (O::*pmf)(Args...)): object(object), pmf(pmf){}
-    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)...); }
+    virtual R operator()(Args... args) const override { return (object->*pmf)(forward<Args>(args)...); }
 };
 // functor template specialization for const methods
 template<Type O, Type R, Type... Args> struct const_method;
@@ -26,7 +26,7 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
     const O* object;
     R (O::*pmf)(Args...) const;
     const_method(const O* object, R (O::*pmf)(Args...) const): object(object), pmf(pmf){}
-    virtual R operator ()(Args... args) const override { return (object->*pmf)(forward<Args>(args)...); }
+    virtual R operator()(Args... args) const override { return (object->*pmf)(forward<Args>(args)...); }
 };
 
 template<Type R, Type... Args> struct function;

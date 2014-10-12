@@ -33,16 +33,16 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match("D1")) r.append( "~this");
     else if(s.match("D2")) r.append( "~this");
     else if(s.match("Dv")){int size=s.integer(); s.match('_'); r.append(demangle(s)+dec(size));}
-    else if(s.match("eq")) r.append("operator ==");
-    else if(s.match("ix")) r.append("operator []");
-    else if(s.match("cl")) r.append("operator ()");
-    else if(s.match("ls")) r.append("operator <<");
-    else if(s.match("rs")) r.append("operator >>");
-    else if(s.match("cv")) r.append("operator " + demangle(s));
-    else if(s.match("pl")) r.append("operator +");
-    else if(s.match("mi")) r.append("operator -");
-    else if(s.match("ml")) r.append("operator *");
-    else if(s.match("dv")) r.append("operator /");
+    else if(s.match("eq")) r.append("operator==");
+    else if(s.match("ix")) r.append("operator[]");
+    else if(s.match("cl")) r.append("operator()");
+    else if(s.match("ls")) r.append("operator<<");
+    else if(s.match("rs")) r.append("operator>>");
+    else if(s.match("cv")) r.append("operator" + demangle(s));
+    else if(s.match("pl")) r.append("operator+");
+    else if(s.match("mi")) r.append("operator-");
+    else if(s.match("ml")) r.append("operator*");
+    else if(s.match("dv")) r.append("operator/");
     else if(s.match('a')) r.append("byte");
     else if(s.match('b')) r.append("bool");
     else if(s.match('c')) r.append("char");

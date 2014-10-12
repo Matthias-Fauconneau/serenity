@@ -116,7 +116,7 @@ int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st
 
 int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
 
-const File& File::resize(int64 size) const { check_(ftruncate(fd, size), fd.pointer, size); return *this; }
+const File& File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); return *this; }
 
 void File::seek(int index) { check_(::lseek(fd,index,0)); }
 

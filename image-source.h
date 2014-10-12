@@ -6,9 +6,7 @@
 #include "time.h"
 #include "cache.h"
 
-typedef ImageMapTarget<ImageF> TargetImage;
 typedef ImageMapSource<ImageF> SourceImage;
-typedef ImageMapTarget<Image> TargetImageRGB;
 typedef ImageMapSource<Image> SourceImageRGB;
 
 /// Collection of images
