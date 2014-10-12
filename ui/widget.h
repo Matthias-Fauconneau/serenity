@@ -27,7 +27,7 @@ struct Widget {
     default_move(Widget);
     virtual ~Widget() {}
 // Contents
-    virtual String title() const { return {}; }
+    virtual String title() { return {}; }
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint(int2) = 0;

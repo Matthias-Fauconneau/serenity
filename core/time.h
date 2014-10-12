@@ -26,9 +26,12 @@ struct Time {
     void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    float toFloat() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    operator float() const { return toReal(); }
+    operator double() const { return toReal(); }
 };
-inline String str(const Time& t) { return str(t.toFloat())+'s'; }
+inline String str(const Time& t) { return str(t.toReal())+'s'; }
+inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

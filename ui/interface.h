@@ -113,7 +113,7 @@ struct WidgetToggle : Widget {
     WidgetToggle(Widget* first, Widget* second) : widgets{first, second} {}
 
     // Forwards content
-    String title() const { return widgets[index]->title(); }
+    String title() override { return widgets[index]->title(); }
     int2 sizeHint(int2 size) override { return widgets[index]->sizeHint(size); }
     Graphics graphics(int2 size) override { return widgets[index]->graphics(size); }
 
@@ -122,4 +122,11 @@ struct WidgetToggle : Widget {
     // Forwards events and enables filter while a key is pressed
     bool keyPress(Key key, Modifiers modifiers) override;
     bool keyRelease(Key key, Modifiers modifiers) override;
+};
+
+struct Index {
+    size_t* pointer;
+    void operator=(size_t value) { *pointer = value; }
+    operator size_t() const { return *pointer; }
+    operator size_t&() { return *pointer; }
 };

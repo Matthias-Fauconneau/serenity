@@ -58,6 +58,7 @@ typedef unsigned int uint;
 typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
+static_assert(sizeof(uint64)==8,"");
 typedef __INTPTR_TYPE__  intptr_t;
 typedef __SIZE_TYPE__ 	size_t;
 constexpr size_t invalid = -1; // Invalid index

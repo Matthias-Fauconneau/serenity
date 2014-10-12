@@ -24,7 +24,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
 
     // Parameter estimation
     {ImageF source (size);
-        parallel_apply(source, [&](float red, float green, float blue) { return red + green + blue; }, red, green, blue);
+        parallel_apply(source, [](float red, float green, float blue) { return red + green + blue; }, red, green, blue);
 
         // Splits image at spot frequency
         ImageF low = gaussianBlur(source, spotLowThreshold);
@@ -32,14 +32,9 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
 
         // Detects low frequency background under spot
         float DC = mean(source);
-        float lowEnergy = 0, highEnergy = 0;
         ref<float> weights = attenuation;
-        chunk_parallel(source.buffer::size, [&](uint, size_t index) {
-            float weight = 1 - weights[index];
-            assert_(weight >= 0);
-            lowEnergy += weight * sq(low[index]-DC);
-            highEnergy += weight * sq(high[index]);
-        });
+        float lowEnergy = parallel_reduce(low, [=](float a, float v, float w) { float weight = 1 - w; return a + weight * sq(v-DC); }, 0.f, weights);
+        float highEnergy = parallel_reduce(high, [=](float a, float v, float w) { float weight = 1 - w; return a + weight * sq(v); }, 0.f, weights);
         assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
         log(lowEnergy, highEnergy);
         float ratio = lowEnergy / highEnergy;
@@ -65,7 +60,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         target -= low_corrected;
 
         // Merges correction near spot
-        parallel_apply(target, [&](float low, float target, float spot, float factor, float high) {
+        parallel_apply(target, [=](float low, float target, float spot, float factor, float high) {
             float mixed =
                     correctionFactor < 1 ? mix(spot, min(0.f, target), correctionFactor)
                                          : mix(min(0.f, target), target, correctionFactor-1);
@@ -73,7 +68,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         }, low, target, spot, blendFactor, high);
 
         // Never darkens
-        parallel_apply(target, [&](float target, float source) { return max(target, source); }, target, source);
+        parallel_apply(target, [](float target, float source) { return max(target, source); }, target, source);
         return target;
     });
 }

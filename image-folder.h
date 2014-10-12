@@ -55,7 +55,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     String name() const override { return String(section(folder.name(),'/',-2,-1)); }
     size_t count() const override { return map::size(); }
     int2 maximumSize() const override { return maximumImageSize; }
-    String name(size_t index) const override { return copy(keys[index]); }
+    String name(size_t index) const override { assert_(index<count()); return copy(keys[index]); }
     int64 time(size_t index) const override { return File(properties(index).at("Path"_), folder).modifiedTime(); }
     const map<String, String>& properties(size_t index) const override { return values[index]; }
     int2 size(size_t index) const override { return fromInt2(properties(index).at("Size"_)); }

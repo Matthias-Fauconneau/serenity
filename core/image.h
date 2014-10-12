@@ -54,8 +54,8 @@ static Image name ## Icon() { \
 // -- Resampling (3x8bit) --
 
 /// Resizes \a source into \a target
-/// \note Only supports integer box downsample
-Image resize(Image&& target, const Image& source);
+void resize(const Image& target, const Image& source);
+inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
 
 // -- ImageF --
 

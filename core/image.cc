@@ -71,7 +71,7 @@ Image decodeImage(const ref<byte> file) {
 
 // -- Resampling (3x8bit) --
 
-static Image box(Image&& target, const Image& source) {
+static void box(const Image& target, const Image& source) {
     assert_(source.width/target.width==source.height/target.height, source.size, target.size);
     assert_(!source.alpha); //FIXME: not alpha correct
     uint scale = source.width/target.width;
@@ -90,10 +90,10 @@ static Image box(Image&& target, const Image& source) {
             targetLine[x] = byte4(s[0], s[1], s[2], 0xFF);
         }
     });
-    return move(target);
 }
+static Image box(Image&& target, const Image& source) { box(target, source); return move(target); }
 
-static Image bilinear(Image&& target, const Image& source) {
+static void bilinear(const Image& target, const Image& source) {
     assert_(!source.alpha);
     const uint stride = source.stride;
     chunk_parallel(target.height, [&](uint, size_t y) {
@@ -111,16 +111,15 @@ static Image bilinear(Image&& target, const Image& source) {
             target(x, y) = d;
         }
     });
-    return move(target);
 }
 
-Image resize(Image&& target, const Image& source) {
+void resize(const Image& target, const Image& source) {
     assert_(source && target && target.size != source.size, source.size, target.size);
-    if(source.width%target.width==0 && source.height%target.height==0) return box(move(target), source); // Integer box downsample
-    else if(target.size > source.size/2) return bilinear(move(target), source); // Bilinear resample
+    if(source.width%target.width==0 && source.height%target.height==0) box(target, source); // Integer box downsample
+    else if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
     else { // Integer box downsample + Bilinear resample
         int downsampleFactor = min(source.size.x/target.size.x, source.size.y/target.size.y);
-        return bilinear(move(target), box(source.size/downsampleFactor, source));
+        bilinear(target, box(source.size/downsampleFactor, source));
     }
 }
 
@@ -162,11 +161,11 @@ static uint8 sRGB(float v) {
     assert_(linear12 < 0x1000);
     return sRGB_forward[linear12];
 }
-void sRGB(mref<byte4> target, ref<float> value) {
-    parallel_apply(target, [&](size_t index) { uint8 v=sRGB(value[index]); return byte4(v,v,v, 0xFF); });
+void sRGB(mref<byte4> target, ref<float> source) {
+    parallel_apply(target, [](float value) { uint8 v=sRGB(value); return byte4(v,v,v, 0xFF); }, source);
 }
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
-    parallel_apply(target, [&](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
+    parallel_apply(target, [=](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
 }
 
 // -- Resampling (float) --
@@ -200,7 +199,7 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 /// Convolves and transposes (with repeat border conditions)
 static void convolve(float* target, const float* source, const float* kernel, int radius,  int width, int height) {
     int N = radius+1+radius;
-    chunk_parallel(height, [&](uint, size_t y) {
+    chunk_parallel(height, [=](uint, size_t y) {
         const float* line = source + y * width;
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {

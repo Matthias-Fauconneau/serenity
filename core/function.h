@@ -32,13 +32,9 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
 template<Type R, Type... Args> struct function;
 /// Provides a common interface to store functions, methods (delegates) and anonymous functions (lambdas)
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
-    long any[22]; //always store functor inline
+    long any[8]; // Always store functor inline
     function():any{0}{} // Invalid function (segfaults)
-    /*/// Wraps a function pointer
-    void function(void (*f)(Args...)) {
-        new (any) function_pointer<R(Args...)>(f);
-    }*/
-    /// Wraps an anonymous function
+    /// Wraps an anonymous function (or a a function pointer)
     template<Type F> function(F f) {
         static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");
         new (any) anonymous_function<F,R(Args...)>(f);

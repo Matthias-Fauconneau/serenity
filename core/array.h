@@ -42,7 +42,7 @@ generic struct array : buffer<T> {
     array() {}
     /// Converts a buffer to an array
     array(buffer<T>&& o) : buffer<T>(move(o)) {}
-    /// Allocates an uninitialized buffer for \a capacity elements
+    /// Allocates an empty array with storage space for \a capacity elements
     explicit array(size_t capacity) : buffer<T>(capacity, 0) {}
     /// Moves elements from a reference
     explicit array(const mref<T> ref) : buffer<T>(ref.size) { mref<T>::move(ref); }
@@ -210,10 +210,8 @@ template<Type T, Type Function> array<T> filter(const ref<T> source, Function pr
 struct String : array<char> {
     using array::array;
     String() {}
-    //String(buffer<byte>&& o) : array<char>(cast<char>(move(o))) {}
     explicit String(string source) : array<char>(source) {}
     template<size_t N> explicit constexpr String(const char (&a)[N]) : array<char>(string(a, N-1)) {}
-    //operator const string() const { return string(*this); }
     using array::append;
     void append(const string source) { return array::append(source); }
     template<size_t N> void append(const char (&source)[N]) { return array::append(string(source, N-1)); }
@@ -228,7 +226,6 @@ inline String operator+(const String& a, const char b) { return operator+<char>(
 inline String operator+(String&& a, const char b) { return operator+<char>(move(a), b); }
 inline String operator+(String&& a, const string b) { return operator+<char>(move(a), b); }
 inline String operator+(String&& a, const String& b) { return operator+<char>(move(a), b); }
-//inline String operator+(buffer<char>&& a, const String& b) { return operator+<char>(move(a), b); }
 
 /// Converts Strings to strings
 inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return  e; }); }

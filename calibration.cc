@@ -21,16 +21,13 @@ static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
 
     // Normalizes sum by mean (DC)
     float factor = 1/mean(target);
-    parallel_apply(target, [&](float v) {  return min(1.f, factor*v); }, target);
+    parallel_apply(target, [=](float v) {  return min(1.f, factor*v); }, target);
 
     // Low pass to filter texture and noise and high pass to filter lighting conditions
     ImageF image = bandPass(target, textureFrequency, lightingFrequency);
 
     // Adds DC back and clips values over 1
-    parallel_apply(target, [&](float v) {  return min(1.f, 1+v); }, image);
-
-    // Asserts
-    chunk_parallel(target.buffer::size, [&](uint, size_t index) { assert_(target[index]>0); });
+    parallel_apply(target, [](float v) {  return min(1.f, 1+v); }, image);
 }
 
 void blurNormalize(ImageF& target, const ImageF& source) {
@@ -48,7 +45,7 @@ void blurNormalize(ImageF& target, const ImageF& source) {
     assert_(min < max, min, max);
     log(min, max);
     {const float scale = 1/(max-min);
-        parallel_apply(target, [&](float value) { return scale*(value-min); }, target);}
+        parallel_apply(target, [=](float value) { return scale*(value-min); }, target);}
 }
 
 
