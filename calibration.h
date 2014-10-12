@@ -4,6 +4,7 @@
 struct Region {
     int2 min, max;
 };
+inline String str(Region o) { return str(o.min, o.max); }
 
 /// Calibrates attenuation bias image by summing images of a white subject
 struct Calibration {

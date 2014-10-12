@@ -64,7 +64,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     SourceImageRGB image(size_t index) const {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
-        return cache<Image>(folder, "Source.sRGB", name(index), strx(size(index)), sourceFile.modifiedTime(), [&](TargetImageRGB& target){
+        return cache<Image>(folder, "Source.sRGB", name(index), size(index), sourceFile.modifiedTime(), [&](TargetImageRGB& target){
             Time time; log_(str("source.decode", size(index), ""));
             Image source = decodeImage(Map(sourceFile));
             log(time);
@@ -78,7 +78,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
         if(size==this->size(index)) return image(index);
-        return cache<Image>(folder, "Resize.sRGB", name(index), strx(size), sourceFile.modifiedTime(), [&](TargetImageRGB& target){
+        return cache<Image>(folder, "Resize.sRGB", name(index), size, sourceFile.modifiedTime(), [&](TargetImageRGB& target){
             SourceImageRGB source = image(index);
             target.resize(size);
             assert_(target.size <= source.size, target.size, source.size);
@@ -89,7 +89,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component, int2 size) const override {
         assert_(index  < count());
-        return cache<ImageF>(folder, "Linear."+str(component), name(index), strx(size), time(index), [&](TargetImage& target) {
+        return cache<ImageF>(folder, "Linear."+str(component), name(index), size, time(index), [&](TargetImage& target) {
             SourceImageRGB source = image(index, size); // Faster but slightly inaccurate
             target.resize(size);
             linear(share(target), source, component);

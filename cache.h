@@ -45,11 +45,11 @@ generic struct ReadSource : T {
     ReadSource(const Folder& folder, string name) : T(*(const T*)readFile(name, folder).data) {}
 };
 
-template<Type T, Type F> T cache(const Folder& folder, string operation, string name, string key, int64 sourceTime,
-                         /*function<T()>*/ F generate, string version = __DATE__ " " __TIME__) {
+template<Type T> T cache(const Folder& folder, string operation, string name, string key, int64 sourceTime,
+                         function<T()> generate, string version = __DATE__ " " __TIME__) {
     return cache<ReadSource<T>,WriteTarget<T>>(folder, operation, name, key, sourceTime, [&](WriteTarget<T>& target) {
         T value = generate();
-        target.properties = key;
+        target.properties = String(key);
         writeFile(target.fileName(), raw(value), folder);
     }, version);
 }
@@ -110,7 +110,7 @@ generic struct ImageMapSource : Map, T {
 };
 
 /// Maps results to be generated or read from cache
-template<Type T, Type F> ImageMapSource<T> cache(const Folder& folder, string operation, string name, string key, int64 sourceTime,
-                                         /*function<void(ImageMapTarget<T>&)>*/ F generate, string version = __DATE__ " " __TIME__) {
-    return cache<ImageMapSource<T>,ImageMapTarget<T>>(folder, operation, name, key, sourceTime, generate, version);
+template<Type T> ImageMapSource<T> cache(const Folder& folder, string operation, string name, int2 size, int64 sourceTime,
+                                         function<void(ImageMapTarget<T>&)> generate, string version = __DATE__ " " __TIME__) {
+    return cache<ImageMapSource<T>,ImageMapTarget<T>>(folder, operation, name, strx(size), sourceTime, generate, version);
 }

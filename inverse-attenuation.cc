@@ -12,6 +12,8 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
     // Calibration parameter
     SourceImage attenuation = Calibration::attenuation(size);
     SourceImage blendFactor = Calibration::blendFactor(size);
+    Region regionOfInterest = Calibration::regionOfInterest(size);
+    log(regionOfInterest);
 
     // Parameter scaling
     const float scale = float(size.x)/1000;
@@ -31,8 +33,9 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         // Detects uniform background under spot
         ImageF lowlow = gaussianBlur(low, 64*scale);
         ref<float> weights = blendFactor;
-        float lowEnergy = parallel_sum(lowlow, [=](float v, float w) { float weight = 1 - w; return weight * sq(v); }, 0.f, weights);
-        float highEnergy = parallel_sum(source, [=](float v, float bg, float w) { float weight = 1 - w; return weight * sq(v-bg); }, 0.f, lowlow, weights);
+        float lowEnergy = parallel_sum(lowlow, [=](float v, float w) { return w * sq(v); }, 0.f, weights);
+        float highEnergy = parallel_sum(source, [=](float v, float bg, float w) { return w * sq(v-bg); }, 0.f, lowlow, weights);
+        assert_(highEnergy > 0, lowEnergy, highEnergy);
         float ratio = lowEnergy / highEnergy;
         correctionFactor = clip(0.f, (ratio-1)/2, 1.f) + clip(0.f, (ratio-2)/8, 1.f);
         blurRadius = clip(spotHighThreshold, (ratio-12)*4*scale, spotLowThreshold);

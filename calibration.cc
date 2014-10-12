@@ -11,10 +11,7 @@ static void calibrate(const ImageF& target, const ImageSource& source) {
     // Sums all images
     target.buffer::clear();
     for(size_t index: range(source.count())) {
-        Time time; log_(str("Calibration.attenuation.source["+str(index)+']',size,""));
         SourceImageRGB sourceImage = source.image(index, size);
-        log(time);
-        assert_(sourceImage.size == size, sourceImage.size, size);
         parallel_apply(target, [](float sum, byte4 source) { return sum + float(int(source.b)+int(source.g)+int(source.r)); }, target, sourceImage);
         debug(break;)
     }
@@ -30,7 +27,7 @@ static void calibrate(const ImageF& target, const ImageSource& source) {
     parallel_apply(target, [](float v) {  return min(1.f, 1+v); }, image);
 }
 
-void blurNormalize(const ImageF& target, const ImageF& source) {
+static void blurNormalize(const ImageF& target, const ImageF& source) {
     // Hardcoded parameters
     int2 size = source.size;
     const float scale = float(size.x)/1000;
@@ -55,7 +52,7 @@ int64 Calibration::time() const {
 }
 
 SourceImage Calibration::attenuation(int2 size) const {
-    return cache<ImageF>(source.folder, "Calibration", "attenuation", strx(size), time(), [&](TargetImage& target) {
+    return cache<ImageF>(source.folder, "Calibration", "attenuation", size, time(), [&](TargetImage& target) {
             target.resize(size);
             Time time; log_(str("Calibration.attenuation",size,""));
             calibrate(target, source);
@@ -64,7 +61,7 @@ SourceImage Calibration::attenuation(int2 size) const {
 }
 
 SourceImage Calibration::blendFactor(int2 size) const {
-    return cache<ImageF>(source.folder, "Calibration", "blendFactor", strx(size), time(), [&](TargetImage& target) {
+    return cache<ImageF>(source.folder, "Calibration", "blendFactor", size, time(), [&](TargetImage& target) {
         target.resize(size);
         Time time; log_(str("Calibration.blendFactor",size,""));
         blurNormalize(target, attenuation(size));
@@ -74,7 +71,7 @@ SourceImage Calibration::blendFactor(int2 size) const {
 
 //FIXME: cache
 Region Calibration::regionOfInterest(int2 size) const {
-    return cache("Calibration", "blendFactor", source.folder, [&]() {
+    return cache<Region>(source.folder, "Calibration", "blendFactor", strx(size), time(), [&]() {
         SourceImage source = blendFactor(size);
         int2 minimums[threadCount], maximums[threadCount];
         parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
@@ -90,5 +87,5 @@ Region Calibration::regionOfInterest(int2 size) const {
             minimums[id] = min, maximums[id] = max;
         });
         return Region{min(minimums), max(maximums)};
-    }, time(), strx(size));
+    });
 }
