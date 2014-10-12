@@ -34,24 +34,34 @@ struct ImageSourceView : ImageView {
         return str(source.name(), source.count() ? str(index+1,'/',source.count(), source.name(index), source.properties(index)) : String());
     }
 
-    void update() {
-        if(!source.count()) return;
+    int2 sizeHint(int2 size) override {
+        assert_(size);
+        int2 maximum = source.maximumSize();
+        int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
+        int2 hint = maximum/downscaleFactor;
+        assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);
+        return hint;
+    }
+    Graphics graphics(int2 size) override {
+        if(!source.count()) return {};
         index = clip(0ul, (size_t)index, source.count()-1);
         if(imageIndex != index) image = SourceImageRGB();
-        if(image.size != source.size(index)) {
+        assert_(image.size <= size, image.size, size);
+        if(image.size*2 <= size) {
             imageIndex = index;
-            assert_(!image.size || source.size(index).x/image.size.x == source.size(index).y/image.size.y);
-            int downscaleFactor = image.size ? (source.size(index).x/image.size.x)/2 : 4; // Doubles resolution at every step
+            assert_(!image.size || size.x/image.size.x == size.y/image.size.y);
+            int downscaleFactor = image.size ? (source.size(index).x/image.size.x)/2 : 16; // Doubles resolution at every step
+            while(source.maximumSize().x/(source.size(index).x/downscaleFactor) > 16) downscaleFactor /= 2; // Limits calibration downscale (FIXME)
             int2 hint = source.size(index)/downscaleFactor;
+            assert_(source.maximumSize().x/hint.x <= 16);
             image = source.image(index, hint); // Progressive view
-            log(downscaleFactor, hint, image.size);
             ImageView::image = share(image);
-            if(image.size != source.size(index)) contentChanged(); // Requests further display until full resolution is shown
+            if(image.size*2 <= size) contentChanged(); // Requests further display until full resolution is shown
         }
+        assert_(image.size <= size, image.size, size);
+        log(image.size, size);
+        return ImageView::graphics(size);
     }
-
-    int2 sizeHint(int2) override { return source.size(0); }
-    Graphics graphics(int2 size) override { update(); return ImageView::graphics(size); }
 
     /// Browses source by moving mouse horizontally over image view (like an hidden slider)
     bool mouseEvent(int2 cursor, int2 size, Event, Button button, Widget*&) override {

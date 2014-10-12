@@ -60,7 +60,7 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
                     if(!visual && depth.depth==32) {
                         root = screen.root;
                         visual=visualType.id;
-                        screenX=screen.width, screenY=screen.height;
+                        size = int2(screen.width, screen.height);
                     }
                 }
             }

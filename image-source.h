@@ -67,6 +67,7 @@ struct ImageSource {
     ImageSource(Folder&& folder) : folder(move(folder)) {}
     virtual String name() const abstract;
     virtual size_t count() const abstract;
+    virtual int2 maximumSize() const abstract;
     virtual String name(size_t index) const abstract;
     virtual int64 time(size_t index) const abstract;
     virtual int2 size(size_t index) const abstract;

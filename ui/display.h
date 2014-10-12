@@ -3,6 +3,7 @@
 #include "thread.h"
 #include "function.h" // onEvent
 #include "map.h" // actions
+#include "vector.h" // int2
 inline buffer<byte> pad(array<byte>&& o, uint width=4){ o.grow(align(width,o.size)); return move(o); }
 
 /// Connection to an X display server
@@ -26,7 +27,7 @@ struct Display : Socket, Poll {
     /// Root visual
     uint visual;
     /// Screen size
-    int screenX, screenY;
+    int2 size;
 
 // Keyboard
     /// Keycode range

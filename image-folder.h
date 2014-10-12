@@ -1,32 +1,29 @@
 #pragma once
 #include "image-source.h"
+#include "variant.h"
 #include "exif.h"
 #include "jpeg.h"
 
 /// Cached collection of images backed by a source folder
 struct ImageFolder : ImageSource, map<String, map<String, String>> {
-    int2 imageSize = 0;
+    int2 maximumImageSize = 0;
 
     ImageFolder(const Folder& source, function<bool(const String& name, const map<String, String>& properties)> predicate={})
         : ImageSource(Folder(".",source)) {
-        {// Lists images, evaluates target image size and load properties
-            int2 maximumImageSize = 0;
-
+        {// Lists images and their properties
             for(String& fileName: folder.list(Files|Sorted)) {
                 Map file = Map(fileName, folder);
                 if(imageFileFormat(file)!="JPEG") continue; // Only JPEG images
                 int2 imageSize = ::imageSize(file);
-                maximumImageSize = max(maximumImageSize, imageSize);
 
                 auto properties = parseExifTags(file);
-                properties.insert("Size"_, str(imageSize));
+                properties.insert("Size"_, strx(imageSize));
                 properties.insert("Path"_, copy(fileName));
                 properties.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
                 insert(String(section(fileName,'.')), {properties.keys, apply(properties.values, [](const Variant& o){return str(o);})});
+
+                maximumImageSize = max(maximumImageSize, imageSize);
             }
-            // Sets target image size
-            imageSize = maximumImageSize / 4;
-            assert_(imageSize);
         }
 
         {// Filters useless tags and renames to short names
@@ -57,21 +54,22 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
     String name() const override { return String(section(folder.name(),'/',-2,-1)); }
     size_t count() const override { return map::size(); }
+    int2 maximumSize() const override { return maximumImageSize; }
     String name(size_t index) const override { return copy(keys[index]); }
-    int64 time(size_t index) const override { return File(values[index].at("Path"_), folder).modifiedTime(); }
+    int64 time(size_t index) const override { return File(properties(index).at("Path"_), folder).modifiedTime(); }
     const map<String, String>& properties(size_t index) const override { return values[index]; }
-    int2 size(size_t) const override { return imageSize; }
+    int2 size(size_t index) const override { return fromInt2(properties(index).at("Size"_)); }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
     SourceImageRGB image(size_t index, int2 hint) const override {
         assert_(index  < count());
-        File sourceFile (values[index].at("Path"_), folder);
-        int2 size = fit(imageSize, hint);
+        File sourceFile (properties(index).at("Path"_), folder);
+        int2 size = fit(this->size(index), hint);
         return cache<Image>(name(index), ".sRGB", folder, [&](TargetImageRGB& target){
             Image source = decodeImage(Map(sourceFile));
             target.resize(size);
             target.buffer::clear();
-            assert_(target.size < source.size);
+            assert_(target.size <= source.size, target.size, source.size);
             resize(share(target), source);
         }, sourceFile.modifiedTime(), size);
     }
@@ -79,7 +77,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component, int2 hint) const override {
         assert_(index  < count());
-        int2 size = fit(imageSize, hint);
+        int2 size = fit(this->size(index), hint);
         return cache<ImageF>(name(index), '.'+str(component), folder, [&](TargetImage& target) {
             SourceImageRGB source = image(index, size); // Faster but slightly inaccurate
             target.resize(source.size);

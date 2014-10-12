@@ -7,8 +7,8 @@ Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& i
     Display::onEvent.connect(this, &Window::onEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
-    if(sizeHint.x<=0) size.x=screenX;
-    if(sizeHint.y<=0) size.y=screenY;
+    if(sizeHint.x<=0) size.x=Display::size.x;
+    if(sizeHint.y<=0) size.y=Display::size.y;
     if((sizeHint.x<0||sizeHint.y<0) && widget) {
         int2 hint = widget->sizeHint(size);
         if(sizeHint.x<0) size.x=max(abs(hint.x),-sizeHint.x);

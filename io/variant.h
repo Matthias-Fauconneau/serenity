@@ -53,7 +53,7 @@ inline int2 fromInt2(TextData& s) {
     int x = s.integer(); // Assigns a single value to all components
     if(!s) return int2(x);
     s.whileAny("x, "); int y=s.integer();
-    assert_(!s); return int2(x,y);
+    assert_(!s, s); return int2(x,y);
 }
 /// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
 inline int2 fromInt2(string str) { TextData s(str); return fromInt2(s); }
