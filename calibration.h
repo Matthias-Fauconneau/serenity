@@ -13,7 +13,7 @@ struct Calibration {
     /// Returns calibration image
     SourceImage attenuation(int2 hint) const;
     /// Returns blend factor image
-    SourceImage blendFactor(int2 hint) const;
+    SourceImage blendFactor(const ImageF& attenuation) const;
 
     /*/// Returns calibration image as sRGB visualization
     Image attenuationRGB() const;

@@ -11,11 +11,10 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
 
     // Calibration parameter
     SourceImage attenuation = Calibration::attenuation(size);
-    SourceImage blendFactor = Calibration::blendFactor(size);
+    SourceImage blendFactor = Calibration::blendFactor(attenuation);
 
     // Parameter scaling
     const float scale = float(size.x)/1000;
-    assert_(scale == float(size.y)/750, size);
     // Hardcoded parameters
     const float spotHighThreshold = 8*scale; // High threshold of spot frequency
     assert_(spotHighThreshold > 0);
@@ -37,12 +36,13 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         ref<float> weights = attenuation;
         chunk_parallel(source.buffer::size, [&](uint, size_t index) {
             float weight = 1 - weights[index];
-            //assert_(weight >= 0);
+            assert_(weight >= 0);
             lowEnergy += weight * sq(low[index]-DC);
             highEnergy += weight * sq(high[index]);
         });
+        assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
+        log(lowEnergy, highEnergy);
         float ratio = lowEnergy / highEnergy;
-        assert_(ratio > 0, lowEnergy, highEnergy);
         correctionFactor = clip(0.f, ratio/4, 1.f) + clip(0.f, ratio/8, 1.f);
         blurRadius = clip(spotHighThreshold, 4*ratio, spotLowThreshold);
     }

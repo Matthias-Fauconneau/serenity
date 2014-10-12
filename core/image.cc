@@ -72,9 +72,7 @@ Image decodeImage(const ref<byte> file) {
 // -- Resampling (3x8bit) --
 
 static Image box(Image&& target, const Image& source) {
-    //assert_(source.width*target.height==source.height*target.width, source.size, target.size); // Restricts to exact ratios
-    assert_(source.width/target.width==source.height/target.height, source.size, target.size); // Crops to nearest ratio
-    assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height);
+    assert_(source.width/target.width==source.height/target.height, source.size, target.size);
     assert_(!source.alpha); //FIXME: not alpha correct
     uint scale = source.width/target.width;
     assert_(scale <= 16, target.size, source.size);
@@ -120,7 +118,10 @@ Image resize(Image&& target, const Image& source) {
     assert_(source && target && target.size != source.size, source.size, target.size);
     if(source.width%target.width==0 && source.height%target.height==0) return box(move(target), source); // Integer box downsample
     else if(target.size > source.size/2) return bilinear(move(target), source); // Bilinear resample
-    else return bilinear(move(target), box(source.size/(source.size/target.size), source)); // Integer box downsample + Bilinear resample
+    else { // Integer box downsample + Bilinear resample
+        int downsampleFactor = min(source.size.x/target.size.x, source.size.y/target.size.y);
+        return bilinear(move(target), box(source.size/downsampleFactor, source));
+    }
 }
 
 // -- sRGB --

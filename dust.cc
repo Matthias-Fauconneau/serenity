@@ -12,23 +12,37 @@ struct Index {
 };
 
 /// Displays an image collection
-struct ImageSourceView : ImageView {
+struct ImageSourceView : ImageView, Poll {
     ImageSource& source;
     Index index;
     size_t imageIndex = -1;
     SourceImageRGB image; // Holds memory map reference
+    int2 size = 0;
     function<void()> contentChanged;
-
-    bool setIndex(int value) {
-        size_t index = clip(0, value, (int)source.count()-1);
-        if(index != this->index) { this->index = index; return true; }
-        return false;
-    }
 
     ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged)
         : source(source), index{index}, contentChanged(contentChanged) {}
     ImageSourceView(ImageSource& source, size_t* index, Window& window)
         : ImageSourceView(source, index, {&window, &Window::render}) {}
+
+    // Evaluation
+
+    void event() override {
+        if(imageIndex != index) { image=SourceImageRGB();  ImageView::image=Image(); }
+        if(image.size*2 > size) return;
+
+        int downscaleFactor = image.size ? (source.size(index).x/image.size.x)/2 : 16; // Doubles resolution at every step
+        while(source.maximumSize().x/(source.size(index).x/downscaleFactor) > 16) downscaleFactor /= 2; // Limits calibration downscale (FIXME)
+        int2 hint = (source.size(index)+int2(downscaleFactor-1))/downscaleFactor;
+        assert_(source.maximumSize().x/hint.x <= 16);
+
+        imageIndex = index;
+        image = source.image(index, hint);
+        ImageView::image = share(image);
+        contentChanged();
+    }
+
+    // Content
 
     String title() const override {
         return str(source.name(), source.count() ? str(index+1,'/',source.count(), source.name(index), source.properties(index)) : String());
@@ -42,25 +56,22 @@ struct ImageSourceView : ImageView {
         assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);
         return hint;
     }
+
     Graphics graphics(int2 size) override {
         if(!source.count()) return {};
         index = clip(0ul, (size_t)index, source.count()-1);
-        if(imageIndex != index) image = SourceImageRGB();
+        if(imageIndex != index) event(); // Evaluates requested image immediately
+        else if(image.size*2 <= size) { this->size=size; queue(); } // Requests further display until full resolution is shown
         assert_(image.size <= size, image.size, size);
-        if(image.size*2 <= size) {
-            imageIndex = index;
-            assert_(!image.size || size.x/image.size.x == size.y/image.size.y);
-            int downscaleFactor = image.size ? (source.size(index).x/image.size.x)/2 : 16; // Doubles resolution at every step
-            while(source.maximumSize().x/(source.size(index).x/downscaleFactor) > 16) downscaleFactor /= 2; // Limits calibration downscale (FIXME)
-            int2 hint = source.size(index)/downscaleFactor;
-            assert_(source.maximumSize().x/hint.x <= 16);
-            image = source.image(index, hint); // Progressive view
-            ImageView::image = share(image);
-            if(image.size*2 <= size) contentChanged(); // Requests further display until full resolution is shown
-        }
-        assert_(image.size <= size, image.size, size);
-        log(image.size, size);
         return ImageView::graphics(size);
+    }
+
+    // Control
+
+    bool setIndex(int value) {
+        size_t index = clip(0, value, (int)source.count()-1);
+        if(index != this->index) { this->index = index; if(index != imageIndex) queue(); return true; }
+        return false;
     }
 
     /// Browses source by moving mouse horizontally over image view (like an hidden slider)
@@ -82,7 +93,6 @@ struct DustRemovalPreview {
     Folder folder {"Pictures", home()};
     ImageFolder calibration {Folder("Paper", folder)};
     InverseAttenuation correction { calibration };
-#if 1
     ImageFolder source { folder, [](const String&, const map<String, String>& properties){ return
                     fromDecimal(properties.at("Aperture"_)) <= 5 ||
                     ( fromDecimal(properties.at("Focal"_)) < 4.1 ||
@@ -96,9 +106,5 @@ struct DustRemovalPreview {
     ImageSourceView sourceView {source, &index, window};
     ImageSourceView correctedView {corrected, &index, window};
     WidgetToggle toggleView {&sourceView, &correctedView};
-#else
-    ImageView views[2]  = {correction.attenuationImage(), correction.blendFactorImage()};
-    WidgetToggle toggleView {&views[0], &views[1]};
-#endif
     Window window {&toggleView};
 } application;

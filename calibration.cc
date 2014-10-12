@@ -1,23 +1,22 @@
 #include "calibration.h"
+#include "math.h"
 
 static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
     assert_(target);
 
-
-    const float scale = float(size.x)/1000;
-    assert_(scale == float(size.y)/750, size);
     // Hardcoded parameters
+    const float scale = float(size.x)/1000;
     const float textureFrequency = 1*scale; // Paper texture frequency
-    const float lightingFrequency = 32*scale; // Lighting conditions frequency (64?)
+    const float lightingFrequency = 64*scale; // Lighting conditions frequency
 
     // Sums all images
     target.buffer::clear();
     for(size_t index: range(source.count())) {
-        for(uint component : range(3)) {
-            SourceImage sourceImage = source.image(index, component, size);
-            assert_(sourceImage.size == size);
-            parallel_apply(target, [](float sum, float source) { return sum + source; }, target, sourceImage);
-        }
+        Time time; log_(str("Calibration.attenuation.source["+str(index)+']',size,""));
+        SourceImageRGB sourceImage = source.image(index, size);
+        log(time);
+        assert_(sourceImage.size == size, sourceImage.size, size);
+        parallel_apply(target, [](float sum, byte4 source) { return sum + float(int(source.b)+int(source.g)+int(source.r)); }, target, sourceImage);
     }
 
     // Normalizes sum by mean (DC)
@@ -29,24 +28,27 @@ static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
 
     // Adds DC back and clips values over 1
     parallel_apply(target, [&](float v) {  return min(1.f, 1+v); }, image);
+
+    // Asserts
+    chunk_parallel(target.buffer::size, [&](uint, size_t index) { assert_(target[index]>0); });
 }
 
 void blurNormalize(ImageF& target, const ImageF& source) {
     // Parameter scaling
     int2 size = source.size;
     const float scale = float(size.x)/1000;
-    assert_(scale == float(size.y)/750, size);
     // Hardcoded parameters
     const float spotLowThreshold = 32*scale; // Low threshold of spot frequency
     assert_(spotLowThreshold > 0);
 
     // Image processing
     target = gaussianBlur(move(target), source, spotLowThreshold);
-    target -= parallel_minimum(target);
-    float max = parallel_maximum(target);
-    assert_(max);
-    float factor = 1./max; // FIXME: single pass minmax
-    target *= factor;
+    float min=inf, max=-inf;
+    parallel_minmax(target, min, max);
+    assert_(min < max, min, max);
+    log(min, max);
+    {const float scale = 1/(max-min);
+        parallel_apply(target, [&](float value) { return scale*(value-min); }, target);}
 }
 
 
@@ -59,14 +61,17 @@ int64 Calibration::time() const {
 SourceImage Calibration::attenuation(int2 size) const {
     return cache<ImageF>("attenuation", "Calibration", source.folder, [&](TargetImage& target) {
             target.resize(size);
+            Time time; log_(str("Calibration.attenuation",size,""));
             calibrate(target, source, size);
+            log(time);
     }, time(), size);
 }
 
-SourceImage Calibration::blendFactor(int2 size) const {
-    return cache<ImageF>("blendFactor", "Calibration", source.folder, [&](TargetImage& target) {
-        SourceImage source = attenuation(size);
-        target.resize(source.size);
-        blurNormalize(target, source.size);
-    }, time(), size);
+SourceImage Calibration::blendFactor(const ImageF& attenuation) const {
+    return cache<ImageF>("blendFactor", "Calibration", this->source.folder, [&](TargetImage& target) {
+        target.resize(attenuation.size);
+        Time time; log_(str("Calibration.blendFactor",attenuation.size,""));
+        blurNormalize(target, attenuation);
+        log(time);
+    }, time(), attenuation.size);
 }

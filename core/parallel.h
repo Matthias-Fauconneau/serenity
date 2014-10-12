@@ -4,23 +4,23 @@
 
 // -> \file algorithm.h
 
-template<Type T, Type F> auto reduce(ref<T> values, F fold, T accumulator) {
+template<Type T, Type F> T reduce(ref<T> values, F fold, T accumulator) {
     assert_(values);
     for(const T& e: values) accumulator = fold(accumulator, e);
     return accumulator;
 }
-template<Type T, Type F, size_t N> auto reduce(const T (&values)[N], F fold, T initialValue) {
+template<Type T, Type F, size_t N> T reduce(const T (&values)[N], F fold, T initialValue) {
     return reduce(ref<T>(values), fold, initialValue);
 }
 
-generic auto sum(ref<T> values) { return reduce(values, [](T accumulator, T value) { return accumulator + value; }, T()); }
-template<Type T, size_t N> auto sum(const T (&values)[N]) { return sum(ref<T>(values)); }
+generic T sum(ref<T> values) { return reduce(values, [](T accumulator, T value) { return accumulator + value; }, T()); }
+template<Type T, size_t N> T sum(const T (&values)[N]) { return sum(ref<T>(values)); }
 
-generic auto min(ref<T> values) { return reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]); }
-template<Type T, size_t N> const T& min(const T (&a)[N]) { return min(ref<T>(a)); }
+generic T min(ref<T> values) { return reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]); }
+template<Type T, size_t N> T min(const T (&a)[N]) { return min(ref<T>(a)); }
 
-generic auto max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]); }
-template<Type T, size_t N> const T& max(const T (&a)[N]) { return max(ref<T>(a)); }
+generic T max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]); }
+template<Type T, size_t N> T max(const T (&a)[N]) { return max(ref<T>(a)); }
 
 // \file parallel.h
 
@@ -83,7 +83,7 @@ void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>.
 /// Minimum number of values to trigger parallel operations
 static constexpr size_t parallelMinimum = 1<<15;
 
-template<Type T, Type F> auto parallel_reduce(ref<T> values, F fold, T initial_value) {
+template<Type T, Type F> T parallel_reduce(ref<T> values, F fold, T initial_value) {
     assert_(values);
     if(values.size < parallelMinimum) return reduce(values, fold, initial_value);
     else {
@@ -92,13 +92,24 @@ template<Type T, Type F> auto parallel_reduce(ref<T> values, F fold, T initial_v
         return reduce(accumulators, fold, initial_value);
     }
 }
-template<Type T, Type F> auto parallel_reduce(ref<T> values, F fold) { return parallel_reduce(values, fold, values[0]); }
+template<Type T, Type F> T parallel_reduce(ref<T> values, F fold) { return parallel_reduce(values, fold, values[0]); }
 
 // \file arithmetic.cc Parallel arithmetic operations
 
 generic T parallel_minimum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
 generic T parallel_maximum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
 generic T parallel_sum(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return accumulator + value; }, 0.f); }
+
+generic void parallel_minmax(ref<T> values, float& minimum, float& maximum) {
+    float minimums[threadCount], maximums[threadCount];
+    parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
+        float min = minimum, max = maximum;
+        for(float v: values.slice(start, size)) min=::min(min, v), max=::max(max, v);
+        minimums[id] = min;
+        maximums[id] = max;
+    });
+    minimum = ::min(minimums), maximum = ::max(maximums);
+}
 
 inline float mean(ref<float> values) {
     float sum = parallel_sum(values);

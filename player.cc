@@ -66,7 +66,7 @@ struct Player : Poll {
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
     VBox layout {{ &toolbar, &main },VBox::Spread};
-    Window window {&layout, -int2(600,1024), "Player", pauseIcon()};
+    Window window {&layout, -int2(1680,1050)/2, "Player", pauseIcon()};
 
 // Content
     String device; // Device underlying folder

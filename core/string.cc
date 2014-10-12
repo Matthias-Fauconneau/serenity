@@ -67,8 +67,8 @@ String left(const string source, size_t size, const char pad) {
 }
 String right(const string source, size_t size, const char pad) {
     buffer<char> target(max(size, source.size));
-    target.slice(0, source.size).clear(pad);
-    target.slice(source.size).copy(source);
+    target.slice(0, size-source.size).clear(pad);
+    target.slice(size-source.size).copy(source);
     return move(target);
 }
 

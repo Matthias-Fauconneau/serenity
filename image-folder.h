@@ -61,26 +61,38 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     int2 size(size_t index) const override { return fromInt2(properties(index).at("Size"_)); }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
-    SourceImageRGB image(size_t index, int2 hint) const override {
+    SourceImageRGB image(size_t index) const {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
-        int2 size = fit(this->size(index), hint);
         return cache<Image>(name(index), ".sRGB", folder, [&](TargetImageRGB& target){
+            Time time; log_(str("source.decode", size(index), ""));
             Image source = decodeImage(Map(sourceFile));
+            log(time);
+            target.resize(source.size);
+            target.copy(source);
+        }, sourceFile.modifiedTime(), size(index), "" /*Disable version invalidation to avoid redecoding on header changes*/);
+    }
+
+    /// Resizes sRGB images
+    SourceImageRGB image(size_t index, int2 size) const override {
+        assert_(index  < count());
+        File sourceFile (properties(index).at("Path"_), folder);
+        if(size==this->size(index)) return image(index);
+        return cache<Image>(name(index), "Resize.sRGB", folder, [&](TargetImageRGB& target){
+            SourceImageRGB source = image(index);
             target.resize(size);
-            target.buffer::clear();
             assert_(target.size <= source.size, target.size, source.size);
             resize(share(target), source);
         }, sourceFile.modifiedTime(), size);
     }
 
     /// Converts sRGB images to linear float images
-    SourceImage image(size_t index, uint component, int2 hint) const override {
+    SourceImage image(size_t index, uint component, int2 size) const override {
         assert_(index  < count());
-        int2 size = fit(this->size(index), hint);
+        //int2 size = fit(this->size(index), hint);
         return cache<ImageF>(name(index), '.'+str(component), folder, [&](TargetImage& target) {
             SourceImageRGB source = image(index, size); // Faster but slightly inaccurate
-            target.resize(source.size);
+            target.resize(size);
             linear(share(target), source, component);
         }, time(index), size);
     }

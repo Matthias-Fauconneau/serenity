@@ -34,24 +34,24 @@ generic Source<T> cache(string name, string operation, const Folder& folder, fun
                 int64 sourceTime, int2 sizeHint = 0, string version = __DATE__ " " __TIME__) {
     Folder cache(operation, folder, true);
     removeIfExisting(name, cache);
-    auto files = filter(cache.list(Files), [&](string fileName){ return !startsWith(fileName, name); });
-    if(files) {
-        assert_(files.size == 1);
-        int64 cacheTime = File(files[0], cache, ::Flags(ReadWrite)).modifiedTime();
-        int2 size = fromInt2(section(files[0],'.',-2,-1));
-        if((sizeHint?size==sizeHint:size>int2(0)) && sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime)
-            return Source<T>(files[0], cache);
-        else {
+    auto files = filter(cache.list(Files), [&](string fileName){ return section(fileName,'.',0,-2) != name; });
+    for(string file: files) {
+        int64 cacheTime = File(file, cache, ::Flags(ReadWrite)).modifiedTime();
+        int2 size = fromInt2(section(file,'.',-2,-1));
+        if(size>int2(0) && sourceTime < cacheTime && (version ? parseDate(version)*1000000000l < cacheTime : true)) {
+            if(size==sizeHint) return Source<T>(file, cache);
+        } else { // Removes any invalidated files (of any size)
             // Safeguards
             assert_(find(cache.name(),"/Pictures/"_));
-            assert_(!files[0].contains('/'));
-            remove(files[0], cache);
+            assert_(!file.contains('/'));
+            remove(file, cache);
         }
     }
     Target<T> target(name, cache);
     String oldName = target.fileName();
     generate(target);
     assert_(target.size>int2(0));
+    assert_(!existsFile(target.fileName(), cache), cache.name(), files, target.fileName(), sizeHint);
     rename(oldName, target.fileName(), cache);
     return Source<T>(target.fileName(), cache);
 }
@@ -76,11 +76,11 @@ struct ImageSource {
     virtual SourceImageRGB image(size_t /*index*/, int2 unused hint = 0) const { error("Unimplemented"); }
 };
 
-// Fits size to hint
+/*// Fits size to hint
 inline int2 fit(int2 size, int2 hint) {
     if(!hint) return size; // No hint
     if(hint >= size) return size; // Larger hint
     return hint.x*size.y < hint.y*size.x ?
-                int2(hint.x, size.y*hint.x/size.x) : // Fits width
-                int2(size.x*hint.y/size.y, hint.y) ; // Fits height
-}
+                int2(hint.x, ((hint.x+size.x-1)/size.x)*size.y) : // Fits width
+                int2(((hint.y+size.y-1)/size.y)*size.x, hint.y) ; // Fits height
+}*/
