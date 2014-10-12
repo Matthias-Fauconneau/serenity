@@ -31,7 +31,7 @@ generic struct Source : Map, T {
 };
 
 generic Source<T> cache(string name, string operation, const Folder& folder, function<void(Target<T>&)> generate,
-                int64 unused sourceTime, string unused version = __DATE__ " " __TIME__) {
+                int64 sourceTime, int2 sizeHint = 0, string version = __DATE__ " " __TIME__) {
     Folder cache(operation, folder, true);
     removeIfExisting(name, cache);
     auto files = filter(cache.list(Files), [&](string fileName){ return !startsWith(fileName, name); });
@@ -39,7 +39,8 @@ generic Source<T> cache(string name, string operation, const Folder& folder, fun
         assert_(files.size == 1);
         int64 cacheTime = File(files[0], cache, ::Flags(ReadWrite)).modifiedTime();
         int2 size = fromInt2(section(files[0],'.',-2,-1));
-        if(size>int2(0) && sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime) return Source<T>(files[0], cache);
+        if((sizeHint?size==sizeHint:size>int2(0)) && sourceTime < cacheTime && parseDate(version)*1000000000l < cacheTime)
+            return Source<T>(files[0], cache);
         else {
             // Safeguards
             assert_(find(cache.name(),"/Pictures/"_));
@@ -65,11 +66,20 @@ struct ImageSource {
     Folder folder;
     ImageSource(Folder&& folder) : folder(move(folder)) {}
     virtual String name() const abstract;
-    virtual size_t size() const abstract;
+    virtual size_t count() const abstract;
     virtual String name(size_t index) const abstract;
     virtual int64 time(size_t index) const abstract;
     virtual int2 size(size_t index) const abstract;
     virtual const map<String, String>& properties(size_t index) const abstract;
-    virtual SourceImage image(size_t /*index*/, uint /*component*/) const { error("Unimplemented"); }
-    virtual SourceImageRGB image(size_t /*index*/) const { error("Unimplemented"); }
+    virtual SourceImage image(size_t /*index*/, uint /*component*/, int2 unused hint=0) const { error("Unimplemented"); }
+    virtual SourceImageRGB image(size_t /*index*/, int2 unused hint = 0) const { error("Unimplemented"); }
 };
+
+// Fits size to hint
+inline int2 fit(int2 size, int2 hint) {
+    if(!hint) return size; // No hint
+    if(hint >= size) return size; // Larger hint
+    return hint.x*size.y < hint.y*size.x ?
+                int2(hint.x, size.y*hint.x/size.x) : // Fits width
+                int2(size.x*hint.y/size.y, hint.y) ; // Fits height
+}

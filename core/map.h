@@ -17,7 +17,8 @@ template<Type K, Type V> struct map {
     }
     map(const ref<K> keys, const ref<V> values) : keys(keys), values(values) { assert(keys.size==values.size); }
 
-    uint size() const { return keys.size; }
+    size_t size() const { return keys.size; }
+    size_t count() const { return keys.size; }
     void reserve(int size) { return keys.reserve(size); values.reserve(size); }
     void clear() { keys.clear(); values.clear(); }
 

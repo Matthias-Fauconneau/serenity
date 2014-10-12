@@ -9,12 +9,12 @@ struct ProcessedSource : ImageSource {
         ImageSource(Folder(".",source.folder)), source(source), operation(operation) {}
 
     String name() const override { return str(operation.name(), source.name()); }
-    size_t size() const override { return source.size(); }
+    size_t count() const override { return source.count(); }
     String name(size_t index) const override { return source.name(index); }
     int64 time(size_t index) const override { return max(operation.time(), source.time(index)); }
     const map<String, String>& properties(size_t index) const override { return source.properties(index); }
     int2 size(size_t index) const override { return source.size(index); }
 
     /// Returns processed sRGB image
-    virtual SourceImageRGB image(size_t index) const override;
+    virtual SourceImageRGB image(size_t index, int2 size) const override;
 };

@@ -77,7 +77,7 @@ static Image box(Image&& target, const Image& source) {
     assert_(source.width%target.width<=source.width/target.width && source.height%target.height<=source.height/target.height);
     assert_(!source.alpha); //FIXME: not alpha correct
     uint scale = source.width/target.width;
-    assert_(scale <= 16);
+    assert_(scale <= 16, target.size, source.size);
     chunk_parallel(target.height, [&](uint, size_t y) {
         const byte4* sourceLine = source.data + y * scale * source.stride;
         byte4* targetLine = target.begin() + y * target.stride;
@@ -224,7 +224,9 @@ static void convolve(float* target, const float* source, const float* kernel, in
 static float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
 ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) {
     assert_(sigma > 0);
-    int radius = ceil(3*sigma), N = radius+1+radius;
+    int radius = ceil(3*sigma);
+    size_t N = radius+1+radius;
+    assert_(int2(N) <= source.size, sigma, radius, N, source.size);
     float kernel[N];
     for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
     float sum = ::sum(ref<float>(kernel,N)); assert_(sum, ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;

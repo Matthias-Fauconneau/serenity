@@ -4,15 +4,31 @@
 
 static float mix(float a, float b, float t) { return (1-t)*a + t*b; }
 
-InverseAttenuation::InverseAttenuation(ImageFolder&& calibration) : Calibration(move(calibration), name()) {}
+InverseAttenuation::InverseAttenuation(const ImageSource& calibration) : Calibration(calibration) {}
 int64 InverseAttenuation::time() const { return max(ImageOperationT::time(), Calibration::time()); }
 buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green, const ImageF& blue) const {
+    int2 size = red.size; assert_(green.size == size && blue.size == size);
+
+    // Calibration parameter
+    SourceImage attenuation = Calibration::attenuation(size);
+    SourceImage blendFactor = Calibration::blendFactor(size);
+
+    // Parameter scaling
+    const float scale = float(size.x)/1000;
+    assert_(scale == float(size.y)/750, size);
+    // Hardcoded parameters
+    const float spotHighThreshold = 8*scale; // High threshold of spot frequency
+    assert_(spotHighThreshold > 0);
+    const float spotLowThreshold = 32*scale; // Low threshold of spot frequency
+    // Estimated parameters
     float blurRadius, correctionFactor;
-    {ImageF source (red.size);
+
+    // Parameter estimation
+    {ImageF source (size);
         parallel_apply(source, [&](float red, float green, float blue) { return red + green + blue; }, red, green, blue);
 
         // Splits image at spot frequency
-        ImageF low = gaussianBlur(source, 32);
+        ImageF low = gaussianBlur(source, spotLowThreshold);
         ImageF high = source - low;
 
         // Detects low frequency background under spot
@@ -20,19 +36,23 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         float lowEnergy = 0, highEnergy = 0;
         ref<float> weights = attenuation;
         chunk_parallel(source.buffer::size, [&](uint, size_t index) {
-            float weight = 1-weights[index];
+            float weight = 1 - weights[index];
+            //assert_(weight >= 0);
             lowEnergy += weight * sq(low[index]-DC);
             highEnergy += weight * sq(high[index]);
         });
         float ratio = lowEnergy / highEnergy;
+        assert_(ratio > 0, lowEnergy, highEnergy);
         correctionFactor = clip(0.f, ratio/4, 1.f) + clip(0.f, ratio/8, 1.f);
-        blurRadius = clip(8.f, 4*ratio, 32.f);
+        blurRadius = clip(spotHighThreshold, 4*ratio, spotLowThreshold);
     }
+
+    // Image processing
     return ::apply(ref<ImageF>{share(red), share(green), share(blue)}, [&](const ImageF& source) {
         // Splits image at spot frequency
-        ImageF low_spot = gaussianBlur(source, 8);
+        ImageF low_spot = gaussianBlur(source, spotHighThreshold);
         ImageF high = source - low_spot;
-        ImageF low = gaussianBlur(low_spot, 32);
+        ImageF low = gaussianBlur(low_spot, spotLowThreshold);
         ImageF spot = low_spot - low;
 
         // Inverses attenuation using attenuation factors calibrated for each pixel
@@ -41,7 +61,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         // Blurs correction to attenuate miscalibration
         target = gaussianBlur(target, blurRadius); // Low pass correction to better correct uniform gradient
         // High pass to match source spot band
-        ImageF low_corrected = gaussianBlur(target, 32);
+        ImageF low_corrected = gaussianBlur(target, spotLowThreshold);
         target -= low_corrected;
 
         // Merges correction near spot

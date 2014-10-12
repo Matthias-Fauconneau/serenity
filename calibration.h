@@ -1,17 +1,22 @@
 #pragma once
 #include "image-folder.h"
 
+/// Calibrates attenuation bias image by summing images of a white subject
 struct Calibration {
-    SourceImage attenuation;
-    SourceImage blendFactor;
+    const ImageSource& source;
 
     /// Calibrates attenuation bias image by summing images of a white subject
-    Calibration(ImageFolder&& calibration, string name);
+    Calibration(const ImageSource& source) : source(source) {}
 
     int64 time() const;
 
-    /// Returns calibration image as sRGB visualization
-    Image attenuationImage() const;
+    /// Returns calibration image
+    SourceImage attenuation(int2 hint) const;
+    /// Returns blend factor image
+    SourceImage blendFactor(int2 hint) const;
+
+    /*/// Returns calibration image as sRGB visualization
+    Image attenuationRGB() const;
     /// Returns blend factor image as sRGB visualization
-    Image blendFactorImage() const;
+    Image blendFactorRGB() const;*/
 };

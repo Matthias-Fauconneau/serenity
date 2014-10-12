@@ -29,9 +29,9 @@ static constexpr uint threadCount = 4;
 struct thread { uint64 id; uint64* counter; uint64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; uint64 pad[3]; };
 inline void* start_routine(thread* t) {
     for(;;) {
-        uint64 i=__sync_fetch_and_add(t->counter,1);
-        if(i>=t->stop) break;
-        (*t->delegate)(t->id, i);
+        uint64 index = __sync_fetch_and_add(t->counter,1);
+        if(index >= t->stop) break;
+        (*t->delegate)(t->id, index);
     }
     return 0;
 }
@@ -43,14 +43,14 @@ template<Type F> void parallel(uint64 start, uint64 stop, F f) {
 #else
     function<void(uint, uint)> delegate = f;
     thread threads[threadCount];
-    for(uint i: range(threadCount)) {
-        threads[i].id = i;
-        threads[i].counter = &start;
-        threads[i].stop = stop;
-        threads[i].delegate = &delegate;
-        pthread_create(&threads[i].pthread,0,(void*(*)(void*))start_routine,&threads[i]);
+    for(uint index: range(threadCount)) {
+        threads[index].id = index;
+        threads[index].counter = &start;
+        threads[index].stop = stop;
+        threads[index].delegate = &delegate;
+        pthread_create(&threads[index].pthread, 0, (void*(*)(void*))start_routine, &threads[index]);
     }
-    for(const thread& t: threads) { uint64 status=-1; pthread_join(t.pthread,(void**)&status); assert(status==0); }
+    for(const thread& thread: threads) { uint64 status=-1; pthread_join(thread.pthread, (void**)&status); assert(status==0); }
 #endif
 }
 template<Type F> void parallel(uint stop, F f) { parallel(0,stop,f); }
