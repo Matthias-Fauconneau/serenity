@@ -30,17 +30,16 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         ImageF low = gaussianBlur(source, spotLowThreshold);
         ImageF high = source - low;
 
-        // Detects low frequency background under spot
-        real DC = mean(source);
-        assert_(isNumber(DC), DC, source.size, source.buffer::size);
+        // Detects uniform background under spot
+        ImageF lowlow = gaussianBlur(low, 64*scale);
         ref<float> weights = attenuation;
-        float lowEnergy = parallel_sum(low, [=](float v, float w) { float weight = 1 - w; assert_(isNumber(weight * sq(v-DC)), weight, v, DC); return weight * sq(v-DC); }, 0.f, weights);
-        float highEnergy = parallel_sum(high, [=](float v, float w) { float weight = 1 - w; assert_(isNumber(weight * sq(v))); return weight * sq(v); }, 0.f, weights);
+        float lowEnergy = parallel_sum(lowlow, [=](float v, float w) { float weight = 1 - w; return weight * sq(v); }, 0.f, weights);
+        float highEnergy = parallel_sum(source, [=](float v, float bg, float w) { float weight = 1 - w; return weight * sq(v-bg); }, 0.f, lowlow, weights);
         assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
         float ratio = lowEnergy / highEnergy;
         correctionFactor = clip(0.f, (ratio-1)/2, 1.f) + clip(0.f, (ratio-2)/8, 1.f);
-        blurRadius = clip(spotHighThreshold, (ratio-12)*2, spotLowThreshold);
-        log(withName(lowEnergy, highEnergy, ratio, correctionFactor, blurRadius));
+        blurRadius = clip(spotHighThreshold, (ratio-12)*4*scale, spotLowThreshold);
+        log(withName(lowEnergy, highEnergy, ratio, correctionFactor, blurRadius/scale));
     }
 
     // Image processing

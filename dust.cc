@@ -7,10 +7,8 @@ struct DustRemovalPreview {
     Folder folder {"Pictures", home()};
     ImageFolder calibration {Folder("Paper", folder)};
     InverseAttenuation correction { calibration };
-    ImageFolder source { folder, [](const String&, const map<String, String>& properties){ return
-                    (fromDecimal(properties.at("Aperture"_)) <= 5
-                      /*|| ( fromDecimal(properties.at("Focal"_)) < 4.1 ||
-                      (fromDecimal(properties.at("Focal"_)) <= 4.3 && fromDecimal(properties.at("Bias"_)) != 0))*/); } };
+    ImageFolder source { folder,
+                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) <= 5; } };
     ProcessedSource corrected {source, correction};
 
     File last {".last", folder, Flags(ReadWrite|Create)};
