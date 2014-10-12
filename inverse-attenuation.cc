@@ -33,8 +33,8 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         // Detects low frequency background under spot
         float DC = mean(source);
         ref<float> weights = attenuation;
-        float lowEnergy = parallel_reduce(low, [=](float a, float v, float w) { float weight = 1 - w; return a + weight * sq(v-DC); }, 0.f, weights);
-        float highEnergy = parallel_reduce(high, [=](float a, float v, float w) { float weight = 1 - w; return a + weight * sq(v); }, 0.f, weights);
+        float lowEnergy = parallel_sum(low, [=](float v, float w) { float weight = 1 - w; return weight * sq(v-DC); }, 0.f, weights);
+        float highEnergy = parallel_sum(high, [=](float v, float w) { float weight = 1 - w; return weight * sq(v); }, 0.f, weights);
         assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
         log(lowEnergy, highEnergy);
         float ratio = lowEnergy / highEnergy;

@@ -83,19 +83,34 @@ void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>.
 /// Minimum number of values to trigger parallel operations
 static constexpr size_t parallelMinimum = 1<<15;
 
-template<Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, T initial_value, ref<Ss>... sources) {
+template<Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, T initial_value) {
     assert_(values);
-    if(values.size < parallelMinimum) return reduce(values, fold, initial_value, sources...);
+    if(values.size < parallelMinimum) return reduce(values, fold, initial_value);
     else {
         float accumulators[threadCount];
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-            accumulators[id] = reduce(values.slice(start, size), fold, initial_value, sources...);
+            accumulators[id] = reduce(values.slice(start, size), fold, initial_value);
         });
-        return reduce(accumulators, fold, initial_value, sources...);
+        return reduce(accumulators, fold, initial_value);
     }
 }
 template<Type T, Type F> T parallel_reduce(ref<T> values, F fold) { return parallel_reduce(values, fold, values[0]); }
 
+// Multiple source sum
+// \note Cannot be a generic reduction as the final fold is single source
+template<Type T, Type F, Type... Ss> T parallel_sum(ref<T> values, F apply, T initial_value, ref<Ss>... sources) {
+    assert_(values);
+    if(values.size < parallelMinimum) return reduce(values, [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources...);
+    else {
+        float accumulators[threadCount];
+        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
+            accumulators[id] = reduce(values.slice(start, size), [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...);
+        });
+        return sum(accumulators);
+    }
+}
+
+/// Multiple accumulator reduction
 template<Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F0 fold0, F1 fold1, T& accumulator0, T& accumulator1) {
     float accumulators[2][threadCount];
     parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
