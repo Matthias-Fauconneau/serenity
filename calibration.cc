@@ -1,10 +1,9 @@
 #include "calibration.h"
 #include "math.h"
 
-static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
-    assert_(target);
-
+static void calibrate(const ImageF& target, const ImageSource& source) {
     // Hardcoded parameters
+    int2 size = target.size;
     const float scale = float(size.x)/1000;
     const float textureFrequency = 1*scale; // Paper texture frequency
     const float lightingFrequency = 64*scale; // Lighting conditions frequency
@@ -31,7 +30,7 @@ static void calibrate(ImageF& target, const ImageSource& source, int2 size) {
     parallel_apply(target, [](float v) {  return min(1.f, 1+v); }, image);
 }
 
-void blurNormalize(ImageF& target, const ImageF& source) {
+void blurNormalize(const ImageF& target, const ImageF& source) {
     // Hardcoded parameters
     int2 size = source.size;
     const float scale = float(size.x)/1000;
@@ -45,7 +44,7 @@ void blurNormalize(ImageF& target, const ImageF& source) {
     assert_(min < max, min, max);
     log(min, max);
     {const float scale = 1/(max-min);
-        parallel_apply(target, [=](float value) { return scale*(value-min); }, target);}
+        parallel_apply(target, [=](float value) { return 1-scale*(value-min); }, target);}
 }
 
 
@@ -56,19 +55,40 @@ int64 Calibration::time() const {
 }
 
 SourceImage Calibration::attenuation(int2 size) const {
-    return cache<ImageF>("attenuation", "Calibration", source.folder, [&](TargetImage& target) {
+    return cache<ImageF>(source.folder, "Calibration", "attenuation", strx(size), time(), [&](TargetImage& target) {
             target.resize(size);
             Time time; log_(str("Calibration.attenuation",size,""));
-            calibrate(target, source, size);
+            calibrate(target, source);
             log(time);
-    }, time(), size);
+    });
 }
 
-SourceImage Calibration::blendFactor(const ImageF& attenuation) const {
-    return cache<ImageF>("blendFactor", "Calibration", this->source.folder, [&](TargetImage& target) {
-        target.resize(attenuation.size);
-        Time time; log_(str("Calibration.blendFactor",attenuation.size,""));
-        blurNormalize(target, attenuation);
+SourceImage Calibration::blendFactor(int2 size) const {
+    return cache<ImageF>(source.folder, "Calibration", "blendFactor", strx(size), time(), [&](TargetImage& target) {
+        target.resize(size);
+        Time time; log_(str("Calibration.blendFactor",size,""));
+        blurNormalize(target, attenuation(size));
         log(time);
-    }, time(), attenuation.size);
+    });
+}
+
+//FIXME: cache
+Region Calibration::regionOfInterest(int2 size) const {
+    return cache("Calibration", "blendFactor", source.folder, [&]() {
+        SourceImage source = blendFactor(size);
+        int2 minimums[threadCount], maximums[threadCount];
+        parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
+            int2 min = size, max = 0;
+            for(size_t y: range(start, start+chunkSize)) {
+                for(size_t x: range(size.x)) {
+                    if(source(x,y)) {
+                        min = ::min(min, int2(x,y));
+                        max = ::max(max, int2(x,y));
+                    }
+                }
+            }
+            minimums[id] = min, maximums[id] = max;
+        });
+        return Region{min(minimums), max(maximums)};
+    }, time(), strx(size));
 }

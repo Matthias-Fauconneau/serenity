@@ -64,13 +64,13 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     SourceImageRGB image(size_t index) const {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
-        return cache<Image>(name(index), ".sRGB", folder, [&](TargetImageRGB& target){
+        return cache<Image>(folder, "Source.sRGB", name(index), strx(size(index)), sourceFile.modifiedTime(), [&](TargetImageRGB& target){
             Time time; log_(str("source.decode", size(index), ""));
             Image source = decodeImage(Map(sourceFile));
             log(time);
             target.resize(source.size);
             target.copy(source);
-        }, sourceFile.modifiedTime(), size(index), "" /*Disable version invalidation to avoid redecoding on header changes*/);
+        }, "" /*Disable version invalidation to avoid redecoding on header changes*/);
     }
 
     /// Resizes sRGB images
@@ -78,22 +78,21 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
         if(size==this->size(index)) return image(index);
-        return cache<Image>(name(index), "Resize.sRGB", folder, [&](TargetImageRGB& target){
+        return cache<Image>(folder, "Resize.sRGB", name(index), strx(size), sourceFile.modifiedTime(), [&](TargetImageRGB& target){
             SourceImageRGB source = image(index);
             target.resize(size);
             assert_(target.size <= source.size, target.size, source.size);
             resize(share(target), source);
-        }, sourceFile.modifiedTime(), size);
+        });
     }
 
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component, int2 size) const override {
         assert_(index  < count());
-        //int2 size = fit(this->size(index), hint);
-        return cache<ImageF>(name(index), '.'+str(component), folder, [&](TargetImage& target) {
+        return cache<ImageF>(folder, "Linear."+str(component), name(index), strx(size), time(index), [&](TargetImage& target) {
             SourceImageRGB source = image(index, size); // Faster but slightly inaccurate
             target.resize(size);
             linear(share(target), source, component);
-        }, time(index), size);
+        });
     }
 };

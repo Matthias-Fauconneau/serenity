@@ -5,6 +5,11 @@
 
 // -> \file algorithm.h
 
+template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
+    for(size_t index: range) accumulator = fold(accumulator, index);
+    return accumulator;
+}
+
 template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A accumulator, ref<Ss>... sources) {
     assert_(values);
     for(size_t index: range(values.size)) accumulator = fold(accumulator, values[index], sources[index]...);
@@ -89,9 +94,7 @@ template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F 
     if(values.size < parallelMinimum) return reduce(values, fold, initial_value);
     else {
         A accumulators[threadCount];
-        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-            accumulators[id] = reduce(values.slice(start, size), fold, initial_value);
-        });
+        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) { accumulators[id] = reduce(values.slice(start, size), fold, initial_value); });
         return reduce(accumulators, fold, initial_value);
     }
 }
@@ -105,8 +108,8 @@ template<Type T, Type F, Type... Ss> T parallel_sum(ref<T> values, F apply, T in
     else {
         float accumulators[threadCount];
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-            accumulators[id] = reduce(values.slice(start, size), [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...);
-        });
+            accumulators[id] = reduce(values.slice(start, size),
+                                      [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
         return sum(accumulators);
     }
 }

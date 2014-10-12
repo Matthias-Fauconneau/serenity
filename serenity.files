@@ -92,3 +92,4 @@ inverse-attenuation.cc
 processed-source.cc
 processed-source.h
 image-source-view.h
+cache.h

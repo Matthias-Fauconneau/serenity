@@ -11,31 +11,28 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
 
     // Calibration parameter
     SourceImage attenuation = Calibration::attenuation(size);
-    SourceImage blendFactor = Calibration::blendFactor(attenuation);
+    SourceImage blendFactor = Calibration::blendFactor(size);
 
     // Parameter scaling
     const float scale = float(size.x)/1000;
     // Hardcoded parameters
     const float spotHighThreshold = 8*scale; // High threshold of spot frequency
-    assert_(spotHighThreshold > 0);
     const float spotLowThreshold = 32*scale; // Low threshold of spot frequency
     // Estimated parameters
     float blurRadius, correctionFactor;
 
     // Parameter estimation
     {ImageF source (size);
-        parallel_apply(source, [](float red, float green, float blue) { assert_(isNumber(red + green + blue)); return red + green + blue; }, red, green, blue);
+        parallel_apply(source, [](float red, float green, float blue) { return red + green + blue; }, red, green, blue);
 
         // Splits image at spot frequency
         ImageF low = gaussianBlur(source, spotLowThreshold);
-        ImageF high = source - low;
 
         // Detects uniform background under spot
         ImageF lowlow = gaussianBlur(low, 64*scale);
-        ref<float> weights = attenuation;
+        ref<float> weights = blendFactor;
         float lowEnergy = parallel_sum(lowlow, [=](float v, float w) { float weight = 1 - w; return weight * sq(v); }, 0.f, weights);
         float highEnergy = parallel_sum(source, [=](float v, float bg, float w) { float weight = 1 - w; return weight * sq(v-bg); }, 0.f, lowlow, weights);
-        assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
         float ratio = lowEnergy / highEnergy;
         correctionFactor = clip(0.f, (ratio-1)/2, 1.f) + clip(0.f, (ratio-2)/8, 1.f);
         blurRadius = clip(spotHighThreshold, (ratio-12)*4*scale, spotLowThreshold);
@@ -64,7 +61,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
             float mixed =
                     correctionFactor < 1 ? mix(spot, min(0.f, target), correctionFactor)
                                          : mix(min(0.f, target), target, correctionFactor-1);
-            return low + (1-factor)*mixed + factor * spot + high;
+            return low + factor*mixed + (1-factor) * spot + high;
         }, low, target, spot, blendFactor, high);
 
         // Never darkens
