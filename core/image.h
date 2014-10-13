@@ -95,6 +95,14 @@ inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
 
 inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); parallel::div(a, a, b); return move(a); }
 
+template<Type F, Type... S> void apply(const ImageF& target, F function, const S&... source) {
+    parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
+        for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
+            target[y*target.stride + x] = function(x, y, target[y*target.stride + x], source[y*source.stride + x]...);
+        }
+    });
+}
+
 template<Type F> void apply(const ImageF& target, const ImageF& a, const ImageF& b, F function) {
     assert_(target.size == a.size && target.size == b.size);
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
@@ -166,7 +174,7 @@ inline void bandPass(const ImageF& target, const ImageF& source, float lowThresh
 // -- Detection --
 
 inline int2 argmin(const ImageF& source) {
-    struct C { int2 position; float value=inf; };
+    struct C { int2 position=0; float value=inf; };
     C minimums[threadCount];
     mref<C>(minimums).clear(); // Some threads may not iterate
     parallel_chunk(source.size.y, [&](uint id, uint64 start, uint64 chunkSize) {

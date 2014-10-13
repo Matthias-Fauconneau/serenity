@@ -32,8 +32,8 @@ int2 Calibration::spotPosition(int2 size) const {
 /// Returns spot size
 int2 Calibration::spotSize(int2 size) const { return int2(min(size.x, size.y)/8); }
 
-SourceImage Calibration::attenuation(int2 size, bool blur) const {
-    return cache<ImageF>(source.folder, "Calibration", (blur?"blur-"_:""_)+"attenuation", spotSize(size), time(), [&](const ImageF& target) {
+SourceImage Calibration::attenuation(int2 size) const {
+    return cache<ImageF>(source.folder, "Calibration", "attenuation", spotSize(size), time(), [&](const ImageF& target) {
         SourceImage source = Calibration::sum(size);
 
         int2 spotPosition = Calibration::spotPosition(size);
@@ -49,21 +49,7 @@ SourceImage Calibration::attenuation(int2 size, bool blur) const {
             }
         });
 
-        // Low pass to filter texture/noise/miscalibration and extend correction
-        //if(blur) gaussianBlur(target, target, 1.f/8*spotSize.x);
-
-        /*// Normalizes sum by mean (DC) and clips values over 1
-        float DC = mean(target);
-        float factor = 1/DC;
-        parallel::apply(target, [=](float v) { return min(1.f, factor*v); }, target);*/
         float factor = 1/parallel::max(target);
         parallel::apply(target, [=](float v) { return min(1.f, factor*v); }, target);
     });
 }
-
-/*SourceImage Calibration::blendFactor(int2 size) const {
-    return cache<ImageF>(source.folder, "Calibration", "blendFactor", spotSize(size), time(), [&](const ImageF& target) {
-        SourceImage source = Calibration::attenuation(size);
-        parallel::apply(target, [=](float value) { return 1-value; }, source);
-    });
-}*/

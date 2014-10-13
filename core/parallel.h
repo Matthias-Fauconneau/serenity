@@ -119,6 +119,7 @@ inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [&](float 
 
 // reduce
 
+generic T min(ref<T> values) { return reduce(values, [](T accumulator, T value) { return ::min(accumulator, value); }); }
 generic T max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return ::max(accumulator, value); }); }
 
 inline real sum(ref<float> values) { return reduce(values, [](real accumulator, float value) { return accumulator + value; }, 0.); }
@@ -139,7 +140,7 @@ template<Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, T initial_val
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
             accumulators[id] = ::reduce(values.slice(start, size),
                                         [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
-        return sum(accumulators);
+        return ::sum(accumulators);
     }
 }
 }

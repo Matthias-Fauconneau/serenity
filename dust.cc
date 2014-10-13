@@ -12,7 +12,7 @@ struct DustRemoval {
 };
 
 struct CalibrationView : DustRemoval, Application {
-    ImageView views[2]  = {sRGB(correction.attenuation(source.maximumSize()/4,false)), sRGB(correction.attenuation(source.maximumSize()/4,true))};
+    ImageView views[2]  = {sRGB(correction.sum(source.maximumSize()/4)),sRGB(correction.attenuation(source.maximumSize()/4))};
     WidgetToggle toggleView {&views[0], &views[1]};
     Window window {&toggleView};
 };

@@ -48,81 +48,79 @@ int64 InverseAttenuation::time() const { return max(ImageOperationT::time(), Cal
 buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green, const ImageF& blue) const {
     const int2 size = red.size; assert_(green.size == size && blue.size == size);
 
-    // Calibrated parameter
+    // Calibrated parameters
     const SourceImage attenuation = Calibration::attenuation(size);
     const int2 spotSize = Calibration::spotSize(size);
     const int2 spotOrigin = Calibration::spotPosition(size)-spotSize/2;
 
-    // Estimated parameters
-    log(spotOrigin, spotSize, size);
-    const ImageF value = crop(red, green, blue, spotOrigin, spotSize);
-    const int2 offset = argmin(value)-spotSize/2;
-    log(offset);
-    const int2 origin = clip(int2(0), spotOrigin+offset, size-spotSize); // Compenstates dust movement
+    // Static parameters
+    const float lowScale = (spotSize.x-1)/6;
+    const float highScale = spotSize.x/16.f;
 
-    /*// Splits image frequencies to detect uniform background under spot
-        ImageF low = gaussianBlur(source, 1.f/8*spotSize.x);
-        float lowEnergy = energy(low);
-        float highEnergy = parallel_sum(source, [](float source, float low) { return sq(source-low); }, 0.f, low);
-        assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
-        float ratio = lowEnergy / highEnergy;
-        correctionFactor = clip(0.f, (ratio-1)/2, 1.f) + clip(0.f, (ratio-2)/8, 1.f);
-        blurRadius = clip(1.f/16, ratio/8, 1.f/8)*spotSize.x;
-        log(withName(lowEnergy, highEnergy, ratio, correctionFactor, blurRadius/spotSize.x));}*/
+    // Estimated parameters
+    ImageF value = crop(red, green, blue, spotOrigin, spotSize);
+
+    // Splits image frequencies to detect uniform background under spot
+    const ImageF low = gaussianBlur(value, lowScale);
+    const float lowEnergy = parallel::energy(low);
+    const float highEnergy = parallel::sum(value, [](float value, float low) { return sq(value-low); }, 0.f, low);
+    assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
+    const float ratio = lowEnergy / highEnergy;
+    const float blurRadius = ::min(ratio / 32, 1.f) * lowScale;
+
+    value = gaussianBlur(value, highScale) - low; // Band pass [spotLowThreshold - spotHighThreshold]
+    const float min = parallel::min(value);
+    const float max = parallel::max(value);
+    const vec2 center = vec2(value.size)/2.f;
+    ::apply(value, [=](float x, float y, float v) {
+        float r2 = sq(vec2(x,y)-center);
+        float w = r2/sq(center.x);
+        return w + (v-min)/(max-min);
+    });
+    const int2 offset = argmin(value)-spotSize/2;
+    value(spotSize/2) = 0;    // Marks calibrated spot center (DEBUG)
+    value(spotSize/2+offset) = 1;     // Marks estimated spot center (DEBUG)
+    const int2 origin = clip(int2(0), spotOrigin+offset, size-spotSize); // Compenstates dust movement
+    log(withName(spotOrigin, offset, origin, spotSize.x, lowEnergy, highEnergy, ratio, lowScale, blurRadius));
 
     // Image processing
-    return ::apply(ref<ImageF>{share(red), share(green), share(blue)}, [=,&attenuation](const ImageF& source) -> ImageF {
+    return ::apply(ref<ImageF>{share(red), share(green), share(blue)}, [&](const ImageF& source) -> ImageF {
+        //return insert(source, value, spotOrigin); // DEBUG: view offset tracker field
+
         // Crops source
         const ImageF crop = ::crop(source, origin, spotSize);
 
         ImageF target;
-        if(0) {
-            // Splits image at spot frequency
-            ImageF low_spot = gaussianBlur(crop, 1.f/16*spotSize.x);
-            ImageF high = crop - low_spot;
-            const float spotLowThreshold = 1.f/8*spotSize.x;
-            ImageF low = gaussianBlur(low_spot, spotLowThreshold);
-            //ImageF spot = low_spot - low;
 
-            // Blurs divisor to compensate miscalibration
-            ImageF divisor = min(attenuation, gaussianBlur(attenuation, spotSize.x/6));
+        // Splits image at spot frequency
+        ImageF low_spot = gaussianBlur(crop, highScale);
+        ImageF high = crop - low_spot;
+        ImageF low = gaussianBlur(low_spot, lowScale);
+        //ImageF spot = low_spot - low;
 
-            // Inverses attenuation using attenuation factors calibrated for each pixel
-            target = move(low_spot) / divisor;
+        // Blurs divisor to compensate miscalibration
+        //ImageF divisor = min(attenuation, gaussianBlur(attenuation, spotSize.x/6));
+        const ImageF& divisor = attenuation;
 
-            // Blurs correction to compensate miscalibration
-            gaussianBlur(target, target, spotSize.x/16); // Low pass correction to better correct uniform gradient
+        // Inverses attenuation (of frequencies under spot frequency) using attenuation factors calibrated for each pixel
+        target = move(low_spot) / divisor;
 
-            // High pass to match source spot band
-            ImageF low_corrected = gaussianBlur(target, spotLowThreshold);
-            parallel::sub(target, target, low_corrected);
+        // Blurs correction to compensate miscalibration and to better correct uniform gradient
+        gaussianBlur(target, target, blurRadius);
 
-            if(0) {
-                /*// Merges correction near spot
-            parallel_apply(target, [=](float low, float target, float spot, float factor, float high) {
-                float mixed =
-                        correctionFactor < 1 ? mix(spot, min(0.f, target), correctionFactor)
-                                             : mix(min(0.f, target), target, correctionFactor-1);
-                return low + factor*mixed + (1-factor) * spot + high;
-            }, low, target, spot, attenuation, high);*/
-            } else {
-                // Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
-                parallel::apply(target, [=](float low, float target, float high) {
-                    return low + /*min(0.f, target)*/ target + high;
-                }, low, target, high);
-            }
-        } else {
-            // Blurs divisor to compensate miscalibration
-            ImageF divisor = share(attenuation); //min(attenuation, gaussianBlur(attenuation, spotSize.x/16));
-            // Inverses attenuation using attenuation factors calibrated for each pixel
-            target = crop / divisor;
-        }
+        // High pass to match source spot band
+        ImageF low_corrected = gaussianBlur(target, lowScale);
+        parallel::sub(target, target, low_corrected);
 
-        // Never darkens
-        max(target, target, crop);
-
-        // Marks detected spot center (DEBUG)
-        //target(spotSize.x/2) = 1;
+        // Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
+        vec2 center = vec2(target.size)/2.f;
+        ::apply(target, [=](float x, float y, float target, float source, float low, float high) {
+            //return low + target + high;
+            float r2 = sq(vec2(x,y)-center);
+            float w = ::min(1.f, r2/sq(center.x));
+            //return low + (1-w)*target + high;
+            return ::max(source, w * source + (1-w) * (low + ::min(0.f, target) + high));
+        }, crop, low, high);
 
         // Inserts cropped correction
         return insert(source, target, origin);
