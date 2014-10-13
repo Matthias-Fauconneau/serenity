@@ -134,14 +134,14 @@ array<Family> cluster(Volume32& target, const Volume16& source, buffer<array<sho
 /// Converts sets to a text file formatted as ((x y z r2)+\n)*
 String toASCII(const ref<Family>& families, const Volume16& source) {
     // Estimates text size to avoid unnecessary reallocations
-    String target ( sum(apply(families,[](const Family& family){ return family.size*4*5;})) );
+    String target ( sum(apply(families,[](const Family& family){ return family.size*(3*4+5);})) );
     byte* targetPtr = target.begin();
     Time time; log_(str("toASCII",families.size,"families... "_));
     for(const Family& family: families) {
         if(family) {
             for(uint64 index: family) {
                 int3 p = zOrder(index);
-                itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<3>(targetPtr, source[index]);
+                itoa<3>(targetPtr, p.x); itoa<3>(targetPtr, p.y); itoa<3>(targetPtr, p.z); itoa<4>(targetPtr, source[index]);
             }
             targetPtr[-1] = '\n';
         }
