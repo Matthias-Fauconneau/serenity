@@ -16,8 +16,8 @@ struct Calibration {
     int2 spotPosition(int2 size) const;
     /// Returns spot size
     int2 spotSize(int2 size) const;
-    /// Returns attenuation image (clip scale crop sum)
-    SourceImage attenuation(int2 size) const;
-    /*/// Returns blend factor image (lowpass attenuation)
+    /// Returns attenuation image (clip scale blur crop sum)
+    SourceImage attenuation(int2 size, bool blur=true) const;
+    /*/// Returns blend factor image (blur attenuation)
     SourceImage blendFactor(int2 size) const;*/
 };

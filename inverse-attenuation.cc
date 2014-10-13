@@ -48,7 +48,7 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
     int2 spotSize = Calibration::spotSize(size);
     int2 spotOrigin = Calibration::spotPosition(size)-spotSize/2;
 
-    // Parameters
+    /*// Parameters
     float blurRadius, correctionFactor;
 
     // Parameter estimation (needs all components)
@@ -77,40 +77,47 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
         correctionFactor = clip(0.f, (ratio-1)/2, 1.f) + clip(0.f, (ratio-2)/8, 1.f);
         blurRadius = clip(1.f/16, ratio/8, 1.f/8)*spotSize.x;
         log(withName(lowEnergy, highEnergy, ratio, correctionFactor, blurRadius/spotSize.x));
-    }
+    }*/
 
     // Image processing
     return ::apply(ref<ImageF>{share(red), share(green), share(blue)}, [=,&attenuation](const ImageF& source) -> ImageF {
         // Crops source
         const ImageF crop = ::crop(source, spotOrigin, spotSize);
 
-        /*// Splits image at spot frequency
+        // Splits image at spot frequency
         ImageF low_spot = gaussianBlur(crop, 1.f/16*spotSize.x);
         ImageF high = crop - low_spot;
         const float spotLowThreshold = 1.f/8*spotSize.x;
         ImageF low = gaussianBlur(low_spot, spotLowThreshold);
-        ImageF spot = low_spot - low;
+        //ImageF spot = low_spot - low;
 
         // Inverses attenuation using attenuation factors calibrated for each pixel
         ImageF target = move(low_spot) / attenuation;
 
         // Blurs correction to attenuate miscalibration
-        gaussianBlur(target, target, blurRadius); // Low pass correction to better correct uniform gradient
+        //gaussianBlur(target, target, blurRadius); // Low pass correction to better correct uniform gradient
+
         // High pass to match source spot band
         ImageF low_corrected = gaussianBlur(target, spotLowThreshold);
         target -= low_corrected;
 
-        // Merges correction near spot
-        parallel_apply(target, [=](float low, float target, float spot, float factor, float high) {
-            float mixed =
-                    correctionFactor < 1 ? mix(spot, min(0.f, target), correctionFactor)
-                                         : mix(min(0.f, target), target, correctionFactor-1);
-            return low + factor*mixed + (1-factor) * spot + high;
-        }, low, target, spot, attenuation, high);
+        if(0) {
+            /*// Merges correction near spot
+            parallel_apply(target, [=](float low, float target, float spot, float factor, float high) {
+                float mixed =
+                        correctionFactor < 1 ? mix(spot, min(0.f, target), correctionFactor)
+                                             : mix(min(0.f, target), target, correctionFactor-1);
+                return low + factor*mixed + (1-factor) * spot + high;
+            }, low, target, spot, attenuation, high);*/
+        } else {
+            // Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
+            parallel_apply(target, [=](float low, float target, float high) {
+                return low + min(0.f, target) + high;
+            }, low, target, high);
+        }
 
         // Never darkens
-        parallel_apply(target, [](float target, float source) { return max(target, source); }, target, crop);*/
-        auto target = crop / attenuation;
+        max(target, target, crop);
 
         // Inserts cropped correction
         return insert(source, target, spotOrigin);

@@ -222,7 +222,10 @@ inline String operator+(const char a, const string b) { return operator+<char>(a
 inline String operator+(const char a, const String& b) { return operator+<char>(a, b); }
 inline String operator+(const string a, char b) { return operator+<char>(a, b); }
 inline String operator+(const string a, const string b) { return operator+<char>(a, b); }
+inline String operator+(const string a, const String& b) { return operator+<char>(a, b); }
 inline String operator+(const String& a, const char b) { return operator+<char>(a, b); }
+inline String operator+(const String& a, const string b) { return operator+<char>(a, b); }
+inline String operator+(const String& a, const String& b) { return operator+<char>(a, b); }
 inline String operator+(String&& a, const char b) { return operator+<char>(move(a), b); }
 inline String operator+(String&& a, const string b) { return operator+<char>(move(a), b); }
 inline String operator+(String&& a, const String& b) { return operator+<char>(move(a), b); }

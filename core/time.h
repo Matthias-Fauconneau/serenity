@@ -32,6 +32,7 @@ struct Time {
 };
 inline String str(const Time& t) { return str(t.toReal())+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
+inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

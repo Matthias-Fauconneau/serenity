@@ -2,6 +2,7 @@
 #pragma once
 #include "file.h"
 #include "function.h"
+#include "time.h"
 
 /// Caches results of \a generate on file system as folder/operation/name.key
 /// \note All results of a given \name and any \a key older than \a sourceTime or \a version are removed
@@ -13,18 +14,23 @@ inline File cache(const Folder& folder, string operation, string name, string ke
         File file (fileName, cache);
         int64 cacheTime = file.modifiedTime();
         string fileKey = section(fileName,'.',-2,-1);
-        if(fileKey && sourceTime < cacheTime && (version ? parseDate(version)*1000000000l < cacheTime : true)) {
+        if(fileKey && cacheTime > sourceTime && (version ? cacheTime > parseDate(version)*1000000000l : true)) {
             if(fileKey==key) return file;
         } else { // Removes any invalidated files (of any key)
             assert_(find(cache.name(),"/Pictures/"_) && !fileName.contains('/')); // Safeguards
+            //log('-', fileName/*, Date(cacheTime), Date(sourceTime), Date(parseDate(version)*1000000000l)*/);
             remove(fileName, cache);
         }
     }
-    File file(name+'.'+key+".invalid", cache, ::Flags(ReadWrite|Create|Truncate));
-    Time time; log_(str(operation, name, key,""));
+    File file(name, cache, ::Flags(ReadWrite|Create|Truncate));
+    Time time;
+    static String prefix;
+    log(prefix+operation, name, key);
+    prefix.append(' ');
     write(file);
-    log(time);
-    rename(name+'.'+key+".invalid", name+'.'+key, cache);
+    prefix.pop();
+    if(time>0.1) log(prefix+str(time));
+    rename(name, name+'.'+key, cache);
     return file;
 }
 

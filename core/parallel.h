@@ -2,6 +2,7 @@
 #include <pthread.h> //pthread
 #include "function.h"
 #include "math.h"
+#include "map.h"
 
 // -> \file math.h
 inline void operator*=(mref<float> values, float factor) { values.apply(values, [&](float v) {  return factor*v; }); }
@@ -86,6 +87,7 @@ void parallel_apply(mref<T> target, Function function) {
 /// Stores the application of a function to every elements of a ref in a mref
 template<Type T, Type Function, Type S0, Type... Ss>
 void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>... sources) {
+    for(auto size: {source0.size, sources.size...}) assert_(target.size == size, target.size, source0.size, sources.size...);
     chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(source0[index], sources[index]...)); });
 }
 
@@ -134,16 +136,16 @@ template<Type A, Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F
 }*/
 
 inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
-    assert_(Y.size == A.size && Y.size==B.size);
+    assert_(Y.size == A.size && Y.size==B.size, withName(Y.size, A.size, B.size));
     if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a-b; });
     else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
 }
 
 //inline void operator-=(mref<float> target, float DC) { subtract(target, target, DC); }
-//inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }
+inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }
 
 inline void div(mref<float> Y, ref<float> A, ref<float> B) {
-    assert_(Y.size == A.size && Y.size==B.size);
+    assert_(Y.size == A.size && Y.size==B.size, withName(Y.size, A.size, B.size));
     if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a/b; });
     else parallel_apply(Y, [&](float a, float b) {  return a/b; }, A, B);
 }

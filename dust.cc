@@ -12,18 +12,15 @@ struct DustRemoval {
 };
 
 struct CalibrationView : DustRemoval, Application {
-    ImageView view  = sRGB(correction.attenuation(source.maximumSize()/4));
-    Window window {&view};
+    ImageView views[2]  = {sRGB(correction.attenuation(source.maximumSize()/4,false)), sRGB(correction.attenuation(source.maximumSize()/4,true))};
+    WidgetToggle toggleView {&views[0], &views[1]};
+    Window window {&toggleView};
 };
 registerApplication(CalibrationView, calibration);
 
 struct DustRemovalTest : DustRemoval, Application {
     ProcessedSource corrected {source, correction};
-    DustRemovalTest() {
-        Time time;
-        SourceImageRGB image = corrected.image(0, source.size(0)/4, true);
-        log(image.size, time);
-    }
+    DustRemovalTest() { corrected.image(0, source.size(0)/4, true); }
 };
 registerApplication(DustRemovalTest, test);
 

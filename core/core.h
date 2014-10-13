@@ -90,11 +90,12 @@ struct range {
 
 #ifndef _INITIALIZER_LIST
 namespace std { generic struct initializer_list {
-    const T* _M_array;
-    size_t _M_len;
-    constexpr initializer_list(const T* data, size_t size) : _M_array(data), _M_len(size) {}
-    constexpr size_t size() const noexcept { return _M_len; }
-    constexpr const T* begin() const noexcept { return _M_array; }
+    const T* data;
+    size_t length;
+    constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
+    constexpr size_t size() const noexcept { return length; }
+    constexpr const T* begin() const noexcept { return data; }
+    constexpr const T* end() const { return (T*)data+length; }
 }; }
 generic struct ref;
 #endif

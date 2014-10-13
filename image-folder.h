@@ -64,7 +64,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     SourceImageRGB image(size_t index) const {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
-        return cache<Image>(folder, "Source.sRGB", name(index), size(index), sourceFile.modifiedTime(), [&](const Image& target){
+        return cache<Image>(folder, "Source", name(index), size(index), sourceFile.modifiedTime(), [&](const Image& target){
             target.copy(decodeImage(Map(sourceFile)));
         }, "" /*Disable version invalidation to avoid redecoding on header changes*/);
     }
@@ -75,7 +75,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
         if(size==this->size(index)) return image(index);
-        return cache<Image>(folder, "Resize.sRGB", name(index), size, sourceFile.modifiedTime(), [&](const Image& target){
+        return cache<Image>(folder, "Resize", name(index), size, sourceFile.modifiedTime(), [&](const Image& target){
             SourceImageRGB source = image(index);
             assert_(target.size <= source.size, target.size, source.size);
             resize(target, source);
@@ -85,7 +85,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component, int2 size) const override {
         assert_(index  < count());
-        return cache<ImageF>(folder, "Linear."+str(component), name(index), size, time(index), [&](const ImageF& target) {
+        return cache<ImageF>(folder, "Linear["+str(component)+']', name(index), size, time(index), [&](const ImageF& target) {
             linear(target, image(index, size), component);
         });
     }

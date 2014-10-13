@@ -126,6 +126,7 @@ struct WidgetToggle : Widget {
 
 struct Index {
     size_t* pointer;
+    Index(size_t* pointer) : pointer(pointer) {}
     void operator=(size_t value) { *pointer = value; }
     operator size_t() const { return *pointer; }
     operator size_t&() { return *pointer; }

@@ -13,7 +13,7 @@ struct ImageSourceView : ImageView, Poll {
     function<void()> contentChanged;
 
     ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged)
-        : source(source), index{index}, contentChanged(contentChanged) {}
+        : source(source), index(index), contentChanged(contentChanged) {}
     ImageSourceView(ImageSource& source, size_t* index, Window& window)
         : ImageSourceView(source, index, {&window, &Window::render}) {}
 
@@ -30,9 +30,7 @@ struct ImageSourceView : ImageView, Poll {
         assert_(source.maximumSize().x/hint.x <= 16);
 
         imageIndex = index;
-        Time time;
         image = source.image(index, hint);
-        if(time>0.1f) log(time);
         ImageView::image = share(image);
         contentChanged();
     }

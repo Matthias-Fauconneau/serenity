@@ -92,18 +92,22 @@ inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
     return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride), size, source.stride);
 }
 
-inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
-//inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); div(a, a, b); return move(a); }
-inline ImageF operator/(const ImageF& a, const ImageF& b) {
-    assert_(a.size == b.size);
-    ImageF target(a.size);
+inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); div(a, a, b); return move(a); }
+
+template<Type F> void apply(const ImageF& target, const ImageF& a, const ImageF& b, F function) {
+    assert_(target.size == a.size && target.size == b.size);
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
         for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
-            target[y*target.stride + x] = a[y*a.stride + x] / b[y*b.stride + x];
+            target[y*target.stride + x] = function(a[y*a.stride + x], b[y*b.stride + x]);
         }
     });
-    return target;
 }
+template<Type F> ImageF apply(ImageF&& y, const ImageF& a, const ImageF& b, F function) { apply(y, a, b, function); return move(y); }
+template<Type F> ImageF apply(const ImageF& a, const ImageF& b, F function) { return apply(a.size, a, b, function); }
+
+inline void max(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, a, b, [](float a, float b){ return max(a, b);}); }
+inline ImageF operator-(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a - b;}); }
+//inline ImageF operator/(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a / b;}); }
 
 // -- sRGB --
 

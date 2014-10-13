@@ -28,7 +28,7 @@ template<class I> struct Interface {
 template<class I> template<class C> typename Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
 
 /// Class to inherit in order to register objects to be instanced depending on first command line argument
-struct Application {};
+struct Application { virtual ~Application() {} };
 #define registerApplication(T, name...) Interface<Application>::Factory<T> name ## ApplicationFactoryRegistration (#name)
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread

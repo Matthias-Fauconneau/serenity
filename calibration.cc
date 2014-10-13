@@ -48,7 +48,7 @@ int2 Calibration::spotPosition(int2 size) const {
 /// Returns spot size
 int2 Calibration::spotSize(int2 size) const { return int2(min(size.x, size.y)/8); }
 
-SourceImage Calibration::attenuation(int2 size) const {
+SourceImage Calibration::attenuation(int2 size, bool blur) const {
     return cache<ImageF>(source.folder, "Calibration", "attenuation", spotSize(size), time(), [&](const ImageF& target) {
         SourceImage source = Calibration::sum(size);
 
@@ -65,6 +65,9 @@ SourceImage Calibration::attenuation(int2 size) const {
             }
         });
 
+        // Low pass to filter texture/noise/miscalibration and extend correction
+        if(blur) gaussianBlur(target, target, 1.f/8*spotSize.x);
+
         // Normalizes sum by mean (DC) and clips values over 1
         float DC = mean(target);
         float factor = 1/DC;
@@ -78,26 +81,3 @@ SourceImage Calibration::attenuation(int2 size) const {
         parallel_apply(target, [=](float value) { return 1-value; }, source);
     });
 }*/
-
-/*Region Calibration::regionOfInterest(int2 size) const {
-    return cache<Region>(source.folder, "Calibration", "regionOfInterest", strx(size), time(), [&]() {
-       SourceImage source = blendFactor(size);
-    });
-}*/
-/*Region bound()
-int2 minimums[threadCount], maximums[threadCount];
-mref<int2>(minimums).clear(size); mref<int2>(maximums).clear(0); // Some threads may not iterate
-parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
-    int2 min = size, max = 0;
-    for(size_t y: range(start, start+chunkSize)) {
-        for(size_t x: range(size.x)) {
-            if(source(x,y) > 1./2) {
-                min = ::min(min, int2(x,y));
-                max = ::max(max, int2(x,y));
-            }
-        }
-    }
-    minimums[id] = min, maximums[id] = max;
-});
-int2 min = ::min(minimums), max = ::max(maximums);
-return Region{::min(min,max), max};*/
