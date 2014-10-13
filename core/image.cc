@@ -3,6 +3,7 @@
 #include "vector.h"
 #include "parallel.h"
 #include "math.h"
+#include "map.h"
 
 // -- Decoding --
 
@@ -154,9 +155,9 @@ void linear(mref<float> target, ref<byte4> source, uint component) {
 }
 
 static uint8 sRGB(float v) {
+    assert_(isNumber(v), v);
     v = ::min(1.f, v); // Saturates
     v = ::max(0.f, v); // Clips
-    //assert_(v>=0, v);
     uint linear12 = 0xFFF*v;
     assert_(linear12 < 0x1000);
     return sRGB_forward[linear12];
@@ -165,6 +166,7 @@ void sRGB(mref<byte4> target, ref<float> source) {
     parallel_apply(target, [](float value) { uint8 v=sRGB(value); return byte4(v,v,v, 0xFF); }, source);
 }
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
+    assert_(target.size == blue.size && target.size == green.size && target.size == red.size, target.size, blue.size, green.size, red.size);
     parallel_apply(target, [=](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
 }
 
@@ -197,26 +199,26 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 // -- Convolution --
 
 /// Convolves and transposes (with repeat border conditions)
-static void convolve(float* target, const float* source, const float* kernel, int radius,  int width, int height) {
+static void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride) {
     int N = radius+1+radius;
     chunk_parallel(height, [=](uint, size_t y) {
-        const float* line = source + y * width;
+        const float* line = source + y * sourceStride;
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {
             float sum = 0;
             for(int dx: range(N)) sum += kernel[dx] * line[max(0, x+dx)];
-            targetColumn[(x+radius)*height] = sum;
+            targetColumn[(x+radius)*targetStride] = sum;
         }
         for(int x: range(0,width-2*radius)) {
             float sum = 0;
             const float* span = line + x;
             for(int dx: range(N)) sum += kernel[dx] * span[dx];
-            targetColumn[(x+radius)*height] = sum;
+            targetColumn[(x+radius)*targetStride] = sum;
         }
         for(int x: range(width-2*radius,width-radius)){
             float sum = 0;
             for(int dx: range(N)) sum += kernel[dx] * line[min(width-1, x+dx)];
-            targetColumn[(x+radius)*height] = sum;
+            targetColumn[(x+radius)*targetStride] = sum;
         }
     });
 }
@@ -226,11 +228,12 @@ void gaussianBlur(const ImageF& target, const ImageF& source, float sigma) {
     assert_(sigma > 0);
     int radius = ceil(3*sigma);
     size_t N = radius+1+radius;
-    assert_(int2(N) <= source.size, sigma, radius, N, source.size);
+    assert_(int2(N) <= source.size, withName(sigma, radius, N, source.size));
     float kernel[N];
     for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
     float sum = ::sum(ref<float>(kernel,N)); assert_(sum, ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
     buffer<float> transpose (target.height*target.width);
-    convolve(transpose.begin(), source.begin(), kernel, radius, source.width, source.height);
-    convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width);
+    convolve(transpose.begin(), source.begin(), kernel, radius, source.width, source.height, source.stride, source.height);
+    assert_(source.size == target.size);
+    convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width, target.height, target.stride);
 }

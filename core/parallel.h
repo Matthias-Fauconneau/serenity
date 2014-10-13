@@ -3,19 +3,22 @@
 #include "function.h"
 #include "math.h"
 
+// -> \file math.h
+inline void operator*=(mref<float> values, float factor) { values.apply(values, [&](float v) {  return factor*v; }); }
+
 // -> \file algorithm.h
 
-template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
+/*template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
     for(size_t index: range) accumulator = fold(accumulator, index);
     return accumulator;
-}
+}*/
 
 template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A accumulator, ref<Ss>... sources) {
     for(size_t index: range(values.size)) accumulator = fold(accumulator, values[index], sources[index]...);
     return accumulator;
 }
-template<Type T, Type F, size_t N, Type... Ss> T reduce(const T (&values)[N], F fold, T initialValue, ref<Ss>... sources) {
-    return reduce(ref<T>(values), fold, initialValue, sources...);
+template<Type T, Type F, size_t N> T reduce(const T (&values)[N], F fold, T initialValue) {
+    return reduce(ref<T>(values), fold, initialValue);
 }
 
 generic T sum(ref<T> values) { return reduce(values, [](T accumulator, T value) { return accumulator + value; }, T()); }
@@ -101,22 +104,7 @@ template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F 
 }
 template<Type T, Type F> T parallel_reduce(ref<T> values, F fold) { return parallel_reduce(values, fold, values[0]); }
 
-// Multiple source sum
-// \note Cannot be a generic reduction as the final fold is single source
-template<Type T, Type F, Type... Ss> T parallel_sum(ref<T> values, F apply, T initial_value, ref<Ss>... sources) {
-    assert_(values);
-    if(values.size < parallelMinimum) return reduce(values, [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources...);
-    else {
-        T accumulators[threadCount];
-        mref<T>(accumulators).clear(initial_value); // Some threads may not iterate
-        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-            accumulators[id] = reduce(values.slice(start, size),
-                                      [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
-        return sum(accumulators);
-    }
-}
-
-/// Multiple accumulator reduction
+/*/// Multiple accumulator reduction
 template<Type A, Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F0 fold0, F1 fold1, A& accumulator0, A& accumulator1) {
     T accumulators[2][threadCount];
     mref<T>(accumulators[0]).clear(accumulator0), mref<T>(accumulators[1]).clear(accumulator1); // Some threads may not iterate
@@ -127,15 +115,46 @@ template<Type A, Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F
         accumulators[1][id] = a1;
     });
     accumulator0 = reduce(accumulators[0], fold0, accumulator0), accumulator1 = reduce(accumulators[1], fold1, accumulator1);
-}
+}*/
 
 // \file arithmetic.cc Parallel arithmetic operations
 
-generic T parallel_min(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
-generic T parallel_max(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
-generic void parallel_minmax(ref<T> values, T& minimum, T& maximum) {
-    return parallel_reduce(values, [](T a, T v) { return min(a, v); }, [](T a, T v) { return max(a, v); }, minimum, maximum);
+// apply
+
+//inline void abs(mref<float> target, ref<float> source) { parallel_apply(target, [&](float v) {  return abs(v); }, source); }
+
+/*inline void operator*=(mref<float> values, float factor) {
+    if(values.size < parallelMinimum) values.apply(values, [&](float v) {  return factor*v; });
+    else parallel_apply(values, [&](float v) {  return factor*v; }, values);
+}*/
+
+/*inline void subtract(mref<float> Y, ref<float> A, float B) {
+    if(Y.size < parallelMinimum) Y.apply(A, [&](float a) {  return a-B; });
+    else parallel_apply(Y, [&](float a) {  return a-B; }, A);
+}*/
+
+inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
+    assert_(Y.size == A.size && Y.size==B.size);
+    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a-b; });
+    else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
 }
+
+//inline void operator-=(mref<float> target, float DC) { subtract(target, target, DC); }
+//inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }
+
+inline void div(mref<float> Y, ref<float> A, ref<float> B) {
+    assert_(Y.size == A.size && Y.size==B.size);
+    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a/b; });
+    else parallel_apply(Y, [&](float a, float b) {  return a/b; }, A, B);
+}
+
+// reduce
+
+//generic T parallel_min(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
+//generic T parallel_max(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
+/*generic void parallel_minmax(ref<T> values, T& minimum, T& maximum) {
+    return parallel_reduce(values, [](T a, T v) { return min(a, v); }, [](T a, T v) { return max(a, v); }, minimum, maximum);
+}*/
 
 inline real parallel_sum(ref<float> values) { return parallel_reduce(values, [](real accumulator, float value) { return accumulator + value; }, 0.); }
 
@@ -148,27 +167,18 @@ inline float energy(ref<float> values) {
     return parallel_reduce(values, [](float accumulator, float value) { return accumulator + value*value; }, 0.f);
 }
 
-inline void abs(mref<float> target, ref<float> source) { parallel_apply(target, [&](float v) {  return abs(v); }, source); }
+// apply reduce
 
-inline void operator*=(mref<float> values, float factor) {
-    if(values.size < parallelMinimum) values.apply(values, [&](float v) {  return factor*v; });
-    else parallel_apply(values, [&](float v) {  return factor*v; }, values);
-}
-
-inline void subtract(mref<float> Y, ref<float> A, float B) {
-    if(Y.size < parallelMinimum) Y.apply(A, [&](float a) {  return a-B; });
-    else parallel_apply(Y, [&](float a) {  return a-B; }, A);
-}
-
-inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
-    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a-b; });
-    else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
-}
-
-inline void operator-=(mref<float> target, float DC) { subtract(target, target, DC); }
-inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }
-
-inline void div(mref<float> Y, ref<float> A, ref<float> B) {
-    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a/b; });
-    else parallel_apply(Y, [&](float a, float b) {  return a/b; }, A, B);
+// \note Cannot be a generic reduction as the final fold is single source
+template<Type T, Type F, Type... Ss> T parallel_sum(ref<T> values, F apply, T initial_value, ref<Ss>... sources) {
+    assert_(values);
+    if(values.size < parallelMinimum) return reduce(values, [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources...);
+    else {
+        T accumulators[threadCount];
+        mref<T>(accumulators).clear(initial_value); // Some threads may not iterate
+        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
+            accumulators[id] = reduce(values.slice(start, size),
+                                      [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
+        return sum(accumulators);
+    }
 }

@@ -94,11 +94,11 @@ String demangle(TextData& s, bool function=true) {
         if(r.size>=3) r.shrink(r.size-2);
         if(const_method) r.append(" const");
     } else {
-        l=s.mayInteger(-1);
+        l = s.mayInteger(-1);
         if(l<=s.available(l)) {
             r.append(s.read(l)); //struct
             if(s.wouldMatch('I')) r.append(demangle(s));
-        } else r.append(s.untilEnd());
+        } else if(s) r.append(s.untilEnd());
     }
     for(int i=0;i<pointer;i++) r.append('*');
     if(rvalue) r.append("&&");

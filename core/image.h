@@ -10,8 +10,8 @@ struct Image : buffer<byte4> {
         int2 size = 0;
         struct { uint width, height; };
     };
-    uint stride=0;
-    bool alpha=false, sRGB=true;
+    uint stride = 0;
+    bool alpha = false, sRGB = true;
 
     Image():size(0){}
     Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false, bool sRGB=true)
@@ -28,6 +28,8 @@ struct Image : buffer<byte4> {
     inline byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*stride+x); }
 };
 inline String str(const Image& o) { return strx(o.size); }
+
+inline Image copy(const Image& o) { return Image(copy((const buffer<byte4>&)o),o.size,o.stride,o.alpha,o.sRGB); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o),o.size,o.stride,o.alpha,o.sRGB); }
@@ -62,27 +64,46 @@ inline Image resize(Image&& target, const Image& source) { resize(target, source
 /// 2D array of floating-point pixels
 struct ImageF : buffer<float> {
     ImageF(){}
-    ImageF(buffer<float>&& data, int2 size) : buffer(::move(data)), size(size) { assert_(buffer::size==size_t(size.x*size.y), size,  width, height, buffer::size); }
-    ImageF(int width, int height) : buffer(height*width), width(width), height(height) { assert_(size>int2(0), size, width, height); }
+    ImageF(buffer<float>&& data, int2 size, uint stride) : buffer(::move(data)), size(size), stride(stride) {
+        assert_(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
+    }
+    ImageF(int width, int height) : buffer(height*width), width(width), height(height), stride(width) { assert_(size>int2(0), size, width, height); }
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 
     explicit operator bool() const { return data && width && height; }
-    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*width+x); }
+    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
 
     union {
         int2 size = 0;
         struct { uint width, height; };
     };
+    uint stride = 0;
 };
 
-/// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o),o.size); }
+inline ImageF copy(const ImageF& o) { return ImageF(copy((const buffer<float>&)o), o.size, o.stride); }
 
-//inline ImageF operator-(const ImageF& a, float b) { ImageF y(a.size); subtract(y, a, b); return y; }
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o), o.size, o.stride); }
+
+/// Returns a cropped weak reference to \a image (unsafe if referenced image is freed)
+inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
+    origin = clip(int2(0), origin, source.size);
+    size = min(size, source.size-origin);
+    return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride), size, source.stride);
+}
+
 inline ImageF operator-(const ImageF& a, const ImageF& b) { ImageF y(a.size); subtract(y, a, b); return y; }
-//inline ImageF operator-(const ImageF& a, ImageF&& b) { subtract(b, a, b); return move(b); }
-//inline ImageF min(ImageF&& a, const ImageF& b) { parallel_apply(a, [](float a, float b) { return min(a, b); }, a, b); return move(a); }
-inline ImageF operator/(ImageF&& a, const ImageF& b) { div(a, a, b); return move(a); }
+//inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); div(a, a, b); return move(a); }
+inline ImageF operator/(const ImageF& a, const ImageF& b) {
+    assert_(a.size == b.size);
+    ImageF target(a.size);
+    parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
+        for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
+            target[y*target.stride + x] = a[y*a.stride + x] / b[y*b.stride + x];
+        }
+    });
+    return target;
+}
 
 // -- sRGB --
 

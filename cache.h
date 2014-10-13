@@ -40,7 +40,7 @@ template<Type T> T cache(const Folder& folder, string operation, string name, st
 generic struct ImageMapSource : T {
     Map map;
     ImageMapSource() {}
-    ImageMapSource(const File& file, int2 size) : map(file) { (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size); }
+    ImageMapSource(const File& file, int2 size) : map(file) { (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size, size.x); }
 };
 
 /// Maps results to be generated or read from cache
@@ -49,6 +49,6 @@ template<Type T> ImageMapSource<T> cache(const Folder& folder, string operation,
     return {cache(folder, operation, name, strx(size), sourceTime, [size,&evaluate](File& file) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         Map map(file, Map::Write);
-        evaluate(T(unsafeReference(cast<typename T::type>(map)), size));
+        evaluate(T(unsafeReference(cast<typename T::type>(map)), size, size.x));
     }, version), size};
 }

@@ -60,7 +60,7 @@ ref<uint8> BinaryData::whileNot(uint8 key) {
 
 
 void TextData::advance(uint step) {
-    assert(index<buffer.size, index, buffer.size);
+    assert(index+step<=buffer.size, index, buffer.size);
     for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
 }
 

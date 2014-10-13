@@ -12,9 +12,8 @@ struct DustRemoval {
 };
 
 struct CalibrationView : DustRemoval, Application {
-    ImageView views[2]  = {sRGB(correction.attenuation(source.maximumSize()/4)), sRGB(correction.blendFactor(source.maximumSize()/4))};
-    WidgetToggle toggleView {&views[0], &views[1]};
-    Window window {&toggleView};
+    ImageView view  = sRGB(correction.attenuation(source.maximumSize()/4));
+    Window window {&view};
 };
 registerApplication(CalibrationView, calibration);
 

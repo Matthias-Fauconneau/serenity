@@ -33,68 +33,51 @@ SourceImage Calibration::sum(int2 size) const {
                 parallel_apply(target, [scale](float sum, byte4 source) {
                     return sum + scale*(sRGB_reverse[source.b]+sRGB_reverse[source.g]+sRGB_reverse[source.r]);
                 }, target, source);
+                debug(break;)
             }
     });
 }
 
 int2 Calibration::spotPosition(int2 size) const {
-    return cache<int2>(source.folder, "Calibration", "spotPosition", strx(size), time(), [&]() { return argmin(sum(size)); });
+    return cache<int2>(source.folder, "Calibration", "spotPosition", strx(size), time(), [&]() {
+        int2 spotSize = Calibration::spotSize(size); // Reverse dependency but ensures spot is found inside enough
+        return spotSize/2+argmin(crop(sum(size), spotSize/2, size-spotSize));
+    });
 }
+
+/// Returns spot size
+int2 Calibration::spotSize(int2 size) const { return int2(min(size.x, size.y)/8); }
 
 SourceImage Calibration::attenuation(int2 size) const {
     return cache<ImageF>(source.folder, "Calibration", "attenuation", spotSize(size), time(), [&](const ImageF& target) {
         SourceImage source = Calibration::sum(size);
 
-        int2 spotPosition = this->spotPosition(size);
-        assert_(spotPosition-target.size/2 >= int2(0)  && spotPosition+target.size/2 < source.size);
+        int2 spotPosition = Calibration::spotPosition(size);
+        int2 spotSize = Calibration::spotSize(size);
+        assert_(spotPosition-spotSize/2 >= int2(0)  && spotPosition+spotSize/2 < source.size, spotPosition, spotSize, source.size);
 
         // Crop
         parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
-            int2 spotTopLeft = spotPosition-target.size/2;
+            int2 spotTopLeft = spotPosition-spotSize/2;
+            size_t offset = spotTopLeft.y*source.stride + spotTopLeft.x;
             for(size_t y: range(start, start+chunkSize)) {
-                for(size_t x: range(target.size.x)) target(x, y) = source(spotTopLeft.x+x, spotTopLeft.y+y);
+                for(size_t x: range(target.size.x)) target[y*target.stride + x] = source[offset + y*source.stride + x];
             }
         });
 
-        /*// Hardcoded parameters
-        int2 size = target.size;
-
-        const float textureFrequency = 8*scale; // Paper texture frequency
-        const float lightingFrequency = 64*scale; // Lighting conditions frequency*/
-        /*int2 spotPosition = argmin(source);
-        parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
-            for(size_t y: range(start, start+chunkSize)) {
-                for(size_t x: range(size.x)) { float v = source(x,y); if(v < min.value) min = C(int2(x,y), v); }
-            }
-            minimums[id] = min;
-        });
-
+        // Normalizes sum by mean (DC) and clips values over 1
         float DC = mean(target);
-
-        // Low pass to filter texture and noise and high pass to filter lighting conditions
-        //bandPass(target, target, textureFrequency, lightingFrequency);
-        target -= DC;
-
-        // Normalizes sum by mean (DC), adds one back (filtered by bandPass) and clips values over 1
         float factor = 1/DC;
-        parallel_apply(target, [=](float v) { return max(0.f, -factor*v); }, target);*/
+        parallel_apply(target, [=](float v) { return min(1.f, factor*v); }, target);
     });
 }
 
-SourceImage Calibration::blendFactor(int2 size) const {
+/*SourceImage Calibration::blendFactor(int2 size) const {
     return cache<ImageF>(source.folder, "Calibration", "blendFactor", spotSize(size), time(), [&](const ImageF& target) {
         SourceImage source = Calibration::attenuation(size);
-
-        //bandPass(target, source, size.x/2, size.x);
-
-        // Image processing
-        //gaussianBlur(target, source, spotLowThreshold);
-        float min=inf, max=-inf;
-        parallel_minmax(source, min, max);
-        {const float scale = 1/(max-min);
-            parallel_apply(target, [=](float value) { return 1-scale*(value-min); }, source);}
+        parallel_apply(target, [=](float value) { return 1-value; }, source);
     });
-}
+}*/
 
 /*Region Calibration::regionOfInterest(int2 size) const {
     return cache<Region>(source.folder, "Calibration", "regionOfInterest", strx(size), time(), [&]() {
