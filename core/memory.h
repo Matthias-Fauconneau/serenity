@@ -65,7 +65,7 @@ template<Type Function> auto apply(size_t size, Function function) -> buffer<dec
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(ref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
-    buffer<decltype(function(source[0]))> target(source.size); target.apply(source, function); return target;
+    buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
 }
 
 // -- Index operations: floor / align

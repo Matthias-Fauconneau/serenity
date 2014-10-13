@@ -5,7 +5,7 @@
 #include "map.h"
 
 // -> \file math.h
-inline void operator*=(mref<float> values, float factor) { values.apply(values, [&](float v) {  return factor*v; }); }
+inline void operator*=(mref<float> values, float factor) { values.apply([&](float v) { return factor*v; }, values); }
 
 // -> \file algorithm.h
 
@@ -46,7 +46,7 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<Type F> void parallel(uint64 start, uint64 stop, F f) {
+template<Type F> void parallel_for(uint64 start, uint64 stop, F f) {
 #if DEBUG || PROFILE
     for(uint i : range(start, stop)) f(0, i);
 #else
@@ -62,7 +62,7 @@ template<Type F> void parallel(uint64 start, uint64 stop, F f) {
     for(const thread& thread: threads) { uint64 status=-1; pthread_join(thread.pthread, (void**)&status); assert(status==0); }
 #endif
 }
-template<Type F> void parallel(uint stop, F f) { parallel(0,stop,f); }
+template<Type F> void parallel_for(uint stop, F f) { parallel_for(0,stop,f); }
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> void parallel_chunk(uint64 totalSize, F f) {
@@ -70,7 +70,7 @@ template<Type F> void parallel_chunk(uint64 totalSize, F f) {
     assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
     const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
     assert_(totalSize-(chunkCount-1)*chunkSize > 0);
-    parallel(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
+    parallel_for(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
 }
 
 /// Runs a loop in parallel chunks with element-wise functor
@@ -78,109 +78,68 @@ template<Type F> void chunk_parallel(uint64 totalSize, F f) {
     parallel_chunk(totalSize, [&](uint id, uint64 start, uint64 size) { for(uint64 index: range(start, start+size)) f(id, index); });
 }
 
+namespace parallel {
+
+/// Minimum number of values to trigger parallel operations
+static constexpr size_t minimumSize = 1<<15;
+
 /// Stores the application of a function to every index in a mref
 template<Type T, Type Function>
-void parallel_apply(mref<T> target, Function function) {
+void apply(mref<T> target, Function function) {
     chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(index)); });
 }
 
 /// Stores the application of a function to every elements of a ref in a mref
-template<Type T, Type Function, Type S0, Type... Ss>
-void parallel_apply(mref<T> target, Function function, ref<S0> source0, ref<Ss>... sources) {
-    for(auto size: {source0.size, sources.size...}) assert_(target.size == size, target.size, source0.size, sources.size...);
-    chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(source0[index], sources[index]...)); });
+template<Type T, Type Function, Type... S>
+void apply(mref<T> target, Function function, ref<S>... sources) {
+    for(auto size: {sources.size...}) assert_(target.size == size, target.size, sources.size...);
+    if(target.size < minimumSize) return target.apply(function, sources...);
+    else chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(sources[index]...)); });
+    //else parallel_chunk(target.size, [&](uint, size_t start, size_t size) { target.slice(start,size).apply(function(sources.slice(start,size)...)); });
 }
-
-/// Minimum number of values to trigger parallel operations
-static constexpr size_t parallelMinimum = 1<<15;
 
 template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, A initial_value) {
     assert_(values);
-    if(values.size < parallelMinimum) return reduce(values, fold, initial_value);
+    if(values.size < minimumSize) return ::reduce(values, fold, initial_value);
     else {
         A accumulators[threadCount];
         mref<A>(accumulators).clear(initial_value); // Some threads may not iterate
-        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) { accumulators[id] = reduce(values.slice(start, size), fold, initial_value); });
+        parallel_chunk(values.size, [&](uint id, size_t start, size_t size) { accumulators[id] = ::reduce(values.slice(start, size), fold, initial_value); });
         return reduce(accumulators, fold, initial_value);
     }
 }
-template<Type T, Type F> T parallel_reduce(ref<T> values, F fold) { return parallel_reduce(values, fold, values[0]); }
-
-/*/// Multiple accumulator reduction
-template<Type A, Type T, Type F0, Type F1> void parallel_reduce(ref<T> values, F0 fold0, F1 fold1, A& accumulator0, A& accumulator1) {
-    T accumulators[2][threadCount];
-    mref<T>(accumulators[0]).clear(accumulator0), mref<T>(accumulators[1]).clear(accumulator1); // Some threads may not iterate
-    parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-        A a0 = accumulator0, a1 = accumulator1;
-        for(T v: values.slice(start, size)) a0=fold0(a0, v), a1=fold1(a1, v);
-        accumulators[0][id] = a0;
-        accumulators[1][id] = a1;
-    });
-    accumulator0 = reduce(accumulators[0], fold0, accumulator0), accumulator1 = reduce(accumulators[1], fold1, accumulator1);
-}*/
+template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values, fold, values[0]); }
 
 // \file arithmetic.cc Parallel arithmetic operations
 
 // apply
 
-//inline void abs(mref<float> target, ref<float> source) { parallel_apply(target, [&](float v) {  return abs(v); }, source); }
-
-/*inline void operator*=(mref<float> values, float factor) {
-    if(values.size < parallelMinimum) values.apply(values, [&](float v) {  return factor*v; });
-    else parallel_apply(values, [&](float v) {  return factor*v; }, values);
-}*/
-
-/*inline void subtract(mref<float> Y, ref<float> A, float B) {
-    if(Y.size < parallelMinimum) Y.apply(A, [&](float a) {  return a-B; });
-    else parallel_apply(Y, [&](float a) {  return a-B; }, A);
-}*/
-
-inline void subtract(mref<float> Y, ref<float> A, ref<float> B) {
-    assert_(Y.size == A.size && Y.size==B.size, withName(Y.size, A.size, B.size));
-    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a-b; });
-    else parallel_apply(Y, [&](float a, float b) {  return a-b; }, A, B);
-}
-
-//inline void operator-=(mref<float> target, float DC) { subtract(target, target, DC); }
-inline void operator-=(mref<float> target, ref<float> source) { subtract(target, target, source); }
-
-inline void div(mref<float> Y, ref<float> A, ref<float> B) {
-    assert_(Y.size == A.size && Y.size==B.size, withName(Y.size, A.size, B.size));
-    if(Y.size < parallelMinimum) Y.apply(A, B, [&](float a, float b) {  return a/b; });
-    else parallel_apply(Y, [&](float a, float b) {  return a/b; }, A, B);
-}
+inline void sub(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [&](float a, float b) {  return a-b; }, A, B); }
+inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [&](float a, float b) {  return a/b; }, A, B); }
 
 // reduce
 
-//generic T parallel_min(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return min(accumulator, value); }); }
-//generic T parallel_max(ref<T> values) { return parallel_reduce(values, [](T accumulator, T value) { return max(accumulator, value); }); }
-/*generic void parallel_minmax(ref<T> values, T& minimum, T& maximum) {
-    return parallel_reduce(values, [](T a, T v) { return min(a, v); }, [](T a, T v) { return max(a, v); }, minimum, maximum);
-}*/
+generic T max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return ::max(accumulator, value); }); }
 
-inline real parallel_sum(ref<float> values) { return parallel_reduce(values, [](real accumulator, float value) { return accumulator + value; }, 0.); }
+inline real sum(ref<float> values) { return reduce(values, [](real accumulator, float value) { return accumulator + value; }, 0.); }
 
-inline real mean(ref<float> values) {
-    float sum = parallel_sum(values);
-    return sum/values.size;
-}
+inline real mean(ref<float> values) { return sum(values)/values.size; }
 
-inline float energy(ref<float> values) {
-    return parallel_reduce(values, [](float accumulator, float value) { return accumulator + value*value; }, 0.f);
-}
+inline float energy(ref<float> values) { return reduce(values, [](float accumulator, float value) { return accumulator + value*value; }, 0.f); }
 
 // apply reduce
 
 // \note Cannot be a generic reduction as the final fold is single source
-template<Type T, Type F, Type... Ss> T parallel_sum(ref<T> values, F apply, T initial_value, ref<Ss>... sources) {
+template<Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, T initial_value, ref<Ss>... sources) {
     assert_(values);
-    if(values.size < parallelMinimum) return reduce(values, [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources...);
+    if(values.size < minimumSize) return ::reduce(values, [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources...);
     else {
         T accumulators[threadCount];
         mref<T>(accumulators).clear(initial_value); // Some threads may not iterate
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-            accumulators[id] = reduce(values.slice(start, size),
-                                      [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
+            accumulators[id] = ::reduce(values.slice(start, size),
+                                        [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
         return sum(accumulators);
     }
+}
 }

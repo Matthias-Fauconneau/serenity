@@ -148,9 +148,9 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
 }
 
 void linear(mref<float> target, ref<byte4> source, uint component) {
-    /***/ if(component==0) parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[0]]; }, source);
-    else if(component==1) parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[1]]; }, source);
-    else if(component==2) parallel_apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[2]]; }, source);
+    /***/ if(component==0) parallel::apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[0]]; }, source);
+    else if(component==1) parallel::apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[1]]; }, source);
+    else if(component==2) parallel::apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[2]]; }, source);
     else error(component);
 }
 
@@ -163,11 +163,11 @@ static uint8 sRGB(float v) {
     return sRGB_forward[linear12];
 }
 void sRGB(mref<byte4> target, ref<float> source) {
-    parallel_apply(target, [](float value) { uint8 v=sRGB(value); return byte4(v,v,v, 0xFF); }, source);
+    parallel::apply(target, [](float value) { uint8 v=sRGB(value); return byte4(v,v,v, 0xFF); }, source);
 }
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
     assert_(target.size == blue.size && target.size == green.size && target.size == red.size, target.size, blue.size, green.size, red.size);
-    parallel_apply(target, [=](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
+    parallel::apply(target, [=](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
 }
 
 // -- Resampling (float) --
