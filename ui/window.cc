@@ -1,6 +1,8 @@
 #include "window.h"
 #include "render.h"
 #include "x.h"
+#include "png.h"
+#include "time.h"
 #include <sys/shm.h>
 
 Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& icon) : widget(widget), size(sizeHint), title(title) {
@@ -26,6 +28,7 @@ Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& i
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     show();
     actions[Escape] = []{exit();};
+    actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
     render();
 }
 
