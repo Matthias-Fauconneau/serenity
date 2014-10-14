@@ -67,17 +67,15 @@ typedef bool (*put_buf_func_ptr)(const void* pBuf, int len, void *pUser);
 enum { LZ_CODE_BUF_SIZE = 64 * 1024, OUT_BUF_SIZE = (LZ_CODE_BUF_SIZE * 13 ) / 10, MAX_HUFF_SYMBOLS = 288, LZ_HASH_BITS = 15, LEVEL1_HASH_SIZE_MASK = 4095, LZ_HASH_SHIFT = (LZ_HASH_BITS + 2) / 3, LZ_HASH_SIZE = 1 << LZ_HASH_BITS };
 
 // Must map to MZ_NO_FLUSH, MZ_SYNC_FLUSH, etc. enums
-typedef enum
-{
+enum flush {
   NO_FLUSH = 0,
   SYNC_FLUSH = 2,
   FULL_FLUSH = 3,
   FINISH = 4
-} flush;
+};
 
 // tdefl's compression state structure.
-typedef struct
-{
+struct compressor {
   put_buf_func_ptr m_pPut_buf_func;
   void *m_pPut_buf_user;
   uint m_flags, m_max_probes[2];
@@ -101,12 +99,11 @@ typedef struct
   uint16 m_next[LZ_DICT_SIZE];
   uint16 m_hash[LZ_HASH_SIZE];
   uint8 m_output_buf[OUT_BUF_SIZE];
-} compressor;
+};
 
 template<Type T, size_t N> void clear(T (&a)[N]) { mref<T>(a).clear(); }
 
-uint32 adler32(uint32 adler, const unsigned char *ptr, size_t buf_len)
-{
+uint32 adler32(uint32 adler, const unsigned char *ptr, size_t buf_len) {
   uint32 i, s1 = (uint32)(adler & 0xffff), s2 = (uint32)(adler >> 16); size_t block_len = buf_len % 5552;
   if (!ptr) return 1;
   while (buf_len) {
@@ -121,8 +118,7 @@ uint32 adler32(uint32 adler, const unsigned char *ptr, size_t buf_len)
 }
 
 // Karl Malbrain's compact CRC-32. See "A compact CCITT crc16 and crc32 C implementation that balances processor cache usage against speed": http://www.geocities.com/malbrain/
-uint32 crc32(uint32 crc, const uint8 *ptr, size_t buf_len)
-{
+uint32 crc32(uint32 crc, const uint8 *ptr, size_t buf_len) {
   static const uint32 s_crc32[16] = { 0, 0x1db71064, 0x3b6e20c8, 0x26d930ac, 0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
     0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c, 0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c };
   uint32 crcu32 = (uint32)crc;
@@ -194,8 +190,7 @@ uint32 crc32(uint32 crc, const uint8 *ptr, size_t buf_len)
     code_len = FAST_LOOKUP_BITS; do { temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)]; } while (temp < 0); \
   } sym = temp; bit_buf >>= code_len; num_bits -= code_len; }
 
-status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_size, uint8 *pOut_buf_start, uint8 *pOut_buf_next, size_t *pOut_buf_size, const uint32 decomp_flags)
-{
+status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_size, uint8 *pOut_buf_start, uint8 *pOut_buf_next, size_t *pOut_buf_size, const uint32 decomp_flags) {
   static const int s_length_base[31] = { 3,4,5,6,7,8,9,10,11,13, 15,17,19,23,27,31,35,43,51,59, 67,83,99,115,131,163,195,227,258,0,0 };
   static const int s_length_extra[31]= { 0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0 };
   static const int s_dist_base[32] = { 1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193, 257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577,0,0};
@@ -215,134 +210,109 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
   switch(r->m_state) { case 0:
 
   bit_buf = num_bits = dist = counter = num_extra = r->m_zhdr0 = r->m_zhdr1 = 0; r->m_z_adler32 = r->m_check_adler32 = 1;
-  if (decomp_flags & FLAG_PARSE_ZLIB_HEADER)
-  {
+  if (decomp_flags & FLAG_PARSE_ZLIB_HEADER) {
     GET_BYTE(1, r->m_zhdr0); GET_BYTE(2, r->m_zhdr1);
     counter = (((r->m_zhdr0 * 256 + r->m_zhdr1) % 31 != 0) || (r->m_zhdr1 & 32) || ((r->m_zhdr0 & 15) != 8));
     if (!(decomp_flags & FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) counter |= (((1U << (8U + (r->m_zhdr0 >> 4))) > 32768U) || ((out_buf_size_mask + 1) < (size_t)(1U << (8U + (r->m_zhdr0 >> 4)))));
     if (counter) { RETURN_FOREVER(36, STATUS_FAILED); }
   }
 
-  do
-  {
+  do {
     GET_BITS(3, r->m_final, 3); r->m_type = r->m_final >> 1;
-    if (r->m_type == 0)
-    {
+    if (r->m_type == 0) {
       SKIP_BITS(5, num_bits & 7);
       for(counter = 0; counter < 4; ++counter) {
           if(num_bits) GET_BITS(6, r->m_raw_header[counter], 8);
           else GET_BYTE(7, r->m_raw_header[counter]);
       }
       if ((counter = (r->m_raw_header[0] | (r->m_raw_header[1] << 8))) != (uint)(0xFFFF ^ (r->m_raw_header[2] | (r->m_raw_header[3] << 8)))) { RETURN_FOREVER(39, STATUS_FAILED); }
-      while ((counter) && (num_bits))
-      {
+      while ((counter) && (num_bits)) {
         GET_BITS(51, dist, 8);
         while (pOut_buf_cur >= pOut_buf_end) { RETURN(52, STATUS_HAS_MORE_OUTPUT); }
         *pOut_buf_cur++ = (uint8)dist;
         counter--;
       }
-      while (counter)
-      {
+      while (counter) {
         size_t n; while (pOut_buf_cur >= pOut_buf_end) { RETURN(9, STATUS_HAS_MORE_OUTPUT); }
-        while (pIn_buf_cur >= pIn_buf_end)
-        {
-          if (decomp_flags & FLAG_HAS_MORE_INPUT)
-          {
+        while (pIn_buf_cur >= pIn_buf_end) {
+          if (decomp_flags & FLAG_HAS_MORE_INPUT) {
             RETURN(38, STATUS_NEEDS_MORE_INPUT);
           }
-          else
-          {
+          else {
             RETURN_FOREVER(40, STATUS_FAILED);
           }
         }
         n = min(min(size_t(pOut_buf_end - pOut_buf_cur), size_t(pIn_buf_end - pIn_buf_cur)), size_t(counter));
-        copy(mref<uint8>(pOut_buf_cur, n), ref<uint8>(pIn_buf_cur, n)); pIn_buf_cur += n; pOut_buf_cur += n; counter -= (uint)n;
+        mref<uint8>(pOut_buf_cur, n).copy(ref<uint8>(pIn_buf_cur, n)); pIn_buf_cur += n; pOut_buf_cur += n; counter -= (uint)n;
       }
     }
-    else if (r->m_type == 3)
-    {
+    else if (r->m_type == 3) {
       RETURN_FOREVER(10, STATUS_FAILED);
     }
-    else
-    {
-      if (r->m_type == 1)
-      {
+    else {
+      if (r->m_type == 1) {
         uint8 *p = r->m_tables[0].m_code_size; uint i;
         r->m_table_sizes[0] = 288; r->m_table_sizes[1] = 32; mref<uint8>(r->m_tables[1].m_code_size, 32).clear(5);
         for ( i = 0; i <= 143; ++i) *p++ = 8; for ( ; i <= 255; ++i) *p++ = 9; for ( ; i <= 279; ++i) *p++ = 7; for ( ; i <= 287; ++i) *p++ = 8;
       }
-      else
-      {
+      else {
         for (counter = 0; counter < 3; counter++) { GET_BITS(11, r->m_table_sizes[counter], "\05\05\04"[counter]); r->m_table_sizes[counter] += s_min_table_sizes[counter]; }
         clear(r->m_tables[2].m_code_size); for (counter = 0; counter < r->m_table_sizes[2]; counter++) { uint s; GET_BITS(14, s, 3); r->m_tables[2].m_code_size[s_length_dezigzag[counter]] = (uint8)s; }
         r->m_table_sizes[2] = 19;
       }
-      for ( ; (int)r->m_type >= 0; r->m_type--)
-      {
+      for ( ; (int)r->m_type >= 0; r->m_type--) {
         int tree_next, tree_cur; huff_table *pTable;
         uint i, j, used_syms, total, sym_index, next_code[17], total_syms[16]; pTable = &r->m_tables[r->m_type]; clear(total_syms); clear(pTable->m_look_up); clear(pTable->m_tree);
         for (i = 0; i < r->m_table_sizes[r->m_type]; ++i) total_syms[pTable->m_code_size[i]]++;
         used_syms = 0, total = 0; next_code[0] = next_code[1] = 0;
         for (i = 1; i <= 15; ++i) { used_syms += total_syms[i]; next_code[i + 1] = (total = ((total + total_syms[i]) << 1)); }
-        if ((65536 != total) && (used_syms > 1))
-        {
+        if ((65536 != total) && (used_syms > 1)) {
           RETURN_FOREVER(35, STATUS_FAILED);
         }
-        for (tree_next = -1, sym_index = 0; sym_index < r->m_table_sizes[r->m_type]; ++sym_index)
-        {
+        for (tree_next = -1, sym_index = 0; sym_index < r->m_table_sizes[r->m_type]; ++sym_index) {
           uint rev_code = 0, l, cur_code, code_size = pTable->m_code_size[sym_index]; if (!code_size) continue;
           cur_code = next_code[code_size]++; for (l = code_size; l > 0; l--, cur_code >>= 1) rev_code = (rev_code << 1) | (cur_code & 1);
           if (code_size <= FAST_LOOKUP_BITS) { int16 k = (int16)((code_size << 9) | sym_index); while (rev_code < FAST_LOOKUP_SIZE) { pTable->m_look_up[rev_code] = k; rev_code += (1 << code_size); } continue; }
           if (0 == (tree_cur = pTable->m_look_up[rev_code & (FAST_LOOKUP_SIZE - 1)])) { pTable->m_look_up[rev_code & (FAST_LOOKUP_SIZE - 1)] = (int16)tree_next; tree_cur = tree_next; tree_next -= 2; }
           rev_code >>= (FAST_LOOKUP_BITS - 1);
-          for (j = code_size; j > (FAST_LOOKUP_BITS + 1); j--)
-          {
+          for (j = code_size; j > (FAST_LOOKUP_BITS + 1); j--) {
             tree_cur -= ((rev_code >>= 1) & 1);
             if (!pTable->m_tree[-tree_cur - 1]) { pTable->m_tree[-tree_cur - 1] = (int16)tree_next; tree_cur = tree_next; tree_next -= 2; } else tree_cur = pTable->m_tree[-tree_cur - 1];
           }
           tree_cur -= ((rev_code >>= 1) & 1); pTable->m_tree[-tree_cur - 1] = (int16)sym_index;
         }
-        if (r->m_type == 2)
-        {
-          for (counter = 0; counter < (r->m_table_sizes[0] + r->m_table_sizes[1]); )
-          {
+        if (r->m_type == 2) {
+          for (counter = 0; counter < (r->m_table_sizes[0] + r->m_table_sizes[1]); ) {
             uint s; HUFF_DECODE(16, dist, &r->m_tables[2]); if (dist < 16) { r->m_len_codes[counter++] = (uint8)dist; continue; }
-            if ((dist == 16) && (!counter))
-            {
+            if ((dist == 16) && (!counter)) {
               RETURN_FOREVER(17, STATUS_FAILED);
             }
             num_extra = "\02\03\07"[dist - 16]; GET_BITS(18, s, num_extra); s += "\03\03\013"[dist - 16];
             __builtin___memset_chk(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s, __bos0(r->m_len_codes + counter));
             counter += s;
           }
-          if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter)
-          {
+          if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
             RETURN_FOREVER(21, STATUS_FAILED);
           }
           memcpy(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]); memcpy(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
         }
       }
-      for ( ; ; )
-      {
+      for ( ; ; ) {
         uint8 *pSrc;
-        for ( ; ; )
-        {
-          if (((pIn_buf_end - pIn_buf_cur) < 4) || ((pOut_buf_end - pOut_buf_cur) < 2))
-          {
+        for ( ; ; ) {
+          if (((pIn_buf_end - pIn_buf_cur) < 4) || ((pOut_buf_end - pOut_buf_cur) < 2)) {
             HUFF_DECODE(23, counter, &r->m_tables[0]);
             if (counter >= 256)
               break;
             while (pOut_buf_cur >= pOut_buf_end) { RETURN(24, STATUS_HAS_MORE_OUTPUT); }
             *pOut_buf_cur++ = (uint8)counter;
           }
-          else
-          {
+          else {
             int sym2; uint code_len;
             if (num_bits < 30) { bit_buf |= (((uint64)*((const uint32 *)(pIn_buf_cur))) << num_bits); pIn_buf_cur += 4; num_bits += 32; }
             if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (FAST_LOOKUP_SIZE - 1)]) >= 0)
               code_len = sym2 >> 9;
-            else
-            {
+            else {
               code_len = FAST_LOOKUP_BITS; do { sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)]; } while (sym2 < 0);
             }
             counter = sym2; bit_buf >>= code_len; num_bits -= code_len;
@@ -351,15 +321,13 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
 
             if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (FAST_LOOKUP_SIZE - 1)]) >= 0)
               code_len = sym2 >> 9;
-            else
-            {
+            else {
               code_len = FAST_LOOKUP_BITS; do { sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)]; } while (sym2 < 0);
             }
             bit_buf >>= code_len; num_bits -= code_len;
 
             pOut_buf_cur[0] = (uint8)counter;
-            if (sym2 & 256)
-            {
+            if (sym2 & 256) {
               pOut_buf_cur++;
               counter = sym2;
               break;
@@ -378,35 +346,28 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
         if (num_extra) { uint extra_bits; GET_BITS(27, extra_bits, num_extra); dist += extra_bits; }
 
         dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
-        if ((dist > dist_from_out_buf_start) && (decomp_flags & FLAG_USING_NON_WRAPPING_OUTPUT_BUF))
-        {
+        if ((dist > dist_from_out_buf_start) && (decomp_flags & FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
           RETURN_FOREVER(37, STATUS_FAILED);
         }
 
         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
 
-        if ((max(pOut_buf_cur, pSrc) + counter) > pOut_buf_end)
-        {
-          while (counter--)
-          {
+        if ((max(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+          while (counter--) {
             while (pOut_buf_cur >= pOut_buf_end) { RETURN(53, STATUS_HAS_MORE_OUTPUT); }
             *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
           }
           continue;
         }
-        else if ((counter >= 9) && (counter <= dist))
-        {
+        else if ((counter >= 9) && (counter <= dist)) {
           const uint8 *pSrc_end = pSrc + (counter & ~7);
-          do
-          {
+          do {
             ((uint32 *)pOut_buf_cur)[0] = ((const uint32 *)pSrc)[0];
             ((uint32 *)pOut_buf_cur)[1] = ((const uint32 *)pSrc)[1];
             pOut_buf_cur += 8;
           } while ((pSrc += 8) < pSrc_end);
-          if ((counter &= 7) < 3)
-          {
-            if (counter)
-            {
+          if ((counter &= 7) < 3) {
+            if (counter) {
               pOut_buf_cur[0] = pSrc[0];
               if (counter > 1)
                 pOut_buf_cur[1] = pSrc[1];
@@ -415,15 +376,13 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
             continue;
           }
         }
-        do
-        {
+        do {
           pOut_buf_cur[0] = pSrc[0];
           pOut_buf_cur[1] = pSrc[1];
           pOut_buf_cur[2] = pSrc[2];
           pOut_buf_cur += 3; pSrc += 3;
         } while ((int)(counter -= 3) > 2);
-        if ((int)counter > 0)
-        {
+        if ((int)counter > 0) {
           pOut_buf_cur[0] = pSrc[0];
           if ((int)counter > 1)
             pOut_buf_cur[1] = pSrc[1];
@@ -432,8 +391,7 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
       }
     }
   } while (!(r->m_final & 1));
-  if (decomp_flags & FLAG_PARSE_ZLIB_HEADER)
-  {
+  if (decomp_flags & FLAG_PARSE_ZLIB_HEADER) {
     SKIP_BITS(32, num_bits & 7); for (counter = 0; counter < 4; ++counter) { uint s; if (num_bits) GET_BITS(41, s, 8); else GET_BYTE(42, s); r->m_z_adler32 = (r->m_z_adler32 << 8) | s; }
   }
   RETURN_FOREVER(34, STATUS_DONE);
@@ -442,14 +400,11 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
 common_exit:
   r->m_num_bits = num_bits; r->m_bit_buf = bit_buf; r->m_dist = dist; r->m_counter = counter; r->m_num_extra = num_extra; r->m_dist_from_out_buf_start = dist_from_out_buf_start;
   *pIn_buf_size = pIn_buf_cur - pIn_buf_next; *pOut_buf_size = pOut_buf_cur - pOut_buf_next;
-  if ((decomp_flags & (FLAG_PARSE_ZLIB_HEADER | FLAG_COMPUTE_ADLER32)) && (status >= 0))
-  {
+  if ((decomp_flags & (FLAG_PARSE_ZLIB_HEADER | FLAG_COMPUTE_ADLER32)) && (status >= 0)) {
     const uint8 *ptr = pOut_buf_next; size_t buf_len = *pOut_buf_size;
     uint32 i, s1 = r->m_check_adler32 & 0xffff, s2 = r->m_check_adler32 >> 16; size_t block_len = buf_len % 5552;
-    while (buf_len)
-    {
-      for (i = 0; i + 7 < block_len; i += 8, ptr += 8)
-      {
+    while (buf_len) {
+      for (i = 0; i + 7 < block_len; i += 8, ptr += 8) {
         s1 += ptr[0], s2 += s1; s1 += ptr[1], s2 += s1; s1 += ptr[2], s2 += s1; s1 += ptr[3], s2 += s1;
         s1 += ptr[4], s2 += s1; s1 += ptr[5], s2 += s1; s1 += ptr[6], s2 += s1; s1 += ptr[7], s2 += s1;
       }
@@ -461,18 +416,15 @@ common_exit:
   return status;
 }
 
-void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags)
-{
+void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags) {
   decompressor decomp; void *pBuf = NULL, *pNew_buf; size_t src_buf_ofs = 0, out_buf_capacity = 0;
   *pOut_len = 0;
   decomp.m_state = 0;
-  for ( ; ; )
-  {
+  for ( ; ; ) {
     size_t src_buf_size = src_buf_len - src_buf_ofs, dst_buf_size = out_buf_capacity - *pOut_len, new_out_buf_capacity;
     status status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)pBuf, pBuf ? (uint8*)pBuf + *pOut_len : NULL, &dst_buf_size,
       (flags & ~FLAG_HAS_MORE_INPUT) | FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
-    if ((status < 0) || (status == STATUS_NEEDS_MORE_INPUT))
-    {
+    if ((status < 0) || (status == STATUS_NEEDS_MORE_INPUT)) {
       free(pBuf); *pOut_len = 0; return NULL;
     }
     src_buf_ofs += src_buf_size;
@@ -480,8 +432,7 @@ void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
     if (status == STATUS_DONE) break;
     new_out_buf_capacity = out_buf_capacity * 2; if (new_out_buf_capacity < 128) new_out_buf_capacity = 128;
     pNew_buf = realloc(pBuf, new_out_buf_capacity);
-    if (!pNew_buf)
-    {
+    if (!pNew_buf) {
       free(pBuf); *pOut_len = 0; return NULL;
     }
     pBuf = pNew_buf; out_buf_capacity = new_out_buf_capacity;
@@ -550,38 +501,32 @@ static const uint8 s_large_dist_extra[128] = {
   13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13 };
 
 // Radix sorts sym_freq[] array by 16-bit key m_key. Returns ptr to sorted values.
-typedef struct { uint16 m_key, m_sym_index; } sym_freq;
-static sym_freq* radix_sort_syms(uint num_syms, sym_freq* pSyms0, sym_freq* pSyms1)
-{
+struct sym_freq { uint16 m_key, m_sym_index; };
+static sym_freq* radix_sort_syms(uint num_syms, sym_freq* pSyms0, sym_freq* pSyms1) {
   uint32 total_passes = 2, pass_shift, pass, i, hist[256 * 2]; sym_freq* pCur_syms = pSyms0, *pNew_syms = pSyms1; clear(hist);
   for (i = 0; i < num_syms; i++) { uint freq = pSyms0[i].m_key; hist[freq & 0xFF]++; hist[256 + ((freq >> 8) & 0xFF)]++; }
   while ((total_passes > 1) && (num_syms == hist[(total_passes - 1) * 256])) total_passes--;
-  for (pass_shift = 0, pass = 0; pass < total_passes; pass++, pass_shift += 8)
-  {
+  for (pass_shift = 0, pass = 0; pass < total_passes; pass++, pass_shift += 8) {
     const uint32* pHist = &hist[pass << 8];
     uint offsets[256], cur_ofs = 0;
     for (i = 0; i < 256; i++) { offsets[i] = cur_ofs; cur_ofs += pHist[i]; }
-    for (i = 0; i < num_syms; i++) pNew_syms[offsets[(pCur_syms[i].m_key >> pass_shift) & 0xFF]++] = pCur_syms[i];
-    { sym_freq* t = pCur_syms; pCur_syms = pNew_syms; pNew_syms = t; }
+    for (i = 0; i < num_syms; i++) pNew_syms[offsets[(pCur_syms[i].m_key >> pass_shift) & 0xFF]++] = pCur_syms[i]; { sym_freq* t = pCur_syms; pCur_syms = pNew_syms; pNew_syms = t; }
   }
   return pCur_syms;
 }
 
 // calculate_minimum_redundancy() originally written by: Alistair Moffat, alistair@cs.mu.oz.au, Jyrki Katajainen, jyrki@diku.dk, November 1996.
-static void calculate_minimum_redundancy(sym_freq *A, int n)
-{
+static void calculate_minimum_redundancy(sym_freq *A, int n) {
   int root, leaf, next, avbl, used, dpth;
   if (n==0) return; else if (n==1) { A[0].m_key = 1; return; }
   A[0].m_key += A[1].m_key; root = 0; leaf = 2;
-  for (next=1; next < n-1; next++)
-  {
+  for (next=1; next < n-1; next++) {
     if (leaf>=n || A[root].m_key<A[leaf].m_key) { A[next].m_key = A[root].m_key; A[root++].m_key = (uint16)next; } else A[next].m_key = A[leaf++].m_key;
     if (leaf>=n || (root<next && A[root].m_key<A[leaf].m_key)) { A[next].m_key = (uint16)(A[next].m_key + A[root].m_key); A[root++].m_key = (uint16)next; } else A[next].m_key = (uint16)(A[next].m_key + A[leaf++].m_key);
   }
   A[n-2].m_key = 0; for (next=n-3; next>=0; next--) A[next].m_key = A[A[next].m_key].m_key+1;
   avbl = 1; used = dpth = 0; root = n-2; next = n-1;
-  while (avbl>0)
-  {
+  while (avbl>0) {
     while (root>=0 && (int)A[root].m_key==dpth) { used++; root--; }
     while (avbl>used) { A[next--].m_key = (uint16)(dpth); avbl--; }
     avbl = 2*used; dpth++; used = 0;
@@ -590,28 +535,23 @@ static void calculate_minimum_redundancy(sym_freq *A, int n)
 
 // Limits canonical Huffman code table's max code size.
 enum { MAX_SUPPORTED_HUFF_CODESIZE = 32 };
-static void huffman_enforce_max_code_size(int *pNum_codes, int code_list_len, int max_code_size)
-{
+static void huffman_enforce_max_code_size(int *pNum_codes, int code_list_len, int max_code_size) {
   int i; uint32 total = 0; if (code_list_len <= 1) return;
   for (i = max_code_size + 1; i <= MAX_SUPPORTED_HUFF_CODESIZE; i++) pNum_codes[max_code_size] += pNum_codes[i];
   for (i = max_code_size; i > 0; i--) total += (((uint32)pNum_codes[i]) << (max_code_size - i));
-  while (total != (1UL << max_code_size))
-  {
+  while (total != (1UL << max_code_size)) {
     pNum_codes[max_code_size]--;
     for (i = max_code_size - 1; i > 0; i--) if (pNum_codes[i]) { pNum_codes[i]--; pNum_codes[i + 1] += 2; break; }
     total--;
   }
 }
 
-static void optimize_huffman_table(compressor *d, int table_num, int table_len, int code_size_limit, int static_table)
-{
+static void optimize_huffman_table(compressor *d, int table_num, int table_len, int code_size_limit, int static_table) {
   int i, j, l, num_codes[1 + MAX_SUPPORTED_HUFF_CODESIZE]; uint next_code[MAX_SUPPORTED_HUFF_CODESIZE + 1]; clear(num_codes);
-  if (static_table)
-  {
+  if (static_table) {
     for (i = 0; i < table_len; i++) num_codes[d->m_huff_code_sizes[table_num][i]]++;
   }
-  else
-  {
+  else {
     sym_freq syms0[MAX_HUFF_SYMBOLS], syms1[MAX_HUFF_SYMBOLS], *pSyms;
     int num_used_syms = 0;
     const uint16 *pSym_count = &d->m_huff_count[table_num][0];
@@ -630,8 +570,7 @@ static void optimize_huffman_table(compressor *d, int table_num, int table_len, 
 
   next_code[1] = 0; for (j = 0, i = 2; i <= code_size_limit; i++) next_code[i] = j = ((j + num_codes[i - 1]) << 1);
 
-  for (i = 0; i < table_len; i++)
-  {
+  for (i = 0; i < table_len; i++) {
     uint rev_code = 0, code, code_size; if ((code_size = d->m_huff_code_sizes[table_num][i]) == 0) continue;
     code = next_code[code_size]++; for (l = code_size; l > 0; l--, code >>= 1) rev_code = (rev_code << 1) | (code & 1);
     d->m_huff_codes[table_num][i] = (uint16)rev_code;
@@ -668,8 +607,7 @@ static void optimize_huffman_table(compressor *d, int table_num, int table_len, 
 
 static uint8 s_packed_code_size_syms_swizzle[] = { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
 
-static void start_dynamic_block(compressor *d)
-{
+static void start_dynamic_block(compressor *d) {
   int num_lit_codes, num_dist_codes, num_bit_lengths; uint i, total_code_sizes_to_pack, num_packed_code_sizes, rle_z_count, rle_repeat_count, packed_code_sizes_index;
   uint8 code_sizes_to_pack[MAX_HUFF_SYMBOLS_0 + MAX_HUFF_SYMBOLS_1], packed_code_sizes[MAX_HUFF_SYMBOLS_0 + MAX_HUFF_SYMBOLS_1], prev_code_size = 0xFF;
 
@@ -686,24 +624,19 @@ static void start_dynamic_block(compressor *d)
   total_code_sizes_to_pack = num_lit_codes + num_dist_codes; num_packed_code_sizes = 0; rle_z_count = 0; rle_repeat_count = 0;
 
   memset(&d->m_huff_count[2][0], 0, sizeof(d->m_huff_count[2][0]) * MAX_HUFF_SYMBOLS_2);
-  for (i = 0; i < total_code_sizes_to_pack; i++)
-  {
+  for (i = 0; i < total_code_sizes_to_pack; i++) {
     uint8 code_size = code_sizes_to_pack[i];
-    if (!code_size)
-    {
+    if (!code_size) {
       RLE_PREV_CODE_SIZE();
       if (++rle_z_count == 138) { RLE_ZERO_CODE_SIZE(); }
     }
-    else
-    {
+    else {
       RLE_ZERO_CODE_SIZE();
-      if (code_size != prev_code_size)
-      {
+      if (code_size != prev_code_size) {
         RLE_PREV_CODE_SIZE();
         d->m_huff_count[2][code_size] = (uint16)(d->m_huff_count[2][code_size] + 1); packed_code_sizes[num_packed_code_sizes++] = code_size;
       }
-      else if (++rle_repeat_count == 6)
-      {
+      else if (++rle_repeat_count == 6) {
         RLE_PREV_CODE_SIZE();
       }
     }
@@ -722,16 +655,14 @@ static void start_dynamic_block(compressor *d)
   num_bit_lengths = max(4, (num_bit_lengths + 1)); PUT_BITS(num_bit_lengths - 4, 4);
   for (i = 0; (int)i < num_bit_lengths; i++) PUT_BITS(d->m_huff_code_sizes[2][s_packed_code_size_syms_swizzle[i]], 3);
 
-  for (packed_code_sizes_index = 0; packed_code_sizes_index < num_packed_code_sizes; )
-  {
+  for (packed_code_sizes_index = 0; packed_code_sizes_index < num_packed_code_sizes; ) {
     uint code = packed_code_sizes[packed_code_sizes_index++]; assert(code < MAX_HUFF_SYMBOLS_2);
     PUT_BITS(d->m_huff_codes[2][code], d->m_huff_code_sizes[2][code]);
     if (code >= 16) PUT_BITS(packed_code_sizes[packed_code_sizes_index++], "\02\03\07"[code - 16]);
   }
 }
 
-static void start_static_block(compressor *d)
-{
+static void start_static_block(compressor *d) {
   uint i;
   uint8 *p = &d->m_huff_code_sizes[0][0];
 
@@ -750,8 +681,7 @@ static void start_static_block(compressor *d)
 
 static const uint bitmasks[17] = { 0x0000, 0x0001, 0x0003, 0x0007, 0x000F, 0x001F, 0x003F, 0x007F, 0x00FF, 0x01FF, 0x03FF, 0x07FF, 0x0FFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF };
 
-static bool compress_lz_codes(compressor *d)
-{
+static bool compress_lz_codes(compressor *d) {
   uint flags;
   uint8 *pLZ_codes;
   uint8 *pOutput_buf = d->m_pOutput_buf;
@@ -762,13 +692,11 @@ static bool compress_lz_codes(compressor *d)
 #define PUT_BITS_FAST(b, l) { bit_buffer |= (((uint64)(b)) << bits_in); bits_in += (l); }
 
   flags = 1;
-  for (pLZ_codes = d->m_lz_code_buf; pLZ_codes < pLZ_code_buf_end; flags >>= 1)
-  {
+  for (pLZ_codes = d->m_lz_code_buf; pLZ_codes < pLZ_code_buf_end; flags >>= 1) {
     if (flags == 1)
       flags = *pLZ_codes++ | 0x100;
 
-    if (flags & 1)
-    {
+    if (flags & 1) {
       uint s0, s1, n0, n1, sym, num_extra_bits;
       uint match_len = pLZ_codes[0], match_dist = *(const uint16 *)(pLZ_codes + 1); pLZ_codes += 3;
 
@@ -788,21 +716,18 @@ static bool compress_lz_codes(compressor *d)
       PUT_BITS_FAST(d->m_huff_codes[1][sym], d->m_huff_code_sizes[1][sym]);
       PUT_BITS_FAST(match_dist & bitmasks[num_extra_bits], num_extra_bits);
     }
-    else
-    {
+    else {
       uint lit = *pLZ_codes++;
       assert(d->m_huff_code_sizes[0][lit]);
       PUT_BITS_FAST(d->m_huff_codes[0][lit], d->m_huff_code_sizes[0][lit]);
 
-      if (((flags & 2) == 0) && (pLZ_codes < pLZ_code_buf_end))
-      {
+      if (((flags & 2) == 0) && (pLZ_codes < pLZ_code_buf_end)) {
         flags >>= 1;
         lit = *pLZ_codes++;
         assert(d->m_huff_code_sizes[0][lit]);
         PUT_BITS_FAST(d->m_huff_codes[0][lit], d->m_huff_code_sizes[0][lit]);
 
-        if (((flags & 2) == 0) && (pLZ_codes < pLZ_code_buf_end))
-        {
+        if (((flags & 2) == 0) && (pLZ_codes < pLZ_code_buf_end)) {
           flags >>= 1;
           lit = *pLZ_codes++;
           assert(d->m_huff_code_sizes[0][lit]);
@@ -826,8 +751,7 @@ static bool compress_lz_codes(compressor *d)
   d->m_bits_in = 0;
   d->m_bit_buffer = 0;
 
-  while (bits_in)
-  {
+  while (bits_in) {
     uint32 n = min(bits_in, 16u);
     PUT_BITS((uint)bit_buffer & bitmasks[n], n);
     bit_buffer >>= n;
@@ -839,8 +763,7 @@ static bool compress_lz_codes(compressor *d)
   return (d->m_pOutput_buf < d->m_pOutput_buf_end);
 }
 
-static bool compress_block(compressor *d, bool static_block)
-{
+static bool compress_block(compressor *d, bool static_block) {
   if (static_block)
     start_static_block(d);
   else
@@ -848,8 +771,7 @@ static bool compress_block(compressor *d, bool static_block)
   return compress_lz_codes(d);
 }
 
-static int flush_block(compressor *d, int flush)
-{
+static int flush_block(compressor *d, int flush) {
   uint saved_bit_buf, saved_bits_in;
   uint8 *pSaved_output_buf;
   bool comp_block_succeeded = false;
@@ -866,8 +788,7 @@ static int flush_block(compressor *d, int flush)
   *d->m_pLZ_flags = (uint8)(*d->m_pLZ_flags >> d->m_num_flags_left);
   d->m_pLZ_code_buf -= (d->m_num_flags_left == 8);
 
-  if ((d->m_flags & WRITE_ZLIB_HEADER) && (!d->m_block_index))
-  {
+  if ((d->m_flags & WRITE_ZLIB_HEADER) && (!d->m_block_index)) {
     PUT_BITS(0x78, 8); PUT_BITS(0x01, 8);
   }
 
@@ -880,36 +801,29 @@ static int flush_block(compressor *d, int flush)
 
   // If the block gets expanded, forget the current contents of the output buffer and send a raw block instead.
   if ( ((use_raw_block) || ((d->m_total_lz_bytes) && ((d->m_pOutput_buf - pSaved_output_buf + 1U) >= d->m_total_lz_bytes))) &&
-       ((d->m_lookahead_pos - d->m_lz_code_buf_dict_pos) <= d->m_dict_size) )
-  {
+       ((d->m_lookahead_pos - d->m_lz_code_buf_dict_pos) <= d->m_dict_size) ) {
     uint i; d->m_pOutput_buf = pSaved_output_buf; d->m_bit_buffer = saved_bit_buf, d->m_bits_in = saved_bits_in;
     PUT_BITS(0, 2);
     if (d->m_bits_in) { PUT_BITS(0, 8 - d->m_bits_in); }
-    for (i = 2; i; --i, d->m_total_lz_bytes ^= 0xFFFF)
-    {
+    for (i = 2; i; --i, d->m_total_lz_bytes ^= 0xFFFF) {
       PUT_BITS(d->m_total_lz_bytes & 0xFFFF, 16);
     }
-    for (i = 0; i < d->m_total_lz_bytes; ++i)
-    {
+    for (i = 0; i < d->m_total_lz_bytes; ++i) {
       PUT_BITS(d->m_dict[(d->m_lz_code_buf_dict_pos + i) & LZ_DICT_SIZE_MASK], 8);
     }
   }
   // Check for the extremely unlikely (if not impossible) case of the compressed block not fitting into the output buffer when using dynamic codes.
-  else if (!comp_block_succeeded)
-  {
+  else if (!comp_block_succeeded) {
     d->m_pOutput_buf = pSaved_output_buf; d->m_bit_buffer = saved_bit_buf, d->m_bits_in = saved_bits_in;
     compress_block(d, true);
   }
 
-  if (flush)
-  {
-    if (flush == FINISH)
-    {
+  if (flush) {
+    if (flush == FINISH) {
       if (d->m_bits_in) { PUT_BITS(0, 8 - d->m_bits_in); }
       if (d->m_flags & WRITE_ZLIB_HEADER) { uint i, a = d->m_adler32; for (i = 0; i < 4; i++) { PUT_BITS((a >> 24) & 0xFF, 8); a <<= 8; } }
     }
-    else
-    {
+    else {
       uint i, z = 0; PUT_BITS(0, 3); if (d->m_bits_in) { PUT_BITS(0, 8 - d->m_bits_in); } for (i = 2; i; --i, z ^= 0xFFFF) { PUT_BITS(z & 0xFFFF, 16); }
     }
   }
@@ -921,27 +835,22 @@ static int flush_block(compressor *d, int flush)
 
   d->m_pLZ_code_buf = d->m_lz_code_buf + 1; d->m_pLZ_flags = d->m_lz_code_buf; d->m_num_flags_left = 8; d->m_lz_code_buf_dict_pos += d->m_total_lz_bytes; d->m_total_lz_bytes = 0; d->m_block_index++;
 
-  if ((n = (int)(d->m_pOutput_buf - pOutput_buf_start)) != 0)
-  {
-    if (d->m_pPut_buf_func)
-    {
+  if ((n = (int)(d->m_pOutput_buf - pOutput_buf_start)) != 0) {
+    if (d->m_pPut_buf_func) {
       *d->m_pIn_buf_size = d->m_pSrc - (const uint8 *)d->m_pIn_buf;
       if (!(*d->m_pPut_buf_func)(d->m_output_buf, n, d->m_pPut_buf_user))
         return (d->m_prev_return_status = STATUS_FAILED);
     }
-    else if (pOutput_buf_start == d->m_output_buf)
-    {
+    else if (pOutput_buf_start == d->m_output_buf) {
       int bytes_to_copy = (int)min((size_t)n, (size_t)(*d->m_pOut_buf_size - d->m_out_buf_ofs));
       memcpy((uint8 *)d->m_pOut_buf + d->m_out_buf_ofs, d->m_output_buf, bytes_to_copy);
       d->m_out_buf_ofs += bytes_to_copy;
-      if ((n -= bytes_to_copy) != 0)
-      {
+      if ((n -= bytes_to_copy) != 0) {
         d->m_output_flush_ofs = bytes_to_copy;
         d->m_output_flush_remaining = n;
       }
     }
-    else
-    {
+    else {
       d->m_out_buf_ofs += n;
     }
   }
@@ -950,23 +859,20 @@ static int flush_block(compressor *d, int flush)
 }
 
 #define READ_UNALIGNED_WORD(p) *(const uint16*)(p)
-static bool compress_fast(compressor *d)
-{
+static bool compress_fast(compressor *d) {
   // Faster, minimally featured LZRW1-style match+parse loop with better register utilization. Intended for applications where raw throughput is valued more highly than ratio.
   uint lookahead_pos = d->m_lookahead_pos, lookahead_size = d->m_lookahead_size, dict_size = d->m_dict_size, total_lz_bytes = d->m_total_lz_bytes, num_flags_left = d->m_num_flags_left;
   uint8 *pLZ_code_buf = d->m_pLZ_code_buf, *pLZ_flags = d->m_pLZ_flags;
   uint cur_pos = lookahead_pos & LZ_DICT_SIZE_MASK;
 
-  while ((d->m_src_buf_left) || ((d->m_flush) && (lookahead_size)))
-  {
+  while ((d->m_src_buf_left) || ((d->m_flush) && (lookahead_size))) {
     const uint COMP_FAST_LOOKAHEAD_SIZE = 4096;
     uint dst_pos = (lookahead_pos + lookahead_size) & LZ_DICT_SIZE_MASK;
     uint num_bytes_to_process = min(uint(d->m_src_buf_left), COMP_FAST_LOOKAHEAD_SIZE - lookahead_size);
     d->m_src_buf_left -= num_bytes_to_process;
     lookahead_size += num_bytes_to_process;
 
-    while (num_bytes_to_process)
-    {
+    while (num_bytes_to_process) {
       uint32 n = min(LZ_DICT_SIZE - dst_pos, num_bytes_to_process);
       memcpy(d->m_dict + dst_pos, d->m_pSrc, n);
       if (dst_pos < (MAX_MATCH_LEN - 1))
@@ -979,8 +885,7 @@ static bool compress_fast(compressor *d)
     dict_size = min(LZ_DICT_SIZE - lookahead_size, dict_size);
     if ((!d->m_flush) && (lookahead_size < COMP_FAST_LOOKAHEAD_SIZE)) break;
 
-    while (lookahead_size >= 4)
-    {
+    while (lookahead_size >= 4) {
       uint cur_match_dist, cur_match_len = 1;
       uint8 *pCur_dict = d->m_dict + cur_pos;
       uint first_trigram = (*(const uint32 *)pCur_dict) & 0xFFFFFF;
@@ -989,8 +894,7 @@ static bool compress_fast(compressor *d)
       d->m_hash[hash] = (uint16)lookahead_pos;
 
       if (((cur_match_dist = (uint16)(lookahead_pos - probe_pos)) <= dict_size) &&
-              ((*(const uint32 *)(d->m_dict + (probe_pos &= LZ_DICT_SIZE_MASK)) & 0xFFFFFF) == first_trigram))
-      {
+              ((*(const uint32 *)(d->m_dict + (probe_pos &= LZ_DICT_SIZE_MASK)) & 0xFFFFFF) == first_trigram)) {
         const uint16 *p = (const uint16 *)pCur_dict;
         const uint16 *q = (const uint16 *)(d->m_dict + probe_pos);
         uint32 probe_len = 32;
@@ -1000,15 +904,13 @@ static bool compress_fast(compressor *d)
         if (!probe_len)
           cur_match_len = cur_match_dist ? MAX_MATCH_LEN : 0;
 
-        if ((cur_match_len < MIN_MATCH_LEN) || ((cur_match_len == MIN_MATCH_LEN) && (cur_match_dist >= 8U*1024U)))
-        {
+        if ((cur_match_len < MIN_MATCH_LEN) || ((cur_match_len == MIN_MATCH_LEN) && (cur_match_dist >= 8U*1024U))) {
           cur_match_len = 1;
           *pLZ_code_buf++ = (uint8)first_trigram;
           *pLZ_flags = (uint8)(*pLZ_flags >> 1);
           d->m_huff_count[0][(uint8)first_trigram]++;
         }
-        else
-        {
+        else {
           uint32 s0, s1;
           cur_match_len = min(cur_match_len, lookahead_size);
 
@@ -1028,8 +930,7 @@ static bool compress_fast(compressor *d)
           d->m_huff_count[0][s_len_sym[cur_match_len - MIN_MATCH_LEN]]++;
         }
       }
-      else
-      {
+      else {
         *pLZ_code_buf++ = (uint8)first_trigram;
         *pLZ_flags = (uint8)(*pLZ_flags >> 1);
         d->m_huff_count[0][(uint8)first_trigram]++;
@@ -1044,8 +945,7 @@ static bool compress_fast(compressor *d)
       assert(lookahead_size >= cur_match_len);
       lookahead_size -= cur_match_len;
 
-      if (pLZ_code_buf > &d->m_lz_code_buf[LZ_CODE_BUF_SIZE - 8])
-      {
+      if (pLZ_code_buf > &d->m_lz_code_buf[LZ_CODE_BUF_SIZE - 8]) {
         int n;
         d->m_lookahead_pos = lookahead_pos; d->m_lookahead_size = lookahead_size; d->m_dict_size = dict_size;
         d->m_total_lz_bytes = total_lz_bytes; d->m_pLZ_code_buf = pLZ_code_buf; d->m_pLZ_flags = pLZ_flags; d->m_num_flags_left = num_flags_left;
@@ -1055,8 +955,7 @@ static bool compress_fast(compressor *d)
       }
     }
 
-    while (lookahead_size)
-    {
+    while (lookahead_size) {
       uint8 lit = d->m_dict[cur_pos];
 
       total_lz_bytes++;
@@ -1071,8 +970,7 @@ static bool compress_fast(compressor *d)
       cur_pos = (cur_pos + 1) & LZ_DICT_SIZE_MASK;
       lookahead_size--;
 
-      if (pLZ_code_buf > &d->m_lz_code_buf[LZ_CODE_BUF_SIZE - 8])
-      {
+      if (pLZ_code_buf > &d->m_lz_code_buf[LZ_CODE_BUF_SIZE - 8]) {
         int n;
         d->m_lookahead_pos = lookahead_pos; d->m_lookahead_size = lookahead_size; d->m_dict_size = dict_size;
         d->m_total_lz_bytes = total_lz_bytes; d->m_pLZ_code_buf = pLZ_code_buf; d->m_pLZ_flags = pLZ_flags; d->m_num_flags_left = num_flags_left;
@@ -1088,15 +986,12 @@ static bool compress_fast(compressor *d)
   return true;
 }
 
-static status flush_output_buffer(compressor *d)
-{
-  if (d->m_pIn_buf_size)
-  {
+static status flush_output_buffer(compressor *d) {
+  if (d->m_pIn_buf_size) {
     *d->m_pIn_buf_size = d->m_pSrc - (const uint8 *)d->m_pIn_buf;
   }
 
-  if (d->m_pOut_buf_size)
-  {
+  if (d->m_pOut_buf_size) {
     size_t n = min<size_t>(*d->m_pOut_buf_size - d->m_out_buf_ofs, d->m_output_flush_remaining);
     memcpy((uint8 *)d->m_pOut_buf + d->m_out_buf_ofs, d->m_output_buf + d->m_output_flush_ofs, n);
     d->m_output_flush_ofs += (uint)n;
@@ -1109,10 +1004,8 @@ static status flush_output_buffer(compressor *d)
   return (d->m_finished && !d->m_output_flush_remaining) ? STATUS_DONE : STATUS_OKAY;
 }
 
-status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *pOut_buf, size_t *pOut_buf_size, flush flush)
-{
-  if (!d)
-  {
+status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *pOut_buf, size_t *pOut_buf_size, flush flush) {
+  if (!d) {
     if (pIn_buf_size) *pIn_buf_size = 0;
     if (pOut_buf_size) *pOut_buf_size = 0;
     error("STATUS_BAD_PARAM");
@@ -1125,8 +1018,7 @@ status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *
   d->m_flush = flush;
 
   if ( ((d->m_pPut_buf_func != NULL) == ((pOut_buf != NULL) || (pOut_buf_size != NULL))) || (d->m_prev_return_status != STATUS_OKAY) ||
-        (d->m_wants_to_finish && (flush != FINISH)) || (pIn_buf_size && *pIn_buf_size && !pIn_buf) || (pOut_buf_size && *pOut_buf_size && !pOut_buf) )
-  {
+        (d->m_wants_to_finish && (flush != FINISH)) || (pIn_buf_size && *pIn_buf_size && !pIn_buf) || (pOut_buf_size && *pOut_buf_size && !pOut_buf) ) {
     if (pIn_buf_size) *pIn_buf_size = 0;
     if (pOut_buf_size) *pOut_buf_size = 0;
     error("STATUS_BAD_PARAM");
@@ -1137,8 +1029,7 @@ status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *
     return (d->m_prev_return_status = flush_output_buffer(d));
 
   if (((d->m_flags & GREEDY_PARSING_FLAG) != 0) &&
-      ((d->m_flags & (FILTER_MATCHES | FORCE_ALL_RAW_BLOCKS | RLE_MATCHES)) == 0))
-  {
+      ((d->m_flags & (FILTER_MATCHES | FORCE_ALL_RAW_BLOCKS | RLE_MATCHES)) == 0)) {
     compress_fast(d);
   }
   else error(d->m_flags);
@@ -1146,8 +1037,7 @@ status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *
   if ((d->m_flags & (WRITE_ZLIB_HEADER | COMPUTE_ADLER32)) && (pIn_buf))
     d->m_adler32 = adler32(d->m_adler32, (const uint8 *)pIn_buf, d->m_pSrc - (const uint8 *)pIn_buf);
 
-  if ((flush) && (!d->m_lookahead_size) && (!d->m_src_buf_left) && (!d->m_output_flush_remaining))
-  {
+  if ((flush) && (!d->m_lookahead_size) && (!d->m_src_buf_left) && (!d->m_output_flush_remaining)) {
     flush_block(d, flush);
     d->m_finished = (flush == FINISH);
     if (flush == FULL_FLUSH) { clear(d->m_hash); clear(d->m_next); d->m_dict_size = 0; }
@@ -1157,14 +1047,12 @@ status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *
   return STATUS_DONE;
 }
 
-status compress_buffer(compressor *d, const void *pIn_buf, size_t in_buf_size, flush flush)
-{
+status compress_buffer(compressor *d, const void *pIn_buf, size_t in_buf_size, flush flush) {
   assert(d->m_pPut_buf_func);
   return compress(d, pIn_buf, &in_buf_size, NULL, NULL, flush);
 }
 
-status init(compressor *d, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
-{
+status init(compressor *d, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags) {
   d->m_pPut_buf_func = pPut_buf_func; d->m_pPut_buf_user = pPut_buf_user;
   d->m_flags = (uint)(flags); d->m_max_probes[0] = 1 + ((flags & 0xFFF) + 2) / 3; d->m_greedy_parsing = (flags & GREEDY_PARSING_FLAG) != 0;
   d->m_max_probes[1] = 1 + (((flags & 0xFFF) >> 2) + 2) / 3;
@@ -1182,8 +1070,7 @@ status init(compressor *d, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, 
   return STATUS_OKAY;
 }
 
-bool compress_mem_to_output(const void *pBuf, size_t buf_len, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags)
-{
+bool compress_mem_to_output(const void *pBuf, size_t buf_len, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags) {
   compressor *pComp; assert(!(((buf_len) && (!pBuf)) || (!pPut_buf_func)));
   pComp = (compressor*)malloc(sizeof(compressor)); assert(pComp);
   init(pComp, pPut_buf_func, pPut_buf_user, flags);
@@ -1191,19 +1078,16 @@ bool compress_mem_to_output(const void *pBuf, size_t buf_len, put_buf_func_ptr p
   free(pComp); return true;
 }
 
-typedef struct
-{
+struct output_buffer {
   size_t m_size, m_capacity;
   uint8 *m_pBuf;
   bool m_expandable;
-} output_buffer;
+};
 
-static bool output_buffer_putter(const void *pBuf, int len, void *pUser)
-{
+static bool output_buffer_putter(const void *pBuf, int len, void *pUser) {
   output_buffer *p = (output_buffer *)pUser;
   size_t new_size = p->m_size + len;
-  if (new_size > p->m_capacity)
-  {
+  if (new_size > p->m_capacity) {
     size_t new_capacity = p->m_capacity; uint8 *pNew_buf; if (!p->m_expandable) return false;
     do { new_capacity = max(128UL, new_capacity << 1U); } while (new_size > new_capacity);
     pNew_buf = (uint8*)realloc(p->m_pBuf, new_capacity); if (!pNew_buf) return false;
@@ -1213,8 +1097,7 @@ static bool output_buffer_putter(const void *pBuf, int len, void *pUser)
   return true;
 }
 
-void *compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags)
-{
+void *compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags) {
   output_buffer out_buf = {0,0,0,0};
   if (!pOut_len) return 0; else *pOut_len = 0;
   out_buf.m_expandable = true;
@@ -1225,7 +1108,7 @@ void *compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOu
 buffer<byte> deflate(const ref<byte> source, bool zlib) {
     buffer<byte> data; size_t size=0;
     assert(source.data && source.size);
-    data.data = (byte*)compress_mem_to_heap(source.data, source.size, &size, zlib?WRITE_ZLIB_HEADER:0);
+    data.data = (byte*)compress_mem_to_heap(source.data, source.size, &size, GREEDY_PARSING_FLAG|(zlib?WRITE_ZLIB_HEADER:0));
     data.capacity=data.size=size;
     assert(data, data.size, data.data, data.capacity, size);
     return data;
