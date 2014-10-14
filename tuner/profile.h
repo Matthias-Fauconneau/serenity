@@ -21,7 +21,7 @@ struct OffsetPlot : Widget {
     ~OffsetPlot() {
         String s;
         for(uint i: range(keyCount)) s << str(offsets[i]*100) << ' ' << str(sqrt(variances[i])*100) << '\n';
-        writeFile("offsets.profile", s, config);
+        writeFile("offsets.profile", s, config, true);
     }
     void reset() { mref<float>(offsets).clear(); mref<float>(variances).clear(); }
     int2 sizeHint(int2) const override { return int2(-keyCount*18, 768); }

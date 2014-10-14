@@ -100,7 +100,7 @@ struct Player : Poll {
     void recordPosition() {
         assert_(titles.index<files.size && file);
         if(/*writableFile(".last", folder) &&*/ titles.index<files.size && file)
-            writeFile(".last",files[titles.index]+'\0'+dec(file->position/file->rate)+(randomSequence?"\0random":""), folder);
+            writeFile(".last",files[titles.index]+'\0'+dec(file->position/file->rate)+(randomSequence?"\0random":""), folder, true);
     }
     void setFolder(string path) {
         assert(folder.name() != path);

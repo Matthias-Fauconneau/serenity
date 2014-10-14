@@ -9,7 +9,7 @@ generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } }
 
 typedef vec<rgb,uint8,3> rgb3;
 
-template<template<typename> Type T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
+template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
     typedef vec<T,uint8,N> S;
     typedef vec<T,int,N> V;
     buffer<S> prior(width); prior.clear(0);
@@ -41,7 +41,7 @@ template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint hei
 
 Image decodePNG(const ref<byte> file) {
     BinaryData s(file, true);
-    if(s.read<byte>(8)!="\x89PNG\r\n\x1A\n") { error("Invalid PNG"); return Image(); }
+    if(string(s.read<byte>(8))!="\x89PNG\r\n\x1A\n") { error("Invalid PNG"); return Image(); }
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
     uint palette[256]; bool alpha=false;
     array<byte> buffer;
@@ -58,7 +58,7 @@ Image decodePNG(const ref<byte> file) {
             interlace = s.read();
         } else if(tag == "IDAT") {
             /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
-            else*/ buffer << s.read<byte>(size); // Explicitly concatenates chunks (FIXME: stream inflate)
+            else*/ buffer.append(s.read<byte>(size)); // Explicitly concatenates chunks (FIXME: stream inflate)
         } else if(tag == "IEND") {
             assert(size==0);
             s.advance(4); //CRC
@@ -97,7 +97,7 @@ Image decodePNG(const ref<byte> file) {
     }
     if(data.size < height*(1+width*depth)) { error("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
     Image image(width,height,alpha);
-    byte4* dst = image.pixels;
+    byte4* dst = image.begin();
     int w=width,h=height;
     const byte* src=data.data;
     for(int i=0;i==0 || (interlace && i<7);i++) {
@@ -148,8 +148,8 @@ uint adler32(const ref<byte> data) {
 
 buffer<byte> filter(const Image& image) {
     uint w=image.width, h=image.height;
-    buffer<byte> data(w*h*4+h);
-    byte* dst = data.begin(); const byte* src = (byte*)image.pixels.data;
+    buffer<byte> data(h*(1+w*4));
+    byte* dst = data.begin(); const byte* src = (byte*)image.data;
     for(uint unused y: range(h)) {
         *dst++ = 0;
         for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],image.alpha?src[x*4+3]:0xFF);
@@ -162,11 +162,17 @@ buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n");
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
     array<byte> IHDR = "IHDR"+raw(ihdr);
-    file<< raw(big32(IHDR.size-4)) << IHDR << raw(big32(crc32(IHDR)));
+    file.append(raw(big32(IHDR.size-4)));
+    file.append(IHDR);
+    file.append(raw(big32(crc32(IHDR))));
 
-    array<byte> IDAT = "IDAT"+deflate(filter(image),true);
-    file<< raw(big32(IDAT.size-4)) << IDAT << raw(big32(crc32(IDAT)));
+    buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(filter(image), true);
+    file.append(raw(big32(IDAT.size-4)));
+    file.append(IDAT);
+    file.append(raw(big32(crc32(IDAT))));
 
-    file<<raw(big32(0))<<"IEND"<<raw(big32(crc32("IEND")));
+    file.append(raw(big32(0)));
+    file.append(ref<byte>("IEND"));
+    file.append(raw(big32(crc32(ref<byte>("IEND")))));
     return move(file);
 }
