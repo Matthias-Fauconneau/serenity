@@ -143,4 +143,24 @@ template<Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, T initial_val
         return ::sum(accumulators);
     }
 }
+
+// multiple accumulator reduce
+
+/// Double accumulator reduction
+template<Type A, Type T, Type F0, Type F1> void reduce(ref<T> values, F0 fold0, F1 fold1, A& accumulator0, A& accumulator1) {
+    T accumulators[2][threadCount];
+    mref<T>(accumulators[0]).clear(accumulator0), mref<T>(accumulators[1]).clear(accumulator1); // Some threads may not iterate
+    parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
+        A a0 = accumulator0, a1 = accumulator1;
+        for(T v: values.slice(start, size)) a0=fold0(a0, v), a1=fold1(a1, v);
+        accumulators[0][id] = a0;
+        accumulators[1][id] = a1;
+    });
+    accumulator0 = ::reduce(accumulators[0], fold0, accumulator0), accumulator1 = ::reduce(accumulators[1], fold1, accumulator1);
+}
+
+generic void minmax(ref<T> values, T& minimum, T& maximum) {
+    return reduce(values, [](T a, T v) { return ::min(a, v); }, [](T a, T v) { return ::max(a, v); }, minimum, maximum);
+}
+
 }

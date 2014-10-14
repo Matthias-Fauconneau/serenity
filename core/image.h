@@ -95,33 +95,33 @@ inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
 
 //inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); parallel::div(a, a, b); return move(a); }
 
-template<Type F, Type... S> void apply(const ImageF& target, F function, const S&... source) {
+template<Type F, Type... S> void apply(const ImageF& target, F function, const S&... sources) {
+    for(int2 size: ref<int2>{sources.size...}) assert_(target.size == size, target.size, sources.size...);
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
         for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
-            target[y*target.stride + x] = function(x, y, target[y*target.stride + x], source[y*source.stride + x]...);
+            target[y*target.stride + x] = function(sources[y*sources.stride + x]...);
         }
     });
 }
-
-template<Type F> void apply(const ImageF& target, const ImageF& a, const ImageF& b, F function) {
-    assert_(target.size == a.size && target.size == b.size);
-    parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
-        for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
-            target[y*target.stride + x] = function(a[y*a.stride + x], b[y*b.stride + x]);
-        }
-    });
-}
-template<Type F> ImageF apply(ImageF&& y, const ImageF& a, const ImageF& b, F function) { apply(y, a, b, function); return move(y); }
+template<Type F> ImageF apply(ImageF&& y, const ImageF& a, const ImageF& b, F function) { apply(y, function, a, b); return move(y); }
 template<Type F> ImageF apply(const ImageF& a, const ImageF& b, F function) { return apply(a.size, a, b, function); }
 
-inline void min(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, a, b, [](float a, float b){ return min(a, b);}); }
-inline void max(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, a, b, [](float a, float b){ return max(a, b);}); }
+inline void min(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, [](float a, float b){ return min(a, b);}, a, b); }
+inline void max(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, [](float a, float b){ return max(a, b);}, a, b); }
 
 inline ImageF min(ImageF&& y, const ImageF& a, const ImageF& b) { min(y, a, b); return move(y); }
 inline ImageF min(const ImageF& a, const ImageF& b) { return min(a.size, a, b); }
 
 inline ImageF operator-(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a - b;}); }
 inline ImageF operator/(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a / b;}); }
+
+template<Type F, Type... S> void applyXY(const ImageF& target, F function, const S&... source) {
+    parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
+        for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
+            target[y*target.stride + x] = function(x, y, source[y*source.stride + x]...);
+        }
+    });
+}
 
 // -- sRGB --
 
@@ -158,13 +158,6 @@ inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianB
 inline void highPass(const ImageF& target, const ImageF& source, float threshold) {
     parallel::sub(target, source, gaussianBlur(source, threshold));
 }
-//inline ImageF highPass(ImageF&& target, const ImageF& source, float threshold) { highPass(target, source, threshold); return move(target); }
-//inline ImageF highPass(const ImageF& source, float threshold) { return highPass(source.size, threshold); }
-
-/// Selects image (signal) components of scales (frequencies) within a band
-/*inline ImageF bandPass(const ImageF& source, float lowThreshold, float highThreshold) {
-    return highPass(lowPass(source, lowThreshold), highThreshold);
-}*/
 
 /// Selects image (signal) components of scales (frequencies) within a band
 inline void bandPass(const ImageF& target, const ImageF& source, float lowThreshold, float highThreshold) {

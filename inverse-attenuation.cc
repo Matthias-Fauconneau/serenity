@@ -1,6 +1,6 @@
 #include "inverse-attenuation.h"
 #include "parallel.h"
-#include "math.h"
+//#include "math.h"
 
 //static float mix(float a, float b, float t) { return (1-t)*a + t*b; }
 
@@ -54,59 +54,51 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
     const int2 spotOrigin = Calibration::spotPosition(size)-spotSize/2;
 
     // Static parameters
-    const float lowScale = (spotSize.x-1)/6;
-    const float highScale = spotSize.x/16.f;
+    const float spotLowBound = (spotSize.x-1)/6;
+    const float spotHighBound = spotSize.x/16.f;
 
-    // Estimated parameters
     int2 origin = spotOrigin;
-    if(1) {
-        ImageF value = crop(red, green, blue, spotOrigin, spotSize);
-        const ImageF low = gaussianBlur(value, lowScale);
-        /*// Splits image frequencies to detect uniform background under spot
-    const float lowEnergy = parallel::energy(low);
-    const float highEnergy = parallel::sum(value, [](float value, float low) { return sq(value-low); }, 0.f, low);
-    assert_(lowEnergy > 0 && highEnergy > 0, lowEnergy, highEnergy);
-    const float ratio = lowEnergy / highEnergy;
-    const float blurRadius = ::min(ratio / 32, 1.f) * lowScale;*/
+    if(1) { // Estimates spot movement
 
-        value = gaussianBlur(value, highScale) - low; // Band pass [spotLowThreshold - spotHighThreshold]
-        const float min = parallel::min(value);
-        const float max = parallel::max(value);
-        const vec2 center = vec2(value.size)/2.f;
-        ::apply(value, [=](float x, float y, float v) {
+        // Selects [spotLowThreshold - spotHighThreshold] band in cropped intensity image
+        ImageF intensity = crop(red, green, blue, spotOrigin, spotSize);
+        const ImageF low = gaussianBlur(intensity, spotLowBound);
+        intensity = gaussianBlur(intensity, spotHighBound) - low;
+
+        float min, max;
+        parallel::minmax(intensity, min, max);
+        const vec2 center = vec2(intensity.size)/2.f;
+        ::applyXY(intensity, [=](float x, float y, float v) {
             float r2 = sq(vec2(x,y)-center);
             float w = r2/sq(center.x);
             return w + (v-min)/(max-min);
-        });
-        const int2 offset = argmin(value)-spotSize/2;
-        value(spotSize/2) = 0;    // Marks calibrated spot center (DEBUG)
-        value(spotSize/2+offset) = 1;     // Marks estimated spot center (DEBUG)
-        origin = clip(int2(0), spotOrigin+offset, size-spotSize); // Compenstates dust movement
-        //log(withName(spotOrigin, offset, origin, spotSize.x, lowEnergy, highEnergy, ratio, lowScale, blurRadius));
+        }, intensity);
+        const int2 offset = argmin(intensity)-spotSize/2;
+        intensity(spotSize/2) = 0; // Marks calibrated spot center (DEBUG)
+        intensity(spotSize/2+offset) = 1; // Marks estimated spot center (DEBUG)
+        origin = clip(int2(0), spotOrigin+offset, size-spotSize);
+        //log(withName(spotOrigin, offset, origin));
     }
 
     // Image processing
     return ::apply(ref<ImageF>{share(red), share(green), share(blue)}, [&](const ImageF& source) -> ImageF {
-        //return insert(source, value, spotOrigin); // DEBUG: view offset tracker field
+        //return insert(source, intensity, spotOrigin); // DEBUG: Displays spot tracker field
 
         // Crops source
         const ImageF crop = ::crop(source, origin, spotSize);
 
         // Splits details
-        ImageF low_mid = gaussianBlur(crop, highScale);
-        ImageF high = crop - low_mid;
+        ImageF low_spot = gaussianBlur(crop, spotHighBound);
+        ImageF high = crop - low_spot;
 
         // Inverses attenuation (of frequencies under spot frequency) using attenuation factors calibrated for each pixel
-        ImageF target = low_mid / attenuation;
+        ImageF target = low_spot / attenuation;
 
         float DC = parallel::mean(target);
 
         // Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
-        vec2 center = vec2(target.size)/2.f;
-        ::apply(target, [=](float x, float y, float, float source, float corrected_low_mid, float high) {
-            float r2 = sq(vec2(x,y)-center);
-            float w = ::min(1.f, r2/sq(center.x));
-            return ::max(source, w * source + (1-w) * (DC + ::min(0.f, corrected_low_mid-DC) + high));
+        ::apply(target, [=](float source, float corrected_low_spot, float high) {
+            return max(source, DC + min(0.f, corrected_low_spot-DC) + high);
         }, crop, target, high);
 
         // Inserts cropped correction
