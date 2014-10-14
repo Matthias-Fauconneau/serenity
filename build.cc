@@ -136,7 +136,7 @@ struct Build {
             args << copy(object) << target+".cc"_;
             args << String("-I/usr/include/freetype2"_);
             if(arch=="i386"_) args << String("-m32"_) << String("-march=i386"_) << String("-mfpmath=sse"_);
-            else if(arch=="x86_64"_) args << String("-march=nehalem"_);
+            else if(arch=="x86_64"_) args << String("-march=core2"_);
             else args << String("-march=native"_);
 
             if(!flags.contains("release"_)) args << String("-g"_);
