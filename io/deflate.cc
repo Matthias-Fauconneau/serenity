@@ -86,8 +86,6 @@ struct compressor {
   uint m_saved_match_dist, m_saved_match_len, m_saved_lit, m_output_flush_ofs, m_output_flush_remaining, m_finished, m_block_index, m_wants_to_finish;
   status m_prev_return_status;
   const void *m_pIn_buf;
-  void *m_pOut_buf;
-  size_t *m_pIn_buf_size, *m_pOut_buf_size;
   flush m_flush;
   const uint8 *m_pSrc;
   size_t m_src_buf_left, m_out_buf_ofs;
@@ -417,15 +415,15 @@ common_exit:
 }
 
 void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags) {
-  decompressor decomp; void *pBuf = NULL, *pNew_buf; size_t src_buf_ofs = 0, out_buf_capacity = 0;
+  decompressor decomp; void *pBuf = nullptr, *pNew_buf; size_t src_buf_ofs = 0, out_buf_capacity = 0;
   *pOut_len = 0;
   decomp.m_state = 0;
   for ( ; ; ) {
     size_t src_buf_size = src_buf_len - src_buf_ofs, dst_buf_size = out_buf_capacity - *pOut_len, new_out_buf_capacity;
-    status status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)pBuf, pBuf ? (uint8*)pBuf + *pOut_len : NULL, &dst_buf_size,
+    status status = decompress(&decomp, (const uint8*)pSrc_buf + src_buf_ofs, &src_buf_size, (uint8*)pBuf, pBuf ? (uint8*)pBuf + *pOut_len : nullptr, &dst_buf_size,
       (flags & ~FLAG_HAS_MORE_INPUT) | FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
     if ((status < 0) || (status == STATUS_NEEDS_MORE_INPUT)) {
-      free(pBuf); *pOut_len = 0; return NULL;
+      free(pBuf); *pOut_len = 0; return nullptr;
     }
     src_buf_ofs += src_buf_size;
     *pOut_len += dst_buf_size;
@@ -433,7 +431,7 @@ void *decompress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *p
     new_out_buf_capacity = out_buf_capacity * 2; if (new_out_buf_capacity < 128) new_out_buf_capacity = 128;
     pNew_buf = realloc(pBuf, new_out_buf_capacity);
     if (!pNew_buf) {
-      free(pBuf); *pOut_len = 0; return NULL;
+      free(pBuf); *pOut_len = 0; return nullptr;
     }
     pBuf = pNew_buf; out_buf_capacity = new_out_buf_capacity;
   }
@@ -776,7 +774,7 @@ static int flush_block(compressor *d, int flush) {
   uint8 *pSaved_output_buf;
   bool comp_block_succeeded = false;
   int n, use_raw_block = ((d->m_flags & FORCE_ALL_RAW_BLOCKS) != 0) && (d->m_lookahead_pos - d->m_lz_code_buf_dict_pos) <= d->m_dict_size;
-  uint8 *pOutput_buf_start = ((d->m_pPut_buf_func == NULL) && ((*d->m_pOut_buf_size - d->m_out_buf_ofs) >= OUT_BUF_SIZE)) ? ((uint8 *)d->m_pOut_buf + d->m_out_buf_ofs) : d->m_output_buf;
+  uint8 *pOutput_buf_start = d->m_output_buf;
 
   d->m_pOutput_buf = pOutput_buf_start;
   d->m_pOutput_buf_end = d->m_pOutput_buf + OUT_BUF_SIZE - 16;
@@ -836,23 +834,12 @@ static int flush_block(compressor *d, int flush) {
   d->m_pLZ_code_buf = d->m_lz_code_buf + 1; d->m_pLZ_flags = d->m_lz_code_buf; d->m_num_flags_left = 8; d->m_lz_code_buf_dict_pos += d->m_total_lz_bytes; d->m_total_lz_bytes = 0; d->m_block_index++;
 
   if ((n = (int)(d->m_pOutput_buf - pOutput_buf_start)) != 0) {
-    if (d->m_pPut_buf_func) {
-      *d->m_pIn_buf_size = d->m_pSrc - (const uint8 *)d->m_pIn_buf;
-      if (!(*d->m_pPut_buf_func)(d->m_output_buf, n, d->m_pPut_buf_user))
-        return (d->m_prev_return_status = STATUS_FAILED);
-    }
-    else if (pOutput_buf_start == d->m_output_buf) {
-      int bytes_to_copy = (int)min((size_t)n, (size_t)(*d->m_pOut_buf_size - d->m_out_buf_ofs));
-      memcpy((uint8 *)d->m_pOut_buf + d->m_out_buf_ofs, d->m_output_buf, bytes_to_copy);
-      d->m_out_buf_ofs += bytes_to_copy;
-      if ((n -= bytes_to_copy) != 0) {
-        d->m_output_flush_ofs = bytes_to_copy;
-        d->m_output_flush_remaining = n;
-      }
-    }
-    else {
+      d->m_pPut_buf_func(d->m_output_buf, n, d->m_pPut_buf_user);
+  } else if (pOutput_buf_start == d->m_output_buf) {
+      error("");
+  }
+  else {
       d->m_out_buf_ofs += n;
-    }
   }
 
   return d->m_output_flush_remaining;
@@ -986,47 +973,15 @@ static bool compress_fast(compressor *d) {
   return true;
 }
 
-static status flush_output_buffer(compressor *d) {
-  if (d->m_pIn_buf_size) {
-    *d->m_pIn_buf_size = d->m_pSrc - (const uint8 *)d->m_pIn_buf;
-  }
-
-  if (d->m_pOut_buf_size) {
-    size_t n = min<size_t>(*d->m_pOut_buf_size - d->m_out_buf_ofs, d->m_output_flush_remaining);
-    memcpy((uint8 *)d->m_pOut_buf + d->m_out_buf_ofs, d->m_output_buf + d->m_output_flush_ofs, n);
-    d->m_output_flush_ofs += (uint)n;
-    d->m_output_flush_remaining -= (uint)n;
-    d->m_out_buf_ofs += n;
-
-    *d->m_pOut_buf_size = d->m_out_buf_ofs;
-  }
-
-  return (d->m_finished && !d->m_output_flush_remaining) ? STATUS_DONE : STATUS_OKAY;
-}
-
-status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *pOut_buf, size_t *pOut_buf_size, flush flush) {
-  if (!d) {
-    if (pIn_buf_size) *pIn_buf_size = 0;
-    if (pOut_buf_size) *pOut_buf_size = 0;
-    error("STATUS_BAD_PARAM");
-  }
-
-  d->m_pIn_buf = pIn_buf; d->m_pIn_buf_size = pIn_buf_size;
-  d->m_pOut_buf = pOut_buf; d->m_pOut_buf_size = pOut_buf_size;
-  d->m_pSrc = (const uint8 *)(pIn_buf); d->m_src_buf_left = pIn_buf_size ? *pIn_buf_size : 0;
+status compress(compressor *d, const void *pIn_buf, const size_t pIn_buf_size, flush flush) {
+  d->m_pIn_buf = pIn_buf;
+  d->m_pSrc = (const uint8 *)(pIn_buf); d->m_src_buf_left = pIn_buf_size;
   d->m_out_buf_ofs = 0;
   d->m_flush = flush;
-
-  if ( ((d->m_pPut_buf_func != NULL) == ((pOut_buf != NULL) || (pOut_buf_size != NULL))) || (d->m_prev_return_status != STATUS_OKAY) ||
-        (d->m_wants_to_finish && (flush != FINISH)) || (pIn_buf_size && *pIn_buf_size && !pIn_buf) || (pOut_buf_size && *pOut_buf_size && !pOut_buf) ) {
-    if (pIn_buf_size) *pIn_buf_size = 0;
-    if (pOut_buf_size) *pOut_buf_size = 0;
-    error("STATUS_BAD_PARAM");
-  }
   d->m_wants_to_finish |= (flush == FINISH);
 
   if ((d->m_output_flush_remaining) || (d->m_finished))
-    return (d->m_prev_return_status = flush_output_buffer(d));
+    return (d->m_prev_return_status = ((d->m_finished && !d->m_output_flush_remaining) ? STATUS_DONE : STATUS_OKAY));
 
   if (((d->m_flags & GREEDY_PARSING_FLAG) != 0) &&
       ((d->m_flags & (FILTER_MATCHES | FORCE_ALL_RAW_BLOCKS | RLE_MATCHES)) == 0)) {
@@ -1042,14 +997,7 @@ status compress(compressor *d, const void *pIn_buf, size_t *pIn_buf_size, void *
     d->m_finished = (flush == FINISH);
     if (flush == FULL_FLUSH) { clear(d->m_hash); clear(d->m_next); d->m_dict_size = 0; }
   }
-
-  flush_output_buffer(d);
   return STATUS_DONE;
-}
-
-status compress_buffer(compressor *d, const void *pIn_buf, size_t in_buf_size, flush flush) {
-  assert(d->m_pPut_buf_func);
-  return compress(d, pIn_buf, &in_buf_size, NULL, NULL, flush);
 }
 
 status init(compressor *d, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags) {
@@ -1062,20 +1010,11 @@ status init(compressor *d, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, 
   d->m_pLZ_code_buf = d->m_lz_code_buf + 1; d->m_pLZ_flags = d->m_lz_code_buf; d->m_num_flags_left = 8;
   d->m_pOutput_buf = d->m_output_buf; d->m_pOutput_buf_end = d->m_output_buf; d->m_prev_return_status = STATUS_OKAY;
   d->m_saved_match_dist = d->m_saved_match_len = d->m_saved_lit = 0; d->m_adler32 = 1;
-  d->m_pIn_buf = NULL; d->m_pOut_buf = NULL;
-  d->m_pIn_buf_size = NULL; d->m_pOut_buf_size = NULL;
-  d->m_flush = NO_FLUSH; d->m_pSrc = NULL; d->m_src_buf_left = 0; d->m_out_buf_ofs = 0;
+  d->m_pIn_buf = nullptr;
+  d->m_flush = NO_FLUSH; d->m_pSrc = nullptr; d->m_src_buf_left = 0; d->m_out_buf_ofs = 0;
   memset(&d->m_huff_count[0][0], 0, sizeof(d->m_huff_count[0][0]) * MAX_HUFF_SYMBOLS_0);
   memset(&d->m_huff_count[1][0], 0, sizeof(d->m_huff_count[1][0]) * MAX_HUFF_SYMBOLS_1);
   return STATUS_OKAY;
-}
-
-bool compress_mem_to_output(const void *pBuf, size_t buf_len, put_buf_func_ptr pPut_buf_func, void *pPut_buf_user, int flags) {
-  compressor *pComp; assert(!(((buf_len) && (!pBuf)) || (!pPut_buf_func)));
-  pComp = (compressor*)malloc(sizeof(compressor)); assert(pComp);
-  init(pComp, pPut_buf_func, pPut_buf_user, flags);
-  compress_buffer(pComp, pBuf, buf_len, FINISH);
-  free(pComp); return true;
 }
 
 struct output_buffer {
@@ -1097,18 +1036,17 @@ static bool output_buffer_putter(const void *pBuf, int len, void *pUser) {
   return true;
 }
 
-void *compress_mem_to_heap(const void *pSrc_buf, size_t src_buf_len, size_t *pOut_len, int flags) {
-  output_buffer out_buf = {0,0,0,0};
-  if (!pOut_len) return 0; else *pOut_len = 0;
-  out_buf.m_expandable = true;
-  compress_mem_to_output(pSrc_buf, src_buf_len, output_buffer_putter, &out_buf, flags);
-  *pOut_len = out_buf.m_size; return out_buf.m_pBuf;
-}
-
 buffer<byte> deflate(const ref<byte> source, bool zlib) {
     buffer<byte> data; size_t size=0;
     assert(source.data && source.size);
-    data.data = (byte*)compress_mem_to_heap(source.data, source.size, &size, GREEDY_PARSING_FLAG|(zlib?WRITE_ZLIB_HEADER:0));
+    output_buffer out_buf = {0,0,0,0};
+    out_buf.m_expandable = true;
+    assert(!(((source.size) && (!source.data)) || (!output_buffer_putter)));
+    compressor pComp;
+    init(&pComp, output_buffer_putter, &out_buf, GREEDY_PARSING_FLAG|(zlib?WRITE_ZLIB_HEADER:0));
+    compress(&pComp, source.data, source.size, FINISH);
+    size = out_buf.m_size;
+    data.data = (byte*)out_buf.m_pBuf;
     data.capacity=data.size=size;
     assert(data, data.size, data.data, data.capacity, size);
     return data;
