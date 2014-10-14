@@ -127,7 +127,10 @@ bool writableFile(const string path, const Folder& at) { int fd = openat(at.fd, 
 
 buffer<byte> readFile(const string path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 
-void writeFile(const string path, const ref<byte> content, const Folder& at) { File(path,at,Flags(WriteOnly|Create|Truncate)).write(content); }
+void writeFile(const string path, const ref<byte> content, const Folder& at, bool overwrite) {
+    assert_(overwrite || !existsFile(path, at));
+    File(path,at,Flags(WriteOnly|Create|Truncate)).write(content);
+}
 
 // -- Device
 

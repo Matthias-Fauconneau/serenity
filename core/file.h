@@ -120,8 +120,8 @@ bool existsFile(const string path, const Folder& at=currentWorkingDirectory());
 bool writableFile(const string path, const Folder& at);
 /// Reads whole \a file content
 buffer<byte> readFile(const string path, const Folder& at=currentWorkingDirectory());
-/// Writes \a content into \a file (overwrites any existing file)
-void writeFile(const string path, const ref<byte> content, const Folder& at=currentWorkingDirectory());
+/// Writes \a content into \a file
+void writeFile(const string path, const ref<byte> content, const Folder& at=currentWorkingDirectory(), bool overwrite=false);
 
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
