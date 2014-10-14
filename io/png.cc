@@ -161,7 +161,7 @@ buffer<byte> filter(const Image& image) {
 buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n");
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
-    array<byte> IHDR = "IHDR"+raw(ihdr);
+    buffer<byte> IHDR = ref<byte>("IHDR"_)+raw(ihdr);
     file.append(raw(big32(IHDR.size-4)));
     file.append(IHDR);
     file.append(raw(big32(crc32(IHDR))));
@@ -172,7 +172,7 @@ buffer<byte> encodePNG(const Image& image) {
     file.append(raw(big32(crc32(IDAT))));
 
     file.append(raw(big32(0)));
-    file.append(ref<byte>("IEND"));
-    file.append(raw(big32(crc32(ref<byte>("IEND")))));
+    file.append("IEND"_);
+    file.append(raw(big32(crc32("IEND"_))));
     return move(file);
 }
