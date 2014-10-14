@@ -20,7 +20,7 @@ registerApplication(CalibrationView, calibration);
 
 struct DustRemovalTest : DustRemoval, Application {
     ProcessedSource corrected {source, correction};
-    DustRemovalTest() { corrected.image(0, source.size(0)/4, true); }
+    DustRemovalTest() { corrected.image(0, source.size(0), true); } // Calibration: 5s, Linear: 0.8s
 };
 registerApplication(DustRemovalTest, test);
 

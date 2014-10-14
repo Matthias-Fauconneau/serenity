@@ -93,7 +93,7 @@ inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
     return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride), size, source.stride);
 }
 
-inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); parallel::div(a, a, b); return move(a); }
+//inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); parallel::div(a, a, b); return move(a); }
 
 template<Type F, Type... S> void apply(const ImageF& target, F function, const S&... source) {
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {

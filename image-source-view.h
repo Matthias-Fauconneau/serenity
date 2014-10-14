@@ -17,18 +17,20 @@ struct ImageSourceView : ImageView, Poll {
     ImageSourceView(ImageSource& source, size_t* index, Window& window)
         : ImageSourceView(source, index, {&window, &Window::render}) {}
 
-    // Evaluation
-
+    // Progressive evaluation
     void event() override {
         if(imageIndex != index) { image=SourceImageRGB();  ImageView::image=Image(); }
+#if PROGRESSIVE
         if(image.size*2 > size) return;
         debug(if(image.size) return;)
 
         int downscaleFactor = image.size ? (source.size(index).x/image.size.x)/2 : 16; // Doubles resolution at every step
         while(source.maximumSize().x/(source.size(index).x/downscaleFactor) > 16) downscaleFactor /= 2; // Limits calibration downscale (FIXME)
         int2 hint = (source.size(index)+int2(downscaleFactor-1))/downscaleFactor;
+#else
+        int2 hint = size;
         assert_(source.maximumSize().x/hint.x <= 16);
-
+#endif
         imageIndex = index;
         image = source.image(index, hint);
         ImageView::image = share(image);
@@ -54,8 +56,11 @@ struct ImageSourceView : ImageView, Poll {
     Graphics graphics(int2 size) override {
         if(!source.count()) return {};
         index = clip(0ul, (size_t)index, source.count()-1);
+        this->size=size;
         if(imageIndex != index) event(); // Evaluates requested image immediately
-        else if(image.size*2 <= size) { this->size=size; queue(); } // Requests further display until full resolution is shown
+#if PROGRESSIVE
+        else if(image.size*2 <= size) queue(); // Requests further display until full resolution is shown
+#endif
         assert_(image.size <= size, image.size, size);
         return ImageView::graphics(size);
     }
