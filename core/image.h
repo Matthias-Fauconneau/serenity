@@ -181,3 +181,46 @@ inline int2 argmin(const ImageF& source) {
     for(C v: minimums) { if(v.value < min.value) min = v; }
     return min.position;
 }
+
+// -- Crop copy convert --
+
+/// Copies rectangle \a size around \a origin from \a (red+green+blue) into \a target
+static void crop(const ImageF& target, const ImageF& red, const ImageF& green, const ImageF& blue, int2 origin) {
+    parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
+        assert_(origin >= int2(0) && origin+target.size <= red.size, withName(origin, target.size, red.size) );
+        size_t offset = origin.y*red.stride + origin.x;
+        for(size_t y: range(start, start+chunkSize)) {
+            for(size_t x: range(target.size.x)) {
+                size_t index = offset + y*red.stride + x;
+                target[y*target.stride + x] = red[index] + green[index] + blue[index];
+            }
+        }
+    });
+}
+inline ImageF crop(ImageF&& target, const ImageF& red, const ImageF& green, const ImageF& blue, int2 origin) {
+    crop(target, red, green, blue, origin); return move(target);
+}
+inline ImageF crop(const ImageF& red, const ImageF& green, const ImageF& blue, int2 origin, int2 size) {
+    return crop(size, red, green, blue, origin);
+}
+
+// -- Insert --
+
+/// Copies \a source with \a crop inserted at \a origin into \a target
+static void insert(const ImageF& target, const ImageF& source, const ImageF& crop, int2 origin) {
+    target.copy(source); // Assumes crop is small before source
+    assert_(origin >= int2(0) && origin+crop.size <= target.size, origin, crop.size, target.size);
+    parallel_chunk(crop.size.y, [&](uint, uint64 start, uint64 chunkSize) {
+        size_t offset = origin.y*target.stride + origin.x;
+        for(size_t y: range(start, start+chunkSize)) {
+            for(size_t x: range(crop.size.x)) {
+                size_t index = offset + y*target.stride + x;
+                target[index] = crop[y*crop.stride + x];
+            }
+        }
+    });
+}
+inline ImageF insert(ImageF&& target, const ImageF& source, const ImageF& crop, int2 origin) {
+    insert(target, source, crop, origin); return move(target);
+}
+inline ImageF insert(const ImageF& source, const ImageF& crop, int2 origin) { return insert(source.size, source, crop, origin); }
