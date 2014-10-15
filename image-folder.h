@@ -20,7 +20,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
                 properties.insert("Size"_, strx(imageSize));
                 properties.insert("Path"_, copy(fileName));
                 properties.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
-                insert(String(section(fileName,'.')), {properties.keys, apply(properties.values, [](const Variant& o){return str(o);})});
+                insert(String(section(fileName,'.')), {move(properties.keys), apply(properties.values, [](const Variant& o){return str(o);})});
 
                 maximumImageSize = max(maximumImageSize, imageSize);
             }

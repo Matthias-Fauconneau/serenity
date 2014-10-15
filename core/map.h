@@ -15,7 +15,7 @@ template<Type K, Type V> struct map {
     map(const ref<key_value<K,V>>& pairs) {
         for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
     }
-    map(const ref<K> keys, const ref<V> values) : keys(keys), values(values) { assert(keys.size==values.size); }
+    map(buffer<K>&& keys, const mref<V> values) : keys(keys), values(values) { assert(keys.size==values.size); }
 
     size_t size() const { return keys.size; }
     size_t count() const { return keys.size; }

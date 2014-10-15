@@ -253,8 +253,8 @@ template<> void error(const string& message) __attribute((noreturn));
 generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
 
-const char& ref<char>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
-ref<char> ref<char>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<char>(data+pos, size); }
+inline const char& ref<char>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
+inline ref<char> ref<char>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<char>(data+pos, size); }
 
 // -- FILE
 
@@ -280,8 +280,8 @@ generic struct mref : ref<T> {
     mref(){}
     /// References \a size elements from \a data pointer
     mref(T* data, size_t size) : ref<T>(data,size) {}
-    /*/// Converts an std::initializer_list to mref
-    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}*/
+    /// Converts an std::initializer_list to mref
+    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
     /// Converts a static array to ref
     template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 

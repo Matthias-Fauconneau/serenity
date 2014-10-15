@@ -101,7 +101,7 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            array<string> args ({"-r", "-b", "binary", "-o", object, file});
+            array<string> args (ref<string>{"-r", "-b", "binary", "-o", object, file});
             if(execute(LD, args, true, subfolder)) error("Failed to embed");
             needLink = true;
         }
