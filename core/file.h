@@ -1,6 +1,6 @@
 #pragma once
 /// \file file.h Unix stream I/O and file system abstraction (Handle, Folder, Stream, Socket, File, Device, Map)
-#include "array.h"
+#include "string.h"
 
 /// Linux error code names
 enum class LinuxError { Interrupted=4 };
@@ -153,12 +153,10 @@ struct Map : mref<byte> {
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(::move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const string path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at),prot) {}
+    explicit Map(const string path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at), prot) {}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 
-    /// Locks memory map in RAM
-    void lock(uint size=-1) const;
     /// Unmaps memory map
     void unmap();
 

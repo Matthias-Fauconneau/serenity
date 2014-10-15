@@ -91,7 +91,7 @@ struct range {
     int start, stop;
 };
 
-// -- Debugging
+// -- initializer_list
 
 #ifndef _INITIALIZER_LIST
 namespace std { generic struct initializer_list {
@@ -118,10 +118,10 @@ generic struct ref {
     /// References \a size elements from const \a data pointer
     constexpr ref(const T* data, size_t size) : data(data), size(size) {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
+    //constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
     /// Converts a real std::initializer_list to ref
     constexpr ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
-    /// Converts a static array to ref
+    /// Explicitly references a static array
     template<size_t N> explicit constexpr ref(const T (&a)[N]) : ref(a,N) {}
 
     explicit operator bool() const { return size; }
@@ -130,7 +130,7 @@ generic struct ref {
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
     const T& at(size_t i) const;
-    T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
+    //T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
     const T& operator [](size_t i) const { return at(i); }
     const T& last() const { return at(size-1); }
 
@@ -141,7 +141,7 @@ generic struct ref {
     /// Slices a reference to elements from \a start to \a stop
     //ref<T> operator()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
-    struct reverse_ref {
+    /*struct reverse_ref {
         const T* start; const T* stop;
         struct iterator {
             const T* pointer;
@@ -152,35 +152,73 @@ generic struct ref {
         iterator begin() const { return {start}; }
         iterator end() const { return {stop}; }
     };
-    reverse_ref reverse() { return {end()-1, begin()}; }
+    reverse_ref reverse() { return {end()-1, begin()}; }*/
 
+    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
+    size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
+    /// Returns true if the array contains an occurrence of \a value
+    bool contains(const T& key) const { return indexOf(key)!=invalid; }
     /// Compares all elements
     bool operator ==(const ref<T> o) const {
         if(size != o.size) return false;
         for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
         return true;
     }
-    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
-    /// Returns true if the array contains an occurrence of \a value
-    bool contains(const T& key) const { return indexOf(key)!=invalid; }
 };
-/// Returns const reference to memory used by \a t
-generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
 // -- string
 
-/// ref<char> holding UTF8 text strings
-struct string : ref<char> {
-    using ref::ref;
-    string() {}
-    string(ref<char> o) : ref<char>(o) {}
-    /// Converts a string literal to string
-    template<size_t N> constexpr string(const char (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
-    bool operator ==(const string o) const { return ref<char>::operator==(o); }
+template<> struct ref<char> {
+    typedef char type;
+    const char* data = 0;
+    size_t size = 0;
+
+    /// Default constructs an empty reference
+    constexpr ref() {}
+    /// References \a size elements from const \a data pointer
+    constexpr ref(const char* data, size_t size) : data(data), size(size) {}
+    /// Implicitly references a string literal
+    template<size_t N> constexpr ref(char const(&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
+
+    explicit operator bool() const { return size; }
+
+    const char* begin() const { return data; }
+    const char* end() const { return data+size; }
+    const char& at(size_t i) const;
+    const char& operator [](size_t i) const { return at(i); }
+    ref<char> slice(size_t pos, size_t size) const;
+
+    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
+    size_t indexOf(const char& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
+    /// Returns true if the array contains an occurrence of \a value
+    bool contains(const char& key) const { return indexOf(key)!=invalid; }
+
+    bool operator ==(const ref<char> o) const {
+        if(size != o.size) return false;
+        for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
+        return true;
+    }
 };
+
+/// Returns const reference to memory used by \a t
+generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+
+/// ref<char> holding a UTF8 text string
+typedef ref<char> string;
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
+
+#if 0
+/// ref<char> holding a UTF8 text string literal
+struct StringLiteral : string {
+    //using ref::ref;
+    //StringLiteral() {}
+    //StringLiteral(ref<char> o) : ref<char>(o) {}
+    /// Implicitly references a string literal
+    template<size_t N> constexpr StringLiteral(const char (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
+    //bool operator ==(const StringLiteral o) const { return ref<char>::operator==(o); }
+};
+#endif
 
 // -- Log
 
@@ -214,6 +252,9 @@ template<> void error(const string& message) __attribute((noreturn));
 // -- ref
 generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+
+const char& ref<char>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
+ref<char> ref<char>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<char>(data+pos, size); }
 
 // -- FILE
 

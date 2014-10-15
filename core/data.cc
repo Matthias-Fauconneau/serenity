@@ -39,7 +39,7 @@ bool Data::match(const string key) {
 }
 
 void Data::skip(const uint8 key) {
-    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
+    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())/*+'\''*/);
 }
 void Data::skip(const char key) {
     if(!match(key)) error("Expected '"_+key+"', got '"+peek()+'\'');

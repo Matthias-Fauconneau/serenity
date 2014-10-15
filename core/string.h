@@ -5,12 +5,12 @@
 // -- str()
 
 // Enforces exact match for overload resolution
-generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); return {}; }
+generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
 
 /// Forwards string
 inline string str(string s) { return s; }
 /// Forwards String
-inline string str(const String& s) { return s; }
+//inline string str(const String& s) { return s; }
 /// Forwards char[]
 template<size_t N> string str(const char (&source)[N]) { return string(source); }
 
@@ -46,15 +46,24 @@ int64 fromInteger(const string str, int base=10);
 /// Parses a decimal value
 double fromDecimal(const string str);
 
-// -- strz
+// -- String
+
+typedef array<char> String;
+
+/// Converts Strings to strings
+inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return  e; }); }
 
 /// Copies the reference, appends a null byte and allows implicit conversion to const char*
 struct strz : String {
-    strz(const string s) : String(s+'\0') {}
+    char buffer[20];
+    strz(const string s) : String(s.size<20?::buffer<char>(buffer,sizeof(buffer)):s+'\0') {
+        if(s.size<20) {
+            slice(0, s.size).copy(s);
+            set(s.size, 0);
+        }
+    }
     operator const char*() { return data; }
 };
-
-// -- String
 
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string s, const string before, const string after);
@@ -69,6 +78,9 @@ String toUpper(const string s);
 String left(const string s, size_t size, const char pad=' ');
 /// Pads a string to the right
 String right(const string s, size_t size, const char pad=' ');
+
+/// Flatten cats
+template<class A, class B> String str(const cat<A, B>& a) { return a; }
 
 // -- string[]
 

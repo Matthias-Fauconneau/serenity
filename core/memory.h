@@ -27,7 +27,7 @@ generic struct buffer : mref<T> {
     buffer(size_t capacity, size_t size) : mref<T>((T*)0,size), capacity(capacity) {
         assert(capacity>=size && size>=0); if(!capacity) return;
         if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory");
-        debug(if(logMemory()) { logMemory()=false; log(data, capacity, size); logMemory()=true; })
+        debug(if(logMemory()) { logMemory()=false; log("+", capacity,'\t', size,'\t', (void*)data); logMemory()=true; })
     }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
@@ -38,7 +38,11 @@ generic struct buffer : mref<T> {
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() {
-        debug(if(logMemory()) { logMemory()=false; log(data, capacity, size); logMemory()=true; })
+#if DEBUG
+        if(logMemory() && capacity) {
+            logMemory()=false; log("~", capacity,'\t', size,'\t', (void*)data); logMemory()=true;
+        }
+#endif
         if(capacity) ::free((void*)data); data=0; capacity=0; size=0;
     }
 };
@@ -48,7 +52,7 @@ generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.si
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
 generic buffer<T> unsafeReference(const ref<T> o) { return buffer<T>((T*)o.data, o.size); }
 
-/// Concatenates a single element and a buffer by copying
+/*/// Concatenates a single element and a buffer by copying
 generic inline buffer<T> operator+(const T a, const ref<T> b) {
     buffer<T> target(1+b.size); target.set(0, a); target.slice(1).copy(b); return target;
 }
@@ -61,7 +65,7 @@ generic inline buffer<T> operator+(const ref<T> a, T b) {
 /// Concatenates two buffers by copying
 generic inline buffer<T> operator+(const ref<T> a, const ref<T> b) {
     buffer<T> target(a.size+b.size); target.slice(0, a.size).copy(a); target.slice(a.size).copy(b); return target;
-}
+}*/
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {

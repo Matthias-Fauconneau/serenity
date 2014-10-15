@@ -119,9 +119,9 @@ void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r
 #include <sys/resource.h>
 void __attribute((constructor(102))) setup_signals() {
     /// Limits process ressources to avoid hanging the system when debugging
-    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<8;/*64K*/ setrlimit(RLIMIT_STACK,&limit); }
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24;/*16M*/ setrlimit(RLIMIT_DATA,&limit); }
-    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<28;/*256M*/ setrlimit(RLIMIT_AS,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21;/*2M*/ setrlimit(RLIMIT_STACK,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<29;/*512M*/ setrlimit(RLIMIT_DATA,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30;/*1GB*/ setrlimit(RLIMIT_AS,&limit); }
     setpriority(PRIO_PROCESS,0,19);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
@@ -141,7 +141,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
         traceAllThreads();
-        if(threads.size>1) log(String("Thread #"+dec(gettid())+':'));
+        if(threads.size>1) log("Thread #"+dec(gettid())+':');
         log_(trace(1,0));
         reentrant = false;
     }
@@ -228,10 +228,11 @@ string getenv(const string name, string value) {
     return value;
 }
 
-array<string> arguments() {
+ref<string> arguments() {
     static String cmdline = File("/proc/self/cmdline").readUpTo(4096);
     assert(cmdline.size<4096);
-    return split(section(cmdline,0,1,-1),"\0");
+    static array<string> arguments = split(section(cmdline,0,1,-1),"\0");
+    return arguments;
 }
 
 const Folder& home() { static Folder home(getenv("HOME",str((const char*)getpwuid(geteuid())->pw_dir))); return home; }

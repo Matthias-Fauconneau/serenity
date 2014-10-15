@@ -49,7 +49,6 @@ template<Type K, Type V> struct map {
     template<Type KK> const V* find(const KK& key) const { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
     template<Type KK> V* find(const KK& key) { size_t i = keys.indexOf(key); return i!=invalid ? &values[i] : 0; }
 
-
     template<Type KK> V& insert(KK&& key) { assertNo(key); keys.append(move(key)); return values.append(); }
     template<Type KK, Type VV> V& insert(KK&& key, VV&& value) {
         assertNo(key);
