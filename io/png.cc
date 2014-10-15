@@ -7,10 +7,18 @@ generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } }
 
 typedef vec<rgb,uint8,3> rgb3;
 
+// Paeth median
+template<template<typename> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
+    vec<T, int, N> d = a + b - c;
+    vec<T, int, N> pa = abs(d-a), pb = abs(d-b), pc = abs(d-c);
+    vec<T, uint8, N> p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+    return p;
+}
+
 template<template<typename> class T, int N>
 void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
-    typedef vec<T,uint8,N> S;
-    typedef vec<T,int,N> V;
+    typedef vec<T, uint8, N> S;
+    typedef vec<T, int, N> V;
     buffer<S> prior(width); prior.clear(0);
     for(size_t unused y: range(height)) {
         uint predictor = *source++; assert(predictor<=4,"Unknown PNG predictor",predictor);
@@ -25,10 +33,7 @@ void unpredict(byte4* target, const byte* source, size_t width, size_t height, s
             for(size_t x: range(width)) {
                 V c = b;
                 b = V(prior[x]);
-                V d = V(a) + b - c;
-                V pa = abs(d-V(a)), pb = abs(d-b), pc = abs(d-c);
-                S p/*=Void()*/; for(int i: range(N)) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
-                target[x*xStride]= prior[x]=a= p+src[x];
+                target[x*xStride]= prior[x]= a= Paeth<T,N>(V(a), b, c) + src[x];
             }
         }
         else error(predictor);
@@ -169,8 +174,35 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
     buffer<S> prior(width); prior.clear(0);
     buffer<byte> data ( height * ( 1 + width*sizeof(S) ) );
     byte* target = data.begin();
+    uint predictorStats[4] = {0,0,0,0};
     for(size_t unused y: range(height)) {
-        static constexpr uint8 predictor = 1;
+        // Optimizes sum of absolute differences
+        uint8 bestSADPredictor = 0; uint bestSAD=-1;
+        {
+            S a = 0;
+            { uint SAD=0;
+                for(size_t x: range(width)) SAD += sum(abs(S(source[x])));
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 0; }
+            { uint SAD=0;
+                for(size_t x: range(width)) { SAD += sum(abs(S(source[x])-a)); a= source[x]; }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 1; }
+            { uint SAD=0;
+                for(size_t x: range(width)) { SAD += sum(abs(S(source[x])-prior[x])); }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 2; }
+            { uint SAD=0;
+                for(size_t x: range(width)) { SAD += sum(abs(S(source[x])-S((V(prior[x])+V(a))/2))); a= source[x]; }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 3; }
+            { uint SAD=0;
+                V b=0;
+                for(size_t x: range(width)) {
+                    V c = b;
+                    b = V(prior[x]);
+                    SAD += sum(abs(S(source[x]) - Paeth<T,N>(V(a), b, c)));
+                    a= source[x];
+                }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 4; }
+        }
+        const uint8 predictor = bestSADPredictor;
         *target++ = predictor;
         S* dst = (S*)target;
         S a = 0;
@@ -178,35 +210,35 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
         else if(predictor==1) for(size_t x: range(width)) { dst[x]= S(source[x]) -                                  a;  prior[x]= a= source[x]; }
         else if(predictor==2) for(size_t x: range(width)) { dst[x]= S(source[x]) -                         prior[x]; prior[x]=      source[x]; }
         else if(predictor==3) for(size_t x: range(width)) { dst[x]= S(source[x]) - S((V(prior[x])+V(a))/2); prior[x]= a= source[x]; }
-        /*else if(predictor==4) {
+        else if(predictor==4) {
             V b=0;
             for(size_t x: range(width)) {
                 V c = b;
                 b = V(prior[x]);
-                V d = V(a) + b - c;
-                V pa = abs(d-V(a)), pb = abs(d-b), pc = abs(d-c);
-                S p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
-                dst[x]= prior[x]=a= p+source[x];
+                dst[x]= S(source[x]) - Paeth<T,N>(V(a), b, c);
+                prior[x]=a= source[x];
             }
-        }*/
+        }
         else error(predictor);
         source += width;
         target += width*sizeof(S);
+        predictorStats[predictor]++;
     }
+    log(predictorStats);
     return data;
 }
 
 buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n");
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr
-     { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:3), 0, 0, 0 };
+     { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:2), 0, 0, 0 };
     buffer<byte> IHDR = ref<byte>("IHDR"_)+raw(ihdr);
     file.append(raw(big32(IHDR.size-4)));
     file.append(IHDR);
     file.append(raw(big32(crc32(IHDR))));
 
     buffer<byte> predicted;
-    if(image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height);
+    if(!image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height);
     else predicted = predict<rgba,4>(image.data, image.width, image.height);
 
     buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(predicted, true);

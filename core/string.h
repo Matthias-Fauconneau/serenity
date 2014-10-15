@@ -105,7 +105,7 @@ String str(float n);
 String str(double n);
 
 /// Formats value using best binary prefix
-String binaryPrefix(size_t value, string unit="B");
+String binaryPrefix(size_t value, string unit="B", string unitSuffix="");
 
 /// Converts arrays
 template<Type T, typename enable_if<!is_same<char, T>::value>::type* = nullptr>

@@ -76,8 +76,12 @@ generic vec min(const vec& a, const vec& b){ vec r/*=Void()*/; for(uint i: range
 generic vec max(const vec& a, const vec& b){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=max(a[i],b[i]); return r; }
 generic vec clip(const vec& min, const vec& x, const vec& max){vec r/*=Void()*/; for(uint i: range(N)) r[i]=clip(min[i],x[i],max[i]); return r;}
 
-generic float dot(const vec& a, const vec& b) { float l=0; for(uint i: range(N)) l+=a[i]*b[i]; return l; }
-generic float sq(const vec& a) { return dot(a,a); }
+generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }
+//generic T SAV(const vec& a) { T sav=0; for(uint i: range(N)) sav+=abs(a[i]); return sav; }
+//generic T SAD(const vec& a, const vec& b) { T sad=0; for(uint i: range(N)) sad+=abs(a[i]-b[i]); return sad; }
+generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
+generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
+generic T sq(const vec& a) { return dot(a,a); }
 generic float norm(const vec& a) { return sqrt(dot(a,a)); }
 generic vec normalize(const vec& a){ return a/norm(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
