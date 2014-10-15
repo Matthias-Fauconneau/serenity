@@ -42,7 +42,7 @@
 struct Rock : PersistentProcess, Poll {
     FILE(rock) // Rock process definition (embedded in binary)
     Rock() {
-        specialParameters += {"dump"_,"view"_,"slides"_,"png"_,"pdf"_};
+        specialParameters += {"dump"_,"definition"_,"view"_,"slides"_,"png"_,"pdf"_};
         queue(); // Lets all implementations (Operations, Views) register before execution
     }
     void event() {
@@ -63,6 +63,7 @@ struct Rock : PersistentProcess, Poll {
             log("Arguments:",arguments);
             log("Target paths:",targetPaths);
         }
+        if(specialArguments.contains("definition"_)) log(rock());
         if(!targets && !specialArguments) {
             if(arguments) log("Arguments:",arguments);
             if(targetPaths) log("Target paths:",targetPaths);
