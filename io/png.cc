@@ -158,61 +158,20 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
     buffer<U> prior(width); prior.clear(0);
     buffer<byte> data ( height * ( 1 + width*sizeof(U) ) );
     byte* target = data.begin();
-    uint predictorStats[5] = {0,0,0,0,0};
     for(size_t unused y: range(height)) {
-#if 0
-        // Optimizes sum of absolute differences
-        Predictor bestSADPredictor = Predictor::None; uint bestSAD=-1;
-        {
-            U a = 0;
-            { uint SAD=0;
-                for(size_t x: range(width)) SAD += sum(abs(S(U(source[x]))));
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::None; }
-            { uint SAD=0;
-                for(size_t x: range(width)) { SAD += sum(abs(S(U(source[x])-a))); a= U(source[x]); }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Left; }
-            { uint SAD=0;
-                for(size_t x: range(width)) { SAD += sum(abs(S(U(source[x])-prior[x]))); }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Up; }
-            { uint SAD=0;
-                for(size_t x: range(width)) { SAD += sum(abs(S(U(source[x])-U((V(prior[x])+V(a))/2)))); a= U(source[x]); }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Average; }
-            { uint SAD=0;
-                V b=0;
-                for(size_t x: range(width)) {
-                    V c = b;
-                    b = V(prior[x]);
-                    SAD += sum(abs(S(U(source[x]) - Paeth<T,N>(V(a), b, c))));
-                    a= U(source[x]);
-                }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Paeth; }
-        }
-        const Predictor predictor = bestSADPredictor;
-#else
-        const Predictor predictor = Predictor::Paeth;
-#endif
-        *target++ = byte(predictor);
+        *target++ = byte(Predictor::Paeth);
         U* dst = (U*)target;
         U a = 0;
-        /**/  if(predictor==Predictor::None) for(size_t x: range(width)) { dst[x]= U(source[x])                                      ;  prior[x]=      source[x]; }
-        else if(predictor==Predictor::Left) for(size_t x: range(width)) { dst[x]= U(source[x]) -                                  a;  prior[x]= a= source[x]; }
-        else if(predictor==Predictor::Up) for(size_t x: range(width)) { dst[x]= U(source[x]) -                         prior[x]; prior[x]=      source[x]; }
-        else if(predictor==Predictor::Average) for(size_t x: range(width)) { dst[x]= U(source[x]) - U((V(prior[x])+V(a))/2); prior[x]= a= source[x]; }
-        else if(predictor==Predictor::Paeth) {
-            V b=0;
-            for(size_t x: range(width)) {
-                V c = b;
-                b = V(prior[x]);
-                dst[x]= U(source[x]) - Paeth<T,N>(V(a), b, c);
-                prior[x]=a= source[x];
-            }
+        V b=0;
+        for(size_t x: range(width)) {
+            V c = b;
+            b = V(prior[x]);
+            dst[x]= U(source[x]) - Paeth<T,N>(V(a), b, c);
+            prior[x]=a= source[x];
         }
-        else error(int(predictor));
         source += width;
         target += width*sizeof(U);
-        predictorStats[int(predictor)]++;
     }
-    log(predictorStats);
     return data;
 }
 
