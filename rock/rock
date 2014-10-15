@@ -295,6 +295,7 @@ cdl-flood = ToCDL flood
 cdl-curve-skeleton = ToCDL curve-skeleton
 cdl-surface-skeleton = ToCDL surface-skeleton
 cdl-maximum = ToCDL sqrt-scaled
+cdl-curve-skeleton-distance = ToCDL curve-skeleton-distance
 cdl-connectivity = ToCDL connectivity
 cdl-pore-index = ToCDL pore-index
 cdl-pore-skeleton = ToCDL pore-skeleton
