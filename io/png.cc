@@ -15,20 +15,22 @@ template<template<typename> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N
     return p;
 }
 
+enum class Predictor { None, Left, Up, Average, Paeth };
+
 template<template<typename> class T, int N>
 void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
-    typedef vec<T, uint8, N> S;
+    typedef vec<T, uint8, N> U;
     typedef vec<T, int, N> V;
-    buffer<S> prior(width); prior.clear(0);
+    buffer<U> prior(width); prior.clear(0);
     for(size_t unused y: range(height)) {
-        uint predictor = *source++; assert(predictor<=4,"Unknown PNG predictor",predictor);
-        S* src = (S*)source;
-        S a = 0;
-        /**/  if(predictor==0) for(size_t x: range(width)) target[x*xStride]= prior[x]=       src[x];
-        else if(predictor==1) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= a+src[x];
-        else if(predictor==2) for(size_t x: range(width)) target[x*xStride]= prior[x]=       prior[x]+src[x];
-        else if(predictor==3) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= S((V(prior[x])+V(a))/2)+src[x];
-        else if(predictor==4) {
+        Predictor predictor = Predictor(*source++); assert(predictor<=4,"Unknown PNG predictor",predictor);
+        U* src = (U*)source;
+        U a = 0;
+        /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=       src[x];
+        else if(predictor==Predictor::Left) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= a+src[x];
+        else if(predictor==Predictor::Up) for(size_t x: range(width)) target[x*xStride]= prior[x]=       prior[x]+src[x];
+        else if(predictor==Predictor::Average) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= U((V(prior[x])+V(a))/2)+src[x];
+        else if(predictor==Predictor::Paeth) {
             V b=0;
             for(size_t x: range(width)) {
                 V c = b;
@@ -36,8 +38,8 @@ void unpredict(byte4* target, const byte* source, size_t width, size_t height, s
                 target[x*xStride]= prior[x]= a= Paeth<T,N>(V(a), b, c) + src[x];
             }
         }
-        else error(predictor);
-        source += width*sizeof(S);
+        else error(int(predictor));
+        source += width*sizeof(U);
         target += yStride*xStride*width;
     }
 }
@@ -149,80 +151,66 @@ uint adler32(const ref<byte> data) {
     return a | (b << 16);
 }
 
-/*buffer<byte> predict(const Image& image) {
-    const size_t w=image.width, h=image.height, depth = image.alpha?4:3;
-    static constexpr size_t map[] = {2,1,0,3}; // BGRA -> RGBA
-    buffer<byte> data(h*(1+w*depth));
-    byte* dst = data.begin();
-    const byte* src = (byte*)image.data;
-    for(size_t unused y: range(h)) {
-        static constexpr predict = 1;
-        *dst++ = predict;
-        byte4 a = 0;
-        if(predict==0) for(size_t x: range(w)) dst[x*depth+i] = src[x*depth+map[i]];
-        } else if(predict==1) {
-            for(size_t x: range(w)) for(size_t i : range(depth)) {dst[x*depth+i] = src[x*depth+map[i]]-a;
-        } else error(predict);
-        dst+=w*4, src+=image.stride*4;
-    }
-    return data;
-}*/
-
 template<template<typename> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height) {
-    typedef vec<T,uint8,N> S;
+    typedef vec<T,uint8,N> U;
+    typedef vec<T, int8, N> S;
     typedef vec<T,int,N> V;
-    buffer<S> prior(width); prior.clear(0);
-    buffer<byte> data ( height * ( 1 + width*sizeof(S) ) );
+    buffer<U> prior(width); prior.clear(0);
+    buffer<byte> data ( height * ( 1 + width*sizeof(U) ) );
     byte* target = data.begin();
-    uint predictorStats[4] = {0,0,0,0};
+    uint predictorStats[5] = {0,0,0,0,0};
     for(size_t unused y: range(height)) {
+#if 0
         // Optimizes sum of absolute differences
-        uint8 bestSADPredictor = 0; uint bestSAD=-1;
+        Predictor bestSADPredictor = Predictor::None; uint bestSAD=-1;
         {
-            S a = 0;
+            U a = 0;
             { uint SAD=0;
-                for(size_t x: range(width)) SAD += sum(abs(S(source[x])));
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 0; }
+                for(size_t x: range(width)) SAD += sum(abs(S(U(source[x]))));
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::None; }
             { uint SAD=0;
-                for(size_t x: range(width)) { SAD += sum(abs(S(source[x])-a)); a= source[x]; }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 1; }
+                for(size_t x: range(width)) { SAD += sum(abs(S(U(source[x])-a))); a= U(source[x]); }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Left; }
             { uint SAD=0;
-                for(size_t x: range(width)) { SAD += sum(abs(S(source[x])-prior[x])); }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 2; }
+                for(size_t x: range(width)) { SAD += sum(abs(S(U(source[x])-prior[x]))); }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Up; }
             { uint SAD=0;
-                for(size_t x: range(width)) { SAD += sum(abs(S(source[x])-S((V(prior[x])+V(a))/2))); a= source[x]; }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 3; }
+                for(size_t x: range(width)) { SAD += sum(abs(S(U(source[x])-U((V(prior[x])+V(a))/2)))); a= U(source[x]); }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Average; }
             { uint SAD=0;
                 V b=0;
                 for(size_t x: range(width)) {
                     V c = b;
                     b = V(prior[x]);
-                    SAD += sum(abs(S(source[x]) - Paeth<T,N>(V(a), b, c)));
-                    a= source[x];
+                    SAD += sum(abs(S(U(source[x]) - Paeth<T,N>(V(a), b, c))));
+                    a= U(source[x]);
                 }
-                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = 4; }
+                if(SAD<bestSAD) bestSAD = SAD, bestSADPredictor = Predictor::Paeth; }
         }
-        const uint8 predictor = bestSADPredictor;
-        *target++ = predictor;
-        S* dst = (S*)target;
-        S a = 0;
-        /**/  if(predictor==0) for(size_t x: range(width)) { dst[x]= S(source[x])                                      ;  prior[x]=      source[x]; }
-        else if(predictor==1) for(size_t x: range(width)) { dst[x]= S(source[x]) -                                  a;  prior[x]= a= source[x]; }
-        else if(predictor==2) for(size_t x: range(width)) { dst[x]= S(source[x]) -                         prior[x]; prior[x]=      source[x]; }
-        else if(predictor==3) for(size_t x: range(width)) { dst[x]= S(source[x]) - S((V(prior[x])+V(a))/2); prior[x]= a= source[x]; }
-        else if(predictor==4) {
+        const Predictor predictor = bestSADPredictor;
+#else
+        const Predictor predictor = Predictor::Paeth;
+#endif
+        *target++ = byte(predictor);
+        U* dst = (U*)target;
+        U a = 0;
+        /**/  if(predictor==Predictor::None) for(size_t x: range(width)) { dst[x]= U(source[x])                                      ;  prior[x]=      source[x]; }
+        else if(predictor==Predictor::Left) for(size_t x: range(width)) { dst[x]= U(source[x]) -                                  a;  prior[x]= a= source[x]; }
+        else if(predictor==Predictor::Up) for(size_t x: range(width)) { dst[x]= U(source[x]) -                         prior[x]; prior[x]=      source[x]; }
+        else if(predictor==Predictor::Average) for(size_t x: range(width)) { dst[x]= U(source[x]) - U((V(prior[x])+V(a))/2); prior[x]= a= source[x]; }
+        else if(predictor==Predictor::Paeth) {
             V b=0;
             for(size_t x: range(width)) {
                 V c = b;
                 b = V(prior[x]);
-                dst[x]= S(source[x]) - Paeth<T,N>(V(a), b, c);
+                dst[x]= U(source[x]) - Paeth<T,N>(V(a), b, c);
                 prior[x]=a= source[x];
             }
         }
-        else error(predictor);
+        else error(int(predictor));
         source += width;
-        target += width*sizeof(S);
-        predictorStats[predictor]++;
+        target += width*sizeof(U);
+        predictorStats[int(predictor)]++;
     }
     log(predictorStats);
     return data;

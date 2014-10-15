@@ -152,7 +152,7 @@ String str(double n) { return (isNumber(n) && n==round(n)) ? dec(int(n)) : ftoa(
 
 String binaryPrefix(size_t value, string unit, string unitSuffix) {
     if(value < 1u<<10) return str(value, unit);
-    if(value < 10u<<20) return str(value/1024.0,"ki"_+unitSuffix?:unit);
-    if(value < 10u<<30) return str(value/1024.0/1024.0,"Mi"_+unitSuffix?:unit);
-    return str(value/1024.0/1024.0/1024.0,"Gi"_+unitSuffix?:unit);
+    if(value < 10u<<20) return str(value/1024.0,"ki"_+(unitSuffix?:unit));
+    if(value < 10u<<30) return str(value/1024.0/1024.0,"Mi"_+(unitSuffix?:unit));
+    return str(value/1024.0/1024.0/1024.0,"Gi"_+(unitSuffix?:unit));
 }

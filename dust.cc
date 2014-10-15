@@ -48,19 +48,21 @@ struct DustRemovalExport : DustRemoval, Application {
         Folder output ("Output", folder, true);
         uint64 total = sum(apply(corrected.count(), [this](size_t index) { return product(corrected.size(index)); }));
         log(binaryPrefix(total,"pixels","Pixels"));
-        uint64 exported = 0;
+        uint64 exported = 0; uint64 compressed = 0;
         for(size_t index: range(corrected.count())) {
             uint size = product(corrected.size(index));
-            log(index,'/',corrected.count(),
-                '\t',binaryPrefix(exported,"pixels","Pixels"),'/',binaryPrefix(total,"pixels","Pixels"),
-                '\t',corrected.name(index),binaryPrefix(size,"pixels","Pixels"));
             String name = corrected.name(index);
             uint fileIndex = 0;
             if(existsFile(name, output)) fileIndex = 1;
             while(existsFile(name+'.'+str(fileIndex), output)) fileIndex++;
-            writeFile(name+(fileIndex?'.'+str(fileIndex):String()), encodePNG(corrected.image(index)), output);
+            //writeFile(name+(fileIndex?'.'+str(fileIndex):String()), encodePNG(corrected.image(index)), output);
+            compressed += encodePNG(corrected.image(index)).size;
             exported += size;
-            break;
+            log(index+1,'/',corrected.count(),
+                '\t',binaryPrefix(exported,"pixels","Pixels"),'/',binaryPrefix(total,"pixels","Pixels"),
+                '\t',corrected.name(index),binaryPrefix(size,"pixels","Pixels"),
+                '\t', binaryPrefix(compressed), (float)compressed/exported);
+            //break;
         }
     }
 };
