@@ -56,7 +56,7 @@ struct DustRemovalExport : DustRemoval, Application {
             if(existsFile(name, output)) fileIndex = 1;
             while(existsFile(name+'.'+str(fileIndex), output)) fileIndex++;
             //writeFile(name+(fileIndex?'.'+str(fileIndex):String()), encodePNG(corrected.image(index)), output);
-            compressed += encodePNG(corrected.image(index)).size;
+            compressed += encodePNG(corrected.image(index, 0, true)).size;
             exported += size;
             log(index+1,'/',corrected.count(),
                 '\t',binaryPrefix(exported,"pixels","Pixels"),'/',binaryPrefix(total,"pixels","Pixels"),

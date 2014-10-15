@@ -23,7 +23,7 @@ void unpredict(byte4* target, const byte* source, size_t width, size_t height, s
     typedef vec<T, int, N> V;
     buffer<U> prior(width); prior.clear(0);
     for(size_t unused y: range(height)) {
-        Predictor predictor = Predictor(*source++); assert(predictor<=4,"Unknown PNG predictor",predictor);
+        Predictor predictor = Predictor(*source++);
         U* src = (U*)source;
         U a = 0;
         /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=       src[x];

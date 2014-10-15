@@ -116,7 +116,13 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 // Configures floating-point exceptions
 void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
 
+#include <sys/resource.h>
 void __attribute((constructor(102))) setup_signals() {
+    /// Limits process ressources to avoid hanging the system when debugging
+    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<8;/*64K*/ setrlimit(RLIMIT_STACK,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<24;/*16M*/ setrlimit(RLIMIT_DATA,&limit); }
+    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<28;/*256M*/ setrlimit(RLIMIT_AS,&limit); }
+    setpriority(PRIO_PROCESS,0,19);
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
     check_(sigaction(SIGABRT, &sa, 0));

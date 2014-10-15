@@ -46,6 +46,7 @@ template<Type T> T cache(const Folder& folder, string operation, string name, st
 generic struct ImageMapSource : T {
     Map map;
     ImageMapSource() {}
+    ImageMapSource(T&& image) : T(move(image)) { assert_(T::capacity); /*Heap allocated image*/ }
     ImageMapSource(const File& file, int2 size) : map(file) { (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size, size.x); }
 };
 

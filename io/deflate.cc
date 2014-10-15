@@ -1041,7 +1041,6 @@ buffer<byte> deflate(const ref<byte> source, bool zlib) {
     assert(source.data && source.size);
     output_buffer out_buf = {0,0,0,0};
     out_buf.m_expandable = true;
-    assert(!(((source.size) && (!source.data)) || (!output_buffer_putter)));
     compressor pComp;
     init(&pComp, output_buffer_putter, &out_buf, GREEDY_PARSING_FLAG|(zlib?WRITE_ZLIB_HEADER:0));
     compress(&pComp, source.data, source.size, FINISH);

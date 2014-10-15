@@ -15,6 +15,7 @@ generic struct buffer : mref<T> {
     using mref<T>::data;
     using mref<T>::size;
     size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
+    debug(static bool& logMemory() { static bool value = true; return value; })
 
     /// Default constructs an empty buffer
     buffer(){}
@@ -24,8 +25,9 @@ generic struct buffer : mref<T> {
     buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
     buffer(size_t capacity, size_t size) : mref<T>((T*)0,size), capacity(capacity) {
-     assert(capacity>=size && size>=0); if(!capacity) return;
-     if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory");
+        assert(capacity>=size && size>=0); if(!capacity) return;
+        if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory");
+        debug(if(logMemory()) { logMemory()=false; log(data, capacity, size); logMemory()=true; })
     }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
@@ -35,7 +37,10 @@ generic struct buffer : mref<T> {
 
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
-    ~buffer() { if(capacity) ::free((void*)data); data=0; capacity=0; size=0; }
+    ~buffer() {
+        debug(if(logMemory()) { logMemory()=false; log(data, capacity, size); logMemory()=true; })
+        if(capacity) ::free((void*)data); data=0; capacity=0; size=0;
+    }
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
