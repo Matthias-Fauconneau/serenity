@@ -7,7 +7,10 @@
 template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
-    vec(){}
+    /// Explicitly uninitialized vector
+    //vec(Void) {}
+    /// Defaults initializes to zero
+    vec() : vec(0) {}
     /// Initializes all components to the same value \a v
     vec(T v){ for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
@@ -16,13 +19,13 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     }
     /// Initializes components from a fixed size array
     template<Type... Args> explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
-    /// Initializes first components from another vec \a o and initializes remaining components with args...
+    /*/// Initializes first components from another vec \a o and initializes remaining components with args...
     template<template<typename> class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
         for(int i: range(N-sizeof...(Args))) at(i)=o[i];
         T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
-    }
-    /// Initializes components from another vec \a o casting from \a T2 to \a T
-    template<template<typename> class W, Type F> explicit vec(const vec<W,F,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
+    }*/
+    /// Initializes components from another vec \a o casting from \a S to \a T
+    template<Type S> explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
     /// Unchecked accessor (const)
     const T& at(uint i) const { return ((T*)this)[i]; }
     /// Unchecked accessor
@@ -49,29 +52,29 @@ generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[
 
 generic vec operator +(const vec& u) { return u; }
 generic vec operator -(const vec& u) { vec r; for(uint i: range(N)) r[i]=-u[i]; return r; }
-generic vec operator +(const vec& u, const vec& v) { vec r; for(uint i: range(N)) r[i]=u[i]+v[i]; return r; }
-generic vec operator -(const vec& u, const vec& v) { vec r; for(uint i: range(N)) r[i]=u[i]-v[i]; return r; }
-generic vec operator *(const vec& u, const vec& v) { vec r; for(uint i: range(N)) r[i]=u[i]*v[i]; return r; }
-generic vec operator *(const vec& u, T s) { vec r; for(uint i: range(N)) r[i]=u[i]*s; return r; }
-generic vec operator *(T s, const vec& u) { vec r; for(uint i: range(N)) r[i]=s*u[i]; return r; }
-generic vec operator /(T s, const vec& u) { vec r; for(uint i: range(N)) r[i]=s/u[i]; return r; }
-generic vec operator /(const vec& u, T s) { vec r; for(uint i: range(N)) r[i]=u[i]/s; return r; }
-generic vec operator /(const vec& u, const vec& v) { vec r; for(uint i: range(N)) r[i]=u[i]/v[i]; return r; }
+generic vec operator +(const vec& u, const vec& v) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=u[i]+v[i]; return r; }
+generic vec operator -(const vec& u, const vec& v) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=u[i]-v[i]; return r; }
+generic vec operator *(const vec& u, const vec& v) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=u[i]*v[i]; return r; }
+generic vec operator *(const vec& u, T s) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=u[i]*s; return r; }
+generic vec operator *(T s, const vec& u) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=s*u[i]; return r; }
+generic vec operator /(T s, const vec& u) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=s/u[i]; return r; }
+generic vec operator /(const vec& u, T s) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=u[i]/s; return r; }
+generic vec operator /(const vec& u, const vec& v) { vec r/*=Void()*/; for(uint i: range(N)) r[i]=u[i]/v[i]; return r; }
 generic bool operator <(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]>=v[i]) return false; return true; }
 generic bool operator <=(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return false; return true; }
 generic bool operator ==(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]!=v[i]) return false; return true; }
 generic bool operator >=(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return false; return true; }
 generic bool operator >(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }
 
-generic vec abs(const vec& v){ vec r; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
-generic vec sign(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
-generic vec floor(const vec& v){ vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
-generic vec fract(const vec& v){ vec r; for(uint i: range(N)) r[i]=mod(v[i],1); return r;  }
-generic vec round(const vec& v){ vec r; for(uint i: range(N)) r[i]=round(v[i]); return r;  }
-generic vec ceil(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
-generic vec min(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=min(a[i],b[i]); return r; }
-generic vec max(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=max(a[i],b[i]); return r; }
-generic vec clip(const vec& min, const vec& x, const vec& max){vec r; for(uint i: range(N)) r[i]=clip(min[i],x[i],max[i]); return r;}
+generic vec abs(const vec& v){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
+generic vec sign(const vec& v){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
+generic vec floor(const vec& v){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
+generic vec fract(const vec& v){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=mod(v[i],1); return r;  }
+generic vec round(const vec& v){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=round(v[i]); return r;  }
+generic vec ceil(const vec& v){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
+generic vec min(const vec& a, const vec& b){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=min(a[i],b[i]); return r; }
+generic vec max(const vec& a, const vec& b){ vec r/*=Void()*/; for(uint i: range(N)) r[i]=max(a[i],b[i]); return r; }
+generic vec clip(const vec& min, const vec& x, const vec& max){vec r/*=Void()*/; for(uint i: range(N)) r[i]=clip(min[i],x[i],max[i]); return r;}
 
 generic float dot(const vec& a, const vec& b) { float l=0; for(uint i: range(N)) l+=a[i]*b[i]; return l; }
 generic float sq(const vec& a) { return dot(a,a); }
@@ -112,7 +115,7 @@ typedef vec<xyz,float,3> vec3;
 generic struct xyzw {
     T x,y,z,w;
     vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
-    vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>(x,y,w); }
+    vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>{x,y,w}; }
     vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
@@ -123,14 +126,37 @@ generic struct bgr {
 };
 /// Integer b,g,r vector (8bit)
 typedef vec<bgr,uint8,3> byte3;
+/// Integer b,g,r vector (32bit)
+typedef vec<bgr,uint8,3> bgr3i;
+/// Floating-point b,g,r vector
+typedef vec<bgr,float,3> bgr3f;
 
+generic struct bgra;
+generic struct rgb {
+    T r,g,b;
+    //operator vec<bgra,T,4>() const { return vec<bgra,T,4>{b,g,r,0xFF}; }
+};
+
+generic struct rgba;
 generic struct bgra {
     T b,g,r,a;
-    byte3& bgr() const { return *(vec< ::bgr,T,3>*)this; }
-    byte3 rgb() const { return byte3(r,g,b); }
+    vec<bgr,T,3>& bgr() const { return *(vec<::bgr,T,3>*)this; }
+    operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
+    operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
 };
+
+generic struct rgba {
+    T r,g,b,a;
+};
+
 /// Integer b,g,r,a vector (8bit)
-typedef vec<bgra,uint8,4> byte4;
+struct byte4 : vec<bgra,uint8,4> {
+    using vec::vec;
+    byte4() : vec() {} // Defaults initalizes to zero
+    byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
+    byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
+    byte4(byte3 bgr) : vec(bgr.b, bgr.g, bgr.r, 0xFF) {}
+};
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;
 /// Unsigned integer b,g,r,a vector (32bit)

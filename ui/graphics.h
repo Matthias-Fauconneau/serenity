@@ -12,7 +12,7 @@ static constexpr vec3 white (1, 1, 1);
 /// Fill graphic element
 struct Fill {
     vec2 origin, size;
-    vec3 color; float opacity;
+    bgr3f color; float opacity;
 };
 
 /// Image graphic element
@@ -26,7 +26,7 @@ struct Glyph {
     vec2 origin;
     Font& font;
     uint code;
-    vec3 color;
+    bgr3f color;
 };
 
 /// Line graphic element

@@ -103,7 +103,7 @@ static void bilinear(const Image& target, const Image& source) {
             uint ix = fx/256, iy = fy/256;
             uint u = fx%256, v = fy%256;
             const ref<byte4> span = source.slice(iy*stride+ix);
-            byte4 d;
+            byte4 d /*=Void()*/;
             for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
                 d[i] = ((uint(span[      0][i]) * (256-u) + uint(span[           1][i]) * u) * (256-v)
                        + (uint(span[stride][i]) * (256-u) + uint(span[stride+1][i]) * u) * (       v) ) / (256*256);

@@ -2,6 +2,7 @@
 #include "processed-source.h"
 #include "inverse-attenuation.h"
 #include "image-source-view.h"
+#include "png.h"
 
 struct CalibrationView : Application {
     ImageFolder folder1 {Folder("Pictures", home())};
@@ -11,6 +12,7 @@ struct CalibrationView : Application {
     ImageView views[2]  = {sRGB(calibration1.sum(folder1.maximumSize()/4)),sRGB(calibration2.sum(folder2.maximumSize()/4))};
     WidgetToggle toggleView {&views[0], &views[1]};
     Window window {&toggleView};
+    CalibrationView() { log(withName(folder1.count(), folder2.count())); }
 };
 registerApplication(CalibrationView, calibration);
 
@@ -40,3 +42,15 @@ struct DustRemovalPreview : DustRemoval, Application {
     Window window {&toggleView};
 };
 registerApplication(DustRemovalPreview);
+
+struct DustRemovalExport : DustRemoval, Application {
+    DustRemovalExport() {
+        Folder output ("Output", folder, true);
+        for(size_t index: range(corrected.count())) {
+            log(index,'/',corrected.count(), corrected.name(index));
+            writeFile(corrected.name(index), encodePNG(corrected.image(index)), output);
+            break;
+        }
+    }
+};
+registerApplication(DustRemovalExport, export);

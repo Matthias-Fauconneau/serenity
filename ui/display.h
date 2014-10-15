@@ -27,7 +27,7 @@ struct Display : Socket, Poll {
     /// Root visual
     uint visual;
     /// Screen size
-    int2 size;
+    int2 size = 0;
 
 // Keyboard
     /// Keycode range

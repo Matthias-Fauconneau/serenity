@@ -37,7 +37,7 @@ struct Font {
     Metrics metrics(uint index) const;
 
     struct Glyph {
-        int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
+        int2 offset = 0; // (left bearing, min.y-baseline) //FIXME: -> Image
         Image image;
     };
 
@@ -50,8 +50,8 @@ struct Font {
     bool hint;
 
     handle<FT_FaceRec_*> face;
-    float ascender, descender;
-    vec2 bboxMin, bboxMax;
+    float ascender = 0, descender = 0;
+    vec2 bboxMin = 0, bboxMax = 0;
     map<uint, Glyph> cache;
 
     Map keep;

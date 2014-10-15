@@ -63,6 +63,11 @@ typedef __INTPTR_TYPE__  intptr_t;
 typedef __SIZE_TYPE__ 	size_t;
 constexpr size_t invalid = -1; // Invalid index
 
+/*// Void initialization (explictly uninitialized)
+struct Void {
+    generic operator T() { return T(); } // Initializes with default constructor by default unless T has a T(Void) {} constructor
+};*/
+
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 generic T min(T a, T b) { return a<b ? a : b; }

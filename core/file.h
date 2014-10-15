@@ -65,7 +65,7 @@ struct Stream : Handle {
     /// Reads up to \a size bytes
     buffer<byte> readUpTo(size_t size);
     /// Reads a raw value
-    generic T read() { T t; read((byte*)&t,sizeof(T)); return t; }
+    generic T read() { T t/*=Void()*/; read((byte*)&t,sizeof(T)); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
         ::buffer<T> buffer(size); size_t byteSize=size*sizeof(T);

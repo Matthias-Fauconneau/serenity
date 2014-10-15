@@ -3,8 +3,8 @@
 #include "graphics.h"
 
 /// User interface colors
-static constexpr vec3 lightBlue (7./8, 3./4, 1./2);
-static constexpr vec3 gray (3./4, 3./4, 3./4);
+static constexpr bgr3f lightBlue (7./8, 3./4, 1./2);
+static constexpr bgr3f gray (3./4, 3./4, 3./4);
 
 /// Key symbols
 enum Key {

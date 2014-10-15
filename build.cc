@@ -42,7 +42,7 @@ struct Build {
         return {};
     }
 
-    string tryParseIncludes(TextData& s) {
+    string tryParseIncludes(TextData& s, string fileName) {
         if(!s.match("#include ") && !s.match("//#include ")) return "";
         if(s.match('"')) { // module header
             string name = s.until('.');
@@ -50,7 +50,7 @@ struct Build {
         } else { // library header
             s.skip('<');
             s.whileNo(">\n");
-            s.skip('>');
+            if(!s.match('>')) error(fileName+':'+str(s.lineIndex)+':', "Expected '>', got '"_+s.peek()+'\'');
             s.whileAny(' ');
             if(s.match("//")) {
                 for(;;) {
@@ -114,7 +114,7 @@ struct Build {
         File file(fileName, folder);
         int64 lastEdit = file.modifiedTime();
         for(TextData s = file.read(file.size()); s; s.line()) {
-            {string name = tryParseIncludes(s);
+            {string name = tryParseIncludes(s, fileName);
                 if(name) {
                     String header = find(name+".h");
                     if(header) lastEdit = max(lastEdit, parse(header+".h", parent));

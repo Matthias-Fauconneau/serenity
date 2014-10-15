@@ -2,49 +2,47 @@
 #include "data.h"
 #include "deflate.h"
 
-generic struct rgba { T r,g,b,a; operator byte4() const { return byte4 {b,g,r,a}; } };
-generic struct rgb { T r,g,b; operator byte4() const { return byte4 {b,g,r,255}; } };
 generic struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
 generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
 
 typedef vec<rgb,uint8,3> rgb3;
 
-template<template<typename> class T, int N> void unfilter(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride) {
+template<template<typename> class T, int N>
+void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
     typedef vec<T,uint8,N> S;
     typedef vec<T,int,N> V;
     buffer<S> prior(width); prior.clear(0);
-    for(uint y=0;y<height;y++,raw+=width*sizeof(S),dst+=yStride*xStride*width) {
-        uint filter = *raw++; assert(filter<=4,"Unknown PNG filter",filter);
-        S* src = (S*)raw;
-        S a=0;
-        if(filter==0) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]=      src[i];
-        if(filter==1) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]= a= a+src[i];
-        if(filter==2) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]=      prior[i]+src[i];
-        if(filter==3) for(uint i=0;i<width;i++) dst[xStride*i]= prior[i]= a= S((V(prior[i])+V(a))/2)+src[i];
-        if(filter==4) {
+    for(size_t unused y: range(height)) {
+        uint predictor = *source++; assert(predictor<=4,"Unknown PNG predictor",predictor);
+        S* src = (S*)source;
+        S a = 0;
+        /**/  if(predictor==0) for(size_t x: range(width)) target[x*xStride]= prior[x]=       src[x];
+        else if(predictor==1) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= a+src[x];
+        else if(predictor==2) for(size_t x: range(width)) target[x*xStride]= prior[x]=       prior[x]+src[x];
+        else if(predictor==3) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= S((V(prior[x])+V(a))/2)+src[x];
+        else if(predictor==4) {
             V b=0;
-            for(uint i=0;i<width;i++) {
+            for(size_t x: range(width)) {
                 V c = b;
-                b = V(prior[i]);
+                b = V(prior[x]);
                 V d = V(a) + b - c;
                 V pa = abs(d-V(a)), pb = abs(d-b), pc = abs(d-c);
-                S p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
-                dst[xStride*i]= prior[i]=a= p+src[i];
+                S p/*=Void()*/; for(int i: range(N)) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+                target[x*xStride]= prior[x]=a= p+src[x];
             }
         }
+        else error(predictor);
+        source += width*sizeof(S);
+        target += yStride*xStride*width;
     }
 }
-template void unfilter<luma,1>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
-template void unfilter<ia,2>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
-template void unfilter<rgb,3>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
-template void unfilter<rgba,4>(byte4* dst, const byte* raw, uint width, uint height, uint xStride, uint yStride);
 
 Image decodePNG(const ref<byte> file) {
     BinaryData s(file, true);
     if(string(s.read<byte>(8))!="\x89PNG\r\n\x1A\n") { error("Invalid PNG"); return Image(); }
     uint width=0,height=0,depth=0; uint8 bitDepth=0, type=0, interlace=0;
-    uint palette[256]; bool alpha=false;
-    array<byte> buffer;
+    byte4 palette[256]; bool alpha=false;
+    array<byte> IDAT;
     for(;;) {
         uint32 size = s.read();
         string tag = s.read<byte>(4);
@@ -58,7 +56,7 @@ Image decodePNG(const ref<byte> file) {
             interlace = s.read();
         } else if(tag == "IDAT") {
             /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
-            else*/ buffer.append(s.read<byte>(size)); // Explicitly concatenates chunks (FIXME: stream inflate)
+            else*/ IDAT.append(s.read<byte>(size)); // Explicitly concatenates chunks (FIXME: stream inflate)
         } else if(tag == "IEND") {
             assert(size==0);
             s.advance(4); //CRC
@@ -66,11 +64,11 @@ Image decodePNG(const ref<byte> file) {
         } else if(tag == "PLTE") {
             ref<rgb3> plte = s.read<rgb3>(size/3);
             assert(plte.size<=256);
-            for(uint i: range(plte.size)) (byte4&)palette[i]=plte[i];
+            for(size_t i: range(plte.size)) palette[i] = plte[i];
         }  else if(tag == "tRNS") {
             ref<byte> trns = s.read<byte>(size);
             assert(trns.size<=256);
-            for(uint i: range(trns.size)) ((byte4&)palette[i]).a=trns[i];
+            for(size_t i: range(trns.size)) palette[i].a=trns[i];
             alpha=true;
         } else {
             s.advance(size);
@@ -78,28 +76,28 @@ Image decodePNG(const ref<byte> file) {
         s.advance(4); //CRC
         assert(s);
     }
-    ::buffer<byte> data = inflate(buffer, true);
+    buffer<byte> predicted = inflate(IDAT, true);
     if(bitDepth==1 || bitDepth==4) {
         assert(type==0 || type==3, type);
         assert(depth==1,depth);
         assert(width%(8/bitDepth)==0);
-        assert(data.size == height*(1+width*depth*bitDepth/8));
-        const byte* src = data.data;
-        ::buffer<byte> bytes(height*(1+width*depth));
-        byte* dst = bytes.begin();
-        for(uint y=0;y<height;y++) {
-            dst[0] = src[0]; src++; dst++;
-            if(bitDepth==1) for(uint x=0;x<width/8;x++) for(uint b: range(8)) dst[8*x+b] = (src[x]&(1<<(7-b))) ? 1 : 0;
-            if(bitDepth==4) for(uint x=0;x<width/2;x++) dst[2*x+0]=src[x]>>4, dst[2*x+1]=src[x]&0b1111;
-            src+=width/(8/bitDepth); dst += width;
+        assert(predicted.size == height*(1+width*depth*bitDepth/8));
+        const byte* source = predicted.data;
+        ::buffer<byte> unpackedBytes(height*(1+width*depth));
+        byte* target = unpackedBytes.begin();
+        for(size_t unused y: range(height)) {
+            target[0] = source[0]; source++; target++;
+            if(bitDepth==1) for(size_t x: range(width/8)) for(size_t b: range(8)) target[8*x+b] = (source[x]&(1<<(7-b))) ? 1 : 0;
+            if(bitDepth==4) for(size_t x: range(width/2)) target[2*x+0]=source[x]>>4, target[2*x+1]=source[x]&0b1111;
+            source+=width/(8/bitDepth); target += width;
         }
-        data = move(bytes);
+        predicted = move(unpackedBytes);
     }
-    if(data.size < height*(1+width*depth)) { error("Invalid PNG", data.size, height*(1+width*depth), width, height, depth, bitDepth); return Image(); }
+    assert_(predicted.size == height*(1+width*depth), "Invalid PNG", predicted.size, height*(1+width*depth), width, height, depth, bitDepth);
     Image image(width,height,alpha);
-    byte4* dst = image.begin();
+    byte4* target = image.begin();
     int w=width,h=height;
-    const byte* src=data.data;
+    const byte* source=predicted.data;
     for(int i=0;i==0 || (interlace && i<7);i++) {
         int xStride=1,yStride=1;
         int offset=0;
@@ -114,14 +112,14 @@ Image decodePNG(const ref<byte> file) {
             w=width/xStride;
             h=height/yStride;
         }
-        if(depth==1) unfilter<luma,1>(dst+offset,src,w,h,xStride,yStride);
-        if(depth==2) unfilter<ia,2>(dst+offset,src,w,h,xStride,yStride);
-        if(depth==3) unfilter<rgb,3>(dst+offset,src,w,h,xStride,yStride);
-        if(depth==4) unfilter<rgba,4>(dst+offset,src,w,h,xStride,yStride);
-        src += h*(1+w*depth);
+        if(depth==1) unpredict<luma,1>(target+offset,source,w,h,xStride,yStride);
+        if(depth==2) unpredict<ia,2>(target+offset,source,w,h,xStride,yStride);
+        if(depth==3) unpredict<rgb,3>(target+offset,source,w,h,xStride,yStride);
+        if(depth==4) unpredict<rgba,4>(target+offset,source,w,h,xStride,yStride);
+        source += h*(1+w*depth);
     }
     if(type==3) {
-        for(uint i: range(width*height)) dst[i]=palette[dst[i][0]];
+        for(size_t i: range(width*height)) target[i]=palette[target[i][0]];
     }
     return image;
 }
@@ -146,27 +144,72 @@ uint adler32(const ref<byte> data) {
     return a | (b << 16);
 }
 
-buffer<byte> filter(const Image& image) {
-    uint w=image.width, h=image.height;
-    buffer<byte> data(h*(1+w*4));
-    byte* dst = data.begin(); const byte* src = (byte*)image.data;
-    for(uint unused y: range(h)) {
-        *dst++ = 0;
-        for(uint x: range(w)) ((byte4*)dst)[x]=byte4(src[x*4+2],src[x*4+1],src[x*4+0],image.alpha?src[x*4+3]:0xFF);
+/*buffer<byte> predict(const Image& image) {
+    const size_t w=image.width, h=image.height, depth = image.alpha?4:3;
+    static constexpr size_t map[] = {2,1,0,3}; // BGRA -> RGBA
+    buffer<byte> data(h*(1+w*depth));
+    byte* dst = data.begin();
+    const byte* src = (byte*)image.data;
+    for(size_t unused y: range(h)) {
+        static constexpr predict = 1;
+        *dst++ = predict;
+        byte4 a = 0;
+        if(predict==0) for(size_t x: range(w)) dst[x*depth+i] = src[x*depth+map[i]];
+        } else if(predict==1) {
+            for(size_t x: range(w)) for(size_t i : range(depth)) {dst[x*depth+i] = src[x*depth+map[i]]-a;
+        } else error(predict);
         dst+=w*4, src+=image.stride*4;
+    }
+    return data;
+}*/
+
+template<template<typename> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height) {
+    typedef vec<T,uint8,N> S;
+    typedef vec<T,int,N> V;
+    buffer<S> prior(width); prior.clear(0);
+    buffer<byte> data ( height * ( 1 + width*sizeof(S) ) );
+    byte* target = data.begin();
+    for(size_t unused y: range(height)) {
+        static constexpr uint8 predictor = 1;
+        *target++ = predictor;
+        S* dst = (S*)target;
+        S a = 0;
+        /**/  if(predictor==0) for(size_t x: range(width)) { dst[x]= S(source[x])                                      ;  prior[x]=      source[x]; }
+        else if(predictor==1) for(size_t x: range(width)) { dst[x]= S(source[x]) -                                  a;  prior[x]= a= source[x]; }
+        else if(predictor==2) for(size_t x: range(width)) { dst[x]= S(source[x]) -                         prior[x]; prior[x]=      source[x]; }
+        else if(predictor==3) for(size_t x: range(width)) { dst[x]= S(source[x]) - S((V(prior[x])+V(a))/2); prior[x]= a= source[x]; }
+        /*else if(predictor==4) {
+            V b=0;
+            for(size_t x: range(width)) {
+                V c = b;
+                b = V(prior[x]);
+                V d = V(a) + b - c;
+                V pa = abs(d-V(a)), pb = abs(d-b), pc = abs(d-c);
+                S p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+                dst[x]= prior[x]=a= p+source[x];
+            }
+        }*/
+        else error(predictor);
+        source += width;
+        target += width*sizeof(S);
     }
     return data;
 }
 
 buffer<byte> encodePNG(const Image& image) {
     array<byte> file = String("\x89PNG\r\n\x1A\n");
-    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr { big32(image.width), big32(image.height), 8, 6, 0, 0, 0 };
+    struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr
+     { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:3), 0, 0, 0 };
     buffer<byte> IHDR = ref<byte>("IHDR"_)+raw(ihdr);
     file.append(raw(big32(IHDR.size-4)));
     file.append(IHDR);
     file.append(raw(big32(crc32(IHDR))));
 
-    buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(filter(image), true);
+    buffer<byte> predicted;
+    if(image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height);
+    else predicted = predict<rgba,4>(image.data, image.width, image.height);
+
+    buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(predicted, true);
     file.append(raw(big32(IDAT.size-4)));
     file.append(IDAT);
     file.append(raw(big32(crc32(IDAT))));

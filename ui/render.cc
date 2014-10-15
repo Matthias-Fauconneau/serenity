@@ -1,10 +1,10 @@
 #include "math.h"
 #include "graphics.h"
 
-static void blend(const Image& target, uint x, uint y, vec3 source_linear, float opacity) {
+static void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
     byte4& target_sRGB = target(x,y);
-    vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
-    int3 linearBlend = int3(round((0xFFF*(1-opacity))*vec3(target_linear) + (0xFFF*opacity)*source_linear));
+    bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
+    bgr3i linearBlend = bgr3i(round((0xFFF*(1-opacity))*target_linear + (0xFFF*opacity)*source_linear));
     target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
             min(0xFF,target_sRGB.a+int(round(0xFF*opacity)))); // Additive opacity accumulation
 }
@@ -17,8 +17,8 @@ static void fill(uint* target, uint stride, uint w, uint h, uint value) {
     }
 }
 
-void fill(const Image& target, int2 origin, int2 size, vec3 color, float alpha) {
-    assert_(vec3(0) <= color && color <= vec3(1));
+void fill(const Image& target, int2 origin, int2 size, bgr3f color, float alpha) {
+    assert_(bgr3f(0) <= color && color <= bgr3f(1));
 
     int2 min = ::max(int2(0), origin);
     int2 max = ::min(target.size, origin+size);
@@ -26,7 +26,7 @@ void fill(const Image& target, int2 origin, int2 size, vec3 color, float alpha) 
 
     if(alpha==1) { // Solid fill
         if(!(min < max)) return;
-        int3 linear = int3(round(float(0xFFF)*color));
+        bgr3i linear = bgr3i(round(float(0xFFF)*color));
         byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
         fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
     } else {
@@ -35,19 +35,19 @@ void fill(const Image& target, int2 origin, int2 size, vec3 color, float alpha) 
 }
 
 
-static void blit(const Image& target, int2 origin, const Image& source, vec3 color, float opacity) {
-    assert_(vec3(0) <= color && color <= vec3(1));
+static void blit(const Image& target, int2 origin, const Image& source, bgr3f color, float opacity) {
+    assert_(bgr3f(0) <= color && color <= bgr3f(1));
     assert_(source);
 
     int2 min = ::max(int2(0), origin);
     int2 max = ::min(target.size, origin+source.size);
-    /**/  if(color==vec3(1) && opacity==1 && source.sRGB && !source.alpha) { // Copy
+    /**/  if(color==bgr3f(1) && opacity==1 && source.sRGB && !source.alpha) { // Copy
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 s = source(x-origin.x, y-origin.y);
             target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
         }
     }
-    else if(color==vec3(0) && opacity==1 && !source.sRGB) { // Alpha multiply (e.g. glyphs)
+    else if(color==bgr3f(0) && opacity==1 && !source.sRGB) { // Alpha multiply (e.g. glyphs)
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             int opacity = source(x-origin.x,y-origin.y).a; // FIXME: single channel images
             byte4& target_sRGB = target(x,y);
@@ -60,21 +60,21 @@ static void blit(const Image& target, int2 origin, const Image& source, vec3 col
     else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);
-            vec3 linear = source.sRGB ? vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : vec3(BGRA.bgr())/float(0xFF);
+            bgr3f linear = source.sRGB ? bgr3f(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : bgr3f(BGRA.bgr())/float(0xFF);
             blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
         }
     }
 }
 
 
-static void blend(const Image& target, uint x, uint y, vec3 color, float opacity, bool transpose) {
+static void blend(const Image& target, uint x, uint y, bgr3f color, float opacity, bool transpose) {
     if(transpose) swap(x,y);
     if(x>=target.width || y>=target.height) return;
     blend(target, x,y, color, opacity);
 }
 
-void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float opacity) {
-    assert_(vec3(0) <= color && color <= vec3(1));
+void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
+    assert_(bgr3f(0) <= color && color <= bgr3f(1));
 
     float dx = p2.x - p1.x, dy = p2.y - p1.y;
     bool transpose=false;
@@ -107,22 +107,22 @@ void line(const Image& target, vec2 p1, vec2 p2, vec3 color, float opacity) {
 
 void oxygen(const Image& target, int2 min, int2 max) {
     const int y0 = -32-8, splitY = ::min(300, 3*target.size.y/4);
-    const vec3 radial = vec3(246./255); // linear
-    const vec3 top = vec3(221, 223, 225); // sRGB
-    const vec3 bottom = vec3(184, 187, 194); // sRGB
-    const vec3 middle = (bottom+top)/2.f; //FIXME
+    const bgr3f radial = bgr3f(246./255); // linear
+    const bgr3f top = bgr3f(221, 223, 225); // sRGB
+    const bgr3f bottom = bgr3f(184, 187, 194); // sRGB
+    const bgr3f middle = (bottom+top)/2.f; //FIXME
     // Draws upper linear gradient
     for(int y: range(min.y, ::min(max.y, ::max(0, y0+splitY/2)))) {
         float t = (float) (y-y0) / (splitY/2);
-        for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)), 0xFF);
+        for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)));
     }
     for(int y: range(::max(min.y, y0+splitY/2), ::min(max.y, y0+splitY))) {
         float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
-        byte4 verticalGradient (byte3((1-t)*middle + t*bottom), 0xFF); // mid -> dark
+        byte4 verticalGradient = byte3((1-t)*middle + t*bottom); // mid -> dark
         for(int x: range(min.x, max.x)) target(x,y) = verticalGradient;
     }
     // Draws lower flat part
-    for(int y: range(::max(min.y, y0+splitY), max.y)) for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(bottom), 0xFF);
+    for(int y: range(::max(min.y, y0+splitY), max.y)) for(int x: range(min.x, max.x)) target(x,y) = byte3(bottom);
     // Draws upper radial gradient (600x64)
     const int w = ::min(600, target.size.x), h = 64;
     const float cx = target.size.x/2.f, cy = y0+h/2.f;

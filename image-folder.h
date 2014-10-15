@@ -85,8 +85,8 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     /// Converts sRGB images to linear float images
     SourceImage image(size_t index, uint component, int2 size) const override {
         assert_(index  < count());
-        return cache<ImageF>(folder, "Linear["+str(component)+']', name(index), size, time(index), [&](const ImageF& target) {
-            linear(target, image(index, size), component);
+        return cache<ImageF>(folder, "Linear["+str(component)+']', name(index), size?:this->size(index), time(index), [&](const ImageF& target) {
+            linear(target, size ? image(index, size) : image(index), component);
         });
     }
 };
