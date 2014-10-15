@@ -6,20 +6,20 @@
 #include "crop.h"
 
 /// Computes lists of positions for each value
-buffer<array<short3> > list(const Volume16& source, CropVolume crop, uint16 minimum) {
+generic buffer<array<short3> > list(const VolumeT<T>& source, CropVolume crop, uint16 minimum) {
     assert_(crop.min>=source.margin && crop.max <= source.sampleCount-source.margin, source.margin, crop.min, crop.max, source.sampleCount-source.margin);
     uint radiusSq = crop.cylinder ? sq((crop.size.x-1)/2) : -1;
     int2 center = ((crop.min+(crop.max-int3(1)))/2).xy();
     assert_(source.tiled(), "list");
     const ref<uint64> offsetX = source.offsetX, offsetY = source.offsetY, offsetZ = source.offsetZ;
-    const ref<uint16> sourceData = source;
+    const ref<T> sourceData = source;
     buffer<array<short3>> lists[coreCount];
     for(uint id: range(coreCount)) lists[id] = buffer<array<short3>>(source.maximum+1, source.maximum+1, 0);
     parallel(crop.min.z, crop.max.z, [&](uint id, uint z) {
         buffer<array<short3>>& list = lists[id];
-        const ref<uint16> sourceZ = sourceData.slice(offsetZ[z]);
+        const ref<T> sourceZ = sourceData.slice(offsetZ[z]);
         for(int y=crop.min.y; y<crop.max.y; y++) {
-            const ref<uint16> sourceZY = sourceZ.slice(offsetY[y]);
+            const ref<T> sourceZY = sourceZ.slice(offsetY[y]);
             for(int x=crop.min.x; x<crop.max.x; x++) {
                 uint value = sourceZY[offsetX[x]];
                 if(uint(sq(x-center.x)+sq(y-center.y)) > radiusSq) continue;
@@ -78,7 +78,10 @@ struct List : Operation {
     virtual void execute(const Dict& args, const ref<Result*>& outputs, const ref<const Result*>& inputs) override {
         Volume source = toVolume(*inputs[0]);
         CropVolume crop = parseCrop(args, source.margin, source.sampleCount-source.margin, source.origin);
-        buffer<array<short3>> lists = list(source, crop, args.value("minimum"_,0));
+        buffer<array<short3>> lists;
+        /**/  if(source.sampleSize==sizeof(uint16)) lists = list<uint16>(source, crop, args.value("minimum"_,0));
+        else if(source.sampleSize==sizeof(uint32)) lists = list<uint32>(source, crop, args.value("minimum"_,0));
+        else error(source.sampleSize);
         outputs[0]->metadata = String("lists"_);
         outputs[0]->data = toASCII(lists);
     }
