@@ -1023,7 +1023,7 @@ __attribute__ ((noreturn)) void jpeg_decoder::stop_decoding(jpgd_status status) 
 }
 
 void *jpeg_decoder::alloc(size_t nSize, bool zero) {
-	nSize = (max(nSize, 1) + 3) & ~3;
+	nSize = (max(nSize, 1ul) + 3) & ~3;
 	char *rv = NULL;
 	for (mem_block *b = m_pMem_blocks; b; b = b->m_pNext) {
 		if ((b->m_used_count + nSize) <= b->m_size) {
@@ -1033,7 +1033,7 @@ void *jpeg_decoder::alloc(size_t nSize, bool zero) {
 		}
 	}
 	if (!rv) {
-		int capacity = max(32768 - 256, (nSize + 2047) & ~2047);
+		int capacity = max(32768ul - 256, (nSize + 2047) & ~2047);
 		mem_block *b = (mem_block*)malloc(sizeof(mem_block) + capacity);
 		if (!b) { stop_decoding(JPGD_NOTENOUGHMEM); }
 		b->m_pNext = m_pMem_blocks; m_pMem_blocks = b;
@@ -2919,62 +2919,6 @@ int jpeg_decoder::begin_decoding() {
 
 jpeg_decoder::~jpeg_decoder() {
 	free_all_blocks();
-}
-
-jpeg_decoder_file_stream::jpeg_decoder_file_stream() {
-	m_pFile = NULL;
-	m_eof_flag = false;
-	m_error_flag = false;
-}
-
-void jpeg_decoder_file_stream::close() {
-	if (m_pFile) {
-		fclose(m_pFile);
-		m_pFile = NULL;
-	}
-
-	m_eof_flag = false;
-	m_error_flag = false;
-}
-
-jpeg_decoder_file_stream::~jpeg_decoder_file_stream() {
-	close();
-}
-
-bool jpeg_decoder_file_stream::open(const char *Pfilename) {
-	close();
-
-	m_eof_flag = false;
-	m_error_flag = false;
-
-	m_pFile = fopen(Pfilename, "rb");
-	return m_pFile != NULL;
-}
-
-int jpeg_decoder_file_stream::read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag) {
-	if (!m_pFile)
-		return -1;
-
-	if (m_eof_flag) {
-		*pEOF_flag = true;
-		return 0;
-	}
-
-	if (m_error_flag)
-		return -1;
-
-	int bytes_read = static_cast<int>(fread(pBuf, 1, max_bytes_to_read, m_pFile));
-	if (bytes_read < max_bytes_to_read) {
-		if (ferror(m_pFile)) {
-			m_error_flag = true;
-			return -1;
-		}
-
-		m_eof_flag = true;
-		*pEOF_flag = true;
-	}
-
-	return bytes_read;
 }
 
 bool jpeg_decoder_mem_stream::open(const uint8 *pSrc_data, uint size) {

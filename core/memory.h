@@ -24,7 +24,7 @@ generic struct buffer : mref<T> {
     buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
     buffer(size_t capacity, size_t size, string name) : mref<T>((T*)0,size), capacity(capacity), name(name) {
-        if(capacity > 4096) {
+		if(capacity > 16384) {
             logTrace();
             log("+", name, capacity);
         }
@@ -41,7 +41,7 @@ public:
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() {
         if(capacity) {
-            if(capacity > 4096) {
+			if(capacity > 16384) {
                 logTrace();
                 log("~",name, capacity);
             }

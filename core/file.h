@@ -72,10 +72,10 @@ struct Stream : Handle {
     generic T read() { T t/*=Void()*/; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
-        ::buffer<T> buffer(size, "read"); size_t byteSize=size*sizeof(T);
-        size_t offset=0; while(offset<byteSize) offset+=readUpTo(buffer.slice(offset, byteSize-offset));
-        assert(offset==byteSize);
-        return buffer;
+		::buffer<byte> buffer(size*sizeof(T), "read");
+		size_t offset=0; while(offset<buffer.size) offset+=readUpTo(buffer.slice(offset));
+		assert(offset==buffer.size);
+		return cast<T>(move(buffer));
     }
     /// Polls whether reading would block
     bool poll(int timeout=0);

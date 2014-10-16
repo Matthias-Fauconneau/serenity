@@ -33,7 +33,7 @@ struct Build {
     array<int> pids;
     bool needLink = false;
 
-    array<String> sources = folder.list(Files|Recursive);
+	array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
     String find(const string file) {
         for(string path: sources) {
@@ -113,7 +113,8 @@ struct Build {
     int64 parse(const string fileName, Node& parent) {
         File file(fileName, folder);
         int64 lastEdit = file.modifiedTime();
-        for(TextData s = file.read(file.size()); s; s.line()) {
+		if(file.size() > 32768) return lastEdit; // Skips large files (jpeg, deflate)
+		for(TextData s = file.read(file.size()); s; s.line()) {
             {string name = tryParseIncludes(s, fileName);
                 if(name) {
                     String header = find(name+".h");
@@ -157,6 +158,7 @@ struct Build {
 
     Build() {
         if(arguments()==ref<string>{"statistics"}) {
+			sources.filter( [](string name) { return !(endsWith(name, ".cc")||endsWith(name,".h")); });
             map<size_t, string> files;
             for(string path: sources) files.insertSortedMulti(File(path).size(), path);
             log(str(files,"\n"_));
