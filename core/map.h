@@ -15,7 +15,8 @@ template<Type K, Type V> struct map {
     map(const ref<key_value<K,V>>& pairs) {
         for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
     }
-    map(buffer<K>&& keys, const mref<V> values) : keys(keys), values(values) { assert(keys.size==values.size); }
+    map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(values) { assert(keys.size==values.size); }
+    map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert(keys.size==values.size); }
 
     size_t size() const { return keys.size; }
     size_t count() const { return keys.size; }
@@ -103,12 +104,13 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
     map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-template<Type K, Type V> String str(const map<K,V>& m) {
-    String s; s.append('{');
+template<Type K, Type V> String str(const map<K,V>& m, string separator=", ") {
+    String s; s.append('{'); s.append(separator.last());
     for(uint i: range(m.size())) {
         s.append(str(m.keys[i])+": "+str(m.values[i]));
-        if(i<m.size()-1) s.append(", ");
+        if(i<m.size()-1) s.append(separator);
     }
+    s.append(separator.last());
     s.append('}'); return s;
 }
 

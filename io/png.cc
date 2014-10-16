@@ -21,7 +21,7 @@ template<template<typename> class T, int N>
 void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
     typedef vec<T, uint8, N> U;
     typedef vec<T, int, N> V;
-    buffer<U> prior(width); prior.clear(0);
+    buffer<U> prior(width, "PNG"); prior.clear(0);
     for(size_t unused y: range(height)) {
         Predictor predictor = Predictor(*source++);
         U* src = (U*)source;
@@ -90,7 +90,7 @@ Image decodePNG(const ref<byte> file) {
         assert(width%(8/bitDepth)==0);
         assert(predicted.size == height*(1+width*depth*bitDepth/8));
         const byte* source = predicted.data;
-        ::buffer<byte> unpackedBytes(height*(1+width*depth));
+        ::buffer<byte> unpackedBytes(height*(1+width*depth), "PNG");
         byte* target = unpackedBytes.begin();
         for(size_t unused y: range(height)) {
             target[0] = source[0]; source++; target++;
@@ -155,8 +155,8 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
     typedef vec<T,uint8,N> U;
     typedef vec<T, int8, N> S;
     typedef vec<T,int,N> V;
-    buffer<U> prior(width); prior.clear(0);
-    buffer<byte> data ( height * ( 1 + width*sizeof(U) ) );
+    buffer<U> prior(width, "PNG"); prior.clear(0);
+    buffer<byte> data ( height * ( 1 + width*sizeof(U) ), "PNG");
     byte* target = data.begin();
     for(size_t unused y: range(height)) {
         *target++ = byte(Predictor::Paeth);
@@ -176,25 +176,17 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
 }
 
 buffer<byte> encodePNG(const Image& image) {
-    array<byte> file = String("\x89PNG\r\n\x1A\n");
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr
      { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:2), 0, 0, 0 };
-    buffer<byte> IHDR = ref<byte>("IHDR"_)+raw(ihdr);
-    file.append(raw(big32(IHDR.size-4)));
-    file.append(IHDR);
-    file.append(raw(big32(crc32(IHDR))));
+    array<byte> IHDR = ref<byte>("IHDR"_)+raw(ihdr);
 
     buffer<byte> predicted;
     if(!image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height);
     else predicted = predict<rgba,4>(image.data, image.width, image.height);
-
     buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(predicted, true);
-    file.append(raw(big32(IDAT.size-4)));
-    file.append(IDAT);
-    file.append(raw(big32(crc32(IDAT))));
 
-    file.append(raw(big32(0)));
-    file.append("IEND"_);
-    file.append(raw(big32(crc32("IEND"_))));
-    return move(file);
+    return "\x89PNG\r\n\x1A\n"_
+            +raw(big32(IHDR.size-4)) + IHDR + raw(big32(crc32(IHDR)))
+            +raw(big32(IDAT.size-4)) + IDAT + raw(big32(crc32(IDAT)))
+            +raw(big32(            4-4)) + "IEND"_ + raw(big32(crc32("IEND"_)));
 }

@@ -83,15 +83,15 @@ String join(const ref<string> list, const string separator) {
 }
 String join(const ref<String> list, const string separator) { return join(toRefs(list), separator); }
 
-array<string> split(const string source, byte separator) {
-    array<string> list;
+/*Array<string> split(const string source, byte separator) {
+    Array<string> list;
     TextData s (source);
     while(s) list.append( s.until(separator) );
     return list;
-}
+}*/
 
-array<string> split(const string source, string separator) {
-    array<string> list;
+Array<string> split(const string source, string separator) {
+    Array<string> list;
     TextData s (source);
     while(s) list.append( s.until(separator) );
     return list;

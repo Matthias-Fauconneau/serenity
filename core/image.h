@@ -19,7 +19,7 @@ struct Image : buffer<byte4> {
         assert_(buffer::size == height*this->stride);
     }
     Image(uint width, uint height, bool alpha=false, bool sRGB=true)
-        : buffer(height*width), width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
+        : buffer(height*width, "Image"), width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
         assert(width); assert(height);
     }
     Image(int2 size, bool alpha=false, bool sRGB=true) : Image(size.x, size.y, alpha, sRGB) {}
@@ -67,8 +67,10 @@ struct ImageF : buffer<float> {
     ImageF(buffer<float>&& data, int2 size, size_t stride) : buffer(::move(data)), size(size), stride(stride) {
         assert_(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
     }
-    ImageF(int width, int height) : buffer(height*width), width(width), height(height), stride(width) { assert_(size>int2(0), size, width, height); }
-    ImageF(int2 size) : ImageF(size.x, size.y) {}
+    ImageF(int width, int height, string name) : buffer(height*width, name), width(width), height(height), stride(width) {
+        assert_(size>int2(0), size, width, height);
+    }
+    ImageF(int2 size, string name/*="ImageF"*/) : ImageF(size.x, size.y, name) {}
 
     explicit operator bool() const { return data && width && height; }
     inline float& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
@@ -104,13 +106,13 @@ template<Type F, Type... S> void apply(const ImageF& target, F function, const S
     });
 }
 template<Type F> ImageF apply(ImageF&& y, const ImageF& a, const ImageF& b, F function) { apply(y, function, a, b); return move(y); }
-template<Type F> ImageF apply(const ImageF& a, const ImageF& b, F function) { return apply(a.size, a, b, function); }
+template<Type F> ImageF apply(const ImageF& a, const ImageF& b, F function) { return apply({a.size,"apply"}, a, b, function); }
 
 inline void min(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, [](float a, float b){ return min(a, b);}, a, b); }
 inline void max(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, [](float a, float b){ return max(a, b);}, a, b); }
 
 inline ImageF min(ImageF&& y, const ImageF& a, const ImageF& b) { min(y, a, b); return move(y); }
-inline ImageF min(const ImageF& a, const ImageF& b) { return min(a.size, a, b); }
+inline ImageF min(const ImageF& a, const ImageF& b) { return min({a.size,"min"}, a, b); }
 
 inline ImageF operator-(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a - b;}); }
 inline ImageF operator/(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a / b;}); }
@@ -152,7 +154,7 @@ ImageF resize(ImageF&& target, ImageF&& source);
 /// Applies a gaussian blur
 void gaussianBlur(const ImageF& target, const ImageF& source, float sigma);
 inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) { gaussianBlur(target, source, sigma); return move(target); }
-inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
+inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur({source.size,"blur"}, source, sigma); }
 
 /// Selects image (signal) components of scale (frequency) above threshold
 inline void highPass(const ImageF& target, const ImageF& source, float threshold) {
@@ -201,7 +203,7 @@ inline ImageF crop(ImageF&& target, const ImageF& red, const ImageF& green, cons
     crop(target, red, green, blue, origin); return move(target);
 }
 inline ImageF crop(const ImageF& red, const ImageF& green, const ImageF& blue, int2 origin, int2 size) {
-    return crop(size, red, green, blue, origin);
+    return crop({size,"crop"}, red, green, blue, origin);
 }
 
 // -- Insert --
@@ -223,4 +225,4 @@ static void insert(const ImageF& target, const ImageF& source, const ImageF& cro
 inline ImageF insert(ImageF&& target, const ImageF& source, const ImageF& crop, int2 origin) {
     insert(target, source, crop, origin); return move(target);
 }
-inline ImageF insert(const ImageF& source, const ImageF& crop, int2 origin) { return insert(source.size, source, crop, origin); }
+inline ImageF insert(const ImageF& source, const ImageF& crop, int2 origin) { return insert({source.size,"insert"}, source, crop, origin); }

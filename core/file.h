@@ -57,19 +57,23 @@ struct Stream : Handle {
     Stream(){}
     Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
-    void read(byte* buffer, size_t size);
+    void read(mref<byte> target);
     /// Reads up to \a size bytes into \a buffer
-    int64 readUpTo(byte* buffer, size_t size);
+    int64 readUpTo(mref<byte> target);
     /// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
     /// Reads up to \a size bytes
     buffer<byte> readUpTo(size_t size);
+    /// Reads up to \a size bytes into \a target
+    void readUpTo(array<byte>& target, size_t size);
+    /// Reads up to \a size bytes in an inline Array if possible
+    template<size_t N> Array<byte, N> readUpTo(size_t size) { Array<byte, N> target; readUpTo(target, size); return target; }
     /// Reads a raw value
-    generic T read() { T t/*=Void()*/; read((byte*)&t,sizeof(T)); return t; }
+    generic T read() { T t/*=Void()*/; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
-        ::buffer<T> buffer(size); size_t byteSize=size*sizeof(T);
-        size_t offset=0; while(offset<byteSize) offset+=readUpTo((byte*)buffer.begin()+offset, byteSize-offset);
+        ::buffer<T> buffer(size, "read"); size_t byteSize=size*sizeof(T);
+        size_t offset=0; while(offset<byteSize) offset+=readUpTo(buffer.slice(offset, byteSize-offset));
         assert(offset==byteSize);
         return buffer;
     }
@@ -105,7 +109,7 @@ struct File : Stream {
     /// Returns file type
     FileType type() const;
     /// Returns file size
-    int64 size() const;
+    size_t size() const;
     /// Returns the last access Unix timestamp (in nanoseconds)
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)

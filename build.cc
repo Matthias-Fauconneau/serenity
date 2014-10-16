@@ -156,6 +156,13 @@ struct Build {
     }
 
     Build() {
+        if(arguments()==ref<string>{"statistics"}) {
+            map<size_t, string> files;
+            for(string path: sources) files.insertSortedMulti(File(path).size(), path);
+            log(str(files,"\n"_));
+            return;
+        }
+
         // Configures
         string install;
         for(string arg: arguments()) {

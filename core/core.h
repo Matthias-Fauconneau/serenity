@@ -172,6 +172,7 @@ template<> struct ref<char> {
     const char* end() const { return data+size; }
     const char& at(size_t i) const;
     const char& operator [](size_t i) const { return at(i); }
+    const char& last() const { return at(size-1); }
     ref<char> slice(size_t pos, size_t size) const;
     ref<char> slice(size_t pos) const;
 

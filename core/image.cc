@@ -232,7 +232,7 @@ void gaussianBlur(const ImageF& target, const ImageF& source, float sigma) {
     float kernel[N];
     for(int dx: range(N)) kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
     float sum = ::sum(ref<float>(kernel,N)); assert_(sum, ref<float>(kernel,N)); mref<float>(kernel,N) *= 1/sum;
-    buffer<float> transpose (target.height*target.width);
+    buffer<float> transpose (target.height*target.width, "transpose");
     convolve(transpose.begin(), source.begin(), kernel, radius, source.width, source.height, source.stride, source.height);
     assert_(source.size == target.size);
     convolve(target.begin(),  transpose.begin(), kernel, radius, target.height, target.width, target.height, target.stride);

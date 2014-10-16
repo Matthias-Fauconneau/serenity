@@ -51,7 +51,7 @@ double fromDecimal(const string str);
 
 // -- String
 
-typedef array<char> String;
+typedef Array<char> String;
 
 /// Forwards string
 inline string str(const String& s) { return s; }
@@ -88,7 +88,7 @@ String right(const string s, size_t size, const char pad=' ');
 String join(const ref<string> list, const string separator="");
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array<string> split(const string str, string separator=", ");
+Array<string> split(const string str, string separator=", ");
 
 /// Flatten cats
 template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }

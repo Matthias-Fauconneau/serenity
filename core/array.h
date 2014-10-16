@@ -32,14 +32,13 @@ generic struct array : buffer<T> {
     using buffer<T>::data;
     using buffer<T>::size;
     using buffer<T>::capacity;
-    byte inlineBuffer[is_same<T,char>::value?40:0]; // Pads array<T> reference to cache line size to hold small arrays without managing an heap allocation
-    static constexpr size_t inlineBufferCapacity = sizeof(inlineBuffer); ///sizeof(T);
+    byte inlineBuffer[0]; // Address of any inline buffer
     bool isInline() const { return data==(T*)inlineBuffer; }
 
     /// Default constructs an empty array
-    array() : buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity) {}
+    array() {}
     /// Converts a buffer to an array
-    array(buffer<T>&& o) : buffer<T>(move(o)) { assert_(capacity > inlineBufferCapacity, capacity); }
+    array(buffer<T>&& o) : buffer<T>(move(o)) {}
     /// Allocates an empty array with storage space for \a capacity elements
     explicit array(size_t nextCapacity) : array() { reserve(nextCapacity); }
     /// Copies elements from a reference
@@ -49,7 +48,8 @@ generic struct array : buffer<T> {
 
     array(array&& o) : buffer<T>((T*)o.data, o.size, o.capacity) {
         if(o.isInline()) {
-            data=(T*)inlineBuffer;
+            capacity = 0;
+            reserve(o.size);
             mref<T>::move(o);
         }
         o.data=0, o.size=0, o.capacity=0;
@@ -75,7 +75,8 @@ generic struct array : buffer<T> {
         assert(nextCapacity>=size);
         if(nextCapacity>capacity) {
             const T* data = 0;
-            if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
+            // TODO: move compatible realloc
+            if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory", size, capacity, nextCapacity, sizeof(T));
             swap(data, this->data);
             capacity = nextCapacity;
             mref<T>::move(mref<T>((T*)data, size));
@@ -157,6 +158,41 @@ generic struct array : buffer<T> {
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return array<T>((const ref<T>)o); }
 
+/// Allocates an inline buffer on stack to store small arrays without an heap allocation
+template<Type T, size_t N=128> struct Array : array<T> {
+    using array<T>::data;
+    using array<T>::size;
+    using array<T>::capacity;
+    byte inlineBuffer[N-sizeof(array<T>)]; // Pads array<T> reference to cache line size to hold small arrays without managing an heap allocation
+    static constexpr size_t inlineBufferCapacity = sizeof(inlineBuffer)/sizeof(T);
+
+    /// Default constructs an empty array
+    Array() : array<T>(buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity)) {}
+    /// Converts a buffer to an array
+    Array(buffer<T>&& o) : array<T>(move(o)) { assert_(capacity > inlineBufferCapacity, capacity); }
+    /// Allocates an empty array with storage space for \a capacity elements
+    explicit Array(size_t nextCapacity) : Array() { reserve(nextCapacity); }
+    /// Copies elements from a reference
+    explicit Array(const ref<T> source) : Array() { append(source); }
+    /// Moves elements from a reference
+    explicit Array(const mref<T> source) : Array() { append(source); } //FIXME: only enables for non implicitly copiable types
+
+    Array(Array&& o) : array<T>(buffer<T>((T*)o.data, o.size, o.capacity)) {
+        if(o.isInline()) {
+            data = (T*)inlineBuffer;
+            capacity = inlineBufferCapacity;
+            reserve(o.size);
+            mref<T>::move(o);
+        }
+        o.data=0, o.size=0, o.capacity=0;
+    }
+    Array& operator=(Array&& o) { this->~Array(); new (this) Array(::move(o)); return *this; }
+
+    using array<T>::reserve;
+    using array<T>::append;
+};
+/// Copies all elements in a new array
+generic Array<T> copy(const Array<T>& o) { return Array<T>((const ref<T>)o); }
 
 // -- Sort --
 
