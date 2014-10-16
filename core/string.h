@@ -61,7 +61,7 @@ struct strz : String {
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function> String apply(string source, Function function) {
-    String target(source.size); for(size_t index: range(source.size)) target.append(function(source[index])); return target;
+    String target(source.size); target.size=source.size; target.apply(function, source); return target;
 }
 
 /// Replaces every occurrence of the String \a before with the String \a after
@@ -93,6 +93,10 @@ template<class A, class B> String str(const cat<A, B>& a) { return a; }
 
 /// Converts an unsigned integer
 String str(uint64 number, int pad=0, uint base=10, char padChar='0');
+/// Converts an unsigned integer (implicit conversion)
+inline String str(uint8 number) { return str(uint64(number)); }
+/// Converts an unsigned integer (implicit conversion)
+inline String str(uint32 number) { return str(uint64(number)); }
 /// Converts an unsigned integer (implicit conversion)
 inline String str(size_t number) { return str(uint64(number)); }
 /// Converts an unsigned integer in hexadecimal base

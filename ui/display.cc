@@ -35,9 +35,9 @@ namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 namespace Present { int EXT, event, errorBase; }
 
 Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
-    String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
-    struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
-    if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed");
+    {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
+        struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
+        if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed"); }
     {ConnectionSetup r;
         if(existsFile(".Xauthority",home()) && File(".Xauthority",home()).size()) {
             BinaryData s (readFile(".Xauthority",home()), true);

@@ -129,7 +129,7 @@ extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
 
 /// Converts an sRGB component to linear float
-void linear(mref<float> target, ref<byte4> source, uint component);
+void linear(mref<float> target, ref<byte4> source, int component);
 
 void sRGB(mref<byte4> target, ref<float> value);
 inline Image sRGB(const ImageF& value) {

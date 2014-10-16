@@ -27,7 +27,7 @@ Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& i
     send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     show();
-    actions[Escape] = []{exit();};
+    actions[Escape] = []{requestTermination();};
     actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
     render();
 }
@@ -101,7 +101,7 @@ bool Window::processEvent(const XEvent& e) {
         function<void()>* action = actions.find(Escape);
         if(action) (*action)(); // Local window action
         else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
-        else exit(0); // Exits application by default
+        else requestTermination(0); // Exits application by default
     }
     else if(type==MappingNotify) {}
     else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); state = Present; }
@@ -149,7 +149,7 @@ void Window::event() {
 
             uint stride = align(16, width);
             shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride), size, stride);
+            target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride, 0), size, stride);
             target.clear(0xFF);
             send(Shm::Attach{.seg=id+Segment, .shm=shm});
             send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});

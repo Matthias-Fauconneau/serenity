@@ -64,12 +64,12 @@ struct Build {
         }
         return "";
     }
-    void tryParseDefines(TextData& s) {
+    /*void tryParseDefines(TextData& s) {
         if(!s.match("#define ")) return;
         string id = s.identifier("_");
         s.whileAny(" ");
-        if(!s.match('0')) defines.append( toLower(id) );
-    }
+        if(!s.match('0')) { defines.append( toLower(id) ); log(defines); }
+    }*/
     bool tryParseConditions(TextData& s, string fileName) {
         if(!s.match("#if ")) return false;
         bool condition = !s.match('!');
@@ -124,7 +124,7 @@ struct Build {
                     parent.children.append( modules[modules.indexOf(module)].pointer );
                 }
             }
-            tryParseDefines(s);
+            //tryParseDefines(s);
             tryParseConditions(s, fileName);
             do { s.whileAny(" "); } while(tryParseFiles(s));
         }

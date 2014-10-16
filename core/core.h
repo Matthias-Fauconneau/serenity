@@ -258,7 +258,7 @@ inline ref<char> ref<char>::slice(size_t pos) const { assert(pos<=size); return 
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) noexcept { return p; }
 #endif
-#include <cstdio>
+
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
     using ref<T>::data;

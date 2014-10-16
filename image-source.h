@@ -20,7 +20,7 @@ struct ImageSource {
     virtual int64 time(size_t index) const abstract;
     virtual int2 size(size_t index) const abstract;
     virtual const map<String, String>& properties(size_t index) const abstract;
-    virtual SourceImage image(size_t /*index*/, uint /*component*/, int2 unused hint=0) const { error("Unimplemented"); }
+    virtual SourceImage image(size_t /*index*/, int /*component*/, int2 unused hint=0) const { error("Unimplemented"); }
     virtual SourceImageRGB image(size_t /*index*/, int2 unused hint = 0) const { error("Unimplemented"); }
 };
 
