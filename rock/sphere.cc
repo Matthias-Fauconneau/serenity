@@ -3,7 +3,7 @@
 #include "list.h"
 #include "sample.h"
 
-/// Computes radius for each list of voxels
+/// Computes radius for each list of voxels as the radius of the ball with the same variance
 array<real> radiusList(const buffer<array<short3>>& lists) {
     array<real> radiusList (lists.size);
     for(ref<short3> list: lists) {
@@ -11,10 +11,10 @@ array<real> radiusList(const buffer<array<short3>>& lists) {
         real3 centroid = 0;
         for(short3 position: list) centroid += real3(position);
         centroid /= list.size;
-        real radius = 0;
-        for(short3 position: list) radius += norm(real3(position)-centroid);
-        radius /= list.size;
-        radiusList << radius;
+        real variance = 0;
+        for(short3 position: list) variance += sq(real3(position)-centroid);
+        variance /= list.size;
+        radiusList << sqrt(5./3*variance);
     }
     return move(radiusList);
 }
