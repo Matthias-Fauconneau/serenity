@@ -64,12 +64,6 @@ struct Build {
         }
         return "";
     }
-    /*void tryParseDefines(TextData& s) {
-        if(!s.match("#define ")) return;
-        string id = s.identifier("_");
-        s.whileAny(" ");
-        if(!s.match('0')) { defines.append( toLower(id) ); log(defines); }
-    }*/
     bool tryParseConditions(TextData& s, string fileName) {
         if(!s.match("#if ")) return false;
         bool condition = !s.match('!');

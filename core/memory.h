@@ -45,7 +45,7 @@ public:
                 logTrace();
                 log("~",name, capacity);
             }
-            ::free((void*)data);
+			free((void*)data);
         }
         data=0; capacity=0; size=0;
     }
@@ -89,7 +89,6 @@ template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
 
 /// Reinterpret casts a buffer to another type
 template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
-    log((void*)o.data);
     buffer<T> buffer;
     buffer.data = (const T*)o.data;
     assert((o.size*sizeof(O))%sizeof(T) == 0);

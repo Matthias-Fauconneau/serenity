@@ -146,13 +146,33 @@ int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, requ
 
 // -- Map
 
-Map::Map(const File& file, Prot prot, Flags flags) { size=file.size(); data = size?(byte*)check(mmap(0,size,prot,flags,file.fd,0)):0; }
+array<String> maps;
 
-Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){ this->size=size; data=(byte*)check(mmap(0,size,prot,flags,fd,offset)); }
+Map::Map(const File& file, Prot prot, Flags flags) {
+	size=file.size();
+	name = file.name()+':'+str(size);
+	maps.append(::copy(name));
+	data = size?(byte*)check(mmap(0,size,prot,flags,file.fd,0), '\n', str(maps), File("/proc/self/maps").readUpTo(4096)):0;
+	//log("+", name);
+}
+
+Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){
+	this->size=size;
+	name = Handle(fd).name()+':'+str(size);
+	maps.append(::copy(name));
+	data=(byte*)check(mmap(0,size,prot,flags,fd,offset), maps);
+}
 
 Map::~Map() { unmap(); }
 
-void Map::unmap() { if(data) munmap((void*)data, size); data=0, size=0; }
+void Map::unmap() {
+	if(data) {
+		//log("~", name);
+		maps.remove(name);
+		munmap((void*)data, size);
+	}
+	data=0, size=0;
+}
 
 // -- File system
 

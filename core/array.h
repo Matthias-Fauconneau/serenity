@@ -74,12 +74,14 @@ generic struct array : buffer<T> {
     size_t reserve(size_t nextCapacity) {
         assert(nextCapacity>=size);
         if(nextCapacity>capacity) {
+			bool wasHeap = !isInline() && capacity;
             const T* data = 0;
             // TODO: move compatible realloc
             if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory", size, capacity, nextCapacity, sizeof(T));
             swap(data, this->data);
             capacity = nextCapacity;
             mref<T>::move(mref<T>((T*)data, size));
+			if(wasHeap) free((void*)data);
         }
         return nextCapacity;
     }

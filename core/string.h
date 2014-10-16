@@ -124,7 +124,7 @@ String binaryPrefix(uint64 value, string unit="B", string unitSuffix="");
 
 /// Converts arrays
 template<Type T, typename enable_if<!is_same<char, T>::value>::type* = nullptr>
-String str(const ref<T> source, char separator=' ') {
+String str(const ref<T> source, string separator=" ") {
     String target;
     target.append('[');
     for(uint i: range(source.size)) {
@@ -134,14 +134,14 @@ String str(const ref<T> source, char separator=' ') {
     target.append(']');
     return target;
 }
-generic String str(const mref<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
-generic String str(const buffer<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
-generic String str(const array<T>& source, char separator=' ') { return str((const ref<T>)source, separator); }
-inline String hex(const ref<uint8> source, char separator=' ') { return str(apply(source, [](const uint8& c) { return hex(c,2); }), separator); }
-inline String hex(const ref<byte> source, char separator=' ') { return hex(cast<uint8>(source), separator); }
+generic String str(const mref<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
+generic String str(const buffer<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
+generic String str(const array<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
+inline String hex(const ref<uint8> source, string separator=" ") { return str(apply(source, [](const uint8& c) { return hex(c,2); }), separator); }
+inline String hex(const ref<byte> source, string separator=" ") { return hex(cast<uint8>(source), separator); }
 
 /// Converts static arrays
-template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') { return str(ref<T>(source, N), separator); }
+template<Type T, size_t N> String str(const T (&source)[N], string separator=" ") { return str(ref<T>(source, N), separator); }
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use join({str(args)...}) to convert and concatenate without spaces

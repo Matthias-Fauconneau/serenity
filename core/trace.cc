@@ -129,7 +129,7 @@ Symbol findSymbol(void* find) {
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) { s.whileNot(0); s.skip('\0'); }
-        Array<string, 512> files;
+		Array<string, 1024> files;
         while(s.peek()) {
             files.append( cast<char>(s.whileNot(0)) ); s.skip('\0');
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
