@@ -59,6 +59,11 @@ struct strz : String {
     operator const char*() { return data; }
 };
 
+/// Returns an array of the application of a function to every elements of a reference
+template<Type Function> String apply(string source, Function function) {
+    String target(source.size); for(size_t index: range(source.size)) target.append(function(source[index])); return target;
+}
+
 /// Replaces every occurrence of the String \a before with the String \a after
 String replace(const string s, const string before, const string after);
 /// Lowers case
@@ -87,7 +92,7 @@ template<class A, class B> String str(const cat<A, B>& a) { return a; }
 // -- Number conversions
 
 /// Converts an unsigned integer
-String str(uint64 number, uint pad=0, uint base=10, char padChar='0');
+String str(uint64 number, int pad=0, uint base=10, char padChar='0');
 /// Converts an unsigned integer (implicit conversion)
 inline String str(size_t number) { return str(uint64(number)); }
 /// Converts an unsigned integer in hexadecimal base
@@ -96,7 +101,7 @@ inline String hex(uint64 n, uint pad=0) { return str(n, pad, 16); }
 generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 
 /// Converts a signed integer
-String str(int64 number, uint pad=0, uint base=10, char padChar=' ');
+String str(int64 number, int pad=0, uint base=10, char padChar=' ');
 /// Converts a signed integer (implicit conversion)
 inline String str(int32 n) { return str(int64(n)); }
 

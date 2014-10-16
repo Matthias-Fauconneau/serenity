@@ -32,7 +32,6 @@ generic struct buffer : mref<T> {
     //template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
     /// Initializes a new buffer with the content of \a o
     //explicit buffer(const ref<T> o) : buffer(o.size) { mref<T>::copy(o); }
-protected:
     /// References \a size elements from const \a data pointer
     buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 public:
@@ -51,7 +50,7 @@ public:
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
 
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
-//generic buffer<T> unsafeReference(const mref<T> o) { return buffer<T>((T*)o.data, o.size); }
+generic buffer<T> unsafeReference(const mref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
 
 /*/// Concatenates a single element and a buffer by copying
 generic inline buffer<T> operator+(const T a, const ref<T> b) {

@@ -99,7 +99,7 @@ array<string> split(const string source, string separator) {
 
 // -- Number conversions
 
-String str(uint64 n, uint pad, uint base, char padChar) {
+String str(uint64 n, int pad, uint base, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -110,7 +110,7 @@ String str(uint64 n, uint pad, uint base, char padChar) {
     return String(string(buf+i,64-i));
 }
 
-String str(int64 number, uint pad, uint base, char padChar) {
+String str(int64 number, int pad, uint base, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);

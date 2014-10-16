@@ -147,7 +147,7 @@ void __attribute((constructor(1001))) generate_sRGB_reverse() {
     }
 }
 
-void linear(mref<float> target, ref<byte4> source, uint component) {
+void linear(mref<float> target, ref<byte4> source, int component) {
     /***/ if(component==0) parallel::apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[0]]; }, source);
     else if(component==1) parallel::apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[1]]; }, source);
     else if(component==2) parallel::apply(target, [](byte4 sRGB) { return sRGB_reverse[sRGB[2]]; }, source);

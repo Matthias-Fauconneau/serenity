@@ -64,21 +64,21 @@ inline Image resize(Image&& target, const Image& source) { resize(target, source
 /// 2D array of floating-point pixels
 struct ImageF : buffer<float> {
     ImageF(){}
-    ImageF(buffer<float>&& data, int2 size, uint stride) : buffer(::move(data)), size(size), stride(stride) {
+    ImageF(buffer<float>&& data, int2 size, size_t stride) : buffer(::move(data)), size(size), stride(stride) {
         assert_(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
     }
     ImageF(int width, int height) : buffer(height*width), width(width), height(height), stride(width) { assert_(size>int2(0), size, width, height); }
     ImageF(int2 size) : ImageF(size.x, size.y) {}
 
     explicit operator bool() const { return data && width && height; }
-    inline float& operator()(uint x, uint y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
+    inline float& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
     inline float& operator()(int2 p) const { return operator()(p.x, p.y); }
 
     union {
         int2 size = 0;
         struct { uint width, height; };
     };
-    uint stride = 0;
+    size_t stride = 0;
 };
 
 inline ImageF copy(const ImageF& o) { return ImageF(copy((const buffer<float>&)o), o.size, o.stride); }
@@ -90,7 +90,7 @@ inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o), o.size,
 inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
     origin = clip(int2(0), origin, source.size);
     size = min(size, source.size-origin);
-    return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride), size, source.stride);
+    return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride, 0), size, source.stride);
 }
 
 //inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); parallel::div(a, a, b); return move(a); }

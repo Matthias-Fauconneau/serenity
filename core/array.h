@@ -52,9 +52,13 @@ generic struct array : buffer<T> {
     /// Allocates an empty array with storage space for \a capacity elements
     explicit array(size_t nextCapacity) : array() { reserve(nextCapacity); invariant(); }
     /// Copies elements from a reference
-    explicit array(const ref<T> ref) : array() { append(ref); invariant(); }
+    explicit array(const ref<T> source) : array() { append(source); invariant(); }
     /// Moves elements from a reference
-    explicit array(const mref<T> ref) : array() { append(ref); invariant(); } //FIXME: only enables for non implicitly copiable types
+    explicit array(const mref<T> source) : array() { append(source); invariant(); } //FIXME: only enables for non implicitly copiable types
+    /*/// Evaluates elements from a function
+    template<Type Function> array(const ref<T> source, Function function) : array(source.size) {
+        for(size_t index: range(source.size)) append(function(source[index]));
+    }*/
 
     array(array&& o) : buffer<T>((T*)o.data, o.size, o.capacity) {
         if(o.isInline()) {
@@ -195,20 +199,6 @@ generic array<T> copy(const array<T>& o) {
 
 // -- Concatenate --
 
-/*/// Concatenates two buffers by appending (when first operand can be moved, is otherwise unused)
-generic inline buffer<T> operator+(buffer<T>&& a, const T& b) {
-    array<T> target(move(a)); target.append(b); return move(target);
-}
-
-/// Concatenates two buffers by appending (when first operand can be moved, is otherwise unused)
-generic inline buffer<T> operator+(buffer<T>&& a, const ref<T> b) {
-    array<T> target(move(a)); target.append(b); return move(target);
-}
-// Prevents wrong match with operator +(const ref<T>& a, const array<T>& b)
-generic inline buffer<T> operator+(buffer<T>&& a, const array<T>& b) {
-    array<T> target(move(a)); target.append(b); return move(target);
-}*/
-
 /// Concatenates another \a cat and a value
 template<class A, class T> struct cat {
     A a; const T b;
@@ -275,7 +265,6 @@ generic struct cat<ref<T>, ref<T>> {
     operator array<T>() const { array<T> target (size()); copy(target); return move(target); }
 };
 generic cat<ref<T>,ref<T>> operator +(ref<T> a, ref<T> b) { return {a,b}; }
-//generic cat<ref<T>,ref<T>> operator +(ref<T> a, const array<T>& b) { return {a,b}; }
 // Required for implicit string literal conversion
 inline cat<ref<char>,ref<char>> operator +(ref<char> a, ref<char> b) { return {a,b}; }
 
@@ -298,9 +287,6 @@ generic struct cat<array<T>, ref<T>> {
     operator array<T>() const { array<T> target (size()); copy(target); return move(target); }
 };
 generic cat<array<T>,ref<T>> operator +(array<T>&& a, ref<T> b) { return {move(a),b}; }
-//generic cat<ref<T>,ref<T>> operator +(ref<T> a, const array<T>& b) { return {a,b}; }
-// Required for implicit string literal conversion
-//inline cat<array<char>,ref<char>> operator +(array<char>&& a, ref<char> b) { return {move(a),b}; }
 
 // -- Sort --
 
@@ -340,7 +326,7 @@ generic void quicksort(const mref<T>& at, int left, int right) {
 /// Quicksorts the array in-place
 generic const mref<T>& sort(const mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); return at; }
 
-// -- Miscellaneous --
+// -- Functional  --
 
 /// Creates a new array containing only elements where filter \a predicate does not match
 template<Type T, Type Function> array<T> filter(const ref<T> source, Function predicate) {
