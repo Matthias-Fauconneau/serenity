@@ -81,7 +81,7 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
 void Display::event() {
     for(;;) { // Process any pending events
         for(;;) { // Process any queued events
-            buffer<byte> e;
+            array<byte> e;
             {Locker lock(this->lock);
                 if(!events) break;
                 e = events.take(0);
@@ -110,14 +110,14 @@ void Display::event(const ref<byte> ge) {
     onEvent(ge);
 }
 
-buffer<byte> Display::readReply(uint16 sequence, uint elementSize) {
+array<byte> Display::readReply(uint16 sequence, uint elementSize) {
     for(;;) {
         XEvent e = read<XEvent>();
         if(e.type==Reply) {
             assert_(e.seq==sequence);
-            array<byte> r (raw(e.reply));
-            if(e.reply.size) { assert_(elementSize); r.append(read(e.reply.size*elementSize)); }
-            return move(r);
+            array<byte> reply (raw(e.reply));
+            if(e.reply.size) { assert_(elementSize); reply.append(read(e.reply.size*elementSize)); }
+            return reply;
         }
         if(e.type==Error) { log(e); assert_(e.seq!=sequence, e.seq, sequence); continue; }
         array<byte> o (raw(e));

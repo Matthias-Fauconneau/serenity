@@ -4,7 +4,7 @@
 #include "function.h" // onEvent
 #include "map.h" // actions
 #include "vector.h" // int2
-inline string padding(size_t size, uint width=4){ return "\0\0\0\0"_.slice(align(width, size)-size); }
+inline string padding(size_t size, uint width=4){ return "\0\0\0\0"_.slice(0, align(width, size)-size); }
 generic auto pad(T&& t, uint width=4) -> decltype(t+padding(t.size, width)) { return move(t)+padding(t.size, width); }
 
 /// Connection to an X display server
@@ -13,7 +13,7 @@ struct Display : Socket, Poll {
     /// Synchronizes access to connection and event queue
     Lock lock;
     /// Event queue
-    array<buffer<byte>> events;
+    array<array<byte>> events;
     /// Signals events
     signal<const ref<byte>> onEvent;
     // Write
@@ -51,22 +51,22 @@ struct Display : Socket, Poll {
      }
 
      /// Reads reply checking for errors and queueing events
-     buffer<byte> readReply(uint16 sequence, uint elementSize);
+     array<byte> readReply(uint16 sequence, uint elementSize);
 
      template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, const ref<byte> data={}) {
          static_assert(sizeof(typename Request::Reply)==31,"");
          Locker lock(this->lock); // Prevents a concurrent thread from reading the reply and lock event queue
          uint16 sequence = send(request, data);
-         buffer<byte> r = readReply(sequence, sizeof(T));
-         auto reply = *(typename Request::Reply*)r.data;
-         assert_(r.size == sizeof(typename Request::Reply)+reply.size*sizeof(T), r.size, reply.size);
-         output = buffer<T>(cast<T>(r.slice(sizeof(reply), reply.size*sizeof(T))));
+         array<byte> replyData = readReply(sequence, sizeof(T));
+         typename Request::Reply reply = *(typename Request::Reply*)replyData.data;
+         assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T));
+         output = buffer<T>(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
 
      template<Type Request> typename Request::Reply request(Request request, const ref<byte> data={}) {
          buffer<byte> output;
-         auto reply = this->request(request, output, data);
+         typename Request::Reply reply = this->request(request, output, data);
          assert_(reply.size == 0 && output.size ==0, reply.size, output.size);
          return reply;
      }

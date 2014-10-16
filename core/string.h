@@ -1,6 +1,7 @@
 #pragma once
 /// \file string.h String manipulations (using lightweight string when possible)
 #include "array.h"
+#include "cat.h"
 
 // -- str()
 
@@ -52,6 +53,9 @@ double fromDecimal(const string str);
 
 typedef array<char> String;
 
+/// Forwards string
+inline string str(const String& s) { return s; }
+
 /// Null-terminated \a String with implicit conversion to const char*
 struct strz : String {
     /// Copies a string reference, appends a null byte and allows implicit conversion to const char*
@@ -102,7 +106,7 @@ inline String str(uint32 number) { return str(uint64(number)); }
 /// Converts an unsigned integer (implicit conversion)
 inline String str(size_t number) { return str(uint64(number)); }
 /// Converts an unsigned integer in hexadecimal base
-inline String hex(uint64 n, uint pad=0) { return str(n, pad, 16); }
+inline String hex(uint64 n, int pad=0) { return str(n, pad, 16); }
 /// Converts a memory address in hexadecimal base
 generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 
@@ -141,7 +145,8 @@ template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') 
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use join({str(args)...}) to convert and concatenate without spaces
-template<Type Arg, Type... Args> String str(const Arg& arg, const Args&... args) { return join({str(arg), str(args)...}," "); }
+template<Type Arg0, Type Arg1, Type... Args>
+String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join({str(arg0), str(arg1), str(args)...}," "); }
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log((string)str(args...)); }

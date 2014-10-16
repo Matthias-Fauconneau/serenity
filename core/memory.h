@@ -65,13 +65,13 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 /// Reinterpret casts a const reference to another type
 template<Type T, Type O> ref<T> cast(const ref<O> o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
-    return ref<T>((const T*)o.data,o.size*sizeof(O)/sizeof(T));
+    return ref<T>((const T*)o.data, o.size*sizeof(O)/sizeof(T));
 }
 
 /// Reinterpret casts a mutable reference to another type
 template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
     assert((o.size*sizeof(O))%sizeof(T) == 0);
-    return mref<T>((T*)o.data,o.size*sizeof(O)/sizeof(T));
+    return mref<T>((T*)o.data, o.size*sizeof(O)/sizeof(T));
 }
 
 /// Reinterpret casts a buffer to another type
@@ -83,7 +83,7 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
     buffer.size = o.size*sizeof(O)/sizeof(T);
     assert((o.capacity*sizeof(O))%sizeof(T) == 0);
     buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
-    o.capacity = 0;
+    o.data=0, o.size=0, o.capacity = 0;
     return buffer;
 }
 
