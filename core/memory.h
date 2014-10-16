@@ -20,7 +20,7 @@ generic struct buffer : mref<T> {
     /// Default constructs an empty buffer
     buffer(){}
     /// Move constructor
-    buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
+    buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
     buffer(size_t capacity, size_t size) : mref<T>((T*)0,size), capacity(capacity) {
         assert(capacity>=size && size>=0); if(!capacity) return;

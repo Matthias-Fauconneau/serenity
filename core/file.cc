@@ -56,11 +56,11 @@ array<String> Folder::list(uint flags) const {
                     || (flags&Folders && type==DT_DIR)
                     || (flags&Devices && type==DT_CHR)
                     || (flags&Drives && type==DT_BLK) ) {
-                if(flags&Sorted) list.insertSorted(String(name)); else list.append( String(name) );
+                if(flags&Sorted) list.insertSorted( String(name) ); else list.append( String(name) );
             }
             if(flags&Recursive && type==DT_DIR) {
                 for(const String& file: Folder(name,*this).list(flags)) {
-                    if(flags&Sorted) list.insertSorted(name+'/'+file); else list.append( name+'/'+file );
+                    if(flags&Sorted) list.insertSorted( name+'/'+file ); else list.append( name+'/'+file );
                 }
             }
         }

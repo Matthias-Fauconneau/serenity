@@ -37,21 +37,24 @@ generic struct array : buffer<T> {
     //T inlineBuffer[40/sizeof(T)]; // Pads array<T> reference to cache line size to hold small arrays without managing an heap allocation
     byte inlineBuffer[40/sizeof(T)*sizeof(T)]; // Pads array<T> reference to cache line size to hold small arrays without managing an heap allocation
     static constexpr size_t inlineBufferCapacity = sizeof(inlineBuffer)/sizeof(T);
-    bool isInline() const { assert_((data==(T*)inlineBuffer) ^ (capacity > inlineBufferCapacity)); return data==(T*)inlineBuffer; }
+    void invariant() const { /*assert_((data==(T*)inlineBuffer) ^ (capacity == 0 || capacity > inlineBufferCapacity), data==(T*)inlineBuffer, capacity, size, sizeof(inlineBuffer)/sizeof(T), sizeof(T));*/ }
+    bool isInline() const { invariant(); return data==(T*)inlineBuffer; }
 
     //default_move(array);
     /// Default constructs an empty array
-    array() : buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity) {}
+    //array() { invariant(); }
+    array() : buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity) { invariant(); }
     /// Converts a buffer to an array
     array(buffer<T>&& o) : buffer<T>(move(o)) {
-        assert_(capacity > inlineBufferCapacity, "Buffer was holding a small heap allocation, consider using array for small arrays");
+        assert_(capacity > inlineBufferCapacity, "Buffer was holding a small heap allocation, consider using array for small arrays", capacity);
+        invariant();
     }
     /// Allocates an empty array with storage space for \a capacity elements
-    explicit array(size_t nextCapacity) : array() { reserve(nextCapacity); }
+    explicit array(size_t nextCapacity) : array() { reserve(nextCapacity); invariant(); }
     /// Copies elements from a reference
-    explicit array(const ref<T> ref) : array() { append(ref); }
+    explicit array(const ref<T> ref) : array() { append(ref); invariant(); }
     /// Moves elements from a reference
-    explicit array(const mref<T> ref) : array() { append(ref); } //FIXME: only enables for non implicitly copiable types
+    explicit array(const mref<T> ref) : array() { append(ref); invariant(); } //FIXME: only enables for non implicitly copiable types
 
     array(array&& o) : buffer<T>((T*)o.data, o.size, o.capacity) {
         if(o.isInline()) {
@@ -59,11 +62,13 @@ generic struct array : buffer<T> {
             mref<T>::move(o);
         }
         o.data=0, o.size=0, o.capacity=0;
+        invariant();
     }
-    array& operator=(array&& o) { this->~array(); new (this) array(::move(o)); return *this; }
+    array& operator=(array&& o) { this->~array(); new (this) array(::move(o)); invariant(); return *this; }
 
     /// If the array owns the reference, destroys all initialized elements
     ~array() {
+        invariant();
         if(capacity) {
             for(size_t i: range(size)) at(i).~T();
             if(isInline()) capacity=0;/*Prevents buffer from free'ing*/
@@ -78,19 +83,36 @@ generic struct array : buffer<T> {
 
     /// Allocates enough memory for \a capacity elements
     size_t reserve(size_t nextCapacity) {
+        invariant();
         assert(nextCapacity>=size);
         if(nextCapacity>capacity) {
-            bool wasInline = isInline();
+            /*bool wasInline = isInline();
             if(capacity && !wasInline) {
-                data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); // Reallocates heap buffer (copy is done by allocator if necessary)
+                //data=(T*)realloc((T*)data, nextCapacity*sizeof(T)); // Reallocates heap buffer (copy is done by allocator if necessary)
+                // Self referencing elements need to be moved
+                {T* data = 0;
+                    if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
+                    swap(data, this->data);
+                    mref<T>::move(mref<T>(this->data, size));
+                }
                 assert(size_t(data)%alignof(T)==0);
-                capacity=nextCapacity;
+                capacity = nextCapacity;
             } else if(nextCapacity > inlineBufferCapacity) {
                 if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory");
                 if(wasInline) mref<T>::move(mref<T>((T*)inlineBuffer, size)); // Copies from stack allocation to heap allocation
-                capacity=nextCapacity;
-            } //else kept inline
+                capacity = nextCapacity;
+            } else if(!isInline()) {
+                assert_(!size);
+                data = (T*)inlineBuffer;
+                capacity = inlineBufferCapacity;
+            } // else Kept inline*/
+            const T* data = 0;
+            if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
+            swap(data, this->data);
+            capacity = nextCapacity;
+            mref<T>::move(mref<T>((T*)data, size));
         }
+        invariant();
         return nextCapacity;
     }
     /// Resizes the array to \a size and default initialize new elements
@@ -125,7 +147,7 @@ generic struct array : buffer<T> {
     template<Type V> T& insertAt(int index, V&& e) {
         assert(index>=0);
         reserve(++size);
-        for(int i=size-2;i>=index;i--) raw(at(i+1)).copy(raw(at(i)));
+        for(int i=size-2;i>=index;i--) at(i+1)= move(at(i));
         set(index, move(e));
         return at(index);
     }
@@ -133,7 +155,7 @@ generic struct array : buffer<T> {
     /*template<Type V>*/ int insertSorted(T/*V*/&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::move(e)); return i; }
 
     /// Removes one element at \a index
-    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) raw(at(i)).copy(raw(at(i+1))); size--; }
+    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) at(i)=move(at(i+1)); size--; }
     /// Removes one element at \a index and returns its value
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
