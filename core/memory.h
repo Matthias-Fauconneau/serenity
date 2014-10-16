@@ -15,7 +15,6 @@ generic struct buffer : mref<T> {
     using mref<T>::data;
     using mref<T>::size;
     size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
-    //debug(static bool& logMemory() { static bool value = true; return value; })
 
     /// Default constructs an empty buffer
     buffer(){}
@@ -25,11 +24,8 @@ generic struct buffer : mref<T> {
     buffer(size_t capacity, size_t size) : mref<T>((T*)0,size), capacity(capacity) {
         assert(capacity>=size && size>=0); if(!capacity) return;
         if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory");
-        //debug(if(logMemory()) { logMemory()=false; log("+", capacity,'\t', size,'\t', (void*)data); logMemory()=true; })
     }
     explicit buffer(size_t size) : buffer(size, size){}
-    /// Allocates a buffer for \a capacity elements and fill with value
-    //template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
     /// Initializes a new buffer with the content of \a o
     explicit buffer(const ref<T> o) : buffer(o.size) { mref<T>::copy(o); }
     /// References \a size elements from const \a data pointer
@@ -38,11 +34,6 @@ public:
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() {
-/*#if DEBUG
-        if(logMemory() && capacity) {
-            logMemory()=false; log("~", capacity,'\t', size,'\t', (void*)data); logMemory()=true;
-        }
-#endif*/
         if(capacity) ::free((void*)data); data=0; capacity=0; size=0;
     }
 };
@@ -51,21 +42,6 @@ generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.si
 
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
 generic buffer<T> unsafeReference(const /*m*/ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
-
-/*/// Concatenates a single element and a buffer by copying
-generic inline buffer<T> operator+(const T a, const ref<T> b) {
-    buffer<T> target(1+b.size); target.set(0, a); target.slice(1).copy(b); return target;
-}
-
-/// Concatenates a buffer and a single element by copying
-generic inline buffer<T> operator+(const ref<T> a, T b) {
-    buffer<T> target(a.size+1); target.slice(0, a.size).copy(a); target.set(a.size, b); return target;
-}
-
-/// Concatenates two buffers by copying
-generic inline buffer<T> operator+(const ref<T> a, const ref<T> b) {
-    buffer<T> target(a.size+b.size); target.slice(0, a.size).copy(a); target.slice(a.size).copy(b); return target;
-}*/
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {
@@ -100,6 +76,7 @@ template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
 
 /// Reinterpret casts a buffer to another type
 template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
+    log((void*)o.data);
     buffer<T> buffer;
     buffer.data = (const T*)o.data;
     assert((o.size*sizeof(O))%sizeof(T) == 0);

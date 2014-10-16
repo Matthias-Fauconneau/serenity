@@ -21,7 +21,7 @@ String str(XEvent::Error e) {
             errors = ref<string>(XRender::errors);
         }
     } else request = e.major;
-    return str(errors[code], requests[request]);
+    return str(requests[request], code<errors.size?errors[code]:str(code));
 }
 
 String str(XEvent e) {
@@ -37,7 +37,7 @@ namespace Present { int EXT, event, errorBase; }
 Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
-        if(check(connect(Socket::fd,(const sockaddr*)&addr,2+path.size),path)) error("X connection failed"); }
+        if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }
     {ConnectionSetup r;
         if(existsFile(".Xauthority",home()) && File(".Xauthority",home()).size()) {
             BinaryData s (readFile(".Xauthority",home()), true);
@@ -47,7 +47,7 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
             {uint16 length = s.read(); string port unused = s.read<byte>(length); }
             {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=name.size; }
             {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=data.size; }
-            write(raw(r)+pad(String(name))+pad(String(data)));
+            write(raw(r)+pad(name)+pad(data));
         } else write(raw(r));
     }
     {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
@@ -67,8 +67,8 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
         }
         id=r.ridBase;
         minKeyCode=r.minKeyCode, maxKeyCode=r.maxKeyCode;
+        assert(visual);
     }
-    assert(visual);
 
     {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
@@ -119,7 +119,7 @@ buffer<byte> Display::readReply(uint16 sequence, uint elementSize) {
             if(e.reply.size) { assert_(elementSize); r.append(read(e.reply.size*elementSize)); }
             return move(r);
         }
-        if(e.type==Error) { log(e); assert_(e.seq!=sequence); continue; }
+        if(e.type==Error) { log(e); assert_(e.seq!=sequence, e.seq, sequence); continue; }
         array<byte> o (raw(e));
         if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
         events.append(move(o));

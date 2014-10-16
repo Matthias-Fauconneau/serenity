@@ -4,7 +4,8 @@
 #include "function.h" // onEvent
 #include "map.h" // actions
 #include "vector.h" // int2
-inline buffer<byte> pad(array<byte>&& o, uint width=4){ o.grow(align(width,o.size)); return move(o); }
+inline string padding(size_t size, uint width=4){ return "\0\0\0\0"_.slice(align(width, size)-size); }
+generic auto pad(T&& t, uint width=4) -> decltype(t+padding(t.size, width)) { return move(t)+padding(t.size, width); }
 
 /// Connection to an X display server
 struct Display : Socket, Poll {
@@ -44,7 +45,7 @@ struct Display : Socket, Poll {
     // Write
      template<Type Request> uint16 send(Request request, const ref<byte> data={}) {
          assert_(sizeof(request)%4==0 && sizeof(request) + align(4, data.size) == request.size*4, sizeof(request), data.size, request.size*4);
-         write(string(raw(request)+pad(array<byte>(data))));
+         write(raw(request)+pad(data));
          sequence++;
          return sequence;
      }
@@ -59,7 +60,7 @@ struct Display : Socket, Poll {
          buffer<byte> r = readReply(sequence, sizeof(T));
          auto reply = *(typename Request::Reply*)r.data;
          assert_(r.size == sizeof(typename Request::Reply)+reply.size*sizeof(T), r.size, reply.size);
-         output = buffer<T>(cast<T>(r.slice(sizeof(reply),reply.size*sizeof(T))));
+         output = buffer<T>(cast<T>(r.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
 

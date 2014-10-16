@@ -18,10 +18,10 @@ Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& i
     }
     assert_(size);
     send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"), .type=Atom("ATOM"), .format=32,
-                        .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"), .format=32,
-                        .length=1, .size=6+1}, raw(1));
+    send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"), .type=Atom("ATOM"),
+                        .format=32, .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
+    send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"),
+                        .format=32, .length=1, .size=6+1}, raw(1));
     setTitle(title);
     setIcon(icon);
     send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
@@ -121,7 +121,8 @@ void Window::setTitle(const string title) {
 }
 void Window::setIcon(const Image& icon) {
     send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
-                        .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)}, raw(icon.width)+raw(icon.height)+cast<byte>(icon));
+                        .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)},
+                        raw(icon.width)+raw(icon.height)+cast<byte>(icon));
 }
 
 // Render

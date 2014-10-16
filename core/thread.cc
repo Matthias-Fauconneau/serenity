@@ -14,8 +14,8 @@
 #include <sys/syscall.h>
 
 // Log
-void log_(const string buffer) { check_(write(2, buffer.data, buffer.size)); }
-template<> void log(const string& buffer) { log_(buffer+'\n'); }
+void log_(string buffer) { check_(write(2, buffer.data, buffer.size)); }
+void log(string buffer) { log_(buffer+'\n'); }
 
 // Poll
 void Poll::registerPoll() {

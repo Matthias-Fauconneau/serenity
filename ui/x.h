@@ -174,7 +174,7 @@ struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,ma
 struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
 constexpr string requests[] = {"QueryVersion", "QueryPictFormats", "QueryPictIndexValues", "QueryFilters", "CreatePicture", "ChangePicture",
                                "SetPictureClipRectangles", "SetPictureTransform", "SetPictureFilter", "FreePicture", "Composite"};
-constexpr string errors[] = {"PictFormat", "Picture", "PictOp", "GlyphSet", "Glyph"};
+constexpr string errors[] = {"","PictFormat", "Picture", "PictOp", "GlyphSet", "Glyph"};
 }
 
 namespace Present {

@@ -79,6 +79,8 @@ struct Stream : Handle {
     size_t write(const byte* data, size_t size);
     /// Writes \a buffer
     size_t write(const ref<byte> buffer);
+    /// Writes \a buffer (helps implicit conversion from cat)
+    //size_t write(const array<char>& buffer) { return write((ref<byte>)buffer); }
     /// Writes a raw value
     generic size_t writeRaw(T t) { return write((byte*)&t,sizeof(T)); }
 };

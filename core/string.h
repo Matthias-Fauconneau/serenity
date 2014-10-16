@@ -87,7 +87,7 @@ String join(const ref<string> list, const string separator="");
 array<string> split(const string str, string separator=", ");
 
 /// Flatten cats
-template<class A, class B> String str(const cat<A, B>& a) { return a; }
+template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }
 
 // -- Number conversions
 
@@ -95,6 +95,8 @@ template<class A, class B> String str(const cat<A, B>& a) { return a; }
 String str(uint64 number, int pad=0, uint base=10, char padChar='0');
 /// Converts an unsigned integer (implicit conversion)
 inline String str(uint8 number) { return str(uint64(number)); }
+/// Converts an unsigned integer (implicit conversion)
+inline String str(uint16 number) { return str(uint64(number)); }
 /// Converts an unsigned integer (implicit conversion)
 inline String str(uint32 number) { return str(uint64(number)); }
 /// Converts an unsigned integer (implicit conversion)
@@ -142,9 +144,9 @@ template<Type T, size_t N> String str(const T (&source)[N], char separator=' ') 
 template<Type Arg, Type... Args> String str(const Arg& arg, const Args&... args) { return join({str(arg), str(args)...}," "); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log<string>(str(args...)); }
+template<Type... Args> void log(const Args&... args) { log((string)str(args...)); }
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }
 
 /// Converts Strings to strings
-inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return  e; }); }
+inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return e; }); }

@@ -210,7 +210,6 @@ String trace(int skip, void* ip) {
 #endif
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
-        ::log(s.file);
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         else log.append("0x"+hex(ptr(stack[i]))+'\n');
     }

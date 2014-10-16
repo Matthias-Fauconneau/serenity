@@ -210,10 +210,10 @@ struct StringLiteral : string {
 // -- Log
 
 /// Logs a message to standard output without newline
-void log_(const string message);
+void log_(string message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
-template<> void log(const string& message);
+void log(string message);
 
 // -- Debug
 
