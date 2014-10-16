@@ -42,9 +42,9 @@ static array<Thread*> threads __attribute((init_priority(102)));
 // Handle for the main thread (group leader)
 Thread mainThread __attribute((init_priority(102))) (20);
 // Flag to cleanly terminate all threads
-static bool terminate = false;
+static bool terminationRequested = false;
 // Exit status to return for process (group)
-static int exitStatus = 0;
+static int groupExitStatus = 0;
 
 Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
     Locker lock(threadsLock); threads.append(this); // Adds this thread to global thread list
@@ -53,19 +53,19 @@ void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
 
-static int gettid() { return syscall(SYS_gettid); }
+static int32 gettid() { return syscall(SYS_gettid); }
 
 void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority);
-    while(!terminate) {
+    while(!terminationRequested) {
         if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main)
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
         if((LinuxError)check( ::poll(pollfds,size,-1) ) != LinuxError::Interrupted) {
             for(uint i: range(size)) {
-                if(terminate) break;
+                if(terminationRequested) break;
                 Poll* poll=at(i); int revents=pollfds[i].revents;
                 if(revents && !unregistered.contains(poll)) {
                     poll->revents = revents;
@@ -101,7 +101,7 @@ static void traceAllThreads() {
 }
 static void handler(int sig, siginfo_t* info, void* ctx) {
     if(sig==SIGSEGV) log("Segmentation fault");
-    if(threads.size>1) log("Thread #"+dec(gettid())+':');
+    if(threads.size>1) log("Thread #"+str(gettid())+':');
     log_(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
@@ -114,7 +114,11 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 }
 
 // Configures floating-point exceptions
-void setExceptions(uint except) { int r; asm volatile("stmxcsr %0":"=m"(*&r)); r|=0b111111<<7; r &= ~((except&0b111111)<<7); asm volatile("ldmxcsr %0" : : "m" (*&r)); }
+void setExceptions(uint except) {
+    int r; asm volatile("stmxcsr %0":"=m"(*&r));
+    r|=0b111111<<7; r &= ~((except&0b111111)<<7);
+    asm volatile("ldmxcsr %0" : : "m" (*&r));
+}
 
 #include <sys/resource.h>
 void __attribute((constructor(102))) setup_signals() {
@@ -141,17 +145,15 @@ template<> void __attribute((noreturn)) error(const string& message) {
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
         traceAllThreads();
-        if(threads.size>1) log("Thread #"+dec(gettid())+':');
+        if(threads.size>1) log("Thread #"+str(gettid())+':');
         log_(trace(1,0));
         reentrant = false;
     }
     log(message);
-    exit(-1); // Signals all threads to terminate
+    requestTermination(-1); // Sets terminationRequested flag and signals (EventFD::post) all threads to terminate
     {Locker lock(threadsLock);
-        for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from list
-#if !__arm__
-      __builtin_trap(); //TODO: detect if running under debugger
-#endif
+        for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from the running threads
+    __builtin_trap(); //TODO: detect if running under debugger
     exit_thread(-1); // Exits this thread
 }
 
@@ -169,12 +171,12 @@ int main() {
     }
     if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
     for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
-    return exitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+    return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 
-void exit(int status) {
-    exitStatus = status;
-    terminate = true;
+void requestTermination(int status) {
+    groupExitStatus = status;
+    terminationRequested = true;
     Locker lock(threadsLock);
     assert_(threads);
     for(Thread* thread: threads) thread->post();

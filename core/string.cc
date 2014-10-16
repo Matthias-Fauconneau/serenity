@@ -60,16 +60,16 @@ char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
 String toUpper(const string source) { return apply(source, upperCase); }
 
 String left(const string source, size_t size, const char pad) {
-    buffer<char> target(max(size, source.size));
-    target.slice(0, source.size).copy(source);
-    target.slice(source.size).clear(pad);
-    return move(target);
+    String target(max(size, source.size));
+    target.append(source);
+    while(target.size < size) target.append(pad);
+    return target;
 }
 String right(const string source, size_t size, const char pad) {
-    buffer<char> target(max(size, source.size));
-    target.slice(0, target.size-source.size).clear(pad);
-    target.slice(target.size-source.size).copy(source);
-    return move(target);
+    String target(max(size, source.size));
+    while(target.size < size-source.size) target.append(pad);
+    target.append(source);
+    return target;
 }
 
 // -- string[]
@@ -99,7 +99,7 @@ array<string> split(const string source, string separator) {
 
 // -- Number conversions
 
-String utoa(uint64 n, uint base, int pad, char padChar) {
+String str(uint64 n, uint pad, uint base, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -110,7 +110,7 @@ String utoa(uint64 n, uint base, int pad, char padChar) {
     return String(string(buf+i,64-i));
 }
 
-String itoa(int64 number, uint base, int pad, char padChar) {
+String str(int64 number, uint pad, uint base, char padChar) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);
@@ -123,7 +123,8 @@ String itoa(int64 number, uint base, int pad, char padChar) {
     return String(string(buf+i,64-i));
 }
 
-String ftoa(double n, int precision, uint pad, int exponent) {
+String str(double n, int precision, uint pad, int exponent) {
+    //(isNumber(n) && n==round(n)) ? dec(int(n))
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return ::right("NaN", pad);
     if(n==::inf) return ::right("∞", pad+2);
@@ -133,24 +134,21 @@ String ftoa(double n, int precision, uint pad, int exponent) {
     if(sign) s.append('-');
     if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);
-        uint decimal = round(fract*exp10(precision));
+        uint64 decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
-        s.append( utoa(integer) );
+        s.append( str(uint64(integer)) );
         s.append('.');
-        s.append( utoa(decimal, 10, precision,'0') );
-    } else s.append( utoa(round(n)) );
+        s.append( str(decimal, 10, precision,'0') );
+    } else s.append( str(uint64(round(n))) );
     if(exponent==3 && e==3) s.append('K');
     else if(exponent==3 && e==6) s.append('M');
     else if(exponent==3 && e==9) s.append('G');
-    else if(e) { s.append('e'); s.append(itoa(e)); }
+    else if(e) { s.append('e'); s.append(str(e)); }
     return pad > s.size ? right(s, pad) : move(s);
 }
 
-String str(float n) { return (isNumber(n) && n==round(n)) ? dec(int(n)) : ftoa(n); }
-String str(double n) { return (isNumber(n) && n==round(n)) ? dec(int(n)) : ftoa(n); }
-
-String binaryPrefix(size_t value, string unit, string unitSuffix) {
+String binaryPrefix(uint64 value, string unit, string unitSuffix) {
     if(value < 1u<<10) return str(value, unit);
     if(value < 10u<<20) return str(value/1024.0,"ki"_+(unitSuffix?:unit));
     if(value < 10u<<30) return str(value/1024.0/1024.0,"Mi"_+(unitSuffix?:unit));

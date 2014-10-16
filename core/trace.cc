@@ -32,7 +32,7 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match("C2")) r.append( "this");
     else if(s.match("D1")) r.append( "~this");
     else if(s.match("D2")) r.append( "~this");
-    else if(s.match("Dv")){int size=s.integer(); s.match('_'); r.append(demangle(s)+dec(size));}
+    else if(s.match("Dv")){int size=s.integer(); s.match('_'); r.append(demangle(s)+str(size));}
     else if(s.match("eq")) r.append("operator==");
     else if(s.match("ix")) r.append("operator[]");
     else if(s.match("cl")) r.append("operator()");
@@ -63,8 +63,8 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match("St")) r.append("std");
     else if(s.match('S')) { r.append('S'); s.whileInteger(); s.match('_'); }
     else if(s.match('F')||s.match("Dp")) r.append(demangle(s));
-    else if(s.match("Li")) r.append(dec(s.integer()));
-    else if(s.match("Lj")) r.append(dec(s.integer()));
+    else if(s.match("Li")) r.append(str(s.integer()));
+    else if(s.match("Lj")) r.append(str(s.integer()));
     else if(s.match("Lb")) r.append(str((bool)s.integer()));
     else if(s.match('L')) { r.append("extern "); r.append(demangle(s)); }
     else if(s.match('I')||s.match('J')) { //template | argument pack
@@ -123,7 +123,7 @@ Symbol findSymbol(void* find) {
     Symbol symbol;
     for(const Sym& sym: symtab)
         if(find >= sym.value && find < sym.value+sym.size) { symbol.function = demangle(str(strtab+sym.name)); break; }
-    for(BinaryData& s = debug_line;s.index<s.buffer.size;) {
+    for(BinaryData& s = debug_line; s;) {
         uint begin = s.index;
         struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
         const CU& cu = s.read<CU>();
@@ -145,7 +145,7 @@ Symbol findSymbol(void* find) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
                 line += (opcode % cu.line_range) + cu.line_base;
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(find>=address && find<address+delta) { symbol.file=files[file_index-1]; symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == extended_op) {
@@ -157,12 +157,12 @@ Symbol findSymbol(void* find) {
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else { error("unknown opcode",opcode); s.advance(size); }
+                else error("Unknown opcode");
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
                 int delta = cu.min_inst_len * readLEV(s);
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(find>=address && find<address+delta) { symbol.file=files[file_index-1]; symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == advance_line) line += readLEV(s,true);
@@ -172,18 +172,18 @@ Symbol findSymbol(void* find) {
             else if(opcode == set_basic_block) {}
             else if(opcode == const_add_pc) {
                 uint delta = ((255u - cu.opcode_base) / cu.line_range) * cu.min_inst_len;
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(find>=address && find<address+delta) { symbol.file=files[file_index-1]; symbol.line=line; return symbol; }
                 address += delta;
             }
             else if(opcode == fixed_advance_pc) {
                 uint16 delta = s.read();
-                if(find>=address && find<address+delta) { symbol.file=move(files[file_index-1]); symbol.line=line; return symbol; }
+                if(find>=address && find<address+delta) { symbol.file=files[file_index-1]; symbol.line=line; return symbol; }
                  address += delta;
             }
             else if(opcode == set_prologue_end) {}
             else if(opcode == set_epilogue_begin) {}
             else if(opcode == set_isa) readLEV(s);
-            else error("Unsupported",opcode);
+            else error("Unknown opcode");
         }
     }
     return symbol;
@@ -210,6 +210,7 @@ String trace(int skip, void* ip) {
 #endif
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
+        ::log(s.file);
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         else log.append("0x"+hex(ptr(stack[i]))+'\n');
     }

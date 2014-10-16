@@ -15,34 +15,35 @@ generic struct buffer : mref<T> {
     using mref<T>::data;
     using mref<T>::size;
     size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
-    debug(static bool& logMemory() { static bool value = true; return value; })
+    //debug(static bool& logMemory() { static bool value = true; return value; })
 
     /// Default constructs an empty buffer
     buffer(){}
-    /// References \a size elements from const \a data pointer
-    //buffer(T* data, size_t size) : mref<T>(data, size) {}
     /// Move constructor
     buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) {o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
     buffer(size_t capacity, size_t size) : mref<T>((T*)0,size), capacity(capacity) {
         assert(capacity>=size && size>=0); if(!capacity) return;
         if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory");
-        debug(if(logMemory()) { logMemory()=false; log("+", capacity,'\t', size,'\t', (void*)data); logMemory()=true; })
+        //debug(if(logMemory()) { logMemory()=false; log("+", capacity,'\t', size,'\t', (void*)data); logMemory()=true; })
     }
     explicit buffer(size_t size) : buffer(size, size){}
     /// Allocates a buffer for \a capacity elements and fill with value
-    template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
+    //template<Type Arg, Type... Args> buffer(size_t capacity, size_t size, Arg arg, Args&&... args) : buffer(capacity, size) { this->clear(arg, args...); }
     /// Initializes a new buffer with the content of \a o
-    explicit buffer(const ref<T> o) : buffer(o.size) { mref<T>::copy(o); }
-
+    //explicit buffer(const ref<T> o) : buffer(o.size) { mref<T>::copy(o); }
+protected:
+    /// References \a size elements from const \a data pointer
+    buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+public:
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() {
-#if DEBUG
+/*#if DEBUG
         if(logMemory() && capacity) {
             logMemory()=false; log("~", capacity,'\t', size,'\t', (void*)data); logMemory()=true;
         }
-#endif
+#endif*/
         if(capacity) ::free((void*)data); data=0; capacity=0; size=0;
     }
 };

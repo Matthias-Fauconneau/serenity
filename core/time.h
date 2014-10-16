@@ -24,7 +24,7 @@ struct Time {
     uint64 startTime=realTime(), stopTime=0;
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=ftoa((stopTime-startTime)/1000000000.,1)+'s'; startTime=stopTime; stopTime=0; return s; }
+    String reset() { stop(); String s=str((stopTime-startTime)/1000000000.,1)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }

@@ -100,7 +100,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
-void exit(int status=0);
+void requestTermination(int status=0);
 
 enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
 void setExceptions(uint except);

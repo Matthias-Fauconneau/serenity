@@ -10,7 +10,7 @@
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
     ref<byte> data;
-    uint index=0;
+    size_t index=0;
     ::buffer<byte> buffer;
 
     Data(){}
@@ -36,7 +36,7 @@ struct Data {
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    virtual void advance(uint step) {assert(index+step<=data.size,index,step,data.size); index+=step; }
+    virtual void advance(size_t step) {assert(index+step<=data.size,index,step,data.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
@@ -132,10 +132,10 @@ struct BinaryData : Data {
 /// Provides a convenient interface to parse text streams
 struct TextData : Data {
     /// 1-based line index
-    uint lineIndex = 1;
+    int lineIndex = 1;
 
     using Data::Data;
-    void advance(uint step) override;
+    void advance(size_t step) override;
 
     /// Returns whether input match any of \a keys
     char wouldMatchAny(const string any);

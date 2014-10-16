@@ -59,9 +59,9 @@ ref<uint8> BinaryData::whileNot(uint8 key) {
 }
 
 
-void TextData::advance(uint step) {
-    assert(index+step<=buffer.size, index, buffer.size);
-    for(uint start=index; index<start+step; index++) if(buffer[index]=='\n') lineIndex++;
+void TextData::advance(size_t step) {
+    assert(index+step<=data.size, index, data.size);
+    for(uint start=index; index<start+step; index++) if(data[index]=='\n') lineIndex++;
 }
 
 char TextData::wouldMatchAny(const string any) {

@@ -15,11 +15,12 @@ generic struct remove_reference { typedef T type; };
 generic struct remove_reference<T&> { typedef T type; };
 generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
-generic inline constexpr Type remove_reference<T>::type&& move(T&& t) { return (Type remove_reference<T>::type&&)(t); }
+generic inline constexpr Type remove_reference<T>::type&& __attribute__((warn_unused_result)) move(T&& t)
+{ return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
 generic void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Base template for explicit copy (overriden by explicitly copyable types)
-generic T copy(const T& o) { return o; }
+generic T __attribute__((warn_unused_result))  copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
@@ -257,7 +258,7 @@ inline ref<char> ref<char>::slice(size_t pos) const { assert(pos<=size); return 
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) noexcept { return p; }
 #endif
-
+#include <cstdio>
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
     using ref<T>::data;
@@ -289,7 +290,7 @@ generic struct mref : ref<T> {
     //mref<T> operator()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
     /// Initializes the element at index
-    template<Type... Args> void set(size_t index, Args&&... args) const { new (&at(index)) T(forward<Args>(args)...); }
+    template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T(forward<Args>(args)...)); }
     /// Initializes reference using the same constructor for all elements
     template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
     /// Initializes reference from \a source using move constructor
