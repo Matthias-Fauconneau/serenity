@@ -219,47 +219,40 @@ if method == 'cluster-skeleton': pore-list = List pore-index
 colored-pores = ColorizeIndex pore-index
 colored-throats = ColorizeIndex throat-index
 
-# Radius of each pore
-pore-radius-list = RadiusList pore-list
-throat-radius-list = RadiusList throat-list
+if !throat: list = pore-list
+if  throat: list = throat-list
 
 # Volume of each pore
-pore-volume-list = ListSize pore-list
-throat-volume-list = ListSize throat-list
+volume-list = ListSize list
 
-# Equivalent radius
-pore-equivalent-radius-list = EquivalentRadius pore-volume-list
+# Equivalent ball radius for same volume
+volume-radius-list = VolumeRadius volume-list
+volume-radius-volume = Pair volume-radius-list volume-list
 
-# (radius, volume) pairs of each pore
-pore-radius-volume-list = Pair pore-radius-list pore-volume-list
-throat-radius-volume-list = Pair throat-radius-list throat-volume-list
+# Equivalent ball radius for same variance
+variance-radius-list = VarianceRadius list
+variance-radius-volume = Pair variance-radius-list volume-list
 
-# (equivalent-radius, volume) pairs of each pore
-pore-equivalent-radius-volume-list = Pair pore-equivalent-radius-list pore-volume-list
+# Maximum ball radius within each pore/throat
+maximum-radius-list = MaximumRadius maximum list
+maximum-radius-volume = Pair maximum-radius-list volume-list
 
 # Bounds pores/throats with bounding boxes
-pore-box-list = Bound pore-list
-throat-box-list = Bound throat-list                        
+box-list = Bound list
 
 # Aspect ratio
-pore-aspect-ratio-list = AspectRatio pore-box-list
-throat-aspect-ratio-list = AspectRatio throat-box-list
-pore-aspect-ratio-distribution = KernelDensityEstimation pore-aspect-ratio-list
-throat-aspect-ratio-distribution = KernelDensityEstimation throat-aspect-ratio-list
+aspect-ratio-list = AspectRatio box-list
+aspect-ratio-distribution = KernelDensityEstimation aspect-ratio-list
 
 # Nearest distance
-pore-nearest-distance-list = NearestDistance pore-box-list
-throat-nearest-distance-list = NearestDistance throat-box-list
-pore-nearest-distance-distribution = KernelDensityEstimation pore-nearest-distance-list bandwidth=0.5
-throat-nearest-distance-distribution = KernelDensityEstimation throat-nearest-distance-list bandwidth=0.5
+nearest-distance-list = NearestDistance box-list
+nearest-distance-distribution = KernelDensityEstimation nearest-distance-list bandwidth=0.5
 
 # Rasterizes boxes in a volume
-pore-box-indices = RasterizeBox pore-box-list cropSize
-throat-box-indices = RasterizeBox throat-box-list cropSize
+box-indices = RasterizeBox box-list cropSize
 
 # Colorizes each box in a different color
-pore-colored-boxes = ColorizeIndex pore-box-volume
-throat-colored-boxes = ColorizeIndex throat-box-volume
+colored-boxes = ColorizeIndex box-volume
 
 # --- Export --- #
 
@@ -300,8 +293,8 @@ cdl-surface-skeleton = ToCDL surface-skeleton
 cdl-maximum = ToCDL sqrt-scaled
 cdl-curve-skeleton-distance = ToCDL curve-skeleton-distance
 cdl-connectivity = ToCDL connectivity
-cdl-pore-index = ToCDL pore-index
 cdl-pore-skeleton = ToCDL pore-skeleton
+cdl-pore-index = ToCDL pore-index
 
 # - ASCII - #
 ascii-flood = ToASCII flood
