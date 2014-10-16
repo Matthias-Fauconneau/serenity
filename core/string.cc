@@ -83,13 +83,6 @@ String join(const ref<string> list, const string separator) {
 }
 String join(const ref<String> list, const string separator) { return join(toRefs(list), separator); }
 
-/*Array<string> split(const string source, byte separator) {
-    Array<string> list;
-    TextData s (source);
-    while(s) list.append( s.until(separator) );
-    return list;
-}*/
-
 Array<string> split(const string source, string separator) {
     Array<string> list;
     TextData s (source);
@@ -139,7 +132,7 @@ String str(double n, int precision, uint pad, int exponent) {
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
         s.append( str(uint64(integer)) );
         s.append('.');
-        s.append( str(decimal, 10, precision,'0') );
+		s.append( str(decimal, precision, 10u, '0') );
     } else s.append( str(uint64(round(n))) );
     if(exponent==3 && e==3) s.append('K');
     else if(exponent==3 && e==6) s.append('M');

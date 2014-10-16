@@ -61,9 +61,10 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     int2 size(size_t index) const override { return fromInt2(properties(index).at("Size"_)); }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
-    SourceImageRGB image(size_t index) const {
+	SourceImageRGB image(size_t index, bool noCacheWrite = false) const {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
+		if(noCacheWrite) return decodeImage(Map(sourceFile));
         return cache<Image>(folder, "Source", name(index), size(index), sourceFile.modifiedTime(), [&](const Image& target){
             target.copy(decodeImage(Map(sourceFile)));
         }, "" /*Disable version invalidation to avoid redecoding on header changes*/);
@@ -71,10 +72,11 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 
     /// Resizes sRGB images
     /// \note Resizing after linear float conversion would be more accurate but less efficient
-    SourceImageRGB image(size_t index, int2 size) const override {
+	SourceImageRGB image(size_t index, int2 size, bool noCacheWrite = false) const override {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
-        if(size==this->size(index)) return image(index);
+		if(!size || size>=this->size(index)) return image(index, noCacheWrite);
+		assert_(!noCacheWrite);
         return cache<Image>(folder, "Resize", name(index), size, sourceFile.modifiedTime(), [&](const Image& target){
             SourceImageRGB source = image(index);
             assert_(target.size <= source.size, target.size, source.size);
@@ -83,10 +85,11 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
     }
 
     /// Converts sRGB images to linear float images
-    SourceImage image(size_t index, int component, int2 size) const override {
+	SourceImage image(size_t index, int component, int2 size, bool noCacheWrite) const override {
         assert_(index  < count());
+		if(noCacheWrite) return linear(image(index, size, noCacheWrite), component);
         return cache<ImageF>(folder, "Linear["+str(component)+']', name(index), size?:this->size(index), time(index), [&](const ImageF& target) {
-            linear(target, size ? image(index, size) : image(index), component);
+			linear(target, image(index, size), component);
         });
     }
 };

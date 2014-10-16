@@ -52,16 +52,16 @@ struct DustRemovalExport : DustRemoval, Application {
         for(size_t index: range(corrected.count())) {
             uint size = product(corrected.size(index));
             String name = corrected.name(index);
-            uint fileIndex = 0;
+			//if(existsFile(name, output)) continue; //TODO: invalidate
+			/*uint fileIndex = 0;
             if(existsFile(name, output)) fileIndex = 1;
-            while(existsFile(name+'.'+str(fileIndex), output)) fileIndex++;
-            //writeFile(name+(fileIndex?'.'+str(fileIndex):String()), encodePNG(corrected.image(index)), output);
-            compressed += encodePNG(corrected.image(index, 0, true)).size;
+			while(existsFile(name+'.'+str(fileIndex), output)) fileIndex++;*/
+			compressed += writeFile(name/*+(fileIndex?'.'+str(fileIndex):String())*/, encodePNG(corrected.image(index, 0, true)), output, true);
             exported += size;
-            log(index+1,'/',corrected.count(),
-                '\t',binaryPrefix(exported,"pixels","Pixels"),'/',binaryPrefix(total,"pixels","Pixels"),
-                '\t',corrected.name(index),binaryPrefix(size,"pixels","Pixels"),
-                '\t', binaryPrefix(compressed), (float)compressed/exported);
+			log(str(100*(index+1)/corrected.count())+'%',
+				'\t',index+1,'/',corrected.count(),
+				'\t',exported/1024/1024,'/',total/1024/1024,"MP",
+				'\t',corrected.name(index),size/1024/1024,"MP", corrected.size(index));
             //break;
         }
     }
