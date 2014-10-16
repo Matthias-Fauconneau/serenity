@@ -234,6 +234,9 @@ pore-equivalent-radius-list = EquivalentRadius pore-volume-list
 pore-radius-volume-list = Pair pore-radius-list pore-volume-list
 throat-radius-volume-list = Pair throat-radius-list throat-volume-list
 
+# (equivalent-radius, volume) pairs of each pore
+pore-equivalent-radius-volume-list = Pair pore-equivalent-radius-list pore-volume-list
+
 # Bounds pores/throats with bounding boxes
 pore-box-list = Bound pore-list
 throat-box-list = Bound throat-list                        
